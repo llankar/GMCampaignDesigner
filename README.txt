@@ -1,0 +1,1 @@
+GMCampaignDesigner_CTk - Campaign Manager for RPG Game Masters

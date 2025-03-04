@@ -1,0 +1,27 @@
+{
+    "fields": [
+        {
+            "name": "Name",
+            "type": "text",
+            "default": ""
+        },
+        {
+            "name": "Role",
+            "type": "text",
+            "default": ""
+        },
+        {
+            "name": "Faction",
+            "type": "choice",
+            "options": [
+                "(linked to factions list)"
+            ],
+             "default": ""
+        },
+        {
+            "name": "Description",
+            "type": "longtext",
+            "default": ""
+        }
+    ]
+}

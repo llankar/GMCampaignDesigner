@@ -1,0 +1,16 @@
+[
+    {
+        "id": "1",
+        "Name": "Aldric",
+        "Role": "Merchant",
+        "Faction": "Thieves Guild",
+        "Description": "A sly merchant with ties to the underworld."
+    },
+    {
+        "id": "2",
+        "Name": "Lyra",
+        "Role": "Wizard",
+        "Faction": "Mages Council",
+        "Description": "An enigmatic wizard with ancient knowledge."
+    }
+]

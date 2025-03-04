@@ -1,0 +1,28 @@
+{
+    "fields": [
+        {
+            "name": "Name",
+            "type": "text",
+            "default": ""
+        },
+        {
+            "name": "Places",
+            "type": "choice",
+            "options": [
+                "(linked to places list)"
+            ]
+        },
+        {
+            "name": "NPCs",
+            "type": "choice",
+            "options": [
+                "(linked to npcs list)"
+            ]
+        },
+        {
+            "name": "Secrets",
+            "type": "longtext",
+            "default": ""
+        }
+    ]
+}

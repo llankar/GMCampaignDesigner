@@ -1,0 +1,24 @@
+{
+    "fields": [
+        {
+            "name": "Name",
+            "type": "text",
+            "default": ""
+        },
+        {
+            "name": "Description",
+            "type": "longtext",
+            "default": ""
+        },
+        {
+            "name": "Cool Elements",
+            "type": "longtext",
+            "default": ""
+        },
+        {
+            "name": "Clues",
+            "type": "longtext",
+            "default": ""
+        }
+    ]
+}

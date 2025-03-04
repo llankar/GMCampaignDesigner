@@ -1,0 +1,23 @@
+[
+    {
+        "id": "1",
+        "Name": "Old Tower",
+        "Description": "Crumbling remains of a once glorious tower.",
+        "Cool Elements": "Magic runes still glow faintly.",
+        "Clues": "The floor holds traces of recent rituals."
+    },
+    {
+        "id": "2",
+        "Name": "Haunted Forest",
+        "Description": "Dark forest filled with eerie sounds.",
+        "Cool Elements": "Ghostly apparitions.",
+        "Clues": "Torn piece of a map stuck to a tree."
+    },
+    {
+        "id": "fd0bb6f4-5d70-435b-96d1-b0ff8eea5e7e",
+        "Name": "aaaa",
+        "Description": "a",
+        "Cool Elements": "a",
+        "Clues": "aa"
+    }
+]

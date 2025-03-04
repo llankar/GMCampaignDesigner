@@ -1,0 +1,45 @@
+[
+    {
+        "id": "2ded4ee8-e736-4496-a937-54efea421ff4",
+        "Name": "Scen1",
+        "Places": "(linked to places list)",
+        "NPCs": "(linked to npcs list)",
+        "Secrets": "Tests"
+    },
+    {
+        "id": "d801c212-c721-4005-a045-8e45c7f1612d",
+        "Name": "A",
+        "Places": [
+            "Haunted Forest",
+            "Old Tower",
+            "Haunted Forest"
+        ],
+        "NPCs": [
+            "A",
+            "aaaa",
+            "fdgfdg",
+            "B"
+        ],
+        "Secrets": "ssssssss"
+    },
+    {
+        "id": "77e7fd2b-a944-4900-ad90-5ef9fead3d26",
+        "Name": "aa",
+        "Places": [],
+        "NPCs": [],
+        "Secrets": ""
+    },
+    {
+        "id": "8640a2dd-754f-4c5a-a6d3-3349c590e579",
+        "Name": "aaaa",
+        "Places": [
+            "aaaa",
+            "Old Tower"
+        ],
+        "NPCs": [
+            "A",
+            "B"
+        ],
+        "Secrets": "aaaassssaa"
+    }
+]
