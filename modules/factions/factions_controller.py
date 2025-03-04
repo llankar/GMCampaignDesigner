@@ -1,5 +1,4 @@
-
-from .factions_list_view import FactionsListView
+from .factions_list_window import FactionsListWindow
 
 def open_faction_window(master):
-    FactionsListView(master)
+    FactionsListWindow(master)

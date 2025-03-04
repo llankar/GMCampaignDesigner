@@ -4,12 +4,20 @@ from modules.factions.faction_editor_view import EditFactionWindow
 import json
 import os
 
+from modules.factions.factions_model import load_factions, load_template
+from modules.factions.helpers import format_longtext
+
+
 class FactionsListView(ctk.CTkFrame):
     def __init__(self, master, data_file="factions.json", *args, **kwargs):
         super().__init__(master, *args, **kwargs)
         self.data_file = data_file
-        self.factions = []
-        self.filtered_factions = []
+
+        # Chargement des factions et du template
+        self.factions = load_factions()
+        self.filtered_factions = self.factions.copy()
+        self.template = load_template()
+
         self.search_var = ctk.StringVar()
 
         # Barre de recherche
@@ -26,25 +34,12 @@ class FactionsListView(ctk.CTkFrame):
         add_button = ctk.CTkButton(self, text="Add Faction", command=self.add_item)
         add_button.pack(pady=5)
 
-        # Cadre qui contiendra la liste des factions
+        # Table/liste affichant les factions
         self.list_frame = ctk.CTkFrame(self)
         self.list_frame.pack(fill="both", expand=True)
 
-        self.load_factions()
+        # Chargement initial
         self.refresh_list()
-
-    def load_factions(self):
-        """Charge les factions depuis le fichier JSON."""
-        if os.path.exists(self.data_file):
-            try:
-                with open(self.data_file, "r", encoding="utf-8") as f:
-                    self.factions = json.load(f)
-            except json.JSONDecodeError:
-                messagebox.showerror("Error", f"Could not decode JSON in {self.data_file}.")
-                self.factions = []
-        else:
-            self.factions = []
-        self.filtered_factions = self.factions.copy()
 
     def save_factions(self):
         """Sauvegarde les factions dans le fichier JSON."""
@@ -55,79 +50,95 @@ class FactionsListView(ctk.CTkFrame):
             messagebox.showerror("Error", f"Could not save to {self.data_file}.\n{e}")
 
     def refresh_list(self):
-        """Met à jour l'affichage de la liste des factions."""
-        # On efface d'abord tout le contenu du list_frame
+        """Affiche la liste filtrée des factions."""
         for widget in self.list_frame.winfo_children():
             widget.destroy()
 
-        # Pour chaque faction filtrée, on crée une ligne
+        if not self.filtered_factions:
+            ctk.CTkLabel(self.list_frame, text="No factions found.").pack(pady=10)
+            return
+
+        # Création des entêtes (header)
+        header_frame = ctk.CTkFrame(self.list_frame)
+        header_frame.pack(fill="x", pady=5)
+
+        for field in self.template["fields"]:
+            ctk.CTkLabel(header_frame, text=field["name"], anchor="w").pack(side="left", padx=5, expand=True)
+
+        ctk.CTkLabel(header_frame, text="Actions", anchor="w").pack(side="left", padx=5)
+
+        # Création des lignes
         for faction in self.filtered_factions:
-            row_frame = ctk.CTkFrame(self.list_frame)
-            row_frame.pack(fill="x", padx=5, pady=5)
+            self.create_item_row(faction)
 
-            # Nom de la faction
-            faction_name = faction.get("Name", "Unknown")
-            ctk.CTkLabel(row_frame, text=faction_name).pack(side="left", padx=5)
+    def create_item_row(self, faction):
+        row_frame = ctk.CTkFrame(self.list_frame)
+        row_frame.pack(fill="x", pady=2)
+        for field in self.template["fields"]:
+            value = faction.get(field["name"], "")
+            if field["type"] == "longtext":
+                if isinstance(value, dict):
+                    value = value.get("text", "")  # On ne garde que le texte
+                value = format_longtext(value, max_length=50)
 
-            # Description de la faction
-            # -> Si c'est un dict (RichTextEditor), on récupère juste la clé "text"
-            desc_data = faction.get("Description", "No Description")
-            if isinstance(desc_data, dict):
-                desc_str = desc_data.get("text", "")
-            else:
-                desc_str = desc_data
-            ctk.CTkLabel(row_frame, text=desc_str).pack(side="left", padx=5)
+            ctk.CTkLabel(row_frame, text=value, anchor="w").pack(side="left", padx=5, expand=True)
 
-            # Exemple si on veut afficher "Secrets" aussi dans la liste :
-            # secrets_data = faction.get("Secrets", "")
-            # if isinstance(secrets_data, dict):
-            #     secrets_str = secrets_data.get("text", "")
-            # else:
-            #     secrets_str = secrets_data
-            # ctk.CTkLabel(row_frame, text=secrets_str).pack(side="left", padx=5)
+        action_frame = ctk.CTkFrame(row_frame)
+        action_frame.pack(side="left", padx=5)
 
-            edit_button = ctk.CTkButton(row_frame, text="Edit", command=lambda f=faction: self.edit_item(f))
-            edit_button.pack(side="left", padx=5)
+        edit_button = ctk.CTkButton(action_frame, text="Edit", width=60, command=lambda: self.edit_item(faction))
+        edit_button.pack(side="left", padx=2)
 
-            delete_button = ctk.CTkButton(row_frame, text="Delete", command=lambda f=faction: self.delete_item(f))
-            delete_button.pack(side="left", padx=5)
+        delete_button = ctk.CTkButton(action_frame, text="Delete", width=60, command=lambda: self.delete_item(faction))
+        delete_button.pack(side="left", padx=2)
+
 
     def filter_factions(self):
-        """Filtre la liste des factions en fonction de la chaîne de recherche."""
-        search_text = self.search_var.get().lower()
-        if not search_text:
+        """Filtrage basé sur la recherche."""
+        query = self.search_var.get().strip().lower()
+
+        if not query:
             self.filtered_factions = self.factions.copy()
         else:
             self.filtered_factions = [
-                f for f in self.factions
-                if search_text in f.get("Name", "").lower()
-                or (isinstance(f.get("Description", ""), dict)
-                    and search_text in f["Description"].get("text", "").lower())
-                or (isinstance(f.get("Description", ""), str)
-                    and search_text in f["Description"].lower())
+                faction for faction in self.factions
+                if query in faction.get("Name", "").lower()
+                or self.match_longtext(faction.get("Description", ""), query)
+                or self.match_longtext(faction.get("Secrets", ""), query)
             ]
+
         self.refresh_list()
 
+    def match_longtext(self, data, query):
+        """Recherche textuelle dans les champs longtext."""
+        if isinstance(data, dict):
+            text = data.get("text", "").lower()
+        else:
+            text = str(data).lower()
+        return query in text
+
     def add_item(self):
-        """Crée une nouvelle faction."""
-        new_item = {}
-        editor = EditFactionWindow(self, new_item, creation_mode=True)
+        """Créer une nouvelle faction."""
+        new_faction = {}
+        editor = EditFactionWindow(self, new_faction, creation_mode=True)
         self.wait_window(editor)
+
         if editor.saved:
-            self.factions.append(new_item)
+            self.factions.append(new_faction)
             self.save_factions()
             self.filter_factions()
 
     def edit_item(self, faction):
-        """Ouvre la fenêtre d'édition pour la faction."""
+        """Modifier une faction existante."""
         editor = EditFactionWindow(self, faction, creation_mode=False)
         self.wait_window(editor)
+
         if editor.saved:
             self.save_factions()
             self.filter_factions()
 
     def delete_item(self, faction):
-        """Supprime la faction sélectionnée."""
+        """Supprimer une faction."""
         if messagebox.askyesno("Confirm Deletion", f"Are you sure you want to delete '{faction.get('Name', 'Unknown')}'?"):
             self.factions.remove(faction)
             self.save_factions()

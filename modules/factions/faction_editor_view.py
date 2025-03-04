@@ -8,62 +8,59 @@ class EditFactionWindow(ctk.CTkToplevel):
         self.saved = False
 
         self.title(f'{"Create" if creation_mode else "Edit"} Faction')
-        self.geometry("1280x720")
-        self.minsize(1280, 720)
+        self.geometry("800x600")
+        self.minsize(800, 600)
 
         self.transient(master)
         self.lift()
         self.focus_force()
 
-        # Récupération des données de description et secrets
-        desc_data = faction.get("Description", "")
-        secrets_data = faction.get("Secrets", "")
+        # === Cadre principal avec Scrollbar ===
+        container = ctk.CTkScrollableFrame(self)
+        container.pack(fill="both", expand=True)
 
-        # Pour la description : si les données sont formatées (dictionnaire), récupérer le texte, sinon utiliser le texte brut
+        # === Name ===
+        ctk.CTkLabel(container, text="Name").pack(anchor="w", padx=10, pady=(10, 0))
+        self.name_entry = ctk.CTkEntry(container)
+        self.name_entry.insert(0, faction.get("Name", ""))
+        self.name_entry.pack(fill="x", padx=10, pady=5)
+
+        # === Description ===
+        ctk.CTkLabel(container, text="Description").pack(anchor="w", padx=10, pady=(10, 0))
+
+        desc_data = faction.get("Description", "")
         if isinstance(desc_data, dict):
             initial_desc = desc_data.get("text", "")
         else:
             initial_desc = desc_data
 
-        # Pour les secrets
+        self.description_editor = RichTextEditor(container, initial_text=initial_desc)
+        self.description_editor.pack(fill="both", expand=True, padx=10, pady=5)
+
+        if isinstance(desc_data, dict):
+            self.description_editor.load_text_data(desc_data)
+
+        # === Secrets ===
+        ctk.CTkLabel(container, text="Secrets").pack(anchor="w", padx=10, pady=(10, 0))
+
+        secrets_data = faction.get("Secrets", "")
         if isinstance(secrets_data, dict):
             initial_secrets = secrets_data.get("text", "")
         else:
             initial_secrets = secrets_data
 
-        # Champ "Name"
-        ctk.CTkLabel(self, text="Name").pack(anchor="w", padx=10, pady=(10, 0))
-        self.name_entry = ctk.CTkEntry(self)
-        self.name_entry.insert(0, faction.get("Name", ""))
-        self.name_entry.pack(pady=5, fill="x", padx=10)
+        self.secrets_editor = RichTextEditor(container, initial_text=initial_secrets)
+        self.secrets_editor.pack(fill="both", expand=True, padx=10, pady=5)
 
-        # Champ "Description"
-        ctk.CTkLabel(self, text="Description").pack(anchor="w", padx=10, pady=(10, 0))
-        # On crée l'éditeur sans texte initial
-        self.description_editor = RichTextEditor(self)
-        self.description_editor.pack(pady=5, fill="both", expand=True, padx=10)
-        # Charger le formatage si disponible, sinon insérer le texte brut
-        if isinstance(desc_data, dict):
-            self.description_editor.load_text_data(desc_data)
-        else:
-            self.description_editor.text_widget.insert("1.0", desc_data)
-
-        # Champ "Secrets"
-        ctk.CTkLabel(self, text="Secrets").pack(anchor="w", padx=10, pady=(10, 0))
-        self.secrets_editor = RichTextEditor(self)
-        self.secrets_editor.pack(pady=5, fill="both", expand=True, padx=10)
         if isinstance(secrets_data, dict):
             self.secrets_editor.load_text_data(secrets_data)
-        else:
-            self.secrets_editor.text_widget.insert("1.0", secrets_data)
 
-        # Bouton de sauvegarde
-        save_button = ctk.CTkButton(self, text="Save", command=self.save_faction)
+        # === Bouton Save ===
+        save_button = ctk.CTkButton(container, text="Save", command=self.save_faction)
         save_button.pack(pady=10)
 
     def save_faction(self):
         self.faction["Name"] = self.name_entry.get()
-        # Sauvegarde du texte avec le formatage
         self.faction["Description"] = self.description_editor.get_text_data()
         self.faction["Secrets"] = self.secrets_editor.get_text_data()
         self.saved = True
