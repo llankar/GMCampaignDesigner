@@ -4,7 +4,7 @@ from modules.factions.faction_editor_view import EditFactionWindow
 import json
 import os
 
-from modules.factions.factions_model import load_factions, load_template
+from modules.factions.factions_model import load_factions, save_factions, load_template
 from modules.factions.helpers import format_longtext
 
 
@@ -40,14 +40,6 @@ class FactionsListView(ctk.CTkFrame):
 
         # Chargement initial
         self.refresh_list()
-
-    def save_factions(self):
-        """Sauvegarde les factions dans le fichier JSON."""
-        try:
-            with open(self.data_file, "w", encoding="utf-8") as f:
-                json.dump(self.factions, f, indent=2, ensure_ascii=False)
-        except Exception as e:
-            messagebox.showerror("Error", f"Could not save to {self.data_file}.\n{e}")
 
     def refresh_list(self):
         """Affiche la liste filtrée des factions."""
@@ -125,7 +117,7 @@ class FactionsListView(ctk.CTkFrame):
 
         if editor.saved:
             self.factions.append(new_faction)
-            self.save_factions()
+            save_factions(self.factions)
             self.filter_factions()
 
     def edit_item(self, faction):
@@ -134,12 +126,12 @@ class FactionsListView(ctk.CTkFrame):
         self.wait_window(editor)
 
         if editor.saved:
-            self.save_factions()
+            save_factions(self.factions)
             self.filter_factions()
 
     def delete_item(self, faction):
         """Supprimer une faction."""
         if messagebox.askyesno("Confirm Deletion", f"Are you sure you want to delete '{faction.get('Name', 'Unknown')}'?"):
             self.factions.remove(faction)
-            self.save_factions()
+            save_factions(self.factions)
             self.filter_factions()
