@@ -1,0 +1,12 @@
+pyi-makespec main_window.py --onedir --windowed
+
+# -*- mode: python ; coding: utf-8 -*-
+datas= [ ('data',   'data'), ('assets', 'assets'), ('config', 'config'), ('static', 'static')],
+    
+    
+pyinstaller --noconfirm main_window.spec
+
+copy whole directory
+
+copy modules to root and to _internal directory
+copy assets, config, masks, static to root directory

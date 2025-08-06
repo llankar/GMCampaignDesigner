@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8">
+    <title>{{ db_name }} – Welcome</title>
+    <style>
+        /* full‐screen background image */
+        body {
+            margin: 0;
+            padding: 0;
+            background: url("{{ url_for('get_asset', filename='backgrounds/background.png')}}") no-repeat center center fixed;
+            background-size: cover;
+            font-family: "Segoe UI", sans-serif;
+        }
+
+        /* dark overlay to ensure contrast */
+        body::before {
+            content: "";
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.6);
+            z-index: 0;
+        }
+
+        /* your content container */
+        .overlay {
+            position: relative;
+            z-index: 1;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: flex-start;   /* push items toward the top */
+            padding-top: 10vh;             /* adjust this value as you like */
+            text-align: center;
+            color: #fff;
+        }
+
+        .overlay h1 {
+            font-size: 56px;
+            font-weight: 700;
+            margin-bottom: 20px;
+            text-shadow: 2px 2px 6px #000;
+        }
+
+        /* button‐style nav links */
+        .nav {
+            margin-top: 30px;
+        }
+
+        .nav a {
+            margin: 0 8px;
+            padding: 12px 24px;
+            font-size: 18px;
+            font-weight: bold;
+            color: #fff;
+            background: rgba(30, 30, 30, 0.6);
+            border: 2px solid #ffffff88;
+            border-radius: 8px;
+            text-decoration: none;
+            transition: all 0.2s ease-in-out;
+        }
+
+        .nav a:hover {
+            background: #ffffffcc;
+            color: #1D3572;
+            border-color: #ffffff;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="overlay">
+        <h1>Welcome to <span style="color:#ffe066">{{ db_name }}</span> Campaign</h1>
+        <div class="nav">
+            <a href="{{ url_for('npc_view') }}">Non-Player Characters</a>
+            <a href="{{ url_for('locations_view') }}">Locations</a>
+            <a href="{{ url_for('news_view') }}">News and Rumors</a>
+            <a href="{{ url_for('clues_view') }}">Clues</a>
+            <a href="{{ url_for('factions_view') }}">Factions</a>
+            <a href="{{ url_for('journal.list_entries') }}">Journal</a>
+        </div>
+    </div>
+</body>
+
+</html>

@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8">
+    <title>Create Account</title>
+    <style>
+        body {
+            font-family: Arial;
+            padding: 40px;
+            background: #f0f0f0;
+        }
+
+        .box {
+            max-width: 360px;
+            margin: auto;
+            background: #fff;
+            padding: 20px;
+            border-radius: 8px;
+        }
+
+        h1 {
+            text-align: center;
+            margin-bottom: 1em;
+        }
+
+        label {
+            display: block;
+            margin: 0.5em 0;
+        }
+
+        input {
+            width: 100%;
+            padding: 8px;
+            box-sizing: border-box;
+            margin-top: 4px;
+        }
+
+        button {
+            width: 100%;
+            padding: 10px;
+            background: #1D3572;
+            color: #fff;
+            border: none;
+            border-radius: 4px;
+        }
+
+        button:hover {
+            background: #12224f;
+        }
+
+        .flashes li {
+            background: #f8d7da;
+            color: #842029;
+            padding: 8px;
+            margin-bottom: 0.5em;
+            border-radius: 4px;
+        }
+
+        .link {
+            text-align: center;
+            margin-top: 1em;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="box">
+        <h1>Create Account</h1>
+        {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+        <ul class="flashes">
+            {% for cat, msg in messages %}
+            <li>{{ msg }}</li>
+            {% endfor %}
+        </ul>
+        {% endif %}
+        {% endwith %}
+        <form method="post">
+            <label>Username
+                <input type="text" name="username" required autofocus>
+            </label>
+            <label>Password
+                <input type="password" name="password" required>
+            </label>
+            <label>Confirm Password
+                <input type="password" name="password2" required>
+            </label>
+            <button type="submit">Register</button>
+        </form>
+        <p class="link">
+            Already have an account? <a href="{{ url_for('auth.login') }}">Log in</a>
+        </p>
+    </div>
+</body>
+
+</html>

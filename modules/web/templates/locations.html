@@ -1,0 +1,303 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Locations – {{ db_name }}</title>
+
+    <link href="https://fonts.googleapis.com/css2?family=Permanent+Marker&display=swap" rel="stylesheet" />
+    <link href="https://fonts.googleapis.com/css2?family=Special+Elite&display=swap" rel="stylesheet" />
+
+    <style>
+        html,
+        body {
+            margin: 0;
+            padding: 20px;
+            font-family: 'Permanent Marker', cursive;
+            background: url("{{ url_for('get_asset', filename='corkboard_bg.png')}}") center/cover no-repeat;
+            overflow-x: hidden;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+
+        .header h1 {
+            margin: 0;
+            font-size: 3.5em;
+            color: #333;
+            text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.5);
+        }
+
+        .back-link {
+            display: inline-block;
+            margin-top: 10px;
+            padding: 10px 20px;
+            background: #ffe066;
+            color: #333;
+            font-family: inherit;
+            font-size: 1.2em;
+            text-decoration: none;
+            border: 2px solid #e0d4a3;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+            transition: transform .2s, box-shadow .2s;
+        }
+
+        .back-link:hover {
+            transform: scale(1.05);
+            box-shadow: 0 6px 8px rgba(0, 0, 0, 0.4);
+        }
+
+        .board {
+            position: relative;
+            width: 100%;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        .doodle {
+            position: absolute;
+            z-index: 1;
+            opacity: 0.7;
+            pointer-events: none;
+            width: 100px;
+            height: auto;
+        }
+
+        .card {
+            --rotation: 0deg;
+            position: absolute;
+            z-index: 10;
+            width: 250px;
+            height: 160px;
+            transform: rotate(var(--rotation));
+            transform-origin: center center;
+            perspective: 600px;
+            cursor: grab;
+        }
+
+        .inner {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            transform-style: preserve-3d;
+            transition: transform .6s ease;
+        }
+
+        .card.flipped .inner {
+            transform: rotateY(180deg);
+        }
+
+        .front,
+        .back {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            backface-visibility: hidden;
+            border: 2px solid #444;
+            box-shadow: 3px 3px 8px rgba(0, 0, 0, 0.2);
+            background-color: #fdfcf7;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .front {
+            justify-content: center;
+            align-items: center;
+        }
+
+        .front img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .front .title {
+            padding: 10px;
+            font-family: 'Special Elite', cursive;
+            font-size: 1.2em;
+            color: #333;
+            text-align: center;
+        }
+
+        /* ★ add stamp graphic to the back face ★ */
+        .back {
+            transform: rotateY(180deg);
+            overflow-y: auto;
+            padding: 10px;
+            font-family: Georgia, serif;
+            font-size: 1em;
+            line-height: 1.4;
+            color: #111;
+            position: relative;
+            /* for ::before */
+        }
+
+        .back .title {
+            font-weight: bold;
+            margin-bottom: 6px;
+            font-size: 1.1em;
+        }
+
+        .back::before {
+            content: "";
+            position: absolute;
+            top: 8px;
+            right: 8px;
+            width: 30px;
+            height: 30px;
+            background: url("{{ url_for('get_asset', filename='postage-stamp.png')}}") no-repeat center/contain;
+            opacity: 0.6;
+            transform: rotate(-1deg);
+            pointer-events: none;
+        }
+
+        .card:active {
+            cursor: grabbing;
+        }
+
+        @media (max-width:640px) {
+            .card {
+                width: 80vw;
+                height: 50vw;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="header">
+        <h1>Locations – {{ db_name }}</h1>
+        <a href="{{ url_for('welcome') }}" class="back-link">← Back to Welcome</a>
+    </div>
+
+    <div class="board" id="board">
+        {% for p in places %}
+        <div class="card" data-index="{{ loop.index0 }}">
+            <div class="inner">
+                <!-- FRONT -->
+                <div class="front">
+                    {% if p.PortraitURL %}
+                    <img src="{{ p.PortraitURL }}" alt="{{ p.Name }}">
+                    {% else %}
+                    <div class="title">{{ p.Name }}</div>
+                    {% endif %}
+                </div>
+                <!-- BACK -->
+                <div class="back">
+                    <div class="title">{{ p.Name }}</div>
+                    <p>{{ p.DisplayDescription|safe }}</p>
+                    {% if p.ThreatLevel %}
+                    <p>{% for _ in range(p.ThreatLevel) %}☠️{% endfor %}</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const board = document.getElementById('board'),
+                bw = board.clientWidth,
+                vh = window.innerHeight,
+                cards = Array.from(board.querySelectorAll('.card')),
+                doodles = [
+                    'doodle_arrow.png',
+                    'doodle_interro.png',
+                    'doodle_exclam.png',
+                    'doodle_star.png',
+                    'doodle_symbol.png',
+                    'doodle_secret.png'
+                ];
+
+            // scatter doodles
+            for (let i = 0; i < 6; i++) {
+                const d = document.createElement('img');
+                const filename = doodles[Math.floor(Math.random() * doodles.length)];
+                d.src = "{{ url_for('get_asset', filename='') }}" + filename;
+                d.className = 'doodle';
+                d.style.top = Math.random() * (vh - 100) + 'px';
+                d.style.left = Math.random() * (bw - 100) + 'px';
+                d.style.transform = `rotate(${(Math.random() * 30 - 15).toFixed(1)}deg)`;
+                board.appendChild(d);
+            }
+
+            // grid for visible area
+            const cellW = 180 + 15, cellH = (180 * 0.64) + 15,
+                cols = Math.max(1, Math.floor(bw / cellW)),
+                rows = Math.max(1, Math.floor(vh / cellH)),
+                visibleCount = cols * rows;
+
+            // helper: collision test
+            function intersects(a, b) {
+                return !(a.x + a.w < b.x ||
+                    b.x + b.w < a.x ||
+                    a.y + a.h < b.y ||
+                    b.y + b.h < a.y);
+            }
+            const placedRects = [];
+
+            cards.forEach((card, idx) => {
+                // random rotation
+                card.style.setProperty('--rotation', (Math.random() * 6 - 3).toFixed(2) + 'deg');
+                // random size
+                const w = 180 + Math.random() * 140;
+                card.style.width = w + 'px';
+                card.style.height = (w * 0.64) + 'px';
+
+                // placement
+                let x, y, rect, tries = 0;
+                if (idx < visibleCount) {
+                    do {
+                        x = Math.random() * (bw - card.offsetWidth);
+                        y = Math.random() * (vh - card.offsetHeight);
+                        rect = { x, y, w: card.offsetWidth, h: card.offsetHeight };
+                        tries++;
+                    } while (placedRects.some(r => intersects(r, rect)) && tries < 200);
+                    placedRects.push(rect);
+                } else {
+                    x = Math.random() * (bw - card.offsetWidth);
+                    y = vh + 50 + Math.random() * vh;
+                }
+                card.style.left = x + 'px';
+                card.style.top = y + 'px';
+
+                // dragging
+                card.addEventListener('pointerdown', e => {
+                    e.preventDefault();
+                    card.setPointerCapture(e.pointerId);
+                    const sx = e.clientX, sy = e.clientY,
+                        ox = card.offsetLeft, oy = card.offsetTop;
+                    card.style.zIndex = 1000;
+                    function onMove(ev) {
+                        card.style.left = ox + (ev.clientX - sx) + 'px';
+                        card.style.top = oy + (ev.clientY - sy) + 'px';
+                    }
+                    function onUp() {
+                        card.releasePointerCapture(e.pointerId);
+                        document.removeEventListener('pointermove', onMove);
+                        document.removeEventListener('pointerup', onUp);
+                        card.style.zIndex = '';
+                    }
+                    document.addEventListener('pointermove', onMove);
+                    document.addEventListener('pointerup', onUp);
+                });
+
+                // flip
+                card.addEventListener('click', e => {
+                    if (card.hasPointerCapture(e.pointerId)) return;
+                    card.classList.toggle('flipped');
+                });
+            });
+        });
+    </script>
+</body>
+
+</html>

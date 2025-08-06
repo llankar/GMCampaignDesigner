@@ -1,0 +1,15 @@
+done
+clickable popups on NPC nodes with background
+map image background with markers to place each location
+database with Informations : Title, Information, truth_level, origin npc
+Database with Clues : Name, Type (crime, magic, , Information, location), description and web display + player add and store in db
+Clues : add Image to clue board 
+Clues : Modify existing clue 
+Graph for factions with relations Done + Web display
+
+to do
+
+
+
+
+ 

@@ -1,0 +1,12 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Run GMCampaignDesigner",
+            "type": "python",
+            "request": "launch",
+            "program": "${workspaceFolder}/main_window.py",
+            "console": "integratedTerminal"
+        }
+    ]
+}

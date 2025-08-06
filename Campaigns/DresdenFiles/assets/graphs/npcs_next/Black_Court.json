@@ -1,0 +1,66 @@
+{
+  "nodes": [
+    {
+      "npc_name": "Karl 'The Baron' Dragovich",
+      "x": 622.1652285595812,
+      "y": 399.96706174684556,
+      "color": "#212121"
+    },
+    {
+      "npc_name": "Lavinia Crane",
+      "x": 750.362286219245,
+      "y": 382.5684820015615,
+      "color": "#212121"
+    },
+    {
+      "npc_name": "Matthias 'The Butcher' Kroll",
+      "x": 773.2904957956113,
+      "y": 115.27175706301686,
+      "color": "#212121"
+    },
+    {
+      "npc_name": "Esmeralda Wraithchild",
+      "x": 596.6350492710428,
+      "y": 193.00923871719758,
+      "color": "#212121"
+    },
+    {
+      "npc_name": "Gideon Blackwood",
+      "x": 356.3553626194124,
+      "y": 131.7163275556302,
+      "color": "#212121"
+    },
+    {
+      "npc_name": "Sophia von Hohenheim",
+      "x": 525.8117639535874,
+      "y": 266.29024757138586,
+      "color": "#212121"
+    },
+    {
+      "npc_name": "Rupert 'The Rat' Muldoon",
+      "x": 872.2344858791226,
+      "y": 324.89791827672013,
+      "color": "#212121"
+    },
+    {
+      "npc_name": "Carmilla 'The Siren' di Rossi",
+      "x": 399.57846060250546,
+      "y": 393.4710040444908,
+      "color": "#212121"
+    },
+    {
+      "npc_name": "Alaric 'The Judge' Van Aalten",
+      "x": 755.2686763088162,
+      "y": 555.6758693448372,
+      "color": "#212121"
+    },
+    {
+      "npc_name": "Ingrid Bludrose",
+      "x": 315.8517095934518,
+      "y": 573.1910460925409,
+      "color": "#212121"
+    }
+  ],
+  "links": [],
+  "shapes": []
+}

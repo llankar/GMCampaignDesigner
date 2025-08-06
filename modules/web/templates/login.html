@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8">
+    <title>Login</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 40px;
+            background: #f0f0f0;
+        }
+
+        .container {
+            max-width: 360px;
+            margin: auto;
+            background: #fff;
+            padding: 20px 30px;
+            border-radius: 8px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+        }
+
+        h1 {
+            text-align: center;
+            margin-bottom: 1em;
+        }
+
+        form label {
+            display: block;
+            margin-bottom: 0.5em;
+        }
+
+        form input[type="text"],
+        form input[type="password"] {
+            width: 100%;
+            padding: 8px;
+            box-sizing: border-box;
+            margin-top: 4px;
+            margin-bottom: 1em;
+        }
+
+        button {
+            width: 100%;
+            padding: 10px;
+            background: #1D3572;
+            color: #fff;
+            border: none;
+            border-radius: 4px;
+            font-size: 1em;
+            cursor: pointer;
+        }
+
+        button:hover {
+            background: #12224f;
+        }
+
+        .flashes {
+            list-style: none;
+            padding: 0;
+            margin-bottom: 1em;
+        }
+
+        .flashes li {
+            background: #f8d7da;
+            color: #842029;
+            padding: 8px;
+            border-radius: 4px;
+            margin-bottom: 0.5em;
+        }
+
+        .back-link {
+            display: block;
+            text-align: center;
+            margin-top: 1em;
+            color: #1D3572;
+            text-decoration: none;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <h1>Login</h1>
+        {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+        <ul class="flashes">
+            {% for category, message in messages %}
+            <li>{{ message }}</li>
+            {% endfor %}
+        </ul>
+        {% endif %}
+        {% endwith %}
+        <form method="post">
+            <label>
+                Username
+                <input type="text" name="username" required autofocus>
+            </label>
+            <label>
+                Password
+                <input type="password" name="password" required>
+            </label>
+            <button type="submit">Log In</button>
+        </form>
+        <p style="text-align:center; margin-top:1em;">
+            Don’t have an account? <a href="{{ url_for('auth.register') }}">Sign up here</a>.
+        </p>
+        <a class="back-link" href="{{ url_for('welcome') }}">← Back to Welcome</a>
+    </div>
+</body>
+
+</html>

@@ -1,0 +1,548 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Clues – {{ db_name }}</title>
+    <link href="https://fonts.googleapis.com/css2?family=Permanent+Marker&display=swap" rel="stylesheet" />
+    <style>
+        html,
+        body {
+            margin: 0;
+            padding: 20px;
+            font-family: 'Permanent Marker', cursive;
+            background: url("{{ url_for('get_asset', filename='corkboard_bg.png') }}") center/cover no-repeat;
+            overflow-x: hidden;
+            overflow-y: auto;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 20px;
+            position: relative;
+            z-index: 1000;
+        }
+
+        .header h1 {
+            margin: 0;
+            font-size: 3.5em;
+            color: #070707;
+            text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.5);
+        }
+        .header h1 .add-clue-button {
+            display: inline-block;
+            margin-left: 15px;
+            padding: 0.2em 0.6em;
+            font-size: 0.4em;
+            background: rgba(255,255,255,0.2);
+            border: 1px solid #070707;
+            border-radius: 4px;
+            text-decoration: none;
+            color: #070707;
+            cursor: pointer;
+            transition: background .2s, transform .1s;
+        }
+        .header h1 .add-clue-button:hover {
+            background: rgba(255,255,255,0.5);
+            transform: translateY(-1px);
+        }
+        .board {
+            position: relative;
+            width: 100%;
+            z-index: 1;
+        }
+
+        .link-layer {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: auto;
+            z-index: 1;
+        }
+
+        .clue-card {
+            position: absolute;
+            background: #fff8e1;
+            border: 1px solid #e0d4a3;
+            padding: 15px 10px 10px;
+            /* existing shadow */
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 1),
+                        /* new, bigger shadow for the “underneath” effect */
+                        0 12px 20px rgba(0, 0, 0, 1);
+            transform: rotate(var(--angle));
+            transition: transform .2s;
+            min-width: 180px;
+            max-width: 300px;
+            cursor: grab;
+            user-select: none;
+            z-index: 2;
+        }
+
+        .clue-card:hover {
+            transform: rotate(0deg) scale(1.02);
+            box-shadow: 0 6px 8px rgba(0,0,0,1),
+                        0 18px 30px rgba(0,0,0,1);
+            z-index: 1001;
+        }
+
+        .clue-card::before {
+            content: '';
+            position: absolute;
+            top: -12px;
+            left: 50%;
+            width: 48px;
+            height: 48px;
+            background: url("{{ url_for('get_asset', filename='thumbtack.png') }}") no-repeat center/contain;
+            transform: translateX(-50%);
+        }
+
+        .clue-card h2 {
+            margin: 0 0 .5em;
+            font-size: 1.3em;
+            color: #333;
+        }
+
+        .clue-card .type {
+            font-size: .9em;
+            color: #555;
+            margin-bottom: .5em;
+        }
+
+        .clue-card .desc {
+            font-size: 1em;
+            line-height: 1.4;
+            white-space: pre-wrap;
+        }
+        .clue-portrait {
+            display: block;
+            max-width: 100%;
+            height: auto;
+            margin: 0 0 0.5em;
+            border-radius: 4px;
+        }
+		/* Attachment link styling */
+        .clue-card .attachment {
+            margin-top: 8px;
+        }
+
+        .clue-card .attachment a {
+            display: inline-block;
+            font-size: 0.9em;
+            text-decoration: none;
+        }
+        .back-link {
+            display: inline-block;
+            margin-top: 10px;
+            padding: 10px 20px;
+            background: #ffe066;
+            color: #333;
+            font-size: 1.2em;
+            font-family: inherit;
+            text-decoration: none;
+            border: 2px solid #e0d4a3;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+            transition: transform .2s, box-shadow .2s;
+        }
+
+        .back-link:hover {
+            transform: scale(1.05);
+            box-shadow: 0 6px 8px rgba(0, 0, 0, 0.4);
+        }
+        #context-menu,
+        #link-menu {
+            position: absolute;
+            display: none;
+            background: #fff;
+            border: 1px solid #ccc;
+            box-shadow: 2px 2px 6px rgba(0, 0, 0, 0.2);
+            z-index: 2000;
+            font-family: Arial, sans-serif;
+        }
+
+        #context-menu ul,
+        #link-menu ul {
+            margin: 0;
+            padding: 4px 0;
+            list-style: none;
+        }
+
+        #context-menu li,
+        #link-menu li {
+            padding: 6px 20px;
+            cursor: pointer;
+            white-space: nowrap;
+        }
+
+        #context-menu li:hover,
+        #link-menu li:hover {
+            background: #efefef;
+        }
+
+        #link-banner {
+            position: fixed;
+            top: 10px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(255, 255, 255, 0.9);
+            padding: 10px 20px;
+            border: 1px solid #333;
+            border-radius: 4px;
+            font-family: Arial, sans-serif;
+            display: none;
+            z-index: 3000;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="header">
+        <h1>
+            Clues
+            <a href="{{ url_for('add_clue') }}" class="add-clue-button">Add Clue</a>
+            </h1>
+        <medium>Right-click a note or link for actions</medium>
+    </div>
+    <a href="{{ url_for('welcome') }}" class="back-link">← Back to Welcome</a>
+  
+    <div class="board" id="board">
+        <!-- SVG layer for links -->
+        <svg id="link-layer" class="link-layer"></svg>
+
+        {% for clue in clues %}
+        <div class="clue-card" 
+            data-id="{{ loop.index0 }}" 
+            style="--angle: {{ [-5,-3,-1,1,3,5]|random }}deg;">
+            <h2>{{ clue.Name }}</h2>
+			
+            {% if clue.PortraitURL %}
+            <img src="{{ clue.PortraitURL }}" alt="{{ clue.Name }} portrait" class="clue-portrait">
+            {% endif %}
+        
+            {% if clue.Type %}<div class="type">{{ clue.Type }}</div>{% endif %}
+            <div class="desc">{{ clue.DisplayDescription|safe }}</div>
+			{% if clue.Attachment %}
+            <div class="attachment">
+                <a href="{{ url_for('clue_upload', filename=clue.Attachment) }}" download>
+                    📎 {{ clue.Attachment }}
+                </a>
+            </div>
+			{% endif %}
+        </div>
+        {% endfor %}
+    </div>
+    
+    <!-- Context menus -->
+    <div id="context-menu">
+        <ul>
+            <li id="ctx-edit-clue">Edit Clue</li>
+            <li id="ctx-add-link">Add Link</li>
+            <li id="ctx-delete-clue">Delete Clue</li>
+        </ul>
+    </div>
+    <div id="link-menu">
+        <ul>
+            <li id="ctx-del-link">Delete Link</li>
+        </ul>
+    </div>
+    <div id="link-banner"></div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', async () => {
+            const board = document.getElementById('board'),
+                svg = document.getElementById('link-layer'),
+                cards = Array.from(board.querySelectorAll('.clue-card')),
+                ctxMenu = document.getElementById('context-menu'),
+                linkMenu = document.getElementById('link-menu'),
+                editClueOpt = document.getElementById('ctx-edit-clue');
+                addLinkOpt = document.getElementById('ctx-add-link'),
+                delClueOpt = document.getElementById('ctx-delete-clue'),
+                delLinkOpt = document.getElementById('ctx-del-link'),
+                banner = document.getElementById('link-banner');
+
+            // 0) insert single black-shadow filter into SVG
+            const svgDefs = document.createElementNS('http://www.w3.org/2000/svg', 'defs');
+            const filter = document.createElementNS('http://www.w3.org/2000/svg', 'filter');
+            filter.setAttribute('id', 'text-shadow');
+            filter.setAttribute('x', '-50%');
+            filter.setAttribute('y', '-50%');
+            filter.setAttribute('width', '200%');
+            filter.setAttribute('height', '200%');
+            const fe = document.createElementNS('http://www.w3.org/2000/svg', 'feDropShadow');
+            fe.setAttribute('dx', '2');
+            fe.setAttribute('dy', '2');
+            fe.setAttribute('stdDeviation', '4');
+            fe.setAttribute('flood-color', 'black');
+            fe.setAttribute('flood-opacity', '1');
+            filter.appendChild(fe);
+            svgDefs.appendChild(filter);
+            svg.appendChild(svgDefs);
+
+            // 1) load positions & links
+            const [savedPos, savedLinks] = await Promise.all([
+                fetch('/api/clue-positions').then(r => r.json()).catch(_ => ({})),
+                fetch('/api/clue-links').then(r => r.json()).catch(_ => [])
+            ]);
+            let links = savedLinks.slice();
+
+            // 2) place cards
+            const W = board.clientWidth,
+                fullMap = [],
+                placed = [];
+            const overlap = (a, b) => !(a.left + a.w < b.left || b.left + b.w < a.left || a.top + a.h < b.top || b.top + b.h < a.top);
+            cards.forEach(card => {
+                const id = card.dataset.id,
+                    cw = card.offsetWidth, ch = card.offsetHeight;
+                let x, y, rect, tries = 0;
+                if (savedPos[id] != null) {
+                    x = savedPos[id].x; y = savedPos[id].y;
+                } else {
+                    do {
+                        x = Math.random() * (W - cw);
+                        y = Math.random() * (window.innerHeight - ch);
+                        rect = { left: x, top: y, w: cw, h: ch };
+                        tries++;
+                    } while (placed.some(r => overlap(r, rect)) && tries < 200);
+                    placed.push(rect);
+                }
+                card.style.left = x + 'px';
+                card.style.top = y + 'px';
+                fullMap.push({ id, x, y });
+            });
+
+            // 3) bulk-save positions
+            await fetch('/api/clue-positions', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(Object.fromEntries(
+                    fullMap.map(p => [p.id, { x: p.x, y: p.y }])
+                ))
+            }).catch(() => { });
+
+            // 4) resize board
+            let maxB = 0;
+            cards.forEach(c => {
+                const t = parseFloat(c.style.top), h = c.offsetHeight;
+                maxB = Math.max(maxB, t + h);
+            });
+            board.style.height = (maxB + 20) + 'px';
+
+            // clear only link <g> elements (keep defs)
+            function clearLinks() {
+                svg.querySelectorAll('g[data-index]').forEach(g => g.remove());
+            }
+
+            // 5) draw links with glow + black text-shadow
+            function drawLinks() {
+                clearLinks();
+                svg.setAttribute('width', board.scrollWidth);
+                svg.setAttribute('height', board.scrollHeight);
+                const bb = board.getBoundingClientRect();
+                links.forEach((l, i) => {
+                    const g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+                    g.dataset.index = i;
+                    const a = cards.find(c => c.dataset.id === l.from),
+                        b = cards.find(c => c.dataset.id === l.to);
+                    if (!a || !b) return;
+                    const ra = a.getBoundingClientRect(),
+                        rb = b.getBoundingClientRect(),
+                        x1 = ra.left - bb.left + ra.width / 2,
+                        y1 = ra.top - bb.top + ra.height / 2,
+                        x2 = rb.left - bb.left + rb.width / 2,
+                        y2 = rb.top - bb.top + rb.height / 2;
+
+                    // glow line
+                    const glow = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+                    glow.setAttribute('x1', x1);
+                    glow.setAttribute('y1', y1);
+                    glow.setAttribute('x2', x2);
+                    glow.setAttribute('y2', y2);
+                    glow.setAttribute('stroke', l.color);
+                    glow.setAttribute('stroke-width', '6');
+                    glow.setAttribute('stroke-opacity', '0.2');
+                    g.appendChild(glow);
+
+                    // main line
+                    const ln = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+                    ln.setAttribute('x1', x1);
+                    ln.setAttribute('y1', y1);
+                    ln.setAttribute('x2', x2);
+                    ln.setAttribute('y2', y2);
+                    ln.setAttribute('stroke', l.color);
+                    ln.setAttribute('stroke-width', '2');
+                    g.appendChild(ln);
+
+                    // text with black shadow
+                    const txt = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+                    txt.setAttribute('x', (x1 + x2) / 2);
+                    txt.setAttribute('y', (y1 + y2) / 2 - 6);
+                    txt.setAttribute('fill', l.color);
+                    txt.setAttribute('font-size', '24');
+                    txt.setAttribute('text-anchor', 'middle');
+                    txt.setAttribute('filter', 'url(#text-shadow)');
+                    txt.textContent = l.text;
+                    g.appendChild(txt);
+
+                    svg.appendChild(g);
+                });
+                attachLinkMenu();
+            }
+            drawLinks();
+
+            // 6) drag & drop cards
+            cards.forEach(card => {
+                card.addEventListener('pointerdown', e => {
+                     // if we clicked on an <a> (or inside one), let it do its thing
+                    if (e.target.closest('a')) return;
+
+                    e.preventDefault();
+                    card.setPointerCapture(e.pointerId);
+                    const sx = e.clientX, sy = e.clientY,
+                        ox = card.offsetLeft, oy = card.offsetTop;
+                    card.style.cursor = 'grabbing';
+                    function onMove(ev) {
+                        card.style.left = ox + (ev.clientX - sx) + 'px';
+                        card.style.top = oy + (ev.clientY - sy) + 'px';
+                    }
+                    async function onUp() {
+                        card.releasePointerCapture(e.pointerId);
+                        document.removeEventListener('pointermove', onMove);
+                        document.removeEventListener('pointerup', onUp);
+                        card.style.cursor = 'grab';
+                        await fetch('/api/clue-position', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                id: card.dataset.id,
+                                x: parseFloat(card.style.left),
+                                y: parseFloat(card.style.top)
+                            })
+                        }).catch(() => { });
+                        let mb2 = 0;
+                        cards.forEach(c2 => {
+                            const tt = parseFloat(c2.style.top), hh = c2.offsetHeight;
+                            mb2 = Math.max(mb2, tt + hh);
+                        });
+                        board.style.height = (mb2 + 20) + 'px';
+                        drawLinks();
+                    }
+                    document.addEventListener('pointermove', onMove);
+                    document.addEventListener('pointerup', onUp);
+                });
+                card.ondragstart = () => false;
+            });
+
+            // 7) context menus
+            let linkSrc = null, ctxCard = null;
+            cards.forEach(card => {
+                card.addEventListener('contextmenu', e => {
+                    e.preventDefault();
+                    ctxCard = card;
+                    ctxMenu.style.top = e.clientY + 'px';
+                    ctxMenu.style.left = e.clientX + 'px';
+                    ctxMenu.style.display = 'block';
+                    linkMenu.style.display = 'none';
+                });
+            });
+            document.addEventListener('click', e => {
+                if (!ctxMenu.contains(e.target)) ctxMenu.style.display = 'none';
+                if (!linkMenu.contains(e.target)) linkMenu.style.display = 'none';
+            });
+            editClueOpt.addEventListener('click', () => {
+                ctxMenu.style.display = 'none';
+                const idx = ctxCard.dataset.id;
+                // navigate to the edit page for this clue
+                window.location.href = `/clues/edit/${idx}`;
+            });
+            // 8) Add Link
+            addLinkOpt.addEventListener('click', () => {
+                ctxMenu.style.display = 'none';
+                linkSrc = ctxCard.dataset.id;
+                const name = ctxCard.querySelector('h2').textContent.trim();
+                banner.textContent = `Link source set: “${name}”. Click another clue to finish.`;
+                banner.style.display = 'block';
+            });
+
+            // 9) Delete Clue
+            delClueOpt.addEventListener('click', async () => {
+                ctxMenu.style.display = 'none';
+                const clueName = ctxCard.querySelector('h2').textContent.trim();
+                if (!confirm(`Delete clue “${clueName}”?`)) return;
+                await fetch('/api/clue-delete', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ name: clueName })
+                });
+                ctxCard.remove();
+                drawLinks();
+            });
+
+            // 10) Finish link on click
+            cards.forEach(card => {
+                card.addEventListener('click', async e => {
+                    if (linkSrc === null) return;
+                    const target = card.dataset.id;
+                    if (target === linkSrc) {
+                        linkSrc = null; banner.style.display = 'none'; return;
+                    }
+                    banner.style.display = 'none';
+                    const text = prompt('Link text?', '');
+                    if (!text) { linkSrc = null; return; }
+                    const colors = [
+                        { name: 'Red', value: '#dc3545' },
+                        { name: 'Green', value: '#28a745' },
+                        { name: 'Blue', value: '#007bff' },
+                        { name: 'Orange', value: '#fd7e14' },
+                        { name: 'Purple', value: '#6f42c1' }
+                    ];
+                    const list = colors.map((c, i) => `${i + 1}) ${c.name}`).join('\n');
+                    const idx = parseInt(prompt(`Pick color:\n${list}`, '1'), 10) - 1;
+                    const color = (colors[idx] || colors[0]).value;
+                    const link = { from: linkSrc, to: target, text, color };
+                    links.push(link);
+                    drawLinks();
+                    await fetch('/api/clue-link', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(link)
+                    }).catch(() => { });
+                    linkSrc = null;
+                });
+            });
+
+            // 11) Attach link context menu
+            function attachLinkMenu() {
+                svg.querySelectorAll('g[data-index]').forEach(g => {
+                    g.addEventListener('contextmenu', e => {
+                        e.preventDefault();
+                        ctxMenu.style.display = 'none';
+                        linkMenu.dataset.index = g.dataset.index;
+                        linkMenu.style.top = e.clientY + 'px';
+                        linkMenu.style.left = e.clientX + 'px';
+                        linkMenu.style.display = 'block';
+                    });
+                });
+            }
+
+            // 12) Delete Link
+            delLinkOpt.addEventListener('click', async () => {
+                linkMenu.style.display = 'none';
+                const idx = parseInt(linkMenu.dataset.index, 10);
+                if (isNaN(idx)) return;
+                links.splice(idx, 1);
+                drawLinks();
+                await fetch('/api/clue-link-delete', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ index: idx })
+                }).catch(() => { });
+            });
+
+        });
+    </script>
+</body>
+
+</html>

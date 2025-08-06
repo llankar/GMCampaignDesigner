@@ -1,0 +1,120 @@
+{
+  "nodes": [
+    {
+      "npc_name": "Eldritch Titan",
+      "x": 301.86905558247173,
+      "y": 437.83607963973805,
+      "color": "#673AB7"
+    },
+    {
+      "npc_name": "Oblivion Warden",
+      "x": 278.7388457849101,
+      "y": 142.02966117167074,
+      "color": "#673AB7"
+    },
+    {
+      "npc_name": "Nightmare Ripper",
+      "x": 877.1872034170017,
+      "y": 593.5537258825871,
+      "color": "#673AB7"
+    },
+    {
+      "npc_name": "Veil Shifter",
+      "x": 869.0445840266852,
+      "y": 488.7856602370835,
+      "color": "#673AB7"
+    },
+    {
+      "npc_name": "Harbinger of the Void",
+      "x": 848.6558354590447,
+      "y": 500.85102641566937,
+      "color": "#673AB7"
+    },
+    {
+      "npc_name": "The Corruptor",
+      "x": 510.5689582089077,
+      "y": 175.7850195040682,
+      "color": "#673AB7"
+    },
+    {
+      "npc_name": "Abyssal Herald",
+      "x": 141.63372362771432,
+      "y": 356.45921881136775,
+      "color": "#673AB7"
+    },
+    {
+      "npc_name": "Voidling ",
+      "x": 522.4720486037979,
+      "y": 511.10263685399656,
+      "color": "#673AB7"
+    },
+    {
+      "npc_name": "Chained Horror",
+      "x": 206.3642398180715,
+      "y": 575.4442181081802,
+      "color": "#673AB7"
+    },
+    {
+      "npc_name": "Eye of Despair",
+      "x": 163.4265422112791,
+      "y": 569.1424802111401,
+      "color": "#673AB7"
+    },
+    {
+      "npc_name": "Rift Stalker",
+      "x": 607.8019253698784,
+      "y": 353.45636097971715,
+      "color": "#673AB7"
+    },
+    {
+      "npc_name": "Abyssal Hound",
+      "x": 351.4326895444207,
+      "y": 113.16831753253017,
+      "color": "#673AB7"
+    },
+    {
+      "npc_name": "Echo Wraith",
+      "x": 261.0072891374259,
+      "y": 189.4935266837748,
+      "color": "#673AB7"
+    },
+    {
+      "npc_name": "Shattered Apparition",
+      "x": 757.9403206522517,
+      "y": 256.23785632821,
+      "color": "#673AB7"
+    },
+    {
+      "npc_name": "Chaos Bringer",
+      "x": 307.66523981063335,
+      "y": 300.09274932661447,
+      "color": "#673AB7"
+    },
+    {
+      "npc_name": "Whispering Shadow",
+      "x": 191.28602999593554,
+      "y": 397.7394621883943,
+      "color": "#673AB7"
+    },
+    {
+      "npc_name": "Corrupt Spawn",
+      "x": 337.02094482739477,
+      "y": 533.4030745100209,
+      "color": "#673AB7"
+    },
+    {
+      "npc_name": "Rory 'Frostbite' Mallory",
+      "x": 500.2621960672765,
+      "y": 128.962634529015,
+      "color": "#673AB7"
+    },
+    {
+      "npc_name": "The Voice Beneath the Ice",
+      "x": 821.1449897723105,
+      "y": 330.4078834640055,
+      "color": "#673AB7"
+    }
+  ],
+  "links": [],
+  "shapes": []
+}

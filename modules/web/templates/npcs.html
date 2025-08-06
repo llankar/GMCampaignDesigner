@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="utf-8">
+    <title>{{ page_title }}</title>
+    <script src="https://unpkg.com/cytoscape@3.21.0/dist/cytoscape.min.js"></script>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: Arial, sans-serif;
+            background-color: #fff;
+        }
+
+        header {
+            padding: 10px;
+            background: #1D3572;
+            color: white;
+            text-align: center;
+        }
+
+        #cy {
+            width: 100%;
+            height: 90vh;
+            display: block;
+        }
+    </style>
+</head>
+
+<body>
+    <header>
+        <h1>{{ page_title }}</h1>
+    </header>
+    <div id="cy"></div>
+    <!-- Popup container -->
+    <div id="npcPopup" style="
+                display: none;
+                position: absolute;
+                max-width: 400px;
+                padding: 16px;
+                background: #fff;
+                border: 2px solid #1D3572;
+                border-radius: 12px;
+                box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+                font-size: 14px;
+                z-index: 10000;
+        ">
+        <div id="popupContent"></div>
+    </div>
+    <script>
+        fetch('/api/npc-graph?graph={{ selected_graph }}')
+            .then(response => response.json())
+            .then(data => {
+                const nodes = data.nodes.map((node, idx) => ({
+                    data: {
+                        id: 'node' + idx,
+                        label: node.npc_name,
+                        color: node.color,
+                        portrait: node.portrait,
+                        background: node.background
+                    },
+                    position: { x: node.x, y: node.y }
+                }));
+                const edges = data.links.map(link => ({
+                    data: {
+                        source: nodes.find(n => n.data.label === link.npc_name1).data.id,
+                        target: nodes.find(n => n.data.label === link.npc_name2).data.id,
+                        label: link.text
+                    }
+                }));
+                const cy = cytoscape({
+                    container: document.getElementById('cy'),
+                    elements: { nodes, edges },
+                    style: [
+                        {
+                            selector: 'node',
+                            style: {
+                                'background-image': 'data(portrait)',
+                                'background-fit': 'cover',
+                                'border-color': 'data(color)',
+                                'border-width': 4,
+                                'background-color': '#ccc',
+                                'label': 'data(label)',
+                                'text-valign': 'bottom',
+                                'text-halign': 'center',
+                                'text-margin-y': 5,
+                                'font-size': '10px',
+                                'width': 80,
+                                'height': 80,
+                                'shape': 'ellipse'
+                            }
+                        },
+                        {
+                            selector: 'edge',
+                            style: {
+                                'width': 2,
+                                'line-color': '#ccc',
+                                'target-arrow-color': '#ccc',
+                                'target-arrow-shape': 'triangle',
+                                'curve-style': 'bezier',
+                                'label': 'data(label)',
+                                'font-size': '10px',
+                                'text-background-color': '#fff',
+                                'text-background-opacity': 1,
+                                'text-background-padding': 2
+                            }
+                        }
+                    ],
+                    layout: { name: 'preset' }
+                });
+
+                cy.on('tap', 'node', evt => {
+                    const node = evt.target;
+                    const label = node.data('label');
+                    const bkg = node.data('background') || "(No background)";
+                    const popup = document.getElementById('npcPopup');
+                    document.getElementById('popupContent').innerHTML =
+                        `<strong>${label}</strong><br><br>${bkg}`;
+                    const pos = evt.renderedPosition || node.renderedPosition();
+                    popup.style.left = (pos.x + 20) + 'px';
+                    popup.style.top = (pos.y + 80) + 'px';
+                    popup.style.display = 'block';
+                });
+                cy.on('tap', evt => {
+                    if (evt.target === cy) {
+                        document.getElementById('npcPopup').style.display = 'none';
+                    }
+                });
+            })
+            .catch(error => console.error("Error fetching graph data:", error));
+
+        function getNodeIdByName(nodes, name) {
+            const found = nodes.find(n => n.data.label === name);
+            return found ? found.data.id : null;
+        }
+    </script>
+</body>
+
+</html>

@@ -1,0 +1,60 @@
+{
+  "nodes": [
+    {
+      "npc_name": "Nicodemus Archleone",
+      "x": 765.9090468190793,
+      "y": 328.8793968411132,
+      "color": "#4E342E"
+    },
+    {
+      "npc_name": "Pastor Caleb North",
+      "x": 198.1597081137192,
+      "y": 135.39934237864412,
+      "color": "#4E342E"
+    },
+    {
+      "npc_name": "Marcus 'Mark' Shaw and Ophiriel",
+      "x": 750.4785958870008,
+      "y": 500.0619332906095,
+      "color": "#4E342E"
+    },
+    {
+      "npc_name": "Alexandra 'Lexi' Cross and Vassago",
+      "x": 516.4296482237896,
+      "y": 309.91811916082344,
+      "color": "#4E342E"
+    },
+    {
+      "npc_name": "Captain Jonah Steele and Andras",
+      "x": 805.7918097785251,
+      "y": 400.4297795122139,
+      "color": "#4E342E"
+    },
+    {
+      "npc_name": "Lucille Voss and Marchosias",
+      "x": 133.84976788536136,
+      "y": 277.3269232656305,
+      "color": "#4E342E"
+    },
+    {
+      "npc_name": "Frederick 'Freddie' Winters and Orobas",
+      "x": 270.0631725913282,
+      "y": 197.38445156693504,
+      "color": "#4E342E"
+    },
+    {
+      "npc_name": "Diana Vale and Barbatos",
+      "x": 462.8559010142003,
+      "y": 460.93353572474865,
+      "color": "#4E342E"
+    },
+    {
+      "npc_name": "Mikhail Azarov",
+      "x": 643.8761108593937,
+      "y": 510.657437281284,
+      "color": "#4E342E"
+    }
+  ],
+  "links": [],
+  "shapes": []
+}

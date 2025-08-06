@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8">
+    <title>{% block title %}{{ db_name or 'Campaign' }}{% endblock %}</title>
+
+    <!-- Fonts & Journal CSS -->
+    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@700&family=Open+Sans&display=swap"
+        rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('get_css', filename='journal.css') }}">
+
+    {% block head %}{% endblock %}
+</head>
+
+<body>
+    <!-- You could add a shared header or nav here -->
+    <header style="text-align:center; padding:1em; background:#3B2E2A; color:#E1C699;">
+        <h1>{{ db_name or 'My Campaign' }}</h1>
+    </header>
+
+    <main>
+        {% block content %}{% endblock %}
+    </main>
+
+    <!-- Shared scripts -->
+    {% block scripts %}{% endblock %}
+</body>
+
+</html>

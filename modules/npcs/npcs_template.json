@@ -1,0 +1,18 @@
+{
+  "fields": [
+      {"name": "Name", "type": "text"},
+      {"name": "Role", "type": "text"},
+      {"name": "Description", "type": "longtext"},
+      {"name": "Secret", "type": "longtext"},
+      {"name": "Quote", "type": "text"},
+      {"name": "RoleplayingCues", "type": "longtext"},
+      {"name": "Personality", "type": "longtext"},
+      {"name": "Motivation", "type": "longtext"},
+      {"name": "Background", "type": "longtext"},
+      {"name": "Traits", "type": "longtext"},
+      {"name": "Genre", "type": "text"},
+      {"name": "Factions", "type": "list", "linked_type": "Factions"},
+      {"name": "Objects", "type": "list", "linked_type": "Objects"},
+      {"name": "Portrait", "type": "text"}
+  ]
+}

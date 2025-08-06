@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>News and Rumors – {{ db_name }}</title>
+    <link href="https://fonts.googleapis.com/css2?family=Permanent+Marker&display=swap" rel="stylesheet" />
+    <link href="https://fonts.googleapis.com/css2?family=Special+Elite&display=swap" rel="stylesheet">
+    <style>
+        html,
+        body {
+            margin: 0;
+            padding: 20px;
+            font-family: 'Permanent Marker', cursive;
+            background: url("{{ url_for('get_asset', filename='corkboard_bg.png')}}") center/cover no-repeat;
+            overflow-x: hidden;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+
+        .header h1 {
+            margin: 0;
+            font-size: 3.5em;
+            color: #333;
+            text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.5);
+        }
+
+        .back-link {
+            display: inline-block;
+            margin-top: 10px;
+            padding: 10px 20px;
+            background: #ffe066;
+            color: #333;
+            font-size: 1.2em;
+            font-family: inherit;
+            text-decoration: none;
+            border: 2px solid #e0d4a3;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+            transition: transform .2s, box-shadow .2s;
+        }
+
+        .back-link:hover {
+            transform: scale(1.05);
+            box-shadow: 0 6px 8px rgba(0, 0, 0, 0.4);
+        }
+
+        .board {
+            position: relative;
+            width: 100%;
+            height: 200vh;
+        }
+
+        .news-card {
+            position: absolute;
+            z-index: 10;
+            background: url("{{ url_for('get_asset', filename='newspaper_bg.png')}}") center/cover no-repeat;
+            background-size: cover;
+            background-blend-mode: multiply;
+            background-color: #fdfcf7;
+            border: 1px solid #bbb;
+            box-shadow: 3px 3px 8px rgba(0, 0, 0, 0.2);
+            font-family: Georgia, "Times New Roman", serif;
+            color: #111;
+            padding: 12px 10px 10px;
+            cursor: grab;
+            transition: transform .2s;
+            transform: rotate(var(--rotation));
+            -webkit-mask-image: url("{{ url_for('get_asset', filename='torn_edge_mask.png')}}");
+            -webkit-mask-size: 100% 100%;
+            mask-image: url("{{ url_for('get_asset', filename='torn_edge_mask.png')}}");
+            mask-size: 100% 100%;
+        }
+
+        .news-card:hover {
+            transform: scale(1.02);
+            z-index: 100;
+        }
+
+        .news-card::before {
+            content: '';
+            position: absolute;
+            top: -14px;
+            left: 50%;
+            width: 40px;
+            height: 40px;
+            background: url("{{ url_for('get_asset', filename='thumbtack.png')}}") no-repeat center/contain;
+            transform: translateX(-50%);
+        }
+
+        .news-card h2 {
+            margin: 0 0 .4em;
+            font-size: 1.3em;
+        }
+
+        .news-card .level {
+            font-family: 'Special Elite', cursive;
+            font-size: 1em;
+        }
+
+        .news-card .content {
+            column-count: 2;
+            column-gap: .3em;
+            hyphens: auto;
+            white-space: normal;
+            font-size: 1em;
+            line-height: 1.4;
+        }
+
+        /* Attachment link styling */
+        .news-card .attachment {
+            margin-top: 8px;
+        }
+
+        .news-card .attachment a {
+            display: inline-block;
+            font-size: 0.9em;
+            text-decoration: none;
+        }
+
+        .doodle {
+            position: absolute;
+            z-index: 1;
+            opacity: 0.7;
+            pointer-events: none;
+            width: 100px;
+            height: auto;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="header">
+        <h1>News and Rumors</h1>
+        <a href="{{ url_for('welcome') }}" class="back-link">← Back to Welcome</a>
+    </div>
+
+    <div class="board" id="board">
+        {% for info in informations %}
+        <div class="news-card" data-index="{{ loop.index0 }}">
+            <h2>{{ info.Title }}</h2>
+            {% if info.Level %}
+            <div class="level">Level: {{ info.DisplayLevel|safe }}</div>
+            {% endif %}
+            <div class="content">{{ info.DisplayInformation|safe }}</div>
+            {% if info.Attachment %}
+            <div class="attachment">
+                <a href="{{ url_for('information_upload', filename=info.Attachment) }}" + download>
+                    📎 {{ info.Attachment }}
+                </a>
+            </div>
+            {% endif %}
+        </div>
+        {% endfor %}
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const board = document.getElementById('board');
+            const bw = board.clientWidth;
+            const bh = board.clientHeight;
+            const cards = Array.from(board.querySelectorAll('.news-card'));
+            const placed = [];
+            const margin = 10;
+            const topY = -100;
+
+            // Random doodles
+            const doodleImages = [
+               'doodle_arrow.png',
+               'doodle_interro.png',
+                'doodle_exclam.png',
+                'doodle_star.png',
+                'doodle_symbol.png',
+                'doodle_secret.png'
+            ];
+            const doodleCount = 6;
+            for (let i = 0; i < doodleCount; i++) {
+                const img = document.createElement('img');
+                // Use url_for to build “/assets/…” URLs dynamically:
+                const filename = doodleImages[Math.floor(Math.random() * doodleImages.length)];
+                img.src = "{{ url_for('get_asset', filename='') }}" + filename;
+                img.className = 'doodle';
+                img.style.top = Math.random() * (bh - 100) + 'px';
+                img.style.left = Math.random() * (bw - 100) + 'px';
+                img.style.transform = `rotate(${(Math.random() * 30 - 15).toFixed(1)}deg)`;
+                board.appendChild(img);
+            }
+
+            // Randomize card widths and rotation
+            cards.forEach(card => {
+                const minW = 180, maxW = 320;
+                const w = minW + Math.random() * (maxW - minW);
+                card.style.width = w + 'px';
+
+                const rotation = (Math.random() * 4 - 2).toFixed(2) + 'deg';
+                card.style.setProperty('--rotation', rotation);
+            });
+
+            // Place cards
+            if (cards.length > 0) {
+                const c0 = cards[0];
+                c0.style.left = margin + 'px';
+                c0.style.top = margin + 'px';
+                placed.push({ x: margin, y: margin, w: c0.offsetWidth, h: c0.offsetHeight });
+            }
+            if (cards.length > 1) {
+                const c1 = cards[1];
+                c1.style.left = (bw - c1.offsetWidth - margin) + 'px';
+                c1.style.top = margin + 'px';
+                placed.push({ x: bw - c1.offsetWidth - margin, y: margin, w: c1.offsetWidth, h: c1.offsetHeight });
+            }
+
+            const firstRowHeight = Math.max(cards[0]?.offsetHeight || 0, cards[1]?.offsetHeight || 0);
+            const startY = margin + firstRowHeight / 8 + margin;
+
+            const rest = cards.slice(2).sort((a, b) => b.offsetWidth - a.offsetWidth);
+            rest.forEach(card => {
+                const cw = card.offsetWidth;
+                const ch = card.offsetHeight;
+                let x, y, rect, attempts = 0;
+                do {
+                    x = Math.random() * (bw - cw);
+                    y = startY + Math.random() * (bh - startY - ch);
+                    rect = { x, y, w: cw, h: ch };
+                    attempts++;
+                } while (
+                    placed.some(r => !(r.x + r.w + margin < rect.x ||
+                        rect.x + rect.w + margin < r.x ||
+                        r.y + r.h + margin < rect.y ||
+                        rect.y + rect.h + margin < r.y))
+                    && attempts < 500
+                );
+                card.style.left = x + 'px';
+                card.style.top = y + 'px';
+                placed.push(rect);
+            });
+
+            // Draggable cards
+            cards.forEach(card => {
+                 card.addEventListener('pointerdown', e => {
+                    // if the user actually clicked a link, let the browser handle it
+                    if (e.target.closest('a')) return;
+                    e.preventDefault();
+                    card.setPointerCapture(e.pointerId);
+                    const startX = e.clientX, startY = e.clientY;
+                    const origX = card.offsetLeft, origY = card.offsetTop;
+                    card.style.cursor = 'grabbing';
+                    card.style.zIndex = 1000;
+
+                    function onMove(ev) {
+                        card.style.left = origX + (ev.clientX - startX) + 'px';
+                        card.style.top = origY + (ev.clientY - startY) + 'px';
+                    }
+                    function onUp(ev) {
+                        card.releasePointerCapture(e.pointerId);
+                        document.removeEventListener('pointermove', onMove);
+                        document.removeEventListener('pointerup', onUp);
+                        card.style.cursor = 'grab';
+                        card.style.zIndex = '';
+                    }
+
+                    document.addEventListener('pointermove', onMove);
+                    document.addEventListener('pointerup', onUp);
+                });
+                card.ondragstart = () => false;
+            });
+        });
+    </script>
+</body>
+
+</html>

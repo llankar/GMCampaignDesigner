@@ -1,0 +1,18 @@
+{
+  "nodes": [
+    {
+      "npc_name": "Duchess Maria  Lucia de Estrella",
+      "x": 314.0,
+      "y": 378.0,
+      "color": "#1D3572"
+    },
+    {
+      "npc_name": "Maeve",
+      "x": 568.0,
+      "y": 375.0,
+      "color": "#1D3572"
+    }
+  ],
+  "links": [],
+  "shapes": []
+}

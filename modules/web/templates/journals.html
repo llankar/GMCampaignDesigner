@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container journal-list-page">
+    <h1>RPG Journal</h1>
+    <div class="button-group">
+        <a href="{{ url_for('journal.new_entry') }}">+ New Entry</a>
+        <a href="{{ url_for('welcome') }}">← Back</a>
+    </div>
+
+    <ul class="journal-list">
+        {% for e in entries %}
+        <li class="journal-card">
+            <a href="{{ url_for('journal.view_entry', entry_id=e.id) }}">
+                <div class="entry-title">{{ e.title }}</div>
+                <div class="entry-meta">
+                    {{ e.created_at.strftime('%Y-%m-%d') }}
+                    • <em>by {{ e.user.username }}</em>
+                    {% if e.tags %} • {{ e.tags }}{% endif %}
+                </div>
+            </a>
+        </li>
+        {% endfor %}
+    
+        {% if entries|length == 0 %}
+        <li><em>No entries found.</em></li>
+        {% endif %}
+    </ul>
+</div>
+{% endblock %}

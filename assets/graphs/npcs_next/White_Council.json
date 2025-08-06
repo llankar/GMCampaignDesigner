@@ -1,0 +1,120 @@
+{
+  "nodes": [
+    {
+      "npc_name": "Warden Ezekiel Cross",
+      "x": 620.4678333091721,
+      "y": 205.3383383380006,
+      "color": "#9C27B0"
+    },
+    {
+      "npc_name": "Archivist Yoko Tamura",
+      "x": 638.2765141043521,
+      "y": 283.93996025335747,
+      "color": "#9C27B0"
+    },
+    {
+      "npc_name": "Warden Lysander Black",
+      "x": 679.6678029225396,
+      "y": 447.3621994863897,
+      "color": "#9C27B0"
+    },
+    {
+      "npc_name": "Aisling O'Donnell",
+      "x": 760.1577429432438,
+      "y": 546.4994390629369,
+      "color": "#9C27B0"
+    },
+    {
+      "npc_name": "Emilio Velasco",
+      "x": 829.1446914919243,
+      "y": 593.7757695362328,
+      "color": "#9C27B0"
+    },
+    {
+      "npc_name": "Miyuki Tanaka",
+      "x": 879.0870890792755,
+      "y": 541.6990781574843,
+      "color": "#9C27B0"
+    },
+    {
+      "npc_name": "Jean-Baptiste Moreau",
+      "x": 232.16222645132714,
+      "y": 382.2019489041932,
+      "color": "#9C27B0"
+    },
+    {
+      "npc_name": "Fatima al-Hussein",
+      "x": 883.4349934274617,
+      "y": 220.3770471610713,
+      "color": "#9C27B0"
+    },
+    {
+      "npc_name": "Anatoly Sokolov",
+      "x": 293.572419197269,
+      "y": 139.23840739629912,
+      "color": "#9C27B0"
+    },
+    {
+      "npc_name": "Nina Guerrero",
+      "x": 174.42442316639256,
+      "y": 253.90403761806965,
+      "color": "#9C27B0"
+    },
+    {
+      "npc_name": "Catherine Wallace",
+      "x": 691.8184524592169,
+      "y": 519.7772506571873,
+      "color": "#9C27B0"
+    },
+    {
+      "npc_name": "Hassan al-Khalid",
+      "x": 350.1340787704647,
+      "y": 585.4886575545837,
+      "color": "#9C27B0"
+    },
+    {
+      "npc_name": "Mariana Torres",
+      "x": 571.6124790230986,
+      "y": 489.4793195512712,
+      "color": "#9C27B0"
+    },
+    {
+      "npc_name": "Evelyn 'Evie' Matthews",
+      "x": 853.2102877815124,
+      "y": 123.08132460678098,
+      "color": "#9C27B0"
+    },
+    {
+      "npc_name": "Nathaniel Greene",
+      "x": 826.788411173283,
+      "y": 573.9637807510078,
+      "color": "#9C27B0"
+    },
+    {
+      "npc_name": "Josephine 'Jo' Tyler",
+      "x": 406.0567492830674,
+      "y": 320.7204249620392,
+      "color": "#9C27B0"
+    },
+    {
+      "npc_name": "Arno Fischer",
+      "x": 698.9527878472694,
+      "y": 226.31012544691276,
+      "color": "#9C27B0"
+    },
+    {
+      "npc_name": "Elena Povar",
+      "x": 319.93155545290443,
+      "y": 233.92549964561496,
+      "color": "#9C27B0"
+    },
+    {
+      "npc_name": "Dino Luca",
+      "x": 130.36562271941784,
+      "y": 586.1283216814329,
+      "color": "#9C27B0"
+    }
+  ],
+  "links": [],
+  "shapes": []
+}

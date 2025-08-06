@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="utf-8">
+    <title>Choose Faction Graph</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 20px;
+            background: #f8f9fa;
+        }
+
+        h1 {
+            margin-bottom: 1em;
+        }
+
+        ul {
+            list-style: none;
+            padding: 0;
+        }
+
+        li {
+            margin: .5em 0;
+        }
+
+        a {
+            text-decoration: none;
+            color: #007bff;
+            font-size: 1.1em;
+        }
+
+        a:hover {
+            text-decoration: underline;
+        }
+    </style>
+</head>
+
+<body>
+    <h1>Choose a Faction Graph</h1>
+    <ul>
+        {% for file in graph_files %}
+        <li>
+            <a href="{{ url_for('factions_view', graph=file) }}">
+                {{ file[:-5] }}
+            </a>
+        </li>
+        {% else %}
+        <li><em>No graphs found. Drop JSON in assets/faction_graphs.</em></li>
+        {% endfor %}
+    </ul>
+    <p><a href="{{ url_for('welcome') }}">← Back to Welcome</a></p>
+</body>
+
+</html>

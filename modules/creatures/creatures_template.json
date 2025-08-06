@@ -1,0 +1,13 @@
+{
+  "fields": [
+      {"name": "Name", "type": "text"},
+      {"name": "Type", "type": "text"},
+      {"name": "Description", "type": "longtext"},
+      {"name": "Weakness", "type": "longtext"},
+      {"name": "Powers", "type": "longtext"},
+      {"name": "Stats", "type": "longtext"},
+      {"name": "Background", "type": "longtext"},
+      {"name": "Genre", "type": "text"},
+      {"name": "Portrait", "type": "text"}
+  ]
+}

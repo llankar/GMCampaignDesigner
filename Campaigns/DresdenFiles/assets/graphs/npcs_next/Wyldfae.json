@@ -1,0 +1,96 @@
+{
+  "nodes": [
+    {
+      "npc_name": "The Broken Prince",
+      "x": 722.7508377696545,
+      "y": 431.9431952717086,
+      "color": "#56A3A6"
+    },
+    {
+      "npc_name": "Queen Briarheart",
+      "x": 777.2553505886594,
+      "y": 583.8769275046218,
+      "color": "#56A3A6"
+    },
+    {
+      "npc_name": "Wyld Huntress Seline",
+      "x": 893.1436642765452,
+      "y": 501.2158497202425,
+      "color": "#56A3A6"
+    },
+    {
+      "npc_name": "Knight Captain Mariel Brightwind",
+      "x": 565.2916310276662,
+      "y": 339.5228060680448,
+      "color": "#56A3A6"
+    },
+    {
+      "npc_name": "The Hollow Prince",
+      "x": 847.6491242442635,
+      "y": 169.5347239163413,
+      "color": "#56A3A6"
+    },
+    {
+      "npc_name": "Laughing Dagger Kaelen",
+      "x": 831.715626209679,
+      "y": 207.24083064431284,
+      "color": "#56A3A6"
+    },
+    {
+      "npc_name": "Archivist Yewthorn",
+      "x": 884.2028864023598,
+      "y": 163.5987597826695,
+      "color": "#56A3A6"
+    },
+    {
+      "npc_name": "The Bound Jester",
+      "x": 396.67887610653383,
+      "y": 192.8908055838456,
+      "color": "#56A3A6"
+    },
+    {
+      "npc_name": "Wyld Healer Brialyn",
+      "x": 706.0190982031005,
+      "y": 122.38043414319097,
+      "color": "#56A3A6"
+    },
+    {
+      "npc_name": "Griselda the Hag",
+      "x": 298.7957626444076,
+      "y": 373.01418368679504,
+      "color": "#56A3A6"
+    },
+    {
+      "npc_name": "Nox",
+      "x": 724.1699821058645,
+      "y": 535.0487742165816,
+      "color": "#56A3A6"
+    },
+    {
+      "npc_name": "Cora Dewdrop",
+      "x": 498.43260627756507,
+      "y": 564.3424906500896,
+      "color": "#56A3A6"
+    },
+    {
+      "npc_name": "Kraig Stoneback",
+      "x": 107.63923496748271,
+      "y": 307.1721786265639,
+      "color": "#56A3A6"
+    },
+    {
+      "npc_name": "Puck",
+      "x": 371.2403351939617,
+      "y": 316.2448974268165,
+      "color": "#56A3A6"
+    },
+    {
+      "npc_name": "Vela Stone",
+      "x": 639.762080087662,
+      "y": 212.9477124306432,
+      "color": "#56A3A6"
+    }
+  ],
+  "links": [],
+  "shapes": []
+}

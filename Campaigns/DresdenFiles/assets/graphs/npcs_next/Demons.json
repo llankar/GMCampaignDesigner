@@ -1,0 +1,18 @@
+{
+  "nodes": [
+    {
+      "npc_name": "Demon Prince Velkar",
+      "x": 285.0396918672034,
+      "y": 370.15450324211355,
+      "color": "#E91E63"
+    },
+    {
+      "npc_name": "Demon Grishkar",
+      "x": 314.12399761951826,
+      "y": 584.6128658306465,
+      "color": "#E91E63"
+    }
+  ],
+  "links": [],
+  "shapes": []
+}

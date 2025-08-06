@@ -1,0 +1,248 @@
+{% extends "base.html" %}
+
+{% block head %}
+<!-- TinyMCE: community (no API key) -->
+<script src="https://cdn.tiny.cloud/1/l8uouai837afv287zc4ol6pmojd90cxgg9uqvznm9q3pqulf/tinymce/5/tinymce.min.js" referrerpolicy="origin"></script>
+{% endblock %}
+
+{% block content %}
+<div class="container entry-form">
+    <h1>{{ 'Edit' if clue else 'Add' }} Clue</h1>
+    <form id="clueForm" method="post">
+        <label>Name</label>
+        <input type="text" name="Name" value="{{ clue.Name if clue else '' }}" required>
+
+        <label>Type</label>
+        <input type="text" name="Type" value="{{ clue.Type if clue else '' }}">
+
+        <label>Description</label>
+        <!-- The WYSIWYG editor -->
+        <textarea id="tinymceDesc"></textarea>
+
+        <!-- Hidden: carry final RTF JSON on submit -->
+        <input type="hidden" name="Description" id="rtfJson">
+
+        <!-- Hidden: bootstrap value (RTF JSON or plain text) -->
+        <input type="hidden" id="existingDescription" value='{{ clue.Description | tojson if clue else "null" }}'>
+
+        <label>
+            <input type="checkbox" name="PlayerDisplay" {% if clue and clue.PlayerDisplay %}checked{% endif %}>
+            Show to players
+        </label>
+
+        <button type="submit">
+            💾 {{ 'Save Changes' if clue else 'Save Clue' }}
+        </button>
+        <a class="button-group" href="{{ url_for('clues_view') }}">← Cancel</a>
+    </form>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // ——— Conversion: HTML ⇄ RTF-JSON —————————————————————————————
+
+    // Helper: normalize “rgb(r,g,b)” → “#rrggbb”
+    function rgbToHex(rgb) {
+        const m = rgb.match(/\d+/g) || [];
+        return "#" + m.slice(0, 3)
+            .map(n => Number(n).toString(16).padStart(2, "0"))
+            .join("");
+    }
+
+    function htmlToRtf(root) {
+        let text = "", idx = 0;
+        const formatting = {};
+
+        function mark(tagName, start, end) {
+            (formatting[tagName] = formatting[tagName] || []).push([start, end]);
+        }
+
+        function recurse(node) {
+            if (node.nodeType === Node.TEXT_NODE) {
+                text += node.nodeValue;
+                idx += node.nodeValue.length;
+            }
+            else if (node.nodeType === Node.ELEMENT_NODE) {
+                const start = idx;
+                Array.from(node.childNodes).forEach(recurse);
+                const end = idx;
+                const tag = node.tagName.toLowerCase();
+
+                // Basic styles
+                if (tag === "strong" || tag === "b") mark("bold", start, end);
+                if (tag === "em" || tag === "i") mark("italic", start, end);
+                if (tag === "u") mark("underline", start, end);
+
+                // Lists: detect bullet vs. numbered
+                if (tag === "li") {
+                    const p = node.parentElement;
+                    mark(p && p.tagName.toLowerCase() === "ol" ? "numbered" : "bullet", start, end);
+                }
+
+                // Inline font-size & color
+                const style = node.style;
+                if (style.fontSize) mark("size_" + parseInt(style.fontSize), start, end);
+                if (style.color) mark("color_" + rgbToHex(style.color), start, end);
+
+                // Alignment on block tags
+                if ((tag === "p" || tag === "div") && style.textAlign) {
+                    mark(style.textAlign, start, end);
+                }
+
+                // ensure a newline after paragraphs & list items
+                if (tag === "p" || tag === "li") {
+                    text += "\n"; idx += 1;
+                }
+            }
+        }
+
+        recurse(root);
+        return { text, formatting };
+    }
+
+    function rtfToHtml(rtf) {
+        const { text = "", formatting = {} } = rtf;
+        const opens = {}, closes = {};
+
+        // Build open/close maps
+        for (const [fmt, ranges] of Object.entries(formatting)) {
+            for (const [s, e] of ranges) {
+                (opens[s] = opens[s] || []).push(fmt);
+                (closes[e] = closes[e] || []).push(fmt);
+            }
+        }
+
+        let out = "";
+        for (let i = 0; i < text.length; i++) {
+            // close first
+            (closes[i] || []).forEach(fmt => {
+                if (fmt === "bold" || fmt === "italic" || fmt === "underline") {
+                    const tag = fmt === "bold" ? "strong" : fmt === "italic" ? "em" : "u";
+                    out += `</${tag}>`;
+                }
+                else if (fmt.startsWith("size_") || fmt.startsWith("color_")) {
+                    out += `</span>`;
+                }
+                else if (fmt === "left" || fmt === "center" || fmt === "right") {
+                    out += `</div>`;
+                }
+            });
+
+            // open next
+            (opens[i] || []).forEach(fmt => {
+                if (fmt === "bold" || fmt === "italic" || fmt === "underline") {
+                    const tag = fmt === "bold" ? "strong" : fmt === "italic" ? "em" : "u";
+                    out += `<${tag}>`;
+                }
+                else if (fmt.startsWith("size_")) {
+                    const sz = fmt.split("_", 2)[1];
+                    out += `<span style="font-size:${sz}px">`;
+                }
+                else if (fmt.startsWith("color_")) {
+                    const col = fmt.split("_", 2)[1];
+                    out += `<span style="color:${col}">`;
+                }
+                else if (fmt === "left" || fmt === "center" || fmt === "right") {
+                    out += `<div style="text-align:${fmt}">`;
+                }
+                else if (fmt === "bullet") {
+                    out += `• `;
+                }
+                else if (fmt === "numbered") {
+                    out += `1. `;
+                }
+            });
+
+            // add the character (with <br> for newlines)
+            out += text[i] === "\n" ? "<br>" : text[i]
+                .replace(/&/g, "&amp;")
+                .replace(/</g, "&lt;")
+                .replace(/>/g, "&gt;");
+        }
+
+        // close any at end
+        (closes[text.length] || []).forEach(fmt => {
+            if (fmt === "bold" || fmt === "italic" || fmt === "underline") {
+                const tag = fmt === "bold" ? "strong" : fmt === "italic" ? "em" : "u";
+                out += `</${tag}>`;
+            }
+            else if (fmt.startsWith("size_") || fmt.startsWith("color_")) {
+                out += `</span>`;
+            }
+            else if (fmt === "left" || fmt === "center" || fmt === "right") {
+                out += `</div>`;
+            }
+        });
+
+        return out;
+    }
+
+    // ——— Boot TinyMCE and wire up save/load ——————————————————
+
+    document.addEventListener("DOMContentLoaded", function () {
+        // parse existing JSON RTF if any
+        let existing = null;
+        try {
+            existing = JSON.parse(
+                document.getElementById("existingDescription").value
+            );
+        } catch { }
+
+        tinymce.init({
+            selector: "#tinymceDesc",
+            menubar: false,
+            // === keep exactly these tags & attributes ===
+            valid_elements:
+            'strong/b,em/i,u,' +  // bold/italic/underline
+            'span[style],div[style],' +
+            'p,br,ul,ol,li,blockquote,' + // basic blocks
+            'a[href|target]',      // links
+            // no need for extended_valid_elements or valid_styles when we enumerate here
+           plugins: "lists link textcolor colorpicker",
+           toolbar: [
+                "undo redo | bold italic underline | bullist numlist",
+                "fontsizeselect forecolor | alignleft aligncenter alignright"
+            ].join(" "),
+            branding: false,
+            forced_root_block: false,
+            // — disable all TinyMCE cleanup & filtering —
+            verify_html: false,
+            cleanup: false,
+            cleanup_on_startup: false,
+            // === don’t strip any tags or attributes ===
+            valid_elements: "*[*]",
+           // 1) Allow every element and attribute (so nothing is stripped)
+            extended_valid_elements: "span[style],div[style],strong/b,em/i,u",
+            valid_styles: {
+                "*": "color,font-size,text-align"
+            },
+            setup(editor) {
+                editor.on("init", () => {
+                    if (existing && typeof existing.text === "string") {
+                        // RTF-JSON → HTML
+                        editor.setContent(rtfToHtml(existing), { format: "html" });
+                        document.getElementById("rtfJson").value =
+                            JSON.stringify(existing);
+                    } else {
+                        // plain-text fallback
+                        editor.setContent(existing || "", { format: "text" });
+                    }
+                });
+            }
+        });
+
+        // On submit: HTML → RTF-JSON
+        document.getElementById("clueForm")
+            .addEventListener("submit", function () {
+                const html = tinymce.get("tinymceDesc")
+                    .getContent({ format: "html" });
+                const div = document.createElement("div");
+                div.innerHTML = html;
+                const rtf = htmlToRtf(div);
+                document.getElementById("rtfJson").value =
+                    JSON.stringify(rtf);
+            });
+    });
+</script>
+{% endblock %}

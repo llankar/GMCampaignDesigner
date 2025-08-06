@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="utf-8">
+    <title>Add Information</title>
+</head>
+
+<body>
+    <h1>Add News / Rumor</h1>
+    <form method="post" enctype="multipart/form-data">
+        <label>Title<br><input name="Title" required></label><br><br>
+        <label>Information<br><textarea name="Information" rows="4"></textarea></label><br><br>
+        <label>Level<br><input name="Level"></label><br><br>
+        <label>Show to players? <input type="checkbox" name="PlayerDisplay" checked></label><br><br>
+        <!-- adjust NPCs select if you have NPC list -->
+        <label>Attach file<br><input type="file" name="Attachment"></label><br><br>
+        <button type="submit">Add</button>
+    </form>
+    <p><a href="{{ url_for('news_view') }}">← Back to news board</a></p>
+</body>
+
+</html>

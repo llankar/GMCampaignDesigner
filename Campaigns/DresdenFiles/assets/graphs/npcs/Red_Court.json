@@ -1,0 +1,157 @@
+{
+  "nodes": [
+    {
+      "npc_name": "Isabella 'Izzy' Ramos",
+      "x": 355.2003873167424,
+      "y": 365.6233578028646,
+      "color": "red"
+    },
+    {
+      "npc_name": "Akio Tanaka",
+      "x": 1113.9041009664825,
+      "y": 675.2293928547285,
+      "color": "#1D3572"
+    },
+    {
+      "npc_name": "Claire Fontaine",
+      "x": 864.8950557882788,
+      "y": 403.95955517045866,
+      "color": "purple"
+    },
+    {
+      "npc_name": "Mateo Delgado",
+      "x": 546.0115660172478,
+      "y": 648.8122150873221,
+      "color": "#1D3572"
+    },
+    {
+      "npc_name": "Vladislav 'Vlad' Sokolov",
+      "x": 1109.9797121363922,
+      "y": 373.4692117581918,
+      "color": "purple"
+    },
+    {
+      "npc_name": "Duchess Maria  Lucia de Estrella",
+      "x": 1098.9243655653368,
+      "y": 144.37105440809296,
+      "color": "purple"
+    },
+    {
+      "npc_name": "Lord Jonathan Blackwood",
+      "x": 480.68679475227043,
+      "y": 143.3671478771837,
+      "color": "red"
+    },
+    {
+      "npc_name": "Carmen Moreno",
+      "x": 545.8531195526898,
+      "y": 377.85720496191243,
+      "color": "red"
+    },
+    {
+      "npc_name": "Dr. Nicolas Mendoza",
+      "x": 1349.8034626307362,
+      "y": 385.19557743007124,
+      "color": "purple"
+    },
+    {
+      "npc_name": "Alexandra 'Lexi' Varez",
+      "x": 1352.7995205212633,
+      "y": 685.0503966975037,
+      "color": "#1D3572"
+    },
+    {
+      "npc_name": "Miguel 'The Artist' Rossi",
+      "x": 490.24060118945454,
+      "y": 876.4218879470716,
+      "color": "#1D3572"
+    },
+    {
+      "npc_name": "Isabella and Saria Luna",
+      "x": 832.2670767469915,
+      "y": 873.0071436422132,
+      "color": "#1D3572"
+    },
+    {
+      "npc_name": "Alberto 'The Keeper' Novar",
+      "x": 160.38388350067987,
+      "y": 343.488019810756,
+      "color": "red"
+    }
+  ],
+  "links": [
+    {
+      "npc_name1": "Lord Jonathan Blackwood",
+      "npc_name2": "Carmen Moreno",
+      "text": "obey",
+      "arrow_mode": "start"
+    },
+    {
+      "npc_name1": "Isabella 'Izzy' Ramos",
+      "npc_name2": "Lord Jonathan Blackwood",
+      "text": "obey",
+      "arrow_mode": "end"
+    },
+    {
+      "npc_name1": "Lord Jonathan Blackwood",
+      "npc_name2": "Alberto 'The Keeper' Novar",
+      "text": "obey",
+      "arrow_mode": "start"
+    },
+    {
+      "npc_name1": "Lord Jonathan Blackwood",
+      "npc_name2": "Duchess Maria  Lucia de Estrella",
+      "text": "distrust",
+      "arrow_mode": "both"
+    },
+    {
+      "npc_name1": "Carmen Moreno",
+      "npc_name2": "Mateo Delgado",
+      "text": "work with",
+      "arrow_mode": "both"
+    },
+    {
+      "npc_name1": "Isabella and Saria Luna",
+      "npc_name2": "Mateo Delgado",
+      "text": "dislike",
+      "arrow_mode": "both"
+    },
+    {
+      "npc_name1": "Vladislav 'Vlad' Sokolov",
+      "npc_name2": "Duchess Maria  Lucia de Estrella",
+      "text": "guard",
+      "arrow_mode": "end"
+    },
+    {
+      "npc_name1": "Claire Fontaine",
+      "npc_name2": "Duchess Maria  Lucia de Estrella",
+      "text": "obey",
+      "arrow_mode": "end"
+    },
+    {
+      "npc_name1": "Dr. Nicolas Mendoza",
+      "npc_name2": "Duchess Maria  Lucia de Estrella",
+      "text": "obey",
+      "arrow_mode": "both"
+    },
+    {
+      "npc_name1": "Akio Tanaka",
+      "npc_name2": "Vladislav 'Vlad' Sokolov",
+      "text": "spar with",
+      "arrow_mode": "both"
+    },
+    {
+      "npc_name1": "Alexandra 'Lexi' Varez",
+      "npc_name2": "Dr. Nicolas Mendoza",
+      "text": "work with",
+      "arrow_mode": "both"
+    },
+    {
+      "npc_name1": "Miguel 'The Artist' Rossi",
+      "npc_name2": "Isabella and Saria Luna",
+      "text": "loves",
+      "arrow_mode": "end"
+    }
+  ],
+  "shapes": []
+}

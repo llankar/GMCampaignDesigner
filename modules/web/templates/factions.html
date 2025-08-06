@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>{{ page_title }}</title>
+    <script src="https://unpkg.com/cytoscape@3.21.0/dist/cytoscape.min.js"></script>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: Arial, sans-serif;
+            background: #fff;
+        }
+
+        header {
+            padding: 10px;
+            background: #444;
+            color: white;
+            text-align: center;
+        }
+
+        #cy {
+            width: 100%;
+            height: 90vh;
+            display: block;
+        }
+    </style>
+</head>
+
+<body>
+    <header>
+        <h1>{{ page_title }}</h1>
+    </header>
+    <div id="cy"></div>
+    <div id="popup" style="
+        display: none;
+        position: absolute;
+        max-width: 300px;
+        padding: 12px;
+        background: #fff;
+        border: 2px solid #444;
+        border-radius: 8px;
+        box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+        z-index: 1000;">
+        <div id="popupContent"></div>
+    </div>
+
+    <script>
+        fetch('/api/faction-graph?graph={{ selected_graph }}')
+            .then(r => r.json())
+            .then(data => {
+                const nodes = data.nodes.map((n, i) => ({
+                    data: {
+                        id: 'n' + i,
+                        label: n.name,
+                        color: n.color || '#888',
+                        // no portraits, but Cytoscape style can still reference this
+                        portrait: n.portrait,
+                        background: n.background
+                    },
+                    position: { x: n.x, y: n.y }
+                }));
+                const edges = data.links.map((l, i) => ({
+                    data: {
+                        id: 'e' + i,
+                        source: nodes.find(x => x.data.label === data.nodes.find(n => n.tag === l.from).name).data.id,
+                        target: nodes.find(x => x.data.label === data.nodes.find(n => n.tag === l.to).name).data.id,
+                        label: l.text
+                    }
+                }));
+
+                const cy = cytoscape({
+                    container: document.getElementById('cy'),
+                    elements: [...nodes, ...edges],
+                    style: [
+                        {
+                            selector: 'node',
+                            style: {
+                                'shape': 'roundrectangle',
+                                'background-color': 'data(color)',
+                                'label': 'data(label)',
+                                'text-valign': 'center',
+                                'text-halign': 'center',
+                                'width': 100,
+                                'height': 50,
+                                'font-size': 12
+                            }
+                        },
+                        {
+                            selector: 'edge',
+                            style: {
+                                'curve-style': 'bezier',
+                                'target-arrow-shape': 'triangle',
+                                'label': 'data(label)',
+                                'font-size': 10,
+                                'line-color': '#bbb',
+                                'target-arrow-color': '#bbb',
+                                'width': 2
+                            }
+                        }
+                    ],
+                    layout: { name: 'preset' }
+                });
+
+                cy.on('tap', 'node', evt => {
+                    const n = evt.target.data();
+                    const popup = document.getElementById('popup');
+                    document.getElementById('popupContent').innerHTML =
+                        `<strong>${n.label}</strong><p>${n.background}</p>`;
+                    const pos = evt.renderedPosition || evt.target.renderedPosition();
+                    popup.style.left = (pos.x + 20) + 'px';
+                    popup.style.top = (pos.y + 20) + 'px';
+                    popup.style.display = 'block';
+                });
+                cy.on('tap', evt => {
+                    if (evt.target === cy) {
+                        document.getElementById('popup').style.display = 'none';
+                    }
+                });
+            })
+            .catch(console.error);
+    </script>
+</body>
+
+</html>

@@ -1,0 +1,2 @@
+del /Q D:\SynologyDrive\rpg\Python\GMCampaignDesigner2\dist\main_window\_internal\assets\generated\*
+del /Q D:\SynologyDrive\rpg\Python\GMCampaignDesigner2\dist\main_window\_internal\assets\portraits\*
