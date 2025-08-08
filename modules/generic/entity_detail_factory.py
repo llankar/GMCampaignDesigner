@@ -7,6 +7,7 @@ from modules.helpers.template_loader import load_template
 from modules.generic.generic_model_wrapper import GenericModelWrapper
 from tkinter import Toplevel, messagebox
 from tkinter import ttk
+import tkinter.font as tkfont
 from modules.ui.image_viewer import show_portrait
 from modules.generic.generic_editor_window import GenericEditorWindow
 from modules.helpers.config_helper import ConfigHelper
@@ -65,8 +66,10 @@ def insert_longtext(parent, header, content):
     # Resize after layout
     def update_height():
         lines = int(box._textbox.count("1.0", "end", "displaylines")[0])
+        font = tkfont.nametofont(box._textbox.cget("font"))
+        line_px = font.metrics("linespace")
         clamped = max(2, min(lines, 20))
-        box.configure(height=clamped)
+        box.configure(height=clamped * line_px)
 
     box.after(100, update_height)
 
