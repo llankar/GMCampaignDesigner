@@ -1,3 +1,4 @@
+import tkinter as tk
 from tkinter import filedialog, messagebox
 
 import customtkinter as ctk
@@ -11,9 +12,6 @@ class ScenarioGeneratorView(ctk.CTkFrame):
 
     def __init__(self, parent):
         super().__init__(parent)
-
-        # Match the dark background style from the original generator UI
-        self.configure(fg_color="#2c3e50")
 
         self.setting_var = ctk.StringVar(value=list(GENERATOR_FUNCTIONS.keys())[0])
         self.title_var = ctk.StringVar(value="")
@@ -31,9 +29,9 @@ class ScenarioGeneratorView(ctk.CTkFrame):
                           variable=self.setting_var).pack(side="left", padx=5)
         ctk.CTkButton(top, text="Generate", command=self.generate_campaign).pack(side="left", padx=5)
 
-        # Scrollable area for displaying generated scenario cards
-        self.results_frame = ctk.CTkScrollableFrame(self, fg_color="#2c3e50")
-        self.results_frame.pack(fill="both", expand=True, padx=10, pady=10)
+        self.text_box = ctk.CTkTextbox(self, wrap="word")
+        self.text_box.pack(fill="both", expand=True, padx=10, pady=10)
+        self.text_box.configure(state="disabled")
 
         bottom = ctk.CTkFrame(self)
         bottom.pack(fill="x", padx=10, pady=(0, 10))
@@ -59,35 +57,11 @@ class ScenarioGeneratorView(ctk.CTkFrame):
 
         self.current_campaign = campaign
 
-        # Clear previous results
-        for child in self.results_frame.winfo_children():
-            child.destroy()
-
-        # Display each entry as a styled card similar to the original UI
+        self.text_box.configure(state="normal")
+        self.text_box.delete("1.0", "end")
         for key, value in campaign.items():
-            card = ctk.CTkFrame(
-                self.results_frame,
-                fg_color="#34495e",
-                corner_radius=4,
-            )
-            title_lbl = ctk.CTkLabel(
-                card,
-                text=key,
-                text_color="#ecf0f1",
-                font=("Helvetica", 14, "bold"),
-                anchor="w",
-            )
-            desc_lbl = ctk.CTkLabel(
-                card,
-                text=value,
-                text_color="#bdc3c7",
-                justify="left",
-                wraplength=1700,
-                font=("Helvetica", 11),
-            )
-            title_lbl.pack(anchor="w", padx=8, pady=(4, 0))
-            desc_lbl.pack(anchor="w", padx=8, pady=(0, 6))
-            card.pack(fill="x", expand=True, padx=5, pady=5)
+            self.text_box.insert("end", f"{key}: {value}\n\n")
+        self.text_box.configure(state="disabled")
 
         self.export_btn.configure(state="normal")
         self.add_btn.configure(state="normal")
