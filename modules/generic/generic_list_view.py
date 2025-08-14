@@ -94,7 +94,7 @@ class GenericListView(ctk.CTkFrame):
 
         self.group_column = ConfigHelper.get(
             "ListGrouping", self.model_wrapper.entity_type, fallback=None
-        )
+        ) or None
 
         self.unique_field = next(
             (f["name"] for f in self.template["fields"] if f["name"] != "Portrait"),
@@ -496,17 +496,22 @@ class GenericListView(ctk.CTkFrame):
         return os.path.join("assets/images/map_images", dest_filename)
 
     def choose_group_column(self):
-        options = [self.unique_field] + [c for c in self.columns if c != self.unique_field]
+        options = ["None", self.unique_field] + [c for c in self.columns if c != self.unique_field]
         top = ctk.CTkToplevel(self)
         top.title("Group By")
-        var = ctk.StringVar(value=self.group_column or options[0])
+        var = ctk.StringVar(value=self.group_column or "None")
         ctk.CTkLabel(top, text="Select grouping column:").pack(padx=10, pady=10)
         menu = ctk.CTkOptionMenu(top, values=options, variable=var)
         menu.pack(padx=10, pady=5)
 
         def confirm():
-            self.group_column = var.get()
-            ConfigHelper.set("ListGrouping", self.model_wrapper.entity_type, self.group_column)
+            selection = var.get()
+            if selection == "None":
+                self.group_column = None
+                ConfigHelper.set("ListGrouping", self.model_wrapper.entity_type, "")
+            else:
+                self.group_column = selection
+                ConfigHelper.set("ListGrouping", self.model_wrapper.entity_type, self.group_column)
             top.destroy()
             self.refresh_list()
 
