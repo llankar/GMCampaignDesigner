@@ -5,6 +5,7 @@ from ctypes import wintypes
 import customtkinter as ctk
 import tkinter as tk
 from tkinter import ttk, messagebox, filedialog
+import copy
 from PIL import Image, ImageTk
 from modules.generic.generic_editor_window import GenericEditorWindow
 from modules.ui.image_viewer import show_portrait
@@ -174,6 +175,14 @@ class GenericListView(ctk.CTkFrame):
 
         self.tree.bind("<Double-1>", self.on_double_click)
         self.tree.bind("<Button-3>", self.on_right_click)
+        self.tree.bind("<ButtonPress-1>", self.on_tree_click)
+        self.tree.bind("<B1-Motion>", self.on_tree_drag)
+        self.tree.bind("<ButtonRelease-1>", self.on_tree_drop)
+        self.tree.bind("<Control-c>", lambda e: self.copy_item(self.tree.focus()))
+        self.tree.bind("<Control-v>", lambda e: self.paste_item(self.tree.focus() or None))
+        self.copied_item = None
+        self.dragging_iid = None
+
         self._tooltip = _ToolTip(self.tree)
 
         self.refresh_list()
@@ -198,6 +207,64 @@ class GenericListView(ctk.CTkFrame):
             self.insert_grouped_items()
         else:
             self.insert_next_batch()
+
+    def on_tree_click(self, event):
+        if self.group_column or self.filtered_items != self.items:
+            self.dragging_iid = None
+            return
+        self.dragging_iid = self.tree.identify_row(event.y)
+        self.start_index = self.tree.index(self.dragging_iid) if self.dragging_iid else None
+
+    def on_tree_drag(self, event):
+        pass
+
+    def on_tree_drop(self, event):
+        if not self.dragging_iid:
+            return
+        if self.group_column or self.filtered_items != self.items:
+            self.dragging_iid = None
+            return
+        target_iid = self.tree.identify_row(event.y)
+        if not target_iid:
+            target_index = len(self.tree.get_children()) - 1
+        else:
+            target_index = self.tree.index(target_iid)
+        if target_index > self.start_index:
+            target_index -= 1
+        self.tree.move(self.dragging_iid, '', target_index)
+        id_map = {sanitize_id(str(it.get(self.unique_field, ""))): idx for idx, it in enumerate(self.items)}
+        old_index = id_map.get(self.dragging_iid)
+        if old_index is not None:
+            item = self.items.pop(old_index)
+            self.items.insert(target_index, item)
+            self.filtered_items = list(self.items)
+            self.model_wrapper.save_items(self.items)
+        self.dragging_iid = None
+
+    def copy_item(self, iid):
+        item = next((it for it in self.items if sanitize_id(str(it.get(self.unique_field, ""))) == iid), None)
+        if item:
+            self.copied_item = copy.deepcopy(item)
+
+    def paste_item(self, iid=None):
+        if not self.copied_item:
+            return
+        new_item = copy.deepcopy(self.copied_item)
+        base_name = f"{new_item.get(self.unique_field, '')} Copy"
+        existing = {sanitize_id(str(it.get(self.unique_field, ""))) for it in self.items}
+        new_name = base_name
+        counter = 1
+        while sanitize_id(new_name) in existing:
+            counter += 1
+            new_name = f"{base_name} {counter}"
+        new_item[self.unique_field] = new_name
+        if iid:
+            index = next((i for i, it in enumerate(self.items) if sanitize_id(str(it.get(self.unique_field, ""))) == iid), len(self.items)) + 1
+        else:
+            index = len(self.items)
+        self.items.insert(index, new_item)
+        self.model_wrapper.save_items(self.items)
+        self.filter_items(self.search_var.get())
 
     def insert_next_batch(self):
         end = min(self.batch_index + self.batch_size, len(self.filtered_items))
@@ -306,6 +373,15 @@ class GenericListView(ctk.CTkFrame):
                 label="Show Portrait",
                 command=lambda: self.show_portrait_window(iid)
             )
+        menu.add_command(
+            label="Copy",
+            command=lambda: self.copy_item(iid)
+        )
+        menu.add_command(
+            label="Paste",
+            state=(tk.NORMAL if self.copied_item else tk.DISABLED),
+            command=lambda: self.paste_item(iid)
+        )
         menu.add_command(
             label="Delete",
             command=lambda: self.delete_item(iid)
