@@ -28,6 +28,7 @@ from modules.npcs.npc_graph_editor import NPCGraphEditor
 from modules.pcs.pc_graph_editor import PCGraphEditor
 from modules.scenarios.scenario_graph_editor import ScenarioGraphEditor
 from modules.scenarios.scenario_importer import ScenarioImportWindow
+from modules.scenarios.scenario_generator_view import ScenarioGeneratorView
 from modules.generic.export_for_foundry import preview_and_export_foundry
 from modules.helpers import text_helpers
 from db.db import load_schema_from_json, initialize_db
@@ -110,6 +111,7 @@ class MainWindow(ctk.CTk):
             "import_scenario": self.load_icon("import_icon.png", size=(60, 60)),
             "export_foundry": self.load_icon("export_foundry_icon.png", size=(60, 60)),
             "map_tool": self.load_icon("map_tool_icon.png", size=(60, 60)),
+            "generate_scenario": self.load_icon("generate_icon.png", size=(60, 60)),
         }
 
     def load_icon(self, file_name, size=(60, 60)):
@@ -182,6 +184,7 @@ class MainWindow(ctk.CTk):
             ("pc_graph", "Open PC Graph Editor", self.open_pc_graph_editor),
             ("faction_graph", "Open Factions Graph Editor", self.open_faction_graph_editor),
             ("scenario_graph", "Open Scenario Graph Editor", self.open_scenario_graph_editor),
+            ("generate_scenario", "Generate Scenario", self.open_scenario_generator),
             ("generate_portraits", "Generate Portraits", self.generate_missing_portraits),
             ("associate_portraits", "Associate NPC Portraits", self.associate_npc_portraits),
             ("import_scenario", "Import Scenario", self.open_scenario_importer),
@@ -684,6 +687,16 @@ class MainWindow(ctk.CTk):
         container = ctk.CTkFrame(self.content_frame)
         container.grid(row=0, column=0, sticky="nsew")
         ScenarioImportWindow(container)
+
+    def open_scenario_generator(self):
+        self.clear_current_content()
+        parent = self.get_content_container()
+        container = ScenarioGeneratorView(parent)
+        container.grid(row=0, column=0, sticky="nsew")
+        parent.grid_rowconfigure(0, weight=1)
+        parent.grid_columnconfigure(0, weight=1)
+        self.current_open_view = container
+        self.current_open_entity = None
 
     def change_database_storage(self):
         # 1) Pick or create .db
