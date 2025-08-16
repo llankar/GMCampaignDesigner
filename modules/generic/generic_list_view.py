@@ -576,6 +576,9 @@ class GenericListView(ctk.CTkFrame):
             self.tree.item(iid, tags=(f"color_{color_name}",))
         else:
             self.tree.item(iid, tags=())
+        # Deselect the row so the new color is visible immediately
+        self.tree.selection_remove(iid)
+        self.tree.focus("")
         self._save_row_color(base_id, color_name)
 
     def _save_row_color(self, base_id, color_name):
