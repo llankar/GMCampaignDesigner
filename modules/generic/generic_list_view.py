@@ -254,7 +254,10 @@ class GenericListView(ctk.CTkFrame):
         if target_index > self.start_index:
             target_index -= 1
         self.tree.move(self.dragging_iid, '', target_index)
-        id_map = {sanitize_id(str(it.get(self.unique_field, ""))): idx for idx, it in enumerate(self.items)}
+        id_map = {
+            sanitize_id(str(it.get(self.unique_field, ""))).lower(): idx
+            for idx, it in enumerate(self.items)
+        }
         old_index = id_map.get(self.dragging_iid)
         if old_index is not None:
             item = self.items.pop(old_index)
@@ -265,7 +268,14 @@ class GenericListView(ctk.CTkFrame):
         self.dragging_iid = None
 
     def copy_item(self, iid):
-        item = next((it for it in self.items if sanitize_id(str(it.get(self.unique_field, ""))) == iid), None)
+        item = next(
+            (
+                it
+                for it in self.items
+                if sanitize_id(str(it.get(self.unique_field, ""))).lower() == iid
+            ),
+            None,
+        )
         if item:
             self.copied_item = copy.deepcopy(item)
 
@@ -274,15 +284,29 @@ class GenericListView(ctk.CTkFrame):
             return
         new_item = copy.deepcopy(self.copied_item)
         base_name = f"{new_item.get(self.unique_field, '')} Copy"
-        existing = {sanitize_id(str(it.get(self.unique_field, ""))) for it in self.items}
+        existing = {
+            sanitize_id(str(it.get(self.unique_field, ""))).lower()
+            for it in self.items
+        }
         new_name = base_name
         counter = 1
-        while sanitize_id(new_name) in existing:
+        while sanitize_id(new_name).lower() in existing:
             counter += 1
             new_name = f"{base_name} {counter}"
         new_item[self.unique_field] = new_name
         if iid:
-            index = next((i for i, it in enumerate(self.items) if sanitize_id(str(it.get(self.unique_field, ""))) == iid), len(self.items)) + 1
+            index = (
+                next(
+                    (
+                        i
+                        for i, it in enumerate(self.items)
+                        if sanitize_id(str(it.get(self.unique_field, ""))).lower()
+                        == iid
+                    ),
+                    len(self.items),
+                )
+                + 1
+            )
         else:
             index = len(self.items)
         self.items.insert(index, new_item)
@@ -441,8 +465,11 @@ class GenericListView(ctk.CTkFrame):
 
     def open_in_gm_screen(self, iid):
         item = next(
-            (it for it in self.filtered_items
-             if sanitize_id(str(it.get(self.unique_field, ""))) == iid),
+            (
+                it
+                for it in self.filtered_items
+                if sanitize_id(str(it.get(self.unique_field, ""))).lower() == iid
+            ),
             None
         )
         if not item:
@@ -487,9 +514,11 @@ class GenericListView(ctk.CTkFrame):
     def add_items(self, items):
         added = 0
         for itm in items:
-            nid = sanitize_id(str(itm.get(self.unique_field, "")))
-            if not any(sanitize_id(str(i.get(self.unique_field, ""))) == nid
-                    for i in self.items):
+            nid = sanitize_id(str(itm.get(self.unique_field, ""))).lower()
+            if not any(
+                sanitize_id(str(i.get(self.unique_field, ""))).lower() == nid
+                for i in self.items
+            ):
                 self.items.append(itm)
                 added += 1
         if added:
