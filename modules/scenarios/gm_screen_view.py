@@ -6,7 +6,7 @@ from tkinter import filedialog, messagebox
 from PIL import Image
 from functools import partial
 from modules.generic.generic_model_wrapper import GenericModelWrapper
-from modules.helpers.text_helpers import format_longtext
+from modules.helpers.text_helpers import format_multiline_text
 from customtkinter import CTkLabel, CTkImage
 from modules.generic.entity_detail_factory import create_entity_detail_frame
 from modules.npcs.npc_graph_editor import NPCGraphEditor
@@ -740,7 +740,7 @@ class GMScreenView(ctk.CTkFrame):
         
     def insert_longtext(self, parent, header, content):
         ctk.CTkLabel(parent, text=f"{header}:", font=("Arial", 14, "bold")).pack(anchor="w", padx=10)
-        formatted_text = format_longtext(content, max_length=2000)
+        formatted_text = format_multiline_text(content, max_length=2000)
         box = ctk.CTkTextbox(parent, wrap="word", height=120)
         box.insert("1.0", formatted_text)
         box.configure(state="disabled")

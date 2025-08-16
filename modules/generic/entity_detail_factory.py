@@ -2,7 +2,7 @@ import os
 import customtkinter as ctk
 from PIL import Image
 from customtkinter import CTkLabel, CTkImage, CTkTextbox
-from modules.helpers.text_helpers import format_longtext
+from modules.helpers.text_helpers import format_longtext, format_multiline_text
 from modules.helpers.template_loader import load_template
 from modules.generic.generic_model_wrapper import GenericModelWrapper
 from tkinter import Toplevel, messagebox
@@ -55,7 +55,7 @@ def insert_longtext(parent, header, content):
         text = content.get("text", "")
     else:
         text = str(content)
-    formatted_text = format_longtext(text, max_length=2000)
+    formatted_text = format_multiline_text(text, max_length=2000)
 
     box = CTkTextbox(parent, wrap="word")
     box.insert = box._textbox.insert
