@@ -64,10 +64,10 @@ def insert_longtext(parent, header, content):
 
     # Resize after layout
     def update_height():
-        lines = int(box._textbox.count("1.0", "end", "displaylines")[0])
-        font = tkfont.nametofont(box._textbox.cget("font"))
+        lines = int(box._textbox.count("1.0", "end", "lines")[0])
+        font = tkfont.Font(font=box._textbox.cget("font"))
         line_px = font.metrics("linespace")
-        box.configure(height=max(2, lines) * line_px)
+        box.configure(height=max(2, lines+2) * line_px)
         box.configure(state="disabled")
 
     box.after_idle(update_height)
