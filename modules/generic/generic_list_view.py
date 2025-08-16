@@ -182,21 +182,39 @@ class GenericListView(ctk.CTkFrame):
         self.tree.bind("<Control-v>", lambda e: self.paste_item(self.tree.focus() or None))
         self.copied_item = None
         self.dragging_iid = None
+        # --- Row color setup ---
+        self.color_options = {
+            "Red": "#FF6666",
+            "Orange": "#FFB266",
+            "Yellow": "#FFFF66",
+            "Green": "#66FF66",
+            "Cyan": "#66FFFF",
+            "Blue": "#6699FF",
+            "Purple": "#CC66FF",
+            "Pink": "#FF66CC",
+            "Gray": "#CCCCCC",
+            "Brown": "#996633",
+        }
+        for name, hex_color in self.color_options.items():
+            self.tree.tag_configure(f"color_{name}", background=hex_color)
+
+        self.row_color_section = f"RowColors_{self.model_wrapper.entity_type}"
+        self.row_colors = {}
+        cfg = ConfigHelper.load_config()
+        if cfg.has_section(self.row_color_section):
+            self.row_colors = dict(cfg.items(self.row_color_section))
 
         self._tooltip = _ToolTip(self.tree)
 
         self.refresh_list()
     
     def show_portrait_window(self, iid):
-        item = next((it for it in self.filtered_items
-                    if sanitize_id(str(it.get(self.unique_field, ""))) == iid),
-                    None)
+        item, _ = self._find_item_by_iid(iid)
         if not item:
             messagebox.showerror("Error", "Item not found.")
             return
         path = item.get("Portrait", "")
         title = str(item.get(self.unique_field, ""))
-        # Delegate to our new helper
         show_portrait(path, title)
 
     def refresh_list(self):
@@ -273,12 +291,15 @@ class GenericListView(ctk.CTkFrame):
             raw = item.get(self.unique_field, "")
             if isinstance(raw, dict):
                 raw = raw.get("text", "")
-            base_id = sanitize_id(raw or f"item_{int(time.time()*1000)}")
+            base_id = sanitize_id(raw or f"item_{int(time.time()*1000)}").lower()
             iid = unique_iid(self.tree, base_id)
             name_text = self.clean_value(item.get(self.unique_field, ""))
             vals = tuple(self.clean_value(item.get(c, "")) for c in self.columns)
             try:
                 self.tree.insert("", "end", iid=iid, text=name_text, values=vals)
+                color = self.row_colors.get(base_id)
+                if color:
+                    self.tree.item(iid, tags=(f"color_{color}",))
             except Exception as e:
                 print("[ERROR] inserting item:", e, iid, vals)
         self.batch_index = end
@@ -299,12 +320,15 @@ class GenericListView(ctk.CTkFrame):
                 raw = item.get(self.unique_field, "")
                 if isinstance(raw, dict):
                     raw = raw.get("text", "")
-                base_iid = sanitize_id(raw or f"item_{int(time.time()*1000)}")
+                base_iid = sanitize_id(raw or f"item_{int(time.time()*1000)}").lower()
                 iid = unique_iid(self.tree, base_iid)
                 name_text = self.clean_value(item.get(self.unique_field, ""))
                 vals = tuple(self.clean_value(item.get(c, "")) for c in self.columns)
                 try:
                     self.tree.insert(group_id, "end", iid=iid, text=name_text, values=vals)
+                    color = self.row_colors.get(base_iid)
+                    if color:
+                        self.tree.item(iid, tags=(f"color_{color}",))
                 except Exception as e:
                     print("[ERROR] inserting item:", e, iid, vals)
 
@@ -332,9 +356,7 @@ class GenericListView(ctk.CTkFrame):
         iid = self.tree.focus()
         if not iid:
             return
-        item = next((it for it in self.filtered_items
-                    if sanitize_id(str(it.get(self.unique_field, ""))) == iid),
-                    None)
+        item, _ = self._find_item_by_iid(iid)
         if item:
             editor = GenericEditorWindow(
                 self.master, item, self.template,
@@ -350,14 +372,12 @@ class GenericListView(ctk.CTkFrame):
         if not iid:
             return
         self.tree.selection_set(iid)
-        # only show portrait if the item actually has one
-        item = next((it for it in self.filtered_items
-                    if sanitize_id(str(it.get(self.unique_field, ""))) == iid),
-                    None)
+        # Determine item and portrait path
+        item, base_id = self._find_item_by_iid(iid)
         campaign_dir = ConfigHelper.get_campaign_dir()
         portrait_path = item.get("Portrait", "") if item else ""
         if portrait_path:
-            portrait_path= os.path.join(campaign_dir, portrait_path)
+            portrait_path = os.path.join(campaign_dir, portrait_path)
             has_portrait = bool(portrait_path and os.path.isabs(portrait_path))
         else:
             has_portrait = False
@@ -386,11 +406,29 @@ class GenericListView(ctk.CTkFrame):
             label="Delete",
             command=lambda: self.delete_item(iid)
         )
+        if item:
+            color_menu = tk.Menu(menu, tearoff=0)
+            for name in self.color_options.keys():
+                color_menu.add_command(
+                    label=name,
+                    command=lambda n=name: self.set_row_color(iid, n)
+                )
+            color_menu.add_separator()
+            color_menu.add_command(
+                label="Clear Color",
+                command=lambda: self.set_row_color(iid, None)
+            )
+            menu.add_cascade(label="Row Color", menu=color_menu)
         menu.post(event.x_root, event.y_root)
-    
+
     def delete_item(self, iid):
-        self.items = [it for it in self.items
-                    if sanitize_id(str(it.get(self.unique_field, ""))) != iid]
+        base_id = iid.lower()
+        if base_id in self.row_colors:
+            self._save_row_color(base_id, None)
+        self.items = [
+            it for it in self.items
+            if sanitize_id(str(it.get(self.unique_field, ""))).lower() != base_id
+        ]
         self.model_wrapper.save_items(self.items)
         self.filter_items(self.search_var.get())
 
@@ -519,4 +557,43 @@ class GenericListView(ctk.CTkFrame):
         top.transient(self.master)
         top.lift()
         top.focus_force()
+
+    def _find_item_by_iid(self, iid):
+        for it in self.filtered_items:
+            raw = it.get(self.unique_field, "")
+            if isinstance(raw, dict):
+                raw = raw.get("text", "")
+            base_id = sanitize_id(raw).lower()
+            if iid == base_id or iid.startswith(base_id + "_"):
+                return it, base_id
+        return None, None
+
+    def set_row_color(self, iid, color_name):
+        item, base_id = self._find_item_by_iid(iid)
+        if not base_id:
+            return
+        if color_name:
+            self.tree.item(iid, tags=(f"color_{color_name}",))
+        else:
+            self.tree.item(iid, tags=())
+        self._save_row_color(base_id, color_name)
+
+    def _save_row_color(self, base_id, color_name):
+        cfg = ConfigHelper.load_config()
+        section = self.row_color_section
+        if not cfg.has_section(section):
+            cfg.add_section(section)
+        if color_name:
+            cfg.set(section, base_id, color_name)
+            self.row_colors[base_id] = color_name
+        else:
+            if cfg.has_option(section, base_id):
+                cfg.remove_option(section, base_id)
+            self.row_colors.pop(base_id, None)
+        with open("config/config.ini", "w", encoding="utf-8") as f:
+            cfg.write(f)
+        try:
+            ConfigHelper._config_mtime = os.path.getmtime("config/config.ini")
+        except OSError:
+            pass
         
