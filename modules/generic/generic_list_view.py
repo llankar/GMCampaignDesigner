@@ -105,6 +105,10 @@ class GenericListView(ctk.CTkFrame):
             if f["name"] not in ("Portrait", self.unique_field)
         ]
 
+        # --- Load saved list order ---
+        self.order_section = f"ListOrder_{self.model_wrapper.entity_type}"
+        self._load_list_order()
+
         # --- Search bar ---
         search_frame = ctk.CTkFrame(self)
         search_frame.pack(fill="x", padx=(5,45), pady=5)
@@ -257,6 +261,7 @@ class GenericListView(ctk.CTkFrame):
             self.items.insert(target_index, item)
             self.filtered_items = list(self.items)
             self.model_wrapper.save_items(self.items)
+            self._save_list_order()
         self.dragging_iid = None
 
     def copy_item(self, iid):
@@ -282,6 +287,7 @@ class GenericListView(ctk.CTkFrame):
             index = len(self.items)
         self.items.insert(index, new_item)
         self.model_wrapper.save_items(self.items)
+        self._save_list_order()
         self.filter_items(self.search_var.get())
 
     def insert_next_batch(self):
@@ -430,6 +436,7 @@ class GenericListView(ctk.CTkFrame):
             if sanitize_id(str(it.get(self.unique_field, ""))).lower() != base_id
         ]
         self.model_wrapper.save_items(self.items)
+        self._save_list_order()
         self.filter_items(self.search_var.get())
 
     def open_in_gm_screen(self, iid):
@@ -455,6 +462,7 @@ class GenericListView(ctk.CTkFrame):
         if self.open_editor(new, True):
             self.items.append(new)
             self.model_wrapper.save_items(self.items)
+            self._save_list_order()
             self.filter_items(self.search_var.get())
 
     def open_editor(self, item, creation_mode=False):
@@ -486,6 +494,7 @@ class GenericListView(ctk.CTkFrame):
                 added += 1
         if added:
             self.model_wrapper.save_items(self.items)
+            self._save_list_order()
             self.filter_items(self.search_var.get())
 
     def import_map_directory(self):
@@ -560,13 +569,45 @@ class GenericListView(ctk.CTkFrame):
 
     def _find_item_by_iid(self, iid):
         for it in self.filtered_items:
-            raw = it.get(self.unique_field, "")
-            if isinstance(raw, dict):
-                raw = raw.get("text", "")
-            base_id = sanitize_id(raw).lower()
+            base_id = self._get_base_id(it)
             if iid == base_id or iid.startswith(base_id + "_"):
                 return it, base_id
         return None, None
+
+    def _get_base_id(self, item):
+        raw = item.get(self.unique_field, "")
+        if isinstance(raw, dict):
+            raw = raw.get("text", "")
+        return sanitize_id(raw).lower()
+
+    def _load_list_order(self):
+        cfg = ConfigHelper.load_config()
+        self.list_order = {}
+        if cfg.has_section(self.order_section):
+            for key, val in cfg.items(self.order_section):
+                try:
+                    self.list_order[key] = int(val)
+                except ValueError:
+                    continue
+        self.items.sort(key=lambda it: self.list_order.get(self._get_base_id(it), float('inf')))
+        self.filtered_items = list(self.items)
+
+    def _save_list_order(self):
+        cfg = ConfigHelper.load_config()
+        section = self.order_section
+        if not cfg.has_section(section):
+            cfg.add_section(section)
+        else:
+            for opt in cfg.options(section):
+                cfg.remove_option(section, opt)
+        for idx, item in enumerate(self.items):
+            cfg.set(section, self._get_base_id(item), str(idx))
+        with open("config/config.ini", "w", encoding="utf-8") as f:
+            cfg.write(f)
+        try:
+            ConfigHelper._config_mtime = os.path.getmtime("config/config.ini")
+        except OSError:
+            pass
 
     def set_row_color(self, iid, color_name):
         item, base_id = self._find_item_by_iid(iid)
