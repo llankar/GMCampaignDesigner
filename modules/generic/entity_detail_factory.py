@@ -60,18 +60,17 @@ def insert_longtext(parent, header, content):
     box = CTkTextbox(parent, wrap="word")
     box.insert = box._textbox.insert
     box.insert("1.0", formatted_text)
-    box.configure(state="disabled")
     box.pack(fill="x", padx=10, pady=5)
 
     # Resize after layout
     def update_height():
         lines = int(box._textbox.count("1.0", "end", "displaylines")[0])
-        #font = tkfont.nametofont(box._textbox.cget("font"))
-        #line_px = font.metrics("linespace")
-        clamped = max(2, min(lines, 2))
-        box.configure(height=100)
+        font = tkfont.Font(font=box._textbox.cget("font"))
+        line_px = font.metrics("linespace")
+        box.configure(height=max(2, lines) * line_px)
+        box.configure(state="disabled")
 
-    box.after(100, update_height)
+    box.after_idle(update_height)
 
 def insert_links(parent, header, items, linked_type, open_entity_callback):
     ctk.CTkLabel(parent, text=f"{header}:", font=("Arial", 14, "bold")).pack(anchor="w", padx=10)
