@@ -542,40 +542,82 @@ class GenericListView(ctk.CTkFrame):
             self.refresh_cards()
 
     def refresh_cards(self):
+        """Rebuild the card view.
+
+        Building many cards at once can be slow and block the UI.  Instead of
+        creating every widget in a single pass we schedule the creation in
+        small batches using ``after`` which keeps the interface responsive.
+        """
+        if getattr(self, "_card_after_id", None):
+            self.after_cancel(self._card_after_id)
+            self._card_after_id = None
+
         for child in self.card_frame.winfo_children():
             child.destroy()
         self.card_widgets = {}
-        for item in self.filtered_items:
+
+        self._pending_cards = list(self.filtered_items)
+        self._build_card_batch(0)
+
+    def _build_card_batch(self, index, batch_size=20):
+        """Create a batch of cards and schedule the next batch."""
+        end = index + batch_size
+        for item in self._pending_cards[index:end]:
             base_id = self._get_base_id(item)
-            card = ctk.CTkFrame(self.card_frame)
-            card.pack(fill="x", padx=5, pady=5)
+            card = self._create_card(base_id, item)
             self.card_widgets[base_id] = card
-            color = self.row_colors.get(base_id)
-            if color:
-                card.configure(fg_color=self.color_options.get(color))
-            title = self.clean_value(item.get(self.unique_field, ""))
+        if end < len(self._pending_cards):
+            self._card_after_id = self.after(
+                1, self._build_card_batch, end, batch_size
+            )
+        else:
+            self._card_after_id = None
+
+    def _create_card(self, base_id, item):
+        """Create a single card widget for the given item."""
+        card = ctk.CTkFrame(
+            self.card_frame,
+            fg_color="#333333",
+            corner_radius=8,
+            border_width=2,
+            border_color="#555555",
+        )
+        card.pack(fill="x", padx=5, pady=5)
+
+        color = self.row_colors.get(base_id)
+        if color:
+            card.configure(fg_color=self.color_options.get(color))
+
+        title = self.clean_value(item.get(self.unique_field, ""))
+        ctk.CTkLabel(
+            card,
+            text=title,
+            font=("Segoe UI", 14, "bold"),
+            anchor="w",
+            justify="left",
+            wraplength=1500,
+        ).pack(fill="x", padx=5, pady=(5, 0))
+        for col in self.columns:
+            val = self.clean_value(item.get(col, ""))
             ctk.CTkLabel(
                 card,
-                text=title,
-                font=("Segoe UI", 14, "bold"),
+                text=f"{col}: {val}",
                 anchor="w",
                 justify="left",
                 wraplength=1500,
-            ).pack(fill="x", padx=5, pady=(5, 0))
-            for col in self.columns:
-                val = self.clean_value(item.get(col, ""))
-                ctk.CTkLabel(
-                    card,
-                    text=f"{col}: {val}",
-                    anchor="w",
-                    justify="left",
-                    wraplength=1500,
-                ).pack(fill="x", padx=5, pady=(0, 2))
-            card.bind("<Button-1>", lambda e, iid=base_id: self.on_card_click(iid))
-            card.bind("<Button-3>", lambda e, iid=base_id: self.on_card_right_click(e, iid))
-            for child in card.winfo_children():
-                child.bind("<Button-1>", lambda e, iid=base_id: self.on_card_click(iid))
-                child.bind("<Button-3>", lambda e, iid=base_id: self.on_card_right_click(e, iid))
+            ).pack(fill="x", padx=5, pady=(0, 2))
+
+        card.bind("<Button-1>", lambda e, iid=base_id: self.on_card_click(iid))
+        card.bind(
+            "<Button-3>", lambda e, iid=base_id: self.on_card_right_click(e, iid)
+        )
+        for child in card.winfo_children():
+            child.bind("<Button-1>", lambda e, iid=base_id: self.on_card_click(iid))
+            child.bind(
+                "<Button-3>",
+                lambda e, iid=base_id: self.on_card_right_click(e, iid),
+            )
+        return card
 
     def delete_item(self, iid):
         base_id = iid.lower()
