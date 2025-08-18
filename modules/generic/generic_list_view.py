@@ -557,10 +557,10 @@ class GenericListView(ctk.CTkFrame):
             ctk.CTkLabel(
                 card,
                 text=title,
-                font=("Segoe UI", 12, "bold"),
+                font=("Segoe UI", 14, "bold"),
                 anchor="w",
                 justify="left",
-                wraplength=600,
+                wraplength=1500,
             ).pack(fill="x", padx=5, pady=(5, 0))
             for col in self.columns:
                 val = self.clean_value(item.get(col, ""))
@@ -569,7 +569,7 @@ class GenericListView(ctk.CTkFrame):
                     text=f"{col}: {val}",
                     anchor="w",
                     justify="left",
-                    wraplength=600,
+                    wraplength=1500,
                 ).pack(fill="x", padx=5, pady=(0, 2))
             card.bind("<Button-1>", lambda e, iid=base_id: self.on_card_click(iid))
             card.bind("<Button-3>", lambda e, iid=base_id: self.on_card_right_click(e, iid))
