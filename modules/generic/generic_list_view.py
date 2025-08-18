@@ -105,6 +105,10 @@ class GenericListView(ctk.CTkFrame):
             if f["name"] not in ("Portrait", self.unique_field)
         ]
 
+        # --- Column configuration ---
+        self.column_section = f"ColumnSettings_{self.model_wrapper.entity_type}"
+        self._load_column_settings()
+
         # --- Load saved list order ---
         self.order_section = f"ListOrder_{self.model_wrapper.entity_type}"
         self._load_list_order()
@@ -169,6 +173,8 @@ class GenericListView(ctk.CTkFrame):
                             command=lambda c=col: self.sort_column(c))
             self.tree.column(col, width=150, anchor="w")
 
+        self._apply_column_settings()
+
         vsb = ttk.Scrollbar(tree_frame, orient="vertical", command=self.tree.yview)
         hsb = ttk.Scrollbar(tree_frame, orient="horizontal", command=self.tree.xview)
         self.tree.configure(yscrollcommand=vsb.set, xscrollcommand=hsb.set)
@@ -179,13 +185,14 @@ class GenericListView(ctk.CTkFrame):
 
         self.tree.bind("<Double-1>", self.on_double_click)
         self.tree.bind("<Button-3>", self.on_right_click)
-        self.tree.bind("<ButtonPress-1>", self.on_tree_click)
-        self.tree.bind("<B1-Motion>", self.on_tree_drag)
-        self.tree.bind("<ButtonRelease-1>", self.on_tree_drop)
+        self.tree.bind("<ButtonPress-1>", self.on_button_press)
+        self.tree.bind("<B1-Motion>", self.on_mouse_move)
+        self.tree.bind("<ButtonRelease-1>", self.on_button_release)
         self.tree.bind("<Control-c>", lambda e: self.copy_item(self.tree.focus()))
         self.tree.bind("<Control-v>", lambda e: self.paste_item(self.tree.focus() or None))
         self.copied_item = None
         self.dragging_iid = None
+        self.dragging_column = None
         # --- Row color setup ---
         self.color_options = {
             "Red": "#FF6666",
@@ -211,7 +218,7 @@ class GenericListView(ctk.CTkFrame):
         self._tooltip = _ToolTip(self.tree)
 
         self.refresh_list()
-    
+
     def show_portrait_window(self, iid):
         item, _ = self._find_item_by_iid(iid)
         if not item:
@@ -229,6 +236,43 @@ class GenericListView(ctk.CTkFrame):
             self.insert_grouped_items()
         else:
             self.insert_next_batch()
+
+    def on_button_press(self, event):
+        region = self.tree.identify("region", event.x, event.y)
+        if region == "heading":
+            col = self.tree.identify_column(event.x)
+            if col != "#0":
+                self.dragging_column = col
+            else:
+                self.dragging_column = None
+        else:
+            self.dragging_column = None
+            self.on_tree_click(event)
+
+    def on_mouse_move(self, event):
+        if self.dragging_column:
+            return
+        self.on_tree_drag(event)
+
+    def on_button_release(self, event):
+        if self.dragging_column:
+            target = self.tree.identify_column(event.x)
+            if target != self.dragging_column:
+                drag_name = self._column_from_ident(self.dragging_column)
+                target_name = self._column_from_ident(target)
+                if drag_name and drag_name in self.column_order:
+                    cols = [c for c in self.column_order if c != drag_name]
+                    if target_name in cols:
+                        idx = cols.index(target_name)
+                        cols.insert(idx, drag_name)
+                    else:
+                        cols.append(drag_name)
+                    self.column_order = cols
+                    self._apply_column_settings()
+            self.dragging_column = None
+        else:
+            self.on_tree_drop(event)
+        self._save_column_settings()
 
     def on_tree_click(self, event):
         if self.group_column or self.filtered_items != self.items:
@@ -398,6 +442,10 @@ class GenericListView(ctk.CTkFrame):
                 self.refresh_list()
 
     def on_right_click(self, event):
+        region = self.tree.identify("region", event.x, event.y)
+        if region == "heading":
+            self._show_columns_menu(event)
+            return
         iid = self.tree.identify_row(event.y)
         if not iid:
             return
@@ -608,6 +656,98 @@ class GenericListView(ctk.CTkFrame):
         if isinstance(raw, dict):
             raw = raw.get("text", "")
         return sanitize_id(raw).lower()
+
+    def _column_from_ident(self, ident):
+        if ident == "#0":
+            return None
+        try:
+            idx = int(ident.replace("#", "")) - 1
+        except ValueError:
+            return None
+        display = list(self.tree["displaycolumns"])
+        if 0 <= idx < len(display):
+            return display[idx]
+        return None
+
+    def _load_column_settings(self):
+        cfg = ConfigHelper.load_config()
+        self.column_order = list(self.columns)
+        self.hidden_columns = set()
+        self.column_widths = {}
+        if cfg.has_section(self.column_section):
+            order_str = cfg.get(self.column_section, "order", fallback="")
+            if order_str:
+                loaded = [c for c in order_str.split(",") if c in self.columns]
+                for c in self.columns:
+                    if c not in loaded:
+                        loaded.append(c)
+                self.column_order = loaded
+            hidden_str = cfg.get(self.column_section, "hidden", fallback="")
+            if hidden_str:
+                self.hidden_columns = {c for c in hidden_str.split(",") if c in self.columns}
+            for col in ["#0"] + self.columns:
+                key = f"width_{sanitize_id(col)}"
+                w = cfg.get(self.column_section, key, fallback="")
+                try:
+                    self.column_widths[col] = int(w)
+                except ValueError:
+                    pass
+
+    def _apply_column_settings(self):
+        for col, width in self.column_widths.items():
+            try:
+                self.tree.column(col, width=width)
+            except tk.TclError:
+                continue
+        display = [c for c in self.column_order if c not in self.hidden_columns]
+        self.tree["displaycolumns"] = display
+
+    def _save_column_settings(self):
+        cfg = ConfigHelper.load_config()
+        section = self.column_section
+        if not cfg.has_section(section):
+            cfg.add_section(section)
+        cfg.set(section, "order", ",".join(self.column_order))
+        cfg.set(section, "hidden", ",".join(self.hidden_columns))
+        for col in ["#0"] + list(self.columns):
+            key = f"width_{sanitize_id(col)}"
+            try:
+                width = self.tree.column("#0" if col == "#0" else col, "width")
+                cfg.set(section, key, str(width))
+            except tk.TclError:
+                continue
+        with open("config/config.ini", "w", encoding="utf-8") as f:
+            cfg.write(f)
+        try:
+            ConfigHelper._config_mtime = os.path.getmtime("config/config.ini")
+        except OSError:
+            pass
+
+    def _show_columns_menu(self, event):
+        menu = tk.Menu(self, tearoff=0)
+        menu.add_command(label="Columns...", command=self._open_column_chooser)
+        menu.post(event.x_root, event.y_root)
+
+    def _open_column_chooser(self):
+        top = ctk.CTkToplevel(self)
+        top.title("Columns")
+        vars = {}
+        for col in self.columns:
+            var = tk.BooleanVar(value=col not in self.hidden_columns)
+            vars[col] = var
+            chk = ctk.CTkCheckBox(top, text=col, variable=var)
+            chk.pack(anchor="w", padx=10, pady=2)
+
+        def apply():
+            self.hidden_columns = {c for c, v in vars.items() if not v.get()}
+            self._apply_column_settings()
+            self._save_column_settings()
+            top.destroy()
+
+        ctk.CTkButton(top, text="OK", command=apply).pack(pady=5)
+        top.transient(self.master)
+        top.lift()
+        top.focus_force()
 
     def _load_list_order(self):
         cfg = ConfigHelper.load_config()
