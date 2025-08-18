@@ -557,21 +557,32 @@ class GenericListView(ctk.CTkFrame):
         self.card_widgets = {}
 
         self._pending_cards = list(self.filtered_items)
-        self._build_card_batch(0)
+        self._next_card_index = 0
+        self._load_next_cards()
 
-    def _build_card_batch(self, index, batch_size=20):
-        """Create a batch of cards and schedule the next batch."""
-        end = index + batch_size
-        for item in self._pending_cards[index:end]:
+        canvas = getattr(self.card_frame, "_parent_canvas", None)
+        if canvas:
+            canvas.bind("<Configure>", self._on_card_scroll)
+            canvas.bind_all("<MouseWheel>", self._on_card_scroll)
+            canvas.bind_all("<Button-4>", self._on_card_scroll)
+            canvas.bind_all("<Button-5>", self._on_card_scroll)
+
+    def _load_next_cards(self, batch_size=10):
+        """Create the next batch of cards."""
+        end = self._next_card_index + batch_size
+        for item in self._pending_cards[self._next_card_index:end]:
             base_id = self._get_base_id(item)
             card = self._create_card(base_id, item)
             self.card_widgets[base_id] = card
-        if end < len(self._pending_cards):
-            self._card_after_id = self.after(
-                1, self._build_card_batch, end, batch_size
-            )
-        else:
-            self._card_after_id = None
+        self._next_card_index = end
+
+    def _on_card_scroll(self, event=None):
+        canvas = getattr(self.card_frame, "_parent_canvas", None)
+        if not canvas:
+            return
+        y1, y2 = canvas.yview()
+        if y2 >= 0.95 and self._next_card_index < len(self._pending_cards):
+            self._load_next_cards()
 
     def _create_card(self, base_id, item):
         """Create a single card widget for the given item."""
@@ -588,15 +599,23 @@ class GenericListView(ctk.CTkFrame):
         if color:
             card.configure(fg_color=self.color_options.get(color))
 
-        title = self.clean_value(item.get(self.unique_field, ""))
-        ctk.CTkLabel(
+        title_text = self.clean_value(item.get(self.unique_field, ""))
+        title_frame = ctk.CTkFrame(
             card,
-            text=title,
+            fg_color="#3d3d3d",
+            border_width=1,
+            border_color="#666666",
+            corner_radius=4,
+        )
+        title_frame.pack(fill="x", padx=5, pady=(5, 0))
+        ctk.CTkLabel(
+            title_frame,
+            text=title_text,
             font=("Segoe UI", 14, "bold"),
             anchor="w",
             justify="left",
             wraplength=1500,
-        ).pack(fill="x", padx=5, pady=(5, 0))
+        ).pack(fill="x", padx=4, pady=4)
         for col in self.columns:
             val = self.clean_value(item.get(col, ""))
             ctk.CTkLabel(

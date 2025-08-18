@@ -89,13 +89,19 @@ def display_pcs_in_banner(banner_frame, pcs_items):
         label_content.pack(fill="x")
 
     def add_large_label(parent, title, content):
-        frame = ctk.CTkFrame(parent, fg_color="transparent")
+        frame = ctk.CTkFrame(
+            parent,
+            fg_color="#555555",
+            border_width=1,
+            border_color="#777777",
+            corner_radius=4,
+        )
         frame.pack(fill="x", pady=2, padx=3)
         label_content = ctk.CTkLabel(
             frame, text=content, font=("Segoe UI", 15, "bold"),
             anchor="w", justify="left", wraplength=card_width - 20
         )
-        label_content.pack(fill="x")
+        label_content.pack(fill="x", padx=4, pady=4)
 
     # Populate all PCs
     for pc_name, pc_data in pcs_items.items():
