@@ -134,12 +134,20 @@ class GenericListView(ctk.CTkFrame):
         ctk.CTkButton(search_frame, text="Group By",
             command=self.choose_group_column)\
         .pack(side="left", padx=5)
+        self.current_view = "Table"
+        self.view_toggle = ctk.CTkSegmentedButton(
+            search_frame,
+            values=["Table", "Cards"],
+            command=self.on_view_change,
+        )
+        self.view_toggle.set("Table")
+        self.view_toggle.pack(side="left", padx=5)
 
         # --- Treeview setup ---
-        tree_frame = ctk.CTkFrame(self, fg_color="#2B2B2B")
-        tree_frame.pack(fill="both", expand=True, padx=5, pady=5)
-        tree_frame.grid_rowconfigure(0, weight=1)
-        tree_frame.grid_columnconfigure(0, weight=1)
+        self.tree_frame = ctk.CTkFrame(self, fg_color="#2B2B2B")
+        self.tree_frame.pack(fill="both", expand=True, padx=5, pady=5)
+        self.tree_frame.grid_rowconfigure(0, weight=1)
+        self.tree_frame.grid_columnconfigure(0, weight=1)
 
         style = ttk.Style(self)
         style.theme_use("clam")
@@ -157,7 +165,7 @@ class GenericListView(ctk.CTkFrame):
                 background=[("selected", "#2B2B2B")])
 
         self.tree = ttk.Treeview(
-            tree_frame,
+            self.tree_frame,
             columns=self.columns,
             show="tree headings",
             selectmode="browse",
@@ -175,13 +183,17 @@ class GenericListView(ctk.CTkFrame):
 
         self._apply_column_settings()
 
-        vsb = ttk.Scrollbar(tree_frame, orient="vertical", command=self.tree.yview)
-        hsb = ttk.Scrollbar(tree_frame, orient="horizontal", command=self.tree.xview)
+        vsb = ttk.Scrollbar(self.tree_frame, orient="vertical", command=self.tree.yview)
+        hsb = ttk.Scrollbar(self.tree_frame, orient="horizontal", command=self.tree.xview)
         self.tree.configure(yscrollcommand=vsb.set, xscrollcommand=hsb.set)
 
         self.tree.grid(row=0, column=0, sticky="nsew")
         vsb.grid(row=0, column=1, sticky="ns")
         hsb.grid(row=1, column=0, sticky="ew")
+
+        # --- Card view setup ---
+        self.card_frame = ctk.CTkScrollableFrame(self, fg_color="#2B2B2B")
+        self.card_widgets = {}
 
         self.tree.bind("<Double-1>", self.on_double_click)
         self.tree.bind("<Button-3>", self.on_right_click)
@@ -236,6 +248,8 @@ class GenericListView(ctk.CTkFrame):
             self.insert_grouped_items()
         else:
             self.insert_next_batch()
+        if self.current_view == "Cards":
+            self.refresh_cards()
 
     def on_button_press(self, event):
         region = self.tree.identify("region", event.x, event.y)
@@ -450,7 +464,24 @@ class GenericListView(ctk.CTkFrame):
         if not iid:
             return
         self.tree.selection_set(iid)
-        # Determine item and portrait path
+        self._show_item_menu(iid, event)
+
+    def on_card_right_click(self, event, iid):
+        self._show_item_menu(iid, event)
+
+    def on_card_click(self, iid):
+        item, _ = self._find_item_by_iid(iid)
+        if item:
+            editor = GenericEditorWindow(
+                self.master, item, self.template,
+                self.model_wrapper, creation_mode=False
+            )
+            self.master.wait_window(editor)
+            if getattr(editor, "saved", False):
+                self.model_wrapper.save_items(self.items)
+                self.refresh_list()
+
+    def _show_item_menu(self, iid, event):
         item, base_id = self._find_item_by_iid(iid)
         campaign_dir = ConfigHelper.get_campaign_dir()
         portrait_path = item.get("Portrait", "") if item else ""
@@ -498,6 +529,53 @@ class GenericListView(ctk.CTkFrame):
             )
             menu.add_cascade(label="Row Color", menu=color_menu)
         menu.post(event.x_root, event.y_root)
+
+    def on_view_change(self, value):
+        self.current_view = value
+        if value == "Table":
+            self.card_frame.pack_forget()
+            self.tree_frame.pack(fill="both", expand=True, padx=5, pady=5)
+            self.refresh_list()
+        else:
+            self.tree_frame.pack_forget()
+            self.card_frame.pack(fill="both", expand=True, padx=5, pady=5)
+            self.refresh_cards()
+
+    def refresh_cards(self):
+        for child in self.card_frame.winfo_children():
+            child.destroy()
+        self.card_widgets = {}
+        for item in self.filtered_items:
+            base_id = self._get_base_id(item)
+            card = ctk.CTkFrame(self.card_frame)
+            card.pack(fill="x", padx=5, pady=5)
+            self.card_widgets[base_id] = card
+            color = self.row_colors.get(base_id)
+            if color:
+                card.configure(fg_color=self.color_options.get(color))
+            title = self.clean_value(item.get(self.unique_field, ""))
+            ctk.CTkLabel(
+                card,
+                text=title,
+                font=("Segoe UI", 12, "bold"),
+                anchor="w",
+                justify="left",
+                wraplength=600,
+            ).pack(fill="x", padx=5, pady=(5, 0))
+            for col in self.columns:
+                val = self.clean_value(item.get(col, ""))
+                ctk.CTkLabel(
+                    card,
+                    text=f"{col}: {val}",
+                    anchor="w",
+                    justify="left",
+                    wraplength=600,
+                ).pack(fill="x", padx=5, pady=(0, 2))
+            card.bind("<Button-1>", lambda e, iid=base_id: self.on_card_click(iid))
+            card.bind("<Button-3>", lambda e, iid=base_id: self.on_card_right_click(e, iid))
+            for child in card.winfo_children():
+                child.bind("<Button-1>", lambda e, iid=base_id: self.on_card_click(iid))
+                child.bind("<Button-3>", lambda e, iid=base_id: self.on_card_right_click(e, iid))
 
     def delete_item(self, iid):
         base_id = iid.lower()
@@ -786,6 +864,12 @@ class GenericListView(ctk.CTkFrame):
             self.tree.item(iid, tags=(f"color_{color_name}",))
         else:
             self.tree.item(iid, tags=())
+        card = self.card_widgets.get(base_id)
+        if card:
+            if color_name:
+                card.configure(fg_color=self.color_options.get(color_name))
+            else:
+                card.configure(fg_color=self.card_frame.cget("fg_color"))
         # Deselect the row so the new color is visible immediately
         self.tree.selection_remove(iid)
         self.tree.focus("")
