@@ -1,10 +1,12 @@
 import re
 import time
 import os
+import hashlib
 import customtkinter as ctk
 import tkinter as tk
 from tkinter import ttk, messagebox, filedialog
 import copy
+from PIL import Image, ImageTk
 from modules.generic.generic_editor_window import GenericEditorWindow
 from modules.ui.image_viewer import show_portrait
 from modules.helpers.config_helper import ConfigHelper
@@ -12,6 +14,7 @@ from modules.scenarios.gm_screen_view import GMScreenView
 import shutil
 
 PORTRAIT_FOLDER = os.path.join(ConfigHelper.get_campaign_dir(), "assets", "portraits")
+THUMB_CACHE_DIR = os.path.join(PORTRAIT_FOLDER, ".thumb_cache")
 ctk.set_appearance_mode("Dark")
 ctk.set_default_color_theme("blue")
 
@@ -101,6 +104,11 @@ class GenericListView(ctk.CTkFrame):
             if f["name"] not in ("Portrait", self.unique_field)
         ]
 
+        # --- Thumbnail caching ---
+        os.makedirs(THUMB_CACHE_DIR, exist_ok=True)
+        self._thumb_cache = {}
+        self.thumb_size = 25  # matches Treeview rowheight
+
         # --- Column configuration ---
         self.column_section = f"ColumnSettings_{self.model_wrapper.entity_type}"
         self._load_column_settings()
@@ -135,7 +143,7 @@ class GenericListView(ctk.CTkFrame):
         self.tree_frame = ctk.CTkFrame(self, fg_color="#2B2B2B")
         self.tree_frame.pack(fill="both", expand=True, padx=5, pady=5)
         self.tree_frame.grid_rowconfigure(0, weight=1)
-        self.tree_frame.grid_columnconfigure(0, weight=1)
+        self.tree_frame.grid_columnconfigure(1, weight=1)
 
         style = ttk.Style(self)
         style.theme_use("clam")
@@ -171,13 +179,23 @@ class GenericListView(ctk.CTkFrame):
 
         self._apply_column_settings()
 
-        vsb = ttk.Scrollbar(self.tree_frame, orient="vertical", command=self.tree.yview)
-        hsb = ttk.Scrollbar(self.tree_frame, orient="horizontal", command=self.tree.xview)
-        self.tree.configure(yscrollcommand=vsb.set, xscrollcommand=hsb.set)
+        # Canvas for thumbnails
+        self.thumb_canvas = tk.Canvas(
+            self.tree_frame,
+            width=self.thumb_size,
+            highlightthickness=0,
+            bg="#2B2B2B",
+        )
+        self.thumb_canvas.grid(row=0, column=0, sticky="ns")
 
-        self.tree.grid(row=0, column=0, sticky="nsew")
-        vsb.grid(row=0, column=1, sticky="ns")
-        hsb.grid(row=1, column=0, sticky="ew")
+        self.vsb = ttk.Scrollbar(self.tree_frame, orient="vertical")
+        hsb = ttk.Scrollbar(self.tree_frame, orient="horizontal", command=self.tree.xview)
+        self.tree.configure(yscrollcommand=self._on_tree_yview, xscrollcommand=hsb.set)
+        self.vsb.configure(command=self._on_vsb)
+
+        self.tree.grid(row=0, column=1, sticky="nsew")
+        self.vsb.grid(row=0, column=2, sticky="ns")
+        hsb.grid(row=1, column=1, sticky="ew")
 
         self.tree.bind("<Double-1>", self.on_double_click)
         self.tree.bind("<Button-3>", self.on_right_click)
@@ -186,6 +204,9 @@ class GenericListView(ctk.CTkFrame):
         self.tree.bind("<ButtonRelease-1>", self.on_button_release)
         self.tree.bind("<Control-c>", lambda e: self.copy_item(self.tree.focus()))
         self.tree.bind("<Control-v>", lambda e: self.paste_item(self.tree.focus() or None))
+        self.tree.bind("<Configure>", lambda e: self._redraw_thumbnails())
+        self.tree.bind("<<TreeviewOpen>>", lambda e: self._redraw_thumbnails())
+        self.tree.bind("<<TreeviewClose>>", lambda e: self._redraw_thumbnails())
         self.copied_item = None
         self.dragging_iid = None
         self.dragging_column = None
@@ -220,7 +241,7 @@ class GenericListView(ctk.CTkFrame):
         if not item:
             messagebox.showerror("Error", "Item not found.")
             return
-        path = item.get("Portrait", "")
+        path = self._resolve_portrait_path(item.get("Portrait", ""))
         title = str(item.get(self.unique_field, ""))
         show_portrait(path, title)
 
@@ -232,6 +253,74 @@ class GenericListView(ctk.CTkFrame):
             self.insert_grouped_items()
         else:
             self.insert_next_batch()
+        self.after_idle(self._redraw_thumbnails)
+
+    # --- Thumbnail sidecar helpers ---
+    def _on_tree_yview(self, *args):
+        self.vsb.set(*args)
+        self._redraw_thumbnails()
+
+    def _on_vsb(self, *args):
+        self.tree.yview(*args)
+        self._redraw_thumbnails()
+
+    def _redraw_thumbnails(self):
+        if not hasattr(self, "thumb_canvas"):
+            return
+        self.thumb_canvas.delete("all")
+        self.thumb_canvas.image_refs = []
+        self.thumb_canvas.config(height=self.tree.winfo_height())
+        for iid in self.tree.get_children(""):
+            self._draw_thumb_recursive(iid)
+
+    def _resolve_portrait_path(self, portrait):
+        if not portrait:
+            return ""
+        path = portrait.replace("\\", os.sep)
+        drive, _ = os.path.splitdrive(path)
+        if os.path.isabs(path) or drive:
+            return os.path.normpath(path)
+        return os.path.normpath(os.path.join(ConfigHelper.get_campaign_dir(), path))
+
+    def _draw_thumb_recursive(self, iid):
+        bbox = self.tree.bbox(iid)
+        if bbox:
+            if not self.tree.get_children(iid):
+                item, _ = self._find_item_by_iid(iid)
+                if item:
+                    portrait_path = self._resolve_portrait_path(item.get("Portrait", ""))
+                    if portrait_path:
+                        thumb = self._get_thumbnail(portrait_path)
+                        if thumb:
+                            x = self.thumb_size // 2
+                            y = bbox[1] + bbox[3] // 2
+                            self.thumb_canvas.create_image(x, y, image=thumb)
+                            self.thumb_canvas.image_refs.append(thumb)
+        if self.tree.item(iid, "open"):
+            for child in self.tree.get_children(iid):
+                self._draw_thumb_recursive(child)
+
+    def _get_thumbnail(self, path):
+        path = os.path.normpath(path)
+        if not os.path.exists(path):
+            return None
+        if path in self._thumb_cache:
+            return self._thumb_cache[path]
+        hash_name = hashlib.md5(path.encode("utf-8")).hexdigest() + ".png"
+        cache_file = os.path.join(THUMB_CACHE_DIR, hash_name)
+        try:
+            if os.path.exists(cache_file):
+                with Image.open(cache_file) as pil_img:
+                    tk_img = ImageTk.PhotoImage(pil_img.copy())
+            else:
+                with Image.open(path) as pil_img:
+                    pil_img.thumbnail((self.thumb_size, self.thumb_size))
+                    pil_img.save(cache_file)
+                    tk_img = ImageTk.PhotoImage(pil_img.copy())
+            self._thumb_cache[path] = tk_img
+            return tk_img
+        except Exception:
+            return None
 
     def on_button_press(self, event):
         region = self.tree.identify("region", event.x, event.y)
@@ -306,6 +395,7 @@ class GenericListView(ctk.CTkFrame):
             self.model_wrapper.save_items(self.items)
             self._save_list_order()
         self.dragging_iid = None
+        self._redraw_thumbnails()
 
     def copy_item(self, iid):
         item = next(
@@ -373,6 +463,7 @@ class GenericListView(ctk.CTkFrame):
             except Exception as e:
                 print("[ERROR] inserting item:", e, iid, vals)
         self.batch_index = end
+        self._redraw_thumbnails()
         if end < len(self.filtered_items):
             self.after(50, self.insert_next_batch)
 
@@ -401,6 +492,7 @@ class GenericListView(ctk.CTkFrame):
                         self.tree.item(iid, tags=(f"color_{color}",))
                 except Exception as e:
                     print("[ERROR] inserting item:", e, iid, vals)
+        self._redraw_thumbnails()
 
     def clean_value(self, val):
         if val is None:
@@ -450,13 +542,8 @@ class GenericListView(ctk.CTkFrame):
 
     def _show_item_menu(self, iid, event):
         item, base_id = self._find_item_by_iid(iid)
-        campaign_dir = ConfigHelper.get_campaign_dir()
-        portrait_path = item.get("Portrait", "") if item else ""
-        if portrait_path:
-            portrait_path = os.path.join(campaign_dir, portrait_path)
-            has_portrait = bool(portrait_path and os.path.isabs(portrait_path))
-        else:
-            has_portrait = False
+        portrait_path = self._resolve_portrait_path(item.get("Portrait", "")) if item else ""
+        has_portrait = bool(portrait_path and os.path.exists(portrait_path))
 
         menu = tk.Menu(self, tearoff=0)
         if self.model_wrapper.entity_type == "scenarios":
