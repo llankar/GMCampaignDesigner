@@ -542,23 +542,31 @@ class GenericListView(ctk.CTkFrame):
             self.refresh_cards()
 
     def refresh_cards(self):
-        """Rebuild the card view.
+        """Rebuild the card view with virtualized card loading.
 
-        Building many cards at once can be slow and block the UI.  Instead of
-        creating every widget in a single pass we schedule the creation in
-        small batches using ``after`` which keeps the interface responsive.
+        Only a small window of cards is kept in memory.  As the user scrolls
+        cards that move far out of view are destroyed and new ones are created
+        on demand.  This keeps the widget count low even for very long lists.
         """
-        if getattr(self, "_card_after_id", None):
-            self.after_cancel(self._card_after_id)
-            self._card_after_id = None
 
         for child in self.card_frame.winfo_children():
             child.destroy()
+
+        # Mapping from list index -> base_id for cards currently in memory
+        self._card_indices = {}
+        # Mapping from base_id -> card widget (used for row color updates)
         self.card_widgets = {}
 
-        self._pending_cards = list(self.filtered_items)
-        self._next_card_index = 0
-        self._load_next_cards()
+        # Spacer frames reserve vertical space for items that are not
+        # currently rendered so the scrollbar represents the full list
+        self._top_spacer = ctk.CTkFrame(self.card_frame, height=0)
+        self._top_spacer.pack(fill="x")
+        self._bottom_spacer = ctk.CTkFrame(self.card_frame, height=0)
+        self._bottom_spacer.pack(fill="x")
+
+        self._card_height = None
+        self._visible_start = 0
+        self._visible_end = 0
 
         canvas = getattr(self.card_frame, "_parent_canvas", None)
         if canvas:
@@ -567,33 +575,87 @@ class GenericListView(ctk.CTkFrame):
             canvas.bind_all("<Button-4>", self._on_card_scroll)
             canvas.bind_all("<Button-5>", self._on_card_scroll)
 
-    def _load_next_cards(self, batch_size=10, delay_ms=10):
-        """Create the next batch of cards.
-
-        Each batch of cards is created via ``after`` to keep the UI responsive
-        when dealing with large numbers of widgets.
-        """
-        end = self._next_card_index + batch_size
-        for item in self._pending_cards[self._next_card_index:end]:
-            base_id = self._get_base_id(item)
-            card = self._create_card(base_id, item)
-            self.card_widgets[base_id] = card
-        self._next_card_index = end
-        if self._next_card_index < len(self._pending_cards):
-            self._card_after_id = self.after(delay_ms, self._load_next_cards)
-        else:
-            self._card_after_id = None
+        # Populate the initial visible region
+        self.after(0, self._on_card_scroll)
 
     def _on_card_scroll(self, event=None):
         canvas = getattr(self.card_frame, "_parent_canvas", None)
-        if not canvas:
+        if not canvas or not self.filtered_items:
             return
-        y1, y2 = canvas.yview()
-        if y2 >= 0.95 and self._next_card_index < len(self._pending_cards):
-            self._load_next_cards()
 
-    def _create_card(self, base_id, item):
-        """Create a single card widget for the given item."""
+        # Determine the height of a single card if not known yet
+        if self._card_height is None:
+            sample_item = self.filtered_items[0]
+            sample = self._create_card(self._get_base_id(sample_item), sample_item,
+                                       before=self._bottom_spacer)
+            self.card_frame.update_idletasks()
+            self._card_height = sample.winfo_height() + 10  # padding
+            sample.destroy()
+
+        total_items = len(self.filtered_items)
+        y1, y2 = canvas.yview()
+        canvas_h = canvas.winfo_height()
+        total_height = self._card_height * total_items
+
+        first_pixel = y1 * total_height
+        last_pixel = first_pixel + canvas_h
+
+        first_index = max(0, int(first_pixel // self._card_height))
+        last_index = min(total_items, int(last_pixel // self._card_height) + 1)
+
+        buffer = 5
+        start = max(0, first_index - buffer)
+        end = min(total_items, last_index + buffer)
+
+        if start != self._visible_start or end != self._visible_end:
+            self._visible_start, self._visible_end = start, end
+            self._update_visible_cards()
+
+    def _update_visible_cards(self):
+        """Create/destroy cards to match the current visible index range."""
+        start, end = self._visible_start, self._visible_end
+        total = len(self.filtered_items)
+
+        # Remove cards that are no longer in the visible window
+        for idx in list(self._card_indices.keys()):
+            if idx < start or idx >= end:
+                base_id = self._card_indices.pop(idx)
+                card = self.card_widgets.pop(base_id, None)
+                if card:
+                    card.destroy()
+
+        # Create cards for newly visible indices
+        for idx in range(start, end):
+            if idx not in self._card_indices:
+                item = self.filtered_items[idx]
+                base_id = self._get_base_id(item)
+                card = self._create_card(base_id, item, before=self._bottom_spacer)
+                self._card_indices[idx] = base_id
+                self.card_widgets[base_id] = card
+
+        # Adjust spacer heights to represent off-screen content
+        if self._card_height:
+            top_h = start * self._card_height
+            bottom_h = (total - end) * self._card_height
+            self._top_spacer.configure(height=top_h)
+            self._bottom_spacer.configure(height=bottom_h)
+            canvas = getattr(self.card_frame, "_parent_canvas", None)
+            if canvas:
+                canvas.configure(scrollregion=canvas.bbox("all"))
+
+    def _create_card(self, base_id, item, before=None):
+        """Create a single card widget for the given item.
+
+        Parameters
+        ----------
+        base_id: str
+            Identifier of the item.
+        item: dict
+            Data for the card.
+        before: widget, optional
+            If given, the card will be packed before this widget.  Used by the
+            virtualized list to insert cards before the bottom spacer.
+        """
         card = ctk.CTkFrame(
             self.card_frame,
             fg_color="#333333",
@@ -601,7 +663,10 @@ class GenericListView(ctk.CTkFrame):
             border_width=2,
             border_color="#555555",
         )
-        card.pack(fill="x", padx=5, pady=5)
+        pack_opts = {"fill": "x", "padx": 5, "pady": 5}
+        if before is not None:
+            pack_opts["before"] = before
+        card.pack(**pack_opts)
 
         color = self.row_colors.get(base_id)
         if color:
