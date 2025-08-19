@@ -567,14 +567,22 @@ class GenericListView(ctk.CTkFrame):
             canvas.bind_all("<Button-4>", self._on_card_scroll)
             canvas.bind_all("<Button-5>", self._on_card_scroll)
 
-    def _load_next_cards(self, batch_size=10):
-        """Create the next batch of cards."""
+    def _load_next_cards(self, batch_size=10, delay_ms=10):
+        """Create the next batch of cards.
+
+        Each batch of cards is created via ``after`` to keep the UI responsive
+        when dealing with large numbers of widgets.
+        """
         end = self._next_card_index + batch_size
         for item in self._pending_cards[self._next_card_index:end]:
             base_id = self._get_base_id(item)
             card = self._create_card(base_id, item)
             self.card_widgets[base_id] = card
         self._next_card_index = end
+        if self._next_card_index < len(self._pending_cards):
+            self._card_after_id = self.after(delay_ms, self._load_next_cards)
+        else:
+            self._card_after_id = None
 
     def _on_card_scroll(self, event=None):
         canvas = getattr(self.card_frame, "_parent_canvas", None)
