@@ -466,10 +466,21 @@ class GenericListView(ctk.CTkFrame):
         self.tree.selection_set(iid)
         self._show_item_menu(iid, event)
 
-    def on_card_right_click(self, event, iid):
-        self._show_item_menu(iid, event)
+    def on_card_right_click(self, event):
+        card_widget = event.widget
+        while card_widget and not hasattr(card_widget, "_base_id"):
+            card_widget = card_widget.master
+        if not card_widget:
+            return
+        self._show_item_menu(card_widget._base_id, event)
 
-    def on_card_click(self, iid):
+    def on_card_click(self, event):
+        card_widget = event.widget
+        while card_widget and not hasattr(card_widget, "_base_id"):
+            card_widget = card_widget.master
+        if not card_widget:
+            return
+        iid = card_widget._base_id
         item, _ = self._find_item_by_iid(iid)
         if item:
             editor = GenericEditorWindow(
@@ -603,6 +614,8 @@ class GenericListView(ctk.CTkFrame):
         )
         card.pack(fill="x", padx=5, pady=5)
 
+        card._base_id = base_id
+
         color = self.row_colors.get(base_id)
         if color:
             card.configure(fg_color=self.color_options.get(color))
@@ -634,16 +647,8 @@ class GenericListView(ctk.CTkFrame):
                 wraplength=1500,
             ).pack(fill="x", padx=5, pady=(0, 2))
 
-        card.bind("<Button-1>", lambda e, iid=base_id: self.on_card_click(iid))
-        card.bind(
-            "<Button-3>", lambda e, iid=base_id: self.on_card_right_click(e, iid)
-        )
-        for child in card.winfo_children():
-            child.bind("<Button-1>", lambda e, iid=base_id: self.on_card_click(iid))
-            child.bind(
-                "<Button-3>",
-                lambda e, iid=base_id: self.on_card_right_click(e, iid),
-            )
+        card.bind("<Button-1>", self.on_card_click)
+        card.bind("<Button-3>", self.on_card_right_click)
         return card
 
     def delete_item(self, iid):
