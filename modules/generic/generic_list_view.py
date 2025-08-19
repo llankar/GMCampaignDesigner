@@ -1,21 +1,17 @@
 import re
 import time
-import os, ctypes
-from ctypes import wintypes
+import os
 import customtkinter as ctk
 import tkinter as tk
 from tkinter import ttk, messagebox, filedialog
 import copy
-from PIL import Image, ImageTk
 from modules.generic.generic_editor_window import GenericEditorWindow
 from modules.ui.image_viewer import show_portrait
 from modules.helpers.config_helper import ConfigHelper
-from modules.helpers.window_helper import position_window_at_top
 from modules.scenarios.gm_screen_view import GMScreenView
 import shutil
 
 PORTRAIT_FOLDER = os.path.join(ConfigHelper.get_campaign_dir(), "assets", "portraits")
-MAX_PORTRAIT_SIZE = (1024, 1024)
 ctk.set_appearance_mode("Dark")
 ctk.set_default_color_theme("blue")
 
@@ -134,14 +130,6 @@ class GenericListView(ctk.CTkFrame):
         ctk.CTkButton(search_frame, text="Group By",
             command=self.choose_group_column)\
         .pack(side="left", padx=5)
-        self.current_view = "Table"
-        self.view_toggle = ctk.CTkSegmentedButton(
-            search_frame,
-            values=["Table", "Cards"],
-            command=self.on_view_change,
-        )
-        self.view_toggle.set("Table")
-        self.view_toggle.pack(side="left", padx=5)
 
         # --- Treeview setup ---
         self.tree_frame = ctk.CTkFrame(self, fg_color="#2B2B2B")
@@ -190,10 +178,6 @@ class GenericListView(ctk.CTkFrame):
         self.tree.grid(row=0, column=0, sticky="nsew")
         vsb.grid(row=0, column=1, sticky="ns")
         hsb.grid(row=1, column=0, sticky="ew")
-
-        # --- Card view setup ---
-        self.card_frame = ctk.CTkScrollableFrame(self, fg_color="#2B2B2B")
-        self.card_widgets = {}
 
         self.tree.bind("<Double-1>", self.on_double_click)
         self.tree.bind("<Button-3>", self.on_right_click)
@@ -248,8 +232,6 @@ class GenericListView(ctk.CTkFrame):
             self.insert_grouped_items()
         else:
             self.insert_next_batch()
-        if self.current_view == "Cards":
-            self.refresh_cards()
 
     def on_button_press(self, event):
         region = self.tree.identify("region", event.x, event.y)
@@ -466,21 +448,6 @@ class GenericListView(ctk.CTkFrame):
         self.tree.selection_set(iid)
         self._show_item_menu(iid, event)
 
-    def on_card_right_click(self, event, iid):
-        self._show_item_menu(iid, event)
-
-    def on_card_click(self, iid):
-        item, _ = self._find_item_by_iid(iid)
-        if item:
-            editor = GenericEditorWindow(
-                self.master, item, self.template,
-                self.model_wrapper, creation_mode=False
-            )
-            self.master.wait_window(editor)
-            if getattr(editor, "saved", False):
-                self.model_wrapper.save_items(self.items)
-                self.refresh_list()
-
     def _show_item_menu(self, iid, event):
         item, base_id = self._find_item_by_iid(iid)
         campaign_dir = ConfigHelper.get_campaign_dir()
@@ -529,187 +496,6 @@ class GenericListView(ctk.CTkFrame):
             )
             menu.add_cascade(label="Row Color", menu=color_menu)
         menu.post(event.x_root, event.y_root)
-
-    def on_view_change(self, value):
-        self.current_view = value
-        if value == "Table":
-            self.card_frame.pack_forget()
-            self.tree_frame.pack(fill="both", expand=True, padx=5, pady=5)
-            self.refresh_list()
-        else:
-            self.tree_frame.pack_forget()
-            self.card_frame.pack(fill="both", expand=True, padx=5, pady=5)
-            self.refresh_cards()
-
-    def refresh_cards(self):
-        """Rebuild the card view with virtualized card loading.
-
-        Only a small window of cards is kept in memory.  As the user scrolls
-        cards that move far out of view are destroyed and new ones are created
-        on demand.  This keeps the widget count low even for very long lists.
-        """
-
-        for child in self.card_frame.winfo_children():
-            child.destroy()
-
-        # Mapping from list index -> base_id for cards currently in memory
-        self._card_indices = {}
-        # Mapping from base_id -> card widget (used for row color updates)
-        self.card_widgets = {}
-
-        # Spacer frames reserve vertical space for items that are not
-        # currently rendered so the scrollbar represents the full list
-        self._top_spacer = ctk.CTkFrame(self.card_frame, height=0)
-        self._top_spacer.pack(fill="x")
-        self._bottom_spacer = ctk.CTkFrame(self.card_frame, height=0)
-        self._bottom_spacer.pack(fill="x")
-
-        self._card_height = None
-        self._visible_start = 0
-        self._visible_end = 0
-
-        canvas = getattr(self.card_frame, "_parent_canvas", None)
-        if canvas:
-            canvas.bind("<Configure>", self._on_card_scroll)
-            canvas.bind_all("<MouseWheel>", self._on_card_scroll)
-            canvas.bind_all("<Button-4>", self._on_card_scroll)
-            canvas.bind_all("<Button-5>", self._on_card_scroll)
-
-        # Populate the initial visible region
-        self.after(0, self._on_card_scroll)
-
-    def _on_card_scroll(self, event=None):
-        canvas = getattr(self.card_frame, "_parent_canvas", None)
-        if not canvas or not self.filtered_items:
-            return
-
-        # Determine the height of a single card if not known yet
-        if self._card_height is None:
-            sample_item = self.filtered_items[0]
-            sample = self._create_card(self._get_base_id(sample_item), sample_item,
-                                       before=self._bottom_spacer)
-            self.card_frame.update_idletasks()
-            self._card_height = sample.winfo_height() + 10  # padding
-            sample.destroy()
-
-        total_items = len(self.filtered_items)
-        y1, y2 = canvas.yview()
-        canvas_h = canvas.winfo_height()
-        total_height = self._card_height * total_items
-
-        first_pixel = y1 * total_height
-        last_pixel = first_pixel + canvas_h
-
-        first_index = max(0, int(first_pixel // self._card_height))
-        last_index = min(total_items, int(last_pixel // self._card_height) + 1)
-
-        buffer = 5
-        start = max(0, first_index - buffer)
-        end = min(total_items, last_index + buffer)
-
-        if start != self._visible_start or end != self._visible_end:
-            self._visible_start, self._visible_end = start, end
-            self._update_visible_cards()
-
-    def _update_visible_cards(self):
-        """Create/destroy cards to match the current visible index range."""
-        start, end = self._visible_start, self._visible_end
-        total = len(self.filtered_items)
-
-        # Remove cards that are no longer in the visible window
-        for idx in list(self._card_indices.keys()):
-            if idx < start or idx >= end:
-                base_id = self._card_indices.pop(idx)
-                card = self.card_widgets.pop(base_id, None)
-                if card:
-                    card.destroy()
-
-        # Create cards for newly visible indices
-        for idx in range(start, end):
-            if idx not in self._card_indices:
-                item = self.filtered_items[idx]
-                base_id = self._get_base_id(item)
-                card = self._create_card(base_id, item, before=self._bottom_spacer)
-                self._card_indices[idx] = base_id
-                self.card_widgets[base_id] = card
-
-        # Adjust spacer heights to represent off-screen content
-        if self._card_height:
-            top_h = start * self._card_height
-            bottom_h = (total - end) * self._card_height
-            self._top_spacer.configure(height=top_h)
-            self._bottom_spacer.configure(height=bottom_h)
-            canvas = getattr(self.card_frame, "_parent_canvas", None)
-            if canvas:
-                canvas.configure(scrollregion=canvas.bbox("all"))
-
-    def _create_card(self, base_id, item, before=None):
-        """Create a single card widget for the given item.
-
-        Parameters
-        ----------
-        base_id: str
-            Identifier of the item.
-        item: dict
-            Data for the card.
-        before: widget, optional
-            If given, the card will be packed before this widget.  Used by the
-            virtualized list to insert cards before the bottom spacer.
-        """
-        card = ctk.CTkFrame(
-            self.card_frame,
-            fg_color="#333333",
-            corner_radius=8,
-            border_width=2,
-            border_color="#555555",
-        )
-        pack_opts = {"fill": "x", "padx": 5, "pady": 5}
-        if before is not None:
-            pack_opts["before"] = before
-        card.pack(**pack_opts)
-
-        color = self.row_colors.get(base_id)
-        if color:
-            card.configure(fg_color=self.color_options.get(color))
-
-        title_text = self.clean_value(item.get(self.unique_field, ""))
-        title_frame = ctk.CTkFrame(
-            card,
-            fg_color="#3d3d3d",
-            border_width=1,
-            border_color="#666666",
-            corner_radius=4,
-        )
-        title_frame.pack(fill="x", padx=5, pady=(5, 0))
-        ctk.CTkLabel(
-            title_frame,
-            text=title_text,
-            font=("Segoe UI", 14, "bold"),
-            anchor="w",
-            justify="left",
-            wraplength=1500,
-        ).pack(fill="x", padx=4, pady=4)
-        for col in self.columns:
-            val = self.clean_value(item.get(col, ""))
-            ctk.CTkLabel(
-                card,
-                text=f"{col}: {val}",
-                anchor="w",
-                justify="left",
-                wraplength=1500,
-            ).pack(fill="x", padx=5, pady=(0, 2))
-
-        card.bind("<Button-1>", lambda e, iid=base_id: self.on_card_click(iid))
-        card.bind(
-            "<Button-3>", lambda e, iid=base_id: self.on_card_right_click(e, iid)
-        )
-        for child in card.winfo_children():
-            child.bind("<Button-1>", lambda e, iid=base_id: self.on_card_click(iid))
-            child.bind(
-                "<Button-3>",
-                lambda e, iid=base_id: self.on_card_right_click(e, iid),
-            )
-        return card
 
     def delete_item(self, iid):
         base_id = iid.lower()
@@ -998,12 +784,6 @@ class GenericListView(ctk.CTkFrame):
             self.tree.item(iid, tags=(f"color_{color_name}",))
         else:
             self.tree.item(iid, tags=())
-        card = self.card_widgets.get(base_id)
-        if card:
-            if color_name:
-                card.configure(fg_color=self.color_options.get(color_name))
-            else:
-                card.configure(fg_color=self.card_frame.cget("fg_color"))
         # Deselect the row so the new color is visible immediately
         self.tree.selection_remove(iid)
         self.tree.focus("")
