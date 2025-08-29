@@ -175,8 +175,7 @@ class MainWindow(ctk.CTk):
             "import_scenario": self.load_icon("import_icon.png", size=(60, 60)),
             "export_foundry": self.load_icon("export_foundry_icon.png", size=(60, 60)),
             "map_tool": self.load_icon("map_tool_icon.png", size=(60, 60)),
-            "generate_scenario": self.load_icon("generate_scenario_icon.png", size=(60, 60)),
-            "ai_settings": self.load_icon("folder_icon.png", size=(60, 60)),
+            "generate_scenario": self.load_icon("generate_scenario_icon.png", size=(60, 60))
         }
 
     def load_icon(self, file_name, size=(60, 60)):
@@ -233,7 +232,6 @@ class MainWindow(ctk.CTk):
         icons_list = [
             ("change_db", "Change Data Storage", self.change_database_storage),
             ("swarm_path", "Set SwarmUI Path", self.select_swarmui_path),
-            ("ai_settings", "AI Settings", self.open_ai_settings),
             ("manage_scenarios", "Manage Scenarios", lambda: self.open_entity("scenarios")),
             ("manage_pcs", "Manage PCs", lambda: self.open_entity("pcs")),
             ("manage_npcs", "Manage NPCs", lambda: self.open_entity("npcs")),

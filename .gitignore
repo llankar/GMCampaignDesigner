@@ -3070,12 +3070,5 @@ Campaigns/DresdenFiles/masks/Unnamed_2523761832832_mask.png
 Campaigns/DresdenFiles/masks/Unnamed_3127463781520_mask.png
 db/__pycache__/db.cpython-312.pyc
 modules/ai/__pycache__/local_ai_client.cpython-312.pyc
-modules/factions/__pycache__/faction_graph_editor.cpython-312.pyc
-modules/factions/__pycache__/faction_graph_editor.cpython-312.pyc
-modules/factions/__pycache__/faction_graph_editor.cpython-312.pyc
-modules/generic/__pycache__/entity_detail_factory.cpython-312.pyc
-modules/generic/__pycache__/export_for_foundry.cpython-312.pyc
-modules/generic/__pycache__/generic_editor_window.cpython-312.pyc
-modules/generic/__pycache__/generic_list_selection_view.cpython-312.pyc
-modules/generic/__pycache__/generic_list_view.cpython-312.pyc
-modules/generic/__pycache__/generic_model_wrapper.cpython-312.pyc
+modules/factions/__pycache__/*
+modules/generic/__pycache__/*

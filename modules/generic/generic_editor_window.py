@@ -1134,7 +1134,7 @@ class GenericEditorWindow(ctk.CTkToplevel):
             current = self._field_text(field_name)
             context_name = self.item.get("Name") or self.item.get("Title") or self.model_wrapper.entity_type
             system = (
-                "You are a helpful RPG assistant. Improve the given text for use in a campaign manager. "
+                "You are a helpful RPG assistant. Improve the given text for use in a campaign manager adding details and flavor. "
                 "Keep it concise, evocative, and suitable for GMs. Return plain text only."
             )
             user = f"Entity: {context_name}\nField: {field_name}\nText to improve:\n{current}"
