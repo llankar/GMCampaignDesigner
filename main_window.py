@@ -72,6 +72,70 @@ class MainWindow(ctk.CTk):
         root = self.winfo_toplevel()
         root.bind_all("<Control-f>", self._on_ctrl_f)
 
+    def open_ai_settings(self):
+        top = ctk.CTkToplevel(self)
+        top.title("AI Settings")
+        top.geometry("520x360")
+        top.lift(); top.focus_force(); top.attributes("-topmost", True); top.after_idle(lambda: top.attributes("-topmost", False))
+
+        # Current config values
+        base_url = ConfigHelper.get("AI", "base_url", fallback="http://localhost:8080") or ""
+        model = ConfigHelper.get("AI", "model", fallback="gpt-oss") or ""
+        temperature = ConfigHelper.get("AI", "temperature", fallback="0.7") or "0.7"
+        max_tokens = ConfigHelper.get("AI", "max_tokens", fallback="512") or "512"
+        api_key = ConfigHelper.get("AI", "api_key", fallback="") or ""
+
+        # Vars
+        v_base = ctk.StringVar(value=base_url)
+        v_model = ctk.StringVar(value=model)
+        v_temp = ctk.StringVar(value=str(temperature))
+        v_max = ctk.StringVar(value=str(max_tokens))
+        v_key = ctk.StringVar(value=api_key)
+
+        form = ctk.CTkFrame(top)
+        form.pack(fill="both", expand=True, padx=12, pady=12)
+
+        def row(label, widget):
+            r = ctk.CTkFrame(form)
+            r.pack(fill="x", pady=6)
+            ctk.CTkLabel(r, text=label, width=140, anchor="w").pack(side="left")
+            widget.pack(side="left", fill="x", expand=True)
+
+        row("Base URL", ctk.CTkEntry(form, textvariable=v_base, placeholder_text="http://localhost:8080"))
+        row("Model", ctk.CTkEntry(form, textvariable=v_model, placeholder_text="gpt-oss"))
+        row("Temperature", ctk.CTkEntry(form, textvariable=v_temp))
+        row("Max Tokens", ctk.CTkEntry(form, textvariable=v_max))
+        row("API Key", ctk.CTkEntry(form, textvariable=v_key))
+
+        btns = ctk.CTkFrame(top)
+        btns.pack(fill="x", padx=12, pady=(0,12))
+
+        def save():
+            try:
+                # Basic normalization
+                _ = float(v_temp.get())
+                _ = int(v_max.get())
+            except Exception:
+                messagebox.showerror("Invalid Values", "Temperature must be a float and Max Tokens an integer.")
+                return
+            ConfigHelper.set("AI", "base_url", v_base.get().strip())
+            ConfigHelper.set("AI", "model", v_model.get().strip())
+            ConfigHelper.set("AI", "temperature", v_temp.get().strip())
+            ConfigHelper.set("AI", "max_tokens", v_max.get().strip())
+            ConfigHelper.set("AI", "api_key", v_key.get())
+            messagebox.showinfo("Saved", "AI settings saved.")
+
+        def reset_defaults():
+            v_base.set("http://localhost:8080")
+            v_model.set("gpt-oss")
+            v_temp.set("0.7")
+            v_max.set("512")
+            v_key.set("")
+
+        ctk.CTkButton(btns, text="Save", command=save).pack(side="right", padx=6)
+        ctk.CTkButton(btns, text="Defaults", command=reset_defaults).pack(side="right", padx=6)
+        ctk.CTkButton(btns, text="Close", command=top.destroy).pack(side="right", padx=6)
+
     # ---------------------------
     # Setup and Layout Methods
     # ---------------------------
@@ -112,6 +176,7 @@ class MainWindow(ctk.CTk):
             "export_foundry": self.load_icon("export_foundry_icon.png", size=(60, 60)),
             "map_tool": self.load_icon("map_tool_icon.png", size=(60, 60)),
             "generate_scenario": self.load_icon("generate_scenario_icon.png", size=(60, 60)),
+            "ai_settings": self.load_icon("folder_icon.png", size=(60, 60)),
         }
 
     def load_icon(self, file_name, size=(60, 60)):
@@ -168,6 +233,7 @@ class MainWindow(ctk.CTk):
         icons_list = [
             ("change_db", "Change Data Storage", self.change_database_storage),
             ("swarm_path", "Set SwarmUI Path", self.select_swarmui_path),
+            ("ai_settings", "AI Settings", self.open_ai_settings),
             ("manage_scenarios", "Manage Scenarios", lambda: self.open_entity("scenarios")),
             ("manage_pcs", "Manage PCs", lambda: self.open_entity("pcs")),
             ("manage_npcs", "Manage NPCs", lambda: self.open_entity("npcs")),

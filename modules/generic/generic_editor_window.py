@@ -15,6 +15,7 @@ from modules.generic.generic_model_wrapper import GenericModelWrapper
 import tkinter as tk
 import random
 from modules.helpers.text_helpers import format_longtext
+from modules.ai.local_ai_client import LocalAIClient
 import json
 
 SWARMUI_PROCESS = None
@@ -257,6 +258,13 @@ class GenericEditorWindow(ctk.CTkToplevel):
 
         # Optionally, adjust window position.
         position_window_at_top(self)
+        # Lazy AI client init
+        self._ai_client = None
+
+    def _get_ai(self):
+        if self._ai_client is None:
+            self._ai_client = LocalAIClient()
+        return self._ai_client
     def _make_richtext_editor(self, parent, initial_text, hide_toolbar=True):
         """
         Shared initialization for any RichTextEditor-based field.
@@ -301,11 +309,25 @@ class GenericEditorWindow(ctk.CTkToplevel):
                 self.scroll_frame, text="Random Summary",
                 command=self.generate_scenario_description
             ).pack(pady=5)
+            ctk.CTkButton(
+                self.scroll_frame, text="AI Draft Summary",
+                command=lambda fn=field["name"]: self.ai_draft_field(fn)
+            ).pack(pady=5)
         if field["name"] == "Secrets":
             ctk.CTkButton(
                 self.scroll_frame, text="Generate Secret",
                 command=self.generate_secret_text
             ).pack(pady=5)
+            ctk.CTkButton(
+                self.scroll_frame, text="AI Draft Secret",
+                command=lambda fn=field["name"]: self.ai_draft_field(fn)
+            ).pack(pady=5)
+
+        # Generic AI improvement button for any long text field
+        ctk.CTkButton(
+            self.scroll_frame, text=f"AI Improve {field['name']}",
+            command=lambda fn=field["name"]: self.ai_improve_field(fn)
+        ).pack(pady=5)
 
     def create_dynamic_longtext_list(self, field):
         container = ctk.CTkFrame(self.scroll_frame)
@@ -1083,4 +1105,71 @@ class GenericEditorWindow(ctk.CTkToplevel):
         
         return dest_path_short
     
+    # ---------------- AI helpers (gpt-oss / OpenAI-compatible) ----------------
+    def _field_text(self, field_name):
+        widget = self.field_widgets.get(field_name)
+        if hasattr(widget, "text_widget"):
+            return widget.text_widget.get("1.0", "end").strip()
+        return str(self.item.get(field_name, ""))
+
+    def _set_field_text(self, field_name, text):
+        widget = self.field_widgets.get(field_name)
+        if hasattr(widget, "text_widget"):
+            widget.text_widget.delete("1.0", "end")
+            widget.text_widget.insert("1.0", text)
+        else:
+            # Fallback: create_text_entry stored Entry
+            try:
+                widget.delete(0, "end")
+                widget.insert(0, text)
+            except Exception:
+                self.item[field_name] = text
+
+    def ai_improve_field(self, field_name):
+        try:
+            current = self._field_text(field_name)
+            context_name = self.item.get("Name") or self.item.get("Title") or self.model_wrapper.entity_type
+            system = (
+                "You are a helpful RPG assistant. Improve the given text for use in a campaign manager. "
+                "Keep it concise, evocative, and suitable for GMs. Return plain text only."
+            )
+            user = f"Entity: {context_name}\nField: {field_name}\nText to improve:\n{current}"
+            content = self._get_ai().chat([
+                {"role": "system", "content": system},
+                {"role": "user", "content": user},
+            ])
+            if content:
+                self._set_field_text(field_name, content)
+        except Exception as e:
+            messagebox.showerror("AI Error", f"Failed to improve {field_name}: {e}")
+
+    def ai_draft_field(self, field_name):
+        try:
+            context_name = self.item.get("Name") or self.item.get("Title") or self.model_wrapper.entity_type
+            # Build a lightweight context from common fields if present
+            hints = []
+            for key in ("NPCs", "Places", "Creatures", "Factions", "Genre", "Tags", "Objectives"):
+                val = self.item.get(key)
+                if val:
+                    hints.append(f"{key}: {val}")
+            joined_hints = "\n".join(hints)
+            system = (
+                "You are a helpful RPG assistant. Draft a compelling field for a campaign item. "
+                "Write 1-3 short paragraphs. Return plain text only."
+            )
+            user = (
+                f"Entity: {context_name}\n"
+                f"Target field: {field_name}\n"
+                f"Hints (optional):\n{joined_hints}\n"
+                "Draft the field content now."
+            )
+            content = self._get_ai().chat([
+                {"role": "system", "content": system},
+                {"role": "user", "content": user},
+            ])
+            if content:
+                self._set_field_text(field_name, content)
+        except Exception as e:
+            messagebox.showerror("AI Error", f"Failed to draft {field_name}: {e}")
+
     
