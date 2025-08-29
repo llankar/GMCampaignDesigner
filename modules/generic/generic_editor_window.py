@@ -303,31 +303,35 @@ class GenericEditorWindow(ctk.CTkToplevel):
         editor = self._make_richtext_editor(self.scroll_frame, raw)
         self.field_widgets[field["name"]] = editor
 
+        # Place action buttons for this field on one row
+        btn_row = ctk.CTkFrame(self.scroll_frame)
+        btn_row.pack(fill="x", pady=5)
+
         # extra buttons for Summary/Secrets…
         if field["name"] == "Summary":
             ctk.CTkButton(
-                self.scroll_frame, text="Random Summary",
+                btn_row, text="Random Summary",
                 command=self.generate_scenario_description
-            ).pack(pady=5)
+            ).pack(side="left", padx=5, pady=5)
             ctk.CTkButton(
-                self.scroll_frame, text="AI Draft Summary",
+                btn_row, text="AI Draft Summary",
                 command=lambda fn=field["name"]: self.ai_draft_field(fn)
-            ).pack(pady=5)
+            ).pack(side="left", padx=5, pady=5)
         if field["name"] == "Secrets":
             ctk.CTkButton(
-                self.scroll_frame, text="Generate Secret",
+                btn_row, text="Generate Secret",
                 command=self.generate_secret_text
-            ).pack(pady=5)
+            ).pack(side="left", padx=5, pady=5)
             ctk.CTkButton(
-                self.scroll_frame, text="AI Draft Secret",
+                btn_row, text="AI Draft Secret",
                 command=lambda fn=field["name"]: self.ai_draft_field(fn)
-            ).pack(pady=5)
+            ).pack(side="left", padx=5, pady=5)
 
         # Generic AI improvement button for any long text field
         ctk.CTkButton(
-            self.scroll_frame, text=f"AI Improve {field['name']}",
+            btn_row, text=f"AI Improve {field['name']}",
             command=lambda fn=field["name"]: self.ai_improve_field(fn)
-        ).pack(pady=5)
+        ).pack(side="left", padx=5, pady=5)
 
     def create_dynamic_longtext_list(self, field):
         container = ctk.CTkFrame(self.scroll_frame)
