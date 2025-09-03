@@ -15,6 +15,7 @@ from modules.generic.generic_model_wrapper import GenericModelWrapper
 import tkinter as tk
 import random
 from modules.helpers.text_helpers import format_longtext
+from modules.helpers.text_helpers import ai_text_to_rtf_json
 from modules.ai.local_ai_client import LocalAIClient
 import json
 
@@ -1119,8 +1120,13 @@ class GenericEditorWindow(ctk.CTkToplevel):
     def _set_field_text(self, field_name, text):
         widget = self.field_widgets.get(field_name)
         if hasattr(widget, "text_widget"):
-            widget.text_widget.delete("1.0", "end")
-            widget.text_widget.insert("1.0", text)
+            # Try to interpret AI markdown-like formatting into RTF-JSON
+            try:
+                rtf = ai_text_to_rtf_json(text)
+                widget.load_text_data(rtf)
+            except Exception:
+                widget.text_widget.delete("1.0", "end")
+                widget.text_widget.insert("1.0", text)
         else:
             # Fallback: create_text_entry stored Entry
             try:
