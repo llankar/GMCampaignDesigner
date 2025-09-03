@@ -3072,3 +3072,4 @@ db/__pycache__/db.cpython-312.pyc
 modules/ai/__pycache__/local_ai_client.cpython-312.pyc
 modules/factions/__pycache__/*
 modules/generic/__pycache__/*
+__pycache__/*

@@ -1,4 +1,5 @@
 import html
+import re
 
 def format_longtext(data, max_length=30000):
     """ Formate un champ longtext pour l'afficher dans une liste (abrégé + multi-lignes). """
@@ -149,3 +150,206 @@ def normalize_rtf_json(rtf, text_widget=None):
             new_ranges.append([ to_offset(start), to_offset(end) ])
         new_fm[tag] = new_ranges
     return {"text": text, "formatting": new_fm}
+
+
+def ai_text_to_rtf_json(raw_text):
+    """
+    Convert an AI answer (plain text with light Markdown/HTML) to our RTF-JSON:
+    {"text": str, "formatting": { tag: [(start,end), ...], ... }}
+
+    Supported inline markers:
+    - Bold: **text**, __text__, <b>text</b>, <strong>text</strong>
+    - Italic: *text*, _text_, <i>text</i>, <em>text</em>
+    - Underline: ++text++, <u>text</u>
+
+    Block helpers:
+    - Headings: #, ##, ### → size_22/18/16 on the full line text
+    - Bullets: lines starting with "- " or "* " are turned into "• " prefix
+    - Numbered: lines starting with "1. ", "2) ", etc. are kept as-is
+
+    Returns formatting with numeric offsets suitable for RichTextEditor.load_text_data.
+    """
+    if raw_text is None:
+        raw_text = ""
+
+    # Normalize newlines
+    text = str(raw_text).replace("\r\n", "\n").replace("\r", "\n")
+
+    formatting = {}
+
+    def add_run(tag, start, end):
+        if start is None or end is None or end <= start:
+            return
+        formatting.setdefault(tag, []).append((start, end))
+
+    # Regexes for numbered list and headings
+    numbered_re = re.compile(r"^(\s*)(\d+)[\.)]\s+")
+    heading_map = [
+        (re.compile(r"^\s*#\s+"), "size_22"),
+        (re.compile(r"^\s*##\s+"), "size_18"),
+        (re.compile(r"^\s*###\s+"), "size_16"),
+    ]
+
+    out_chars = []
+    out_pos = 0
+
+    def process_inline(line):
+        """Return (rendered_line, inline_runs) where inline_runs is [(tag,start,end), ...] relative to start of this rendered line."""
+        i = 0
+        rendered = []
+        runs = []
+        # stacks store starting offset in rendered text for an open tag
+        stack = {
+            "bold": [],
+            "italic": [],
+            "underline": [],
+        }
+
+        def open_tag(tag):
+            stack[tag].append(len(rendered))
+
+        def close_tag(tag):
+            if stack[tag]:
+                start = stack[tag].pop()
+                end = len(rendered)
+                if end > start:
+                    runs.append((tag, start, end))
+
+        L = len(line)
+        while i < L:
+            ch = line[i]
+
+            # HTML-like tags
+            if line.startswith("<strong>", i):
+                open_tag("bold"); i += 8; continue
+            if line.startswith("</strong>", i):
+                close_tag("bold"); i += 9; continue
+            if line.startswith("<b>", i):
+                open_tag("bold"); i += 3; continue
+            if line.startswith("</b>", i):
+                close_tag("bold"); i += 4; continue
+            if line.startswith("<em>", i):
+                open_tag("italic"); i += 4; continue
+            if line.startswith("</em>", i):
+                close_tag("italic"); i += 5; continue
+            if line.startswith("<i>", i):
+                open_tag("italic"); i += 3; continue
+            if line.startswith("</i>", i):
+                close_tag("italic"); i += 4; continue
+            if line.startswith("<u>", i):
+                open_tag("underline"); i += 3; continue
+            if line.startswith("</u>", i):
+                close_tag("underline"); i += 4; continue
+
+            # Markdown-like markers (order matters for multi-char)
+            if line.startswith("**", i):
+                # toggle bold
+                if stack["bold"]:
+                    close_tag("bold")
+                else:
+                    open_tag("bold")
+                i += 2; continue
+            if line.startswith("__", i):
+                # treat as bold (common in MD)
+                if stack["bold"]:
+                    close_tag("bold")
+                else:
+                    open_tag("bold")
+                i += 2; continue
+            if line.startswith("++", i):
+                if stack["underline"]:
+                    close_tag("underline")
+                else:
+                    open_tag("underline")
+                i += 2; continue
+            if ch == "*":
+                if stack["italic"]:
+                    close_tag("italic")
+                else:
+                    open_tag("italic")
+                i += 1; continue
+            if ch == "_":
+                if stack["italic"]:
+                    close_tag("italic")
+                else:
+                    open_tag("italic")
+                i += 1; continue
+
+            # default: copy character
+            rendered.append(ch)
+            i += 1
+
+        # Close any unclosed tags at end-of-line (best-effort)
+        for tag, arr in stack.items():
+            while arr:
+                start = arr.pop()
+                end = len(rendered)
+                if end > start:
+                    runs.append((tag, start, end))
+
+        return ("".join(rendered), runs)
+
+    lines = text.split("\n")
+    for li, raw_line in enumerate(lines):
+        line = raw_line
+        size_tag = None
+        bullet_prefix = ""
+
+        # Headings (check from largest to smallest? we mapped in order #, ##, ### above)
+        # Use most specific first: ###, then ##, then #
+        if re.match(r"^\s*###\s+", line):
+            line = re.sub(r"^\s*###\s+", "", line)
+            size_tag = "size_16"
+        elif re.match(r"^\s*##\s+", line):
+            line = re.sub(r"^\s*##\s+", "", line)
+            size_tag = "size_18"
+        elif re.match(r"^\s*#\s+", line):
+            line = re.sub(r"^\s*#\s+", "", line)
+            size_tag = "size_22"
+
+        # Bulleted list markers: - or * followed by space (honor leading whitespace)
+        m_bullet = re.match(r"^(\s*)([-*])\s+", line)
+        if m_bullet:
+            indent = m_bullet.group(1)
+            # remove marker
+            line = line[m_bullet.end():]
+            bullet_prefix = indent + "• "
+
+        # Numbered list: keep numeric prefix, just normalize spacing
+        # (we don't add formatting tags; the textual prefix is enough)
+        # Already matched bullet? skip numbered check in that case
+        if not m_bullet:
+            m_num = numbered_re.match(line)
+            if m_num:
+                # normalize to "<indent><n>. "
+                indent, n = m_num.group(1), m_num.group(2)
+                line = indent + f"{n}. " + line[m_num.end():]
+
+        rendered, inline_runs = process_inline(line)
+
+        # Write into global buffer and collect runs with absolute offsets
+        prefix_len = len(bullet_prefix)
+        line_start = out_pos
+        if bullet_prefix:
+            out_chars.append(bullet_prefix)
+            out_pos += prefix_len
+        if rendered:
+            out_chars.append(rendered)
+        # Apply inline runs adjusted by prefix_len and current line start
+        for tag, s, e in inline_runs:
+            add_run(tag, line_start + s + prefix_len, line_start + e + prefix_len)
+
+        # Apply heading size across the whole line (including bullet prefix)
+        if size_tag:
+            line_len = prefix_len + len(rendered)
+            if line_len > 0:
+                add_run(size_tag, line_start, line_start + line_len)
+
+        # Advance position; add newline between lines, but not after last line
+        out_pos = line_start + prefix_len + len(rendered)
+        if li < len(lines) - 1:
+            out_chars.append("\n")
+            out_pos += 1
+
+    final_text = "".join(out_chars)
+    return {"text": final_text, "formatting": formatting}
