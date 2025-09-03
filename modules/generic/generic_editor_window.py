@@ -1133,11 +1133,32 @@ class GenericEditorWindow(ctk.CTkToplevel):
         try:
             current = self._field_text(field_name)
             context_name = self.item.get("Name") or self.item.get("Title") or self.model_wrapper.entity_type
-            system = (
+            # Load templates from config with sensible fallbacks
+            default_system = (
                 "You are a helpful RPG assistant. Improve the given text for use in a campaign manager adding details and flavor. "
                 "Keep it concise, evocative, and suitable for GMs. Return plain text only."
             )
-            user = f"Entity: {context_name}\nField: {field_name}\nText to improve:\n{current}"
+            default_user = "Entity: {context_name}\nField: {field_name}\nText to improve:\n{current}"
+
+            system_tpl = ConfigHelper.get("AI_PROMPTS", "improve_system", fallback=default_system)
+            user_tpl = ConfigHelper.get("AI_PROMPTS", "improve_user", fallback=default_user)
+            # Allow \n sequences in config to mean newlines
+            if isinstance(system_tpl, str):
+                system_tpl = system_tpl.replace("\\n", "\n")
+            if isinstance(user_tpl, str):
+                user_tpl = user_tpl.replace("\\n", "\n")
+
+            # Safe formatting of the user template
+            fmt_values = {
+                "context_name": context_name,
+                "field_name": field_name,
+                "current": current,
+            }
+            try:
+                user = user_tpl.format(**fmt_values)
+            except Exception:
+                user = default_user.format(**fmt_values)
+            system = system_tpl
             content = self._get_ai().chat([
                 {"role": "system", "content": system},
                 {"role": "user", "content": user},
@@ -1157,16 +1178,36 @@ class GenericEditorWindow(ctk.CTkToplevel):
                 if val:
                     hints.append(f"{key}: {val}")
             joined_hints = "\n".join(hints)
-            system = (
+            # Load templates from config with sensible fallbacks
+            default_system = (
                 "You are a helpful RPG assistant. Draft a compelling field for a campaign item. "
                 "Write 1-3 short paragraphs. Return plain text only."
             )
-            user = (
-                f"Entity: {context_name}\n"
-                f"Target field: {field_name}\n"
-                f"Hints (optional):\n{joined_hints}\n"
+            default_user = (
+                "Entity: {context_name}\n"
+                "Target field: {field_name}\n"
+                "Hints (optional):\n{joined_hints}\n"
                 "Draft the field content now."
             )
+
+            system_tpl = ConfigHelper.get("AI_PROMPTS", "draft_system", fallback=default_system)
+            user_tpl = ConfigHelper.get("AI_PROMPTS", "draft_user", fallback=default_user)
+            # Allow \n sequences in config to mean newlines
+            if isinstance(system_tpl, str):
+                system_tpl = system_tpl.replace("\\n", "\n")
+            if isinstance(user_tpl, str):
+                user_tpl = user_tpl.replace("\\n", "\n")
+
+            fmt_values = {
+                "context_name": context_name,
+                "field_name": field_name,
+                "joined_hints": joined_hints,
+            }
+            try:
+                user = user_tpl.format(**fmt_values)
+            except Exception:
+                user = default_user.format(**fmt_values)
+            system = system_tpl
             content = self._get_ai().chat([
                 {"role": "system", "content": system},
                 {"role": "user", "content": user},
