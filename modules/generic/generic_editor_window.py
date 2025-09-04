@@ -18,6 +18,7 @@ from modules.helpers.text_helpers import format_longtext
 from modules.helpers.text_helpers import ai_text_to_rtf_json
 from modules.ai.local_ai_client import LocalAIClient
 import json
+from io import BytesIO
 
 SWARMUI_PROCESS = None
 
@@ -1006,7 +1007,7 @@ class GenericEditorWindow(ctk.CTkToplevel):
             # Step 2: Define image generation parameters
             prompt_data = {
                 "session_id": session_id,
-                "images": 1,  # Only one portrait needed
+                "images": 6,  # Generate multiple candidates
                 "prompt": prompt,
                 "negativeprompt": "blurry, low quality, comics style, mangastyle, paint style, watermark, ugly, monstrous, too many fingers, too many legs, too many arms, bad hands, unrealistic weapons, bad grip on equipment, nude",
                 "model": selected_model,
@@ -1025,37 +1026,106 @@ class GenericEditorWindow(ctk.CTkToplevel):
                 messagebox.showerror("Error", "Image generation failed. Check API response.")
                 return
 
-            # Step 3: Download the first generated image
-            image_url = f"{SWARM_API_URL}/{images[0]}"
-            downloaded_image = requests.get(image_url)
-            if downloaded_image.status_code != 200:
-                messagebox.showerror("Error", "Failed to download the generated image.")
+            # Step 3: Download all generated images into memory
+            thumbs = []
+            images_bytes = []
+            for rel_path in images:
+                try:
+                    url = f"{SWARM_API_URL}/{rel_path}"
+                    resp = requests.get(url)
+                    if resp.status_code == 200:
+                        images_bytes.append(resp.content)
+                        img = Image.open(BytesIO(resp.content)).convert("RGB")
+                        thumb = img.copy()
+                        thumb.thumbnail((256, 256))
+                        thumbs.append(thumb)
+                except Exception:
+                    continue
+
+            if not thumbs:
+                messagebox.showerror("Error", "Failed to download generated images.")
                 return
 
-            # Step 4: Save the image locally and update the NPC's Portrait field
+            # Step 4: Let user choose one of the 6 images
+            chosen_index = self._show_image_selection_window(thumbs)
+            if chosen_index is None or chosen_index < 0 or chosen_index >= len(images_bytes):
+                return  # User cancelled
+
+            chosen_bytes = images_bytes[chosen_index]
+
+            # Step 5: Save the chosen image locally and update the NPC's Portrait field
             output_filename = f"{npc_name.replace(' ', '_')}_portrait.png"
             with open(output_filename, "wb") as f:
-                f.write(downloaded_image.content)
+                f.write(chosen_bytes)
 
-            # Associate the generated portrait with the NPC data.
+            # Associate the selected portrait with the NPC data.
             self.portrait_path = self.copy_and_resize_portrait(output_filename)
             self.portrait_label.configure(text=os.path.basename(self.portrait_path))
-            #copy the outputfilename file to the assets/generated folder
+
+            # Copy the original generated file to assets/generated and delete local temp
             GENERATED_FOLDER = os.path.join(ConfigHelper.get_campaign_dir(), "assets", "generated")
             os.makedirs(GENERATED_FOLDER, exist_ok=True)
             shutil.copy(output_filename, os.path.join(GENERATED_FOLDER, output_filename))
-            os.remove(output_filename)  # Delete the original image file
-            # messagebox.showinfo("Success", f"Portrait saved as {output_filename} and associated with the NPC.")
-
-            # Optional: Update the portrait display in the UI.
-            # For example, if you have a portrait label (self.portrait_label), reload the image:
-            # from PIL import ImageTk, Image
-            # img = Image.open(output_filename).resize((64, 64))
-            # self.portrait_image = ctk.CTkImage(light_image=img, size=(64, 64))
-            # self.portrait_label.configure(image=self.portrait_image, text="")
+            os.remove(output_filename)
 
         except Exception as e:
             messagebox.showerror("Error", f"An error occurred: {e}")
+
+    def _show_image_selection_window(self, pil_images):
+        """
+        Display a modal window with thumbnails side by side for the user to choose.
+        Returns the selected index, or None if cancelled.
+        """
+        if not pil_images:
+            return None
+
+        top = ctk.CTkToplevel(self)
+        top.title("Choose a Portrait")
+        top.transient(self)
+        top.grab_set()
+
+        # Container frame
+        container = ctk.CTkFrame(top)
+        container.pack(padx=10, pady=10, fill="both", expand=True)
+
+        # Keep CTkImage references to avoid GC
+        ctk_images = []
+        selected = {"idx": None}
+
+        def on_choose(i):
+            selected["idx"] = i
+            top.destroy()
+
+        # Layout: 3 columns x 2 rows (up to 6 images)
+        cols = 6 if len(pil_images) <= 6 else 6
+        # Place horizontally side by side if <= 6
+        for i, img in enumerate(pil_images[:6]):
+            cimg = ctk.CTkImage(light_image=img, size=(256, 256))
+            ctk_images.append(cimg)
+            btn = ctk.CTkButton(container, image=cimg, text="", width=260, height=260,
+                                command=lambda idx=i: on_choose(idx))
+            btn.grid(row=0, column=i, padx=5, pady=5)
+
+        # Cancel button
+        cancel_btn = ctk.CTkButton(top, text="Cancel", command=lambda: (setattr(selected, "idx", None), top.destroy()))
+        # Workaround: setattr on dict won't work; override with lambda capturing selected
+        def _cancel():
+            selected["idx"] = None
+            top.destroy()
+        cancel_btn.configure(command=_cancel)
+        cancel_btn.pack(pady=5)
+
+        # Size window to fit thumbnails in a row
+        top.update_idletasks()
+        total_w = min(6, len(pil_images)) * (260 + 10) + 20
+        total_h = 320
+        try:
+            top.geometry(f"{total_w}x{total_h}")
+        except Exception:
+            pass
+
+        top.wait_window()
+        return selected["idx"]
 
     def select_portrait(self):
         file_path = filedialog.askopenfilename(
