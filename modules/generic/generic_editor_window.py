@@ -329,6 +329,17 @@ class GenericEditorWindow(ctk.CTkToplevel):
                 command=lambda fn=field["name"]: self.ai_draft_field(fn)
             ).pack(side="left", padx=5, pady=5)
 
+        # Add AI draft for NPC/Creature Description
+        if (
+            field["name"] == "Description"
+            and self.model_wrapper
+            and getattr(self.model_wrapper, "entity_type", "") in ("npcs", "creatures")
+        ):
+            ctk.CTkButton(
+                btn_row, text="AI Draft Description",
+                command=lambda fn=field["name"]: self.ai_draft_field(fn)
+            ).pack(side="left", padx=5, pady=5)
+
         # Generic AI improvement button for any long text field
         ctk.CTkButton(
             btn_row, text=f"AI Improve {field['name']}",
