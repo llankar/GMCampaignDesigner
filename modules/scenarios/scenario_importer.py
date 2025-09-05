@@ -405,7 +405,7 @@ class ScenarioImportWindow(ctk.CTkToplevel):
             "Output STRICT JSON only, no prose, matching the provided schema.\n\n"
             f"Source: {source_label}\n"
             "Schema (field types):\n" + json.dumps(schema_hint, ensure_ascii=False, indent=2) + "\n\n"
-            "Guidance: If stats are present in the text (even from other systems), convert them into concise Dresden-style creature 'Stats' similar to examples.\n"
+            "Guidance: If stats are present in the text (even from other systems), convert them into concise creature 'Stats' similar to examples.\n"
             "Examples of desired 'Stats' formatting from the active DB (do not invent values not in text, interpolate reasonably):\n" + json.dumps(stats_examples, ensure_ascii=False, indent=2) + "\n\n"
             "Now extract from this text:\n" + raw_text[:12000]  # cap to keep prompt reasonable
         )
