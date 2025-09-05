@@ -3073,3 +3073,10 @@ modules/ai/__pycache__/local_ai_client.cpython-312.pyc
 modules/factions/__pycache__/*
 modules/generic/__pycache__/*
 __pycache__/*
+dist/main_window/_internal/assets/generate_scenario_icon.png
+dist/main_window/_internal/importlib_metadata-8.7.0.dist-info/INSTALLER
+dist/main_window/_internal/importlib_metadata-8.7.0.dist-info/METADATA
+dist/main_window/_internal/importlib_metadata-8.7.0.dist-info/RECORD
+dist/main_window/_internal/importlib_metadata-8.7.0.dist-info/top_level.txt
+dist/main_window/_internal/importlib_metadata-8.7.0.dist-info/WHEEL
+dist/main_window/_internal/importlib_metadata-8.7.0.dist-info/licenses/LICENSE

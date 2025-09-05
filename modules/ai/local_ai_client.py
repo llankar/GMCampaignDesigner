@@ -144,7 +144,7 @@ class LocalAIClient:
         except Exception as e:
             raise RuntimeError(f"Could not parse PowerShell JSON: {e}. Raw: {out[:500]}")
 
-    def chat(self, messages, model=None, temperature=None, max_tokens=None, timeout=120):
+    def chat(self, messages, model=None, temperature=None, max_tokens=None, timeout=600):
         """
         Send a chat completion request and return the assistant's text.
 
