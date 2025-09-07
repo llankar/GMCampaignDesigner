@@ -1,10 +1,10 @@
-import re
+﻿import re
 import os
 import json
 import customtkinter as ctk
 from tkinter import messagebox, filedialog
 import threading
-from modules.helpers.text_helpers import format_longtext
+from modules.helpers.text_helpers import format_longtext, ai_text_to_rtf_json
 from modules.generic.generic_model_wrapper import GenericModelWrapper
 from modules.ai.local_ai_client import LocalAIClient
 
@@ -32,6 +32,37 @@ def remove_emojis(text):
    #logging.debug("Emojis removed.")
     return cleaned
 
+def parse_json_relaxed(s: str):
+    """Try to parse JSON from a possibly noisy AI response (module-level helper)."""
+    if not s:
+        raise RuntimeError("Empty AI response")
+    s = s.strip()
+    # Remove markdown fences if present
+    if s.startswith("```"):
+        s = re.sub(r"^```(json)?", "", s, flags=re.IGNORECASE).strip()
+        s = s.rstrip("`").strip()
+    # Try direct
+    try:
+        return json.loads(s)
+    except Exception:
+        pass
+    # Find first JSON object or array
+    start = None
+    for i, ch in enumerate(s):
+        if ch in '{[':
+            start = i
+            break
+    if start is not None:
+        tail = s[start:]
+        # Try progressively trimming
+        for j in range(len(tail), max(len(tail)-2000, 0), -1):
+            chunk = tail[:j]
+            try:
+                return json.loads(chunk)
+            except Exception:
+                continue
+    raise RuntimeError("Failed to parse JSON from AI response")
+
 def import_formatted_scenario(text):
     # Remove emojis.
     cleaned_text = remove_emojis(text)
@@ -44,7 +75,7 @@ def import_formatted_scenario(text):
     
     # Extract Introduction.
     intro_match = re.search(
-        r'(?i)(?:^|\n)\s*Introduction\s*:?\s*(.*?)(?=\n\s*(?:Tied Player Characters:|Main Locations|📍 Main Locations|Key NPCs|NPCs))',
+        r'(?i)(?:^|\n)\s*Introduction\s*:?\s*(.*?)(?=\n\s*(?:Tied Player Characters:|Main Locations|ðŸ“ Main Locations|Key NPCs|NPCs))',
         cleaned_text,
         re.DOTALL
     )
@@ -53,7 +84,7 @@ def import_formatted_scenario(text):
     
     # --- Extract Places ---
     locations = []
-    loc_split = re.split(r'(?mi)^\s*(?:Main Locations|📍 Main Locations).*$', cleaned_text, maxsplit=1)
+    loc_split = re.split(r'(?mi)^\s*(?:Main Locations|ðŸ“ Main Locations).*$', cleaned_text, maxsplit=1)
     if len(loc_split) > 1:
         remainder = loc_split[1]
         npc_index = remainder.find("Key NPCs")
@@ -71,7 +102,7 @@ def import_formatted_scenario(text):
                 continue
             lines = entry.splitlines()
             name_line = lines[0].strip()
-            parts = re.split(r'\s*[-–]\s*', name_line)
+            parts = re.split(r'\s*[-â€“]\s*', name_line)
             loc_name = parts[0].strip()
             description = ""
             current_section = None
@@ -103,8 +134,8 @@ def import_formatted_scenario(text):
                 continue
             lines = entry.splitlines()
             header = lines[0].strip()
-            if "–" in header:
-                parts = re.split(r'\s*[-–]\s*', header)
+            if "â€“" in header:
+                parts = re.split(r'\s*[-â€“]\s*', header)
                 npc_name = parts[0].strip()
                 npc_role = parts[1].strip() if len(parts) > 1 else ""
             else:
@@ -189,15 +220,18 @@ def import_formatted_scenario(text):
     
    #logging.info("Scenario imported successfully using the database (appended to existing data)!")
 
-# ─────────────────────────────────────────────────────────────────────────
+# â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 # CLASS: ScenarioImportWindow
 # A window that allows users to paste scenario text for import.
-# ─────────────────────────────────────────────────────────────────────────
+# â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 class ScenarioImportWindow(ctk.CTkToplevel):
     def __init__(self, master=None):
         super().__init__(master)
         self.title("Import Formatted Scenario")
         self.geometry("600x600")
+        self.transient(master)  # Stay on top of the master window
+        self.grab_set()         # Block background clicks
+        self.focus_force()      # Focus on the dialog
         
         instruction_label = ctk.CTkLabel(self, text="Paste scenario text or import a PDF:")
         instruction_label.pack(pady=(10, 0), padx=10)
@@ -307,41 +341,32 @@ class ScenarioImportWindow(ctk.CTkToplevel):
             return "\n".join(text)
         except Exception:
             pass
-        # Try pdfminer.six
-        try:
-            from pdfminer.high_level import extract_text as pdfminer_extract
-            return pdfminer_extract(path) or ""
-        except Exception:
-            pass
-        # Try PyMuPDF
-        try:
-            import fitz  # PyMuPDF
-            text = []
-            with fitz.open(path) as doc:
-                for page in doc:
-                    text.append(page.get_text("text"))
-            return "\n".join(text)
-        except Exception:
-            pass
-        raise RuntimeError("No PDF text extractor available. Install 'pypdf' or 'pdfminer.six' or 'pymupdf'.")
-
+        
     def _ai_extract_and_import(self, raw_text: str, source_label: str = ""):
         """
-        Use LocalAI to extract scenarios/NPCs/creatures/places from text and merge into DB.
+        Multi-phase AI extraction to improve depth, especially Scenario Summary and Scenes.
+
+        Phases:
+          1) Outline: Title, concise Summary draft, scene stubs (title + gist), referenced names.
+          2) Expand Summary: richer GM-facing summary (2–4 paragraphs).
+          3) Expand Scenes: detailed scene texts per stub.
+          4) Entities: structured NPCs/Creatures/Places/Factions.
+        Then merge into the database.
         """
-        self._set_status("Analyzing text with AI...")
+        self._set_status("Analyzing text with AI (phase 1/4)...")
         self._busy(True)
-        # Load examples from current DB to guide formatting (esp. creature Stats)
+
+        # DB wrappers
         creatures_wrapper = GenericModelWrapper("creatures")
         npcs_wrapper = GenericModelWrapper("npcs")
         places_wrapper = GenericModelWrapper("places")
         scenarios_wrapper = GenericModelWrapper("scenarios")
 
+        # Pull a few existing creature stats as examples
         existing_creatures = creatures_wrapper.load_items()
         stats_examples = []
         for row in existing_creatures:
             st = row.get("Stats")
-            # Normalize longtext object or raw string
             if isinstance(st, dict):
                 st = st.get("text", "")
             if isinstance(st, str) and st.strip():
@@ -353,109 +378,140 @@ class ScenarioImportWindow(ctk.CTkToplevel):
             if len(stats_examples) >= 3:
                 break
 
-        # Build instruction and schema
-        schema_hint = {
-            "scenarios": [
-                {
-                    "Title": "text",
-                    "Summary": "longtext",
-                    "Secrets": "longtext",
-                    "Scenes": ["longtext"],
-                    "Places": ["Name"],
-                    "NPCs": ["Name"],
-                    "Creatures": ["Name"],
-                    "Factions": ["Name"]
-                }
-            ],
+        client = LocalAIClient()
+
+        # -------- Phase 1: Outline --------
+        outline_schema = {
+            "Title": "text",
+            "Summary": "short text (3-5 sentences)",
+            "Scenes": [{"Title": "text", "Gist": "1-3 sentences"}],
+            "NPCs": ["Name"],
+            "Places": ["Name"]
+        }
+        prompt_outline = (
+            "You are an assistant that extracts a high-level scenario outline from RPG source text.\n"
+            "Return STRICT JSON only, no prose.\n\n"
+            f"Source: {source_label}\n"
+            "JSON schema:\n" + json.dumps(outline_schema, ensure_ascii=False, indent=2) + "\n\n"
+            "Notes: Use only info from the text. If uncertain, omit.\n"
+            "Now outline this text:\n" + raw_text[:50000]
+        )
+        outline_raw = client.chat([
+            {"role": "system", "content": "Extract concise scenario outlines as strict JSON."},
+            {"role": "user", "content": prompt_outline}
+        ])
+        outline = parse_json_relaxed(outline_raw)
+        if not isinstance(outline, dict):
+            raise RuntimeError("AI did not return a JSON object for outline")
+
+        title = outline.get("Title") or "Unnamed Scenario"
+        summary_draft = outline.get("Summary") or ""
+        outline_scenes = outline.get("Scenes") or []
+
+        # -------- Phase 2: Expand Summary --------
+        self._set_status("Analyzing text with AI (phase 2/4)...")
+        prompt_summary = (
+            "Rewrite the following scenario summary into a richer, evocative, GM-friendly 2–4 paragraph summary.\n"
+            "- Keep it consistent with the source text.\n"
+            "- Avoid rules jargon.\n"
+            "Return PLAIN TEXT only.\n\n"
+            f"Title: {title}\n"
+            "Current summary:\n" + (summary_draft or "")
+        )
+        summary_expanded = client.chat([
+            {"role": "system", "content": "You write compelling GM-facing RPG summaries. Return plain text."},
+            {"role": "user", "content": prompt_summary}
+        ])
+        # Clean potential code fences/backticks
+        if summary_expanded and summary_expanded.strip().startswith("```"):
+            summary_expanded = re.sub(r"^```(?:[a-zA-Z]+)?", "", summary_expanded, flags=re.IGNORECASE).strip().rstrip("`").strip()
+        summary_expanded = summary_expanded.strip()
+
+        # -------- Phase 3: Expand Scenes --------
+        self._set_status("Analyzing text with AI (phase 3/4)...")
+        scenes_schema = {"Scenes": [{"Title": "text", "Text": "multi-paragraph detailed scene"}]}
+        prompt_scenes = (
+            "Using the outline below and the source text, produce detailed scene writeups.\n"
+            "For each scene, include a 1–2 paragraph overview plus bullet points for: key beats, conflicts/obstacles, clues/hooks, transitions, important locations, and involved NPCs.\n"
+            "Return STRICT JSON only with this schema:\n" + json.dumps(scenes_schema, ensure_ascii=False, indent=2) + "\n\n"
+            f"Title: {title}\n"
+            "Outline scenes:\n" + json.dumps(outline_scenes, ensure_ascii=False, indent=2) + "\n\n"
+            "Source excerpt (may be truncated):\n" + raw_text[:50000]
+        )
+        scenes_raw = client.chat([
+            {"role": "system", "content": "Expand scene stubs into detailed, game-usable scenes as strict JSON."},
+            {"role": "user", "content": prompt_scenes}
+        ])
+        scenes_obj = parse_json_relaxed(scenes_raw)
+        if not isinstance(scenes_obj, dict) or not isinstance(scenes_obj.get("Scenes"), list):
+            raise RuntimeError("AI did not return a JSON object with Scenes")
+        scenes_expanded_list = []
+        for sc in scenes_obj.get("Scenes", []) or []:
+            if isinstance(sc, dict):
+                txt = sc.get("Text") or ""
+                if isinstance(txt, dict) and "text" in txt:
+                    txt = txt.get("text", "")
+                scenes_expanded_list.append(ai_text_to_rtf_json(str(txt).strip()))
+
+        # -------- Phase 4: Entities (NPCs/Creatures/Places/Factions) --------
+        self._set_status("Analyzing text with AI (phase 4/4)...")
+        entities_schema = {
             "npcs": [
-                {
-                    "Name": "text",
-                    "Role": "text",
-                    "Description": "longtext",
-                    "Secret": "longtext",
-                    "Factions": ["Name"],
-                    "Portrait": "text(optional)"
-                }
+                {"Name": "text", "Role": "text", "Description": "longtext", "Secret": "longtext", "Factions": ["Name"], "Portrait": "text(optional)"}
             ],
             "creatures": [
-                {
-                    "Name": "text",
-                    "Type": "text",
-                    "Description": "longtext",
-                    "Weakness": "longtext",
-                    "Powers": "longtext",
-                    "Stats": "longtext",
-                    "Background": "longtext"
-                }
+                {"Name": "text", "Type": "text", "Description": "longtext", "Weakness": "longtext", "Powers": "longtext", "Stats": "longtext", "Background": "longtext"}
             ],
             "places": [
-                {
-                    "Name": "text",
-                    "Description": "longtext",
-                    "Secrets": "longtext(optional)"
-                }
+                {"Name": "text", "Description": "longtext", "Secrets": "longtext(optional)"}
             ],
             "factions": [
                 {"Name": "text", "Description": "longtext(optional)"}
             ]
         }
-
-        prompt = (
-            "You extract structured scenario data from RPG source text. "
-            "Output STRICT JSON only, no prose, matching the provided schema.\n\n"
-            f"Source: {source_label}\n"
-            "Schema (field types):\n" + json.dumps(schema_hint, ensure_ascii=False, indent=2) + "\n\n"
-            "Guidance: If stats are present in the text (even from other systems), convert them into concise creature 'Stats' similar to examples.\n"
-            "Examples of desired 'Stats' formatting from the active DB (do not invent values not in text, interpolate reasonably):\n" + json.dumps(stats_examples, ensure_ascii=False, indent=2) + "\n\n"
-            "Now extract from this text:\n" + raw_text[:12000]  # cap to keep prompt reasonable
+        prompt_entities = (
+            "Extract RPG entities from the text. Output STRICT JSON only, matching the schema below.\n"
+            "If stats are present (even from other systems), convert into concise creature 'Stats' similar to examples. Do not invent facts.\n\n"
+            "Schema:\n" + json.dumps(entities_schema, ensure_ascii=False, indent=2) + "\n\n"
+            "Examples of desired 'Stats' formatting from the active DB:\n" + json.dumps(stats_examples, ensure_ascii=False, indent=2) + "\n\n"
+            "Text to analyze (may be truncated):\n" + raw_text[:50000]
         )
-
-        client = LocalAIClient()
-        ai_response = client.chat([
-            {"role": "system", "content": "You convert RPG book text into JSON game data."},
-            {"role": "user", "content": prompt}
+        entities_raw = client.chat([
+            {"role": "system", "content": "Extract structured entities (NPCs, creatures, places, factions) as strict JSON."},
+            {"role": "user", "content": prompt_entities}
         ])
+        entities = parse_json_relaxed(entities_raw)
+        if not isinstance(entities, dict):
+            raise RuntimeError("AI did not return a JSON object for entities")
 
-        data = self._parse_json_relaxed(ai_response)
-        if not isinstance(data, dict):
-            self._busy(False)
-            self._set_status("Idle")
-            raise RuntimeError("AI did not return a JSON object")
-
-        # Normalize and merge into DB
+        # ---------- Merge into DB ----------
         def to_longtext(val):
             if isinstance(val, dict) and "text" in val:
-                return val  # already longtext object
-            return {"text": str(val) if val is not None else "", "formatting": default_formatting}
+                return val
+            return ai_text_to_rtf_json(str(val) if val is not None else "")
 
-        # Scenarios
+        # Scenario
         self._set_status("Merging scenarios into database...")
-        if "scenarios" in data and isinstance(data["scenarios"], list):
-            current_items = scenarios_wrapper.load_items()
-            new_items = []
-            for s in data["scenarios"]:
-                if not isinstance(s, dict):
-                    continue
-                item = {
-                    "Title": s.get("Title", "Unnamed Scenario"),
-                    "Summary": to_longtext(s.get("Summary", "")),
-                    "Secrets": to_longtext(s.get("Secrets", "")),
-                    "Scenes": s.get("Scenes", []),
-                    "Places": s.get("Places", []),
-                    "NPCs": s.get("NPCs", []),
-                    "Creatures": s.get("Creatures", []),
-                    "Factions": s.get("Factions", []),
-                    "Objects": s.get("Objects", []),
-                }
-                new_items.append(item)
-            scenarios_wrapper.save_items(current_items + new_items)
+        current_scenarios = scenarios_wrapper.load_items()
+        scenario_item = {
+            "Title": title,
+            "Summary": to_longtext(summary_expanded or summary_draft or ""),
+            "Secrets": to_longtext(""),
+            "Scenes": scenes_expanded_list,
+            "Places": entities.get("places", []) and [p.get("Name", "") for p in entities.get("places", []) if isinstance(p, dict)] or (outline.get("Places") or []),
+            "NPCs": entities.get("npcs", []) and [n.get("Name", "") for n in entities.get("npcs", []) if isinstance(n, dict)] or (outline.get("NPCs") or []),
+            "Creatures": [c.get("Name", "") for c in entities.get("creatures", []) if isinstance(c, dict)],
+            "Factions": [f.get("Name", "") for f in entities.get("factions", []) if isinstance(f, dict)],
+            "Objects": []
+        }
+        scenarios_wrapper.save_items(current_scenarios + [scenario_item])
 
         # NPCs
         self._set_status("Merging NPCs into database...")
-        if "npcs" in data and isinstance(data["npcs"], list):
+        if isinstance(entities.get("npcs"), list):
             current_items = npcs_wrapper.load_items()
             new_items = []
-            for n in data["npcs"]:
+            for n in entities.get("npcs"):
                 if not isinstance(n, dict):
                     continue
                 item = {
@@ -479,17 +535,14 @@ class ScenarioImportWindow(ctk.CTkToplevel):
 
         # Creatures
         self._set_status("Merging creatures into database...")
-        if "creatures" in data and isinstance(data["creatures"], list):
+        if isinstance(entities.get("creatures"), list):
             current_items = creatures_wrapper.load_items()
             new_items = []
-            for c in data["creatures"]:
+            for c in entities.get("creatures"):
                 if not isinstance(c, dict):
                     continue
                 stats_val = c.get("Stats", "")
-                if isinstance(stats_val, dict) and "text" in stats_val:
-                    stats_norm = stats_val
-                else:
-                    stats_norm = to_longtext(stats_val)
+                stats_norm = stats_val if (isinstance(stats_val, dict) and "text" in stats_val) else to_longtext(stats_val)
                 item = {
                     "Name": c.get("Name", "Unnamed"),
                     "Type": c.get("Type", ""),
@@ -506,10 +559,10 @@ class ScenarioImportWindow(ctk.CTkToplevel):
 
         # Places
         self._set_status("Merging places into database...")
-        if "places" in data and isinstance(data["places"], list):
+        if isinstance(entities.get("places"), list):
             current_items = places_wrapper.load_items()
             new_items = []
-            for p in data["places"]:
+            for p in entities.get("places"):
                 if not isinstance(p, dict):
                     continue
                 item = {
@@ -523,42 +576,10 @@ class ScenarioImportWindow(ctk.CTkToplevel):
                 new_items.append(item)
             places_wrapper.save_items(current_items + new_items)
 
-        messagebox.showinfo("Imported", "AI import completed and merged into the database.")
+        messagebox.showinfo("Imported", "AI multi-phase import completed and merged into the database.")
         self._set_status("Import complete.")
         self.after(2000, lambda: self._set_status("Idle"))
         self._busy(False)
-
-    def _parse_json_relaxed(self, s: str):
-        """Try to parse JSON from a possibly noisy AI response."""
-        if not s:
-            raise RuntimeError("Empty AI response")
-        s = s.strip()
-        # Remove markdown fences if present
-        if s.startswith("```"):
-            s = re.sub(r"^```(json)?", "", s, flags=re.IGNORECASE).strip()
-            s = s.rstrip("`").strip()
-        # Try direct
-        try:
-            return json.loads(s)
-        except Exception:
-            pass
-        # Find first JSON object or array
-        start = None
-        for i, ch in enumerate(s):
-            if ch in '{[':
-                start = i
-                break
-        if start is not None:
-            tail = s[start:]
-            # Try progressively trimming
-            for j in range(len(tail), max(len(tail)-2000, 0), -1):
-                chunk = tail[:j]
-                try:
-                    return json.loads(chunk)
-                except Exception:
-                    continue
-        raise RuntimeError("Failed to parse JSON from AI response")
-
     # --- UI helpers ---
     def _set_status(self, text: str):
         def _do():
@@ -594,3 +615,4 @@ class ScenarioImportWindow(ctk.CTkToplevel):
 
     def _error(self, title: str, msg: str):
         self.after(0, lambda: messagebox.showerror(title, msg))
+
