@@ -984,7 +984,64 @@ class GenericEditorWindow(ctk.CTkToplevel):
         button_frame.pack(pady=5)
 
         ctk.CTkButton(button_frame, text="Select Image", command=self.select_image).pack(side="left", padx=5)
+        ctk.CTkButton(button_frame, text="Paste Image", command=self.paste_image_from_clipboard).pack(side="left", padx=5)
         self.field_widgets[field["name"]] = self.image_path
+
+    def paste_image_from_clipboard(self):
+        """Paste image from clipboard and set as entity image (map image).
+        Supports images directly or image file paths in clipboard (Windows/macOS).
+        """
+        try:
+            data = ImageGrab.grabclipboard()
+        except Exception as e:
+            messagebox.showerror("Clipboard Error", f"Unable to access clipboard: {e}")
+            return
+
+        if data is None:
+            messagebox.showinfo("Paste Image", "No image found in clipboard.")
+            return
+
+        # If clipboard contains a list of file paths, try first valid image path
+        if isinstance(data, list):
+            for path in data:
+                try:
+                    if os.path.isfile(path):
+                        self.image_path = self.copy_and_resize_image(path)
+                        self.image_label.configure(text=os.path.basename(self.image_path))
+                        return
+                except Exception:
+                    continue
+            messagebox.showinfo("Paste Image", "Clipboard has file paths but none are valid images.")
+            return
+
+        # If clipboard contains a PIL Image
+        if isinstance(data, Image.Image):
+            try:
+                campaign_dir = ConfigHelper.get_campaign_dir()
+                image_folder = os.path.join(campaign_dir, "assets", "images", "map_images")
+                os.makedirs(image_folder, exist_ok=True)
+
+                base_name = (self.item.get("Name") or "Unnamed").replace(" ", "_")
+                dest_filename = f"{base_name}_{id(self)}.png"
+                dest_path = os.path.join(image_folder, dest_filename)
+
+                # Convert to RGB to ensure PNG save works for all modes
+                img = data
+                if img.mode in ("P", "RGBA"):
+                    img = img.convert("RGB")
+
+                # Save directly to destination
+                img.save(dest_path, format="PNG")
+
+                # Store relative path used by the app
+                self.image_path = os.path.join("assets/images/map_images/", dest_filename)
+                self.image_label.configure(text=os.path.basename(self.image_path))
+                return
+            except Exception as e:
+                messagebox.showerror("Paste Image", f"Failed to paste image: {e}")
+                return
+
+        messagebox.showinfo("Paste Image", "Clipboard content is not an image.")
 
     def launch_swarmui(self):
         global SWARMUI_PROCESS
