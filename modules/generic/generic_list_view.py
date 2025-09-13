@@ -423,7 +423,8 @@ class GenericListView(ctk.CTkFrame):
         self.refresh_list()
 
     def on_double_click(self, event):
-        iid = self.tree.focus()
+        # Use the row under the mouse to avoid stale focus
+        iid = self.tree.identify_row(event.y) or self.tree.focus()
         if not iid:
             return
         item, _ = self._find_item_by_iid(iid)
@@ -643,10 +644,20 @@ class GenericListView(ctk.CTkFrame):
         top.focus_force()
 
     def _find_item_by_iid(self, iid):
+        # Prefer exact match on sanitized ID
         for it in self.filtered_items:
             base_id = self._get_base_id(it)
-            if iid == base_id or iid.startswith(base_id + "_"):
+            if iid == base_id:
                 return it, base_id
+
+        # If the iid has a duplicate suffix like "_2", strip it and try again
+        m = re.match(r"^(.*)_\d+$", iid or "")
+        if m:
+            base = m.group(1)
+            for it in self.filtered_items:
+                if self._get_base_id(it) == base:
+                    return it, base
+
         return None, None
 
     def _get_base_id(self, item):

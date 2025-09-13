@@ -154,7 +154,8 @@ class GenericListSelectionView(ctk.CTkFrame):
         self.refresh_list()
 
     def on_double_click(self, event):
-        item_id = self.tree.focus()
+        # Prefer the row under the cursor; fall back to focus
+        item_id = self.tree.identify_row(event.y) or self.tree.focus()
         if not item_id:
             return
         selected_item = next(
