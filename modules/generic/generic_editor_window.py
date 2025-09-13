@@ -8,6 +8,7 @@ from modules.helpers import text_helpers
 from modules.helpers.rich_text_editor import RichTextEditor
 from modules.helpers.window_helper import position_window_at_top
 from PIL import Image, ImageTk
+from PIL import ImageGrab
 from tkinter import filedialog,  messagebox
 from modules.helpers.swarmui_helper import get_available_models
 from modules.helpers.config_helper import ConfigHelper
@@ -891,9 +892,66 @@ class GenericEditorWindow(ctk.CTkToplevel):
         button_frame.pack(pady=5)
         
         ctk.CTkButton(button_frame, text="Select Portrait", command=self.select_portrait).pack(side="left", padx=5)
+        ctk.CTkButton(button_frame, text="Paste Portrait", command=self.paste_portrait_from_clipboard).pack(side="left", padx=5)
         ctk.CTkButton(button_frame, text="Create Portrait with description", command=self.create_portrait_with_swarmui).pack(side="left", padx=5)
 
         self.field_widgets[field["name"]] = self.portrait_path
+
+    def paste_portrait_from_clipboard(self):
+        """Paste image from clipboard and set as entity portrait.
+        Supports images directly or image file paths in clipboard (Windows).
+        """
+        try:
+            data = ImageGrab.grabclipboard()
+        except Exception as e:
+            messagebox.showerror("Clipboard Error", f"Unable to access clipboard: {e}")
+            return
+
+        if data is None:
+            messagebox.showinfo("Paste Portrait", "No image found in clipboard.")
+            return
+
+        # If clipboard contains a list of file paths, try first valid image path
+        if isinstance(data, list):
+            for path in data:
+                try:
+                    if os.path.isfile(path):
+                        self.portrait_path = self.copy_and_resize_portrait(path)
+                        self.portrait_label.configure(text=os.path.basename(self.portrait_path))
+                        return
+                except Exception:
+                    continue
+            messagebox.showinfo("Paste Portrait", "Clipboard has file paths but none are valid images.")
+            return
+
+        # If clipboard contains a PIL Image
+        if isinstance(data, Image.Image):
+            try:
+                campaign_dir = ConfigHelper.get_campaign_dir()
+                portrait_folder = os.path.join(campaign_dir, "assets", "portraits")
+                os.makedirs(portrait_folder, exist_ok=True)
+
+                base_name = (self.item.get("Name") or "Unnamed").replace(" ", "_")
+                dest_filename = f"{base_name}_{id(self)}.png"
+                dest_path = os.path.join(portrait_folder, dest_filename)
+
+                # Convert to RGB to ensure PNG save works for all modes
+                img = data
+                if img.mode in ("P", "RGBA"):
+                    img = img.convert("RGB")
+
+                # Save directly to destination
+                img.save(dest_path, format="PNG")
+
+                # Store relative path used by the app
+                self.portrait_path = os.path.join("assets/portraits/", dest_filename)
+                self.portrait_label.configure(text=os.path.basename(self.portrait_path))
+                return
+            except Exception as e:
+                messagebox.showerror("Paste Portrait", f"Failed to paste image: {e}")
+                return
+
+        messagebox.showinfo("Paste Portrait", "Clipboard content is not an image.")
     
     def create_image_field(self, field):
         # Create a main frame for the image field
