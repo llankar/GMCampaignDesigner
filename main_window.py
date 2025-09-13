@@ -1,4 +1,5 @@
 import os
+import sys
 import json
 import sqlite3
 import subprocess
@@ -764,6 +765,15 @@ class MainWindow(ctk.CTk):
 
     def change_database_storage(self):
         # 1) Pick or create .db
+        # Ensure we start file dialogs in the Campaigns directory under the app directory
+        try:
+            # If packaged (e.g., PyInstaller), use the executable directory; else use this file's directory
+            app_dir = os.path.dirname(sys.executable) if getattr(sys, 'frozen', False) else os.path.dirname(os.path.abspath(__file__))
+        except Exception:
+            app_dir = os.getcwd()
+        campaigns_dir = os.path.join(app_dir, "Campaigns")
+        os.makedirs(campaigns_dir, exist_ok=True)
+
         choice = messagebox.askquestion(
             "Change Database",
             "Do you want to open an existing database file?"
@@ -771,12 +781,14 @@ class MainWindow(ctk.CTk):
         if choice == "yes":
             new_db_path = filedialog.askopenfilename(
                 title="Select Database",
+                initialdir=campaigns_dir,
                 filetypes=[("SQLite DB Files", "*.db"), ("All Files", "*.*")]
             )
         else:
             new_db_path = filedialog.asksaveasfilename(
                 title="Create New Database",
                 defaultextension=".db",
+                initialdir=campaigns_dir,
                 filetypes=[("SQLite DB Files", "*.db"), ("All Files", "*.*")]
             )
         if not new_db_path:
