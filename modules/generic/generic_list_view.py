@@ -7,6 +7,7 @@ from tkinter import ttk, messagebox, filedialog
 import copy
 from modules.generic.generic_editor_window import GenericEditorWindow
 from modules.ui.image_viewer import show_portrait
+from modules.ui.second_screen_display import show_entity_on_second_screen
 from modules.helpers.config_helper import ConfigHelper
 from modules.scenarios.gm_screen_view import GMScreenView
 import shutil
@@ -104,6 +105,10 @@ class GenericListView(ctk.CTkFrame):
         # --- Column configuration ---
         self.column_section = f"ColumnSettings_{self.model_wrapper.entity_type}"
         self._load_column_settings()
+
+        # --- Display fields for second screen ---
+        self.display_section = f"DisplayFields_{self.model_wrapper.entity_type}"
+        self._load_display_fields()
 
         # --- Load saved list order ---
         self.order_section = f"ListOrder_{self.model_wrapper.entity_type}"
@@ -465,6 +470,11 @@ class GenericListView(ctk.CTkFrame):
                 label="Open in GM Screen",
                 command=lambda: self.open_in_gm_screen(iid)
             )
+        if item:
+            menu.add_command(
+                label="Display on Second Screen",
+                command=lambda: self.display_on_second_screen(iid)
+            )
         if has_portrait:
             menu.add_command(
                 label="Show Portrait",
@@ -497,6 +507,14 @@ class GenericListView(ctk.CTkFrame):
             )
             menu.add_cascade(label="Row Color", menu=color_menu)
         menu.post(event.x_root, event.y_root)
+
+    def display_on_second_screen(self, iid):
+        item, _ = self._find_item_by_iid(iid)
+        if not item:
+            return
+        title = str(item.get(self.unique_field, ""))
+        fields = list(self.display_fields) if getattr(self, 'display_fields', None) else list(self.columns[:3])
+        show_entity_on_second_screen(item=item, title=title, fields=fields)
 
     def delete_item(self, iid):
         base_id = iid.lower()
@@ -735,6 +753,7 @@ class GenericListView(ctk.CTkFrame):
     def _show_columns_menu(self, event):
         menu = tk.Menu(self, tearoff=0)
         menu.add_command(label="Columns...", command=self._open_column_chooser)
+        menu.add_command(label="Display Fields...", command=self._open_display_fields_chooser)
         menu.post(event.x_root, event.y_root)
 
     def _open_column_chooser(self):
@@ -751,6 +770,32 @@ class GenericListView(ctk.CTkFrame):
             self.hidden_columns = {c for c, v in vars.items() if not v.get()}
             self._apply_column_settings()
             self._save_column_settings()
+            top.destroy()
+
+        ctk.CTkButton(top, text="OK", command=apply).pack(pady=5)
+        top.transient(self.master)
+        top.lift()
+        top.focus_force()
+
+    def _open_display_fields_chooser(self):
+        top = ctk.CTkToplevel(self)
+        top.title("Display Fields (Second Screen)")
+        vars = {}
+        available = list(self.columns)
+        # Allow portrait selection as well
+        if "Portrait" not in available:
+            available_with_portrait = ["Portrait"] + available
+        else:
+            available_with_portrait = available
+        for col in available_with_portrait:
+            var = tk.BooleanVar(value=col in getattr(self, 'display_fields', set()))
+            vars[col] = var
+            chk = ctk.CTkCheckBox(top, text=col, variable=var)
+            chk.pack(anchor="w", padx=10, pady=2)
+
+        def apply():
+            self.display_fields = {c for c, v in vars.items() if v.get()}
+            self._save_display_fields()
             top.destroy()
 
         ctk.CTkButton(top, text="OK", command=apply).pack(pady=5)
@@ -780,6 +825,29 @@ class GenericListView(ctk.CTkFrame):
                 cfg.remove_option(section, opt)
         for idx, item in enumerate(self.items):
             cfg.set(section, self._get_base_id(item), str(idx))
+        with open("config/config.ini", "w", encoding="utf-8") as f:
+            cfg.write(f)
+        try:
+            ConfigHelper._config_mtime = os.path.getmtime("config/config.ini")
+        except OSError:
+            pass
+
+    def _load_display_fields(self):
+        cfg = ConfigHelper.load_config()
+        self.display_fields = set()
+        if cfg.has_section(self.display_section):
+            raw = cfg.get(self.display_section, "fields", fallback="")
+            if raw:
+                self.display_fields = {c for c in raw.split(",") if c}
+        if not self.display_fields:
+            self.display_fields = set(self.columns[:3])
+
+    def _save_display_fields(self):
+        cfg = ConfigHelper.load_config()
+        section = self.display_section
+        if not cfg.has_section(section):
+            cfg.add_section(section)
+        cfg.set(section, "fields", ",".join([c for c in self.display_fields]))
         with open("config/config.ini", "w", encoding="utf-8") as f:
             cfg.write(f)
         try:
