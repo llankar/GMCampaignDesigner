@@ -263,7 +263,8 @@ class DisplayMapController:
         self.pan_x += dx
         self.pan_y += dy
         self._last_mouse = (event.x, event.y)
-        self._update_canvas_images()
+        # Fast path: only move existing canvas items; avoid costly resizes
+        self._nudge_canvas(dx, dy)
 
     def _on_middle_release(self, event):
         # End panning mode
@@ -273,6 +274,52 @@ class DisplayMapController:
                 self.canvas.configure(cursor="")
             except tk.TclError:
                 pass
+            # Snap to full redraw once released; also sync mirrors
+            try:
+                self._update_canvas_images(resample=self._fast_resample)
+                if getattr(self, 'fs_canvas', None):
+                    self._update_fullscreen_map()
+                if getattr(self, '_web_server_thread', None):
+                    self._update_web_display_map()
+            except Exception:
+                pass
+
+    def _nudge_canvas(self, dx, dy):
+        """Move all visible canvas items by dx,dy without recomputing images."""
+        try:
+            if self.base_id:
+                self.canvas.move(self.base_id, dx, dy)
+            if self.mask_id:
+                self.canvas.move(self.mask_id, dx, dy)
+            # Move tokens and shapes
+            for item in self.tokens:
+                for cid in item.get("canvas_ids", []):
+                    if cid:
+                        self.canvas.move(cid, dx, dy)
+                if item.get("type", "token") == "token":
+                    if item.get("name_id"):
+                        self.canvas.move(item["name_id"], dx, dy)
+                    if item.get("info_widget_id"):
+                        self.canvas.move(item["info_widget_id"], dx, dy)
+                    if item.get("hp_canvas_ids"):
+                        for hp_cid in item["hp_canvas_ids"]:
+                            if hp_cid:
+                                self.canvas.move(hp_cid, dx, dy)
+            # Move resize handles if displayed
+            for hid in getattr(self, '_resize_handles', []) or []:
+                try:
+                    self.canvas.move(hid, dx, dy)
+                except tk.TclError:
+                    pass
+            # Move marker if present
+            if self._marker_id:
+                try:
+                    self.canvas.move(self._marker_id, dx, dy)
+                except tk.TclError:
+                    pass
+        except tk.TclError:
+            # Fallback to full redraw if something goes wrong
+            self._update_canvas_images(resample=self._fast_resample)
 
     def _on_mouse_down(self, event):
         # Check if a resize handle was clicked first
