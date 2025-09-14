@@ -221,18 +221,107 @@ class MainWindow(ctk.CTk):
                                         font=("Segoe UI", 14, "italic"), fg_color="transparent", text_color="white")
         self.db_name_label.pack(pady=(0, 1), anchor="center")
 
-        self.create_icon_grid()
+        self.create_accordion_sidebar()
 
-    def create_icon_grid(self):
-        icons_frame = ctk.CTkFrame(self.sidebar_inner, fg_color="transparent")
-        
-        icons_frame.pack(fill="both", expand=True, padx=2, pady=2)
-        columns = 2
-        for col in range(columns):
-            icons_frame.grid_columnconfigure(col, weight=1)
-        icons_list = [
+    def create_accordion_sidebar(self):
+        container = ctk.CTkFrame(self.sidebar_inner, fg_color="transparent")
+        container.pack(fill="both", expand=True, padx=2, pady=2)
+        sections = []  # track all sections to enforce single-open behavior
+        default_title = "Campaign Workshop"
+        default_meta = {"sec": None}
+
+        def make_section(parent, title, buttons):
+            sec = ctk.CTkFrame(parent)
+            sec.pack(fill="x", pady=(4, 6))
+
+            header = ctk.CTkFrame(sec, fg_color="#0b3d6e")
+            header.pack(fill="x")
+            title_lbl = ctk.CTkLabel(header, text=title, anchor="center")
+            title_lbl.pack(fill="x", pady=6)
+            state = {"open": False, "after": None}
+
+            body = ctk.CTkFrame(sec, fg_color="transparent")
+            # grid layout for buttons
+            cols = 2
+            for c in range(cols):
+                body.grid_columnconfigure(c, weight=1)
+            for idx, (icon_key, tooltip, cmd) in enumerate(buttons):
+                r, c = divmod(idx, cols)
+                icon = self.icons.get(icon_key)
+                btn = create_icon_button(body, icon, tooltip, cmd)
+                btn.grid(row=r, column=c, padx=2, pady=2, sticky="ew")
+
+            def expand():
+                if state["open"]:
+                    return
+                state["open"] = True
+                try:
+                    body.pack(fill="x", padx=2, pady=(2, 2))
+                except Exception:
+                    pass
+
+            def collapse():
+                if not state["open"]:
+                    return
+                state["open"] = False
+                try:
+                    body.pack_forget()
+                except Exception:
+                    pass
+
+            def on_enter(_e=None):
+                # Cancel pending collapse on this section
+                if state["after"]:
+                    try:
+                        sec.after_cancel(state["after"])
+                    except Exception:
+                        pass
+                    state["after"] = None
+                # Collapse all other sections immediately to ensure only one open
+                for meta in sections:
+                    if meta["sec"] is sec:
+                        continue
+                    if meta["state"]["after"]:
+                        try:
+                            meta["sec"].after_cancel(meta["state"]["after"])
+                        except Exception:
+                            pass
+                        meta["state"]["after"] = None
+                    meta["collapse"]()
+                # Expand this section
+                expand()
+
+            def on_leave(_e=None):
+                # schedule collapse to avoid flicker
+                if state["after"]:
+                    try:
+                        sec.after_cancel(state["after"])
+                    except Exception:
+                        pass
+                state["after"] = sec.after(350, collapse)
+
+            # Only header is visible until hover
+            collapse()
+            header.bind("<Enter>", on_enter)
+            sec.bind("<Enter>", on_enter)
+            sec.bind("<Leave>", on_leave)
+            body.bind("<Enter>", on_enter)
+            # Register section for global coordination
+            sections.append({
+                "sec": sec,
+                "state": state,
+                "collapse": collapse,
+                "expand": expand,
+                "title": title,
+            })
+            return sec
+
+        # Group buttons
+        data_system = [
             ("change_db", "Change Data Storage", self.change_database_storage),
             ("swarm_path", "Set SwarmUI Path", self.select_swarmui_path),
+        ]
+        content = [
             ("manage_scenarios", "Manage Scenarios", lambda: self.open_entity("scenarios")),
             ("manage_pcs", "Manage PCs", lambda: self.open_entity("pcs")),
             ("manage_npcs", "Manage NPCs", lambda: self.open_entity("npcs")),
@@ -243,29 +332,57 @@ class MainWindow(ctk.CTk):
             ("manage_informations", "Manage Informations", lambda: self.open_entity("informations")),
             ("manage_clues", "Manage Clues", lambda: self.open_entity("clues")),
             ("manage_maps", "Manage Maps", lambda: self.open_entity("maps")),
-            ("export_scenarios", "Export Scenarios", self.preview_and_export_scenarios),
-            ("gm_screen", "Open GM Screen", self.open_gm_screen),
+        ]
+        relations = [
             ("npc_graph", "Open NPC Graph Editor", self.open_npc_graph_editor),
             ("pc_graph", "Open PC Graph Editor", self.open_pc_graph_editor),
             ("faction_graph", "Open Factions Graph Editor", self.open_faction_graph_editor),
             ("scenario_graph", "Open Scenario Graph Editor", self.open_scenario_graph_editor),
+        ]
+        utilities = [
             ("generate_scenario", "Generate Scenario", self.open_scenario_generator),
+            ("import_scenario", "Import Scenario", self.open_scenario_importer),
+            ("gm_screen", "Open GM Screen", self.open_gm_screen),
+            ("export_scenarios", "Export Scenarios", self.preview_and_export_scenarios),
+            ("export_foundry", "Export Scenarios for Foundry", self.export_foundry),
             ("generate_portraits", "Generate Portraits", self.generate_missing_portraits),
             ("associate_portraits", "Associate NPC Portraits", self.associate_npc_portraits),
-            ("import_scenario", "Import Scenario", self.open_scenario_importer),
-            ("export_foundry", "Export Scenarios for Foundry", self.export_foundry),
             ("map_tool", "Map Tool", self.map_tool),
-            
-            
-            
         ]
-        self.icon_buttons = []
-        for idx, (icon_key, tooltip, cmd) in enumerate(icons_list):
-            row = idx // columns
-            col = idx % columns
-            btn = create_icon_button(icons_frame, self.icons[icon_key], tooltip, cmd)
-            btn.grid(row=row, column=col, padx=2, pady=2)
-            self.icon_buttons.append(btn)
+
+        make_section(container, "Data & System", data_system)
+        make_section(container, "Campaign Workshop", content)
+        make_section(container, "Relations & Graphs", relations)
+        make_section(container, "Utilities", utilities)
+
+        # Open the default section by default
+        for meta in sections:
+            if meta.get("title") == default_title:
+                default_meta = meta
+                try:
+                    meta["expand"]()
+                except Exception:
+                    pass
+                break
+
+        # If pointer leaves the accordion entirely, collapse all sections
+        def _collapse_all(_e=None):
+            # Collapse all, then re-open the default section so it is visible by default
+            for meta in sections:
+                if meta["state"]["after"]:
+                    try:
+                        meta["sec"].after_cancel(meta["state"]["after"])
+                    except Exception:
+                        pass
+                    meta["state"]["after"] = None
+                meta["collapse"]()
+            # Re-open default
+            if default_meta.get("expand"):
+                try:
+                    default_meta["expand"]()
+                except Exception:
+                    pass
+        container.bind("<Leave>", _collapse_all)
 
     def create_content_area(self):
         self.content_frame = ctk.CTkFrame(self.main_frame)
