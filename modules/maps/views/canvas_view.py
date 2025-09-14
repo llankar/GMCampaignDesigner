@@ -30,7 +30,10 @@ def _build_canvas(self):
     self.canvas.bind("<ButtonPress-1>",    self._on_mouse_down)
     self.canvas.bind("<B1-Motion>",        self._on_mouse_move)
     self.canvas.bind("<ButtonRelease-1>",  self._on_mouse_up)
-    self.canvas.bind("<ButtonPress-2>",    self._on_middle_click) # Typically middle mouse
+    # Middle mouse: start panning on press, move while held, stop on release
+    self.canvas.bind("<ButtonPress-2>",    self._on_middle_click) # start pan
+    self.canvas.bind("<B2-Motion>",        self._on_middle_drag)  # live pan
+    self.canvas.bind("<ButtonRelease-2>",  self._on_middle_release) # end pan
     
     # Zoom & resize
     self.canvas.bind("<MouseWheel>",       self.on_zoom)

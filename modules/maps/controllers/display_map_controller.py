@@ -173,10 +173,34 @@ class DisplayMapController:
         if self.fs_canvas: self._fs_marker_id = self.fs_canvas.create_oval(sx-r,sy-r,sx+r,sy+r, outline='red', width=2)
 
     def _on_middle_click(self, event):
-        cw, ch = self.canvas.winfo_width(), self.canvas.winfo_height()
-        xw = (event.x - self.pan_x) / self.zoom; yw = (event.y - self.pan_y) / self.zoom
-        self.pan_x = (cw/2) - xw*self.zoom; self.pan_y = (ch/2) - yw*self.zoom
+        # Start panning mode: remember starting mouse position and pan
+        self._panning = True
+        self._last_mouse = (event.x, event.y)
+        self._orig_pan = (self.pan_x, self.pan_y)
+        try:
+            self.canvas.configure(cursor="fleur")
+        except tk.TclError:
+            pass
+
+    def _on_middle_drag(self, event):
+        # While middle button held, pan by mouse delta
+        if not self._panning:
+            return
+        dx = event.x - self._last_mouse[0]
+        dy = event.y - self._last_mouse[1]
+        self.pan_x += dx
+        self.pan_y += dy
+        self._last_mouse = (event.x, event.y)
         self._update_canvas_images()
+
+    def _on_middle_release(self, event):
+        # End panning mode
+        if self._panning:
+            self._panning = False
+            try:
+                self.canvas.configure(cursor="")
+            except tk.TclError:
+                pass
 
     def _on_mouse_down(self, event):
         # Check if a resize handle was clicked first
