@@ -82,6 +82,11 @@ class DisplayMapController:
         self._marker_start    = None
         self._marker_id       = None
         self._fs_marker_id    = None
+        self._marker_anim_after_id = None
+        self._marker_radius   = None
+        self._marker_anim_dir = 1
+        self._marker_min_r    = 6
+        self._marker_max_r    = 25
 
         # For interactive shape resizing (re-adding)
         self._resize_handles = []
@@ -166,11 +171,78 @@ class DisplayMapController:
             self._on_hp_double_click(event, token)
                                      
     def _create_marker(self):
-        if not self._marker_start: return
-        x0, y0 = self._marker_start; xw = (x0 - self.pan_x) / self.zoom; yw = (y0 - self.pan_y) / self.zoom
-        sx, sy = int(xw*self.zoom + self.pan_x), int(yw*self.zoom + self.pan_y); r = 25
-        self._marker_id = self.canvas.create_oval(sx-r,sy-r,sx+r,sy+r, outline='red', width=2)
-        if self.fs_canvas: self._fs_marker_id = self.fs_canvas.create_oval(sx-r,sy-r,sx+r,sy+r, outline='red', width=2)
+        # Create a pulsating circle that animates while the user holds the click
+        if not self._marker_start:
+            return
+        x0, y0 = self._marker_start
+        xw = (x0 - self.pan_x) / self.zoom
+        yw = (y0 - self.pan_y) / self.zoom
+        sx, sy = int(xw * self.zoom + self.pan_x), int(yw * self.zoom + self.pan_y)
+        # Start small then grow to max, then pulse between min and max
+        self._marker_radius = self._marker_min_r
+        r = self._marker_radius
+        # Create or reset the ovals
+        if self._marker_id:
+            try:
+                self.canvas.coords(self._marker_id, sx - r, sy - r, sx + r, sy + r)
+            except tk.TclError:
+                self._marker_id = None
+        if not self._marker_id:
+            self._marker_id = self.canvas.create_oval(sx - r, sy - r, sx + r, sy + r, outline='red', width=2)
+        if self.fs_canvas:
+            if self._fs_marker_id:
+                try:
+                    self.fs_canvas.coords(self._fs_marker_id, sx - r, sy - r, sx + r, sy + r)
+                except tk.TclError:
+                    self._fs_marker_id = None
+            if not self._fs_marker_id:
+                self._fs_marker_id = self.fs_canvas.create_oval(sx - r, sy - r, sx + r, sy + r, outline='red', width=2)
+        # Kick off animation loop
+        self._marker_anim_dir = 1
+        self._schedule_marker_animation()
+
+    def _schedule_marker_animation(self):
+        # Schedule next frame of the pulsating animation
+        if not self._marker_start:
+            return
+        # Use a short interval for smooth animation
+        if self._marker_anim_after_id:
+            try:
+                self.canvas.after_cancel(self._marker_anim_after_id)
+            except Exception:
+                pass
+        self._marker_anim_after_id = self.canvas.after(40, self._animate_marker)
+
+    def _animate_marker(self):
+        # If mouse released or marker removed, stop animation
+        if not self._marker_start or not self._marker_id:
+            return
+        # Update radius
+        step = 2
+        self._marker_radius += step * self._marker_anim_dir
+        if self._marker_radius >= self._marker_max_r:
+            self._marker_radius = self._marker_max_r
+            self._marker_anim_dir = -1
+        elif self._marker_radius <= self._marker_min_r:
+            self._marker_radius = self._marker_min_r
+            self._marker_anim_dir = 1
+        # Recompute current screen position from stored screen start
+        x0, y0 = self._marker_start
+        xw = (x0 - self.pan_x) / self.zoom
+        yw = (y0 - self.pan_y) / self.zoom
+        sx, sy = int(xw * self.zoom + self.pan_x), int(yw * self.zoom + self.pan_y)
+        r = self._marker_radius
+        try:
+            self.canvas.coords(self._marker_id, sx - r, sy - r, sx + r, sy + r)
+        except tk.TclError:
+            self._marker_id = None
+        if self.fs_canvas and self._fs_marker_id:
+            try:
+                self.fs_canvas.coords(self._fs_marker_id, sx - r, sy - r, sx + r, sy + r)
+            except tk.TclError:
+                self._fs_marker_id = None
+        # Loop
+        self._schedule_marker_animation()
 
     def _on_middle_click(self, event):
         # Start panning mode: remember starting mouse position and pan
@@ -274,6 +346,12 @@ class DisplayMapController:
 
     def _on_mouse_up(self, event):
         if self._marker_after_id: self.canvas.after_cancel(self._marker_after_id); self._marker_after_id = None
+        if self._marker_anim_after_id:
+            try:
+                self.canvas.after_cancel(self._marker_anim_after_id)
+            except Exception:
+                pass
+            self._marker_anim_after_id = None
         if self._marker_id: self.canvas.delete(self._marker_id); self._marker_id = None
         if self.fs_canvas and self._fs_marker_id: self.fs_canvas.delete(self._fs_marker_id); self._fs_marker_id = None
         if self._fog_action_active:
