@@ -1358,7 +1358,7 @@ class MainWindow(ctk.CTk):
         top.attributes("-topmost", True)
         top.after_idle(lambda: top.attributes("-topmost", False))
         top.title("Map Tool")
-        top.geometry("1400x900")  # or whatever size you prefer
+        top.geometry("1920x1080+0+0")  # or whatever size you prefer
 
         # 3) Inside that window, create a single frame to hold your map UI
         map_frame = ctk.CTkFrame(top)
