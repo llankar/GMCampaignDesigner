@@ -90,9 +90,16 @@ class GenericListView(ctk.CTkFrame):
         self.items = self.model_wrapper.load_items()
         self.filtered_items = list(self.items)
 
-        self.group_column = ConfigHelper.get(
-            "ListGrouping", self.model_wrapper.entity_type, fallback=None
-        ) or None
+        # Load grouping from campaign-local settings
+        cfg_grp = ConfigHelper.load_campaign_config()
+        try:
+            self.group_column = (
+                cfg_grp.get("ListGrouping", self.model_wrapper.entity_type)
+                if cfg_grp.has_section("ListGrouping") and cfg_grp.has_option("ListGrouping", self.model_wrapper.entity_type)
+                else None
+            )
+        except Exception:
+            self.group_column = None
 
         self.unique_field = next(
             (f["name"] for f in self.template["fields"] if f["name"] != "Portrait"),
@@ -217,7 +224,7 @@ class GenericListView(ctk.CTkFrame):
 
         self.row_color_section = f"RowColors_{self.model_wrapper.entity_type}"
         self.row_colors = {}
-        cfg = ConfigHelper.load_config()
+        cfg = ConfigHelper.load_campaign_config()
         if cfg.has_section(self.row_color_section):
             self.row_colors = dict(cfg.items(self.row_color_section))
 
@@ -654,10 +661,20 @@ class GenericListView(ctk.CTkFrame):
             selection = var.get()
             if selection == "None":
                 self.group_column = None
-                ConfigHelper.set("ListGrouping", self.model_wrapper.entity_type, "")
+                cfg = ConfigHelper.load_campaign_config()
+                if not cfg.has_section("ListGrouping"):
+                    cfg.add_section("ListGrouping")
+                cfg.set("ListGrouping", self.model_wrapper.entity_type, "")
+                with open(ConfigHelper.get_campaign_settings_path(), "w", encoding="utf-8") as f:
+                    cfg.write(f)
             else:
                 self.group_column = selection
-                ConfigHelper.set("ListGrouping", self.model_wrapper.entity_type, self.group_column)
+                cfg = ConfigHelper.load_campaign_config()
+                if not cfg.has_section("ListGrouping"):
+                    cfg.add_section("ListGrouping")
+                cfg.set("ListGrouping", self.model_wrapper.entity_type, self.group_column)
+                with open(ConfigHelper.get_campaign_settings_path(), "w", encoding="utf-8") as f:
+                    cfg.write(f)
             top.destroy()
             self.refresh_list()
 
@@ -722,7 +739,7 @@ class GenericListView(ctk.CTkFrame):
         return None
 
     def _load_column_settings(self):
-        cfg = ConfigHelper.load_config()
+        cfg = ConfigHelper.load_campaign_config()
         self.column_order = list(self.columns)
         self.hidden_columns = set()
         self.column_widths = {}
@@ -755,7 +772,7 @@ class GenericListView(ctk.CTkFrame):
         self.tree["displaycolumns"] = display
 
     def _save_column_settings(self):
-        cfg = ConfigHelper.load_config()
+        cfg = ConfigHelper.load_campaign_config()
         section = self.column_section
         if not cfg.has_section(section):
             cfg.add_section(section)
@@ -768,10 +785,10 @@ class GenericListView(ctk.CTkFrame):
                 cfg.set(section, key, str(width))
             except tk.TclError:
                 continue
-        with open("config/config.ini", "w", encoding="utf-8") as f:
+        with open(ConfigHelper.get_campaign_settings_path(), "w", encoding="utf-8") as f:
             cfg.write(f)
         try:
-            ConfigHelper._config_mtime = os.path.getmtime("config/config.ini")
+            ConfigHelper._campaign_mtime = os.path.getmtime(ConfigHelper.get_campaign_settings_path())
         except OSError:
             pass
 
@@ -829,7 +846,7 @@ class GenericListView(ctk.CTkFrame):
         top.focus_force()
 
     def _load_list_order(self):
-        cfg = ConfigHelper.load_config()
+        cfg = ConfigHelper.load_campaign_config()
         self.list_order = {}
         if cfg.has_section(self.order_section):
             for key, val in cfg.items(self.order_section):
@@ -841,7 +858,7 @@ class GenericListView(ctk.CTkFrame):
         self.filtered_items = list(self.items)
 
     def _save_list_order(self):
-        cfg = ConfigHelper.load_config()
+        cfg = ConfigHelper.load_campaign_config()
         section = self.order_section
         if not cfg.has_section(section):
             cfg.add_section(section)
@@ -850,15 +867,15 @@ class GenericListView(ctk.CTkFrame):
                 cfg.remove_option(section, opt)
         for idx, item in enumerate(self.items):
             cfg.set(section, self._get_base_id(item), str(idx))
-        with open("config/config.ini", "w", encoding="utf-8") as f:
+        with open(ConfigHelper.get_campaign_settings_path(), "w", encoding="utf-8") as f:
             cfg.write(f)
         try:
-            ConfigHelper._config_mtime = os.path.getmtime("config/config.ini")
+            ConfigHelper._campaign_mtime = os.path.getmtime(ConfigHelper.get_campaign_settings_path())
         except OSError:
             pass
 
     def _load_display_fields(self):
-        cfg = ConfigHelper.load_config()
+        cfg = ConfigHelper.load_campaign_config()
         self.display_fields = set()
         if cfg.has_section(self.display_section):
             raw = cfg.get(self.display_section, "fields", fallback="")
@@ -868,15 +885,15 @@ class GenericListView(ctk.CTkFrame):
             self.display_fields = set(self.columns[:3])
 
     def _save_display_fields(self):
-        cfg = ConfigHelper.load_config()
+        cfg = ConfigHelper.load_campaign_config()
         section = self.display_section
         if not cfg.has_section(section):
             cfg.add_section(section)
         cfg.set(section, "fields", ",".join([c for c in self.display_fields]))
-        with open("config/config.ini", "w", encoding="utf-8") as f:
+        with open(ConfigHelper.get_campaign_settings_path(), "w", encoding="utf-8") as f:
             cfg.write(f)
         try:
-            ConfigHelper._config_mtime = os.path.getmtime("config/config.ini")
+            ConfigHelper._campaign_mtime = os.path.getmtime(ConfigHelper.get_campaign_settings_path())
         except OSError:
             pass
 
@@ -894,7 +911,7 @@ class GenericListView(ctk.CTkFrame):
         self._save_row_color(base_id, color_name)
 
     def _save_row_color(self, base_id, color_name):
-        cfg = ConfigHelper.load_config()
+        cfg = ConfigHelper.load_campaign_config()
         section = self.row_color_section
         if not cfg.has_section(section):
             cfg.add_section(section)
@@ -905,10 +922,10 @@ class GenericListView(ctk.CTkFrame):
             if cfg.has_option(section, base_id):
                 cfg.remove_option(section, base_id)
             self.row_colors.pop(base_id, None)
-        with open("config/config.ini", "w", encoding="utf-8") as f:
+        with open(ConfigHelper.get_campaign_settings_path(), "w", encoding="utf-8") as f:
             cfg.write(f)
         try:
-            ConfigHelper._config_mtime = os.path.getmtime("config/config.ini")
+            ConfigHelper._campaign_mtime = os.path.getmtime(ConfigHelper.get_campaign_settings_path())
         except OSError:
             pass
         

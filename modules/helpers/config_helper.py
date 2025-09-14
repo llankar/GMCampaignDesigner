@@ -1,10 +1,12 @@
-import configparser
+﻿import configparser
 import os
 
 class ConfigHelper:
     _instance = None
     _config = None
     _config_mtime = None
+    _campaign_config = None
+    _campaign_mtime = None
 
     @classmethod
     def load_config(cls, file_path="config/config.ini"):
@@ -33,7 +35,7 @@ class ConfigHelper:
         try:
             return cls._config.get(section, key, fallback=fallback)
         except Exception as e:
-            print(f"Config error: [{section}] {key} — {e}")
+            print(f"Config error: [{section}] {key} â€” {e}")
             return fallback
 
     def set(section, key, value, file_path="config/config.ini"):
@@ -56,3 +58,24 @@ class ConfigHelper:
         return os.path.abspath(os.path.dirname(db_path))
 
 
+
+
+    @classmethod
+    def get_campaign_settings_path(cls):
+        """Path to campaign-local settings file stored next to the DB."""
+        return os.path.join(cls.get_campaign_dir(), "settings.ini")
+
+    @classmethod
+    def load_campaign_config(cls):
+        """Load campaign-local settings.ini, cached by mtime similar to load_config."""
+        path = cls.get_campaign_settings_path()
+        mtime = os.path.getmtime(path) if os.path.exists(path) else None
+        if cls._campaign_config is None or mtime != cls._campaign_mtime:
+            cfg = configparser.ConfigParser()
+            if mtime is not None:
+                cfg.read(path)
+                cls._campaign_mtime = mtime
+            else:
+                cls._campaign_mtime = None
+            cls._campaign_config = cfg
+        return cls._campaign_config
