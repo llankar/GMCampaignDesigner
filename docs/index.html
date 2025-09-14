@@ -1,0 +1,338 @@
+
+<!DOCTYPE html>
+<html lang='en'>
+<head>
+  <meta charset='utf-8' />
+  <title>GMCampaignDesigner Documentation</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 24px; color: #111; }
+    h1, h2, h3, h4 { color: #0b3d6e; }
+    code { background: #f2f4f8; padding: 2px 4px; border-radius: 3px; }
+    section { margin-bottom: 36px; }
+    figure.shot { margin: 0 0 24px 0; }
+    figure.shot img { max-width: 100%; height: auto; border: 1px solid #ddd; border-radius: 4px; display: block; }
+    figure.shot figcaption { color: #666; font-size: 0.9em; margin-top: 6px; }
+    .menu-block { margin-bottom: 16px; }
+    ul { margin-top: 8px; }
+  </style>
+  <meta name='viewport' content='width=device-width, initial-scale=1'>
+  <meta name='generator' content='generate_docs.py'>
+  <meta name='robots' content='noindex'>
+  <meta http-equiv='X-UA-Compatible' content='IE=edge' />
+  <meta name='description' content='Auto-generated documentation for GMCampaignDesigner'>
+  <meta name='theme-color' content='#0b3d6e' />
+  <meta name='og:title' content='GMCampaignDesigner Documentation' />
+  <meta name='og:type' content='website' />
+  <meta name='og:description' content='Auto-generated documentation for GMCampaignDesigner' />
+  <meta name='og:image' content='images/main_window.png' />
+  <meta name='og:image:alt' content='Main Window Screenshot' />
+  <meta name='twitter:card' content='summary_large_image' />
+  <meta name='twitter:title' content='GMCampaignDesigner Documentation' />
+  <meta name='twitter:image' content='images/main_window.png' />
+  <meta name='twitter:image:alt' content='Main Window Screenshot' />
+  <meta name='apple-mobile-web-app-title' content='GMCampaignDesigner Docs' />
+</head>
+<body>
+  
+        <section id="overview">
+          <h1>GMCampaignDesigner Documentation</h1>
+          <p>This document provides an overview of the application's features, UI, right-click context menus, and a module API reference generated from the source code.</p>
+          <p>Version generated on: 2025-09-14 15:17:15</p>
+        </section>
+        <section id='screenshots'><h2>UI Screenshots</h2><figure class='shot'><img src='images/entity_clues.png' alt='Entity Clues' /><figcaption>Entity Clues</figcaption></figure>
+<figure class='shot'><img src='images/entity_creatures.png' alt='Entity Creatures' /><figcaption>Entity Creatures</figcaption></figure>
+<figure class='shot'><img src='images/entity_factions.png' alt='Entity Factions' /><figcaption>Entity Factions</figcaption></figure>
+<figure class='shot'><img src='images/entity_informations.png' alt='Entity Informations' /><figcaption>Entity Informations</figcaption></figure>
+<figure class='shot'><img src='images/entity_maps.png' alt='Entity Maps' /><figcaption>Entity Maps</figcaption></figure>
+<figure class='shot'><img src='images/entity_npcs.png' alt='Entity Npcs' /><figcaption>Entity Npcs</figcaption></figure>
+<figure class='shot'><img src='images/entity_objects.png' alt='Entity Objects' /><figcaption>Entity Objects</figcaption></figure>
+<figure class='shot'><img src='images/entity_pcs.png' alt='Entity Pcs' /><figcaption>Entity Pcs</figcaption></figure>
+<figure class='shot'><img src='images/entity_places.png' alt='Entity Places' /><figcaption>Entity Places</figcaption></figure>
+<figure class='shot'><img src='images/entity_scenarios.png' alt='Entity Scenarios' /><figcaption>Entity Scenarios</figcaption></figure>
+<figure class='shot'><img src='images/faction_graph.png' alt='Faction Graph' /><figcaption>Faction Graph</figcaption></figure>
+<figure class='shot'><img src='images/gm_screen.png' alt='Gm Screen' /><figcaption>Gm Screen</figcaption></figure>
+<figure class='shot'><img src='images/main_window.png' alt='Main Window' /><figcaption>Main Window</figcaption></figure>
+<figure class='shot'><img src='images/map_tool_editor.png' alt='Map Tool Editor' /><figcaption>Map Tool Editor</figcaption></figure>
+<figure class='shot'><img src='images/map_tool_oval.png' alt='Map Tool Oval' /><figcaption>Map Tool Oval</figcaption></figure>
+<figure class='shot'><img src='images/map_tool_rectangle.png' alt='Map Tool Rectangle' /><figcaption>Map Tool Rectangle</figcaption></figure>
+<figure class='shot'><img src='images/map_tool_selector.png' alt='Map Tool Selector' /><figcaption>Map Tool Selector</figcaption></figure>
+<figure class='shot'><img src='images/npc_graph.png' alt='Npc Graph' /><figcaption>Npc Graph</figcaption></figure>
+<figure class='shot'><img src='images/pc_graph.png' alt='Pc Graph' /><figcaption>Pc Graph</figcaption></figure>
+<figure class='shot'><img src='images/scenario_generator.png' alt='Scenario Generator' /><figcaption>Scenario Generator</figcaption></figure>
+<figure class='shot'><img src='images/scenario_graph.png' alt='Scenario Graph' /><figcaption>Scenario Graph</figcaption></figure>
+<figure class='shot'><img src='images/scenario_importer.png' alt='Scenario Importer' /><figcaption>Scenario Importer</figcaption></figure></section><section id='context-menus'><h2>Right-Click Menus</h2><div class='menu-block'><h3>modules\factions\faction_graph_editor.py</h3><ul><li>Delete Faction</li></ul></div>
+<div class='menu-block'><h3>modules\generic\generic_list_view.py</h3><ul><li>Open in GM Screen</li><li>Display on Second Screen</li><li>Show Portrait</li><li>Copy</li><li>Paste</li><li>Delete</li><li>Clear Color</li><li>Columns...</li><li>Display Fields...</li><li>Row Color</li></ul></div>
+<div class='menu-block'><h3>modules\maps\controllers\display_map_controller.py</h3><ul><li>Edit Shape Graphically</li><li>Edit Color</li><li>Edit Dimensions (Numeric)</li><li>Toggle Fill</li><li>Copy Shape</li><li>Delete Shape</li><li>Bring to Front</li><li>Send to Back</li><li>Resize Token</li><li>Change Border Color</li><li>Copy Token</li><li>Delete Token</li><li>Show Portrait</li></ul></div>
+<div class='menu-block'><h3>modules\npcs\npc_graph_editor.py</h3><ul><li>No Arrows</li><li>Arrow at Start</li><li>Arrow at End</li><li>Arrows at Both Ends</li><li>Delete Node</li><li>Change Color</li><li>Display Portrait Window</li><li>Change shape size</li><li>Bring to Front</li><li>Send to Back</li><li>Delete Shape</li><li>Arrow Mode</li></ul></div>
+<div class='menu-block'><h3>modules\pcs\pc_graph_editor.py</h3><ul><li>No Arrows</li><li>Arrow at Start</li><li>Arrow at End</li><li>Arrows at Both Ends</li><li>Delete Node</li><li>Change Color</li><li>Display Portrait Window</li><li>Change shape size</li><li>Bring to Front</li><li>Send to Back</li><li>Delete Shape</li><li>Arrow Mode</li></ul></div>
+<div class='menu-block'><h3>modules\scenarios\scenario_graph_editor.py</h3><ul><li>Delete Node</li><li>Change Color</li><li>Display Portrait</li></ul></div>
+<div class='menu-block'><h3>modules\web\templates\clues.html</h3><ul><li>Edit Clue</li><li>Add Link</li><li>Delete Clue</li></ul></div>
+<div class='menu-block'><h3>modules\web\templates\clues.html</h3><ul><li>Delete Link</li></ul></div></section><section id='api'><h2>Module API Reference</h2><section class='module'><h3>campaign_generator.py</h3><p>campaign_generator_ui.py
+------------------------
+
+This module provides a simple graphical interface for generating
+role‑playing game campaigns based on different settings: Fantasy,
+Science‑Fiction, Modern and Post‑Apocalyptic.  The UI is built using
+Tkinter with ttk widgets for a clean look.  Users select a setting,
+generate a random campaign using the corresponding generator module,
+view the results, and export the details to a Word (.docx) document.
+
+The program falls back on a minimal DOCX implementation to avoid
+requiring external libraries.  It creates a valid Word document by
+zipping together the necessary XML parts whenever the user chooses to
+export.
+
+To run the application: ``python3 campaign_generator_ui.py``.  A window
+will open allowing you to select the setting and generate a campaign.</p><h4>Functions</h4><ul><li><code>roll()</code> — Return a random entry from a table.</li><li><code>generate_fantasy_campaign()</code> — Generate a random fantasy campaign outline using detailed paragraphs.
+
+Each entry is constructed by rolling multiple times on various tables to
+produce a longer, multi‑sentence description.  Seeds from the
+FlexTale tables are occasionally used as the first component to retain
+authenticity, but additional random rolls flesh out the context,
+motives, hazards and rewards.  This approach satisfies the request
+for longer entries while still ensuring hundreds of unique
+combinations per category.</li><li><code>generate_scifi_campaign()</code> — Generate a random science‑fiction campaign with detailed paragraphs.
+
+Like the fantasy generator, this function uses multi‑roll
+compositions to create rich descriptions for each campaign element.
+The variety of table entries combined with additional context and
+hazards ensures a large pool of possible outputs.</li><li><code>generate_modern_campaign()</code> — Generate a random modern campaign with detailed descriptions.
+
+Uses the same composition functions as other settings to provide
+extended narrative elements and ensure depth for each field.  This
+satisfies the requirement for longer entries built from multiple
+rolls.</li><li><code>generate_postapoc_campaign()</code> — Generate a random post‑apocalyptic campaign with richly detailed entries.
+
+Leverages the same multi‑roll composition functions to craft
+descriptive paragraphs, blending seeds from the source tables with
+additional context and flavour unique to the wasteland.</li><li><code>generate_starting_location()</code> — Generate a starting location string for the given setting.</li><li><code>compose_detailed_starting()</code> — Compose a longer starting location description using multiple random rolls.
+
+This function stitches together several generated fragments to build a
+multi‑sentence paragraph.  It begins with a seed or constructed
+starting location, mentions at least one nearby region, introduces
+two NPCs or hazards, and hints at an emerging rumour or quest item.</li><li><code>compose_detailed_quest()</code> — Compose a longer quest description by combining multiple quests and hooks.
+
+A primary quest is joined by two side objectives, and multiple
+motivations are referenced to weave a complex storyline.  This
+ensures that the adventure feels layered and detailed.</li><li><code>compose_detailed_hook()</code> — Compose a longer quest hook by combining multiple reasons and contexts.
+
+This merges several hooks into a single narrative, offering
+overlapping incentives or pressures that drive the party towards
+action.</li><li><code>compose_detailed_giver()</code> — Compose a longer quest giver description.
+
+The quest giver is fleshed out by introducing additional allies or
+rivals and by foreshadowing both the rewards and the consequences
+associated with the mission.  A final hook ties their motives to
+the overarching plot.</li><li><code>compose_detailed_npc()</code> — Compose a longer NPC description with secrets or motives.
+
+Two NPCs are described in detail, with hidden identities, alliances
+and secret motivations.  Additional hooks hint at why they are
+connected to the heroes.</li><li><code>compose_detailed_region()</code> — Compose a longer region description including hazards.
+
+This function describes multiple adjacent regions, their unique
+qualities and hazards, and sometimes hints at secrets or rewards
+buried within.</li><li><code>compose_detailed_distance()</code> — Compose a longer travel distance with obstacles.
+
+Describes the primary journey and a secondary leg of travel while
+mentioning terrain and potential hazards.  This builds a sense of
+the arduousness of the trip.</li><li><code>compose_detailed_encounter()</code> — Compose a longer encounter description combining multiple hazards.
+
+Two or more random encounters are chained together to create a
+challenging and varied sequence of events.</li><li><code>compose_detailed_reward()</code> — Compose a longer reward description combining tangible and intangible prizes.
+
+A trio of rewards is described, including a special quest item and
+hints of bonus advantages such as knowledge or favours.</li><li><code>compose_detailed_penalty()</code> — Compose a longer penalty description combining multiple negative outcomes.
+
+Multiple penalties are chained together, with additional hazards and
+hooks hinting at the reasons for the failures.  This makes the
+consequences feel weighty and narrative.</li><li><code>compose_detailed_item()</code> — Compose a longer quest item description combining different properties.
+
+Multiple unique items are described together, along with hints of
+rewards and penalties associated with their possession.  This
+encourages the party to weigh the risks and benefits.</li><li><code>generate_quest_template()</code> — Generate a quest template string.</li><li><code>generate_quest_hook()</code> — Generate a quest hook string.</li><li><code>generate_quest_giver()</code> — Generate a quest giver description.</li><li><code>generate_npc()</code> — Generate a key NPC description.</li><li><code>generate_region()</code> — Generate a region description.</li><li><code>generate_distance()</code> — Generate a travel distance string.</li><li><code>generate_random_encounter()</code> — Generate a random encounter description.</li><li><code>generate_reward()</code> — Generate a reward description.</li><li><code>generate_penalty()</code> — Generate a penalty description.</li><li><code>generate_quest_item()</code> — Generate a quest item description.</li><li><code>export_to_docx()</code> — Create a DOCX file containing the campaign information with styled headings and text.</li><li><code>main()</code> — </li></ul><div class='class'><h4>class CampaignGeneratorApp</h4><p>Main application window for generating campaigns.</p><ul><li><code>__init__()</code> — </li><li><code>_create_widgets()</code> — </li><li><code>generate_campaign()</code> — Generate and display a campaign for the selected setting.</li><li><code>export_campaign()</code> — </li><li><code>export_campaign_json()</code> — Export the current campaign to a JSON file using the provided template.
+
+The generated scenario is converted into a dictionary with fields
+Title, Summary, Secrets, Places and NPCs.  Summary and Secrets are
+stored as objects containing text and empty formatting lists to
+mirror the example template.  If the chosen file already exists
+and contains a JSON list, the scenario will be appended; otherwise
+a new list is created.</li></ul></div></section>
+<section class='module'><h3>main_window.py</h3><p></p><h4>Functions</h4><ul></ul><div class='class'><h4>class MainWindow</h4><p></p><ul><li><code>__init__()</code> — </li><li><code>open_ai_settings()</code> — </li><li><code>set_window_icon()</code> — </li><li><code>create_layout()</code> — </li><li><code>load_icons()</code> — </li><li><code>load_icon()</code> — </li><li><code>create_sidebar()</code> — </li><li><code>create_icon_grid()</code> — </li><li><code>create_content_area()</code> — </li><li><code>_toggle_banner()</code> — </li><li><code>get_content_container()</code> — Choose correct parent depending on banner state.</li><li><code>create_exit_button()</code> — </li><li><code>load_model_config()</code> — </li><li><code>init_wrappers()</code> — </li><li><code>open_faction_graph_editor()</code> — </li><li><code>clear_current_content()</code> — </li><li><code>move_current_view()</code> — Move the current open view to the correct container based on banner state.</li><li><code>open_entity()</code> — </li><li><code>save_items_to_json()</code> — </li><li><code>load_items_from_json()</code> — </li><li><code>open_gm_screen()</code> — </li><li><code>open_npc_graph_editor()</code> — </li><li><code>open_pc_graph_editor()</code> — </li><li><code>open_scenario_graph_editor()</code> — </li><li><code>export_foundry()</code> — </li><li><code>open_scenario_importer()</code> — </li><li><code>open_scenario_generator()</code> — </li><li><code>change_database_storage()</code> — </li><li><code>select_swarmui_path()</code> — </li><li><code>launch_swarmui()</code> — </li><li><code>cleanup_swarmui()</code> — </li><li><code>generate_missing_portraits()</code> — </li><li><code>generate_missing_npc_portraits()</code> — </li><li><code>generate_portraits_continue_npcs()</code> — </li><li><code>generate_missing_creature_portraits()</code> — </li><li><code>generate_portraits_continue_creatures()</code> — </li><li><code>generate_portrait_for_npc()</code> — </li><li><code>generate_portrait_for_creature()</code> — </li><li><code>copy_and_resize_portrait()</code> — </li><li><code>preview_and_export_scenarios()</code> — </li><li><code>preview_and_save()</code> — </li><li><code>apply_formatting()</code> — </li><li><code>normalize_name()</code> — </li><li><code>build_portrait_mapping()</code> — </li><li><code>associate_npc_portraits()</code> — </li><li><code>_on_ctrl_f()</code> — Global Ctrl+F binding: only opens search when GM screen is active.</li><li><code>map_tool()</code> — </li></ul></div></section>
+<section class='module'><h3>modules\ai\authoring_wizard.py</h3><p></p><h4>Functions</h4><ul><li><code>_parse_json_relaxed()</code> — </li></ul><div class='class'><h4>class AuthoringWizardView</h4><p>AI-assisted authoring for NPCs and Scenarios with presets and checks.</p><ul><li><code>__init__()</code> — </li><li><code>_build_layout()</code> — </li><li><code>select_for()</code> — Select default tab based on entity type (e.g., 'npcs' or 'scenarios').</li><li><code>_build_tab_npc()</code> — </li><li><code>_build_tab_scenario()</code> — </li><li><code>_build_tab_beats()</code> — </li><li><code>_lore_digest()</code> — </li><li><code>_short()</code> — </li><li><code>_system_hdr()</code> — </li><li><code>_with_lore()</code> — </li><li><code>_chat_json()</code> — </li><li><code>_chat_text()</code> — </li><li><code>_as_text()</code> — Coerce arbitrary value to displayable text.</li><li><code>generate_npc()</code> — </li><li><code>check_npc_consistency()</code> — </li><li><code>save_npc()</code> — </li><li><code>generate_scenario()</code> — </li><li><code>check_scenario_consistency()</code> — </li><li><code>save_scenario()</code> — </li><li><code>expand_beat()</code> — </li></ul></div></section>
+<section class='module'><h3>modules\ai\local_ai_client.py</h3><p></p><h4>Functions</h4><ul></ul><div class='class'><h4>class LocalAIClient</h4><p>Minimal OpenAI-compatible chat client for local models (e.g., gpt-oss,
+LM Studio, Ollama OpenAI adapter, text-gen webui proxy).
+
+Reads configuration from [AI] in config/config.ini:
+  - base_url: server base (e.g., http://localhost:8080)
+  - api_key: optional token if your server requires it
+  - model:   model name/id to request
+  - temperature: default generation temperature (float)
+  - max_tokens:  optional default max tokens (int)
+  - use_powershell: if true on Windows, call via PowerShell
+                    Invoke-WebRequest (default true on Windows)</p><ul><li><code>__init__()</code> — </li><li><code>_parse_json_safe()</code> — Parse JSON from a string that may contain extra leading/trailing text.
+
+Returns the first JSON object/array found.</li><li><code>_powershell_generate()</code> — POST to url using PowerShell Invoke-WebRequest.
+
+Returns parsed JSON dict.</li><li><code>chat()</code> — Send a chat completion request and return the assistant's text.
+
+messages: list[{role, content}] per OpenAI API</li></ul></div></section>
+<section class='module'><h3>modules\clues\clues_model.py</h3><p></p><h4>Functions</h4><ul><li><code>load()</code> — </li><li><code>save()</code> — </li></ul></section>
+<section class='module'><h3>modules\creatures\creatures_model.py</h3><p></p><h4>Functions</h4><ul><li><code>load()</code> — </li><li><code>save()</code> — </li></ul></section>
+<section class='module'><h3>modules\creatures\creatures_opener.py</h3><p></p><h4>Functions</h4><ul><li><code>open_creature_editor_window()</code> — Opens the specified NPC in a new GenericEditorWindow,
+completely detached from the scenario/tabs system.</li></ul></section>
+<section class='module'><h3>modules\factions\faction_graph_editor.py</h3><p></p><h4>Functions</h4><ul></ul><div class='class'><h4>class FactionGraphEditor</h4><p></p><ul><li><code>__init__()</code> — </li><li><code>init_toolbar()</code> — </li><li><code>add_faction()</code> — </li><li><code>_on_faction_chosen()</code> — </li><li><code>place_node()</code> — </li><li><code>start_link()</code> — </li><li><code>_pick_link_start()</code> — </li><li><code>_pick_link_end()</code> — </li><li><code>draw_graph()</code> — </li><li><code>start_drag()</code> — </li><li><code>do_drag()</code> — </li><li><code>end_drag()</code> — </li><li><code>on_right_click()</code> — </li><li><code>_delete_node()</code> — </li><li><code>get_state()</code> — </li><li><code>set_state()</code> — </li><li><code>save_graph()</code> — </li><li><code>load_graph()</code> — </li></ul></div></section>
+<section class='module'><h3>modules\factions\factions_model.py</h3><p></p><h4>Functions</h4><ul><li><code>load()</code> — </li><li><code>save()</code> — </li></ul></section>
+<section class='module'><h3>modules\generic\entity_detail_factory.py</h3><p></p><h4>Functions</h4><ul><li><code>insert_text()</code> — </li><li><code>insert_longtext()</code> — </li><li><code>insert_links()</code> — </li><li><code>open_entity_tab()</code> — Opens (or focuses) a detail window for the given entity_type/name.
+Debug prints added to trace why/when new windows are created.</li><li><code>unwrap_value()</code> — If val is a dict with a 'text' key, return that.
+Otherwise, return str(val) (or '' if None).</li><li><code>insert_npc_table()</code> — </li><li><code>insert_creature_table()</code> — </li><li><code>insert_places_table()</code> — Render a table of Places (excluding PlayerDisplay) with columns:
+Portrait, Name, Description, NPCs, Secrets</li><li><code>insert_list_longtext()</code> — Insert a header + several collapsed CTkLabels, each wrapping to the parent width.</li><li><code>create_scenario_detail_frame()</code> — Build a scrollable detail view for a scenario with:
+1) A header zone (Title, Summary, Secrets)
+2) Then the rest of the fields, but NPCs always before Places.</li><li><code>EditWindow()</code> — </li><li><code>create_entity_detail_frame()</code> — Routes Scenarios through our custom header/body and
+everything else through the generic detail path.</li><li><code>open_entity_window()</code> — </li></ul></section>
+<section class='module'><h3>modules\generic\entity_opener.py</h3><p></p><h4>Functions</h4><ul><li><code>open_detached_npc()</code> — Opens the specified NPC in a brand-new Toplevel window
+using a minimal GMScreenView to show the NPC data
+(but not as a tab).</li><li><code>open_detached_pc()</code> — Opens the specified NPC in a brand-new Toplevel window
+using a minimal GMScreenView to show the NPC data
+(but not as a tab).</li></ul></section>
+<section class='module'><h3>modules\generic\entity_selection_dialog.py</h3><p></p><h4>Functions</h4><ul></ul><div class='class'><h4>class EntitySelectionDialog</h4><p></p><ul><li><code>__init__()</code> — </li><li><code>create_table_header()</code> — </li><li><code>refresh_list()</code> — </li><li><code>create_item_row()</code> — </li><li><code>filter_items()</code> — </li><li><code>sort_column()</code> — </li><li><code>select_entity()</code> — </li><li><code>open_selected()</code> — </li></ul></div></section>
+<section class='module'><h3>modules\generic\export_for_foundry.py</h3><p></p><h4>Functions</h4><ul><li><code>preview_and_export_foundry()</code> — Exports scenarios, NPCs, and places into a ZIP archive that contains a JSON file formatted
+for Foundry VTT import and a portraits folder with all the portrait image files.
+
+Each scenario becomes a scene with embedded title, summary, secrets, NPC tokens (with preset positions and color-coded faction borders),
+and clickable markers for linked place scenes. Separate place scenes are also exported.
+
+The portrait fields in the export JSON are set to relative paths like "portraits/filename.png".</li></ul></section>
+<section class='module'><h3>modules\generic\generic_editor_window.py</h3><p></p><h4>Functions</h4><ul><li><code>load_entities_list()</code> — Creates a model wrapper for the given entity type, fetches all
+database records, and returns a list of names.
+
+Args:
+    entity_type (str): The type of entity to load (e.g., "npcs", "factions").
+
+Returns:
+    list: A list of names for the given entity, or an empty list on error.</li><li><code>load_factions_list()</code> — </li><li><code>load_npcs_list()</code> — </li><li><code>load_pcs_list()</code> — </li><li><code>load_places_list()</code> — </li><li><code>load_objects_list()</code> — </li><li><code>load_creatures_list()</code> — </li></ul><div class='class'><h4>class CustomDropdown</h4><p></p><ul><li><code>__init__()</code> — master      – parent widget (usually the root or your main window)
+options     – list of strings
+command     – callback(value) when the user selects
+width       – desired pixel width (defaults to master widget’s width)
+max_height  – maximum pixel height</li><li><code>_populate_options()</code> — </li><li><code>_on_search_change()</code> — </li><li><code>_on_activate()</code> — </li><li><code>_on_mousewheel()</code> — </li><li><code>_on_focus_out()</code> — </li></ul></div><div class='class'><h4>class GenericEditorWindow</h4><p></p><ul><li><code>__init__()</code> — </li><li><code>_get_ai()</code> — </li><li><code>_make_richtext_editor()</code> — Shared initialization for any RichTextEditor-based field.
+Returns the editor instance.</li><li><code>create_longtext_field()</code> — </li><li><code>create_dynamic_longtext_list()</code> — </li><li><code>create_file_field()</code> — </li><li><code>select_attachment()</code> — </li><li><code>create_boolean_field()</code> — </li><li><code>generate_secret_text()</code> — Reads three text files from the assets folder:
+- Secret truths.txt
+- Secret origins.txt
+- Secret consequences.txt
+Each file is expected to contain approximately 100 elements (one per line).
+The function randomly selects one line from each file in the order:
+Secret truths, then Secret origins, then Secret consequences.
+The final string is then inserted into the 'Secrets' text widget.</li><li><code>generate_npc()</code> — Generates random NPC data by:
+- Filling the Appearance, Background, Personality, and Quirks fields using the corresponding asset files:
+    npc_appearance.txt, npc_background.txt, npc_personality.txt, npc_quirks.txt
+- Filling the NPC's Secret field by reading from:
+    npc_secret_implication.txt, npc_secret_motive.txt, npc_secret_origin.txt, npc_secret_detail.txt
+Updates both the underlying data model (self.item) and the UI widgets.</li><li><code>generate_scenario()</code> — </li><li><code>generate_scenario_description()</code> — Reads four text files from the assets folder:
+- Inciting Incidents.txt
+- Antagonists.txt
+- Objectives.txt
+- Settings.txt
+Each file contains ~100 elements (one per line). This function randomly selects one line
+from each file and constructs a single-line description in the order:
+Inciting Incident, Antagonists, Objectives, Settings.
+The output is then inserted into the 'Summary' (scenario description) text widget.</li><li><code>on_combo_mousewheel()</code> — </li><li><code>create_dynamic_combobox_list()</code> — </li><li><code>create_text_entry()</code> — </li><li><code>create_action_bar()</code> — </li><li><code>save()</code> — </li><li><code>create_portrait_field()</code> — </li><li><code>paste_portrait_from_clipboard()</code> — Paste image from clipboard and set as entity portrait.
+Supports images directly or image file paths in clipboard (Windows).</li><li><code>create_image_field()</code> — </li><li><code>paste_image_from_clipboard()</code> — Paste image from clipboard and set as entity image (map image).
+Supports images directly or image file paths in clipboard (Windows/macOS).</li><li><code>launch_swarmui()</code> — </li><li><code>cleanup_swarmui()</code> — Terminate the SwarmUI process if it is running.</li><li><code>create_portrait_with_swarmui()</code> — </li><li><code>generate_portrait()</code> — Generates a portrait image using the SwarmUI API and associates the resulting
+image with the current NPC by updating its 'Portrait' field.</li><li><code>_show_image_selection_window()</code> — Display a modal window with thumbnails side by side for the user to choose.
+Returns the selected index, or None if cancelled.</li><li><code>select_portrait()</code> — </li><li><code>select_image()</code> — </li><li><code>copy_and_resize_image()</code> — </li><li><code>copy_and_resize_portrait()</code> — </li><li><code>_field_text()</code> — </li><li><code>_set_field_text()</code> — </li><li><code>ai_improve_field()</code> — </li><li><code>ai_draft_field()</code> — </li><li><code>_infer_theme()</code> — Infer a coarse genre/theme string from existing entities of given type.</li><li><code>ai_generate_full_scenario()</code> — </li><li><code>ai_generate_full_npc()</code> — </li><li><code>ai_generate_full_creature()</code> — </li></ul></div></section>
+<section class='module'><h3>modules\generic\generic_list_selection_view.py</h3><p></p><h4>Functions</h4><ul></ul><div class='class'><h4>class GenericListSelectionView</h4><p></p><ul><li><code>__init__()</code> — </li><li><code>refresh_list()</code> — </li><li><code>sort_column()</code> — </li><li><code>filter_items()</code> — </li><li><code>on_double_click()</code> — </li><li><code>open_selected()</code> — </li><li><code>select_entity()</code> — </li><li><code>sanitize_id()</code> — </li></ul></div></section>
+<section class='module'><h3>modules\generic\generic_list_view.py</h3><p></p><h4>Functions</h4><ul><li><code>sanitize_id()</code> — </li><li><code>unique_iid()</code> — Return a unique iid for the given treeview based on base_id.</li></ul><div class='class'><h4>class _ToolTip</h4><p>Simple tooltip for a Treeview showing full cell text on hover.</p><ul><li><code>__init__()</code> — </li><li><code>_on_motion()</code> — </li><li><code>_on_leave()</code> — </li><li><code>_show()</code> — </li><li><code>_hide()</code> — </li></ul></div><div class='class'><h4>class GenericListView</h4><p></p><ul><li><code>__init__()</code> — </li><li><code>show_portrait_window()</code> — </li><li><code>refresh_list()</code> — </li><li><code>on_button_press()</code> — </li><li><code>on_mouse_move()</code> — </li><li><code>on_button_release()</code> — </li><li><code>on_tree_click()</code> — </li><li><code>on_tree_drag()</code> — </li><li><code>on_tree_drop()</code> — </li><li><code>copy_item()</code> — </li><li><code>paste_item()</code> — </li><li><code>insert_next_batch()</code> — </li><li><code>insert_grouped_items()</code> — </li><li><code>clean_value()</code> — </li><li><code>sort_column()</code> — </li><li><code>on_double_click()</code> — </li><li><code>on_right_click()</code> — </li><li><code>_show_item_menu()</code> — </li><li><code>display_on_second_screen()</code> — </li><li><code>delete_item()</code> — </li><li><code>open_in_gm_screen()</code> — </li><li><code>add_item()</code> — </li><li><code>open_editor()</code> — </li><li><code>filter_items()</code> — </li><li><code>add_items()</code> — </li><li><code>import_map_directory()</code> — </li><li><code>_copy_map_image()</code> — </li><li><code>choose_group_column()</code> — </li><li><code>open_ai_wizard()</code> — Open the AI Authoring Wizard in a modal window, scoped to this entity list.</li><li><code>_find_item_by_iid()</code> — </li><li><code>_get_base_id()</code> — </li><li><code>_column_from_ident()</code> — </li><li><code>_load_column_settings()</code> — </li><li><code>_apply_column_settings()</code> — </li><li><code>_save_column_settings()</code> — </li><li><code>_show_columns_menu()</code> — </li><li><code>_open_column_chooser()</code> — </li><li><code>_open_display_fields_chooser()</code> — </li><li><code>_load_list_order()</code> — </li><li><code>_save_list_order()</code> — </li><li><code>_load_display_fields()</code> — </li><li><code>_save_display_fields()</code> — </li><li><code>set_row_color()</code> — </li><li><code>_save_row_color()</code> — </li></ul></div></section>
+<section class='module'><h3>modules\generic\generic_model_wrapper.py</h3><p></p><h4>Functions</h4><ul></ul><div class='class'><h4>class GenericModelWrapper</h4><p></p><ul><li><code>__init__()</code> — </li><li><code>load_items()</code> — </li><li><code>save_items()</code> — </li></ul></div></section>
+<section class='module'><h3>modules\helpers\config_helper.py</h3><p></p><h4>Functions</h4><ul></ul><div class='class'><h4>class ConfigHelper</h4><p></p><ul><li><code>load_config()</code> — Load the configuration from ``file_path``.
+
+The file is read only when it's not cached or when the file has
+changed on disk since the last load. This allows updating the
+configuration without restarting the application.</li><li><code>get()</code> — </li><li><code>set()</code> — </li><li><code>get_campaign_dir()</code> — Return the directory containing the configured database file.</li></ul></div></section>
+<section class='module'><h3>modules\helpers\custom_buttons.py</h3><p></p><h4>Functions</h4><ul></ul><div class='class'><h4>class MinimalCTkButton</h4><p></p><ul><li><code>__init__()</code> — </li><li><code>_adjust_width()</code> — </li></ul></div></section>
+<section class='module'><h3>modules\helpers\rich_text_editor.py</h3><p></p><h4>Functions</h4><ul></ul><div class='class'><h4>class RichTextEditor</h4><p></p><ul><li><code>__init__()</code> — </li><li><code>update_text_height()</code> — </li><li><code>toggle_bold()</code> — </li><li><code>toggle_italic()</code> — </li><li><code>toggle_underline()</code> — </li><li><code>change_font_size()</code> — </li><li><code>change_text_color()</code> — </li><li><code>align_left()</code> — </li><li><code>align_center()</code> — </li><li><code>align_right()</code> — </li><li><code>toggle_bullet_list()</code> — </li><li><code>toggle_numbered_list()</code> — </li><li><code>get_text_data()</code> — Returns a dict with plain text and *integer* formatting ranges.</li><li><code>load_text_data()</code> — Loads text and applies formatting from RTF-JSON (with numeric offsets).</li><li><code>get_text()</code> — For backward compatibility, return plain text.</li><li><code>_index_to_offset()</code> — Turn a Tk index like "3.14" (line 3, column 14) into a
+single integer offset in the full self.text_widget content.</li></ul></div></section>
+<section class='module'><h3>modules\helpers\selection_dialog.py</h3><p></p><h4>Functions</h4><ul></ul><div class='class'><h4>class SelectionDialog</h4><p></p><ul><li><code>__init__()</code> — </li><li><code>on_ok()</code> — </li><li><code>on_cancel()</code> — </li></ul></div></section>
+<section class='module'><h3>modules\helpers\swarmui_helper.py</h3><p></p><h4>Functions</h4><ul><li><code>get_available_models()</code> — </li></ul></section>
+<section class='module'><h3>modules\helpers\template_loader.py</h3><p></p><h4>Functions</h4><ul><li><code>load_template()</code> — </li></ul></section>
+<section class='module'><h3>modules\helpers\text_helpers.py</h3><p></p><h4>Functions</h4><ul><li><code>format_longtext()</code> — Formate un champ longtext pour l'afficher dans une liste (abrégé + multi-lignes). </li><li><code>format_multiline_text()</code> — Like format_longtext but *preserves* newlines for HTML &lt;pre‑wrap&gt; output.</li><li><code>rtf_to_html()</code> — Convert RTF-JSON {"text":…, "formatting":…} into HTML, handling:
+- numeric offsets (e.g. "0", "26")
+- Tk indices (e.g. "1.26" for line 1, column 26)</li><li><code>normalize_rtf_json()</code> — Convert any { text:str, formatting:{ tag:[[s,e],…], … } }
+where s/e might be "line.char" (e.g. "1.26")
+into integer offsets.</li><li><code>ai_text_to_rtf_json()</code> — Convert an AI answer (plain text with light Markdown/HTML) to our RTF-JSON:
+{"text": str, "formatting": { tag: [(start,end), ...], ... }}
+
+Supported inline markers:
+- Bold: **text**, __text__, &lt;b&gt;text&lt;/b&gt;, &lt;strong&gt;text&lt;/strong&gt;
+- Italic: *text*, _text_, &lt;i&gt;text&lt;/i&gt;, &lt;em&gt;text&lt;/em&gt;
+- Underline: ++text++, &lt;u&gt;text&lt;/u&gt;
+
+Block helpers:
+- Headings: #, ##, ### → size_22/18/16 on the full line text
+- Bullets: lines starting with "- " or "* " are turned into "• " prefix
+- Numbered: lines starting with "1. ", "2) ", etc. are kept as-is
+
+Returns formatting with numeric offsets suitable for RichTextEditor.load_text_data.</li><li><code>_coerce_text()</code> — </li><li><code>format_longtext()</code> — </li><li><code>format_multiline_text()</code> — </li></ul></section>
+<section class='module'><h3>modules\helpers\window_helper.py</h3><p></p><h4>Functions</h4><ul><li><code>position_window_at_top()</code> — Positionne une fenêtre au sommet de l'écran, centrée horizontalement.
+
+Args:
+    window: la fenêtre CustomTkinter ou Tkinter à positionner.
+    width: largeur fixe (facultatif). Si None, utilise la taille actuelle.
+    height: hauteur fixe (facultatif). Si None, utilise la taille actuelle.</li></ul></section>
+<section class='module'><h3>modules\informations\informations_model.py</h3><p></p><h4>Functions</h4><ul><li><code>load()</code> — </li><li><code>save()</code> — </li></ul></section>
+<section class='module'><h3>modules\maps\controllers\display_map_controller.py</h3><p></p><h4>Functions</h4><ul></ul><div class='class'><h4>class DisplayMapController</h4><p></p><ul><li><code>__init__()</code> — </li><li><code>open_global_search()</code> — </li><li><code>_push_fog_history()</code> — </li><li><code>undo_fog()</code> — </li><li><code>_on_token_right_click()</code> — </li><li><code>_on_token_double_click()</code> — </li><li><code>_create_marker()</code> — </li><li><code>_schedule_marker_animation()</code> — </li><li><code>_animate_marker()</code> — </li><li><code>_on_middle_click()</code> — </li><li><code>_on_middle_drag()</code> — </li><li><code>_on_middle_release()</code> — </li><li><code>_nudge_canvas()</code> — Move all visible canvas items by dx,dy without recomputing images.</li><li><code>_on_mouse_down()</code> — </li><li><code>_on_mouse_move()</code> — </li><li><code>_on_mouse_up()</code> — </li><li><code>_perform_zoom()</code> — </li><li><code>_update_canvas_images()</code> — </li><li><code>_bind_item_events()</code> — </li><li><code>_on_item_press()</code> — </li><li><code>_on_item_move()</code> — </li><li><code>_on_item_release()</code> — </li><li><code>_on_item_right_click()</code> — </li><li><code>_show_shape_menu()</code> — </li><li><code>_edit_shape_color_dialog()</code> — </li><li><code>_resize_shape_dialog()</code> — </li><li><code>_resize_token_dialog()</code> — Opens a dialog to resize the given token.</li><li><code>_show_token_menu()</code> — Displays a context menu for the given token.</li><li><code>_prompt_change_token_border_color()</code> — Prompts the user for a new border color for the token.</li><li><code>_toggle_shape_fill()</code> — </li><li><code>_copy_item()</code> — </li><li><code>_paste_item()</code> — </li><li><code>_delete_item()</code> — </li><li><code>_bring_item_to_front()</code> — </li><li><code>_send_item_to_back()</code> — </li><li><code>_on_max_hp_menu_click()</code> — </li><li><code>_on_max_hp_entry_commit()</code> — </li><li><code>_on_hp_double_click()</code> — </li><li><code>_on_hp_entry_commit()</code> — </li><li><code>on_resize()</code> — </li><li><code>on_zoom()</code> — </li><li><code>save_map()</code> — </li><li><code>_on_drawing_tool_change()</code> — </li><li><code>_on_shape_fill_mode_change()</code> — </li><li><code>_on_pick_shape_fill_color()</code> — </li><li><code>_on_pick_shape_border_color()</code> — </li><li><code>_update_shape_controls_visibility()</code> — </li><li><code>_activate_graphical_resize()</code> — </li><li><code>_draw_resize_handles()</code> — </li><li><code>_remove_resize_handles()</code> — </li><li><code>_on_resize_handle_press()</code> — </li><li><code>_on_resize_handle_move()</code> — </li><li><code>_on_resize_handle_release()</code> — </li></ul></div></section>
+<section class='module'><h3>modules\maps\maps_model.py</h3><p></p><h4>Functions</h4><ul><li><code>load()</code> — </li><li><code>save()</code> — </li></ul></section>
+<section class='module'><h3>modules\maps\services\entity_picker_service.py</h3><p></p><h4>Functions</h4><ul><li><code>open_entity_picker()</code> — Show a GenericListSelectionView for NPCs or Creatures.</li><li><code>on_entity_selected()</code> — Called when user picks an NPC or Creature in the selection dialog.</li></ul></section>
+<section class='module'><h3>modules\maps\services\fog_manager.py</h3><p></p><h4>Functions</h4><ul><li><code>_set_fog()</code> — </li><li><code>clear_fog()</code> — </li><li><code>reset_fog()</code> — </li><li><code>on_paint()</code> — Paint or erase fog using a square brush of size self.brush_size,
+with semi-transparent black (alpha=128) for fog.</li></ul></section>
+<section class='module'><h3>modules\maps\services\token_manager.py</h3><p></p><h4>Functions</h4><ul><li><code>add_token()</code> — </li><li><code>_on_token_press()</code> — </li><li><code>_on_token_move()</code> — </li><li><code>_on_token_release()</code> — </li><li><code>_copy_token()</code> — Copy the last‐clicked token’s data into a buffer.</li><li><code>_paste_token()</code> — </li><li><code>_resize_token_dialog()</code> — Prompt for a new px size, then redraw just that token.</li><li><code>_change_token_border_color()</code> — Open a color chooser and update the token’s border.</li><li><code>_delete_token()</code> — Remove a token’s canvas items (image, border, name, HP UI, info widget, edit entries) and its data.</li><li><code>_persist_tokens()</code> — Quickly capture token state, then hand off the heavy write to a daemon thread.</li></ul></section>
+<section class='module'><h3>modules\maps\utils\icon_loader.py</h3><p></p><h4>Functions</h4><ul><li><code>load_icon()</code> — </li></ul></section>
+<section class='module'><h3>modules\maps\views\canvas_view.py</h3><p></p><h4>Functions</h4><ul><li><code>_build_canvas()</code> — </li><li><code>_on_delete_key()</code> — If an item (token or shape) is selected, delete it on Delete key.</li><li><code>on_paint2()</code> — Paint or erase fog using a square brush of size self.brush_size,
+with semi-transparent black (alpha=128) for fog.</li></ul></section>
+<section class='module'><h3>modules\maps\views\fullscreen_view.py</h3><p></p><h4>Functions</h4><ul><li><code>open_fullscreen()</code> — </li><li><code>_update_fullscreen_map()</code> — Mirror the GM canvas into the fullscreen window.</li></ul></section>
+<section class='module'><h3>modules\maps\views\map_selector.py</h3><p></p><h4>Functions</h4><ul><li><code>select_map()</code> — Show the full‐frame map selector, replacing any existing UI.</li><li><code>_on_display_map()</code> — Callback from selector: build editor UI and load the chosen map.</li></ul></section>
+<section class='module'><h3>modules\maps\views\toolbar_view.py</h3><p></p><h4>Functions</h4><ul><li><code>_build_toolbar()</code> — </li><li><code>_on_brush_size_change()</code> — </li><li><code>_on_brush_shape_change()</code> — </li><li><code>_change_brush()</code> — </li><li><code>_on_token_size_change()</code> — </li></ul></section>
+<section class='module'><h3>modules\maps\views\web_display_view.py</h3><p></p><h4>Functions</h4><ul><li><code>open_web_display()</code> — </li><li><code>_render_map_image()</code> — </li><li><code>_update_web_display_map()</code> — </li><li><code>close_web_display()</code> — Shut down the web display server if it is running.
+
+The server is stopped using Werkzeug's ``shutdown`` API rather than
+sending an HTTP request to a dedicated route.</li></ul></section>
+<section class='module'><h3>modules\npcs\npc_graph_editor.py</h3><p></p><h4>Functions</h4><ul></ul><div class='class'><h4>class NPCGraphEditor</h4><p></p><ul><li><code>__init__()</code> — </li><li><code>_on_zoom()</code> — </li><li><code>open_npc_editor()</code> — </li><li><code>display_portrait_window()</code> — Display the NPC's portrait in a normal window (with decorations) that is
+sized and positioned to cover the second monitor (if available).  </li><li><code>_on_mousewheel_y()</code> — </li><li><code>get_state()</code> — </li><li><code>set_state()</code> — </li><li><code>_on_mousewheel_x()</code> — </li><li><code>init_toolbar()</code> — </li><li><code>reset_zoom()</code> — </li><li><code>start_link_creation()</code> — </li><li><code>select_first_node()</code> — </li><li><code>select_second_node()</code> — </li><li><code>prompt_link_text()</code> — </li><li><code>add_link()</code> — </li><li><code>add_npc()</code> — </li><li><code>place_pending_npc()</code> — </li><li><code>add_faction()</code> — </li><li><code>update_links_positions_for_node()</code> — </li><li><code>update_links_for_node()</code> — </li><li><code>delete_shape()</code> — </li><li><code>on_right_click()</code> — </li><li><code>show_color_menu()</code> — </li><li><code>show_link_menu()</code> — </li><li><code>show_node_menu()</code> — </li><li><code>set_arrow_mode()</code> — </li><li><code>delete_node()</code> — </li><li><code>redraw_after_drag()</code> — </li><li><code>_on_canvas_configure()</code> — Whenever the canvas is resized (or we manually call this),
+redraw the background to fill the full width/height.</li><li><code>draw_nodes()</code> — </li><li><code>draw_all_links()</code> — </li><li><code>draw_one_link()</code> — </li><li><code>draw_arrowhead()</code> — </li><li><code>save_graph()</code> — </li><li><code>load_graph()</code> — </li><li><code>change_node_color()</code> — </li><li><code>change_shape_color()</code> — </li><li><code>show_shape_menu()</code> — </li><li><code>bring_to_front()</code> — </li><li><code>send_to_back()</code> — </li><li><code>activate_resize_mode()</code> — </li><li><code>start_resizing()</code> — </li><li><code>do_resizing()</code> — </li><li><code>end_resizing()</code> — </li><li><code>distance_point_to_line()</code> — </li><li><code>get_link_by_position()</code> — </li><li><code>add_shape()</code> — </li><li><code>draw_shape()</code> — </li><li><code>draw_all_shapes()</code> — </li><li><code>save_graph()</code> — </li><li><code>load_portrait_scaled()</code> — </li><li><code>draw_graph()</code> — </li><li><code>start_drag()</code> — </li><li><code>on_drag()</code> — </li><li><code>end_drag()</code> — </li></ul></div></section>
+<section class='module'><h3>modules\npcs\npc_opener.py</h3><p></p><h4>Functions</h4><ul><li><code>open_npc_editor_window()</code> — Opens the specified NPC in a new GenericEditorWindow,
+completely detached from the scenario/tabs system.</li></ul></section>
+<section class='module'><h3>modules\npcs\npcs_model.py</h3><p></p><h4>Functions</h4><ul><li><code>load()</code> — </li><li><code>save()</code> — </li></ul></section>
+<section class='module'><h3>modules\objects\objects_model.py</h3><p></p><h4>Functions</h4><ul><li><code>load()</code> — </li><li><code>save()</code> — </li></ul></section>
+<section class='module'><h3>modules\pcs\display_pcs.py</h3><p></p><h4>Functions</h4><ul><li><code>display_pcs_in_banner()</code> — </li></ul></section>
+<section class='module'><h3>modules\pcs\pc_graph_editor.py</h3><p></p><h4>Functions</h4><ul><li><code>get_monitors()</code> — </li></ul><div class='class'><h4>class PCGraphEditor</h4><p></p><ul><li><code>__init__()</code> — </li><li><code>open_pc_editor()</code> — </li><li><code>display_portrait_window()</code> — Delegate portrait‐popping to the shared `show_portrait` helper.</li><li><code>_on_mousewheel_y()</code> — </li><li><code>get_state()</code> — </li><li><code>set_state()</code> — </li><li><code>_on_mousewheel_x()</code> — </li><li><code>init_toolbar()</code> — </li><li><code>start_link_creation()</code> — </li><li><code>select_first_node()</code> — </li><li><code>select_second_node()</code> — </li><li><code>prompt_link_text()</code> — </li><li><code>add_link()</code> — </li><li><code>add_pc()</code> — </li><li><code>place_pending_pc()</code> — </li><li><code>add_faction()</code> — </li><li><code>update_links_positions_for_node()</code> — </li><li><code>update_links_for_node()</code> — </li><li><code>delete_shape()</code> — </li><li><code>on_right_click()</code> — </li><li><code>show_color_menu()</code> — </li><li><code>show_link_menu()</code> — </li><li><code>show_node_menu()</code> — </li><li><code>set_arrow_mode()</code> — </li><li><code>delete_node()</code> — </li><li><code>redraw_after_drag()</code> — </li><li><code>draw_nodes()</code> — </li><li><code>draw_all_links()</code> — </li><li><code>draw_one_link()</code> — </li><li><code>draw_arrowhead()</code> — </li><li><code>save_graph()</code> — </li><li><code>load_graph()</code> — </li><li><code>change_node_color()</code> — </li><li><code>change_shape_color()</code> — </li><li><code>show_shape_menu()</code> — </li><li><code>bring_to_front()</code> — </li><li><code>send_to_back()</code> — </li><li><code>activate_resize_mode()</code> — </li><li><code>start_resizing()</code> — </li><li><code>do_resizing()</code> — </li><li><code>end_resizing()</code> — </li><li><code>distance_point_to_line()</code> — </li><li><code>get_link_by_position()</code> — </li><li><code>add_shape()</code> — </li><li><code>draw_shape()</code> — </li><li><code>draw_all_shapes()</code> — </li><li><code>save_graph()</code> — </li><li><code>draw_graph()</code> — </li><li><code>start_drag()</code> — </li><li><code>on_drag()</code> — </li><li><code>end_drag()</code> — </li></ul></div></section>
+<section class='module'><h3>modules\pcs\pc_opener.py</h3><p></p><h4>Functions</h4><ul><li><code>open_pc_editor_window()</code> — Opens the specified NPC in a new GenericEditorWindow,
+completely detached from the scenario/tabs system.</li></ul></section>
+<section class='module'><h3>modules\pcs\pcs_model.py</h3><p></p><h4>Functions</h4><ul><li><code>load()</code> — </li><li><code>save()</code> — </li></ul></section>
+<section class='module'><h3>modules\places\places_model.py</h3><p></p><h4>Functions</h4><ul><li><code>load()</code> — </li><li><code>save()</code> — </li></ul></section>
+<section class='module'><h3>modules\scenarios\gm_screen_view.py</h3><p></p><h4>Functions</h4><ul></ul><div class='class'><h4>class GMScreenView</h4><p></p><ul><li><code>__init__()</code> — </li><li><code>open_global_search()</code> — </li><li><code>load_template()</code> — </li><li><code>add_tab()</code> — </li><li><code>_on_tab_press()</code> — </li><li><code>_on_tab_motion()</code> — </li><li><code>_trigger_shift()</code> — </li><li><code>_animate_shift()</code> — </li><li><code>_swap_order()</code> — </li><li><code>_on_tab_release()</code> — </li><li><code>toggle_detach_tab()</code> — </li><li><code>detach_tab()</code> — </li><li><code>create_note_frame()</code> — </li><li><code>reattach_tab()</code> — </li><li><code>close_tab()</code> — </li><li><code>reposition_add_button()</code> — </li><li><code>_add_random_entity()</code> — Pick a random NPC, Creature, Object, Information or Clue and open it.
+        </li><li><code>show_tab()</code> — </li><li><code>add_new_tab()</code> — </li><li><code>open_selection_window()</code> — </li><li><code>open_entity_tab()</code> — Open a new tab for a specific entity with its details.
+
+Args:
+    entity_type (str): The type of entity (e.g., 'Scenarios', 'NPCs', 'Creatures').
+    name (str): The name or title of the specific entity to display.
+
+Raises:
+    messagebox.showerror: If the specified entity cannot be found in the wrapper.
+
+Creates a new tab with the entity's details using a shared factory function,
+and provides a mechanism to recursively open related entities.</li><li><code>create_scenario_graph_frame()</code> — </li><li><code>create_entity_frame()</code> — </li><li><code>insert_text()</code> — </li><li><code>insert_longtext()</code> — </li><li><code>insert_links()</code> — </li><li><code>_on_link_clicked()</code> — </li><li><code>save_note_to_file()</code> — </li><li><code>create_npc_graph_frame()</code> — </li><li><code>create_pc_graph_frame()</code> — </li><li><code>reorder_detached_windows()</code> — </li><li><code>destroy()</code> — </li></ul></div></section>
+<section class='module'><h3>modules\scenarios\scenario_generator_view.py</h3><p></p><h4>Functions</h4><ul></ul><div class='class'><h4>class ScenarioGeneratorView</h4><p>Frame embedding the scenario generator inside the main application.</p><ul><li><code>__init__()</code> — </li><li><code>_build_widgets()</code> — </li><li><code>generate_campaign()</code> — </li><li><code>export_docx()</code> — </li><li><code>add_to_db()</code> — </li></ul></div></section>
+<section class='module'><h3>modules\scenarios\scenario_graph_editor.py</h3><p></p><h4>Functions</h4><ul><li><code>clean_longtext()</code> — </li><li><code>make_watermarked_postit()</code> — </li></ul><div class='class'><h4>class ScenarioGraphEditor</h4><p></p><ul><li><code>__init__()</code> — </li><li><code>_on_zoom()</code> — </li><li><code>reset_zoom()</code> — </li><li><code>init_toolbar()</code> — </li><li><code>select_scenario()</code> — </li><li><code>display_portrait_window()</code> — </li><li><code>load_scenario()</code> — </li><li><code>draw_graph()</code> — </li><li><code>load_portrait()</code> — </li><li><code>load_portrait_scaled()</code> — </li><li><code>draw_nodes()</code> — </li><li><code>draw_links()</code> — </li><li><code>draw_one_link()</code> — </li><li><code>start_drag()</code> — </li><li><code>on_drag()</code> — </li><li><code>on_double_click()</code> — </li><li><code>on_right_click()</code> — </li><li><code>_on_mousewheel_y()</code> — </li><li><code>_on_mousewheel_x()</code> — </li><li><code>show_node_menu()</code> — </li><li><code>show_color_menu()</code> — </li><li><code>change_node_color()</code> — </li><li><code>delete_node()</code> — </li><li><code>save_graph()</code> — </li><li><code>load_graph()</code> — </li><li><code>get_state()</code> — </li><li><code>set_state()</code> — </li><li><code>load_icon()</code> — </li></ul></div></section>
+<section class='module'><h3>modules\scenarios\scenario_importer.py</h3><p></p><h4>Functions</h4><ul></ul></section>
+<section class='module'><h3>modules\scenarios\scenarios_model.py</h3><p></p><h4>Functions</h4><ul><li><code>load()</code> — </li><li><code>save()</code> — </li></ul></section>
+<section class='module'><h3>modules\ui\icon_button.py</h3><p></p><h4>Functions</h4><ul><li><code>create_icon_button()</code> — </li></ul></section>
+<section class='module'><h3>modules\ui\image_viewer.py</h3><p></p><h4>Functions</h4><ul><li><code>_get_monitors()</code> — Return list of (x, y, width, height).</li><li><code>show_portrait()</code> — Display a full‑screen CTkToplevel showing the image at `path`.
+Clicking anywhere closes the window.</li></ul></section>
+<section class='module'><h3>modules\ui\second_screen_display.py</h3><p></p><h4>Functions</h4><ul><li><code>show_entity_on_second_screen()</code> — Open a fullscreen window on the second monitor displaying selected fields of an entity.
+
+- item: dict of entity data
+- title: string for main heading
+- fields: list of field names to display (may include 'Portrait')</li></ul></section>
+<section class='module'><h3>modules\ui\tooltip.py</h3><p></p><h4>Functions</h4><ul></ul><div class='class'><h4>class ToolTip</h4><p></p><ul><li><code>__init__()</code> — </li><li><code>schedule_wrapper()</code> — </li><li><code>schedule()</code> — </li><li><code>cancel()</code> — </li><li><code>showtip()</code> — </li><li><code>hidetip()</code> — </li></ul></div></section>
+<section class='module'><h3>modules\web\GM_webviewer.py</h3><p></p><h4>Functions</h4><ul><li><code>load_user()</code> — </li><li><code>login()</code> — </li><li><code>register()</code> — </li><li><code>logout()</code> — </li><li><code>list_entries()</code> — </li><li><code>view_entry()</code> — </li><li><code>new_entry()</code> — </li><li><code>edit_entry()</code> — </li><li><code>delete_entry()</code> — </li><li><code>load_links()</code> — </li><li><code>save_links_list()</code> — </li><li><code>save_link()</code> — </li><li><code>delete_clue_link()</code> — </li><li><code>delete_clue()</code> — </li><li><code>load_positions()</code> — </li><li><code>save_positions()</code> — </li><li><code>get_graph_list()</code> — </li><li><code>get_portrait_mapping()</code> — </li><li><code>get_places_list()</code> — </li><li><code>get_informations_list()</code> — </li><li><code>get_clues_list()</code> — </li><li><code>default()</code> — </li><li><code>welcome()</code> — </li><li><code>npc_view()</code> — </li><li><code>locations_view()</code> — </li><li><code>news_view()</code> — </li><li><code>clues_view()</code> — </li><li><code>get_clue_links()</code> — </li><li><code>add_clue_link()</code> — </li><li><code>npc_graph()</code> — </li><li><code>get_clue_positions()</code> — </li><li><code>set_clue_position()</code> — </li><li><code>get_portrait()</code> — </li><li><code>get_asset()</code> — </li><li><code>get_css()</code> — </li><li><code>set_all_clue_positions()</code> — </li><li><code>information_upload()</code> — </li><li><code>clue_upload()</code> — </li><li><code>add_information()</code> — </li><li><code>factions_view()</code> — </li><li><code>faction_graph()</code> — </li><li><code>add_clue()</code> — </li><li><code>edit_clue()</code> — </li></ul><div class='class'><h4>class User</h4><p></p><ul></ul></div><div class='class'><h4>class JournalEntry</h4><p></p><ul></ul></div></section>
+<section class='module'><h3>modules\web\test_server.py</h3><p></p><h4>Functions</h4><ul><li><code>hello()</code> — </li></ul></section></section>
+</body>
+</html>
