@@ -353,3 +353,30 @@ def ai_text_to_rtf_json(raw_text):
 
     final_text = "".join(out_chars)
     return {"text": final_text, "formatting": formatting}
+
+# --- Robust fallbacks for longtext coercion ---
+def _coerce_text(val):
+    if val is None:
+        return ""
+    if isinstance(val, list):
+        return " ".join(str(x) for x in val if x is not None)
+    if isinstance(val, dict):
+        v = val.get("text", "")
+        if isinstance(v, (list, dict)):
+            return _coerce_text(v)
+        return str(v)
+    return str(val)
+
+def format_longtext(data, max_length=30000):
+    text = _coerce_text(data)
+    text = text.replace("\n", " ").strip()
+    if len(text) > max_length:
+        return text[:max_length] + "..."
+    return text
+
+def format_multiline_text(data, max_length=30000):
+    text = _coerce_text(data)
+    text = text.replace("\r\n", "\n").strip()
+    if len(text) > max_length:
+        return text[:max_length] + "�?�"
+    return text

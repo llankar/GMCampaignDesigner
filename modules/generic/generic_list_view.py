@@ -10,6 +10,7 @@ from modules.ui.image_viewer import show_portrait
 from modules.ui.second_screen_display import show_entity_on_second_screen
 from modules.helpers.config_helper import ConfigHelper
 from modules.scenarios.gm_screen_view import GMScreenView
+from modules.ai.authoring_wizard import AuthoringWizardView
 import shutil
 
 PORTRAIT_FOLDER = os.path.join(ConfigHelper.get_campaign_dir(), "assets", "portraits")
@@ -131,6 +132,10 @@ class GenericListView(ctk.CTkFrame):
         if self.model_wrapper.entity_type == "maps":
             ctk.CTkButton(search_frame, text="Import Directory",
                           command=self.import_map_directory)\
+                .pack(side="left", padx=5)
+        if self.model_wrapper.entity_type in ("npcs", "scenarios"):
+            ctk.CTkButton(search_frame, text="AI Wizard",
+                          command=self.open_ai_wizard)\
                 .pack(side="left", padx=5)
         ctk.CTkButton(search_frame, text="Group By",
             command=self.choose_group_column)\
@@ -660,6 +665,26 @@ class GenericListView(ctk.CTkFrame):
         top.transient(self.master)
         top.lift()
         top.focus_force()
+
+    def open_ai_wizard(self):
+        """Open the AI Authoring Wizard in a modal window, scoped to this entity list."""
+        top = ctk.CTkToplevel(self)
+        top.title("AI Authoring Wizard")
+        top.geometry("1000x720")
+        top.lift(); top.focus_force(); top.grab_set()
+        frame = AuthoringWizardView(top)
+        frame.pack(fill="both", expand=True)
+        try:
+            frame.select_for(self.model_wrapper.entity_type)
+        except Exception:
+            pass
+        def on_close():
+            try:
+                top.grab_release()
+            except Exception:
+                pass
+            top.destroy()
+        top.protocol("WM_DELETE_WINDOW", on_close)
 
     def _find_item_by_iid(self, iid):
         # Prefer exact match on sanitized ID

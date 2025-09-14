@@ -763,6 +763,8 @@ class MainWindow(ctk.CTk):
         self.current_open_view = container
         self.current_open_entity = None
 
+    
+
     def change_database_storage(self):
         # 1) Pick or create .db
         # Ensure we start file dialogs in the Campaigns directory under the app directory
