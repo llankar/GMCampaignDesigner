@@ -234,7 +234,8 @@ class GenericEditorWindow(ctk.CTkToplevel):
                 self.create_dynamic_longtext_list(field)
             elif field["type"] == "longtext":
                 self.create_longtext_field(field)
-            elif field["name"] in ["NPCs", "Places", "Factions", "Objects", "Creatures", "PCs"]:
+            elif field["name"] in ["NPCs", "Places", "Factions", "Objects", "Creatures", "PCs"] or \
+                 (field.get("type") == "list" and field.get("linked_type")):
                 self.create_dynamic_combobox_list(field)
             elif field["type"] == "boolean":
                 self.create_boolean_field(field)
@@ -711,27 +712,30 @@ class GenericEditorWindow(ctk.CTkToplevel):
 
         combobox_list = []
         combobox_vars = []
-        if field["name"] == "PCs":
+        # Prefer explicit linked_type when provided (for custom fields)
+        linked = (field.get("linked_type") or "").strip()
+        fname = field.get("name")
+        if linked == "PCs" or fname == "PCs":
             options_list = load_pcs_list()
-            label_text = "Add PC"
-        elif field["name"] == "NPCs":
+            label_text = f"Add {linked or 'PC'}"
+        elif linked == "NPCs" or fname == "NPCs":
             options_list = load_npcs_list()
-            label_text = "Add NPC"
-        elif field["name"] == "Places":
+            label_text = f"Add {linked or 'NPC'}"
+        elif linked == "Places" or fname == "Places":
             options_list = load_places_list()
-            label_text = "Add Place"
-        elif field["name"] == "Factions":
+            label_text = f"Add {linked or 'Place'}"
+        elif linked == "Factions" or fname == "Factions":
             options_list = load_factions_list()
-            label_text = "Add Faction"
-        elif field["name"] == "Objects":
+            label_text = f"Add {linked or 'Faction'}"
+        elif linked == "Objects" or fname == "Objects":
             options_list = load_objects_list()
-            label_text = "Add Object"
-        elif field["name"] == "Creatures":
+            label_text = f"Add {linked or 'Object'}"
+        elif linked == "Creatures" or fname == "Creatures":
             options_list = load_creatures_list()
-            label_text = "Add Creature"
+            label_text = f"Add {linked or 'Creature'}"
         else:
             options_list = []
-            label_text = f"Add {field['name']}"
+            label_text = f"Add {fname}"
 
         initial_values = self.item.get(field["name"]) or []
 
@@ -845,7 +849,8 @@ class GenericEditorWindow(ctk.CTkToplevel):
                     self.item[field["name"]] = ""
                 else:
                     self.item[field["name"]] = data
-            elif field["name"] in ["Places", "NPCs", "Factions", "Objects", "Creatures", "PCs"]:	
+            elif field["name"] in ["Places", "NPCs", "Factions", "Objects", "Creatures", "PCs"] or \
+                 (field.get("type") == "list" and field.get("linked_type")):
                 self.item[field["name"]] = [cb.get() for cb in widget if cb.get()]
             elif field["type"] == "file":
                 # store the filename (not full path) into the model

@@ -6,6 +6,7 @@ from tkinter import filedialog, messagebox
 from PIL import Image
 from functools import partial
 from modules.generic.generic_model_wrapper import GenericModelWrapper
+from modules.helpers.template_loader import load_template as load_entity_template
 from modules.helpers.text_helpers import format_multiline_text
 from customtkinter import CTkLabel, CTkImage
 from modules.generic.entity_detail_factory import create_entity_detail_frame
@@ -47,14 +48,14 @@ class GMScreenView(ctk.CTkFrame):
         }
 
         self.templates = {
-            "Scenarios": self.load_template("scenarios/scenarios_template.json"),
-            "Places": self.load_template("places/places_template.json"),
-            "NPCs": self.load_template("npcs/npcs_template.json"),
-            "PCs": self.load_template("pcs/pcs_template.json"),
-            "Factions": self.load_template("factions/factions_template.json"),
-            "Creatures": self.load_template("creatures/creatures_template.json"),
-            "Clues": self.load_template("clues/clues_template.json"),
-            "Informations": self.load_template("informations/informations_template.json")
+            "Scenarios": load_entity_template("scenarios"),
+            "Places": load_entity_template("places"),
+            "NPCs": load_entity_template("npcs"),
+            "PCs": load_entity_template("pcs"),
+            "Factions": load_entity_template("factions"),
+            "Creatures": load_entity_template("creatures"),
+            "Clues": load_entity_template("clues"),
+            "Informations": load_entity_template("informations")
         }
 
         self.tabs = {}
@@ -221,7 +222,23 @@ class GMScreenView(ctk.CTkFrame):
         base_path = os.path.dirname(__file__)
         template_path = os.path.join(base_path, "..", filename)
         with open(template_path, "r", encoding="utf-8") as file:
-            return json.load(file)
+            data = json.load(file)
+        # Merge custom_fields if present so GM screen also shows user-defined fields
+        fields = list(data.get("fields", []))
+        if isinstance(data.get("custom_fields"), list):
+            existing = {str(f.get("name", "")).strip() for f in fields}
+            for f in data["custom_fields"]:
+                try:
+                    name = str(f.get("name", "")).strip()
+                    if not name or name in existing:
+                        continue
+                    out = {"name": name, "type": f.get("type", "text")}
+                    if out["type"] in ("list", "list_longtext") and f.get("linked_type"):
+                        out["linked_type"] = f.get("linked_type")
+                    fields.append(out)
+                except Exception:
+                    continue
+        return {"fields": fields}
 
     def add_tab(self, name, content_frame, content_factory=None):
         tab_frame = ctk.CTkFrame(self.tab_bar)

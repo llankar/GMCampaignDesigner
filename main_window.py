@@ -7,7 +7,7 @@ import time
 import requests
 import shutil
 import tkinter as tk
-from tkinter import filedialog, messagebox, Toplevel, Listbox, MULTIPLE, PhotoImage
+from tkinter import filedialog, messagebox, Toplevel, Listbox, MULTIPLE, PhotoImage, simpledialog
 import logging
 
 import customtkinter as ctk
@@ -37,6 +37,7 @@ from modules.factions.faction_graph_editor import FactionGraphEditor
 from modules.pcs.display_pcs import display_pcs_in_banner
 from modules.generic.generic_list_selection_view import GenericListSelectionView
 from modules.maps.controllers.display_map_controller import DisplayMapController
+from modules.generic.custom_fields_editor import CustomFieldsEditor
 
 
 # Set up CustomTkinter appearance
@@ -155,6 +156,7 @@ class MainWindow(ctk.CTk):
         self.icons = {
             "change_db": self.load_icon("database_icon.png", size=(60, 60)),
             "swarm_path": self.load_icon("folder_icon.png", size=(60, 60)),
+            "customize_fields": self.load_icon("customize_fields.png", size=(60, 60)),
             "manage_scenarios": self.load_icon("scenario_icon.png", size=(60, 60)),
             "manage_pcs": self.load_icon("pc_icon.png", size=(60, 60)),
             "manage_npcs": self.load_icon("npc_icon.png", size=(60, 60)),
@@ -178,6 +180,14 @@ class MainWindow(ctk.CTk):
             "map_tool": self.load_icon("map_tool_icon.png", size=(60, 60)),
             "generate_scenario": self.load_icon("generate_scenario_icon.png", size=(60, 60))
         }
+
+    def open_custom_fields_editor(self):
+        try:
+            top = CustomFieldsEditor(self)
+            top.transient(self)
+            top.lift(); top.focus_force()
+        except Exception as e:
+            messagebox.showerror("Error", f"Failed to open Custom Fields Editor:\n{e}")
 
     def load_icon(self, file_name, size=(60, 60)):
         path = os.path.join("assets", file_name)
@@ -220,6 +230,12 @@ class MainWindow(ctk.CTk):
         self.db_name_label = ctk.CTkLabel(db_container, text=db_name,
                                         font=("Segoe UI", 14, "italic"), fg_color="transparent", text_color="white")
         self.db_name_label.pack(pady=(0, 1), anchor="center")
+        try:
+            # Show full absolute path on hover
+            full_path = os.path.abspath(db_path)
+            self.db_tooltip = ToolTip(self.db_name_label, full_path)
+        except Exception:
+            self.db_tooltip = None
 
         self.create_accordion_sidebar()
 
@@ -320,6 +336,7 @@ class MainWindow(ctk.CTk):
         data_system = [
             ("change_db", "Change Data Storage", self.change_database_storage),
             ("swarm_path", "Set SwarmUI Path", self.select_swarmui_path),
+            ("customize_fields", "Customize Fields", self.open_custom_fields_editor),
         ]
         content = [
             ("manage_scenarios", "Manage Scenarios", lambda: self.open_entity("scenarios")),
@@ -904,19 +921,53 @@ class MainWindow(ctk.CTk):
                 filetypes=[("SQLite DB Files", "*.db"), ("All Files", "*.*")]
             )
         else:
-            new_db_path = filedialog.asksaveasfilename(
-                title="Create New Database",
-                defaultextension=".db",
-                initialdir=campaigns_dir,
-                filetypes=[("SQLite DB Files", "*.db"), ("All Files", "*.*")]
-            )
+            # Ask for a campaign/database name, create a subdirectory under Campaigns,
+            # and place the new DB file inside that subdirectory.
+            while True:
+                name = simpledialog.askstring("New Campaign", "Enter campaign name:", parent=self)
+                if name is None:
+                    new_db_path = None
+                    break
+                safe = "".join(ch for ch in name.strip() if ch.isalnum() or ch in ("_","-"," ")).strip()
+                safe = safe.replace(" ", "_")
+                if not safe:
+                    messagebox.showwarning("Invalid Name", "Please enter a valid campaign name.")
+                    continue
+                target_dir = os.path.join(campaigns_dir, safe)
+                try:
+                    os.makedirs(target_dir, exist_ok=True)
+                except Exception as e:
+                    messagebox.showerror("Error", f"Failed to create folder:\n{e}")
+                    continue
+                new_db_path = os.path.join(target_dir, f"{safe}.db")
+                break
         if not new_db_path:
             return
 
         # 2) Persist to config so get_connection()/init_db() will pick it up
         ConfigHelper.set("Database", "path", new_db_path)
 
-        # 3) Open a fresh connection and create all tables based on JSON templates
+        # 3) If new DB, seed campaign-local templates from defaults
+        is_new_db = (choice != "yes")
+        if is_new_db:
+            try:
+                from shutil import copyfile
+                entities = ("pcs","npcs","scenarios","factions","places","objects","creatures","informations","clues","maps")
+                camp_dir = os.path.abspath(os.path.dirname(new_db_path))
+                tpl_dir = os.path.join(camp_dir, "templates")
+                os.makedirs(tpl_dir, exist_ok=True)
+                for e in entities:
+                    src = os.path.join("modules", e, f"{e}_template.json")
+                    dst = os.path.join(tpl_dir, f"{e}_template.json")
+                    try:
+                        if not os.path.exists(dst):
+                            copyfile(src, dst)
+                    except Exception:
+                        pass
+            except Exception:
+                pass
+
+        # 4) Open a fresh connection and create all tables based on JSON templates
         conn = sqlite3.connect(new_db_path)
         cursor = conn.cursor()
 
@@ -1001,6 +1052,16 @@ class MainWindow(ctk.CTk):
 
         db_name = os.path.splitext(os.path.basename(new_db_path))[0]
         self.db_name_label.configure(text=db_name)
+        # Update tooltip text to reflect new full path
+        try:
+            full_path = os.path.abspath(new_db_path)
+            if getattr(self, 'db_tooltip', None) is None:
+                self.db_tooltip = ToolTip(self.db_name_label, full_path)
+            else:
+                # Update text on existing tooltip
+                self.db_tooltip.text = full_path
+        except Exception:
+            self.db_tooltip = None
 
     def select_swarmui_path(self):
         folder = filedialog.askdirectory(title="Select SwarmUI Path")

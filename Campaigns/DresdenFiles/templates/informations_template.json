@@ -1,0 +1,11 @@
+{
+  "fields": [
+      {"name": "Title", "type": "text"},
+      {"name": "Information", "type": "longtext"},
+      {"name": "Level", "type": "longtext"},
+      {"name": "PlayerDisplay", "type": "boolean"},
+      {"name": "NPCs", "type": "list", "linked_type": "NPCs"},
+      {"name": "PCs", "type": "list", "linked_type": "PCs"},
+      {"name": "Attachment", "type": "file"}
+  ]
+}

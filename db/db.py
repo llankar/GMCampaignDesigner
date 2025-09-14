@@ -4,7 +4,9 @@ import os
 import json
 import re
 import platform
+from shutil import copyfile
 from modules.helpers.config_helper import ConfigHelper
+from modules.helpers.template_loader import load_template, list_known_entities
 import logging
 
 # Map our JSON “type” names to SQLite types
@@ -18,26 +20,34 @@ _SQLITE_TYPE = {
 }
 
 def load_schema_from_json(entity_name):
-    """
-    Opens PROJECT_ROOT/modules/<entity_name>/<entity_name>_template.json
-    and returns [(col_name, sql_type), …].
-    """
-    project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
-    json_path    = os.path.join(
-        project_root,
-        "modules",
-        entity_name,
-        f"{entity_name}_template.json"
-    )
-    with open(json_path, encoding="utf-8") as f:
-        tmpl = json.load(f)
-
+    """Load merged template for entity (campaign-local preferred) and return SQL schema."""
+    tmpl = load_template(entity_name)
     schema = []
-    for field in tmpl["fields"]:
-        name = field["name"]
-        jtype = field["type"]
+    for field in tmpl.get("fields", []):
+        name = field.get("name")
+        jtype = field.get("type", "text")
+        if not name:
+            continue
         schema.append((name, _SQLITE_TYPE.get(jtype, "TEXT")))
     return schema
+
+
+def _ensure_campaign_templates():
+    """Seed campaign templates directory from defaults if missing."""
+    db_path = ConfigHelper.get("Database", "path", fallback="default_campaign.db") or "default_campaign.db"
+    camp_dir = os.path.abspath(os.path.dirname(db_path))
+    tpl_dir = os.path.join(camp_dir, "templates")
+    if os.path.isdir(tpl_dir):
+        return
+    try:
+        os.makedirs(tpl_dir, exist_ok=True)
+        for e in list_known_entities():
+            src = os.path.join(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")), "modules", e, f"{e}_template.json")
+            dst = os.path.join(tpl_dir, f"{e}_template.json")
+            if os.path.isfile(src) and not os.path.exists(dst):
+                copyfile(src, dst)
+    except Exception:
+        pass
 
 def get_connection():
     raw_db_path = ConfigHelper.get("Database", "path", fallback="default_campaign.db").strip()
@@ -56,6 +66,7 @@ def get_connection():
     return sqlite3.connect(DB_PATH)
 
 def initialize_db():
+    _ensure_campaign_templates()
     conn   = get_connection()
     cursor = conn.cursor()
 
