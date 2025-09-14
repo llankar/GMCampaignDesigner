@@ -49,6 +49,10 @@ class AuthoringWizardView(ctk.CTkFrame):
         self.factions = GenericModelWrapper("factions")
         self.infos = GenericModelWrapper("informations")
         self.ai = LocalAIClient()
+        # Keep last generated structured data so we can save/check while
+        # displaying a human-friendly text view in the UI.
+        self._last_npc_data = None
+        self._last_scenario_data = None
 
         # Presets
         self.tones = [
@@ -266,6 +270,57 @@ class AuthoringWizardView(ctk.CTkFrame):
         ]
         return self.ai.chat(messages)
 
+    # -------- Formatting helpers (text view) --------
+    def _format_kv(self, key, value):
+        text = self._as_text(value).strip()
+        return f"{key}:\n{text}\n" if text else ""
+
+    def _format_list(self, title, items):
+        if not items:
+            return ""
+        lines = []
+        for it in items:
+            if isinstance(it, dict):
+                # Try common keys
+                name = it.get("Name") or it.get("Title") or it.get("text") or str(it)
+                lines.append(f"- {self._as_text(name)}")
+            else:
+                lines.append(f"- {self._as_text(it)}")
+        return f"{title}:\n" + "\n".join(lines) + "\n"
+
+    def _format_npc_text(self, data: dict) -> str:
+        parts = []
+        parts.append(self._format_kv("Name", data.get("Name")))
+        parts.append(self._format_kv("Role", data.get("Role")))
+        parts.append(self._format_kv("Description", data.get("Description")))
+        parts.append(self._format_kv("Background", data.get("Background")))
+        parts.append(self._format_kv("Personality", data.get("Personality")))
+        parts.append(self._format_kv("Motivation", data.get("Motivation")))
+        parts.append(self._format_kv("Quote", data.get("Quote")))
+        parts.append(self._format_kv("Roleplaying Cues", data.get("RoleplayingCues")))
+        parts.append(self._format_list("Traits", data.get("Traits") or []))
+        parts.append(self._format_list("Factions", data.get("Factions") or []))
+        parts.append(self._format_kv("Secrets", data.get("Secrets")))
+        return "\n".join(p for p in parts if p).strip() + "\n"
+
+    def _format_scenario_text(self, data: dict) -> str:
+        parts = []
+        parts.append(self._format_kv("Title", data.get("Title")))
+        parts.append(self._format_kv("Summary", data.get("Summary")))
+        parts.append(self._format_kv("Secrets", data.get("Secrets")))
+        # Scenes may be list[str|dict]
+        scenes = []
+        for sc in data.get("Scenes") or []:
+            if isinstance(sc, dict):
+                scenes.append(self._as_text(sc.get("text") or sc))
+            else:
+                scenes.append(self._as_text(sc))
+        parts.append(self._format_list("Scenes", scenes))
+        parts.append(self._format_list("NPCs", data.get("NPCs") or []))
+        parts.append(self._format_list("Places", data.get("Places") or []))
+        parts.append(self._format_list("Factions", data.get("Factions") or []))
+        return "\n".join(p for p in parts if p).strip() + "\n"
+
     # NPC generation -----------------------------------------------------
     @staticmethod
     def _as_text(val):
@@ -311,15 +366,21 @@ class AuthoringWizardView(ctk.CTkFrame):
         # Merge defaults
         for k in schema:
             data.setdefault(k, schema[k])
-        # Show nicely
+        # Keep structured result for saving/checking, but show human text
+        self._last_npc_data = data
         self.npc_output.delete("1.0", "end")
-        self.npc_output.insert("1.0", json.dumps(data, indent=2, ensure_ascii=False))
+        self.npc_output.insert("1.0", self._format_npc_text(data))
 
     def check_npc_consistency(self):
-        try:
-            data = _parse_json_relaxed(self.npc_output.get("1.0", "end").strip())
-        except Exception:
-            messagebox.showerror("Invalid JSON", "Please generate or paste valid NPC JSON first.")
+        # Prefer the last structured data; allow JSON pasted by power users as fallback
+        data = self._last_npc_data
+        if not isinstance(data, dict):
+            try:
+                data = _parse_json_relaxed(self.npc_output.get("1.0", "end").strip())
+            except Exception:
+                data = None
+        if not isinstance(data, dict):
+            messagebox.showerror("No Data", "Please generate an NPC first.")
             return
         issues = []
         # Factions exist?
@@ -337,10 +398,14 @@ class AuthoringWizardView(ctk.CTkFrame):
             messagebox.showwarning("Consistency Issues", "\n".join(issues))
 
     def save_npc(self):
-        try:
-            data = _parse_json_relaxed(self.npc_output.get("1.0", "end").strip())
-        except Exception:
-            messagebox.showerror("Invalid JSON", "NPC output must be valid JSON.")
+        data = self._last_npc_data
+        if not isinstance(data, dict):
+            try:
+                data = _parse_json_relaxed(self.npc_output.get("1.0", "end").strip())
+            except Exception:
+                data = None
+        if not isinstance(data, dict):
+            messagebox.showerror("No Data", "Please generate an NPC first.")
             return
         # Map to DB schema used by GenericListView templates
         item = {
@@ -405,14 +470,19 @@ class AuthoringWizardView(ctk.CTkFrame):
             data["Scenes"] = data["Scenes"][:5]
         for k in schema:
             data.setdefault(k, schema[k])
+        self._last_scenario_data = data
         self.sc_output.delete("1.0", "end")
-        self.sc_output.insert("1.0", json.dumps(data, indent=2, ensure_ascii=False))
+        self.sc_output.insert("1.0", self._format_scenario_text(data))
 
     def check_scenario_consistency(self):
-        try:
-            data = _parse_json_relaxed(self.sc_output.get("1.0", "end").strip())
-        except Exception:
-            messagebox.showerror("Invalid JSON", "Please generate or paste valid Scenario JSON first.")
+        data = self._last_scenario_data
+        if not isinstance(data, dict):
+            try:
+                data = _parse_json_relaxed(self.sc_output.get("1.0", "end").strip())
+            except Exception:
+                data = None
+        if not isinstance(data, dict):
+            messagebox.showerror("No Data", "Please generate a scenario first.")
             return
         issues = []
         known_places = {it.get("Name") for it in self.places.load_items()}
@@ -429,10 +499,14 @@ class AuthoringWizardView(ctk.CTkFrame):
             messagebox.showwarning("Consistency Issues", "\n".join(issues))
 
     def save_scenario(self):
-        try:
-            data = _parse_json_relaxed(self.sc_output.get("1.0", "end").strip())
-        except Exception:
-            messagebox.showerror("Invalid JSON", "Scenario output must be valid JSON.")
+        data = self._last_scenario_data
+        if not isinstance(data, dict):
+            try:
+                data = _parse_json_relaxed(self.sc_output.get("1.0", "end").strip())
+            except Exception:
+                data = None
+        if not isinstance(data, dict):
+            messagebox.showerror("No Data", "Please generate a scenario first.")
             return
         # Enforce caps again on save
         if isinstance(data.get("NPCs"), list):
