@@ -857,7 +857,7 @@ class GenericEditorWindow(ctk.CTkToplevel):
                 # store the filename (not full path) into the model
                 self.item[field["name"]] = getattr(self, "attachment_filename", "")
             elif field["name"] == "Portrait":
-                self.item[field["name"]] = self.portrait_path
+                self.item[field["name"]] = self._campaign_relative_path(self.portrait_path)
             elif field["name"] == "Image":
                 self.item[field["name"]] = self._campaign_relative_path(self.image_path)
             elif field["type"] == "boolean":
@@ -869,39 +869,49 @@ class GenericEditorWindow(ctk.CTkToplevel):
         self.destroy()
 
     def create_portrait_field(self, field):
-        # Create a main frame for the portrait field
         frame = ctk.CTkFrame(self.scroll_frame)
         frame.pack(fill="x", pady=5)
 
-        campaign_dir = ConfigHelper.get_campaign_dir()
-        portrait_path = self.item.get("Portrait", "")
+        campaign_dir = Path(ConfigHelper.get_campaign_dir())
+        raw_path = self.item.get("Portrait", "") or ""
+        normalized_path = self._campaign_relative_path(raw_path)
+        self.portrait_path = normalized_path
+
+        abs_path = None
+        if normalized_path:
+            candidate = Path(normalized_path)
+            abs_path = candidate if candidate.is_absolute() else campaign_dir / candidate
+        elif raw_path:
+            candidate = Path(raw_path)
+            abs_path = candidate if candidate.is_absolute() else campaign_dir / candidate
+
         image_frame = ctk.CTkFrame(frame)
         image_frame.pack(fill="x", pady=5)
-        if portrait_path == "" or portrait_path is None:
-            self.portrait_label = ctk.CTkLabel(image_frame, text="[No Image]")
-            self.portrait_path= "[No Image]"
-        else:
-            self.portrait_path= os.path.join(campaign_dir, portrait_path)
-            # Create a separate frame for the image and center it
-            if self.portrait_path and os.path.exists(self.portrait_path):
-                image = Image.open(self.portrait_path).resize((256, 256))
+
+        if abs_path and abs_path.exists():
+            try:
+                image = Image.open(abs_path).resize((256, 256))
                 self.portrait_image = ctk.CTkImage(light_image=image, size=(256, 256))
                 self.portrait_label = ctk.CTkLabel(image_frame, image=self.portrait_image, text="")
-            else:
-                self.portrait_label = ctk.CTkLabel(image_frame, text="[No Image]")
-            
-            # Pack without specifying a side to center the widget
+            except Exception:
+                self.portrait_label = ctk.CTkLabel(image_frame, text="[No Portrait]")
+                self.portrait_image = None
+        else:
+            self.portrait_label = ctk.CTkLabel(image_frame, text="[No Portrait]")
+            self.portrait_image = None
+            if not normalized_path:
+                self.portrait_path = ""
+
         self.portrait_label.pack(pady=5)
-        
-        # Create a frame for the buttons and pack them (they'll appear below the centered image)
+
         button_frame = ctk.CTkFrame(frame)
         button_frame.pack(pady=5)
-        
+
         ctk.CTkButton(button_frame, text="Select Portrait", command=self.select_portrait).pack(side="left", padx=5)
         ctk.CTkButton(button_frame, text="Paste Portrait", command=self.paste_portrait_from_clipboard).pack(side="left", padx=5)
         ctk.CTkButton(button_frame, text="Create Portrait with description", command=self.create_portrait_with_swarmui).pack(side="left", padx=5)
 
-        self.field_widgets[field["name"]] = self.portrait_path
+        self._update_portrait_preview()
 
     def paste_portrait_from_clipboard(self):
         """Paste image from clipboard and set as entity portrait.
@@ -917,48 +927,47 @@ class GenericEditorWindow(ctk.CTkToplevel):
             messagebox.showinfo("Paste Portrait", "No image found in clipboard.")
             return
 
-        # If clipboard contains a list of file paths, try first valid image path
         if isinstance(data, list):
             for path in data:
                 try:
                     if os.path.isfile(path):
                         self.portrait_path = self.copy_and_resize_portrait(path)
-                        self.portrait_label.configure(text=os.path.basename(self.portrait_path))
+                        self._update_portrait_preview()
                         return
                 except Exception:
                     continue
             messagebox.showinfo("Paste Portrait", "Clipboard has file paths but none are valid images.")
             return
 
-        # If clipboard contains a PIL Image
         if isinstance(data, Image.Image):
             try:
-                campaign_dir = ConfigHelper.get_campaign_dir()
-                portrait_folder = os.path.join(campaign_dir, "assets", "portraits")
-                os.makedirs(portrait_folder, exist_ok=True)
+                campaign_dir = Path(ConfigHelper.get_campaign_dir())
+                portrait_folder = campaign_dir / 'assets' / 'portraits'
+                portrait_folder.mkdir(parents=True, exist_ok=True)
 
-                base_name = (self.item.get("Name") or "Unnamed").replace(" ", "_")
+                base_name = (self.item.get('Name') or 'Unnamed').replace(' ', '_')
                 dest_filename = f"{base_name}_{id(self)}.png"
-                dest_path = os.path.join(portrait_folder, dest_filename)
+                dest_path = portrait_folder / dest_filename
 
-                # Convert to RGB to ensure PNG save works for all modes
                 img = data
-                if img.mode in ("P", "RGBA"):
-                    img = img.convert("RGB")
+                if img.mode in ('P', 'RGBA'):
+                    img = img.convert('RGB')
 
-                # Save directly to destination
-                img.save(dest_path, format="PNG")
+                img.save(dest_path, format='PNG')
 
-                # Store relative path used by the app
-                self.portrait_path = os.path.join("assets/portraits/", dest_filename)
-                self.portrait_label.configure(text=os.path.basename(self.portrait_path))
+                try:
+                    relative = dest_path.relative_to(campaign_dir).as_posix()
+                except ValueError:
+                    relative = dest_path.as_posix()
+                self.portrait_path = relative
+                self._update_portrait_preview()
                 return
             except Exception as e:
                 messagebox.showerror("Paste Portrait", f"Failed to paste image: {e}")
                 return
 
         messagebox.showinfo("Paste Portrait", "Clipboard content is not an image.")
-    
+
     def create_image_field(self, field):
         frame = ctk.CTkFrame(self.scroll_frame)
         frame.pack(fill="x", pady=5)
@@ -1233,7 +1242,7 @@ class GenericEditorWindow(ctk.CTkToplevel):
 
             # Associate the selected portrait with the NPC data.
             self.portrait_path = self.copy_and_resize_portrait(output_filename)
-            self.portrait_label.configure(text=os.path.basename(self.portrait_path))
+            self._update_portrait_preview()
 
             # Copy the original generated file to assets/generated and delete local temp
             GENERATED_FOLDER = os.path.join(ConfigHelper.get_campaign_dir(), "assets", "generated")
@@ -1316,7 +1325,7 @@ class GenericEditorWindow(ctk.CTkToplevel):
 
         if file_path:
             self.portrait_path = self.copy_and_resize_portrait(file_path)
-            self.portrait_label.configure(text=os.path.basename(self.portrait_path))
+            self._update_portrait_preview()
     
     def select_image(self):
         file_path = filedialog.askopenfilename(
@@ -1353,7 +1362,7 @@ class GenericEditorWindow(ctk.CTkToplevel):
             self.field_widgets["Image"] = self.image_path
 
     def _campaign_relative_path(self, path):
-        if not path or str(path).strip() in ("[No Image]", "[No Attachment]", ""):
+        if not path or str(path).strip() in ("[No Image]", "[No Portrait]", "[No Attachment]", ""):
             return ""
         try:
             candidate = Path(path)
@@ -1366,6 +1375,26 @@ class GenericEditorWindow(ctk.CTkToplevel):
             except Exception:
                 return candidate.resolve().as_posix()
         return candidate.as_posix()
+
+    def _update_portrait_preview(self):
+        campaign_dir = Path(ConfigHelper.get_campaign_dir())
+        if self.portrait_path:
+            candidate = Path(self.portrait_path)
+            abs_path = candidate if candidate.is_absolute() else campaign_dir / candidate
+        else:
+            abs_path = None
+        try:
+            if abs_path and abs_path.exists():
+                image = Image.open(abs_path).resize((256, 256))
+                self.portrait_image = ctk.CTkImage(light_image=image, size=(256, 256))
+                self.portrait_label.configure(image=self.portrait_image, text="")
+            else:
+                raise FileNotFoundError
+        except Exception:
+            display_name = os.path.basename(self.portrait_path) if self.portrait_path else "[No Portrait]"
+            self.portrait_label.configure(image=None, text=display_name)
+            self.portrait_image = None
+        self.field_widgets["Portrait"] = self.portrait_path
 
     def copy_and_resize_image(self, src_path):
         campaign_dir = Path(ConfigHelper.get_campaign_dir())
@@ -1387,21 +1416,24 @@ class GenericEditorWindow(ctk.CTkToplevel):
         return relative
 
     def copy_and_resize_portrait(self, src_path):
-        campaign_dir = ConfigHelper.get_campaign_dir()
-        PORTRAIT_FOLDER = os.path.join(campaign_dir, "assets", "portraits")
+        campaign_dir = Path(ConfigHelper.get_campaign_dir())
+        portrait_folder = campaign_dir / 'assets' / 'portraits'
         MAX_PORTRAIT_SIZE = (1024, 1024)
 
-        os.makedirs(PORTRAIT_FOLDER, exist_ok=True)
+        portrait_folder.mkdir(parents=True, exist_ok=True)
 
-        npc_name = self.item.get("Name", "Unnamed").replace(" ", "_")
+        npc_name = self.item.get('Name', 'Unnamed').replace(' ', '_')
         ext = os.path.splitext(src_path)[-1].lower()
         dest_filename = f"{npc_name}_{id(self)}{ext}"
-        dest_path = os.path.join(PORTRAIT_FOLDER, dest_filename)
-        dest_path_short= os.path.join("assets/portraits/", dest_filename)
+        dest_path = portrait_folder / dest_filename
         shutil.copy(src_path, dest_path)
-        
-        return dest_path_short
-    
+
+        try:
+            relative = dest_path.relative_to(campaign_dir).as_posix()
+        except ValueError:
+            relative = dest_path.as_posix()
+        return relative
+
     # ---------------- AI helpers (gpt-oss / OpenAI-compatible) ----------------
     def _field_text(self, field_name):
         widget = self.field_widgets.get(field_name)

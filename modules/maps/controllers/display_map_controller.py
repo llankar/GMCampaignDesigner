@@ -1,5 +1,6 @@
 import os
 import json
+from pathlib import Path
 from tkinter import colorchooser
 import tkinter as tk
 import customtkinter as ctk
@@ -978,11 +979,12 @@ class DisplayMapController:
         self._zoom_final_after_id = self.canvas.after(300, lambda: self._perform_zoom(final=True))
 
     def save_map(self):
-        abs_masks_dir = os.path.abspath(MASKS_DIR); os.makedirs(abs_masks_dir, exist_ok=True)
+        abs_masks_dir = Path(MASKS_DIR).resolve(); abs_masks_dir.mkdir(parents=True, exist_ok=True)
         if not self.current_map or "Image" not in self.current_map: print("Error: Current map or map image not set. Cannot save mask."); return
         img_name = os.path.basename(self.current_map["Image"]); base, _ = os.path.splitext(img_name)
-        mask_filename = f"{base}_mask.png"; abs_mask_path = os.path.join(abs_masks_dir, mask_filename)
-        rel_mask_path = os.path.join("masks/", mask_filename)
+        mask_filename = f"{base}_mask.png"
+        abs_mask_path = abs_masks_dir / mask_filename
+        rel_mask_path = (Path('masks') / mask_filename).as_posix()
         if self.mask_img: self.mask_img.save(abs_mask_path, format="PNG")
         else: print("Warning: No fog mask image to save.")
         self.current_map["FogMaskPath"] = rel_mask_path; self._persist_tokens()
