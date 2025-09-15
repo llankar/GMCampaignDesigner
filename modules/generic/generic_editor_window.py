@@ -20,6 +20,7 @@ from modules.helpers.text_helpers import ai_text_to_rtf_json
 from modules.ai.local_ai_client import LocalAIClient
 import json
 from io import BytesIO
+from pathlib import Path
 
 SWARMUI_PROCESS = None
 
@@ -858,7 +859,7 @@ class GenericEditorWindow(ctk.CTkToplevel):
             elif field["name"] == "Portrait":
                 self.item[field["name"]] = self.portrait_path
             elif field["name"] == "Image":
-                self.item[field["name"]] = self.image_path
+                self.item[field["name"]] = self._campaign_relative_path(self.image_path)
             elif field["type"] == "boolean":
                 # widget is stored as (option_menu, StringVar); convert to Boolean.
                 self.item[field["name"]] = True if widget[1].get() == "True" else False
@@ -959,32 +960,41 @@ class GenericEditorWindow(ctk.CTkToplevel):
         messagebox.showinfo("Paste Portrait", "Clipboard content is not an image.")
     
     def create_image_field(self, field):
-        # Create a main frame for the image field
         frame = ctk.CTkFrame(self.scroll_frame)
         frame.pack(fill="x", pady=5)
 
-        campaign_dir = ConfigHelper.get_campaign_dir()
-        image_path = self.item.get("Image", "")
-        # Create a separate frame for the image and center it
+        campaign_dir = Path(ConfigHelper.get_campaign_dir())
+        raw_image_path = self.item.get("Image", "") or ""
+        normalized_path = self._campaign_relative_path(raw_image_path)
+        self.image_path = normalized_path
+
+        abs_path = None
+        if normalized_path:
+            candidate = Path(normalized_path)
+            abs_path = candidate if candidate.is_absolute() else campaign_dir / candidate
+        elif raw_image_path:
+            candidate = Path(raw_image_path)
+            abs_path = candidate if candidate.is_absolute() else campaign_dir / candidate
+
         image_frame = ctk.CTkFrame(frame)
         image_frame.pack(fill="x", pady=5)
-        if image_path == "" or image_path is None:
-            self.image_label = ctk.CTkLabel(image_frame, text="[No Image]")
-            self.image_path= "[No Image]"
-        else:
-            self.image_path= os.path.join(campaign_dir, image_path)
-            
-            if self.image_path and os.path.exists(self.image_path):
-                image = Image.open(self.image_path).resize((256, 256))
+
+        if abs_path and abs_path.exists():
+            try:
+                image = Image.open(abs_path).resize((256, 256))
                 self.image_image = ctk.CTkImage(light_image=image, size=(256, 256))
                 self.image_label = ctk.CTkLabel(image_frame, image=self.image_image, text="")
-            else:
+            except Exception:
                 self.image_label = ctk.CTkLabel(image_frame, text="[No Image]")
+                self.image_image = None
+        else:
+            self.image_label = ctk.CTkLabel(image_frame, text="[No Image]")
+            self.image_image = None
+            if not normalized_path:
+                self.image_path = ""
 
-        # Pack without specifying a side to center the widget
         self.image_label.pack(pady=5)
 
-        # Create a frame for the buttons and pack them (they'll appear below the centered image)
         button_frame = ctk.CTkFrame(frame)
         button_frame.pack(pady=5)
 
@@ -1012,7 +1022,23 @@ class GenericEditorWindow(ctk.CTkToplevel):
                 try:
                     if os.path.isfile(path):
                         self.image_path = self.copy_and_resize_image(path)
-                        self.image_label.configure(text=os.path.basename(self.image_path))
+                        if self.image_path:
+                            candidate = Path(self.image_path)
+                            abs_path = candidate if candidate.is_absolute() else Path(ConfigHelper.get_campaign_dir()) / candidate
+                        else:
+                            abs_path = None
+                        try:
+                            if abs_path and abs_path.exists():
+                                image = Image.open(abs_path).resize((256, 256))
+                                self.image_image = ctk.CTkImage(light_image=image, size=(256, 256))
+                                self.image_label.configure(image=self.image_image, text="")
+                            else:
+                                raise FileNotFoundError
+                        except Exception:
+                            display_name = os.path.basename(self.image_path) if self.image_path else "[No Image]"
+                            self.image_label.configure(image=None, text=display_name)
+                            self.image_image = None
+                        self.field_widgets["Image"] = self.image_path
                         return
                 except Exception:
                     continue
@@ -1022,13 +1048,13 @@ class GenericEditorWindow(ctk.CTkToplevel):
         # If clipboard contains a PIL Image
         if isinstance(data, Image.Image):
             try:
-                campaign_dir = ConfigHelper.get_campaign_dir()
-                image_folder = os.path.join(campaign_dir, "assets", "images", "map_images")
-                os.makedirs(image_folder, exist_ok=True)
+                campaign_dir = Path(ConfigHelper.get_campaign_dir())
+                image_folder = campaign_dir / 'assets' / 'images' / 'map_images'
+                image_folder.mkdir(parents=True, exist_ok=True)
 
-                base_name = (self.item.get("Name") or "Unnamed").replace(" ", "_")
+                base_name = (self.item.get('Name') or 'Unnamed').replace(' ', '_')
                 dest_filename = f"{base_name}_{id(self)}.png"
-                dest_path = os.path.join(image_folder, dest_filename)
+                dest_path = image_folder / dest_filename
 
                 # Convert to RGB to ensure PNG save works for all modes
                 img = data
@@ -1039,8 +1065,24 @@ class GenericEditorWindow(ctk.CTkToplevel):
                 img.save(dest_path, format="PNG")
 
                 # Store relative path used by the app
-                self.image_path = os.path.join("assets/images/map_images/", dest_filename)
-                self.image_label.configure(text=os.path.basename(self.image_path))
+                try:
+                    relative = Path(dest_path).relative_to(campaign_dir).as_posix()
+                except ValueError:
+                    relative = Path(dest_path).as_posix()
+                self.image_path = relative
+                abs_path = Path(dest_path)
+                try:
+                    if abs_path.exists():
+                        image = Image.open(abs_path).resize((256, 256))
+                        self.image_image = ctk.CTkImage(light_image=image, size=(256, 256))
+                        self.image_label.configure(image=self.image_image, text="")
+                    else:
+                        raise FileNotFoundError
+                except Exception:
+                    display_name = os.path.basename(self.image_path) if self.image_path else "[No Image]"
+                    self.image_label.configure(image=None, text=display_name)
+                    self.image_image = None
+                self.field_widgets["Image"] = self.image_path
                 return
             except Exception as e:
                 messagebox.showerror("Paste Image", f"Failed to paste image: {e}")
@@ -1292,23 +1334,57 @@ class GenericEditorWindow(ctk.CTkToplevel):
 
         if file_path:
             self.image_path = self.copy_and_resize_image(file_path)
-            self.image_label.configure(text=os.path.basename(self.image_path))
+            if self.image_path:
+                candidate = Path(self.image_path)
+                abs_path = candidate if candidate.is_absolute() else Path(ConfigHelper.get_campaign_dir()) / candidate
+            else:
+                abs_path = None
+            try:
+                if abs_path and abs_path.exists():
+                    image = Image.open(abs_path).resize((256, 256))
+                    self.image_image = ctk.CTkImage(light_image=image, size=(256, 256))
+                    self.image_label.configure(image=self.image_image, text="")
+                else:
+                    raise FileNotFoundError
+            except Exception:
+                display_name = os.path.basename(self.image_path) if self.image_path else "[No Image]"
+                self.image_label.configure(image=None, text=display_name)
+                self.image_image = None
+            self.field_widgets["Image"] = self.image_path
+
+    def _campaign_relative_path(self, path):
+        if not path or str(path).strip() in ("[No Image]", "[No Attachment]", ""):
+            return ""
+        try:
+            candidate = Path(path)
+        except TypeError:
+            return str(path)
+        if candidate.is_absolute():
+            try:
+                campaign_dir = Path(ConfigHelper.get_campaign_dir()).resolve()
+                return candidate.resolve().relative_to(campaign_dir).as_posix()
+            except Exception:
+                return candidate.resolve().as_posix()
+        return candidate.as_posix()
 
     def copy_and_resize_image(self, src_path):
-        campaign_dir = ConfigHelper.get_campaign_dir()
-        IMAGE_FOLDER = os.path.join(campaign_dir, "assets", "images", "map_images")
+        campaign_dir = Path(ConfigHelper.get_campaign_dir())
+        image_folder = campaign_dir / 'assets' / 'images' / 'map_images'
         MAX_IMAGE_SIZE = (1920, 1080)
 
-        os.makedirs(IMAGE_FOLDER, exist_ok=True)
+        image_folder.mkdir(parents=True, exist_ok=True)
 
-        image_name = self.item.get("Name", "Unnamed").replace(" ", "_")
+        image_name = self.item.get('Name', 'Unnamed').replace(' ', '_')
         ext = os.path.splitext(src_path)[-1].lower()
         dest_filename = f"{image_name}_{id(self)}{ext}"
-        dest_path = os.path.join(IMAGE_FOLDER, dest_filename)
-        dest_path_short= os.path.join("assets/images/map_images/", dest_filename)
+        dest_path = image_folder / dest_filename
         shutil.copy(src_path, dest_path)
 
-        return dest_path_short
+        try:
+            relative = dest_path.relative_to(campaign_dir).as_posix()
+        except ValueError:
+            relative = dest_path.as_posix()
+        return relative
 
     def copy_and_resize_portrait(self, src_path):
         campaign_dir = ConfigHelper.get_campaign_dir()

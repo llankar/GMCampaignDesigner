@@ -3,10 +3,11 @@ import sys
 import ast
 import re
 import time
+import copy
+import shutil
 from pathlib import Path
 
 from PIL import ImageGrab
-
 
 ROOT = Path(__file__).resolve().parents[1]
 MODULES_DIR = ROOT / "modules"
@@ -34,6 +35,146 @@ def discover_html_files():
     return sorted(set(files))
 
 
+
+def _safe_get_source(src: str, node):
+    if node is None:
+        return None
+    try:
+        segment = ast.get_source_segment(src, node)
+        if segment is not None:
+            return segment.strip()
+    except Exception:
+        pass
+    try:
+        return ast.unparse(node).strip()
+    except Exception:
+        return None
+
+
+def _format_arg(arg, src: str):
+    name = arg.arg
+    annotation = _safe_get_source(src, getattr(arg, "annotation", None))
+    if annotation:
+        return f"{name}: {annotation}"
+    return name
+
+
+def _collect_param_info(node: ast.FunctionDef, src: str):
+    params = []
+    args = node.args
+    positional = list(args.posonlyargs) + list(args.args)
+    defaults = [None] * (len(positional) - len(args.defaults)) + list(args.defaults)
+    posonly_count = len(args.posonlyargs)
+    for idx, arg in enumerate(positional):
+        params.append({
+            "name": arg.arg,
+            "base_name": arg.arg,
+            "annotation": _safe_get_source(src, getattr(arg, "annotation", None)),
+            "default": _safe_get_source(src, defaults[idx]) if defaults[idx] is not None else None,
+            "kind": "positional-only" if idx < posonly_count else "positional-or-keyword",
+        })
+    if args.vararg:
+        params.append({
+            "name": f"*{args.vararg.arg}",
+            "base_name": args.vararg.arg,
+            "annotation": _safe_get_source(src, getattr(args.vararg, "annotation", None)),
+            "default": None,
+            "kind": "var-positional",
+        })
+    if args.kwonlyargs:
+        for arg, default in zip(args.kwonlyargs, args.kw_defaults):
+            params.append({
+                "name": arg.arg,
+                "base_name": arg.arg,
+                "annotation": _safe_get_source(src, getattr(arg, "annotation", None)),
+                "default": _safe_get_source(src, default) if default is not None else None,
+                "kind": "keyword-only",
+            })
+    if args.kwarg:
+        params.append({
+            "name": f"**{args.kwarg.arg}",
+            "base_name": args.kwarg.arg,
+            "annotation": _safe_get_source(src, getattr(args.kwarg, "annotation", None)),
+            "default": None,
+            "kind": "var-keyword",
+        })
+    return params
+
+
+def _summarize_params(params):
+    parts = []
+    for info in params:
+        if info["base_name"] in {"self", "cls"}:
+            continue
+        traits = []
+        kind = info["kind"]
+        if kind == "positional-only":
+            traits.append("positional-only")
+        elif kind == "keyword-only":
+            traits.append("keyword-only")
+        elif kind == "var-positional":
+            traits.append("variadic positional")
+        elif kind == "var-keyword":
+            traits.append("variadic keyword")
+        annotation = info.get("annotation")
+        if annotation:
+            traits.append(f"type {annotation}")
+        default = info.get("default")
+        if default is not None:
+            traits.append(f"default {default}")
+        if traits:
+            parts.append(f"{info['base_name']} ({', '.join(traits)})")
+        else:
+            parts.append(info["base_name"])
+    if parts:
+        return "Parameters: " + "; ".join(parts) + "."
+    return ""
+
+
+def _build_signature(node: ast.FunctionDef, src: str):
+    args = node.args
+    pieces = []
+    positional = list(args.posonlyargs) + list(args.args)
+    defaults = [None] * (len(positional) - len(args.defaults)) + list(args.defaults)
+    posonly_count = len(args.posonlyargs)
+    for idx, arg in enumerate(positional):
+        text = _format_arg(arg, src)
+        default_node = defaults[idx]
+        if default_node is not None:
+            default_text = _safe_get_source(src, default_node)
+            if default_text is not None:
+                text = f"{text}={default_text}"
+        pieces.append(text)
+        if posonly_count and idx == posonly_count - 1:
+            pieces.append("/")
+    if args.vararg:
+        pieces.append(f"*{_format_arg(args.vararg, src)}")
+    elif args.kwonlyargs:
+        pieces.append("*")
+    for arg, default in zip(args.kwonlyargs, args.kw_defaults):
+        text = _format_arg(arg, src)
+        if default is not None:
+            default_text = _safe_get_source(src, default)
+            if default_text is not None:
+                text = f"{text}={default_text}"
+        pieces.append(text)
+    if args.kwarg:
+        pieces.append(f"**{_format_arg(args.kwarg, src)}")
+    params = ", ".join(filter(None, pieces))
+    return f"{node.name}({params})"
+
+
+def _describe_function(node: ast.FunctionDef, src: str):
+    doc = (ast.get_docstring(node) or "").strip()
+    params = _summarize_params(_collect_param_info(node, src))
+    returns = _safe_get_source(src, node.returns)
+    return_text = f"Returns: {returns}." if returns else ""
+    chunks = [chunk for chunk in (doc, params, return_text) if chunk]
+    if not chunks:
+        chunks.append("No inline documentation available.")
+    return " ".join(chunks)
+
+
 def parse_module_api(py_path: Path):
     api = {"module": str(py_path.relative_to(ROOT)), "doc": None, "functions": [], "classes": []}
     try:
@@ -44,19 +185,26 @@ def parse_module_api(py_path: Path):
         tree = ast.parse(src)
     except Exception:
         return api
-    api["doc"] = ast.get_docstring(tree)
+    api["doc"] = (ast.get_docstring(tree) or "").strip()
     for node in tree.body:
         if isinstance(node, ast.FunctionDef):
             api["functions"].append({
                 "name": node.name,
                 "lineno": node.lineno,
-                "doc": ast.get_docstring(node) or "",
+                "signature": _build_signature(node, src),
+                "doc": _describe_function(node, src),
             })
         elif isinstance(node, ast.ClassDef):
+            bases = []
+            for base in node.bases:
+                base_src = _safe_get_source(src, base)
+                if base_src:
+                    bases.append(base_src)
             klass = {
                 "name": node.name,
                 "lineno": node.lineno,
-                "doc": ast.get_docstring(node) or "",
+                "doc": (ast.get_docstring(node) or "").strip(),
+                "bases": bases,
                 "methods": [],
             }
             for sub in node.body:
@@ -64,10 +212,12 @@ def parse_module_api(py_path: Path):
                     klass["methods"].append({
                         "name": sub.name,
                         "lineno": sub.lineno,
-                        "doc": ast.get_docstring(sub) or "",
+                        "signature": _build_signature(sub, src),
+                        "doc": _describe_function(sub, src),
                     })
             api["classes"].append(klass)
     return api
+
 
 
 MENU_PATTERNS = [
@@ -168,15 +318,20 @@ def grab_widget_screenshot(widget, name: str):
         return None
 
 
+
 def screenshot_app_views():
-    # Run the Tk app in a subprocess-like flow but inside current process
     os.environ["DOCS_MODE"] = "1"
     sys.path.insert(0, str(ROOT))
     try:
-        import tkinter as tk
+        import tkinter as tk  # noqa: F401 - imported to ensure Tk initialises
         import customtkinter as ctk
         from main_window import MainWindow
-    except Exception as e:
+        from modules.generic.generic_model_wrapper import GenericModelWrapper
+        from modules.helpers.template_loader import load_template
+        from modules.generic.entity_detail_factory import create_scenario_detail_frame
+        from modules.generic.custom_fields_editor import CustomFieldsEditor
+        from modules.generic.generic_editor_window import GenericEditorWindow
+    except Exception:
         return {}
 
     shots = {}
@@ -185,7 +340,49 @@ def screenshot_app_views():
     app.update()
     shots["main_window"] = str(grab_widget_screenshot(app, "main_window") or "")
 
-    # Sidebar entity views
+    def capture_sidebar_sections():
+        try:
+            children = list(app.sidebar_inner.winfo_children())
+            if not children:
+                return
+            container = children[-1]
+            sections = [child for child in container.winfo_children() if isinstance(child, ctk.CTkFrame)]
+            keys = [
+                ("accordion_data_system", "Data & System"),
+                ("accordion_campaign_workshop", "Campaign Workshop"),
+                ("accordion_relations_graphs", "Relations & Graphs"),
+                ("accordion_utilities", "Utilities"),
+            ]
+            for idx, (shot_key, _title) in enumerate(keys):
+                if idx >= len(sections):
+                    break
+                section_frame = sections[idx]
+                header = None
+                for child in section_frame.winfo_children():
+                    if isinstance(child, ctk.CTkFrame):
+                        header = child
+                        break
+                if header is None:
+                    continue
+                header.event_generate("<Enter>")
+                app.update_idletasks()
+                app.update()
+                shots[shot_key] = str(grab_widget_screenshot(app, shot_key) or "")
+            if len(sections) > 1:
+                header = None
+                for child in sections[1].winfo_children():
+                    if isinstance(child, ctk.CTkFrame):
+                        header = child
+                        break
+                if header:
+                    header.event_generate("<Enter>")
+                    app.update_idletasks()
+                    app.update()
+        except Exception:
+            pass
+
+    capture_sidebar_sections()
+
     for ent in ["scenarios", "pcs", "npcs", "creatures", "factions", "places", "objects", "informations", "clues", "maps"]:
         try:
             app.open_entity(ent)
@@ -194,7 +391,6 @@ def screenshot_app_views():
         except Exception:
             pass
 
-    # Graph editors
     for key, fn in [
         ("npc_graph", app.open_npc_graph_editor),
         ("pc_graph", app.open_pc_graph_editor),
@@ -208,7 +404,6 @@ def screenshot_app_views():
         except Exception:
             pass
 
-    # Scenario generator/importer
     try:
         app.open_scenario_generator()
         app.update()
@@ -222,36 +417,220 @@ def screenshot_app_views():
     except Exception:
         pass
 
-    # Map tool (separate Toplevel)
+    def build_sample_scenario(template):
+        sample = {}
+        for field in template.get("fields", []):
+            name = field.get("name")
+            ftype = field.get("type")
+            if not name:
+                continue
+            if name == "Title":
+                sample[name] = "Sample Scenario Overview"
+                continue
+            if name == "Summary":
+                sample[name] = "A quick overview tying together stakes, goals, and hooks."
+                continue
+            if name == "Secrets":
+                sample[name] = "Important twists and truths reserved for the GM."
+                continue
+            if ftype == "longtext":
+                sample[name] = {"text": f"{name} details and notes."}
+            elif ftype == "list_longtext":
+                sample[name] = [
+                    {"text": f"{name} entry 1"},
+                    {"text": f"{name} entry 2"},
+                ]
+            elif ftype == "list":
+                sample[name] = [f"{name} item 1", f"{name} item 2"]
+            elif ftype == "boolean":
+                sample[name] = False
+            else:
+                sample[name] = f"{name} details"
+        sample.setdefault("Title", "Sample Scenario Overview")
+        sample.setdefault("Summary", "A quick overview tying together stakes, goals, and hooks.")
+        sample.setdefault("Secrets", "Important twists and truths reserved for the GM.")
+        return sample
+
+    scenario_wrapper = None
+    scenario_template = None
+    scenario_item = None
+    try:
+        scenario_template = load_template("scenarios")
+    except Exception:
+        scenario_template = None
+    try:
+        scenario_wrapper = GenericModelWrapper("scenarios")
+        existing = scenario_wrapper.load_items()
+        if existing:
+            scenario_item = copy.deepcopy(existing[0])
+    except Exception:
+        scenario_wrapper = None
+    if scenario_item is None and scenario_template:
+        scenario_item = build_sample_scenario(scenario_template)
+    if scenario_item and scenario_template is None:
+        try:
+            scenario_template = load_template("scenarios")
+        except Exception:
+            scenario_template = None
+
+    if scenario_item:
+        detail_top = None
+        try:
+            detail_top = ctk.CTkToplevel(app)
+            detail_top.title("Scenario Detail Preview")
+            detail_top.geometry("1400x900")
+            detail_top.lift()
+            detail_top.focus_force()
+            create_scenario_detail_frame("Scenarios", scenario_item, detail_top, open_entity_callback=None)
+            detail_top.update_idletasks()
+            detail_top.update()
+            shots["scenario_detail"] = str(grab_widget_screenshot(detail_top, "scenario_detail") or "")
+        except Exception:
+            pass
+        finally:
+            if detail_top is not None:
+                try:
+                    detail_top.destroy()
+                except Exception:
+                    pass
+                app.update()
+
+    if scenario_item and scenario_template:
+        editor_window = None
+        try:
+            editor_window = GenericEditorWindow(
+                app,
+                copy.deepcopy(scenario_item),
+                scenario_template,
+                scenario_wrapper or GenericModelWrapper("scenarios"),
+                creation_mode=False
+            )
+            editor_window.update_idletasks()
+            editor_window.update()
+            shots["scenario_editor"] = str(grab_widget_screenshot(editor_window, "scenario_editor") or "")
+        except Exception:
+            pass
+        finally:
+            if editor_window is not None:
+                try:
+                    editor_window.destroy()
+                except Exception:
+                    pass
+                app.update()
+
+    fields_editor = None
+    try:
+        fields_editor = CustomFieldsEditor(app)
+        fields_editor.update_idletasks()
+        fields_editor.update()
+        shots["custom_fields_editor"] = str(grab_widget_screenshot(fields_editor, "custom_fields_editor") or "")
+    except Exception:
+        pass
+    finally:
+        if fields_editor is not None:
+            try:
+                fields_editor.destroy()
+            except Exception:
+                pass
+            app.update()
+
+    def ensure_map_samples(ctrl):
+        if not ctrl:
+            return []
+        try:
+            existing = ctrl._maps if getattr(ctrl, '_maps', None) else {}
+        except Exception:
+            existing = {}
+        try:
+            from modules.helpers.config_helper import ConfigHelper
+            campaign_dir = Path(ConfigHelper.get_campaign_dir())
+        except Exception:
+            campaign_dir = None
+        valid_names = []
+        if campaign_dir is not None:
+            for key, item in existing.items():
+                if not isinstance(item, dict):
+                    continue
+                image_rel = item.get('Image')
+                if not image_rel:
+                    continue
+                full_path = (campaign_dir / image_rel).resolve()
+                if full_path.exists():
+                    valid_names.append(key)
+        else:
+            valid_names = [key for key, item in existing.items() if isinstance(item, dict) and item.get('Image')]
+        if valid_names:
+            return valid_names
+        if campaign_dir is None:
+            return []
+        map_dir = campaign_dir / 'assets' / 'images' / 'map_images'
+        try:
+            map_dir.mkdir(parents=True, exist_ok=True)
+        except Exception:
+            return []
+        sample_sources = [
+            ROOT / 'assets' / 'images' / 'Unnamed_1689623850560.png',
+            ROOT / 'assets' / 'images' / 'Unnamed_1957333036608.png',
+            ROOT / 'assets' / 'images' / 'Unnamed_2378696683072.png',
+        ]
+        generated = {}
+        for idx, src in enumerate(sample_sources, 1):
+            if not src.exists():
+                continue
+            dest = map_dir / f'docs_sample_map_{idx}.png'
+            try:
+                shutil.copyfile(src, dest)
+            except Exception:
+                continue
+            rel = dest.relative_to(campaign_dir).as_posix()
+            generated[f'Docs Sample Map {idx}'] = {
+                'Name': f'Docs Sample Map {idx}',
+                'Description': 'Auto-generated sample map for documentation screenshots.',
+                'Image': rel,
+                'FogMaskPath': '',
+                'Tokens': '[]',
+                'token_size': 64,
+                'pan_x': 0,
+                'pan_y': 0,
+                'zoom': 1.0,
+            }
+        if generated:
+            ctrl._maps = generated
+            return list(generated.keys())
+        return []
+
+
+
     try:
         app.map_tool()
         app.update(); app.update_idletasks()
-        # The most recent toplevel should be the map tool window
         tops = [w for w in app.winfo_children() if isinstance(w, ctk.CTkToplevel)]
         map_top = tops[-1] if tops else None
         if map_top:
             shots["map_tool_selector"] = str(grab_widget_screenshot(map_top, "map_tool_selector") or "")
-            # Try to switch from selector to editor by selecting first available map
             ctrl = getattr(app, 'map_controller', None)
-            if ctrl and getattr(ctrl, '_maps', None):
+            map_names = ensure_map_samples(ctrl)
+            if ctrl and map_names:
+                for idx, name in enumerate(map_names[:2], 1):
+                    try:
+                        ctrl._on_display_map("maps", name)
+                        app.update(); app.update_idletasks()
+                        key = f"map_tool_map{idx}"
+                        shots[key] = str(grab_widget_screenshot(map_top, key) or "")
+                    except Exception:
+                        continue
                 try:
-                    first_map_name = list(ctrl._maps.keys())[0]
-                    ctrl._on_display_map("maps", first_map_name)
-                    app.update(); app.update_idletasks()
-                    shots["map_tool_editor"] = str(grab_widget_screenshot(map_top, "map_tool_editor") or "")
-                    # Toggle drawing tools to surface shape controls
-                    ctrl._on_drawing_tool_change("Rectangle"); app.update();
+                    ctrl._on_drawing_tool_change("Rectangle"); app.update()
                     shots["map_tool_rectangle"] = str(grab_widget_screenshot(map_top, "map_tool_rectangle") or "")
-                    ctrl._on_drawing_tool_change("Oval"); app.update();
+                    ctrl._on_drawing_tool_change("Oval"); app.update()
                     shots["map_tool_oval"] = str(grab_widget_screenshot(map_top, "map_tool_oval") or "")
-                    # Back to token mode
-                    ctrl._on_drawing_tool_change("Token"); app.update();
+                    ctrl._on_drawing_tool_change("Token"); app.update()
                 except Exception:
                     pass
     except Exception:
         pass
 
-    # Try GM screen only if possible
+
     try:
         app.open_gm_screen()
         app.update()
@@ -259,26 +638,35 @@ def screenshot_app_views():
     except Exception:
         pass
 
-    # Close app
     try:
         app.destroy()
     except Exception:
         pass
 
-    # Filter out empty paths
     return {k: v for k, v in shots.items() if v}
+
 
 
 def build_html(api_data, menu_data, shots):
     def esc(s):
         return (s or "").replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
 
+    def render_image(key):
+        path = shots.get(key)
+        if not path:
+            return ""
+        try:
+            rel = Path(path).relative_to(DOCS_DIR).as_posix()
+        except Exception:
+            rel = Path(path).as_posix()
+        title = key.replace("_", " " ).title()
+        return f"<figure class='shot'><img src='{rel}' alt='{esc(title)}' /><figcaption>{esc(title)}</figcaption></figure>"
+
     sections = []
 
-    # Overview
     sections.append(
         """
-        <section id="overview">
+        <section id=\"overview\">
           <h1>GMCampaignDesigner Documentation</h1>
           <p>This document provides an overview of the application's features, UI, right-click context menus, and a module API reference generated from the source code.</p>
           <p>Version generated on: {ts}</p>
@@ -286,16 +674,45 @@ def build_html(api_data, menu_data, shots):
         """.format(ts=time.strftime("%Y-%m-%d %H:%M:%S"))
     )
 
-    # UI Screenshots section
     if shots:
-        items = []
-        for key, path in sorted(shots.items()):
-            rel = Path(path).relative_to(DOCS_DIR)
-            title = key.replace('_',' ').title()
-            items.append(f"<figure class='shot'><img src='{rel.as_posix()}' alt='{esc(title)}' /><figcaption>{esc(title)}</figcaption></figure>")
-        sections.append("<section id='screenshots'><h2>UI Screenshots</h2>" + "\n".join(items) + "</section>")
+        used = set()
+        group_chunks = []
 
-    # Context menus
+        def add_group(title, keys):
+            items = []
+            for key in keys:
+                if key in shots and key not in used:
+                    rendered = render_image(key)
+                    if rendered:
+                        items.append(rendered)
+                        used.add(key)
+            if items:
+                group_chunks.append(f"<h3>{esc(title)}</h3>" + "".join(items))
+
+        add_group("Main Window & Sidebar", [
+            "main_window",
+            "accordion_data_system",
+            "accordion_campaign_workshop",
+            "accordion_relations_graphs",
+            "accordion_utilities",
+        ])
+
+        entity_keys = [k for k in sorted(shots) if k.startswith("entity_") and k not in used]
+        if entity_keys:
+            group_chunks.append("<h3>Entity Managers</h3>" + "".join(render_image(k) for k in entity_keys))
+            used.update(entity_keys)
+
+        add_group("Detail & Editor Windows", ["scenario_detail", "scenario_editor", "custom_fields_editor"])
+        add_group("Graph Editors", ["npc_graph", "pc_graph", "faction_graph", "scenario_graph"])
+        add_group("GM & Scenario Tools", ["gm_screen", "scenario_generator", "scenario_importer"])
+        add_group("Map Tools", ["map_tool_selector", "map_tool_map1", "map_tool_map2", "map_tool_rectangle", "map_tool_oval"])
+
+        remaining = [k for k in sorted(shots) if k not in used]
+        if remaining:
+            group_chunks.append("<h3>Additional Views</h3>" + "".join(render_image(k) for k in remaining))
+
+        sections.append("<section id='screenshots'><h2>UI Screenshots</h2>" + "".join(group_chunks) + "</section>")
+
     if menu_data:
         blocks = []
         for m in menu_data:
@@ -303,19 +720,19 @@ def build_html(api_data, menu_data, shots):
             blocks.append(f"<div class='menu-block'><h3>{esc(m['module'])}</h3><ul>{items}</ul></div>")
         sections.append("<section id='context-menus'><h2>Right-Click Menus</h2>" + "\n".join(blocks) + "</section>")
 
-    # API Reference
     api_blocks = []
     for mod in api_data:
         fn_list = ''.join(
-            f"<li><code>{esc(f['name'])}()</code> — {esc(f['doc'])}</li>" for f in mod["functions"]
+            f"<li><code>{esc(f['signature'])}</code> &ndash; {esc(f['doc'])}</li>" for f in mod["functions"]
         )
         class_blocks = []
         for c in mod["classes"]:
+            bases = f" ({', '.join(esc(b) for b in c.get('bases', []) if b)})" if c.get("bases") else ""
             methods = ''.join(
-                f"<li><code>{esc(m['name'])}()</code> — {esc(m['doc'])}</li>" for m in c["methods"]
+                f"<li><code>{esc(m['signature'])}</code> &ndash; {esc(m['doc'])}</li>" for m in c["methods"]
             )
             class_blocks.append(
-                f"<div class='class'><h4>class {esc(c['name'])}</h4><p>{esc(c['doc'])}</p><ul>{methods}</ul></div>"
+                f"<div class='class'><h4>class {esc(c['name'])}{bases}</h4><p>{esc(c['doc'])}</p><ul>{methods}</ul></div>"
             )
         api_blocks.append(
             f"<section class='module'><h3>{esc(mod['module'])}</h3><p>{esc(mod['doc'])}</p>"
@@ -394,178 +811,259 @@ def main():
     print(f"User manual written to: {DOCS_DIR / 'user-manual.html'}")
 
 
+
 def build_user_manual(shots, menu_data, py_files):
     def img(key, alt=None):
         p = shots.get(key)
         if not p:
             return ""
-        rel = Path(p).relative_to(DOCS_DIR).as_posix()
+        try:
+            rel = Path(p).relative_to(DOCS_DIR).as_posix()
+        except Exception:
+            rel = Path(p).as_posix()
         caption = alt or key.replace('_', ' ').title()
         return f"<figure class='shot'><img class='manual-shot' src='{rel}' alt='{caption}' /><figcaption>{caption}</figcaption></figure>"
 
     def section(title, body):
         return f"<section><h2 id='{title.lower().replace(' ', '-')}'>{title}</h2>{body}</section>"
 
-    # Helpers to pull right-click menus by area without showing module filenames
     def collect_items(filter_fn):
         items = []
         for m in menu_data:
             if filter_fn(m.get('module', '')):
                 items.extend(m.get('items') or [])
-        # Deduplicate while preserving order
-        seen = set(); out = []
-        for it in items:
-            if it not in seen:
-                seen.add(it); out.append(it)
-        return out
+        seen = set()
+        ordered = []
+        for item in items:
+            if item not in seen:
+                seen.add(item)
+                ordered.append(item)
+        return ordered
 
-    entity_menu = collect_items(lambda mod: 'generic/generic_list_view.py' in mod.replace('\\','/'))
-    graph_menu_all = collect_items(lambda mod: any(s in mod.replace('\\','/') for s in [
-        'npcs/npc_graph_editor.py','pcs/pc_graph_editor.py','factions/faction_graph_editor.py','scenarios/scenario_graph_editor.py'
+    entity_menu = collect_items(lambda mod: 'generic/generic_list_view.py' in mod.replace('\\', '/'))
+    graph_menu_all = collect_items(lambda mod: any(s in mod.replace('\\', '/') for s in [
+        'npcs/npc_graph_editor.py', 'pcs/pc_graph_editor.py', 'factions/faction_graph_editor.py', 'scenarios/scenario_graph_editor.py'
     ]))
-    map_menu_all = collect_items(lambda mod: 'maps/controllers/display_map_controller.py' in mod.replace('\\','/'))
-    clues_menu = collect_items(lambda mod: 'web/templates/clues.html' in mod.replace('\\','/'))
+    map_menu_all = collect_items(lambda mod: 'maps/controllers/display_map_controller.py' in mod.replace('\\', '/'))
+    clues_menu = collect_items(lambda mod: 'web/templates/clues.html' in mod.replace('\\', '/'))
 
-    # Heuristic grouping for graph editor menus
     arrow_items = [i for i in graph_menu_all if 'Arrow' in i]
-    node_items = [i for i in graph_menu_all if 'Node' in i or i in ('Change Color','Display Portrait','Display Portrait Window')]
+    node_items = [i for i in graph_menu_all if 'Node' in i or i in ('Change Color', 'Display Portrait', 'Display Portrait Window')]
     shape_items_graph = [i for i in graph_menu_all if 'Shape' in i and i not in arrow_items]
 
-    # Heuristic grouping for map tool menus
-    map_token_items = [i for i in map_menu_all if 'Token' in i or i in ('Show Portrait','Change Border Color','Resize Token')]
+    map_token_items = [i for i in map_menu_all if 'Token' in i or i in ('Show Portrait', 'Change Border Color', 'Resize Token')]
     map_shape_items = [i for i in map_menu_all if 'Shape' in i and i not in map_token_items]
 
+    accordion_sections = [
+        (
+            'Data & System',
+            'Switch between campaign databases and configure global integrations.',
+            [
+                '<b>Change Data Storage</b>: Choose which SQLite campaign file to work with.',
+                '<b>Set SwarmUI Path</b>: Point the portrait generator at your SwarmUI installation.',
+                '<b>Customize Fields</b>: Open the custom field editor (see Editor Tools).',
+            ],
+            'accordion_data_system',
+        ),
+        (
+            'Campaign Workshop',
+            'Access every entity manager from a single place.',
+            [
+                '<b>Manage Scenarios</b>: Maintain adventure outlines and summaries.',
+                '<b>Manage NPCs / PCs / Creatures</b>: Track cast members, their traits, and portraits.',
+                '<b>Manage Places, Factions, Objects, Informations, Clues, Maps</b>: Open the corresponding list view.',
+            ],
+            'accordion_campaign_workshop',
+        ),
+        (
+            'Relations & Graphs',
+            'Open visual editors to map relationships between entities.',
+            [
+                '<b>NPC / PC / Faction / Scenario Graph Editor</b>: Launch the graph workspace focused on that entity type.',
+            ],
+            'accordion_relations_graphs',
+        ),
+        (
+            'Utilities',
+            'Launch helper tools for session prep and presentation.',
+            [
+                '<b>Generate Scenario</b> and <b>AI Wizard</b>: Automate outline or content generation.',
+                '<b>Import Scenario</b>: Map external documents into campaign data.',
+                '<b>GM Screen</b> and <b>Map Tool</b>: Present scenario details or share battle maps.',
+                '<b>Export Scenarios</b> / <b>Export for Foundry</b>: Produce shareable outputs.',
+            ],
+            'accordion_utilities',
+        ),
+    ]
+
     parts = [
-        "<html><head><meta charset='utf-8'><title>GMCampaignDesigner User Manual</title>"
-        "<link rel='stylesheet' href='user-manual.css'></head><body>"
-        "<header><h1>GMCampaignDesigner — User Manual</h1></header>"
-        "<nav>"
-        "<a href='#getting-started'>Getting Started</a>"
-        "<a href='#ui-overview'>UI Overview</a>"
-        "<a href='#managing-entities'>Managing Entities</a>"
-        "<a href='#graph-editors'>Graph Editors</a>"
-        "<a href='#gm-screen'>GM Screen</a>"
-        "<a href='#scenario-tools'>Scenario Tools</a>"
-        "<a href='#map-tool'>Map Tool</a>"
-        "<a href='#context-menus'>Right-Click Menus</a>"
-        "<a href='#tips'>Tips</a>"
+        "<html><head><meta charset='utf-8'><title>GMCampaignDesigner User Manual</title>",
+        "<link rel='stylesheet' href='user-manual.css'></head><body>",
+        "<header><h1>GMCampaignDesigner User Manual</h1></header>",
+        "<nav>",
+        "<a href='#getting-started'>Getting Started</a>",
+        "<a href='#sidebar-accordion'>Sidebar Accordion</a>",
+        "<a href='#entity-managers'>Entity Managers</a>",
+        "<a href='#detail-windows'>Detail Windows</a>",
+        "<a href='#editor-tools'>Editor Tools</a>",
+        "<a href='#graph-editors'>Graph Editors</a>",
+        "<a href='#gm-screen'>GM Screen</a>",
+        "<a href='#scenario-tools'>Scenario Tools</a>",
+        "<a href='#map-tool'>Map Tool</a>",
+        "<a href='#tips'>Tips</a>",
         "</nav><div class='container'>"
     ]
 
-    parts.append(section("Getting Started",
+    parts.append(section('Getting Started',
         "<ul>"
         "<li>Launch the app: <code>python main_window.py</code>.</li>"
-        "<li>Choose or create a campaign database via the left sidebar (Change Data Storage).</li>"
+        "<li>Select or create a campaign database from <b>Data & System &rarr; Change Data Storage</b>.</li>"
         "<li>Populate PCs, NPCs, Creatures, Places, Objects, Informations, Clues, and Maps.</li>"
-        "</ul>" + img("main_window", "Main window")
+        "</ul>" + img('main_window', 'Main window overview')
     ))
 
-    parts.append(section("UI Overview",
-        "<p>The left sidebar provides quick access to tools and entity managers."
-        " Hover each icon to see its name. Click to open the corresponding manager in the main area."
-        " Use the top-right banner toggle (when available) to show PCs at a glance.</p>"
-        + "".join(img(f"entity_{k}", f"{k.title()} view") for k in [
-            "scenarios","pcs","npcs","creatures","factions","places","objects","informations","clues","maps"
-        ])
-    ))
+    accordion_html = [
+        "<p>The sidebar groups every command inside collapsible sections. Hover a blue header to expand its button grid; moving the pointer away collapses it after a short delay. The Campaign Workshop section reopens automatically when idle.</p>"
+    ]
+    for title, description, bullet_points, shot_key in accordion_sections:
+        accordion_html.append(f"<h3>{title}</h3>")
+        accordion_html.append(f"<p>{description}</p>")
+        accordion_html.append("<ul>" + ''.join(f"<li>{item}</li>" for item in bullet_points) + "</ul>")
+        accordion_html.append(img(shot_key, f"{title} section"))
+    parts.append(section('Sidebar Accordion', ''.join(accordion_html)))
 
-    # Managing Entities with right-click menu details
-    ent_menu_html = ''.join(f"<li>{i}</li>" for i in entity_menu) if entity_menu else ''
+    ent_menu_html = ''.join(f"<li>{item}</li>" for item in entity_menu) if entity_menu else ''
     clues_html = ''
     if clues_menu:
-        # Map clues menus into card/link actions
         card_actions = [i for i in clues_menu if 'Link' not in i]
         link_actions = [i for i in clues_menu if 'Link' in i]
         clues_html = (
-            "<p><b>Clues board:</b> Right-click a card for: "
-            + ", ".join(card_actions) + ". Right-click a link for: "
-            + ", ".join(link_actions) + ".</p>"
+            "<p><b>Clues board:</b> Right-click a clue card for: "
+            + ', '.join(card_actions)
+            + ". Right-click a link for: "
+            + ', '.join(link_actions)
+            + ".</p>"
         )
-    parts.append(section("Managing Entities",
-        "<p>Each list supports filtering, sorting by column, and context actions:</p>"
-        "<ul>"
-        "<li><b>Add/Edit:</b> Double-click a row or use toolbar buttons to edit details.</li>"
-        "<li><b>Duplicate/Delete:</b> Right-click a row to duplicate or delete.</li>"
-        "<li><b>Import/Export:</b> Buttons allow saving to and loading from JSON.</li>"
-        "<li><b>Columns & Fields:</b> Right-click to show/hide columns and pick which fields display.</li>"
-        "<li><b>Colors & Portraits:</b> Assign row colors; show portrait if available.</li>"
-        "</ul>"
-        + ("<p><b>Right-click menu includes:</b></p><ul>" + ent_menu_html + "</ul>" if ent_menu_html else "")
-        + img("entity_scenarios", "Scenarios List")
-        + clues_html
-    ))
 
-    # Graph Editors with right-click and shortcuts
+    entity_parts = [
+        "<p>Expand <b>Campaign Workshop</b> and click a manager button to open the list view. Each view supports column sorting, instant filtering, grouping, and rich editing:</p>",
+        "<ul>",
+        "<li><b>Quick edit:</b> Double-click a row to launch the Generic Editor window. Use the toolbar buttons to add new entries.</li>",
+        "<li><b>Right-click options:</b> Duplicate, delete, recolor rows, show portraits, export data, or send a card to the second screen." + ("<ul>" + ent_menu_html + "</ul>" if ent_menu_html else "") + "</li>",
+        "<li><b>Import/Export:</b> Use the dedicated buttons to load or save JSON, or open the AI Wizard for assisted authoring.</li>",
+        "<li><b>Second screen:</b> Display selected fields on a player-facing monitor from the context menu.</li>",
+        "</ul>",
+        clues_html,
+        ''.join(img(f"entity_{k}", f"{k.title()} manager") for k in [
+            'scenarios', 'pcs', 'npcs', 'creatures', 'factions', 'places', 'objects', 'informations', 'clues', 'maps'
+        ])
+    ]
+    entity_body = ''.join(part for part in entity_parts if part)
+    parts.append(section('Entity Managers', entity_body))
+
+    detail_body = ''.join([
+        "<p><b>EntityDetailFactory</b> renders rich detail views—used inside the GM Screen and any pop-out detail window. Select a scenario and choose <i>Open in GM Screen</i> (from the scenario list) or open the GM Screen from Utilities, then pick a tab to see the structured layout with collapsible scenes, linked NPC tables, and quick navigation.</p>",
+        "<p>The preview below shows the standalone layout with an <b>Edit</b> button that reopens the Generic Editor for the same record.</p>",
+        img('scenario_detail', 'Scenario detail view')
+    ])
+    parts.append(section('Detail Windows', detail_body))
+
+    editor_body = ''.join([
+        "<p>The <b>Generic Editor</b> window opens when you add or double-click an item. Fields are generated from the active template and include quick actions:</p>",
+        "<ul>",
+        "<li><b>Action bar:</b> Save, cancel, and scenario-aware AI buttons appear based on the entity type.</li>",
+        "<li><b>Rich text:</b> Long-form fields use the RichTextEditor with inline toolbars and AI helpers.</li>",
+        "<li><b>Linked lists:</b> Multiselect comboboxes let you associate NPCs, Places, Factions, and more.</li>",
+        "<li><b>Portraits & files:</b> Manage artwork attachments directly from the editor.</li>",
+        "</ul>",
+        img('scenario_editor', 'Generic Editor window'),
+        "<p>Use <b>Data & System &rarr; Customize Fields</b> to tailor the schema per entity. The editor below lets you add new fields, set types, and choose linked entities.</p>",
+        img('custom_fields_editor', 'Custom Fields Editor')
+    ])
+    parts.append(section('Editor Tools', editor_body))
+
     ge_node_html = ''.join(f"<li>{i}</li>" for i in node_items) if node_items else ''
     ge_link_html = ''
     if arrow_items:
-        ge_link_html = (
-            "<li><b>Arrow Mode submenu:</b> " + ", ".join(arrow_items) + "</li>"
-        )
+        ge_link_html = "<li><b>Arrow Mode submenu:</b> " + ', '.join(arrow_items) + "</li>"
     ge_shape_html = ''.join(f"<li>{i}</li>" for i in shape_items_graph) if shape_items_graph else ''
-    parts.append(section("Graph Editors",
-        "<p>Visual editors for NPCs, PCs, Factions, and Scenarios let you:</p>"
+    parts.append(section('Graph Editors',
+        "<p>Visual editors for NPCs, PCs, Factions, and Scenarios let you map relationships and story beats.</p>"
         "<ul>"
-        "<li><b>Add nodes:</b> Use dedicated add actions or double-click (where available).</li>"
-        "<li><b>Drag to move:</b> Left-click and drag nodes to arrange.</li>"
-        "<li><b>Create links:</b> Select first node, then second; enter link text when prompted.</li>"
-        "<li><b>Zoom/Pan:</b> Mouse wheel to zoom; Shift+wheel to pan horizontally.</li>"
+        "<li><b>Add nodes:</b> Use the toolbar actions or double-click (where available) to create a node.</li>"
+        "<li><b>Drag to arrange:</b> Left-click and drag nodes to reposition; mouse wheel zooms the canvas.</li>"
+        "<li><b>Create links:</b> Select a source node, then a target node, and enter link text when prompted.</li>"
         "</ul>"
         + ("<p><b>Right-click a node for:</b></p><ul>" + ge_node_html + "</ul>" if ge_node_html else "")
         + ("<p><b>Right-click a link for:</b></p><ul>" + ge_link_html + "</ul>" if ge_link_html else "")
         + ("<p><b>Right-click a shape for:</b></p><ul>" + ge_shape_html + "</ul>" if ge_shape_html else "")
-        + img("npc_graph", "NPC Graph") + img("pc_graph", "PC Graph")
-        + img("faction_graph", "Faction Graph") + img("scenario_graph", "Scenario Graph")
+        + img('npc_graph', 'NPC Graph') + img('pc_graph', 'PC Graph')
+        + img('faction_graph', 'Faction Graph') + img('scenario_graph', 'Scenario Graph')
     ))
 
-    parts.append(section("GM Screen",
-        "<p>Browse and present a scenario with a condensed GM-focused layout:</p>"
+    parts.append(section('GM Screen',
+        "<p>The GM Screen consolidates scenario prep: select a scenario to open tabs for NPCs, Places, scenes, and notes. Use <code>Ctrl+F</code> for instant search, toggle the PC banner for quick reference, and click any linked entity to open its detail frame.</p>"
+        + img('gm_screen', 'GM Screen overview')
+    ))
+
+    parts.append(section('Scenario Tools',
+        "<p>Two helpers streamline content creation:</p>"
         "<ul>"
-        "<li>Pick a scenario from the list, then drill into details.</li>"
-        "<li><b>Search:</b> Press <code>Ctrl+F</code> to open global search within GM Screen.</li>"
-        "<li><b>Banner:</b> Show PCs at the top for quick reference.</li>"
+        "<li><b>Scenario Generator:</b> Configure prompts and let the AI draft outline sections you can review and tweak.</li>"
+        "<li><b>Scenario Importer:</b> Map headings from external documents into template fields before saving.</li>"
         "</ul>"
-        + img("gm_screen", "GM Screen")
+        + img('scenario_generator', 'Scenario Generator') + img('scenario_importer', 'Scenario Importer')
     ))
 
-    parts.append(section("Scenario Tools",
-        "<p>Two helpers streamline content:</p>"
-        "<ul>"
-        "<li><b>Generator:</b> Creates scenario outlines; adjust options, then generate and refine.</li>"
-        "<li><b>Importer:</b> Parse external scenario documents and map fields before saving.</li>"
-        "</ul>"
-        + img("scenario_generator", "Scenario Generator") + img("scenario_importer", "Scenario Importer")
-    ))
-
-    # Map Tool with right-click and shortcuts
     map_tok_html = ''.join(f"<li>{i}</li>" for i in map_token_items) if map_token_items else ''
     map_shape_html = ''.join(f"<li>{i}</li>" for i in map_shape_items) if map_shape_items else ''
-    parts.append(section("Map Tool",
-        "<p>Open a separate window to display and edit maps, tokens, auras, fog, and shapes.</p>"
+    parts.append(section('Map Tool',
+
+        "<p>The Map Tool opens in its own window so you can prep encounters while the campaign lists stay visible. Use the selector view to choose or import a battle map, then switch to the editor to reveal fog, drop tokens, and broadcast to players.</p>"
+
         "<ul>"
-        "<li><b>Select a Map:</b> Choose from your maps list.</li>"
-        "<li><b>Fog of War:</b> Add/Remove/Clear/Reset fog; <code>[</code> and <code>]</code> adjust brush size; Rectangle/Circle shapes.</li>"
-        "<li><b>Tokens:</b> Add NPC/Creature/PC tokens; adjust Token Size slider.</li>"
-        "<li><b>Shapes:</b> Switch Active Tool to Rectangle or Oval; set Fill/Border colors and fill mode.</li>"
-        "<li><b>Fullscreen/Web:</b> Mirror the map to a separate window or a web client.</li>"
-        "<li><b>Context Menus:</b> Right-click tokens/shapes for actions like resize, color, z-order, copy, delete.</li>"
+
+        "<li><b>Map selector:</b> Browse the maps table, double-click to load, or right-click to import directories of images.</li>"
+
+        "<li><b>Fog of war:</b> Paint additive or subtractive fog with brush shortcuts (<code>[</code>/<code>]</code>) and reset the mask with a single click.</li>"
+
+        "<li><b>Tokens & auras:</b> Add NPC, PC, or creature tokens, colour their borders, track HP overlays, and duplicate or delete entries through the context menu.</li>"
+
+        "<li><b>Drawing tools:</b> Switch between Token, Rectangle, and Oval modes to sketch zones, spell areas, or light auras with filled/outline styles.</li>"
+
+        "<li><b>Broadcast & sync:</b> Mirror the current map to fullscreen or the web client; pan and zoom updates are pushed live.</li>"
+
         "</ul>"
+
         + ("<p><b>Token right-click includes:</b></p><ul>" + map_tok_html + "</ul>" if map_tok_html else "")
+
         + ("<p><b>Shape right-click includes:</b></p><ul>" + map_shape_html + "</ul>" if map_shape_html else "")
-        + (img("map_tool_selector", "Map Tool — Selector") if shots.get("map_tool_selector") else "")
-        + (img("map_tool_editor", "Map Tool — Editor") if shots.get("map_tool_editor") else "")
-        + (img("map_tool_rectangle", "Map Tool — Rectangle Tool") if shots.get("map_tool_rectangle") else "")
-        + (img("map_tool_oval", "Map Tool — Oval Tool") if shots.get("map_tool_oval") else "")
+
+        + (img('map_tool_selector', 'Map Tool selector') if shots.get('map_tool_selector') else '')
+
+        + (img('map_tool_map1', 'Map Tool - urban encounter') if shots.get('map_tool_map1') else '')
+
+        + (img('map_tool_map2', 'Map Tool - mystical ruins') if shots.get('map_tool_map2') else '')
+
+        + (img('map_tool_rectangle', 'Rectangle tool options') if shots.get('map_tool_rectangle') else '')
+
+        + (img('map_tool_oval', 'Oval tool options') if shots.get('map_tool_oval') else '')
+
     ))
 
-    parts.append(section("Tips",
-        "<div class='tip'><b>Screenshots:</b> This manual captures the full screen to avoid cut edges. To regenerate, run <code>python scripts/generate_docs.py</code>.</div>"
-        "<div class='tip'><b>Exporting for Foundry:</b> Use <i>Export Scenarios for Foundry</i> from the sidebar to generate a Foundry-ready export.</div>"
-        "<div class='tip'><b>Portraits:</b> Generate or associate portraits for NPCs and creatures from the sidebar tools.</div>"
+
+
+
+
+    parts.append(section('Tips',
+        "<div class='tip'><b>Screenshots:</b> Run <code>python scripts/generate_docs.py</code> to refresh this manual after UI changes.</div>"
+        "<div class='tip'><b>Exports:</b> Use <i>Export Scenarios</i> or <i>Export for Foundry</i> (Utilities section) to share content.</div>"
+        "<div class='tip'><b>Portrait workflow:</b> Generate or link portraits from the Utilities section; double-click a portrait in any list to pop it out.</div>"
     ))
 
     parts.append("</div></body></html>")
-    return "".join(parts)
+    return ''.join(parts)
+
 
 
 if __name__ == "__main__":
