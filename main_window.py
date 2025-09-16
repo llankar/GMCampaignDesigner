@@ -245,6 +245,7 @@ class MainWindow(ctk.CTk):
         sections = []  # track all sections to enforce single-open behavior
         default_title = "Campaign Workshop"
         default_meta = {"sec": None}
+        active_section = {"sec": None}
 
         def make_section(parent, title, buttons):
             sec = ctk.CTkFrame(parent)
@@ -254,10 +255,9 @@ class MainWindow(ctk.CTk):
             header.pack(fill="x")
             title_lbl = ctk.CTkLabel(header, text=title, anchor="center")
             title_lbl.pack(fill="x", pady=6)
-            state = {"open": False, "after": None}
+            state = {"open": False}
 
             body = ctk.CTkFrame(sec, fg_color="transparent")
-            # grid layout for buttons
             cols = 2
             for c in range(cols):
                 body.grid_columnconfigure(c, weight=1)
@@ -285,49 +285,28 @@ class MainWindow(ctk.CTk):
                 except Exception:
                     pass
 
-            def on_enter(_e=None):
-                # Cancel pending collapse on this section
-                if state["after"]:
-                    try:
-                        sec.after_cancel(state["after"])
-                    except Exception:
-                        pass
-                    state["after"] = None
-                # Collapse all other sections immediately to ensure only one open
-                for meta in sections:
-                    if meta["sec"] is sec:
-                        continue
-                    if meta["state"]["after"]:
-                        try:
-                            meta["sec"].after_cancel(meta["state"]["after"])
-                        except Exception:
-                            pass
-                        meta["state"]["after"] = None
-                    meta["collapse"]()
-                # Expand this section
-                expand()
+            def toggle(_event=None):
+                if state["open"]:
+                    collapse()
+                    if active_section["sec"] is sec:
+                        active_section["sec"] = None
+                else:
+                    for meta in sections:
+                        if meta["sec"] is sec:
+                            continue
+                        meta["collapse"]()
+                    expand()
+                    active_section["sec"] = sec
 
-            def on_leave(_e=None):
-                # schedule collapse to avoid flicker
-                if state["after"]:
-                    try:
-                        sec.after_cancel(state["after"])
-                    except Exception:
-                        pass
-                state["after"] = sec.after(350, collapse)
+            header.bind("<Button-1>", toggle)
+            title_lbl.bind("<Button-1>", toggle)
 
-            # Only header is visible until hover
-            collapse()
-            header.bind("<Enter>", on_enter)
-            sec.bind("<Enter>", on_enter)
-            sec.bind("<Leave>", on_leave)
-            body.bind("<Enter>", on_enter)
-            # Register section for global coordination
             sections.append({
                 "sec": sec,
                 "state": state,
                 "collapse": collapse,
                 "expand": expand,
+                "toggle": toggle,
                 "title": title,
             })
             return sec
@@ -378,28 +357,10 @@ class MainWindow(ctk.CTk):
                 default_meta = meta
                 try:
                     meta["expand"]()
+                    active_section["sec"] = meta["sec"]
                 except Exception:
                     pass
                 break
-
-        # If pointer leaves the accordion entirely, collapse all sections
-        def _collapse_all(_e=None):
-            # Collapse all, then re-open the default section so it is visible by default
-            for meta in sections:
-                if meta["state"]["after"]:
-                    try:
-                        meta["sec"].after_cancel(meta["state"]["after"])
-                    except Exception:
-                        pass
-                    meta["state"]["after"] = None
-                meta["collapse"]()
-            # Re-open default
-            if default_meta.get("expand"):
-                try:
-                    default_meta["expand"]()
-                except Exception:
-                    pass
-        container.bind("<Leave>", _collapse_all)
 
     def create_content_area(self):
         self.content_frame = ctk.CTkFrame(self.main_frame)
