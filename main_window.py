@@ -40,6 +40,7 @@ from modules.maps.controllers.display_map_controller import DisplayMapController
 from modules.generic.custom_fields_editor import CustomFieldsEditor
 
 
+from modules.dice.dice_roller_window import DiceRollerWindow
 # Set up CustomTkinter appearance
 ctk.set_appearance_mode("Dark")
 ctk.set_default_color_theme("blue")
@@ -71,6 +72,7 @@ class MainWindow(ctk.CTk):
         self.load_model_config()
         self.init_wrappers()
         self.current_gm_view = None
+        self.dice_roller_window = None
         root = self.winfo_toplevel()
         root.bind_all("<Control-f>", self._on_ctrl_f)
 
@@ -178,7 +180,8 @@ class MainWindow(ctk.CTk):
             "import_scenario": self.load_icon("import_icon.png", size=(60, 60)),
             "export_foundry": self.load_icon("export_foundry_icon.png", size=(60, 60)),
             "map_tool": self.load_icon("map_tool_icon.png", size=(60, 60)),
-            "generate_scenario": self.load_icon("generate_scenario_icon.png", size=(60, 60))
+            "generate_scenario": self.load_icon("generate_scenario_icon.png", size=(60, 60)),
+            "dice_roller": self.load_icon("dice_roller_icon.png", size=(60, 60))
         }
 
     def open_custom_fields_editor(self):
@@ -344,6 +347,7 @@ class MainWindow(ctk.CTk):
             ("generate_portraits", "Generate Portraits", self.generate_missing_portraits),
             ("associate_portraits", "Associate NPC Portraits", self.associate_npc_portraits),
             ("map_tool", "Map Tool", self.map_tool),
+            ("dice_roller", "Open Dice Roller", self.open_dice_roller),
         ]
 
         make_section(container, "Data & System", data_system)
@@ -1483,6 +1487,23 @@ class MainWindow(ctk.CTk):
         if self.current_gm_view:
             self.current_gm_view.open_global_search()
          # otherwise ignore silently
+
+    def open_dice_roller(self):
+        try:
+            window = self.dice_roller_window
+            if window is None or not window.winfo_exists():
+                self.dice_roller_window = DiceRollerWindow(self)
+                self.dice_roller_window.bind("<Destroy>", self._on_dice_window_destroyed)
+            self.dice_roller_window.show()
+        except Exception as exc:
+            messagebox.showerror("Error", f"Failed to open Dice Roller:\n{exc}")
+
+    def _on_dice_window_destroyed(self, event=None):
+        if event is None:
+            self.dice_roller_window = None
+            return
+        if event.widget is self.dice_roller_window:
+            self.dice_roller_window = None
 
     def map_tool(self):
         # 1) Wrap your 'maps' table as before
