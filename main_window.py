@@ -45,6 +45,7 @@ from modules.factions.faction_graph_editor import FactionGraphEditor
 from modules.pcs.display_pcs import display_pcs_in_banner
 from modules.generic.generic_list_selection_view import GenericListSelectionView
 from modules.maps.controllers.display_map_controller import DisplayMapController
+from modules.maps.world_map_view import WorldMapWindow
 from modules.generic.custom_fields_editor import CustomFieldsEditor
 
 
@@ -203,6 +204,7 @@ class MainWindow(ctk.CTk):
             "pc_graph": self.load_icon("pc_graph_icon.png", size=(60, 60)),
             "faction_graph": self.load_icon("faction_graph_icon.png", size=(60, 60)),
             "scenario_graph": self.load_icon("scenario_graph_icon.png", size=(60, 60)),
+            "world_map": self.load_icon("maps_icon.png", size=(60, 60)),
             "generate_portraits": self.load_icon("generate_icon.png", size=(60, 60)),
             "associate_portraits": self.load_icon("associate_icon.png", size=(60, 60)),
             "import_scenario": self.load_icon("import_icon.png", size=(60, 60)),
@@ -370,6 +372,7 @@ class MainWindow(ctk.CTk):
             ("pc_graph", "Open PC Graph Editor", self.open_pc_graph_editor),
             ("faction_graph", "Open Factions Graph Editor", self.open_faction_graph_editor),
             ("scenario_graph", "Open Scenario Graph Editor", self.open_scenario_graph_editor),
+            ("world_map", "Open World Map", self.open_world_map),
         ]
         utilities = [
             ("generate_scenario", "Generate Scenario", self.open_scenario_generator),
@@ -859,6 +862,17 @@ class MainWindow(ctk.CTk):
         self.current_open_view   = container
         self.current_open_entity = None
 
+
+    def open_world_map(self):
+        """Launch the World Map nested navigation window."""
+        log_info("Opening World Map window", func_name="main_window.MainWindow.open_world_map")
+        existing = getattr(self, "_world_map_window", None)
+        if existing and existing.winfo_exists():
+            existing.focus()
+            existing.lift()
+            return
+        window = WorldMapWindow(self)
+        self._world_map_window = window
 
     def open_scenario_graph_editor(self):
         self._graph_type = 'scenario'
