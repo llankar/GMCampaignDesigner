@@ -1,4 +1,7 @@
 import sqlite3
+from modules.helpers.logging_helper import log_module_import
+
+log_module_import(__name__)
 
 def print_db_info(db_file):
     conn = sqlite3.connect(db_file)

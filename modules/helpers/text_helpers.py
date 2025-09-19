@@ -1,5 +1,8 @@
 import html
 import re
+from modules.helpers.logging_helper import log_module_import
+
+log_module_import(__name__)
 
 def format_longtext(data, max_length=30000):
     """ Formate un champ longtext pour l'afficher dans une liste (abrégé + multi-lignes). """

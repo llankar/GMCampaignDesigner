@@ -3,6 +3,9 @@ from tkinter import ttk, messagebox
 import customtkinter as ctk
 import time
 import re
+from modules.helpers.logging_helper import log_module_import
+
+log_module_import(__name__)
 
 class GenericListSelectionView(ctk.CTkFrame):
     def __init__(self, master, entity_type, model_wrapper, template, on_select_callback=None, *args, **kwargs):

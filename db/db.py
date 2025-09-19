@@ -8,6 +8,9 @@ from shutil import copyfile
 from modules.helpers.config_helper import ConfigHelper
 from modules.helpers.template_loader import load_template, list_known_entities
 import logging
+from modules.helpers.logging_helper import log_module_import
+
+log_module_import(__name__)
 
 # Map our JSON “type” names to SQLite types
 _SQLITE_TYPE = {

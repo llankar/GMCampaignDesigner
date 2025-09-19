@@ -2,7 +2,9 @@ import json
 import os
 from modules.helpers.config_helper import ConfigHelper
 from modules.helpers.logging_helper import log_debug, log_function, log_info, log_warning
+from modules.helpers.logging_helper import log_module_import
 
+log_module_import(__name__)
 
 @log_function
 def _default_template_path(entity_name: str) -> str:

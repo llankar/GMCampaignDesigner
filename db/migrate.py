@@ -3,6 +3,9 @@ import json
 import os
 import sqlite3
 from db import get_connection, initialize_db
+from modules.helpers.logging_helper import log_module_import
+
+log_module_import(__name__)
 
 def migrate_table(json_file, table, columns):
     if not os.path.exists(json_file):

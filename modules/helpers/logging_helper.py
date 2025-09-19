@@ -4,9 +4,6 @@ import inspect
 from functools import wraps
 from typing import Any, Callable, TypeVar, cast, Optional
 
-from modules.helpers.config_helper import ConfigHelper
-
-
 F = TypeVar("F", bound=Callable[..., Any])
 
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -26,6 +23,8 @@ def _resolve_directory(directory: str) -> str:
 
 def _refresh_logger() -> logging.Logger:
     global _LOGGER, _LAST_CONFIG, _LOGGER_ENABLED, _ACTIVE_LOG_PATH
+
+    from modules.helpers.config_helper import ConfigHelper
 
     enabled = ConfigHelper.getboolean("Logging", "enabled", fallback=False)
     directory = ConfigHelper.get("Logging", "directory", fallback="logs") or "logs"
@@ -151,6 +150,12 @@ def log_exception(message: str, *, func_name: Optional[str] = None) -> None:
     logger.exception("%s - %s", name, message)
 
 
+
+
+def log_module_import(module_name: Optional[str] = None) -> None:
+    name = module_name or _determine_caller(extra_depth=1)
+    _log(logging.INFO, "module import", func_name=name)
+
 def log_function(func: F) -> F:
     @wraps(func)
     def wrapper(*args: Any, **kwargs: Any) -> Any:
@@ -208,6 +213,7 @@ __all__ = [
     "log_error",
     "log_exception",
     "log_function",
+    "log_module_import",
     "log_info",
     "log_methods",
     "log_warning",

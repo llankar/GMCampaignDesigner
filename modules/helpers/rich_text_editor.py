@@ -2,6 +2,9 @@ import customtkinter as ctk
 import tkinter as tk
 from tkinter import simpledialog, colorchooser
 from modules.helpers.custom_buttons import MinimalCTkButton  # Import de notre bouton personnalisé
+from modules.helpers.logging_helper import log_module_import
+
+log_module_import(__name__)
 
 class RichTextEditor(ctk.CTkFrame):
     def __init__(self, master, initial_text=""):

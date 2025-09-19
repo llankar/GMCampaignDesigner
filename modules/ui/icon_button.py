@@ -1,7 +1,9 @@
 import tkinter as tk
 import customtkinter as ctk
 from modules.ui.tooltip import ToolTip
+from modules.helpers.logging_helper import log_module_import
 
+log_module_import(__name__)
 
 def create_icon_button(parent, icon, tooltip_text, command):
     container = tk.Frame(parent, bg="#2B2B2B")

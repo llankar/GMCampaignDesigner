@@ -1,5 +1,7 @@
 from modules.helpers.logging_helper import log_debug, log_function
+from modules.helpers.logging_helper import log_module_import
 
+log_module_import(__name__)
 
 @log_function
 def position_window_at_top(window, width=None, height=None):

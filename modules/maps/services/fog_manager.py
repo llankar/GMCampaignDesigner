@@ -1,4 +1,7 @@
 from PIL import ImageDraw, Image, ImageTk
+from modules.helpers.logging_helper import log_module_import
+
+log_module_import(__name__)
 
 def _set_fog(self, mode):
     self.fog_mode = mode

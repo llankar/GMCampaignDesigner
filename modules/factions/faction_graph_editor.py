@@ -6,6 +6,9 @@ from tkinter import filedialog, messagebox, Menu, ttk
 from PIL import Image, ImageTk
 from modules.generic.generic_list_selection_view import GenericListSelectionView
 from modules.generic.generic_model_wrapper import GenericModelWrapper
+from modules.helpers.logging_helper import log_module_import
+
+log_module_import(__name__)
 
 ctk.set_appearance_mode("Dark")
 ctk.set_default_color_theme("blue")

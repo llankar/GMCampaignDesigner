@@ -12,15 +12,26 @@ from modules.helpers.config_helper import ConfigHelper
 from modules.scenarios.gm_screen_view import GMScreenView
 from modules.ai.authoring_wizard import AuthoringWizardView
 import shutil
+from modules.helpers.logging_helper import (
+    log_function,
+    log_info,
+    log_methods,
+    log_warning,
+    log_module_import,
+)
+
+log_module_import(__name__)
 
 PORTRAIT_FOLDER = os.path.join(ConfigHelper.get_campaign_dir(), "assets", "portraits")
 ctk.set_appearance_mode("Dark")
 ctk.set_default_color_theme("blue")
 
 
+@log_function
 def sanitize_id(s):
     return re.sub(r'[^a-zA-Z0-9]+', '_', str(s)).strip('_')
 
+@log_function
 def unique_iid(tree, base_id):
     """Return a unique iid for the given treeview based on base_id."""
     iid = base_id
@@ -30,6 +41,7 @@ def unique_iid(tree, base_id):
         iid = f"{base_id}_{counter}"
     return iid
 
+@log_methods
 class _ToolTip:
     """Simple tooltip for a Treeview showing full cell text on hover."""
     def __init__(self, widget):
@@ -80,6 +92,7 @@ class _ToolTip:
             self.tipwindow = None
             self.text = ""
 
+@log_methods
 class GenericListView(ctk.CTkFrame):
     def __init__(self, master, model_wrapper, template, *args, **kwargs):
         super().__init__(master, *args, **kwargs)
@@ -233,6 +246,7 @@ class GenericListView(ctk.CTkFrame):
         self.refresh_list()
 
     def show_portrait_window(self, iid):
+        log_info(f"Showing portrait for {self.model_wrapper.entity_type} item: {iid}", func_name="GenericListView.show_portrait_window")
         item, _ = self._find_item_by_iid(iid)
         if not item:
             messagebox.showerror("Error", "Item not found.")
@@ -242,6 +256,7 @@ class GenericListView(ctk.CTkFrame):
         show_portrait(path, title)
 
     def refresh_list(self):
+        log_info(f"Refreshing list for {self.model_wrapper.entity_type}", func_name="GenericListView.refresh_list")
         self.tree.delete(*self.tree.get_children())
         self.batch_index = 0
         self.batch_size = 50
@@ -521,6 +536,7 @@ class GenericListView(ctk.CTkFrame):
         menu.post(event.x_root, event.y_root)
 
     def display_on_second_screen(self, iid):
+        log_info(f"Displaying {self.model_wrapper.entity_type} on second screen: {iid}", func_name="GenericListView.display_on_second_screen")
         item, _ = self._find_item_by_iid(iid)
         if not item:
             return
@@ -529,6 +545,7 @@ class GenericListView(ctk.CTkFrame):
         show_entity_on_second_screen(item=item, title=title, fields=fields)
 
     def delete_item(self, iid):
+        log_info(f"Deleting {self.model_wrapper.entity_type} item: {iid}", func_name="GenericListView.delete_item")
         base_id = iid.lower()
         if base_id in self.row_colors:
             self._save_row_color(base_id, None)
@@ -541,6 +558,7 @@ class GenericListView(ctk.CTkFrame):
         self.filter_items(self.search_var.get())
 
     def open_in_gm_screen(self, iid):
+        log_info(f"Opening {self.model_wrapper.entity_type} in GM screen: {iid}", func_name="GenericListView.open_in_gm_screen")
         item = next(
             (
                 it
@@ -562,6 +580,7 @@ class GenericListView(ctk.CTkFrame):
         view.pack(fill="both", expand=True)
 
     def add_item(self):
+        log_info(f"Adding new {self.model_wrapper.entity_type} item", func_name="GenericListView.add_item")
         new = {}
         if self.open_editor(new, True):
             self.items.append(new)
@@ -570,6 +589,7 @@ class GenericListView(ctk.CTkFrame):
             self.filter_items(self.search_var.get())
 
     def open_editor(self, item, creation_mode=False):
+        log_info(f"Opening editor for {self.model_wrapper.entity_type} (creation={creation_mode})", func_name="GenericListView.open_editor")
         ed = GenericEditorWindow(
             self.master, item, self.template,
             self.model_wrapper, creation_mode
@@ -578,6 +598,7 @@ class GenericListView(ctk.CTkFrame):
         return getattr(ed, "saved", False)
 
     def filter_items(self, query):
+        log_info(f"Filtering {self.model_wrapper.entity_type} with query: {query}", func_name="GenericListView.filter_items")
         q = query.strip().lower()
         if q:
             self.filtered_items = [
@@ -589,6 +610,7 @@ class GenericListView(ctk.CTkFrame):
         self.refresh_list()
 
     def add_items(self, items):
+        log_info(f"Adding batch of {len(items)} items to {self.model_wrapper.entity_type}", func_name="GenericListView.add_items")
         added = 0
         for itm in items:
             nid = sanitize_id(str(itm.get(self.unique_field, ""))).lower()
@@ -604,6 +626,7 @@ class GenericListView(ctk.CTkFrame):
             self.filter_items(self.search_var.get())
 
     def import_map_directory(self):
+        log_info("Importing maps from directory", func_name="GenericListView.import_map_directory")
         dir_path = filedialog.askdirectory(title="Select Map Image Directory")
         if not dir_path:
             return
@@ -649,6 +672,7 @@ class GenericListView(ctk.CTkFrame):
         return os.path.join("assets/images/map_images", dest_filename)
 
     def choose_group_column(self):
+        log_info(f"Selecting group column for {self.model_wrapper.entity_type}", func_name="GenericListView.choose_group_column")
         options = ["None", self.unique_field] + [c for c in self.columns if c != self.unique_field]
         top = ctk.CTkToplevel(self)
         top.title("Group By")
@@ -684,6 +708,7 @@ class GenericListView(ctk.CTkFrame):
         top.focus_force()
 
     def open_ai_wizard(self):
+        log_info(f"Launching AI wizard for {self.model_wrapper.entity_type}", func_name="GenericListView.open_ai_wizard")
         """Open the AI Authoring Wizard in a modal window, scoped to this entity list."""
         top = ctk.CTkToplevel(self)
         top.title("AI Authoring Wizard")

@@ -17,6 +17,9 @@ import os
 import textwrap
 from modules.ui.image_viewer import show_portrait
 from modules.helpers.config_helper import ConfigHelper
+from modules.helpers.logging_helper import log_module_import
+
+log_module_import(__name__)
 
 ctk.set_appearance_mode("Dark")
 ctk.set_default_color_theme("blue")

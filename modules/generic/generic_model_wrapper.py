@@ -1,6 +1,9 @@
 import sqlite3
 import json
 from db.db import get_connection
+from modules.helpers.logging_helper import log_module_import
+
+log_module_import(__name__)
 
 class GenericModelWrapper:
     def __init__(self, entity_type):

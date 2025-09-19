@@ -5,6 +5,9 @@ import zipfile
 from tkinter import filedialog, messagebox
 from modules.generic.generic_model_wrapper import GenericModelWrapper
 from modules.helpers.config_helper import ConfigHelper
+from modules.helpers.logging_helper import log_module_import
+
+log_module_import(__name__)
 
 # Define the name for the temporary portraits folder and the relative folder name in the ZIP.
 TEMP_PORTRAIT_FOLDER = "temp_portraits"

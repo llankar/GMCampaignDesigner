@@ -6,7 +6,9 @@ import customtkinter as ctk
 
 from campaign_generator import GENERATOR_FUNCTIONS, export_to_docx
 from modules.generic.generic_model_wrapper import GenericModelWrapper
+from modules.helpers.logging_helper import log_module_import
 
+log_module_import(__name__)
 
 class ScenarioGeneratorView(ctk.CTkFrame):
     """Frame embedding the scenario generator inside the main application."""

@@ -1,7 +1,9 @@
 import tkinter as tk
 from modules.ui.image_viewer import show_portrait
 from modules.generic.generic_list_selection_view import GenericListSelectionView
+from modules.helpers.logging_helper import log_module_import
 
+log_module_import(__name__)
 
 def open_entity_picker(self, entity_type):
     """

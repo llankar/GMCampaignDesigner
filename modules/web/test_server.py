@@ -1,4 +1,8 @@
 from flask import Flask
+from modules.helpers.logging_helper import log_module_import
+
+log_module_import(__name__)
+
 app = Flask(__name__)
 
 @app.route("/")

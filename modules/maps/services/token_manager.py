@@ -8,6 +8,9 @@ from modules.ui.image_viewer import show_portrait
 import tkinter.simpledialog as sd
 import tkinter as tk
 import threading
+from modules.helpers.logging_helper import log_module_import
+
+log_module_import(__name__)
 
 def add_token(self, path, entity_type, entity_name, entity_record=None):
     img_path = path

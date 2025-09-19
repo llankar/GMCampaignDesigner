@@ -1,4 +1,7 @@
 import tkinter as tk
+from modules.helpers.logging_helper import log_module_import
+
+log_module_import(__name__)
 
 class ToolTip:
     def __init__(self, widget, text, delay=500):

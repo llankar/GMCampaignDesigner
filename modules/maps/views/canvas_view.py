@@ -1,5 +1,9 @@
 import tkinter as tk
 from PIL import ImageDraw
+from modules.helpers.logging_helper import log_module_import
+
+log_module_import(__name__)
+
 MIN_ZOOM = 0.01  # Minimum zoom level to prevent division by zero
 
 def _build_canvas(self):

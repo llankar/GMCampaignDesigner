@@ -8,6 +8,9 @@ from PIL import Image, ImageTk, ImageDraw
 from modules.helpers.config_helper import ConfigHelper
 from modules.helpers.template_loader import load_template
 from modules.generic.generic_list_selection_view import GenericListSelectionView
+from modules.helpers.logging_helper import log_module_import
+
+log_module_import(__name__)
 
 def select_map(self):
     """Show the full‐frame map selector, replacing any existing UI."""

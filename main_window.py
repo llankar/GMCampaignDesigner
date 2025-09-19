@@ -20,6 +20,7 @@ from modules.helpers.config_helper import ConfigHelper
 from modules.helpers.swarmui_helper import get_available_models
 from modules.helpers.logging_helper import (
     initialize_logging,
+    log_module_import,
     log_debug,
     log_exception,
     log_info,
@@ -50,7 +51,7 @@ from modules.generic.custom_fields_editor import CustomFieldsEditor
 from modules.dice.dice_roller_window import DiceRollerWindow
 
 initialize_logging()
-log_info("main_window module loaded", func_name="main_window")
+log_module_import(__name__)
 
 # Set up CustomTkinter appearance
 ctk.set_appearance_mode("Dark")

@@ -5,9 +5,18 @@ from PIL import Image, ImageTk
 from modules.ui.image_viewer import _get_monitors
 from modules.helpers.config_helper import ConfigHelper
 from modules.helpers.text_helpers import format_multiline_text
+from modules.helpers.logging_helper import (
+    log_function,
+    log_info,
+    log_warning,
+    log_module_import,
+)
 
+log_module_import(__name__)
 
+@log_function
 def show_entity_on_second_screen(item, title, fields):
+    log_info(f"Showing entity on second screen: {title}", func_name="show_entity_on_second_screen")
     """Open a fullscreen window on the second monitor displaying selected fields of an entity.
 
     - item: dict of entity data
@@ -16,6 +25,7 @@ def show_entity_on_second_screen(item, title, fields):
     """
     monitors = _get_monitors()
     if not monitors:
+        log_warning("No monitors available for second screen display", func_name="show_entity_on_second_screen")
         return
     target = monitors[1] if len(monitors) > 1 else monitors[0]
     sx, sy, sw, sh = target

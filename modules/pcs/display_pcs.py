@@ -1,5 +1,9 @@
 import customtkinter as ctk
 from modules.helpers.text_helpers import format_multiline_text
+from modules.helpers.logging_helper import log_module_import
+
+log_module_import(__name__)
+
 def display_pcs_in_banner(banner_frame, pcs_items):
     # Clear previous banner content
     for widget in banner_frame.winfo_children():

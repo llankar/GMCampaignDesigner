@@ -1,4 +1,4 @@
-﻿import tkinter as tk
+import tkinter as tk
 import random
 import time
 import math
@@ -17,7 +17,9 @@ except ImportError:  # pragma: no cover - scipy is listed in requirements, but f
     ConvexHull = None
 
 from modules.helpers.window_helper import position_window_at_top
+from modules.helpers.logging_helper import log_module_import
 
+log_module_import(__name__)
 
 @dataclass(frozen=True)
 class DiceModel:

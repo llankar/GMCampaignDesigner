@@ -5,6 +5,9 @@ from flask import Flask, send_file
 from werkzeug.serving import make_server
 from PIL import Image, ImageDraw
 from modules.helpers.config_helper import ConfigHelper
+from modules.helpers.logging_helper import log_module_import
+
+log_module_import(__name__)
 
 # Simple Flask app to serve the current map image
 

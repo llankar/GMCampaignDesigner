@@ -21,9 +21,19 @@ from modules.ai.local_ai_client import LocalAIClient
 import json
 from io import BytesIO
 from pathlib import Path
+from modules.helpers.logging_helper import (
+    log_function,
+    log_info,
+    log_methods,
+    log_warning,
+    log_module_import,
+)
+
+log_module_import(__name__)
 
 SWARMUI_PROCESS = None
 
+@log_methods
 class CustomDropdown(ctk.CTkToplevel):
     def __init__(self, master, options, command, width=None, max_height=300, **kwargs):
         """
@@ -126,6 +136,7 @@ class CustomDropdown(ctk.CTkToplevel):
             return
         self.destroy()
 
+@log_function
 def load_entities_list(entity_type):
     """
     Creates a model wrapper for the given entity type, fetches all
@@ -147,19 +158,25 @@ def load_entities_list(entity_type):
         print(f"Error loading {entity_type}: {e}")
         return []
 
+@log_function
 def load_factions_list():
     return load_entities_list("factions")
 
+@log_function
 def load_npcs_list():
     return load_entities_list("npcs")
+@log_function
 def load_pcs_list():
     return load_entities_list("pcs")
+@log_function
 def load_places_list():
     return load_entities_list("places")
 
+@log_function
 def load_objects_list():
     return load_entities_list("objects")
 
+@log_function
 def load_creatures_list():
     return load_entities_list("creatures")
 
@@ -183,6 +200,7 @@ Args:
     template (dict): A template defining the structure of the item
     creation_mode (bool, optional): Whether the window is in item creation mode. Defaults to False.
 """
+@log_methods
 class GenericEditorWindow(ctk.CTkToplevel):
     def __init__(self, master, item, template, model_wrapper, creation_mode=False):
         super().__init__(master)

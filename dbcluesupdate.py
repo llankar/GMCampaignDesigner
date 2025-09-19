@@ -1,5 +1,8 @@
 import json, sqlite3
 from modules.helpers.text_helpers import normalize_rtf_json
+from modules.helpers.logging_helper import log_module_import
+
+log_module_import(__name__)
 
 conn = sqlite3.connect("Dresden Files.db")
 c = conn.cursor()

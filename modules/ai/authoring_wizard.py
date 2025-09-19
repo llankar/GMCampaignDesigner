@@ -5,7 +5,9 @@ from tkinter import messagebox
 
 from modules.ai.local_ai_client import LocalAIClient
 from modules.generic.generic_model_wrapper import GenericModelWrapper
+from modules.helpers.logging_helper import log_module_import
 
+log_module_import(__name__)
 
 def _parse_json_relaxed(s: str):
     if not s:

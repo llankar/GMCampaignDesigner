@@ -1,4 +1,7 @@
 import customtkinter as ctk
+from modules.helpers.logging_helper import log_module_import
+
+log_module_import(__name__)
 
 class SelectionDialog(ctk.CTkToplevel):
     def __init__(self, master, title, label, options):

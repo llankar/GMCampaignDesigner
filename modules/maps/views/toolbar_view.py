@@ -1,6 +1,9 @@
 import tkinter as tk
 import customtkinter as ctk
 from modules.ui.icon_button import create_icon_button
+from modules.helpers.logging_helper import log_module_import
+
+log_module_import(__name__)
 
 def _build_toolbar(self):    
     # Main toolbar container that fills the width and holds the scrollable area

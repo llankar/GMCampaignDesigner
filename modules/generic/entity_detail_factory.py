@@ -11,6 +11,13 @@ import tkinter.font as tkfont
 from modules.ui.image_viewer import show_portrait
 from modules.generic.generic_editor_window import GenericEditorWindow
 from modules.helpers.config_helper import ConfigHelper
+from modules.helpers.logging_helper import (
+    log_function,
+    log_info,
+    log_module_import,
+)
+
+log_module_import(__name__)
 
 # Configure portrait size.
 PORTRAIT_SIZE = (200, 200)
@@ -25,6 +32,7 @@ wrappers = {
             "PCs": GenericModelWrapper("pcs"),
         }
 
+@log_function
 def insert_text(parent, header, content):
     label = ctk.CTkLabel(parent, text=f"{header}:", font=("Arial", 14, "bold"))
     label.pack(anchor="w", padx=10)
@@ -47,6 +55,7 @@ def insert_text(parent, header, content):
     box.configure(state="disabled")
     box.pack(fill="x", padx=10, pady=5)
 
+@log_function
 def insert_longtext(parent, header, content):
     ctk.CTkLabel(parent, text=f"{header}:", font=("Arial", 14, "bold")).pack(anchor="w", padx=10)
 
@@ -72,6 +81,7 @@ def insert_longtext(parent, header, content):
 
     box.after_idle(update_height)
 
+@log_function
 def insert_links(parent, header, items, linked_type, open_entity_callback):
     ctk.CTkLabel(parent, text=f"{header}:", font=("Arial", 14, "bold")).pack(anchor="w", padx=10)
     for item in items:
@@ -82,7 +92,9 @@ def insert_links(parent, header, items, linked_type, open_entity_callback):
             label.bind("<Button-1>", lambda event, l=linked_type, i=item: open_entity_callback(l, i))
 
 
+@log_function
 def open_entity_tab(entity_type, name, master):
+    log_info(f"Opening entity tab for {entity_type}: {name}", func_name="open_entity_tab")
     """
     Opens (or focuses) a detail window for the given entity_type/name.
     Debug prints added to trace why/when new windows are created.
@@ -139,6 +151,7 @@ def open_entity_tab(entity_type, name, master):
 
     new_window.protocol("WM_DELETE_WINDOW", _on_close)
     
+@log_function
 def unwrap_value(val):
     """
     If val is a dict with a 'text' key, return that.
@@ -150,6 +163,7 @@ def unwrap_value(val):
         return ""
     return str(val)
 
+@log_function
 def insert_npc_table(parent, header, npc_names, open_entity_callback):
     CTkLabel(parent, text=f"{header}:", font=("Arial", 14, "bold"))\
         .pack(anchor="w", padx=10, pady=(1, 2))
@@ -246,6 +260,7 @@ def insert_npc_table(parent, header, npc_names, open_entity_callback):
         # make this row expandable so portrait centers vertically
         table.grid_rowconfigure(r, weight=1)
 
+@log_function
 def insert_creature_table(parent, header, creature_names, open_entity_callback):
     CTkLabel(parent, text=f"{header}:", font=("Arial", 14, "bold")) \
         .pack(anchor="w", padx=10, pady=(1, 2))
@@ -332,6 +347,7 @@ def insert_creature_table(parent, header, creature_names, open_entity_callback):
 
         table.grid_rowconfigure(r, weight=1)
 
+@log_function
 def insert_places_table(parent, header, place_names, open_entity_callback):
     """
     Render a table of Places (excluding PlayerDisplay) with columns:
@@ -444,6 +460,7 @@ def insert_places_table(parent, header, place_names, open_entity_callback):
         # match NPC row heights
         table.grid_rowconfigure(r, weight=1)
         
+@log_function
 def insert_list_longtext(parent, header, items):
     """Insert a header + several collapsed CTkLabels, each wrapping to the parent width."""
     ctk.CTkLabel(parent, text=f"{header}:", font=("Arial", 14, "bold")) \
@@ -486,6 +503,7 @@ def insert_list_longtext(parent, header, items):
         btn.configure(command=_toggle)
         btn.pack(fill="x", expand=True)
 
+@log_function
 def create_scenario_detail_frame(entity_type, scenario_item, master, open_entity_callback=None):
     """
     Build a scrollable detail view for a scenario with:
@@ -593,6 +611,7 @@ def create_scenario_detail_frame(entity_type, scenario_item, master, open_entity
     ttk.Separator(frame, orient="horizontal").pack(fill="x", pady=10)
     return frame
 
+@log_function
 def EditWindow(self, item, template, model_wrapper, creation_mode=False, on_save=None):
     # load the full list so saves actually persist
     items = model_wrapper.load_items()
@@ -616,6 +635,7 @@ def EditWindow(self, item, template, model_wrapper, creation_mode=False, on_save
    # 2) Identify the unique key field ("Title" for scenarios, else "Name")
   
         
+@log_function
 def create_entity_detail_frame(entity_type, entity, master, open_entity_callback=None):
     """
     Routes Scenarios through our custom header/body and
@@ -722,30 +742,28 @@ def create_entity_detail_frame(entity_type, entity, master, open_entity_callback
     # Return the scrollable container so that whoever creates the window or tab gets a frame with scrollbars.
     return content_frame
 
+@log_function
 def open_entity_window(entity_type, name):
-        # Look up the entity using the wrappers dictionary.
-        wrapper = wrappers[entity_type]
-        items = wrapper.load_items()
-        key = "Title" if entity_type == "Scenarios" else "Name"
-        entity = next((i for i in items if i.get(key) == name), None)
-        if not entity:
-            messagebox.showerror("Error", f"{entity_type[:-1]} '{name}' not found.")
-            return
+    log_info(f"Opening entity window for {entity_type}: {name}", func_name="open_entity_window")
+    wrapper = wrappers[entity_type]
+    items = wrapper.load_items()
+    key = "Title" if entity_type == "Scenarios" else "Name"
+    entity = next((i for i in items if i.get(key) == name), None)
+    if not entity:
+        messagebox.showerror("Error", f"{entity_type[:-1]} '{name}' not found.")
+        return
 
-        # Create a new window.
-        new_window = ctk.CTkToplevel()
-        new_window.title(f"{entity_type[:-1]}: {name}")
-        new_window.geometry("1000x600")
-        new_window.minsize(1000, 600)
-        new_window.configure(padx=10, pady=10)
+    new_window = ctk.CTkToplevel()
+    new_window.title(f"{entity_type[:-1]}: {name}")
+    new_window.geometry("1000x600")
+    new_window.minsize(1000, 600)
+    new_window.configure(padx=10, pady=10)
 
-        # Create a scrollable container inside the new window.
-        scrollable_container = ctk.CTkScrollableFrame(new_window)
-        scrollable_container.pack(fill="both", expand=True)
+    scrollable_container = ctk.CTkScrollableFrame(new_window)
+    scrollable_container.pack(fill="both", expand=True)
 
-        # Build the detail frame and pack it into the container.
-        detail_frame = create_entity_detail_frame(
-            entity_type, entity, master=scrollable_container,
-            open_entity_callback=open_entity_window  # Pass this same callback if you want links inside to work similarly.
-        )
-        detail_frame.pack(fill="both", expand=True)
+    detail_frame = create_entity_detail_frame(
+        entity_type, entity, master=scrollable_container,
+        open_entity_callback=open_entity_window
+    )
+    detail_frame.pack(fill="both", expand=True)

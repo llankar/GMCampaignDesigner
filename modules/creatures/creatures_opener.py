@@ -4,6 +4,9 @@ from tkinter import messagebox
 from modules.generic.generic_model_wrapper import GenericModelWrapper
 from modules.helpers.template_loader import load_template
 from modules.generic.generic_editor_window import GenericEditorWindow
+from modules.helpers.logging_helper import log_module_import
+
+log_module_import(__name__)
 
 def open_creature_editor_window(creature_name):
     """

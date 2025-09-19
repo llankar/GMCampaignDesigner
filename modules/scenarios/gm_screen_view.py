@@ -16,10 +16,20 @@ from modules.scenarios.scenario_graph_editor import ScenarioGraphEditor
 from modules.generic.generic_list_selection_view import GenericListSelectionView
 from modules.helpers.config_helper import ConfigHelper
 import random
+from modules.helpers.logging_helper import (
+    log_function,
+    log_info,
+    log_methods,
+    log_warning,
+    log_module_import,
+)
+
+log_module_import(__name__)
 
 PORTRAIT_FOLDER = os.path.join(ConfigHelper.get_campaign_dir(), "assets", "portraits")
 MAX_PORTRAIT_SIZE = (64, 64)  # Thumbnail size for lists
 
+@log_methods
 class GMScreenView(ctk.CTkFrame):
     def __init__(self, master, scenario_item, *args, **kwargs):
         super().__init__(master, *args, **kwargs)
@@ -241,6 +251,7 @@ class GMScreenView(ctk.CTkFrame):
         return {"fields": fields}
 
     def add_tab(self, name, content_frame, content_factory=None):
+        log_info(f"Adding GM screen tab: {name}", func_name="GMScreenView.add_tab")
         tab_frame = ctk.CTkFrame(self.tab_bar)
         tab_frame.pack(side="left", padx=2, pady=5)
 
@@ -366,6 +377,7 @@ class GMScreenView(ctk.CTkFrame):
         self.dragging = None
 
     def toggle_detach_tab(self, name):
+        log_info(f"Toggling detach for tab: {name}", func_name="GMScreenView.toggle_detach_tab")
         if self.tabs[name]["detached"]:
             self.reattach_tab(name)
             # After reattaching, show the detach icon
@@ -376,6 +388,7 @@ class GMScreenView(ctk.CTkFrame):
             self.tabs[name]["detach_button"].configure(image=self.reattach_icon)
 
     def detach_tab(self, name):
+        log_info(f"Detaching tab: {name}", func_name="GMScreenView.detach_tab")
         print(f"[DETACH] Start detaching tab: {name}")
         if self.tabs[name].get("detached", False):
             print(f"[DETACH] Tab '{name}' is already detached.")
@@ -477,6 +490,7 @@ class GMScreenView(ctk.CTkFrame):
 
 
     def reattach_tab(self, name):
+        log_info(f"Reattaching tab: {name}", func_name="GMScreenView.reattach_tab")
         print(f"[REATTACH] Start reattaching tab: {name}")
         # If the tab isn't marked detached, skip
         if not self.tabs[name].get("detached", False):
@@ -570,6 +584,7 @@ class GMScreenView(ctk.CTkFrame):
             self.random_button.pack(side="left", padx=2, pady=5)
     
     def _add_random_entity(self):
+        log_info("Adding random entity to GM screen", func_name="GMScreenView._add_random_entity")
         """Pick a random NPC, Creature, Object, Information or Clue and open it.
         """
         types = ["NPCs", "Creatures", "Objects", "Informations", "Clues"]
@@ -589,6 +604,7 @@ class GMScreenView(ctk.CTkFrame):
         self.open_entity_tab(etype, name)
 
     def show_tab(self, name):
+        log_info(f"Showing tab: {name}", func_name="GMScreenView.show_tab")
         # Hide content for the current tab if it's not detached.
         if self.current_tab and self.current_tab in self.tabs:
             if not self.tabs[self.current_tab]["detached"]:
@@ -601,6 +617,7 @@ class GMScreenView(ctk.CTkFrame):
             self.tabs[name]["content_frame"].pack(fill="both", expand=True)
 
     def add_new_tab(self):
+        log_info("Opening entity selection for new tab", func_name="GMScreenView.add_new_tab")
         # Added "Scenario Graph Editor" to the list of options.
         options = ["Factions", "Places", "NPCs", "PCs", "Creatures","Scenarios", "Clues", "Informations","Note Tab", "NPC Graph", "PC Graph", "Scenario Graph Editor"]
         popup = ctk.CTkToplevel(self)
@@ -614,6 +631,7 @@ class GMScreenView(ctk.CTkFrame):
                         command=lambda o=option: self.open_selection_window(o, popup)).pack(pady=2)
 
     def open_selection_window(self, entity_type, popup):
+        log_info(f"Opening selection window for {entity_type}", func_name="GMScreenView.open_selection_window")
         popup.destroy()
         if entity_type == "Note Tab":
             self.add_tab(
@@ -652,6 +670,7 @@ class GMScreenView(ctk.CTkFrame):
 
 
     def open_entity_tab(self, entity_type, name):
+        log_info(f"Opening entity tab {entity_type}: {name}", func_name="GMScreenView.open_entity_tab")
         """
         Open a new tab for a specific entity with its details.
         
@@ -682,6 +701,7 @@ class GMScreenView(ctk.CTkFrame):
         )
 
     def create_scenario_graph_frame(self, master=None):
+        log_info(f"Creating scenario graph frame", func_name="GMScreenView.create_scenario_graph_frame")
         if master is None:
             master = self.content_area
         
@@ -702,6 +722,7 @@ class GMScreenView(ctk.CTkFrame):
         return frame
 
     def create_entity_frame(self, entity_type, entity, master=None):
+        log_info(f"Creating entity frame for {entity_type}: {entity.get('Name') or entity.get('Title')}", func_name="GMScreenView.create_entity_frame")
         if master is None:
             master = self.content_area
         frame = ctk.CTkFrame(master)

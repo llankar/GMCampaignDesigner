@@ -26,6 +26,9 @@ from sqlalchemy.orm import joinedload
 from modules.helpers.config_helper import ConfigHelper
 from modules.generic.generic_model_wrapper import GenericModelWrapper
 from modules.helpers.text_helpers import format_multiline_text, rtf_to_html
+from modules.helpers.logging_helper import log_module_import
+
+log_module_import(__name__)
 
 # ──────────────────────────────────────────────────────────────────────────────
 # Set up logging

@@ -1,4 +1,4 @@
-﻿import re
+import re
 import os
 import json
 import customtkinter as ctk
@@ -7,7 +7,15 @@ import threading
 from modules.helpers.text_helpers import format_longtext, ai_text_to_rtf_json
 from modules.generic.generic_model_wrapper import GenericModelWrapper
 from modules.ai.local_ai_client import LocalAIClient
+from modules.helpers.logging_helper import (
+    log_function,
+    log_info,
+    log_methods,
+    log_warning,
+    log_module_import,
+)
 
+log_module_import(__name__)
 
 # Default formatting object.
 default_formatting = {
@@ -19,6 +27,7 @@ default_formatting = {
     "right": []
 }
 
+@log_function
 def remove_emojis(text):
     emoji_pattern = re.compile("[" 
                                u"\U0001F600-\U0001F64F"  
@@ -32,6 +41,7 @@ def remove_emojis(text):
    #logging.debug("Emojis removed.")
     return cleaned
 
+@log_function
 def parse_json_relaxed(s: str):
     """Try to parse JSON from a possibly noisy AI response (module-level helper)."""
     if not s:
@@ -63,6 +73,7 @@ def parse_json_relaxed(s: str):
                 continue
     raise RuntimeError("Failed to parse JSON from AI response")
 
+@log_function
 def import_formatted_scenario(text):
     # Remove emojis.
     cleaned_text = remove_emojis(text)
@@ -224,6 +235,7 @@ def import_formatted_scenario(text):
 # CLASS: ScenarioImportWindow
 # A window that allows users to paste scenario text for import.
 # â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+@log_methods
 class ScenarioImportWindow(ctk.CTkToplevel):
     def __init__(self, master=None):
         super().__init__(master)
@@ -259,6 +271,7 @@ class ScenarioImportWindow(ctk.CTkToplevel):
         self.status_label.pack(side="right", padx=(8,0))
         
     def import_scenario(self):
+        log_info("Importing scenario from JSON", func_name="ScenarioImportWindow.import_scenario")
         scenario_text = self.scenario_textbox.get("1.0", "end-1c")
         try:
             self._set_status("Importing pasted scenario...")
@@ -275,6 +288,7 @@ class ScenarioImportWindow(ctk.CTkToplevel):
     # AI-powered PDF import
     # -------------------------
     def import_pdf_via_ai(self):
+        log_info("Importing scenario PDF via AI", func_name="ScenarioImportWindow.import_pdf_via_ai")
         try:
             pdf_path = filedialog.askopenfilename(
                 title="Select Scenario PDF",
@@ -302,6 +316,7 @@ class ScenarioImportWindow(ctk.CTkToplevel):
             messagebox.showerror("AI PDF Import Error", str(e))
 
     def ai_parse_textarea(self):
+        log_info("Parsing scenario text via AI", func_name="ScenarioImportWindow.ai_parse_textarea")
         text = self.scenario_textbox.get("1.0", "end-1c").strip()
         if not text:
             messagebox.showwarning("No Text", "Please paste scenario text first.")
@@ -343,6 +358,7 @@ class ScenarioImportWindow(ctk.CTkToplevel):
             pass
         
     def _ai_extract_and_import(self, raw_text: str, source_label: str = ""):
+        log_info(f"Running AI extraction for {source_label or 'input'}", func_name="ScenarioImportWindow._ai_extract_and_import")
         """
         Multi-phase AI extraction to improve depth, especially Scenario Summary and Scenes.
 
@@ -582,6 +598,7 @@ class ScenarioImportWindow(ctk.CTkToplevel):
         self._busy(False)
     # --- UI helpers ---
     def _set_status(self, text: str):
+        log_info(f"Import status: {message}", func_name="ScenarioImportWindow._set_status")
         def _do():
             try:
                 self.status_label.configure(text=text)

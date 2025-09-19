@@ -2,7 +2,14 @@ import customtkinter as ctk
 import tkinter as tk
 from tkinter import messagebox
 from modules.helpers.template_loader import _load_base_template, save_custom_fields, list_known_entities
+from modules.helpers.logging_helper import (
+    log_function,
+    log_info,
+    log_methods,
+    log_module_import,
+)
 
+log_module_import(__name__)
 
 FIELD_TYPES = [
     "text",
@@ -14,6 +21,7 @@ FIELD_TYPES = [
 ]
 
 
+@log_methods
 class CustomFieldsEditor(ctk.CTkToplevel):
     """UI to manage user-defined custom fields per entity.
 
@@ -100,6 +108,7 @@ class CustomFieldsEditor(ctk.CTkToplevel):
         self.destroy()
 
     def _on_entity_change(self, entity: str):
+        log_info(f"Loading custom fields for {entity}", func_name="CustomFieldsEditor._on_entity_change")
         # Load base fields
         try:
             base = _load_base_template(entity)
@@ -139,6 +148,7 @@ class CustomFieldsEditor(ctk.CTkToplevel):
             pass
 
     def _add_or_update(self):
+        log_info(f"Custom field add/update requested for {self.entity_var.get()}", func_name="CustomFieldsEditor._add_or_update")
         name = self.name_var.get().strip()
         ftype = self.type_var.get().strip() or "text"
         linked = self.linked_var.get().strip()
@@ -168,6 +178,7 @@ class CustomFieldsEditor(ctk.CTkToplevel):
         self.linked_var.set("")
 
     def _remove_selected(self):
+        log_info(f"Removing selected custom field for {self.entity_var.get()}", func_name="CustomFieldsEditor._remove_selected")
         sel = self.custom_list.curselection()
         if not sel:
             return
@@ -194,6 +205,7 @@ class CustomFieldsEditor(ctk.CTkToplevel):
         self._on_type_change()
 
     def _save_current(self):
+        log_info(f"Saving custom fields for {self.entity_var.get()}", func_name="CustomFieldsEditor._save_current")
         entity = self.entity_var.get()
         # Filter out any entries that accidentally collide with base names
         safe = [f for f in self._custom_current if str(f.get("name", "")) not in self._base_name_set]

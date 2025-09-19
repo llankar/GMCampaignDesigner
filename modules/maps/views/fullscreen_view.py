@@ -1,6 +1,9 @@
 import tkinter as tk
 from PIL import ImageTk, Image
 from screeninfo import get_monitors
+from modules.helpers.logging_helper import log_module_import
+
+log_module_import(__name__)
 
 def open_fullscreen(self):
     monitors = get_monitors()

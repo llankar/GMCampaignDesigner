@@ -1,5 +1,8 @@
 import customtkinter as ctk
 import tkinter.font as tkFont
+from modules.helpers.logging_helper import log_module_import
+
+log_module_import(__name__)
 
 class MinimalCTkButton(ctk.CTkButton):
     def __init__(self, master, text="", **kwargs):

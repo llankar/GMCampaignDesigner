@@ -88,3 +88,9 @@ class ConfigHelper:
                 cls._campaign_mtime = None
             cls._campaign_config = cfg
         return cls._campaign_config
+
+# Late import to avoid circular dependency with logging_helper
+from modules.helpers.logging_helper import log_module_import
+
+log_module_import(__name__)
+

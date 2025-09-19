@@ -5,7 +5,9 @@ import subprocess
 import tempfile
 import os
 from modules.helpers.config_helper import ConfigHelper
+from modules.helpers.logging_helper import log_module_import
 
+log_module_import(__name__)
 
 class LocalAIClient:
     """

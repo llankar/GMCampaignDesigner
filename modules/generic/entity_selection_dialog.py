@@ -5,6 +5,9 @@ from PIL import Image
 from customtkinter import CTkLabel, CTkImage
 from modules.helpers.text_helpers import format_longtext
 from modules.helpers.config_helper import ConfigHelper
+from modules.helpers.logging_helper import log_module_import
+
+log_module_import(__name__)
 
 PORTRAIT_FOLDER = os.path.join(ConfigHelper.get_campaign_dir(), "assets", "portraits")
 MAX_PORTRAIT_SIZE = (64, 64)

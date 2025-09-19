@@ -1,5 +1,8 @@
 import json
 import os
+from modules.helpers.logging_helper import log_module_import
+
+log_module_import(__name__)
 
 DATA_FILE = "informations.json"
 

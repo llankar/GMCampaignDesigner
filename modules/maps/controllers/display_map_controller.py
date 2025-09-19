@@ -21,6 +21,9 @@ from modules.helpers.template_loader import load_template
 from modules.helpers.text_helpers import format_longtext
 from modules.helpers.config_helper import ConfigHelper
 from modules.ui.image_viewer import show_portrait
+from modules.helpers.logging_helper import log_module_import
+
+log_module_import(__name__)
 
 DEFAULT_BRUSH_SIZE = 32  # px
 DEFAULT_SHAPE_WIDTH = 50

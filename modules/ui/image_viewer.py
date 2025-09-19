@@ -5,10 +5,19 @@ from ctypes import wintypes
 import tkinter as tk
 import customtkinter as ctk
 from PIL import Image, ImageTk
+from modules.helpers.logging_helper import (
+    log_function,
+    log_info,
+    log_warning,
+    log_module_import,
+)
+
+log_module_import(__name__)
 
 # max size for the popup (same as in generic_list_view)
 MAX_PORTRAIT_SIZE = (1024, 1024)
 
+@log_function
 def _get_monitors():
     """Return list of (x, y, width, height)."""
     monitors = []
@@ -25,7 +34,9 @@ def _get_monitors():
         0, 0, MonitorEnumProc(_enum), 0)
     return monitors
 
+@log_function
 def show_portrait(path, title=None):
+    log_info(f"Showing portrait: {path}", func_name="show_portrait")
     """
     Display a full‑screen CTkToplevel showing the image at `path`.
     Clicking anywhere closes the window.
@@ -35,12 +46,14 @@ def show_portrait(path, title=None):
         if os.path.exists(candidate):
             path = candidate
     if not path or not os.path.exists(path):
+        log_warning(f"Portrait path missing or invalid: {path}", func_name="show_portrait")
         tk.messagebox.showerror("Error", "No valid portrait available.")
         return
 
     try:
         img = Image.open(path)
     except Exception as e:
+        log_warning(f"Failed to load portrait {path}: {e}", func_name="show_portrait")
         tk.messagebox.showerror("Error", f"Failed to load image: {e}")
         return
 

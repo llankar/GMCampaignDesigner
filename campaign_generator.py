@@ -825,6 +825,9 @@ GENERATOR_FUNCTIONS = {
 # generated combinations to preserve the flavour of the original tables.
 
 import math
+from modules.helpers.logging_helper import log_module_import
+
+log_module_import(__name__)
 
 # Common word lists used across categories
 COMMON_ADJECTIVES = [

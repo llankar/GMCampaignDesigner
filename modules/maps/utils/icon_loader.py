@@ -1,7 +1,9 @@
 from modules.helpers.template_loader import load_template
 from PIL import Image
 import customtkinter as ctk
+from modules.helpers.logging_helper import log_module_import
 
+log_module_import(__name__)
 
 def load_icon(self, path, size=(32,32)):
     #Load & resize with PIL
