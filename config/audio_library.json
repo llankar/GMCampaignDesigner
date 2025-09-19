@@ -1,0 +1,100 @@
+{
+  "music": {
+    "categories": {
+      "Fantasy": {
+        "tracks": [
+          {
+            "id": "7e2089a10aee43b48e6ccf6353cf2c7b",
+            "name": "01. Koi! Halation THE WAR～without Freyja～",
+            "path": "D:\\Music\\Macross Δ - 1st Album - Walküre Attack! - Walküre\\01. Koi! Halation THE WAR～without Freyja～.mp3",
+            "category": "Fantasy"
+          },
+          {
+            "id": "57facf913eb947b2a22f383eeaba212d",
+            "name": "02. Ichido dakeno Koi nara",
+            "path": "D:\\Music\\Macross Δ - 1st Album - Walküre Attack! - Walküre\\02. Ichido dakeno Koi nara.mp3",
+            "category": "Fantasy"
+          },
+          {
+            "id": "f49aae5eca784e829b084dbd1449ec76",
+            "name": "03. Jiritikku♡BEGINNER",
+            "path": "D:\\Music\\Macross Δ - 1st Album - Walküre Attack! - Walküre\\03. Jiritikku♡BEGINNER.mp3",
+            "category": "Fantasy"
+          },
+          {
+            "id": "0c71a95e6f33425ab252d0dff89efbcb",
+            "name": "04. Fukakuteisei☆COSMIC MOVEMENT",
+            "path": "D:\\Music\\Macross Δ - 1st Album - Walküre Attack! - Walküre\\04. Fukakuteisei☆COSMIC MOVEMENT.mp3",
+            "category": "Fantasy"
+          },
+          {
+            "id": "37efb10b871d49e08cd9b87165a26dae",
+            "name": "05. Bokura no Senjou",
+            "path": "D:\\Music\\Macross Δ - 1st Album - Walküre Attack! - Walküre\\05. Bokura no Senjou.mp3",
+            "category": "Fantasy"
+          },
+          {
+            "id": "f611a6ecd6c54610acc632c585b079ef",
+            "name": "06. NEO STREAM",
+            "path": "D:\\Music\\Macross Δ - 1st Album - Walküre Attack! - Walküre\\06. NEO STREAM.mp3",
+            "category": "Fantasy"
+          },
+          {
+            "id": "351756cf61db48e8aa738935e5c53ba0",
+            "name": "07. AXIA～Daisuki de Daikirai～",
+            "path": "D:\\Music\\Macross Δ - 1st Album - Walküre Attack! - Walküre\\07. AXIA～Daisuki de Daikirai～.mp3",
+            "category": "Fantasy"
+          },
+          {
+            "id": "f17c940c41004d6594d4fac805f7081a",
+            "name": "08. GIRAFFE BLUES",
+            "path": "D:\\Music\\Macross Δ - 1st Album - Walküre Attack! - Walküre\\08. GIRAFFE BLUES.mp3",
+            "category": "Fantasy"
+          },
+          {
+            "id": "70eafcd310b342388e32b361b3566bcf",
+            "name": "09. Walküre Attack!",
+            "path": "D:\\Music\\Macross Δ - 1st Album - Walküre Attack! - Walküre\\09. Walküre Attack!.mp3",
+            "category": "Fantasy"
+          },
+          {
+            "id": "70d50fc4dfa443858edfce1714367806",
+            "name": "10. Rune ga Pikatto Hikattara ～Album Version～",
+            "path": "D:\\Music\\Macross Δ - 1st Album - Walküre Attack! - Walküre\\10. Rune ga Pikatto Hikattara ～Album Version～.mp3",
+            "category": "Fantasy"
+          },
+          {
+            "id": "f6ec1d266fdc4224b1960684ca5431a9",
+            "name": "11. Ikenai Border Line ～Album Version～",
+            "path": "D:\\Music\\Macross Δ - 1st Album - Walküre Attack! - Walküre\\11. Ikenai Border Line ～Album Version～.mp3",
+            "category": "Fantasy"
+          },
+          {
+            "id": "9e352f29f07d46f5a926748e407f7606",
+            "name": "12. Koi! Halation THE WAR ～Album Version～",
+            "path": "D:\\Music\\Macross Δ - 1st Album - Walküre Attack! - Walküre\\12. Koi! Halation THE WAR ～Album Version～.mp3",
+            "category": "Fantasy"
+          }
+        ],
+        "directories": [
+          "D:\\Music\\Macross Δ - 1st Album - Walküre Attack! - Walküre"
+        ]
+      }
+    },
+    "settings": {
+      "volume": 0.7884187082405344,
+      "shuffle": true,
+      "loop": true,
+      "last_directory": "D:/Music/Macross Δ - 1st Album - Walküre Attack! - Walküre"
+    }
+  },
+  "effects": {
+    "categories": {},
+    "settings": {
+      "volume": 0.75,
+      "shuffle": false,
+      "loop": false,
+      "last_directory": ""
+    }
+  }
+}

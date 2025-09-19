@@ -50,6 +50,7 @@ from modules.generic.custom_fields_editor import CustomFieldsEditor
 
 
 from modules.dice.dice_roller_window import DiceRollerWindow
+from modules.audio.sound_manager_window import SoundManagerWindow
 
 initialize_logging()
 log_module_import(__name__)
@@ -90,6 +91,7 @@ class MainWindow(ctk.CTk):
         self.init_wrappers()
         self.current_gm_view = None
         self.dice_roller_window = None
+        self.sound_manager_window = None
         root = self.winfo_toplevel()
         root.bind_all("<Control-f>", self._on_ctrl_f)
 
@@ -383,6 +385,7 @@ class MainWindow(ctk.CTk):
             ("generate_portraits", "Generate Portraits", self.generate_missing_portraits),
             ("associate_portraits", "Associate NPC Portraits", self.associate_npc_portraits),
             ("map_tool", "Map Tool", self.map_tool),
+            ("sound_manager", "Sound & Music Manager", self.open_sound_manager),
             ("dice_roller", "Open Dice Roller", self.open_dice_roller),
         ]
 
@@ -1543,6 +1546,27 @@ class MainWindow(ctk.CTk):
         if self.current_gm_view:
             self.current_gm_view.open_global_search()
          # otherwise ignore silently
+
+
+    def open_sound_manager(self):
+        try:
+            window = self.sound_manager_window
+            if window is None or not window.winfo_exists():
+                self.sound_manager_window = SoundManagerWindow(self)
+                self.sound_manager_window.bind("<Destroy>", self._on_sound_manager_destroyed)
+            else:
+                self.sound_manager_window.deiconify()
+                self.sound_manager_window.focus()
+                self.sound_manager_window.lift()
+        except Exception as exc:
+            messagebox.showerror("Error", f"Failed to open Sound & Music Manager:\n{exc}")
+
+    def _on_sound_manager_destroyed(self, event=None):
+        if event is None:
+            self.sound_manager_window = None
+            return
+        if event.widget is self.sound_manager_window:
+            self.sound_manager_window = None
 
     def open_dice_roller(self):
         try:
