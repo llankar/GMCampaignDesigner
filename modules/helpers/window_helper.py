@@ -1,3 +1,7 @@
+from modules.helpers.logging_helper import log_debug, log_function
+
+
+@log_function
 def position_window_at_top(window, width=None, height=None):
     """ Positionne une fenêtre au sommet de l'écran, centrée horizontalement.
 
@@ -19,4 +23,7 @@ def position_window_at_top(window, width=None, height=None):
     x = (screen_width - width) // 2
     y = 0  # Collé en haut de l'écran
 
-    window.geometry(f"{width}x{height}+{x}+{y}")
+    geometry = f"{width}x{height}+{x}+{y}"
+    log_debug(f"Applying geometry {geometry} on screen {screen_width}x{screen_height}",
+              func_name="modules.helpers.window_helper.position_window_at_top")
+    window.geometry(geometry)

@@ -8,7 +8,6 @@ import requests
 import shutil
 import tkinter as tk
 from tkinter import filedialog, messagebox, Toplevel, Listbox, MULTIPLE, PhotoImage, simpledialog
-import logging
 
 import customtkinter as ctk
 from PIL import Image, ImageTk
@@ -19,6 +18,14 @@ from modules.helpers.window_helper import position_window_at_top
 from modules.helpers.template_loader import load_template
 from modules.helpers.config_helper import ConfigHelper
 from modules.helpers.swarmui_helper import get_available_models
+from modules.helpers.logging_helper import (
+    initialize_logging,
+    log_debug,
+    log_exception,
+    log_info,
+    log_methods,
+    log_warning,
+)
 from modules.ui.tooltip import ToolTip
 from modules.ui.icon_button import create_icon_button
 
@@ -41,6 +48,10 @@ from modules.generic.custom_fields_editor import CustomFieldsEditor
 
 
 from modules.dice.dice_roller_window import DiceRollerWindow
+
+initialize_logging()
+log_info("main_window module loaded", func_name="main_window")
+
 # Set up CustomTkinter appearance
 ctk.set_appearance_mode("Dark")
 ctk.set_default_color_theme("blue")
@@ -51,9 +62,12 @@ SWARMUI_PROCESS = None
 #logging.basicConfig(level=logging.DEBUG, format='%(levelname)s: %(message)s')
 
 
+@log_methods
 class MainWindow(ctk.CTk):
     def __init__(self):
         super().__init__()
+
+        log_info("Initializing MainWindow", func_name="main_window.MainWindow.__init__")
 
         self.title("GMCampaignDesigner")
         self.geometry("1920x980")
@@ -62,6 +76,7 @@ class MainWindow(ctk.CTk):
         self.current_open_view   = None
         self.current_open_entity = None    # ← initialize here to avoid AttributeError
         initialize_db()
+        log_info("Database initialization complete", func_name="main_window.MainWindow.__init__")
         position_window_at_top(self)
         self.set_window_icon()
         self.create_layout()
@@ -77,6 +92,7 @@ class MainWindow(ctk.CTk):
         root.bind_all("<Control-f>", self._on_ctrl_f)
 
     def open_ai_settings(self):
+        log_info("Opening AI settings dialog", func_name="main_window.MainWindow.open_ai_settings")
         top = ctk.CTkToplevel(self)
         top.title("AI Settings")
         top.geometry("520x360")
@@ -120,6 +136,8 @@ class MainWindow(ctk.CTk):
                 _ = float(v_temp.get())
                 _ = int(v_max.get())
             except Exception:
+                log_warning("Rejected AI settings save due to invalid numeric values",
+                            func_name="main_window.MainWindow.open_ai_settings.save")
                 messagebox.showerror("Invalid Values", "Temperature must be a float and Max Tokens an integer.")
                 return
             ConfigHelper.set("AI", "base_url", v_base.get().strip())
@@ -127,6 +145,10 @@ class MainWindow(ctk.CTk):
             ConfigHelper.set("AI", "temperature", v_temp.get().strip())
             ConfigHelper.set("AI", "max_tokens", v_max.get().strip())
             ConfigHelper.set("AI", "api_key", v_key.get())
+            log_info(
+                "AI settings saved",
+                func_name="main_window.MainWindow.open_ai_settings.save",
+            )
             messagebox.showinfo("Saved", "AI settings saved.")
 
         def reset_defaults():
@@ -135,6 +157,10 @@ class MainWindow(ctk.CTk):
             v_temp.set("0.7")
             v_max.set("512")
             v_key.set("")
+            log_info(
+                "AI settings reset to defaults",
+                func_name="main_window.MainWindow.open_ai_settings.reset_defaults",
+            )
 
         ctk.CTkButton(btns, text="Save", command=save).pack(side="right", padx=6)
         ctk.CTkButton(btns, text="Defaults", command=reset_defaults).pack(side="right", padx=6)
@@ -155,6 +181,7 @@ class MainWindow(ctk.CTk):
         self.main_frame.pack(fill="both", expand=True)
 
     def load_icons(self):
+        log_debug("Loading sidebar icons", func_name="main_window.MainWindow.load_icons")
         self.icons = {
             "change_db": self.load_icon("database_icon.png", size=(60, 60)),
             "swarm_path": self.load_icon("folder_icon.png", size=(60, 60)),
@@ -186,10 +213,13 @@ class MainWindow(ctk.CTk):
 
     def open_custom_fields_editor(self):
         try:
+            log_info("Opening Custom Fields Editor", func_name="main_window.MainWindow.open_custom_fields_editor")
             top = CustomFieldsEditor(self)
             top.transient(self)
             top.lift(); top.focus_force()
         except Exception as e:
+            log_exception(f"Failed to open Custom Fields Editor: {e}",
+                          func_name="main_window.MainWindow.open_custom_fields_editor")
             messagebox.showerror("Error", f"Failed to open Custom Fields Editor:\n{e}")
 
     def load_icon(self, file_name, size=(60, 60)):
@@ -197,8 +227,10 @@ class MainWindow(ctk.CTk):
         try:
             pil_image = Image.open(path)
         except Exception as e:
-            #logging.error("Error loading %s: %s", path, e)
+            log_warning(f"Unable to load icon {file_name}: {e}",
+                        func_name="main_window.MainWindow.load_icon")
             return None
+        log_debug(f"Loaded icon {file_name}", func_name="main_window.MainWindow.load_icon")
         return ctk.CTkImage(light_image=pil_image, dark_image=pil_image, size=size)
 
     def create_sidebar(self):
@@ -566,6 +598,14 @@ class MainWindow(ctk.CTk):
         self.models_path = ConfigHelper.get("Paths", "models_path",
                                             fallback=r"E:\SwarmUI\SwarmUI\Models\Stable-diffusion")
         self.model_options = get_available_models()
+        log_debug(
+            f"Models path resolved to {self.models_path}",
+            func_name="main_window.MainWindow.load_model_config",
+        )
+        log_info(
+            f"Loaded {len(self.model_options)} available AI models",
+            func_name="main_window.MainWindow.load_model_config",
+        )
 
     def init_wrappers(self):
         self.place_wrapper = GenericModelWrapper("places")
@@ -577,6 +617,7 @@ class MainWindow(ctk.CTk):
         self.clues_wrapper = GenericModelWrapper("clues")
         self.informations_wrapper = GenericModelWrapper("informations")
         self.maps_wrapper = GenericModelWrapper("maps")
+        log_info("Entity wrappers initialized", func_name="main_window.MainWindow.init_wrappers")
 
     def open_faction_graph_editor(self):
         self._graph_type = 'faction'
