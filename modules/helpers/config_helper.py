@@ -38,6 +38,15 @@ class ConfigHelper:
             print(f"Config error: [{section}] {key} â€” {e}")
             return fallback
 
+    @classmethod
+    def getboolean(cls, section, key, fallback=False):
+        cls.load_config()
+        try:
+            return cls._config.getboolean(section, key, fallback=fallback)
+        except Exception as e:
+            print(f"Config error: [{section}] {key} â€” {e}")
+            return fallback
+
     def set(section, key, value, file_path="config/config.ini"):
         config = configparser.ConfigParser()
         if os.path.exists(file_path):

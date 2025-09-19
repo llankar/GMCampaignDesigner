@@ -1,29 +1,35 @@
 import json
 import os
 from modules.helpers.config_helper import ConfigHelper
+from modules.helpers.logging_helper import log_debug, log_function, log_info, log_warning
 
 
+@log_function
 def _default_template_path(entity_name: str) -> str:
     return os.path.join("modules", entity_name, f"{entity_name}_template.json")
 
 
+@log_function
 def _campaign_template_path(entity_name: str) -> str:
     camp = ConfigHelper.get_campaign_dir()
     return os.path.join(camp, "templates", f"{entity_name}_template.json")
 
 
+@log_function
 def _template_path(entity_name: str) -> str:
     """Prefer campaign-local template if it exists, else fall back to defaults."""
     camp_path = _campaign_template_path(entity_name)
     return camp_path if os.path.exists(camp_path) else _default_template_path(entity_name)
 
 
+@log_function
 def _load_base_template(entity_name: str) -> dict:
     """Load the current template JSON (campaign-local if present)."""
     with open(_template_path(entity_name), "r", encoding="utf-8") as f:
         return json.load(f)
 
 
+@log_function
 def load_template(entity_name: str) -> dict:
     """Load template and return merged fields (fields + custom_fields if present).
 
@@ -46,11 +52,18 @@ def load_template(entity_name: str) -> dict:
             if ftype in ("list", "list_longtext") and fld.get("linked_type"):
                 out["linked_type"] = str(fld.get("linked_type"))
             merged.append(out)
-        except Exception:
+        except Exception as exc:
+            log_warning(f"Skipping invalid custom field for {entity_name}: {exc}",
+                        func_name="modules.helpers.template_loader.load_template")
             continue
+    log_info(
+        f"Loaded template '{entity_name}' with {len(merged)} fields",
+        func_name="modules.helpers.template_loader.load_template",
+    )
     return {"fields": merged}
 
 
+@log_function
 def save_custom_fields(entity_name: str, fields: list):
     """Write custom fields into the entity template file under "custom_fields" key.
 
@@ -98,8 +111,13 @@ def save_custom_fields(entity_name: str, fields: list):
     final_text = "\n".join(out)
     with open(path, "w", encoding="utf-8") as f:
         f.write(final_text)
+    log_info(
+        f"Saved {len(custom_list)} custom fields for '{entity_name}'",
+        func_name="modules.helpers.template_loader.save_custom_fields",
+    )
 
 
+@log_function
 def list_known_entities() -> list:
     root = os.path.join("modules")
     out = []
@@ -108,6 +126,11 @@ def list_known_entities() -> list:
             tpl = os.path.join(root, name, f"{name}_template.json")
             if os.path.isfile(tpl):
                 out.append(name)
-    except Exception:
-        pass
+    except Exception as exc:
+        log_warning(f"Unable to list entities: {exc}",
+                    func_name="modules.helpers.template_loader.list_known_entities")
+    log_debug(
+        f"Discovered {len(out)} entity templates",
+        func_name="modules.helpers.template_loader.list_known_entities",
+    )
     return sorted(out)
