@@ -293,6 +293,16 @@ class SoundManagerWindow(ctk.CTkToplevel):
         for section, player in self.players.items():
             player.add_listener(lambda event, payload, s=section: self._dispatch_player_event(s, event, payload))
 
+    def show(self) -> None:
+        try:
+            self.deiconify()
+            self.lift()
+            self.focus_force()
+            self.attributes("-topmost", True)
+            self.after(400, lambda: self.attributes("-topmost", False))
+        except Exception:
+            pass
+
     def _dispatch_player_event(self, section: str, event: str, payload: dict[str, Any]) -> None:
         try:
             self.after(0, self._handle_player_event, section, event, payload)

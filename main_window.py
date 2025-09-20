@@ -1554,10 +1554,7 @@ class MainWindow(ctk.CTk):
             if window is None or not window.winfo_exists():
                 self.sound_manager_window = SoundManagerWindow(self)
                 self.sound_manager_window.bind("<Destroy>", self._on_sound_manager_destroyed)
-            else:
-                self.sound_manager_window.deiconify()
-                self.sound_manager_window.focus()
-                self.sound_manager_window.lift()
+            self.sound_manager_window.show()
         except Exception as exc:
             messagebox.showerror("Error", f"Failed to open Sound & Music Manager:\n{exc}")
 
