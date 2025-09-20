@@ -50,6 +50,8 @@ from modules.generic.custom_fields_editor import CustomFieldsEditor
 
 
 from modules.dice.dice_roller_window import DiceRollerWindow
+from modules.audio.audio_bar_window import AudioBarWindow
+from modules.audio.audio_controller import get_audio_controller
 from modules.audio.sound_manager_window import SoundManagerWindow
 
 initialize_logging()
@@ -91,9 +93,13 @@ class MainWindow(ctk.CTk):
         self.init_wrappers()
         self.current_gm_view = None
         self.dice_roller_window = None
+        self.audio_controller = get_audio_controller()
         self.sound_manager_window = None
+        self.audio_bar_window = None
         root = self.winfo_toplevel()
         root.bind_all("<Control-f>", self._on_ctrl_f)
+
+        self.after(400, self.open_audio_bar)
 
     def open_ai_settings(self):
         log_info("Opening AI settings dialog", func_name="main_window.MainWindow.open_ai_settings")
@@ -215,6 +221,7 @@ class MainWindow(ctk.CTk):
             "generate_scenario": self.load_icon("generate_scenario_icon.png", size=(60, 60)),
             "dice_roller": self.load_icon("dice_roller_icon.png", size=(60, 60)),
             "sound_manager": self.load_icon("sound_manager_icon.png", size=(60, 60)),
+            "audio_controls": self.load_icon("sound_manager_icon.png", size=(60, 60)),
         }
 
     def open_custom_fields_editor(self):
@@ -387,6 +394,7 @@ class MainWindow(ctk.CTk):
             ("associate_portraits", "Associate NPC Portraits", self.associate_npc_portraits),
             ("map_tool", "Map Tool", self.map_tool),
             ("sound_manager", "Sound & Music Manager", self.open_sound_manager),
+            ("audio_controls", "Audio Controls Bar", self.open_audio_bar),
             ("dice_roller", "Open Dice Roller", self.open_dice_roller),
         ]
 
@@ -1549,13 +1557,35 @@ class MainWindow(ctk.CTk):
          # otherwise ignore silently
 
 
+    def open_audio_bar(self):
+        try:
+            window = self.audio_bar_window
+        except AttributeError:
+            window = None
+        try:
+            if window is None or not window.winfo_exists():
+                self.audio_bar_window = AudioBarWindow(self, controller=self.audio_controller)
+                self.audio_bar_window.bind("<Destroy>", self._on_audio_bar_destroyed)
+                window = self.audio_bar_window
+            window.show()
+        except Exception as exc:
+            messagebox.showerror("Error", f"Failed to open Audio Controls Bar:\n{exc}")
+
+    def _on_audio_bar_destroyed(self, event=None):
+        if event is None or event.widget is self.audio_bar_window:
+            self.audio_bar_window = None
+
     def open_sound_manager(self):
         try:
             window = self.sound_manager_window
+        except AttributeError:
+            window = None
+        try:
             if window is None or not window.winfo_exists():
-                self.sound_manager_window = SoundManagerWindow(self)
+                self.sound_manager_window = SoundManagerWindow(self, controller=self.audio_controller)
                 self.sound_manager_window.bind("<Destroy>", self._on_sound_manager_destroyed)
-            self.sound_manager_window.show()
+                window = self.sound_manager_window
+            window.show()
         except Exception as exc:
             messagebox.showerror("Error", f"Failed to open Sound & Music Manager:\n{exc}")
 

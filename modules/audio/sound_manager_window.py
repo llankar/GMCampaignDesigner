@@ -5,8 +5,9 @@ from tkinter import filedialog, messagebox, simpledialog
 import customtkinter as ctk
 from typing import Any
 
-from modules.audio.audio_library import AudioLibrary, AUDIO_EXTENSIONS
-from modules.audio.audio_player import AudioPlayer
+from modules.audio.audio_library import AUDIO_EXTENSIONS
+from modules.audio.audio_controller import AudioController, get_audio_controller
+from modules.audio.audio_constants import SECTION_TITLES
 from modules.helpers.window_helper import position_window_at_top
 from modules.helpers.logging_helper import log_exception, log_module_import
 
@@ -17,33 +18,31 @@ AUDIO_FILE_TYPES = [
     ("All Files", "*.*"),
 ]
 
-SECTION_TITLES = {
-    "music": "Music",
-    "effects": "Sound Effects",
-}
-
-
 class SoundManagerWindow(ctk.CTkToplevel):
     """Utility window for organizing and playing music and sound effects."""
 
-    def __init__(self, master: tk.Misc | None = None) -> None:
+    def __init__(
+        self,
+        master: tk.Misc | None = None,
+        *,
+        controller: AudioController | None = None,
+    ) -> None:
         super().__init__(master)
         self.title("Sound & Music Manager")
         self.geometry("1200x900")
         self.minsize(1200, 900)
         self.resizable(True, True)
 
-        self.library = AudioLibrary()
-        self.players = {
-            "music": AudioPlayer(),
-            "effects": AudioPlayer(),
-        }
+        self.controller = controller or get_audio_controller()
+        self.library = self.controller.library
         self.sections: dict[str, dict[str, Any]] = {}
+        self._controller_listener: Any | None = None
 
         self._build_ui()
-        self._register_player_callbacks()
+        self._register_controller_callbacks()
         position_window_at_top(self, width=1100, height=720)
         self.protocol("WM_DELETE_WINDOW", self._on_close)
+        self.bind("<Destroy>", self._on_destroy_event)
 
     def _build_ui(self) -> None:
         self.grid_columnconfigure(0, weight=1)
@@ -216,7 +215,11 @@ class SoundManagerWindow(ctk.CTkToplevel):
         )
         next_btn.grid(row=0, column=3, padx=6, pady=(6, 6))
 
-        shuffle_var = tk.BooleanVar(value=bool(self.library.get_setting(section, "shuffle", False)))
+        controller_state = self.controller.get_state(section)
+        shuffle_initial = bool(
+            controller_state.get("shuffle") if controller_state else self.library.get_setting(section, "shuffle", False)
+        )
+        shuffle_var = tk.BooleanVar(value=shuffle_initial)
         shuffle_cb = ctk.CTkCheckBox(
             playback_frame,
             text="Shuffle",
@@ -225,7 +228,10 @@ class SoundManagerWindow(ctk.CTkToplevel):
         )
         shuffle_cb.grid(row=0, column=4, padx=6, pady=(6, 6))
 
-        loop_var = tk.BooleanVar(value=bool(self.library.get_setting(section, "loop", False)))
+        loop_initial = bool(
+            controller_state.get("loop") if controller_state else self.library.get_setting(section, "loop", False)
+        )
+        loop_var = tk.BooleanVar(value=loop_initial)
         loop_cb = ctk.CTkCheckBox(
             playback_frame,
             text="Loop",
@@ -248,15 +254,38 @@ class SoundManagerWindow(ctk.CTkToplevel):
         )
         volume_slider.grid(row=0, column=1, sticky="ew", padx=(0, 8), pady=(8, 6))
 
-        volume_value_var = tk.StringVar(value="100%")
+        volume_initial = float(
+            controller_state.get("volume") if controller_state else self.library.get_setting(section, "volume", 0.8)
+        )
+        volume_slider.set(volume_initial * 100)
+        volume_value_var = tk.StringVar(value=f"{int(volume_initial * 100)}%")
         volume_value = ctk.CTkLabel(volume_frame, textvariable=volume_value_var, width=60)
         volume_value.grid(row=0, column=2, sticky="e", padx=(0, 8), pady=(8, 6))
 
-        status_var = tk.StringVar(value="")
+        status_text = ""
+        if controller_state:
+            track_for_status = controller_state.get("current_track") or {}
+            if controller_state.get("last_error"):
+                status_text = f"Error: {controller_state.get('last_error')}"
+            elif controller_state.get("is_playing") and track_for_status:
+                name = track_for_status.get("name") or os.path.basename(track_for_status.get("path", ""))
+                status_text = f"Playing '{name}'."
+            elif track_for_status:
+                status_text = "Playback paused."
+        status_var = tk.StringVar(value=status_text)
         status_label = ctk.CTkLabel(tracks_frame, textvariable=status_var, anchor="w")
         status_label.grid(row=5, column=0, columnspan=2, sticky="ew", padx=8, pady=(0, 4))
 
-        now_playing_var = tk.StringVar(value="")
+        now_playing_text = ""
+        if controller_state:
+            track = controller_state.get("current_track") or {}
+            if controller_state.get("is_playing") and track:
+                name = track.get("name") or os.path.basename(track.get("path", ""))
+                now_playing_text = f"Now playing: {name}"
+            elif track:
+                name = track.get("name") or os.path.basename(track.get("path", ""))
+                now_playing_text = f"Last track: {name}"
+        now_playing_var = tk.StringVar(value=now_playing_text)
         now_playing_label = ctk.CTkLabel(
             tracks_frame,
             textvariable=now_playing_var,
@@ -266,13 +295,6 @@ class SoundManagerWindow(ctk.CTkToplevel):
         now_playing_label.grid(row=6, column=0, columnspan=2, sticky="ew", padx=8, pady=(0, 12))
         category_list.bind("<<ListboxSelect>>", lambda _evt, s=section: self._on_category_selected(s))
         track_list.bind("<Double-Button-1>", lambda _evt, s=section: self._play_selected(s))
-
-        initial_volume = float(self.library.get_setting(section, "volume", 0.8))
-        volume_slider.set(initial_volume * 100)
-        volume_value_var.set(f"{int(initial_volume * 100)}%")
-        self.players[section].set_volume(initial_volume)
-        self.players[section].set_shuffle(shuffle_var.get())
-        self.players[section].set_loop(loop_var.get())
 
         state: dict[str, Any] = {
             "container": container,
@@ -289,9 +311,23 @@ class SoundManagerWindow(ctk.CTkToplevel):
             "current_category": None,
         }
         return state
-    def _register_player_callbacks(self) -> None:
-        for section, player in self.players.items():
-            player.add_listener(lambda event, payload, s=section: self._dispatch_player_event(s, event, payload))
+    def _register_controller_callbacks(self) -> None:
+        if self._controller_listener is not None:
+            return
+        self._controller_listener = (
+            lambda section, event, payload: self._dispatch_controller_event(section, event, payload)
+        )
+        self.controller.add_listener(self._controller_listener)
+
+    def _detach_controller_listener(self) -> None:
+        if self._controller_listener is None:
+            return
+        self.controller.remove_listener(self._controller_listener)
+        self._controller_listener = None
+
+    def _on_destroy_event(self, event: tk.Event) -> None:  # pragma: no cover - UI callback
+        if event.widget is self:
+            self._detach_controller_listener()
 
     def show(self) -> None:
         try:
@@ -303,16 +339,16 @@ class SoundManagerWindow(ctk.CTkToplevel):
         except Exception:
             pass
 
-    def _dispatch_player_event(self, section: str, event: str, payload: dict[str, Any]) -> None:
+    def _dispatch_controller_event(self, section: str, event: str, payload: dict[str, Any]) -> None:
         try:
-            self.after(0, self._handle_player_event, section, event, payload)
+            self.after(0, self._handle_controller_event, section, event, payload)
         except Exception as exc:  # pragma: no cover - defensive
             log_exception(
-                f"SoundManagerWindow._dispatch_player_event - failed to schedule event: {exc}",
-                func_name="SoundManagerWindow._dispatch_player_event",
+                f"SoundManagerWindow._dispatch_controller_event - failed to schedule event: {exc}",
+                func_name="SoundManagerWindow._dispatch_controller_event",
             )
 
-    def _handle_player_event(self, section: str, event: str, payload: dict[str, Any]) -> None:
+    def _handle_controller_event(self, section: str, event: str, payload: dict[str, Any]) -> None:
         state = self.sections.get(section)
         if not state:
             return
@@ -321,17 +357,80 @@ class SoundManagerWindow(ctk.CTkToplevel):
             name = track.get("name") or os.path.basename(track.get("path", ""))
             state["now_playing_var"].set(f"Now playing: {name}")
             self._highlight_track(section, track.get("id"))
+            state["status_var"].set(f"Playing '{name}'.")
         elif event == "error":
             message = payload.get("message") or "Playback failed."
             state["status_var"].set(f"Error: {message}")
         elif event == "stopped":
             state["now_playing_var"].set("")
+            state["status_var"].set("Playback stopped.")
         elif event == "playlist_ended":
             state["now_playing_var"].set("Playlist finished")
+            state["status_var"].set("Playlist finished.")
         elif event == "volume_changed":
             value = payload.get("value", 0.0)
             state["volume_slider"].set(float(value) * 100)
             state["volume_value_var"].set(f"{int(float(value) * 100)}%")
+        elif event == "shuffle_changed":
+            state["shuffle_var"].set(bool(payload.get("value")))
+        elif event == "loop_changed":
+            state["loop_var"].set(bool(payload.get("value")))
+        elif event == "state_changed":
+            data = payload.get("state")
+            if isinstance(data, dict):
+                self._apply_controller_state(section, data)
+        elif event in {"play_failed", "navigation_failed"}:
+            message = payload.get("message") or self.controller.get_last_error(section)
+            if message:
+                state["status_var"].set(f"Error: {message}")
+
+    def _apply_controller_state(self, section: str, data: dict[str, Any]) -> None:
+        state = self.sections.get(section)
+        if not state:
+            return
+
+        if "volume" in data:
+            try:
+                value = float(data.get("volume", 0.0))
+            except (TypeError, ValueError):
+                value = 0.0
+            state["volume_slider"].set(value * 100)
+            state["volume_value_var"].set(f"{int(value * 100)}%")
+
+        if "shuffle" in data:
+            state["shuffle_var"].set(bool(data.get("shuffle")))
+        if "loop" in data:
+            state["loop_var"].set(bool(data.get("loop")))
+
+        category = data.get("category")
+        if isinstance(category, str) and category:
+            current = state.get("current_category")
+            if current != category:
+                categories = self.library.get_categories(section)
+                if category in categories:
+                    index = categories.index(category)
+                    listbox = state["category_list"]
+                    listbox.select_clear(0, "end")
+                    listbox.select_set(index)
+                    listbox.see(index)
+                    state["current_category"] = category
+                    self._refresh_tracks(section)
+
+        track = data.get("current_track") or {}
+        last_error = data.get("last_error", "")
+        name = track.get("name") or os.path.basename(track.get("path", ""))
+        if track:
+            if data.get("is_playing"):
+                state["now_playing_var"].set(f"Now playing: {name}")
+                state["status_var"].set(f"Playing '{name}'.")
+            elif not state["now_playing_var"].get():
+                state["now_playing_var"].set(f"Last track: {name}")
+            self._highlight_track(section, track.get("id"))
+        elif not data.get("is_playing"):
+            state["now_playing_var"].set("")
+
+        if last_error:
+            state["status_var"].set(f"Error: {last_error}")
 
     def _highlight_track(self, section: str, track_id: str | None) -> None:
         if not track_id:
@@ -582,60 +681,52 @@ class SoundManagerWindow(ctk.CTkToplevel):
             return
         selection = state["track_list"].curselection()
         index = selection[0] if selection else 0
-        player = self.players[section]
-        player.set_playlist(list(tracks))
-        if player.play(start_index=index):
+        self.controller.set_playlist(section, list(tracks), category=category)
+        if self.controller.play(section, start_index=index):
             track = tracks[index]
             name = track.get("name") or os.path.basename(track.get("path", ""))
             self._set_status(section, f"Playing '{name}'.")
         else:
-            details = player.last_error or "Failed to start playback."
+            details = self.controller.get_last_error(section) or "Failed to start playback."
             state["status_var"].set(f"Error: {details}")
             messagebox.showerror("Playback", f"Failed to start playback:\n{details}", parent=self)
 
     def _next_track(self, section: str) -> None:
-        if self.players[section].next():
+        if self.controller.next(section):
             self._set_status(section, "Skipped to next track.")
         else:
             self._set_status(section, "No next track available.")
 
     def _previous_track(self, section: str) -> None:
-        if self.players[section].previous():
+        if self.controller.previous(section):
             self._set_status(section, "Returned to previous track.")
         else:
             self._set_status(section, "No previous track available.")
 
     def _stop_player(self, section: str) -> None:
-        self.players[section].stop()
+        self.controller.stop(section)
         self._set_status(section, "Playback stopped.")
 
     def _toggle_shuffle(self, section: str) -> None:
         state = self._get_state(section)
         value = bool(state["shuffle_var"].get())
-        self.players[section].set_shuffle(value)
-        self.library.set_setting(section, "shuffle", value)
+        self.controller.set_shuffle(section, value)
         self._set_status(section, f"Shuffle {'enabled' if value else 'disabled'}.")
 
     def _toggle_loop(self, section: str) -> None:
         state = self._get_state(section)
         value = bool(state["loop_var"].get())
-        self.players[section].set_loop(value)
-        self.library.set_setting(section, "loop", value)
+        self.controller.set_loop(section, value)
         self._set_status(section, f"Loop {'enabled' if value else 'disabled'}.")
 
     def _on_volume_change(self, section: str, value: float) -> None:
         state = self._get_state(section)
         normalized = max(0.0, min(float(value) / 100.0, 1.0))
         state["volume_value_var"].set(f"{int(normalized * 100)}%")
-        self.players[section].set_volume(normalized)
-        self.library.set_setting(section, "volume", normalized)
+        self.controller.set_volume(section, normalized)
 
     def _on_close(self) -> None:
-        for player in self.players.values():
-            try:
-                player.stop()
-            except Exception:
-                pass
+        self._detach_controller_listener()
         self.destroy()
 
 
