@@ -84,6 +84,11 @@ class AudioController:
             state["playlist"] = list(playlist)
             state["category"] = category
             state["last_error"] = ""
+            if not self._track_in_playlist(state.get("current_track"), playlist):
+                state["current_track"] = None
+                state["is_playing"] = False
+            if not self._track_in_playlist(state.get("last_track"), playlist):
+                state["last_track"] = None
         self._emit("playlist_set", section, playlist=list(playlist), category=category)
         self._emit("state_changed", section, state=self.get_state(section))
 
@@ -166,6 +171,7 @@ class AudioController:
             "loop": loop,
             "is_playing": False,
             "current_track": None,
+            "last_track": None,
             "playlist": [],
             "category": None,
             "last_error": "",
@@ -176,6 +182,19 @@ class AudioController:
             return self._players[section]
         except KeyError as exc:
             raise KeyError(f"Unknown audio section '{section}'.") from exc
+
+    @staticmethod
+    def _track_in_playlist(track: Optional[Dict[str, Any]], playlist: List[Dict[str, Any]]) -> bool:
+        if not track:
+            return False
+        track_id = track.get("id")
+        path = track.get("path")
+        for item in playlist:
+            if track_id and item.get("id") == track_id:
+                return True
+            if path and item.get("path") == path:
+                return True
+        return False
 
     def _update_last_error(self, section: str, message: str) -> None:
         with self._lock:
@@ -189,6 +208,17 @@ class AudioController:
                 state["current_track"] = payload.get("track")
                 state["is_playing"] = True
                 state["last_error"] = ""
+                if payload.get("track"):
+                    state["last_track"] = payload.get("track")
+            elif event == "stopped":
+                state["is_playing"] = False
+                track = payload.get("track")
+                if track:
+                    state["last_track"] = track
+            elif event == "playlist_ended":
+                state["is_playing"] = False
+                if state.get("current_track"):
+                    state["last_track"] = state["current_track"]
             elif event == "stopped":
                 state["is_playing"] = False
             elif event == "playlist_ended":
@@ -203,6 +233,9 @@ class AudioController:
             elif event == "error":
                 state["last_error"] = str(payload.get("message", ""))
                 state["is_playing"] = False
+                track = payload.get("track")
+                if track:
+                    state["last_track"] = track
         payload = dict(payload)
         payload.setdefault("section", section)
         self._emit(event, section, payload)
