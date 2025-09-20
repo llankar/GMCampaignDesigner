@@ -82,19 +82,31 @@
       }
     },
     "settings": {
-      "volume": 0.7884187082405344,
+      "volume": 1.0,
       "shuffle": true,
       "loop": true,
       "last_directory": "D:/Music/Macross Δ - 1st Album - Walküre Attack! - Walküre"
     }
   },
   "effects": {
-    "categories": {},
+    "categories": {
+      "Horror": {
+        "tracks": [
+          {
+            "id": "a164b6f680aa4fff96d7cc105b01a7ca",
+            "name": "06. NEO STREAM",
+            "path": "D:\\Music\\Macross Δ - 1st Album - Walküre Attack! - Walküre\\06. NEO STREAM.mp3",
+            "category": "Horror"
+          }
+        ],
+        "directories": []
+      }
+    },
     "settings": {
       "volume": 0.75,
       "shuffle": false,
       "loop": false,
-      "last_directory": ""
+      "last_directory": "D:\\Music\\Macross Δ - 1st Album - Walküre Attack! - Walküre"
     }
   }
 }

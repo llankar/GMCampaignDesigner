@@ -213,7 +213,8 @@ class MainWindow(ctk.CTk):
             "export_foundry": self.load_icon("export_foundry_icon.png", size=(60, 60)),
             "map_tool": self.load_icon("map_tool_icon.png", size=(60, 60)),
             "generate_scenario": self.load_icon("generate_scenario_icon.png", size=(60, 60)),
-            "dice_roller": self.load_icon("dice_roller_icon.png", size=(60, 60))
+            "dice_roller": self.load_icon("dice_roller_icon.png", size=(60, 60)),
+            "sound_manager": self.load_icon("sound_manager_icon.png", size=(60, 60)),
         }
 
     def open_custom_fields_editor(self):

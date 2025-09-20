@@ -29,8 +29,8 @@ class SoundManagerWindow(ctk.CTkToplevel):
     def __init__(self, master: tk.Misc | None = None) -> None:
         super().__init__(master)
         self.title("Sound & Music Manager")
-        self.geometry("1100x720")
-        self.minsize(900, 600)
+        self.geometry("1200x900")
+        self.minsize(1200, 900)
         self.resizable(True, True)
 
         self.library = AudioLibrary()

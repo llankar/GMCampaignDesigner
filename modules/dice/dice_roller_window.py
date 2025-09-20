@@ -1,4 +1,4 @@
-import tkinter as tk
+﻿import tkinter as tk
 import random
 import time
 import math
@@ -228,7 +228,7 @@ class DiceRollerWindow(ctk.CTkToplevel):
         super().__init__(master)
         self.title("Dice Roller")
         self.geometry("1280x760")
-        self.minsize(1140, 680)
+        self.minsize(1200, 760)
         position_window_at_top(self)
         self.configure(bg="#0e1621")
 
