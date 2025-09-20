@@ -67,17 +67,17 @@ class DiceBarWindow(ctk.CTkToplevel):
         container.grid_columnconfigure(2, weight=1)
 
         handle = ctk.CTkLabel(container, text="🎲", width=36, font=("Segoe UI", 18))
-        handle.grid(row=0, column=0, padx=(12, 4), pady=4, sticky="w")
+        handle.grid(row=0, column=0, padx=(12, 4), pady=2, sticky="w")
         handle.bind("<ButtonPress-1>", self._on_drag_start)
         handle.bind("<B1-Motion>", self._on_drag_motion)
         handle.bind("<ButtonRelease-1>", self._on_drag_end)
 
         collapse_button = ctk.CTkButton(container, text="▼", width=28, command=self._toggle_collapsed)
-        collapse_button.grid(row=0, column=1, padx=(0, 6), pady=4, sticky="nsw")
+        collapse_button.grid(row=0, column=1, padx=(0, 6), pady=2, sticky="nsw")
         self._collapse_button = collapse_button
 
         content = ctk.CTkFrame(container, corner_radius=0, fg_color="transparent")
-        self._content_grid_options = {"row": 0, "column": 2, "padx": (0, 12), "pady": 4, "sticky": "nsew"}
+        self._content_grid_options = {"row": 0, "column": 2, "padx": (0, 12), "pady": 2, "sticky": "nsew"}
         content.grid(**self._content_grid_options)
         content.grid_columnconfigure(0, weight=2)
         content.grid_columnconfigure(1, weight=0)
@@ -180,28 +180,9 @@ class DiceBarWindow(ctk.CTkToplevel):
         canonical = result.canonical()
         self.formula_var.set(canonical)
 
-        total = result.total
-        summary_parts: List[str] = []
-        for summary in result.face_summaries:
-            values = summary.display_values
-            if not values:
-                continue
-            if separate:
-                summary_parts.append(
-                    f"{summary.base_count}d{summary.faces}:[{', '.join(values)}] = {summary.total}"
-                )
-            else:
-                summary_parts.append(f"{summary.base_count}d{summary.faces}:[{', '.join(values)}]")
-        modifier = result.modifier
-        if modifier:
-            summary_parts.append(f"mod {modifier:+d}")
-        breakdown = " | ".join(summary_parts) if summary_parts else "0"
-
-        if separate and breakdown:
-            self.result_var.set(f"{canonical} -> {breakdown} = {total}")
-        else:
-            self.result_var.set(f"{canonical} = {total}")
-        self._append_history_entry(canonical, breakdown, total)
+        display_text, history_text = self._format_roll_output(result, separate)
+        self.result_var.set(display_text)
+        self._append_history_entry(history_text)
 
     def _append_die(self, faces: int) -> None:
         fragment = f"1d{faces}"
@@ -215,9 +196,53 @@ class DiceBarWindow(ctk.CTkToplevel):
         self.formula_var.set(parsed.canonical())
         self.result_var.set(f"Added {fragment} to formula.")
 
-    def _append_history_entry(self, canonical: str, breakdown: str, total: int) -> None:
+    def _format_roll_output(
+        self, result: dice_engine.RollResult, separate: bool
+    ) -> Tuple[str, str]:
+        canonical = result.canonical()
+        modifier = result.modifier
+        total = result.total
+
+        def highlight(value: int | str) -> str:
+            return f"⟦{value}⟧"
+
+        if separate:
+            parts: List[str] = []
+            counters: dict[int, int] = {}
+            for chain in result.chains:
+                counters[chain.faces] = counters.get(chain.faces, 0) + 1
+                label = f"d{chain.faces}"
+                if result.parsed.dice.get(chain.faces, 0) > 1:
+                    label = f"{label}#{counters[chain.faces]}"
+                values = ", ".join(chain.display_values)
+                if values:
+                    parts.append(f"{label}:[{values}] = {highlight(chain.total)}")
+                else:
+                    parts.append(f"{label} = {highlight(chain.total)}")
+            if modifier:
+                parts.append(f"mod {modifier:+d}")
+            breakdown = " | ".join(parts) if parts else "0"
+            base_text = f"{canonical} -> {breakdown}"
+            total_text = f"Total = {highlight(total)}"
+            display_text = f"{base_text} | {total_text}" if base_text else total_text
+            history_text = display_text
+            return display_text, history_text
+
+        summary_parts: List[str] = []
+        for summary in result.face_summaries:
+            values = summary.display_values
+            if not values:
+                continue
+            summary_parts.append(f"{summary.base_count}d{summary.faces}:[{', '.join(values)}]")
+        if modifier:
+            summary_parts.append(f"mod {modifier:+d}")
+        breakdown = " | ".join(summary_parts) if summary_parts else "0"
+        display_text = f"{canonical} -> {breakdown} = {highlight(total)}"
+        return display_text, display_text
+
+    def _append_history_entry(self, text: str) -> None:
         timestamp = time.strftime("%H:%M:%S")
-        entry = f"[{timestamp}] {canonical} -> {breakdown} = {total}"
+        entry = f"[{timestamp}] {text}"
         self._history.append(entry)
         self._update_history_menu()
 
@@ -274,7 +299,19 @@ class DiceBarWindow(ctk.CTkToplevel):
     def _apply_geometry(self) -> None:
         screen_width = self.winfo_screenwidth()
         screen_height = self.winfo_screenheight()
-        height = 40 if self._is_collapsed else 72
+        try:
+            self.update_idletasks()
+        except Exception:
+            pass
+
+        if self._is_collapsed:
+            min_height = 32
+        else:
+            min_height = 48
+
+        requested = int(self.winfo_reqheight() or 0)
+        current = int(self.winfo_height() or 0)
+        height = max(min_height, requested, current)
         x = 0
         y = max(screen_height - height, 0)
 
@@ -317,7 +354,7 @@ class DiceBarWindow(ctk.CTkToplevel):
                 if options:
                     frame.grid(**options)
                 else:
-                    frame.grid(row=0, column=2, padx=(0, 12), pady=4, sticky="nsew")
+                    frame.grid(row=0, column=2, padx=(0, 12), pady=2, sticky="nsew")
         self._update_collapse_button()
         self.after(0, self._apply_geometry)
 
