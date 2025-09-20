@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 import tkinter as tk
 from typing import Any, Dict, Optional
 
@@ -26,30 +27,32 @@ class AudioBarWindow(ctk.CTkToplevel):
         super().__init__(master)
         self.controller = controller or get_audio_controller()
         self._listener: Optional[Any] = None
-        self._active_section: str = DEFAULT_SECTION if DEFAULT_SECTION in SECTION_TITLES else next(iter(SECTION_TITLES))
+        self._active_section: str = (
+            DEFAULT_SECTION if DEFAULT_SECTION in SECTION_TITLES else next(iter(SECTION_TITLES))
+        )
+        self._section_cycle: tuple[str, ...] = tuple(SECTION_TITLES.keys())
+        self._playlist_lookup: Dict[str, Dict[str, Any]] = {}
+        self._selected_track_key: Optional[str] = None
 
-        self.title("Audio Controls")
-        self.geometry("520x220")
+        self.overrideredirect(True)
         self.resizable(False, False)
         self.attributes("-topmost", True)
         self.protocol("WM_DELETE_WINDOW", self._on_close)
+        self.bind("<Escape>", lambda _event: self._on_close())
 
-        self._section_display_to_key = {v: k for k, v in SECTION_TITLES.items()}
-        self._section_key_to_display = {k: v for k, v in SECTION_TITLES.items()}
-        default_display = self._section_key_to_display.get(self._active_section, "")
-
-        self.section_display_var = tk.StringVar(value=default_display)
-        self.now_playing_var = tk.StringVar(value="No track playing")
-        self.category_var = tk.StringVar(value="Category: none")
-        self.status_var = tk.StringVar(value="Idle")
+        self.section_toggle_var = tk.StringVar(value=self._section_button_label(self._active_section))
+        self.now_playing_var = tk.StringVar(value="No tracks available")
+        self.status_var = tk.StringVar(value="Status: Idle")
         self.shuffle_var = tk.BooleanVar(value=False)
         self.loop_var = tk.BooleanVar(value=False)
         self.volume_value_var = tk.StringVar(value="0%")
 
+        self._bar_frame: Optional[ctk.CTkFrame] = None
         self._building_ui = False
         self._build_ui()
         self._register_controller_listener()
         self._refresh_from_state()
+        self.after(0, self._apply_geometry)
 
         self.bind("<Destroy>", self._on_destroy_event)
 
@@ -58,97 +61,82 @@ class AudioBarWindow(ctk.CTkToplevel):
     # ------------------------------------------------------------------
     def _build_ui(self) -> None:
         self._building_ui = True
+        self.grid_rowconfigure(0, weight=1)
         self.grid_columnconfigure(0, weight=1)
 
-        header = ctk.CTkFrame(self)
-        header.grid(row=0, column=0, sticky="ew", padx=12, pady=(12, 8))
-        header.grid_columnconfigure(1, weight=1)
-        ctk.CTkLabel(header, text="Section:").grid(row=0, column=0, padx=(4, 8), pady=4, sticky="w")
-        self.section_selector = ctk.CTkOptionMenu(
-            header,
-            values=list(self._section_display_to_key.keys()),
-            variable=self.section_display_var,
-            command=self._on_section_selected,
-            width=220,
+        bar = ctk.CTkFrame(self, corner_radius=0)
+        bar.grid(row=0, column=0, sticky="nsew", padx=8, pady=8)
+        bar.grid_columnconfigure(0, weight=0)
+        bar.grid_columnconfigure(1, weight=2)
+        bar.grid_columnconfigure(10, weight=3)
+        bar.grid_columnconfigure(12, weight=2)
+        self._bar_frame = bar
+
+        self.section_toggle_button = ctk.CTkButton(
+            bar,
+            textvariable=self.section_toggle_var,
+            command=self._toggle_section,
+            width=110,
         )
-        self.section_selector.grid(row=0, column=1, padx=(0, 4), pady=4, sticky="ew")
+        self.section_toggle_button.grid(row=0, column=0, padx=(4, 8), pady=4, sticky="ew")
 
-        controls = ctk.CTkFrame(self)
-        controls.grid(row=1, column=0, sticky="ew", padx=12, pady=(0, 4))
-        for column in range(5):
-            controls.grid_columnconfigure(column, weight=1)
+        self.now_playing_menu = ctk.CTkOptionMenu(
+            bar,
+            variable=self.now_playing_var,
+            values=["No tracks available"],
+            command=self._on_track_selected,
+            width=320,
+        )
+        self.now_playing_menu.grid(row=0, column=1, padx=4, pady=4, sticky="ew")
+        self.now_playing_menu.configure(state="disabled")
 
-        self.prev_button = ctk.CTkButton(controls, text="Prev", command=self._on_prev_clicked)
-        self.prev_button.grid(row=0, column=0, padx=4, pady=4, sticky="ew")
+        self.prev_button = ctk.CTkButton(bar, text="Prev", command=self._on_prev_clicked, width=70)
+        self.prev_button.grid(row=0, column=2, padx=4, pady=4, sticky="ew")
 
-        self.play_button = ctk.CTkButton(controls, text="Play", command=self._on_play_clicked)
-        self.play_button.grid(row=0, column=1, padx=4, pady=4, sticky="ew")
+        self.play_button = ctk.CTkButton(bar, text="Play", command=self._on_play_clicked, width=70)
+        self.play_button.grid(row=0, column=3, padx=4, pady=4, sticky="ew")
 
-        self.pause_button = ctk.CTkButton(controls, text="Pause", command=self._on_pause_clicked)
-        self.pause_button.grid(row=0, column=2, padx=4, pady=4, sticky="ew")
+        self.pause_button = ctk.CTkButton(bar, text="Pause", command=self._on_pause_clicked, width=70)
+        self.pause_button.grid(row=0, column=4, padx=4, pady=4, sticky="ew")
 
-        self.stop_button = ctk.CTkButton(controls, text="Stop", command=self._on_stop_clicked)
-        self.stop_button.grid(row=0, column=3, padx=4, pady=4, sticky="ew")
+        self.stop_button = ctk.CTkButton(bar, text="Stop", command=self._on_stop_clicked, width=70)
+        self.stop_button.grid(row=0, column=5, padx=4, pady=4, sticky="ew")
 
-        self.next_button = ctk.CTkButton(controls, text="Next", command=self._on_next_clicked)
-        self.next_button.grid(row=0, column=4, padx=4, pady=4, sticky="ew")
-
-        toggles = ctk.CTkFrame(self)
-        toggles.grid(row=2, column=0, sticky="ew", padx=12, pady=(0, 4))
-        toggles.grid_columnconfigure(0, weight=1)
-        toggles.grid_columnconfigure(1, weight=1)
+        self.next_button = ctk.CTkButton(bar, text="Next", command=self._on_next_clicked, width=70)
+        self.next_button.grid(row=0, column=6, padx=4, pady=4, sticky="ew")
 
         self.shuffle_checkbox = ctk.CTkCheckBox(
-            toggles,
+            bar,
             text="Shuffle",
             variable=self.shuffle_var,
             command=self._on_shuffle_toggle,
         )
-        self.shuffle_checkbox.grid(row=0, column=0, padx=4, pady=4, sticky="w")
+        self.shuffle_checkbox.grid(row=0, column=7, padx=6, pady=4, sticky="w")
 
         self.loop_checkbox = ctk.CTkCheckBox(
-            toggles,
+            bar,
             text="Loop",
             variable=self.loop_var,
             command=self._on_loop_toggle,
         )
-        self.loop_checkbox.grid(row=0, column=1, padx=4, pady=4, sticky="w")
+        self.loop_checkbox.grid(row=0, column=8, padx=6, pady=4, sticky="w")
 
-        volume_frame = ctk.CTkFrame(self)
-        volume_frame.grid(row=3, column=0, sticky="ew", padx=12, pady=(0, 4))
-        volume_frame.grid_columnconfigure(1, weight=1)
-        ctk.CTkLabel(volume_frame, text="Volume").grid(row=0, column=0, padx=4, pady=4, sticky="w")
+        volume_label = ctk.CTkLabel(bar, text="Volume")
+        volume_label.grid(row=0, column=9, padx=(12, 4), pady=4, sticky="e")
+
         self.volume_slider = ctk.CTkSlider(
-            volume_frame,
+            bar,
             from_=0,
             to=100,
             command=self._on_volume_changed,
         )
-        self.volume_slider.grid(row=0, column=1, padx=4, pady=4, sticky="ew")
-        self.volume_value_label = ctk.CTkLabel(volume_frame, textvariable=self.volume_value_var, width=60)
-        self.volume_value_label.grid(row=0, column=2, padx=4, pady=4, sticky="e")
+        self.volume_slider.grid(row=0, column=10, padx=4, pady=4, sticky="ew")
 
-        info = ctk.CTkFrame(self)
-        info.grid(row=4, column=0, sticky="ew", padx=12, pady=(4, 12))
-        info.grid_columnconfigure(0, weight=1)
-        ctk.CTkLabel(info, textvariable=self.now_playing_var, anchor="w", justify="left").grid(
-            row=0,
-            column=0,
-            sticky="ew",
-            pady=(0, 2),
-        )
-        ctk.CTkLabel(info, textvariable=self.category_var, anchor="w").grid(
-            row=1,
-            column=0,
-            sticky="ew",
-            pady=(0, 2),
-        )
-        ctk.CTkLabel(info, textvariable=self.status_var, anchor="w").grid(
-            row=2,
-            column=0,
-            sticky="ew",
-            pady=(0, 2),
-        )
+        self.volume_value_label = ctk.CTkLabel(bar, textvariable=self.volume_value_var, width=60)
+        self.volume_value_label.grid(row=0, column=11, padx=(4, 12), pady=4, sticky="e")
+
+        self.status_label = ctk.CTkLabel(bar, textvariable=self.status_var, anchor="w")
+        self.status_label.grid(row=0, column=12, padx=(8, 4), pady=4, sticky="ew")
 
         self._building_ui = False
 
@@ -180,53 +168,69 @@ class AudioBarWindow(ctk.CTkToplevel):
         if section != self._active_section:
             return
 
-        if event in {"track_started", "state_changed"}:
+        if event in {"track_started", "state_changed", "playlist_set"}:
             self._refresh_from_state(section)
             self._update_status_from_state(section)
         elif event == "stopped":
             self._refresh_from_state(section)
-            self.status_var.set("Stopped")
+            self.status_var.set("Status: Stopped")
         elif event == "playlist_ended":
             self._refresh_from_state(section)
-            self.status_var.set("Playlist finished")
+            self.status_var.set("Status: Playlist finished")
         elif event == "volume_changed":
-            if section == self._active_section:
-                self._apply_volume(payload.get("value"))
+            self._apply_volume(payload.get("value"))
         elif event == "shuffle_changed":
-            if section == self._active_section:
-                self.shuffle_var.set(bool(payload.get("value")))
+            self.shuffle_var.set(bool(payload.get("value")))
         elif event == "loop_changed":
-            if section == self._active_section:
-                self.loop_var.set(bool(payload.get("value")))
+            self.loop_var.set(bool(payload.get("value")))
         elif event == "error":
             message = payload.get("message") or "Playback failed."
-            if section == self._active_section:
-                self.status_var.set(f"Error: {message}")
+            self.status_var.set(f"Error: {message}")
         elif event in {"play_failed", "navigation_failed"}:
             message = payload.get("message") or self.controller.get_last_error(section)
-            if section == self._active_section and message:
+            if message:
                 self.status_var.set(f"Error: {message}")
 
     # ------------------------------------------------------------------
     # Actions
     # ------------------------------------------------------------------
-    def _on_section_selected(self, display_value: str) -> None:
-        section = self._section_display_to_key.get(display_value, self._active_section)
-        self._active_section = section
-        self.section_display_var.set(self._section_key_to_display.get(section, display_value))
-        self._refresh_from_state(section)
+    def _toggle_section(self) -> None:
+        if not self._section_cycle:
+            return
+        try:
+            current_index = self._section_cycle.index(self._active_section)
+        except ValueError:
+            current_index = 0
+        next_index = (current_index + 1) % len(self._section_cycle)
+        self._active_section = self._section_cycle[next_index]
+        self.section_toggle_var.set(self._section_button_label(self._active_section))
+        self._refresh_from_state(self._active_section)
+
+    def _on_track_selected(self, choice: str) -> None:
+        if choice not in self._playlist_lookup:
+            return
+        self._selected_track_key = choice
 
     def _on_play_clicked(self) -> None:
-        if not self.controller.play(self._active_section):
+        info = self._get_selected_track_info()
+        if info:
+            identifier = info.get("identifier")
+            if identifier:
+                success = self.controller.play(self._active_section, track_id=identifier)
+            else:
+                success = self.controller.play(self._active_section, start_index=info.get("index"))
+        else:
+            success = self.controller.play(self._active_section)
+        if not success:
             self._update_status_from_state(self._active_section)
 
     def _on_pause_clicked(self) -> None:
         self.controller.pause(self._active_section)
-        self.status_var.set("Paused")
+        self.status_var.set("Status: Paused")
 
     def _on_stop_clicked(self) -> None:
         self.controller.stop(self._active_section)
-        self.status_var.set("Stopped")
+        self.status_var.set("Status: Stopped")
 
     def _on_next_clicked(self) -> None:
         if not self.controller.next(self._active_section):
@@ -255,31 +259,34 @@ class AudioBarWindow(ctk.CTkToplevel):
     def _refresh_from_state(self, section: Optional[str] = None) -> None:
         section = section or self._active_section
         state = self.controller.get_state(section)
-        if not state:
-            self.now_playing_var.set("No track playing")
-            self.category_var.set("Category: none")
-            self.status_var.set("Idle")
-            self.shuffle_var.set(False)
-            self.loop_var.set(False)
-            self._apply_volume(0.0)
-            return
+        playlist = (state or {}).get("playlist") or []
+        self._update_playlist_menu(playlist)
 
-        track = state.get("current_track") or {}
-        name = track.get("name") or track.get("path") or "No track playing"
-        if state.get("is_playing"):
-            self.now_playing_var.set(f"Now playing: {name}")
-        elif track:
-            self.now_playing_var.set(f"Last track: {name}")
+        track = None
+        if state:
+            track = state.get("current_track") or state.get("last_track")
+
+        if track:
+            label = self._find_label_for_track(track)
+            if label:
+                self._set_selected_track_by_label(label)
+            else:
+                self.now_playing_var.set(self._format_track_label(track))
+                self._selected_track_key = None
+                self.now_playing_menu.configure(state="disabled")
+        elif self._playlist_lookup:
+            if self._selected_track_key not in self._playlist_lookup:
+                first_label = next(iter(self._playlist_lookup))
+                self._set_selected_track_by_label(first_label)
         else:
-            self.now_playing_var.set("No track playing")
+            self.now_playing_var.set("No tracks available")
+            self._selected_track_key = None
 
-        category = state.get("category") or "none"
-        self.category_var.set(f"Category: {category}")
-        self.shuffle_var.set(bool(state.get("shuffle", False)))
-        self.loop_var.set(bool(state.get("loop", False)))
-        self._apply_volume(state.get("volume", 0.0))
+        self.shuffle_var.set(bool((state or {}).get("shuffle", False)))
+        self.loop_var.set(bool((state or {}).get("loop", False)))
+        self._apply_volume((state or {}).get("volume", 0.0))
         self._update_status_from_state(section)
-        self._update_button_states(state)
+        self._update_button_states(state or {})
 
     def _apply_volume(self, value: Any) -> None:
         try:
@@ -293,28 +300,119 @@ class AudioBarWindow(ctk.CTkToplevel):
     def _update_status_from_state(self, section: str) -> None:
         state = self.controller.get_state(section)
         if not state:
-            self.status_var.set("Idle")
+            self.status_var.set("Status: Idle")
             return
         if state.get("last_error"):
             self.status_var.set(f"Error: {state['last_error']}")
             return
         if state.get("is_playing"):
-            self.status_var.set("Playing")
-        elif state.get("current_track"):
-            self.status_var.set("Paused")
+            self.status_var.set("Status: Playing")
+        elif state.get("current_track") or state.get("last_track"):
+            self.status_var.set("Status: Paused")
         else:
-            self.status_var.set("Idle")
+            self.status_var.set("Status: Idle")
 
     def _update_button_states(self, state: Dict[str, Any]) -> None:
         playing = bool(state.get("is_playing"))
         playlist = state.get("playlist") or []
-        state_normal = tk.NORMAL if playlist else tk.DISABLED
+        has_tracks = bool(playlist)
+        multi_track = len(playlist) > 1
 
-        self.play_button.configure(state=tk.NORMAL if playlist else tk.DISABLED)
+        self.play_button.configure(state=tk.NORMAL if has_tracks else tk.DISABLED)
         self.pause_button.configure(state=tk.NORMAL if playing else tk.DISABLED)
-        self.stop_button.configure(state=tk.NORMAL if playlist else tk.DISABLED)
-        self.next_button.configure(state=state_normal)
-        self.prev_button.configure(state=state_normal)
+        self.stop_button.configure(state=tk.NORMAL if has_tracks else tk.DISABLED)
+        self.next_button.configure(state=tk.NORMAL if multi_track else tk.DISABLED)
+        self.prev_button.configure(state=tk.NORMAL if multi_track else tk.DISABLED)
+
+        if has_tracks:
+            self.now_playing_menu.configure(state="normal")
+        else:
+            self.now_playing_menu.configure(state="disabled")
+
+    def _update_playlist_menu(self, playlist: list[Dict[str, Any]]) -> None:
+        self._playlist_lookup = {}
+        values: list[str] = []
+        for index, track in enumerate(playlist):
+            identifier = self._track_identifier(track)
+            base_label = self._format_track_label(track) or f"Track {index + 1}"
+            label = base_label
+            suffix = 2
+            while label in self._playlist_lookup:
+                label = f"{base_label} ({suffix})"
+                suffix += 1
+            self._playlist_lookup[label] = {
+                "identifier": identifier,
+                "index": index,
+                "track": track,
+            }
+            values.append(label)
+
+        if values:
+            self.now_playing_menu.configure(values=values)
+            if self._selected_track_key in self._playlist_lookup:
+                self.now_playing_var.set(self._selected_track_key)
+            else:
+                self._selected_track_key = values[0]
+                self.now_playing_var.set(values[0])
+            self.now_playing_menu.configure(state="normal")
+        else:
+            self.now_playing_menu.configure(values=["No tracks available"], state="disabled")
+            self.now_playing_var.set("No tracks available")
+            self._selected_track_key = None
+
+    def _find_label_for_track(self, track: Dict[str, Any]) -> Optional[str]:
+        identifier = self._track_identifier(track)
+        for label, info in self._playlist_lookup.items():
+            if info.get("identifier") == identifier:
+                return label
+        return None
+
+    def _set_selected_track_by_label(self, label: str) -> None:
+        if label not in self._playlist_lookup:
+            return
+        self._selected_track_key = label
+        self.now_playing_var.set(label)
+        self.now_playing_menu.configure(state="normal")
+
+    def _get_selected_track_info(self) -> Optional[Dict[str, Any]]:
+        if self._selected_track_key is None:
+            return None
+        return self._playlist_lookup.get(self._selected_track_key)
+
+    @staticmethod
+    def _track_identifier(track: Dict[str, Any]) -> str:
+        identifier = track.get("id")
+        if identifier:
+            return str(identifier)
+        path = track.get("path")
+        if isinstance(path, str) and path:
+            return path
+        return ""
+
+    @staticmethod
+    def _format_track_label(track: Dict[str, Any]) -> str:
+        name = track.get("name")
+        if isinstance(name, str) and name:
+            return name
+        path = track.get("path")
+        if isinstance(path, str) and path:
+            return os.path.basename(path)
+        return ""
+
+    def _section_button_label(self, section: str) -> str:
+        if section == "effects":
+            return "Sound"
+        return SECTION_TITLES.get(section, section.title())
+
+    def _apply_geometry(self) -> None:
+        try:
+            self.update_idletasks()
+            width = self.winfo_screenwidth()
+            height = max(60, int((self._bar_frame.winfo_reqheight() if self._bar_frame else 60) + 16))
+            y = self.winfo_screenheight() - height
+            self.geometry(f"{width}x{height}+0+{max(0, y)}")
+        except Exception:
+            pass
 
     # ------------------------------------------------------------------
     # Window helpers
@@ -322,6 +420,7 @@ class AudioBarWindow(ctk.CTkToplevel):
     def show(self) -> None:
         try:
             self.deiconify()
+            self._apply_geometry()
             self.lift()
             self.focus_force()
             self.attributes("-topmost", True)

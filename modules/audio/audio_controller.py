@@ -166,6 +166,7 @@ class AudioController:
             "loop": loop,
             "is_playing": False,
             "current_track": None,
+            "last_track": None,
             "playlist": [],
             "category": None,
             "last_error": "",
@@ -186,13 +187,28 @@ class AudioController:
         with self._lock:
             state = self._state[section]
             if event == "track_started":
-                state["current_track"] = payload.get("track")
+                raw_track = payload.get("track")
+                track = copy.deepcopy(raw_track) if isinstance(raw_track, dict) else raw_track
+                state["current_track"] = track
+                if isinstance(track, dict):
+                    state["last_track"] = copy.deepcopy(track)
+                elif track is not None:
+                    state["last_track"] = track
                 state["is_playing"] = True
                 state["last_error"] = ""
             elif event == "stopped":
                 state["is_playing"] = False
+                raw_track = payload.get("track")
+                if isinstance(raw_track, dict):
+                    state["last_track"] = copy.deepcopy(raw_track)
+                elif raw_track is not None:
+                    state["last_track"] = raw_track
             elif event == "playlist_ended":
                 state["is_playing"] = False
+                if isinstance(state.get("current_track"), dict):
+                    state["last_track"] = copy.deepcopy(state["current_track"])
+                elif state.get("current_track") is not None:
+                    state["last_track"] = state.get("current_track")
                 state["current_track"] = None
             elif event == "volume_changed":
                 state["volume"] = float(payload.get("value", state.get("volume", 0.0)))
