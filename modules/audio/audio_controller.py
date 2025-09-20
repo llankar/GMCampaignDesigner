@@ -39,6 +39,7 @@ class AudioController:
             player.set_volume(initial_state["volume"])
             player.set_shuffle(initial_state["shuffle"])
             player.set_loop(initial_state["loop"])
+            self._restore_last_playlist(section)
 
     # ------------------------------------------------------------------
     # Listener handling
@@ -84,6 +85,8 @@ class AudioController:
             state["playlist"] = list(playlist)
             state["category"] = category
             state["last_error"] = ""
+        if category:
+            self.library.set_setting(section, "last_category", category)
         self._emit("playlist_set", section, playlist=list(playlist), category=category)
         self._emit("state_changed", section, state=self.get_state(section))
 
@@ -172,6 +175,36 @@ class AudioController:
             "last_error": "",
         }
 
+    def _restore_last_playlist(self, section: str) -> None:
+        category = str(self.library.get_setting(section, "last_category", "") or "")
+        if not category:
+            return
+        try:
+            tracks = self.library.list_tracks(section, category)
+        except KeyError:
+            self.library.set_setting(section, "last_category", "")
+            self.library.set_setting(section, "last_track_id", "")
+            return
+        if not tracks:
+            return
+        player = self._players[section]
+        player.set_playlist(list(tracks))
+        last_track_id = str(self.library.get_setting(section, "last_track_id", "") or "")
+        selected_track: Optional[Dict[str, Any]] = None
+        if last_track_id:
+            for track in tracks:
+                if str(track.get("id")) == last_track_id:
+                    selected_track = track
+                    break
+            if selected_track is None:
+                self.library.set_setting(section, "last_track_id", "")
+        with self._lock:
+            state = self._state[section]
+            state["playlist"] = list(tracks)
+            state["category"] = category
+            if selected_track is not None:
+                state["last_track"] = copy.deepcopy(selected_track)
+
     def _get_player(self, section: str) -> AudioPlayer:
         try:
             return self._players[section]
@@ -192,6 +225,12 @@ class AudioController:
                 state["current_track"] = track
                 if isinstance(track, dict):
                     state["last_track"] = copy.deepcopy(track)
+                    track_id = track.get("id")
+                    if track_id:
+                        self.library.set_setting(section, "last_track_id", str(track_id))
+                    category = track.get("category") or state.get("category")
+                    if category:
+                        self.library.set_setting(section, "last_category", category)
                 elif track is not None:
                     state["last_track"] = track
                 state["is_playing"] = True
