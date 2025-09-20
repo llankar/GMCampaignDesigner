@@ -50,6 +50,7 @@ from modules.generic.custom_fields_editor import CustomFieldsEditor
 
 
 from modules.dice.dice_roller_window import DiceRollerWindow
+from modules.dice.dice_bar_window import DiceBarWindow
 from modules.audio.audio_bar_window import AudioBarWindow
 from modules.audio.audio_controller import get_audio_controller
 from modules.audio.sound_manager_window import SoundManagerWindow
@@ -93,6 +94,7 @@ class MainWindow(ctk.CTk):
         self.init_wrappers()
         self.current_gm_view = None
         self.dice_roller_window = None
+        self.dice_bar_window = None
         self.audio_controller = get_audio_controller()
         self.sound_manager_window = None
         self.audio_bar_window = None
@@ -395,6 +397,7 @@ class MainWindow(ctk.CTk):
             ("map_tool", "Map Tool", self.map_tool),
             ("sound_manager", "Sound & Music Manager", self.open_sound_manager),
             ("audio_controls", "Audio Controls Bar", self.open_audio_bar),
+            ("dice_bar", "Dice Bar", self.open_dice_bar),
             ("dice_roller", "Open Dice Roller", self.open_dice_roller),
         ]
 
@@ -1574,6 +1577,27 @@ class MainWindow(ctk.CTk):
     def _on_audio_bar_destroyed(self, event=None):
         if event is None or event.widget is self.audio_bar_window:
             self.audio_bar_window = None
+
+    def open_dice_bar(self):
+        try:
+            window = self.dice_bar_window
+        except AttributeError:
+            window = None
+        try:
+            if window is None or not window.winfo_exists():
+                self.dice_bar_window = DiceBarWindow(self)
+                self.dice_bar_window.bind("<Destroy>", self._on_dice_bar_destroyed)
+                window = self.dice_bar_window
+            window.show()
+        except Exception as exc:
+            messagebox.showerror("Error", f"Failed to open Dice Bar:\n{exc}")
+
+    def _on_dice_bar_destroyed(self, event=None):
+        if event is None:
+            self.dice_bar_window = None
+            return
+        if event.widget is self.dice_bar_window:
+            self.dice_bar_window = None
 
     def open_sound_manager(self):
         try:
