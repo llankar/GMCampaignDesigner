@@ -48,6 +48,11 @@ class AudioBarWindow(ctk.CTkToplevel):
         self.volume_value_var = tk.StringVar(value="0%")
 
         self._bar_frame: Optional[ctk.CTkFrame] = None
+        self._content_frame: Optional[ctk.CTkFrame] = None
+        self._content_grid_options: Optional[Dict[str, Any]] = None
+        self._collapse_button: Optional[ctk.CTkButton] = None
+        self._is_collapsed = False
+        self._remembered_track_label: Optional[str] = None
         self._building_ui = False
         self._build_ui()
         self._register_controller_listener()
@@ -67,13 +72,28 @@ class AudioBarWindow(ctk.CTkToplevel):
         bar = ctk.CTkFrame(self, corner_radius=0)
         bar.grid(row=0, column=0, sticky="nsew", padx=8, pady=8)
         bar.grid_columnconfigure(0, weight=0)
-        bar.grid_columnconfigure(1, weight=2)
-        bar.grid_columnconfigure(10, weight=3)
-        bar.grid_columnconfigure(12, weight=2)
+        bar.grid_columnconfigure(1, weight=1)
         self._bar_frame = bar
 
-        self.section_toggle_button = ctk.CTkButton(
+        self._collapse_button = ctk.CTkButton(
             bar,
+            text="◀",
+            width=32,
+            command=self._toggle_collapsed,
+        )
+        self._collapse_button.grid(row=0, column=0, padx=(4, 6), pady=4, sticky="nsw")
+
+        content = ctk.CTkFrame(bar, corner_radius=0)
+        self._content_grid_options = {"row": 0, "column": 1, "padx": 0, "pady": 0, "sticky": "nsew"}
+        content.grid(**self._content_grid_options)
+        content.grid_columnconfigure(0, weight=0)
+        content.grid_columnconfigure(1, weight=2)
+        content.grid_columnconfigure(10, weight=3)
+        content.grid_columnconfigure(12, weight=2)
+        self._content_frame = content
+
+        self.section_toggle_button = ctk.CTkButton(
+            content,
             textvariable=self.section_toggle_var,
             command=self._toggle_section,
             width=110,
@@ -81,7 +101,7 @@ class AudioBarWindow(ctk.CTkToplevel):
         self.section_toggle_button.grid(row=0, column=0, padx=(4, 8), pady=4, sticky="ew")
 
         self.now_playing_menu = ctk.CTkOptionMenu(
-            bar,
+            content,
             variable=self.now_playing_var,
             values=["No tracks available"],
             command=self._on_track_selected,
@@ -90,23 +110,23 @@ class AudioBarWindow(ctk.CTkToplevel):
         self.now_playing_menu.grid(row=0, column=1, padx=4, pady=4, sticky="ew")
         self.now_playing_menu.configure(state="disabled")
 
-        self.prev_button = ctk.CTkButton(bar, text="Prev", command=self._on_prev_clicked, width=70)
+        self.prev_button = ctk.CTkButton(content, text="Prev", command=self._on_prev_clicked, width=70)
         self.prev_button.grid(row=0, column=2, padx=4, pady=4, sticky="ew")
 
-        self.play_button = ctk.CTkButton(bar, text="Play", command=self._on_play_clicked, width=70)
+        self.play_button = ctk.CTkButton(content, text="Play", command=self._on_play_clicked, width=70)
         self.play_button.grid(row=0, column=3, padx=4, pady=4, sticky="ew")
 
-        self.pause_button = ctk.CTkButton(bar, text="Pause", command=self._on_pause_clicked, width=70)
+        self.pause_button = ctk.CTkButton(content, text="Pause", command=self._on_pause_clicked, width=70)
         self.pause_button.grid(row=0, column=4, padx=4, pady=4, sticky="ew")
 
-        self.stop_button = ctk.CTkButton(bar, text="Stop", command=self._on_stop_clicked, width=70)
+        self.stop_button = ctk.CTkButton(content, text="Stop", command=self._on_stop_clicked, width=70)
         self.stop_button.grid(row=0, column=5, padx=4, pady=4, sticky="ew")
 
-        self.next_button = ctk.CTkButton(bar, text="Next", command=self._on_next_clicked, width=70)
+        self.next_button = ctk.CTkButton(content, text="Next", command=self._on_next_clicked, width=70)
         self.next_button.grid(row=0, column=6, padx=4, pady=4, sticky="ew")
 
         self.shuffle_checkbox = ctk.CTkCheckBox(
-            bar,
+            content,
             text="Shuffle",
             variable=self.shuffle_var,
             command=self._on_shuffle_toggle,
@@ -114,31 +134,32 @@ class AudioBarWindow(ctk.CTkToplevel):
         self.shuffle_checkbox.grid(row=0, column=7, padx=6, pady=4, sticky="w")
 
         self.loop_checkbox = ctk.CTkCheckBox(
-            bar,
+            content,
             text="Loop",
             variable=self.loop_var,
             command=self._on_loop_toggle,
         )
         self.loop_checkbox.grid(row=0, column=8, padx=6, pady=4, sticky="w")
 
-        volume_label = ctk.CTkLabel(bar, text="Volume")
+        volume_label = ctk.CTkLabel(content, text="Volume")
         volume_label.grid(row=0, column=9, padx=(12, 4), pady=4, sticky="e")
 
         self.volume_slider = ctk.CTkSlider(
-            bar,
+            content,
             from_=0,
             to=100,
             command=self._on_volume_changed,
         )
         self.volume_slider.grid(row=0, column=10, padx=4, pady=4, sticky="ew")
 
-        self.volume_value_label = ctk.CTkLabel(bar, textvariable=self.volume_value_var, width=60)
+        self.volume_value_label = ctk.CTkLabel(content, textvariable=self.volume_value_var, width=60)
         self.volume_value_label.grid(row=0, column=11, padx=(4, 12), pady=4, sticky="e")
 
-        self.status_label = ctk.CTkLabel(bar, textvariable=self.status_var, anchor="w")
+        self.status_label = ctk.CTkLabel(content, textvariable=self.status_var, anchor="w")
         self.status_label.grid(row=0, column=12, padx=(8, 4), pady=4, sticky="ew")
 
         self._building_ui = False
+        self._update_collapse_button()
 
     # ------------------------------------------------------------------
     # Controller listener handling
@@ -267,19 +288,28 @@ class AudioBarWindow(ctk.CTkToplevel):
             track = state.get("current_track") or state.get("last_track")
 
         if track:
+            self._remembered_track_label = self._format_track_label(track) or None
             label = self._find_label_for_track(track)
             if label:
                 self._set_selected_track_by_label(label)
             else:
-                self.now_playing_var.set(self._format_track_label(track))
+                display = self._remembered_track_label or ""
+                if display:
+                    self.now_playing_menu.configure(values=[display], state="disabled")
+                    self.now_playing_var.set(display)
+                else:
+                    self.now_playing_var.set("No tracks available")
                 self._selected_track_key = None
-                self.now_playing_menu.configure(state="disabled")
         elif self._playlist_lookup:
             if self._selected_track_key not in self._playlist_lookup:
                 first_label = next(iter(self._playlist_lookup))
                 self._set_selected_track_by_label(first_label)
         else:
-            self.now_playing_var.set("No tracks available")
+            if self._remembered_track_label:
+                self.now_playing_menu.configure(values=[self._remembered_track_label], state="disabled")
+                self.now_playing_var.set(self._remembered_track_label)
+            else:
+                self.now_playing_var.set("No tracks available")
             self._selected_track_key = None
 
         self.shuffle_var.set(bool((state or {}).get("shuffle", False)))
@@ -317,8 +347,9 @@ class AudioBarWindow(ctk.CTkToplevel):
         playlist = state.get("playlist") or []
         has_tracks = bool(playlist)
         multi_track = len(playlist) > 1
+        has_remembered = bool(self._remembered_track_label)
 
-        self.play_button.configure(state=tk.NORMAL if has_tracks else tk.DISABLED)
+        self.play_button.configure(state=tk.NORMAL if has_tracks or has_remembered else tk.DISABLED)
         self.pause_button.configure(state=tk.NORMAL if playing else tk.DISABLED)
         self.stop_button.configure(state=tk.NORMAL if has_tracks else tk.DISABLED)
         self.next_button.configure(state=tk.NORMAL if multi_track else tk.DISABLED)
@@ -356,8 +387,12 @@ class AudioBarWindow(ctk.CTkToplevel):
                 self.now_playing_var.set(values[0])
             self.now_playing_menu.configure(state="normal")
         else:
-            self.now_playing_menu.configure(values=["No tracks available"], state="disabled")
-            self.now_playing_var.set("No tracks available")
+            if self._remembered_track_label:
+                self.now_playing_menu.configure(values=[self._remembered_track_label], state="disabled")
+                self.now_playing_var.set(self._remembered_track_label)
+            else:
+                self.now_playing_menu.configure(values=["No tracks available"], state="disabled")
+                self.now_playing_var.set("No tracks available")
             self._selected_track_key = None
 
     def _find_label_for_track(self, track: Dict[str, Any]) -> Optional[str]:
@@ -407,12 +442,44 @@ class AudioBarWindow(ctk.CTkToplevel):
     def _apply_geometry(self) -> None:
         try:
             self.update_idletasks()
-            width = self.winfo_screenwidth()
-            height = max(60, int((self._bar_frame.winfo_reqheight() if self._bar_frame else 60) + 16))
+            if self._is_collapsed:
+                target = self._collapse_button or self
+                width = max(80, int(target.winfo_reqwidth() + 16))
+                height_source = target
+            else:
+                width = self.winfo_screenwidth()
+                height_source = self._bar_frame or self
+            height = max(36, int((height_source.winfo_reqheight() if height_source else 36) + 16))
             y = self.winfo_screenheight() - height
             self.geometry(f"{width}x{height}+0+{max(0, y)}")
         except Exception:
             pass
+
+    def _toggle_collapsed(self) -> None:
+        self._set_collapsed(not self._is_collapsed)
+
+    def _set_collapsed(self, collapsed: bool) -> None:
+        if collapsed == self._is_collapsed:
+            return
+        self._is_collapsed = collapsed
+        if self._content_frame is not None:
+            if collapsed:
+                self._content_frame.grid_remove()
+            else:
+                if self._content_grid_options is not None:
+                    self._content_frame.grid(**self._content_grid_options)
+                else:
+                    self._content_frame.grid(row=0, column=1, padx=0, pady=0, sticky="nsew")
+        self._update_collapse_button()
+        self._apply_geometry()
+
+    def _update_collapse_button(self) -> None:
+        if not self._collapse_button:
+            return
+        if self._is_collapsed:
+            self._collapse_button.configure(text="▶")
+        else:
+            self._collapse_button.configure(text="◀")
 
     # ------------------------------------------------------------------
     # Window helpers
