@@ -29,6 +29,8 @@ def _default_state() -> Dict[str, Dict[str, Any]]:
                 "shuffle": False,
                 "loop": True,
                 "last_directory": "",
+                "last_category": "",
+                "last_track_id": "",
             },
         },
         "effects": {
@@ -38,6 +40,8 @@ def _default_state() -> Dict[str, Dict[str, Any]]:
                 "shuffle": False,
                 "loop": False,
                 "last_directory": "",
+                "last_category": "",
+                "last_track_id": "",
             },
         },
     }
@@ -147,7 +151,14 @@ class AudioLibrary:
             settings_raw = section_raw.get("settings", {})
             if isinstance(settings_raw, dict):
                 section_settings = state[section]["settings"]
-                for key in ("volume", "shuffle", "loop", "last_directory"):
+                for key in (
+                    "volume",
+                    "shuffle",
+                    "loop",
+                    "last_directory",
+                    "last_category",
+                    "last_track_id",
+                ):
                     if key in settings_raw:
                         section_settings[key] = settings_raw[key]
 
