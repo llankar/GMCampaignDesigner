@@ -1,10 +1,8 @@
 ﻿import tkinter as tk
-import random
 import time
 import math
 from dataclasses import dataclass
 from typing import Dict, List, Tuple, Set
-from collections import defaultdict
 
 import customtkinter as ctk
 from tkinter import messagebox
@@ -18,6 +16,7 @@ except ImportError:  # pragma: no cover - scipy is listed in requirements, but f
 
 from modules.helpers.window_helper import position_window_at_top
 from modules.helpers.logging_helper import log_module_import
+from modules.dice import dice_engine
 
 log_module_import(__name__)
 
@@ -220,9 +219,13 @@ def _build_dice_models() -> Dict[int, DiceModel]:
 
 DICE_MODELS = _build_dice_models()
 
+SUPPORTED_DICE_SIZES: Tuple[int, ...] = tuple(
+    faces for faces in dice_engine.DEFAULT_DICE_SIZES if faces in DICE_MODELS
+)
+
 
 class DiceRollerWindow(ctk.CTkToplevel):
-    DICE_CHOICES = ("d4", "d6", "d8", "d10", "d12", "d20")
+    DICE_CHOICES = tuple(f"d{faces}" for faces in SUPPORTED_DICE_SIZES)
 
     def __init__(self, master: ctk.CTk):
         super().__init__(master)
@@ -442,84 +445,12 @@ class DiceRollerWindow(ctk.CTkToplevel):
         current = self.formula_var.get().strip()
         combined = fragment if not current else f"{current} + {fragment}"
         try:
-            dice_map, modifier = self._parse_formula(combined)
-        except ValueError as exc:
+            parsed = dice_engine.parse_formula(combined, supported_faces=SUPPORTED_DICE_SIZES)
+        except dice_engine.FormulaError as exc:
             messagebox.showerror("Invalid Formula", str(exc))
             return
-        formatted = self._format_formula(dice_map, modifier)
-        self.formula_var.set(formatted)
+        self.formula_var.set(parsed.canonical())
         self._set_result_text(f"Added {fragment} to formula.")
-
-    def _parse_formula(self, formula: str) -> Tuple[Dict[int, int], int]:
-        cleaned = formula.replace(" ", "").lower()
-        if not cleaned:
-            raise ValueError("Please provide a dice formula.")
-
-        tokens: List[Tuple[str, str]] = []
-        current = ""
-        sign = "+"
-        for char in cleaned:
-            if char in "+-":
-                if current:
-                    tokens.append((sign, current))
-                    current = ""
-                sign = char
-            else:
-                current += char
-        if current:
-            tokens.append((sign, current))
-
-        dice: Dict[int, int] = {}
-        modifier = 0
-        seen_dice_segment = False
-
-        for sign, token in tokens:
-            if not token:
-                raise ValueError("Formula contains an empty segment.")
-            if "d" in token:
-                count_str, _, faces_str = token.partition("d")
-                if not faces_str:
-                    raise ValueError("Missing die size in formula.")
-                count = int(count_str) if count_str else 1
-                faces = int(faces_str)
-                if faces not in DICE_MODELS:
-                    raise ValueError(f"d{faces} is not supported.")
-                if count <= 0:
-                    raise ValueError("Dice count must be positive.")
-                sign_multiplier = -1 if sign == "-" else 1
-                dice[faces] = dice.get(faces, 0) + sign_multiplier * count
-                seen_dice_segment = True
-            else:
-                value = int(token)
-                sign_multiplier = -1 if sign == "-" else 1
-                modifier += sign_multiplier * value
-
-        dice = {faces: count for faces, count in dice.items() if count != 0}
-        for faces, count in dice.items():
-            if count < 0:
-                raise ValueError(f"Negative dice counts detected for d{faces}.")
-
-        if not dice and seen_dice_segment:
-            raise ValueError("All dice cancelled out. Adjust the formula.")
-
-        return dice, modifier
-
-    def _format_formula(self, dice: Dict[int, int], modifier: int) -> str:
-        parts: List[str] = []
-        for faces in sorted(dice):
-            count = dice[faces]
-            if count <= 0:
-                continue
-            token = f"{count}d{faces}" if count != 1 else f"1d{faces}"
-            parts.append(token)
-        if modifier:
-            sign = "+" if modifier > 0 else "-"
-            parts.append(f"{sign} {abs(modifier)}")
-        if not parts:
-            return "0"
-        formatted = " + ".join(parts)
-        formatted = formatted.replace("+ -", "- ")
-        return formatted
 
     # -----------------
     # Rolling & history
@@ -527,65 +458,57 @@ class DiceRollerWindow(ctk.CTkToplevel):
     def roll_dice(self) -> None:
         formula_text = self.formula_var.get()
         try:
-            dice_map, modifier = self._parse_formula(formula_text)
-        except ValueError as exc:
+            parsed = dice_engine.parse_formula(formula_text, supported_faces=SUPPORTED_DICE_SIZES)
+        except dice_engine.FormulaError as exc:
             messagebox.showerror("Invalid Formula", str(exc))
             return
 
-        if not dice_map:
-            messagebox.showerror("Invalid Formula", "Please include at least one die in the formula.")
-            return
-
-        base_counts = dict(dice_map)
         exploding = bool(self.exploding_var.get())
         separate = bool(self.separate_var.get())
 
-        dice_sequence: List[Dict[str, object]] = []
-        grouped_display: Dict[int, List[str]] = defaultdict(list)
-        grouped_totals: Dict[int, int] = defaultdict(int)
-        running_total = 0
+        try:
+            result = dice_engine.roll_parsed_formula(parsed, explode=exploding)
+        except dice_engine.DiceEngineError as exc:
+            messagebox.showerror("Invalid Formula", str(exc))
+            return
 
-        group_index = 0
-        for faces in sorted(dice_map):
-            count = dice_map[faces]
-            for _ in range(count):
-                chain = self._roll_single_die(faces, exploding)
-                chain_entries: List[Dict[str, object]] = []
-                for value, exploded in chain:
-                    running_total += value
-                    display_value = f"{value}{'!' if exploded else ''}"
-                    grouped_display[faces].append(display_value)
-                    grouped_totals[faces] += value
-                    chain_entries.append({"faces": faces, "value": value, "exploded": exploded, "display": display_value, "group": group_index, "chain_end": False})
-                if chain_entries:
-                    chain_entries[-1]["chain_end"] = True
-                    dice_sequence.extend(chain_entries)
-                    group_index += 1
+        canonical = result.canonical()
+        self.formula_var.set(canonical)
 
-        total = running_total + modifier
+        base_counts = dict(result.parsed.dice)
+        modifier = result.modifier
+        total = result.total
+
+        grouped_display: Dict[int, List[str]] = {
+            summary.faces: list(summary.display_values)
+            for summary in result.face_summaries
+        }
+        grouped_totals: Dict[int, int] = {
+            summary.faces: summary.total for summary in result.face_summaries
+        }
 
         breakdown_parts: List[str] = []
-        for faces in sorted(grouped_display):
-            values = grouped_display[faces]
-            base = base_counts.get(faces, len(values))
-            breakdown_parts.append(f"{base}d{faces}: [{', '.join(values)}]")
+        for summary in result.face_summaries:
+            values = summary.display_values
+            if not values:
+                continue
+            breakdown_parts.append(
+                f"{summary.base_count}d{summary.faces}: [{', '.join(values)}]"
+            )
         if modifier:
             breakdown_parts.append(f"modifier {modifier:+d}")
         breakdown_text = " | ".join(breakdown_parts) if breakdown_parts else "0"
 
-        canonical = self._format_formula(dice_map, modifier)
-        self.formula_var.set(canonical)
-
         highlight_spans: List[Tuple[int, int]] = []
         if separate:
             segments: List[str] = []
-            for faces in sorted(grouped_display):
-                values = grouped_display[faces]
+            for summary in result.face_summaries:
+                values = summary.display_values
                 if not values:
                     continue
-                face_total = grouped_totals[faces]
-                base = base_counts.get(faces, len(values))
-                segment = f"{base}d{faces}:[{', '.join(values)}] = {face_total}"
+                segment = (
+                    f"{summary.base_count}d{summary.faces}:[{', '.join(values)}] = {summary.total}"
+                )
                 segments.append(segment)
             if modifier:
                 segments.append(f"modifier {modifier:+d}")
@@ -620,18 +543,40 @@ class DiceRollerWindow(ctk.CTkToplevel):
                 highlight_spans.append((highlight_start, highlight_end))
 
         self._set_result_text(result_text, highlight_spans)
-        self._append_history(canonical, grouped_display, base_counts, grouped_totals, modifier, total, separate)
+        self._append_history(
+            canonical,
+            grouped_display,
+            base_counts,
+            grouped_totals,
+            modifier,
+            total,
+            separate,
+        )
+        dice_sequence = self._build_render_sequence(result)
         self._last_dice_sequence = dice_sequence
         self._render_dice(dice_sequence)
 
-    def _roll_single_die(self, faces: int, exploding: bool) -> List[Tuple[int, bool]]:
-        sequence: List[Tuple[int, bool]] = []
-        keep_rolling = True
-        while keep_rolling:
-            value = random.randint(1, faces)
-            exploded = exploding and faces > 1 and value == faces
-            sequence.append((value, exploded))
-            keep_rolling = exploded
+    def _build_render_sequence(self, result: dice_engine.RollResult) -> List[Dict[str, object]]:
+        sequence: List[Dict[str, object]] = []
+        group_index = 0
+        for chain in result.chains:
+            chain_entries: List[Dict[str, object]] = []
+            for roll in chain.rolls:
+                display_value = f"{roll.value}{'!' if roll.exploded else ''}"
+                chain_entries.append(
+                    {
+                        "faces": chain.faces,
+                        "value": roll.value,
+                        "exploded": roll.exploded,
+                        "display": display_value,
+                        "group": group_index,
+                        "chain_end": False,
+                    }
+                )
+            if chain_entries:
+                chain_entries[-1]["chain_end"] = True
+                sequence.extend(chain_entries)
+                group_index += 1
         return sequence
 
     def _clear_history(self) -> None:
