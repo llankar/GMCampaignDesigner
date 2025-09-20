@@ -1,3 +1,4 @@
+import ctypes
 import os
 import platform
 import random
@@ -103,6 +104,15 @@ class WinMMAudioBackend(BaseAudioBackend):
         self._active: bool = False
         self._timer: Optional[threading.Timer] = None
         self._volume: float = 1.0
+        self._winmm = ctypes.WinDLL("winmm")
+        self._wave_out_handle = ctypes.c_void_p()
+        self._wave_out_set_volume = self._winmm.waveOutSetVolume
+        self._wave_out_get_volume = self._winmm.waveOutGetVolume
+        self._wave_out_set_volume.argtypes = [ctypes.c_void_p, ctypes.c_uint]
+        self._wave_out_set_volume.restype = ctypes.c_uint
+        self._wave_out_get_volume.argtypes = [ctypes.c_void_p, ctypes.POINTER(ctypes.c_uint)]
+        self._wave_out_get_volume.restype = ctypes.c_uint
+        self._initial_volume_raw: Optional[int] = self._get_device_volume_raw()
 
     def load(self, path: str) -> None:
         if not os.path.exists(path):
@@ -141,12 +151,18 @@ class WinMMAudioBackend(BaseAudioBackend):
         return self._active
 
     def set_volume(self, volume: float) -> None:
-        # winsound does not expose volume control; store value for consistency
         self._volume = max(0.0, min(volume, 1.0))
+        if self._set_device_volume(self._volume):
+            return
+        log_warning(
+            "WinMMAudioBackend.set_volume - failed to adjust playback volume via waveOutSetVolume",
+            func_name="WinMMAudioBackend.set_volume",
+        )
 
     def close(self) -> None:
         self.stop()
         self._cleanup_temp()
+        self._restore_initial_volume()
 
     def supports_polling(self) -> bool:
         return True
@@ -227,6 +243,24 @@ class WinMMAudioBackend(BaseAudioBackend):
                 pass
         self._converted_path = None
         self._playback_path = None
+
+    def _get_device_volume_raw(self) -> Optional[int]:
+        value = ctypes.c_uint()
+        result = self._wave_out_get_volume(self._wave_out_handle, ctypes.byref(value))
+        if result != 0:
+            return None
+        return int(value.value)
+
+    def _set_device_volume(self, volume: float) -> bool:
+        level = max(0, min(int(volume * 0xFFFF), 0xFFFF))
+        packed = (level << 16) | level
+        result = self._wave_out_set_volume(self._wave_out_handle, packed)
+        return result == 0
+
+    def _restore_initial_volume(self) -> None:
+        if self._initial_volume_raw is None:
+            return
+        self._wave_out_set_volume(self._wave_out_handle, self._initial_volume_raw)
 
 
 def create_backend() -> BaseAudioBackend:
