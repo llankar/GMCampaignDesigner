@@ -35,6 +35,7 @@ class DiceBarWindow(ctk.CTkToplevel):
 
         self.formula_var = tk.StringVar(value="1d20")
         self.exploding_var = tk.BooleanVar(value=False)
+        self.separate_var = tk.BooleanVar(value=False)
         self.result_var = tk.StringVar(value="Enter a dice formula and roll.")
         self.history_var = tk.StringVar(value=HISTORY_PLACEHOLDER)
 
@@ -82,10 +83,11 @@ class DiceBarWindow(ctk.CTkToplevel):
         content.grid_columnconfigure(1, weight=0)
         content.grid_columnconfigure(2, weight=0)
         content.grid_columnconfigure(3, weight=0)
-        content.grid_columnconfigure(4, weight=3)
-        content.grid_columnconfigure(5, weight=2)
-        content.grid_columnconfigure(6, weight=0)
+        content.grid_columnconfigure(4, weight=0)
+        content.grid_columnconfigure(5, weight=3)
+        content.grid_columnconfigure(6, weight=2)
         content.grid_columnconfigure(7, weight=0)
+        content.grid_columnconfigure(8, weight=0)
         self._content_frame = content
 
         entry = ctk.CTkEntry(content, textvariable=self.formula_var, width=260)
@@ -100,11 +102,18 @@ class DiceBarWindow(ctk.CTkToplevel):
         )
         explode_box.grid(row=0, column=1, padx=4, pady=2, sticky="w")
 
+        separate_box = ctk.CTkCheckBox(
+            content,
+            text="Separate",
+            variable=self.separate_var,
+        )
+        separate_box.grid(row=0, column=2, padx=4, pady=2, sticky="w")
+
         roll_button = ctk.CTkButton(content, text="Roll", width=70, command=self.roll)
-        roll_button.grid(row=0, column=2, padx=4, pady=2, sticky="ew")
+        roll_button.grid(row=0, column=3, padx=4, pady=2, sticky="ew")
 
         preset_frame = ctk.CTkFrame(content, fg_color="transparent")
-        preset_frame.grid(row=0, column=3, padx=6, pady=2, sticky="w")
+        preset_frame.grid(row=0, column=4, padx=6, pady=2, sticky="w")
         for idx, faces in enumerate(SUPPORTED_DICE_SIZES):
             button = ctk.CTkButton(
                 preset_frame,
@@ -120,7 +129,7 @@ class DiceBarWindow(ctk.CTkToplevel):
             anchor="w",
             font=("Segoe UI", 14, "bold"),
         )
-        result_label.grid(row=0, column=4, padx=6, pady=2, sticky="ew")
+        result_label.grid(row=0, column=5, padx=6, pady=2, sticky="ew")
         result_label.bind("<ButtonPress-1>", self._on_drag_start)
         result_label.bind("<B1-Motion>", self._on_drag_motion)
         result_label.bind("<ButtonRelease-1>", self._on_drag_end)
@@ -133,15 +142,15 @@ class DiceBarWindow(ctk.CTkToplevel):
             command=self._on_history_selected,
             width=240,
         )
-        history_menu.grid(row=0, column=5, padx=6, pady=2, sticky="ew")
+        history_menu.grid(row=0, column=6, padx=6, pady=2, sticky="ew")
         history_menu.configure(state="disabled")
         self._history_menu = history_menu
 
         clear_button = ctk.CTkButton(content, text="Clear", width=70, command=self._clear_history)
-        clear_button.grid(row=0, column=6, padx=6, pady=2, sticky="ew")
+        clear_button.grid(row=0, column=7, padx=6, pady=2, sticky="ew")
 
         close_button = ctk.CTkButton(content, text="✕", width=36, command=self._on_close)
-        close_button.grid(row=0, column=7, padx=(6, 10), pady=2, sticky="e")
+        close_button.grid(row=0, column=8, padx=(6, 10), pady=2, sticky="e")
 
         self._update_collapse_button()
 
@@ -159,8 +168,11 @@ class DiceBarWindow(ctk.CTkToplevel):
             self._show_error(str(exc))
             return
 
+        exploding = bool(self.exploding_var.get())
+        separate = bool(self.separate_var.get())
+
         try:
-            result = dice_engine.roll_parsed_formula(parsed, explode=bool(self.exploding_var.get()))
+            result = dice_engine.roll_parsed_formula(parsed, explode=exploding)
         except dice_engine.DiceEngineError as exc:
             self._show_error(str(exc))
             return
@@ -168,18 +180,27 @@ class DiceBarWindow(ctk.CTkToplevel):
         canonical = result.canonical()
         self.formula_var.set(canonical)
 
+        total = result.total
         summary_parts: List[str] = []
         for summary in result.face_summaries:
             values = summary.display_values
             if not values:
                 continue
-            summary_parts.append(f"{summary.base_count}d{summary.faces}:[{', '.join(values)}]")
-        if result.modifier:
-            summary_parts.append(f"mod {result.modifier:+d}")
+            if separate:
+                summary_parts.append(
+                    f"{summary.base_count}d{summary.faces}:[{', '.join(values)}] = {summary.total}"
+                )
+            else:
+                summary_parts.append(f"{summary.base_count}d{summary.faces}:[{', '.join(values)}]")
+        modifier = result.modifier
+        if modifier:
+            summary_parts.append(f"mod {modifier:+d}")
         breakdown = " | ".join(summary_parts) if summary_parts else "0"
 
-        total = result.total
-        self.result_var.set(f"{canonical} = {total}")
+        if separate and breakdown:
+            self.result_var.set(f"{canonical} -> {breakdown} = {total}")
+        else:
+            self.result_var.set(f"{canonical} = {total}")
         self._append_history_entry(canonical, breakdown, total)
 
     def _append_die(self, faces: int) -> None:
@@ -256,6 +277,30 @@ class DiceBarWindow(ctk.CTkToplevel):
         height = 40 if self._is_collapsed else 72
         x = 0
         y = max(screen_height - height, 0)
+
+        audio_window = getattr(self.master, "audio_bar_window", None)
+        if audio_window is not None:
+            try:
+                if audio_window.winfo_exists():
+                    audio_window.update_idletasks()
+                    if audio_window.winfo_viewable():
+                        audio_height = int(audio_window.winfo_height() or 0)
+                        if audio_height <= 1:
+                            geometry = audio_window.geometry()
+                            try:
+                                size_part = geometry.split("x", 1)[1]
+                                height_part = size_part.split("+", 1)[0]
+                                audio_height = int(height_part)
+                            except (IndexError, ValueError):
+                                audio_height = 0
+                        audio_y = int(audio_window.winfo_rooty())
+                        if audio_y <= 0 and audio_height:
+                            audio_y = screen_height - audio_height
+                        spacing = 8
+                        y = max(audio_y - height - spacing, 0)
+            except Exception:
+                pass
+
         self.geometry(f"{screen_width}x{height}+{x}+{y}")
 
     def _show_error(self, message: str) -> None:

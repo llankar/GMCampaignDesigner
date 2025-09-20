@@ -1577,6 +1577,11 @@ class MainWindow(ctk.CTk):
     def _on_audio_bar_destroyed(self, event=None):
         if event is None or event.widget is self.audio_bar_window:
             self.audio_bar_window = None
+            try:
+                if self.dice_bar_window and self.dice_bar_window.winfo_exists():
+                    self.dice_bar_window._apply_geometry()
+            except Exception:
+                pass
 
     def open_dice_bar(self):
         try:
