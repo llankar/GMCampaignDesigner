@@ -36,14 +36,13 @@ class DiceBarWindow(ctk.CTkToplevel):
         self.formula_var = tk.StringVar(value="1d20")
         self.exploding_var = tk.BooleanVar(value=False)
         self.separate_var = tk.BooleanVar(value=False)
-        self.result_var = tk.StringVar(value="Enter a dice formula and roll.")
         self.history_var = tk.StringVar(value=HISTORY_PLACEHOLDER)
 
         self._content_frame: ctk.CTkFrame | None = None
         self._content_grid_options: dict[str, object] | None = None
         self._collapse_button: ctk.CTkButton | None = None
         self._history_menu: ctk.CTkOptionMenu | None = None
-        self._result_label: ctk.CTkLabel | None = None
+        self._result_display: ctk.CTkTextbox | None = None
         self._formula_entry: ctk.CTkEntry | None = None
         self._is_collapsed = False
 
@@ -61,23 +60,25 @@ class DiceBarWindow(ctk.CTkToplevel):
         self.grid_columnconfigure(0, weight=1)
 
         container = ctk.CTkFrame(self, corner_radius=0, fg_color="#101a2a")
-        container.grid(row=0, column=0, sticky="nsew")
+        container.grid(row=0, column=0, sticky="nsew", pady=(0, 0))
         container.grid_columnconfigure(0, weight=0)
         container.grid_columnconfigure(1, weight=0)
         container.grid_columnconfigure(2, weight=1)
 
-        handle = ctk.CTkLabel(container, text="🎲", width=36, font=("Segoe UI", 18))
-        handle.grid(row=0, column=0, padx=(12, 4), pady=2, sticky="w")
+        handle = ctk.CTkLabel(container, text="🎲", width=36, font=("Segoe UI", 16))
+        handle.grid(row=0, column=0, padx=(12, 4), pady=1, sticky="w")
         handle.bind("<ButtonPress-1>", self._on_drag_start)
         handle.bind("<B1-Motion>", self._on_drag_motion)
         handle.bind("<ButtonRelease-1>", self._on_drag_end)
 
-        collapse_button = ctk.CTkButton(container, text="▼", width=28, command=self._toggle_collapsed)
-        collapse_button.grid(row=0, column=1, padx=(0, 6), pady=2, sticky="nsw")
+        collapse_button = ctk.CTkButton(
+            container, text="▼", width=28, height=32, command=self._toggle_collapsed
+        )
+        collapse_button.grid(row=0, column=1, padx=(0, 6), pady=1, sticky="nsw")
         self._collapse_button = collapse_button
 
         content = ctk.CTkFrame(container, corner_radius=0, fg_color="transparent")
-        self._content_grid_options = {"row": 0, "column": 2, "padx": (0, 12), "pady": 2, "sticky": "nsew"}
+        self._content_grid_options = {"row": 0, "column": 2, "padx": (0, 12), "pady": 1, "sticky": "nsew"}
         content.grid(**self._content_grid_options)
         content.grid_columnconfigure(0, weight=2)
         content.grid_columnconfigure(1, weight=0)
@@ -90,8 +91,8 @@ class DiceBarWindow(ctk.CTkToplevel):
         content.grid_columnconfigure(8, weight=0)
         self._content_frame = content
 
-        entry = ctk.CTkEntry(content, textvariable=self.formula_var, width=260)
-        entry.grid(row=0, column=0, padx=(6, 6), pady=2, sticky="ew")
+        entry = ctk.CTkEntry(content, textvariable=self.formula_var, width=260, height=32)
+        entry.grid(row=0, column=0, padx=(6, 6), pady=1, sticky="ew")
         entry.bind("<Return>", lambda _event: self.roll())
         self._formula_entry = entry
 
@@ -100,40 +101,45 @@ class DiceBarWindow(ctk.CTkToplevel):
             text="Explode",
             variable=self.exploding_var,
         )
-        explode_box.grid(row=0, column=1, padx=4, pady=2, sticky="w")
+        explode_box.grid(row=0, column=1, padx=4, pady=1, sticky="w")
 
         separate_box = ctk.CTkCheckBox(
             content,
             text="Separate",
             variable=self.separate_var,
         )
-        separate_box.grid(row=0, column=2, padx=4, pady=2, sticky="w")
+        separate_box.grid(row=0, column=2, padx=4, pady=1, sticky="w")
 
-        roll_button = ctk.CTkButton(content, text="Roll", width=70, command=self.roll)
-        roll_button.grid(row=0, column=3, padx=4, pady=2, sticky="ew")
+        roll_button = ctk.CTkButton(content, text="Roll", width=70, height=32, command=self.roll)
+        roll_button.grid(row=0, column=3, padx=4, pady=1, sticky="ew")
 
         preset_frame = ctk.CTkFrame(content, fg_color="transparent")
-        preset_frame.grid(row=0, column=4, padx=6, pady=2, sticky="w")
+        preset_frame.grid(row=0, column=4, padx=6, pady=1, sticky="w")
         for idx, faces in enumerate(SUPPORTED_DICE_SIZES):
             button = ctk.CTkButton(
                 preset_frame,
                 text=f"d{faces}",
                 width=48,
+                height=32,
                 command=lambda f=faces: self._append_die(f),
             )
-            button.grid(row=0, column=idx, padx=2, pady=2)
+            button.grid(row=0, column=idx, padx=2, pady=1)
 
-        result_label = ctk.CTkLabel(
+        result_display = ctk.CTkTextbox(
             content,
-            textvariable=self.result_var,
-            anchor="w",
+            height=40,
+            wrap="word",
+            activate_scrollbars=False,
             font=("Segoe UI", 14, "bold"),
         )
-        result_label.grid(row=0, column=5, padx=6, pady=2, sticky="ew")
-        result_label.bind("<ButtonPress-1>", self._on_drag_start)
-        result_label.bind("<B1-Motion>", self._on_drag_motion)
-        result_label.bind("<ButtonRelease-1>", self._on_drag_end)
-        self._result_label = result_label
+        result_display.grid(row=0, column=5, padx=6, pady=1, sticky="ew")
+        result_display.configure(state="disabled")
+        result_display.tag_config("result_highlight", foreground="#ffd166")
+        result_display.bind("<ButtonPress-1>", self._on_drag_start)
+        result_display.bind("<B1-Motion>", self._on_drag_motion)
+        result_display.bind("<ButtonRelease-1>", self._on_drag_end)
+        result_display.configure(cursor="arrow")
+        self._result_display = result_display
 
         history_menu = ctk.CTkOptionMenu(
             content,
@@ -141,18 +147,23 @@ class DiceBarWindow(ctk.CTkToplevel):
             values=[HISTORY_PLACEHOLDER],
             command=self._on_history_selected,
             width=240,
+            height=32,
         )
-        history_menu.grid(row=0, column=6, padx=6, pady=2, sticky="ew")
+        history_menu.grid(row=0, column=6, padx=6, pady=1, sticky="ew")
         history_menu.configure(state="disabled")
         self._history_menu = history_menu
 
-        clear_button = ctk.CTkButton(content, text="Clear", width=70, command=self._clear_history)
-        clear_button.grid(row=0, column=7, padx=6, pady=2, sticky="ew")
+        clear_button = ctk.CTkButton(
+            content, text="Clear", width=70, height=32, command=self._clear_history
+        )
+        clear_button.grid(row=0, column=7, padx=6, pady=1, sticky="ew")
 
-        close_button = ctk.CTkButton(content, text="✕", width=36, command=self._on_close)
-        close_button.grid(row=0, column=8, padx=(6, 10), pady=2, sticky="e")
+        close_button = ctk.CTkButton(content, text="✕", width=36, height=32, command=self._on_close)
+        close_button.grid(row=0, column=8, padx=(6, 10), pady=1, sticky="e")
 
         self._update_collapse_button()
+
+        self._set_result_text("Enter a dice formula and roll.")
 
         if self._formula_entry is not None:
             self.after(0, self._formula_entry.focus_set)
@@ -180,8 +191,8 @@ class DiceBarWindow(ctk.CTkToplevel):
         canonical = result.canonical()
         self.formula_var.set(canonical)
 
-        display_text, history_text = self._format_roll_output(result, separate)
-        self.result_var.set(display_text)
+        display_text, history_text, highlight_spans = self._format_roll_output(result, separate)
+        self._set_result_text(display_text, highlight_spans)
         self._append_history_entry(history_text)
 
     def _append_die(self, faces: int) -> None:
@@ -194,11 +205,11 @@ class DiceBarWindow(ctk.CTkToplevel):
             self._show_error(str(exc))
             return
         self.formula_var.set(parsed.canonical())
-        self.result_var.set(f"Added {fragment} to formula.")
+        self._set_result_text(f"Added {fragment} to formula.")
 
     def _format_roll_output(
         self, result: dice_engine.RollResult, separate: bool
-    ) -> Tuple[str, str]:
+    ) -> Tuple[str, str, List[Tuple[int, int]]]:
         canonical = result.canonical()
         modifier = result.modifier
         total = result.total
@@ -224,21 +235,54 @@ class DiceBarWindow(ctk.CTkToplevel):
             breakdown = " | ".join(parts) if parts else "0"
             base_text = f"{canonical} -> {breakdown}"
             total_text = f"Total = {highlight(total)}"
-            display_text = f"{base_text} | {total_text}" if base_text else total_text
-            history_text = display_text
-            return display_text, history_text
+            display_markup = f"{base_text} | {total_text}" if base_text else total_text
+            history_markup = display_markup
+        else:
+            summary_parts: List[str] = []
+            for summary in result.face_summaries:
+                values = summary.display_values
+                if not values:
+                    continue
+                summary_parts.append(f"{summary.base_count}d{summary.faces}:[{', '.join(values)}]")
+            if modifier:
+                summary_parts.append(f"mod {modifier:+d}")
+            breakdown = " | ".join(summary_parts) if summary_parts else "0"
+            display_markup = f"{canonical} -> {breakdown} = {highlight(total)}"
+            history_markup = display_markup
 
-        summary_parts: List[str] = []
-        for summary in result.face_summaries:
-            values = summary.display_values
-            if not values:
-                continue
-            summary_parts.append(f"{summary.base_count}d{summary.faces}:[{', '.join(values)}]")
-        if modifier:
-            summary_parts.append(f"mod {modifier:+d}")
-        breakdown = " | ".join(summary_parts) if summary_parts else "0"
-        display_text = f"{canonical} -> {breakdown} = {highlight(total)}"
-        return display_text, display_text
+        display_text, highlight_spans = self._strip_highlight_markup(display_markup)
+        history_text, _ = self._strip_highlight_markup(history_markup)
+        return display_text, history_text, highlight_spans
+
+    @staticmethod
+    def _strip_highlight_markup(text: str) -> Tuple[str, List[Tuple[int, int]]]:
+        if "⟦" not in text:
+            return text, []
+        output: List[str] = []
+        spans: List[Tuple[int, int]] = []
+        cursor = 0
+        idx = 0
+        length = len(text)
+        while idx < length:
+            if text[idx] == "⟦":
+                end = text.find("⟧", idx + 1)
+                if end == -1:
+                    output.append(text[idx])
+                    cursor += 1
+                    idx += 1
+                    continue
+                segment = text[idx + 1 : end]
+                if segment:
+                    start = cursor
+                    output.append(segment)
+                    cursor += len(segment)
+                    spans.append((start, start + len(segment)))
+                idx = end + 1
+            else:
+                output.append(text[idx])
+                cursor += 1
+                idx += 1
+        return "".join(output), spans
 
     def _append_history_entry(self, text: str) -> None:
         timestamp = time.strftime("%H:%M:%S")
@@ -249,7 +293,7 @@ class DiceBarWindow(ctk.CTkToplevel):
     def _clear_history(self) -> None:
         self._history.clear()
         self._update_history_menu()
-        self.result_var.set("History cleared. Ready for new rolls.")
+        self._set_result_text("History cleared. Ready for new rolls.")
 
     def _update_history_menu(self) -> None:
         if self._history_menu is None:
@@ -276,7 +320,7 @@ class DiceBarWindow(ctk.CTkToplevel):
         canonical = remainder.split(" ->", 1)[0].strip()
         if canonical:
             self.formula_var.set(canonical)
-        self.result_var.set(choice)
+        self._set_result_text(choice)
         try:
             self.clipboard_clear()
             self.clipboard_append(choice)
@@ -307,7 +351,7 @@ class DiceBarWindow(ctk.CTkToplevel):
         if self._is_collapsed:
             min_height = 32
         else:
-            min_height = 48
+            min_height = 44
 
         requested = int(self.winfo_reqheight() or 0)
         current = int(self.winfo_height() or 0)
@@ -341,7 +385,24 @@ class DiceBarWindow(ctk.CTkToplevel):
         self.geometry(f"{screen_width}x{height}+{x}+{y}")
 
     def _show_error(self, message: str) -> None:
-        self.result_var.set(f"⚠️ {message}")
+        self._set_result_text(f"⚠️ {message}")
+
+    def _set_result_text(
+        self, text: str, highlights: List[Tuple[int, int]] | None = None
+    ) -> None:
+        display = self._result_display
+        if display is None:
+            return
+        display.configure(state="normal")
+        display.delete("1.0", "end")
+        display.insert("end", text)
+        display.tag_remove("result_highlight", "1.0", "end")
+        if highlights:
+            for start, end in highlights:
+                if end <= start:
+                    continue
+                display.tag_add("result_highlight", f"1.0+{start}c", f"1.0+{end}c")
+        display.configure(state="disabled")
 
     def _toggle_collapsed(self) -> None:
         self._is_collapsed = not self._is_collapsed
@@ -354,7 +415,7 @@ class DiceBarWindow(ctk.CTkToplevel):
                 if options:
                     frame.grid(**options)
                 else:
-                    frame.grid(row=0, column=2, padx=(0, 12), pady=2, sticky="nsew")
+                    frame.grid(row=0, column=2, padx=(0, 12), pady=1, sticky="nsew")
         self._update_collapse_button()
         self.after(0, self._apply_geometry)
 
