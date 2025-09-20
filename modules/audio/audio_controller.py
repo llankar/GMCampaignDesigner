@@ -219,6 +219,10 @@ class AudioController:
                 state["is_playing"] = False
                 if state.get("current_track"):
                     state["last_track"] = state["current_track"]
+            elif event == "stopped":
+                state["is_playing"] = False
+            elif event == "playlist_ended":
+                state["is_playing"] = False
                 state["current_track"] = None
             elif event == "volume_changed":
                 state["volume"] = float(payload.get("value", state.get("volume", 0.0)))
