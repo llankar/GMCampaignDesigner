@@ -101,6 +101,7 @@ class MainWindow(ctk.CTk):
         root = self.winfo_toplevel()
         root.bind_all("<Control-f>", self._on_ctrl_f)
 
+        self.after(200, self.open_dice_bar)
         self.after(400, self.open_audio_bar)
 
     def open_ai_settings(self):
