@@ -15,6 +15,7 @@ from modules.helpers.logging_helper import log_module_import
 log_module_import(__name__)
 
 SUPPORTED_DICE_SIZES: Tuple[int, ...] = dice_engine.DEFAULT_DICE_SIZES
+HISTORY_PLACEHOLDER = "History empty"
 
 
 class DiceBarWindow(ctk.CTkToplevel):
@@ -35,10 +36,15 @@ class DiceBarWindow(ctk.CTkToplevel):
         self.formula_var = tk.StringVar(value="1d20")
         self.exploding_var = tk.BooleanVar(value=False)
         self.result_var = tk.StringVar(value="Enter a dice formula and roll.")
+        self.history_var = tk.StringVar(value=HISTORY_PLACEHOLDER)
 
-        self._history_box: ctk.CTkTextbox | None = None
+        self._content_frame: ctk.CTkFrame | None = None
+        self._content_grid_options: dict[str, object] | None = None
+        self._collapse_button: ctk.CTkButton | None = None
+        self._history_menu: ctk.CTkOptionMenu | None = None
         self._result_label: ctk.CTkLabel | None = None
         self._formula_entry: ctk.CTkEntry | None = None
+        self._is_collapsed = False
 
         self._build_ui()
         self._apply_geometry()
@@ -53,71 +59,91 @@ class DiceBarWindow(ctk.CTkToplevel):
         self.grid_rowconfigure(0, weight=1)
         self.grid_columnconfigure(0, weight=1)
 
-        container = ctk.CTkFrame(self, corner_radius=12, fg_color="#101a2a")
-        container.grid(row=0, column=0, padx=8, pady=8, sticky="nsew")
-        container.grid_columnconfigure(1, weight=1)
-        container.grid_columnconfigure(2, weight=0)
-        container.grid_columnconfigure(3, weight=0)
-        container.grid_columnconfigure(4, weight=0)
+        container = ctk.CTkFrame(self, corner_radius=0, fg_color="#101a2a")
+        container.grid(row=0, column=0, sticky="nsew")
+        container.grid_columnconfigure(0, weight=0)
+        container.grid_columnconfigure(1, weight=0)
+        container.grid_columnconfigure(2, weight=1)
 
-        handle = ctk.CTkLabel(container, text="🎲", width=28, font=("Segoe UI", 18))
-        handle.grid(row=0, column=0, padx=(10, 4), pady=6, sticky="w")
+        handle = ctk.CTkLabel(container, text="🎲", width=36, font=("Segoe UI", 18))
+        handle.grid(row=0, column=0, padx=(12, 4), pady=4, sticky="w")
         handle.bind("<ButtonPress-1>", self._on_drag_start)
         handle.bind("<B1-Motion>", self._on_drag_motion)
         handle.bind("<ButtonRelease-1>", self._on_drag_end)
 
-        entry = ctk.CTkEntry(container, textvariable=self.formula_var, width=220)
-        entry.grid(row=0, column=1, padx=4, pady=6, sticky="ew")
+        collapse_button = ctk.CTkButton(container, text="▼", width=28, command=self._toggle_collapsed)
+        collapse_button.grid(row=0, column=1, padx=(0, 6), pady=4, sticky="nsw")
+        self._collapse_button = collapse_button
+
+        content = ctk.CTkFrame(container, corner_radius=0, fg_color="transparent")
+        self._content_grid_options = {"row": 0, "column": 2, "padx": (0, 12), "pady": 4, "sticky": "nsew"}
+        content.grid(**self._content_grid_options)
+        content.grid_columnconfigure(0, weight=2)
+        content.grid_columnconfigure(1, weight=0)
+        content.grid_columnconfigure(2, weight=0)
+        content.grid_columnconfigure(3, weight=0)
+        content.grid_columnconfigure(4, weight=3)
+        content.grid_columnconfigure(5, weight=2)
+        content.grid_columnconfigure(6, weight=0)
+        content.grid_columnconfigure(7, weight=0)
+        self._content_frame = content
+
+        entry = ctk.CTkEntry(content, textvariable=self.formula_var, width=260)
+        entry.grid(row=0, column=0, padx=(6, 6), pady=2, sticky="ew")
         entry.bind("<Return>", lambda _event: self.roll())
         self._formula_entry = entry
 
         explode_box = ctk.CTkCheckBox(
-            container,
+            content,
             text="Explode",
             variable=self.exploding_var,
         )
-        explode_box.grid(row=0, column=2, padx=4, pady=6, sticky="w")
+        explode_box.grid(row=0, column=1, padx=4, pady=2, sticky="w")
 
-        roll_button = ctk.CTkButton(container, text="Roll", width=70, command=self.roll)
-        roll_button.grid(row=0, column=3, padx=4, pady=6, sticky="ew")
+        roll_button = ctk.CTkButton(content, text="Roll", width=70, command=self.roll)
+        roll_button.grid(row=0, column=2, padx=4, pady=2, sticky="ew")
 
-        close_button = ctk.CTkButton(container, text="✕", width=32, command=self._on_close)
-        close_button.grid(row=0, column=4, padx=(4, 10), pady=6, sticky="e")
-
-        preset_frame = ctk.CTkFrame(container, fg_color="#0f1725")
-        preset_frame.grid(row=1, column=0, columnspan=5, padx=10, pady=(0, 6), sticky="ew")
+        preset_frame = ctk.CTkFrame(content, fg_color="transparent")
+        preset_frame.grid(row=0, column=3, padx=6, pady=2, sticky="w")
         for idx, faces in enumerate(SUPPORTED_DICE_SIZES):
             button = ctk.CTkButton(
                 preset_frame,
                 text=f"d{faces}",
-                width=52,
+                width=48,
                 command=lambda f=faces: self._append_die(f),
             )
-            button.grid(row=0, column=idx, padx=3, pady=4)
+            button.grid(row=0, column=idx, padx=2, pady=2)
 
         result_label = ctk.CTkLabel(
-            container,
+            content,
             textvariable=self.result_var,
             anchor="w",
-            wraplength=420,
             font=("Segoe UI", 14, "bold"),
         )
-        result_label.grid(row=2, column=0, columnspan=4, padx=(12, 4), pady=(4, 2), sticky="ew")
+        result_label.grid(row=0, column=4, padx=6, pady=2, sticky="ew")
         result_label.bind("<ButtonPress-1>", self._on_drag_start)
         result_label.bind("<B1-Motion>", self._on_drag_motion)
         result_label.bind("<ButtonRelease-1>", self._on_drag_end)
         self._result_label = result_label
 
-        clear_button = ctk.CTkButton(container, text="Clear", width=60, command=self._clear_history)
-        clear_button.grid(row=2, column=4, padx=(4, 12), pady=(4, 2), sticky="e")
+        history_menu = ctk.CTkOptionMenu(
+            content,
+            variable=self.history_var,
+            values=[HISTORY_PLACEHOLDER],
+            command=self._on_history_selected,
+            width=240,
+        )
+        history_menu.grid(row=0, column=5, padx=6, pady=2, sticky="ew")
+        history_menu.configure(state="disabled")
+        self._history_menu = history_menu
 
-        history_box = ctk.CTkTextbox(container, height=90, activate_scrollbars=False, wrap="word")
-        history_box.grid(row=3, column=0, columnspan=5, padx=12, pady=(0, 10), sticky="nsew")
-        history_box.configure(state="disabled")
-        history_box.bind("<ButtonPress-1>", self._on_drag_start)
-        history_box.bind("<B1-Motion>", self._on_drag_motion)
-        history_box.bind("<ButtonRelease-1>", self._on_drag_end)
-        self._history_box = history_box
+        clear_button = ctk.CTkButton(content, text="Clear", width=70, command=self._clear_history)
+        clear_button.grid(row=0, column=6, padx=6, pady=2, sticky="ew")
+
+        close_button = ctk.CTkButton(content, text="✕", width=36, command=self._on_close)
+        close_button.grid(row=0, column=7, padx=(6, 10), pady=2, sticky="e")
+
+        self._update_collapse_button()
 
         if self._formula_entry is not None:
             self.after(0, self._formula_entry.focus_set)
@@ -172,22 +198,44 @@ class DiceBarWindow(ctk.CTkToplevel):
         timestamp = time.strftime("%H:%M:%S")
         entry = f"[{timestamp}] {canonical} -> {breakdown} = {total}"
         self._history.append(entry)
-        if self._history_box is None:
-            return
-        self._history_box.configure(state="normal")
-        self._history_box.delete("1.0", "end")
-        for line in self._history:
-            self._history_box.insert("end", line + "\n")
-        self._history_box.configure(state="disabled")
-        self._history_box.see("end")
+        self._update_history_menu()
 
     def _clear_history(self) -> None:
         self._history.clear()
-        if self._history_box is not None:
-            self._history_box.configure(state="normal")
-            self._history_box.delete("1.0", "end")
-            self._history_box.configure(state="disabled")
+        self._update_history_menu()
         self.result_var.set("History cleared. Ready for new rolls.")
+
+    def _update_history_menu(self) -> None:
+        if self._history_menu is None:
+            return
+        entries = list(self._history)
+        if entries:
+            display_entries = list(reversed(entries))
+            self._history_menu.configure(values=display_entries)
+            self._history_menu.configure(state="normal")
+            self.history_var.set(display_entries[0])
+        else:
+            self._history_menu.configure(values=[HISTORY_PLACEHOLDER])
+            self._history_menu.configure(state="disabled")
+            self.history_var.set(HISTORY_PLACEHOLDER)
+
+    def _on_history_selected(self, choice: str) -> None:
+        if not choice or choice == HISTORY_PLACEHOLDER:
+            return
+        try:
+            close_idx = choice.index("] ")
+            remainder = choice[close_idx + 2 :]
+        except ValueError:
+            remainder = choice
+        canonical = remainder.split(" ->", 1)[0].strip()
+        if canonical:
+            self.formula_var.set(canonical)
+        self.result_var.set(choice)
+        try:
+            self.clipboard_clear()
+            self.clipboard_append(choice)
+        except Exception:
+            pass
 
     # ------------------------------------------------------------------
     # Window helpers
@@ -203,14 +251,35 @@ class DiceBarWindow(ctk.CTkToplevel):
             pass
 
     def _apply_geometry(self) -> None:
-        width, height = 560, 180
         screen_width = self.winfo_screenwidth()
-        x = max(screen_width - width - 60, 40)
-        y = 60
-        self.geometry(f"{width}x{height}+{x}+{y}")
+        screen_height = self.winfo_screenheight()
+        height = 40 if self._is_collapsed else 72
+        x = 0
+        y = max(screen_height - height, 0)
+        self.geometry(f"{screen_width}x{height}+{x}+{y}")
 
     def _show_error(self, message: str) -> None:
         self.result_var.set(f"⚠️ {message}")
+
+    def _toggle_collapsed(self) -> None:
+        self._is_collapsed = not self._is_collapsed
+        frame = self._content_frame
+        if frame is not None:
+            if self._is_collapsed:
+                frame.grid_remove()
+            else:
+                options = self._content_grid_options or {}
+                if options:
+                    frame.grid(**options)
+                else:
+                    frame.grid(row=0, column=2, padx=(0, 12), pady=4, sticky="nsew")
+        self._update_collapse_button()
+        self.after(0, self._apply_geometry)
+
+    def _update_collapse_button(self) -> None:
+        if self._collapse_button is None:
+            return
+        self._collapse_button.configure(text="▲" if self._is_collapsed else "▼")
 
     def _on_drag_start(self, event: tk.Event) -> None:
         self._drag_offset = (event.x_root - self.winfo_x(), event.y_root - self.winfo_y())
