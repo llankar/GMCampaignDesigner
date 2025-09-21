@@ -85,7 +85,9 @@
       "volume": 1.0,
       "shuffle": true,
       "loop": true,
-      "last_directory": "D:/Music/Macross Δ - 1st Album - Walküre Attack! - Walküre"
+      "last_directory": "D:/Music/Macross Δ - 1st Album - Walküre Attack! - Walküre",
+      "last_category": "Fantasy",
+      "last_track_id": "70eafcd310b342388e32b361b3566bcf"
     }
   },
   "effects": {
@@ -103,10 +105,12 @@
       }
     },
     "settings": {
-      "volume": 0.75,
+      "volume": 1.0,
       "shuffle": false,
       "loop": false,
-      "last_directory": "D:\\Music\\Macross Δ - 1st Album - Walküre Attack! - Walküre"
+      "last_directory": "D:\\Music\\Macross Δ - 1st Album - Walküre Attack! - Walküre",
+      "last_category": "Horror",
+      "last_track_id": "a164b6f680aa4fff96d7cc105b01a7ca"
     }
   }
 }
