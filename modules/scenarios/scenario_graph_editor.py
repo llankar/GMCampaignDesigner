@@ -85,6 +85,11 @@ class ScenarioGraphEditor(ctk.CTkFrame):
         self.scene_flow_scenes = []
         self.scene_flow_scene_lookup = {}
 
+        # Tooltip state for scene entity portraits
+        self._entity_tooltip_window = None
+        self._entity_tooltip_after_id = None
+        self._entity_tooltip_pending = None
+
         self.init_toolbar()
         postit_path = "assets/images/post-it.png"
         pin_path = "assets/images/thumbtack.png"
@@ -731,10 +736,12 @@ class ScenarioGraphEditor(ctk.CTkFrame):
                 seen_pairs.add(key)
                 record = self._lookup_entity_by_name(ent_type, cleaned)
                 portrait = self._extract_entity_image(record, ent_type) if record else ""
+                synopsis = self._build_entity_synopsis(ent_type, record) if record else ""
                 entities.append({
                     "type": ent_type,
                     "name": cleaned,
-                    "portrait": portrait
+                    "portrait": portrait,
+                    "synopsis": synopsis
                 })
 
         add_entities(npc_names, "npc")
@@ -921,6 +928,188 @@ class ScenarioGraphEditor(ctk.CTkFrame):
                 return value
         return None
 
+    def _normalize_synopsis_text(self, value, max_length=240):
+        if value is None:
+            return ""
+        snippet = clean_longtext(value, max_length=max_length)
+        snippet = snippet.strip()
+        if not snippet:
+            return ""
+        if snippet.lower() == "none":
+            return ""
+        return snippet
+
+    def _build_entity_synopsis(self, entity_type, record):
+        if not isinstance(record, dict):
+            return ""
+
+        type_specific = {
+            "npc": [
+                "Synopsis", "Summary", "Description", "Background",
+                "Traits", "Role", "Motivation", "Personality",
+                "RoleplayingCues", "Quote"
+            ],
+            "creature": [
+                "Synopsis", "Summary", "Description", "Background",
+                "Type", "Powers", "Weakness", "Stats"
+            ],
+            "place": [
+                "Synopsis", "Summary", "Description", "Background",
+                "Secrets", "Tags"
+            ],
+        }
+        fallback_fields = [
+            "Synopsis", "Summary", "Description", "Background",
+            "Notes", "Details", "Text"
+        ]
+
+        fields = type_specific.get(entity_type, []) + fallback_fields
+        seen = set()
+        for field in fields:
+            key = field.lower()
+            if key in seen:
+                continue
+            seen.add(key)
+            snippet = self._normalize_synopsis_text(record.get(field))
+            if snippet:
+                return snippet
+
+        # Assemble a short synopsis from smaller fields if needed
+        composite_map = {
+            "npc": [("Role", "Role"), ("Motivation", "Motivation"), ("Traits", "Traits")],
+            "creature": [("Type", "Type"), ("Powers", "Powers"), ("Weakness", "Weakness")],
+            "place": [("Tags", "Tags"), ("Population", "Population"), ("Secrets", "Secrets")],
+        }
+        parts = []
+        for label, key in composite_map.get(entity_type, []):
+            snippet = self._normalize_synopsis_text(record.get(key), max_length=120)
+            if snippet:
+                parts.append(f"{label}: {snippet}")
+            if len(parts) >= 2:
+                break
+        if parts:
+            return "\n".join(parts)
+
+        return ""
+
+    def _get_entity_synopsis_for_display(self, entity):
+        if not isinstance(entity, dict):
+            return ""
+        synopsis = entity.get("synopsis")
+        synopsis = self._normalize_synopsis_text(synopsis) if synopsis else ""
+        if synopsis:
+            return synopsis
+        for key in ("Summary", "summary", "Description", "description", "Text", "text", "Notes", "notes"):
+            value = entity.get(key)
+            snippet = self._normalize_synopsis_text(value)
+            if snippet:
+                return snippet
+        return ""
+
+    def _compose_entity_tooltip_text(self, entity_info):
+        if not isinstance(entity_info, dict):
+            return ""
+        name = entity_info.get("name", "") or ""
+        ent_type = entity_info.get("type", "") or ""
+        synopsis = entity_info.get("synopsis", "") or ""
+        synopsis = self._normalize_synopsis_text(synopsis)
+        header = ""
+        if name and ent_type:
+            header = f"{name} ({ent_type.title()})"
+        elif name:
+            header = name
+        elif ent_type:
+            header = ent_type.title()
+
+        if synopsis:
+            if header:
+                return f"{header}\n\n{synopsis}"
+            return synopsis
+        fallback = "No synopsis available."
+        if header:
+            return f"{header}\n\n{fallback}"
+        return fallback
+
+    def _cancel_entity_tooltip_schedule(self):
+        if self._entity_tooltip_after_id:
+            try:
+                self.after_cancel(self._entity_tooltip_after_id)
+            except Exception:
+                pass
+            self._entity_tooltip_after_id = None
+        self._entity_tooltip_pending = None
+
+    def _hide_entity_tooltip(self):
+        if self._entity_tooltip_window:
+            try:
+                self._entity_tooltip_window.destroy()
+            except Exception:
+                pass
+            self._entity_tooltip_window = None
+
+    def _dismiss_entity_tooltip(self):
+        self._cancel_entity_tooltip_schedule()
+        self._hide_entity_tooltip()
+
+    def _schedule_entity_tooltip(self, root_x, root_y, entity_info):
+        self._cancel_entity_tooltip_schedule()
+        self._entity_tooltip_pending = (root_x, root_y, entity_info)
+        self._entity_tooltip_after_id = self.after(
+            250,
+            lambda: self._show_entity_tooltip_at(root_x, root_y, entity_info)
+        )
+
+    def _show_entity_tooltip_at(self, root_x, root_y, entity_info):
+        self._entity_tooltip_after_id = None
+        self._entity_tooltip_pending = None
+        text = self._compose_entity_tooltip_text(entity_info)
+        if not text:
+            return
+        self._hide_entity_tooltip()
+        tw = tk.Toplevel(self.canvas)
+        tw.wm_overrideredirect(True)
+        try:
+            tw.attributes("-topmost", True)
+        except Exception:
+            pass
+        offset_x = int(root_x + 16)
+        offset_y = int(root_y + 24)
+        tw.wm_geometry(f"+{offset_x}+{offset_y}")
+        label = tk.Label(
+            tw,
+            text=text,
+            justify="left",
+            background="#ffffe0",
+            relief="solid",
+            borderwidth=1,
+            font=("Segoe UI", 9, "normal"),
+            padx=6,
+            pady=4,
+            wraplength=320,
+        )
+        label.pack()
+        self._entity_tooltip_window = tw
+
+    def _on_entity_hover_enter(self, event, entity_info):
+        root_x = self.canvas.winfo_rootx() + event.x
+        root_y = self.canvas.winfo_rooty() + event.y
+        self._schedule_entity_tooltip(root_x, root_y, entity_info)
+
+    def _on_entity_hover_leave(self, event=None):
+        self._dismiss_entity_tooltip()
+
+    def _bind_entity_tooltip(self, tag, entity_info):
+        if not self.canvas:
+            return
+        self.canvas.tag_bind(
+            tag,
+            "<Enter>",
+            lambda event, info=entity_info: self._on_entity_hover_enter(event, info),
+            add="+"
+        )
+        self.canvas.tag_bind(tag, "<Leave>", self._on_entity_hover_leave, add="+")
+        self.canvas.tag_bind(tag, "<ButtonPress>", self._on_entity_hover_leave, add="+")
+
     def _find_mentions(self, text, candidates):
         if not text or not candidates:
             return []
@@ -1069,6 +1258,7 @@ class ScenarioGraphEditor(ctk.CTkFrame):
         return slug.strip('-')
 
     def draw_graph(self):
+        self._dismiss_entity_tooltip()
         self.canvas.delete("node")
         self.canvas.delete("link")
         self.node_rectangles.clear()
@@ -1459,8 +1649,18 @@ class ScenarioGraphEditor(ctk.CTkFrame):
                     if portrait_path:
                         icon = self.load_thumbnail(portrait_path, thumb_key, (thumb_size, thumb_size))
                     if icon is None:
-                        entity_type = (entity.get("type") or "").lower()
+                        entity_type_value = entity.get("type") or entity.get("Type") or ""
+                        entity_type = entity_type_value.lower()
                         icon = self.type_icons.get(entity_type)
+                    else:
+                        entity_type_value = entity.get("type") or entity.get("Type") or ""
+                    tooltip_synopsis = self._get_entity_synopsis_for_display(entity)
+                    tooltip_info = {
+                        "name": name,
+                        "type": entity_type_value or entity.get("type") or "",
+                        "synopsis": tooltip_synopsis,
+                    }
+                    entity_tag = f"{node_tag}_entity_{idx}"
                     icon_x = row_left + idx * (thumb_size + thumb_gap) + thumb_size / 2
                     if icon is not None:
                         self.canvas.create_image(
@@ -1468,8 +1668,9 @@ class ScenarioGraphEditor(ctk.CTkFrame):
                             icons_y,
                             image=icon,
                             anchor="center",
-                            tags=("node", node_tag)
+                            tags=("node", node_tag, entity_tag)
                         )
+                        self._bind_entity_tooltip(entity_tag, tooltip_info)
                     else:
                         color = self._entity_placeholder_color(entity.get("type"))
                         radius = thumb_size / 2
@@ -1480,7 +1681,7 @@ class ScenarioGraphEditor(ctk.CTkFrame):
                             icons_y + radius,
                             fill=color,
                             outline="",
-                            tags=("node", node_tag)
+                            tags=("node", node_tag, entity_tag)
                         )
                         initial = (name or "?")[0].upper()
                         marker_font = tkFont.Font(family="Arial", size=max(1, int(10 * scale)), weight="bold")
@@ -1490,8 +1691,9 @@ class ScenarioGraphEditor(ctk.CTkFrame):
                             text=initial,
                             font=marker_font,
                             fill="white",
-                            tags=("node", node_tag)
+                            tags=("node", node_tag, entity_tag)
                         )
+                        self._bind_entity_tooltip(entity_tag, tooltip_info)
 
             # Record bounding box for hit-testing
             self.node_bboxes[node_tag] = (
