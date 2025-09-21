@@ -9,14 +9,13 @@ from modules.generic.generic_model_wrapper import GenericModelWrapper
 from modules.helpers.template_loader import load_template as load_entity_template
 from modules.helpers.text_helpers import format_multiline_text
 from customtkinter import CTkLabel, CTkImage
-from modules.generic.entity_detail_factory import create_entity_detail_frame, build_entity_tooltip
+from modules.generic.entity_detail_factory import create_entity_detail_frame
 from modules.npcs.npc_graph_editor import NPCGraphEditor
 from modules.pcs.pc_graph_editor import PCGraphEditor
 from modules.scenarios.scenario_graph_editor import ScenarioGraphEditor
 from modules.generic.generic_list_selection_view import GenericListSelectionView
 from modules.helpers.config_helper import ConfigHelper
 import random
-from modules.ui.tooltip import ToolTip
 from modules.helpers.logging_helper import (
     log_function,
     log_info,
@@ -36,7 +35,6 @@ class GMScreenView(ctk.CTkFrame):
         super().__init__(master, *args, **kwargs)
         # Persistent cache for portrait images
         self.portrait_images = {}
-        self.portrait_tooltips = {}
         self.scenario = scenario_item
 
         # Load your detach and reattach icon files (adjust file paths and sizes as needed)
@@ -462,9 +460,6 @@ class GMScreenView(ctk.CTkFrame):
                     lab.image = self.portrait_images[key]
                     lab.entity_name = key
                     lab.is_portrait = True
-                    tooltip_text = self.portrait_tooltips.get(key)
-                    if tooltip_text:
-                        lab.tooltip = ToolTip(lab, tooltip_text)
                     lab.pack(pady=10)
                     self.tabs[name]["portrait_label"] = lab
 
@@ -741,12 +736,6 @@ class GMScreenView(ctk.CTkFrame):
             portrait_label.entity_name = entity["Name"]
             portrait_label.is_portrait = True
             self.portrait_images[entity["Name"]] = ctk_image
-            tooltip_text = build_entity_tooltip(entity_type, entity)
-            if tooltip_text:
-                portrait_label.tooltip = ToolTip(portrait_label, tooltip_text)
-                self.portrait_tooltips[entity["Name"]] = tooltip_text
-            else:
-                self.portrait_tooltips.pop(entity["Name"], None)
             portrait_label.pack(pady=10)
             print(f"[DEBUG] Created portrait label for {entity['Name']}: is_portrait={portrait_label.is_portrait}, entity_name={portrait_label.entity_name}")
             frame.portrait_label = portrait_label

@@ -9,7 +9,6 @@ from tkinter import Toplevel, messagebox
 from tkinter import ttk
 import tkinter.font as tkfont
 from modules.ui.image_viewer import show_portrait
-from modules.ui.tooltip import ToolTip
 from modules.generic.generic_editor_window import GenericEditorWindow
 from modules.helpers.config_helper import ConfigHelper
 from modules.helpers.logging_helper import (
@@ -23,54 +22,6 @@ log_module_import(__name__)
 # Configure portrait size.
 PORTRAIT_SIZE = (200, 200)
 _open_entity_windows = {}
-
-TOOLTIP_FIELDS = {
-    "NPCs": ("Role", "Secret", "Traits", "Motivation"),
-    "Creatures": ("Type", "Stats", "Powers", "Weakness", "Background"),
-    "PCs": ("Role", "Traits", "Secret", "Background"),
-    "Places": ("Description", "Secrets"),
-    "Objects": ("Description", "Powers"),
-    "Factions": ("Description", "Secrets"),
-}
-
-
-def _format_tooltip_value(value, max_length=200):
-    if value is None:
-        return ""
-    if isinstance(value, list):
-        joined = ", ".join(str(v).strip() for v in value if str(v).strip())
-        if not joined:
-            return ""
-        return format_longtext(joined, max_length=max_length)
-    return format_longtext(value, max_length=max_length)
-
-
-def build_entity_tooltip(entity_type, data):
-    """Build a compact tooltip string for an entity portrait."""
-    if not isinstance(data, dict):
-        return ""
-
-    name_field = "Title" if entity_type == "Scenarios" else "Name"
-    name_value = str(data.get(name_field, "")).strip()
-    lines = []
-    if name_value:
-        lines.append(name_value)
-
-    for field in TOOLTIP_FIELDS.get(entity_type, ()):  # type: ignore[arg-type]
-        if field == name_field:
-            continue
-        raw_value = data.get(field)
-        text = _format_tooltip_value(raw_value)
-        if text:
-            lines.append(f"{field}: {text}")
-
-    return "\n".join(lines)
-
-
-def _attach_portrait_tooltip(widget, entity_type, data):
-    tooltip_text = build_entity_tooltip(entity_type, data)
-    if tooltip_text:
-        widget.tooltip = ToolTip(widget, tooltip_text)
 wrappers = {
             "Scenarios": GenericModelWrapper("scenarios"),
             "Places": GenericModelWrapper("places"),
@@ -256,7 +207,6 @@ def insert_npc_table(parent, header, npc_names, open_entity_callback):
             photo = CTkImage(light_image=img, size=(40,40))
             widget = CTkLabel(table, image=photo, text="", anchor="center")
             widget.image = photo
-            _attach_portrait_tooltip(widget, "NPCs", data)
             # clicking the thumbnail pops up the full‑screen viewer
             widget.bind(
                 "<Button-1>",
@@ -348,7 +298,6 @@ def insert_creature_table(parent, header, creature_names, open_entity_callback):
             photo = CTkImage(light_image=img, size=(40,40))
             widget = CTkLabel(table, image=photo, text="", anchor="center")
             widget.image = photo
-            _attach_portrait_tooltip(widget, "Creatures", data)
             widget.bind(
                 "<Button-1>",
                 lambda e, p=portrait_path, n=name: show_portrait(p, n)
@@ -458,7 +407,6 @@ def insert_places_table(parent, header, place_names, open_entity_callback):
                     photo = CTkImage(light_image=img, size=(40, 40))
                     cell  = CTkLabel(table, image=photo, text="", anchor="center")
                     cell.image = photo
-                    _attach_portrait_tooltip(cell, "Places", data)
                     cell.bind(
                         "<Button-1>",
                         lambda e, p=portrait, n=name: show_portrait(p, n)
@@ -513,7 +461,7 @@ def insert_places_table(parent, header, place_names, open_entity_callback):
         table.grid_rowconfigure(r, weight=1)
         
 @log_function
-def insert_list_longtext(parent, header, items, open_entity_callback=None, entity_collector=None):
+def insert_list_longtext(parent, header, items, open_entity_callback=None):
     """Insert collapsible sections for long text lists such as scenario scenes."""
     ctk.CTkLabel(parent, text=f"{header}:", font=("Arial", 14, "bold")) \
         .pack(anchor="w", padx=10, pady=(10, 2))
@@ -582,10 +530,6 @@ def insert_list_longtext(parent, header, items, open_entity_callback=None, entit
         npc_names = _coerce_names(scene_dict.get("NPCs"))
         creature_names = _coerce_names(scene_dict.get("Creatures"))
         place_names = _coerce_names(scene_dict.get("Places"))
-        if entity_collector is not None:
-            entity_collector.setdefault("NPCs", set()).update(npc_names)
-            entity_collector.setdefault("Creatures", set()).update(creature_names)
-            entity_collector.setdefault("Places", set()).update(place_names)
         links = _coerce_links(scene_dict.get("Links"))
 
         outer = ctk.CTkFrame(parent, fg_color="transparent")
@@ -734,7 +678,6 @@ def create_scenario_detail_frame(entity_type, scenario_item, master, open_entity
 
     # ——— BODY — prepare fields in the custom order ———
     tpl = load_template(entity_type.lower())
-    scene_entity_tracker = {"NPCs": set(), "Creatures": set(), "Places": set()}
     # remove header fields
     body_fields = [
         f for f in tpl["fields"]
@@ -759,13 +702,7 @@ def create_scenario_detail_frame(entity_type, scenario_item, master, open_entity
         if ftype == "text":
             insert_text(frame, name, value)
         elif ftype == "list_longtext":
-            insert_list_longtext(
-                frame,
-                name,
-                value,
-                open_entity_callback,
-                entity_collector=scene_entity_tracker,
-            )
+            insert_list_longtext(frame, name, value, open_entity_callback)
         elif ftype == "longtext":
             insert_longtext(frame, name, value)
         elif ftype == "list":
@@ -774,13 +711,7 @@ def create_scenario_detail_frame(entity_type, scenario_item, master, open_entity
             if linked == "NPCs":
                 insert_npc_table(frame, "NPCs", items, open_entity_callback)
             elif linked == "Creatures":
-                filtered_creatures = [
-                    creature for creature in items
-                    if creature not in scene_entity_tracker.get("Creatures", set())
-                ]
-                if not filtered_creatures:
-                    continue
-                insert_creature_table(frame, "Creatures", filtered_creatures, open_entity_callback)
+                insert_creature_table(frame, "Creatures", items, open_entity_callback)
             elif linked == "Places":
                 insert_places_table(frame, "Places", items, open_entity_callback)
             else:
@@ -902,7 +833,6 @@ def create_entity_detail_frame(entity_type, entity, master, open_entity_callback
                 portrait_label.entity_name = entity.get("Name", "")
                 portrait_label.is_portrait = True
                 content_frame.portrait_images[entity.get("Name", "")] = ctk_image
-                _attach_portrait_tooltip(portrait_label, entity_type, entity)
                 portrait_label.bind(
                     "<Button-1>",
                     lambda e, p=portrait_path, n=portrait_label.entity_name: show_portrait(p, n)
