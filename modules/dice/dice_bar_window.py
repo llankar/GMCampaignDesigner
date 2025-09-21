@@ -144,8 +144,7 @@ class DiceBarWindow(ctk.CTkToplevel):
         result_frame = ctk.CTkFrame(content, fg_color="transparent")
         result_frame.grid(row=1, column=0, columnspan=7, padx=(4, 8), pady=(0, 6), sticky="ew")
         result_frame.grid_columnconfigure(0, weight=1)
-
-        wrap_length = max(600, int(self.winfo_screenwidth() * 0.6))
+        result_frame.grid_columnconfigure(1, weight=0)
 
         result_label = ctk.CTkLabel(
             result_frame,
@@ -153,9 +152,8 @@ class DiceBarWindow(ctk.CTkToplevel):
             anchor="w",
             font=("Segoe UI", 16, "bold"),
             justify="left",
-            wraplength=wrap_length,
         )
-        result_label.grid(row=0, column=0, sticky="ew")
+        result_label.grid(row=0, column=0, padx=(0, 8), sticky="ew")
         result_label.bind("<ButtonPress-1>", self._on_drag_start)
         result_label.bind("<B1-Motion>", self._on_drag_motion)
         result_label.bind("<ButtonRelease-1>", self._on_drag_end)
@@ -164,11 +162,11 @@ class DiceBarWindow(ctk.CTkToplevel):
         total_label = ctk.CTkLabel(
             result_frame,
             textvariable=self.total_var,
-            anchor="w",
-            font=("Segoe UI", 20, "bold"),
-            justify="left",
+            anchor="e",
+            font=("Segoe UI", 16, "bold"),
+            justify="right",
         )
-        total_label.grid(row=1, column=0, sticky="ew", pady=(4, 0))
+        total_label.grid(row=0, column=1, sticky="e")
         total_label.bind("<ButtonPress-1>", self._on_drag_start)
         total_label.bind("<B1-Motion>", self._on_drag_motion)
         total_label.bind("<ButtonRelease-1>", self._on_drag_end)
