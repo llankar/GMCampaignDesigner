@@ -77,17 +77,18 @@ class DiceBarWindow(ctk.CTkToplevel):
         content = ctk.CTkFrame(bar, corner_radius=0)
         self._content_grid_options = {"row": 0, "column": 1, "padx": 0, "pady": 0, "sticky": "nsew"}
         content.grid(**self._content_grid_options)
-        content.grid_columnconfigure(0, weight=3)
+        content.grid_columnconfigure(0, weight=0)
         content.grid_columnconfigure(1, weight=0)
         content.grid_columnconfigure(2, weight=0)
         content.grid_columnconfigure(3, weight=0)
         content.grid_columnconfigure(4, weight=0)
-        content.grid_columnconfigure(5, weight=1)
-        content.grid_columnconfigure(6, weight=0)
-        content.grid_rowconfigure(1, weight=0)
+        content.grid_columnconfigure(5, weight=0)
+        content.grid_columnconfigure(6, weight=1)
+        content.grid_columnconfigure(7, weight=0)
+        content.grid_rowconfigure(0, weight=1)
         self._content_frame = content
 
-        entry = ctk.CTkEntry(content, textvariable=self.formula_var, width=260, height=30)
+        entry = ctk.CTkEntry(content, textvariable=self.formula_var, width=200, height=30)
         entry.grid(row=0, column=0, padx=(4, 6), pady=4, sticky="ew")
         entry.bind("<Return>", lambda _event: self.roll())
         self._formula_entry = entry
@@ -130,7 +131,7 @@ class DiceBarWindow(ctk.CTkToplevel):
         clear_button.grid(row=0, column=4, padx=4, pady=4, sticky="ew")
 
         preset_frame = ctk.CTkFrame(content, fg_color="transparent")
-        preset_frame.grid(row=0, column=5, padx=6, pady=4, sticky="w")
+        preset_frame.grid(row=0, column=5, padx=(6, 4), pady=4, sticky="w")
         for idx, faces in enumerate(SUPPORTED_DICE_SIZES):
             button = ctk.CTkButton(
                 preset_frame,
@@ -142,7 +143,7 @@ class DiceBarWindow(ctk.CTkToplevel):
             button.grid(row=0, column=idx, padx=2, pady=0)
 
         result_frame = ctk.CTkFrame(content, fg_color="transparent")
-        result_frame.grid(row=1, column=0, columnspan=7, padx=(4, 8), pady=(0, 6), sticky="ew")
+        result_frame.grid(row=0, column=6, padx=(6, 4), pady=4, sticky="ew")
         result_frame.grid_columnconfigure(0, weight=1)
         result_frame.grid_columnconfigure(1, weight=0)
 
@@ -166,14 +167,14 @@ class DiceBarWindow(ctk.CTkToplevel):
             font=("Segoe UI", 16, "bold"),
             justify="right",
         )
-        total_label.grid(row=0, column=1, sticky="e")
+        total_label.grid(row=0, column=1, padx=(8, 0), sticky="e")
         total_label.bind("<ButtonPress-1>", self._on_drag_start)
         total_label.bind("<B1-Motion>", self._on_drag_motion)
         total_label.bind("<ButtonRelease-1>", self._on_drag_end)
         self._total_label = total_label
 
         close_button = ctk.CTkButton(content, text="✕", width=32, height=30, command=self._on_close)
-        close_button.grid(row=0, column=6, padx=(6, 8), pady=4, sticky="e")
+        close_button.grid(row=0, column=7, padx=(4, 8), pady=4, sticky="e")
 
         self._update_collapse_button()
 
