@@ -31,13 +31,17 @@ class DiceBarWindow(ctk.CTkToplevel):
         self.formula_var = tk.StringVar(value="1d20")
         self.exploding_var = tk.BooleanVar(value=False)
         self.separate_var = tk.BooleanVar(value=False)
+        self.result_var = tk.StringVar(value="Enter a dice formula and roll.")
+        self.total_var = tk.StringVar(value="")
+
         self._bar_frame: ctk.CTkFrame | None = None
         self._content_frame: ctk.CTkFrame | None = None
         self._content_grid_options: dict[str, object] | None = None
         self._collapse_button: ctk.CTkButton | None = None
+        self._result_label: ctk.CTkLabel | None = None
         self._formula_entry: ctk.CTkEntry | None = None
         self._is_collapsed = False
-        self._result_display: ctk.CTkTextbox | None = None
+        self._total_label: ctk.CTkLabel | None = None
 
         self._build_ui()
         self._apply_geometry()
@@ -140,29 +144,40 @@ class DiceBarWindow(ctk.CTkToplevel):
         result_frame = ctk.CTkFrame(content, fg_color="transparent")
         result_frame.grid(row=1, column=0, columnspan=7, padx=(4, 8), pady=(0, 6), sticky="ew")
         result_frame.grid_columnconfigure(0, weight=1)
-        result_frame.grid_rowconfigure(0, weight=1)
 
-        result_display = ctk.CTkTextbox(
+        wrap_length = max(600, int(self.winfo_screenwidth() * 0.6))
+
+        result_label = ctk.CTkLabel(
             result_frame,
-            height=32,
-            wrap="none",
-            font=("Segoe UI", 16),
-            activate_scrollbars=False,
+            textvariable=self.result_var,
+            anchor="w",
+            font=("Segoe UI", 16, "bold"),
+            justify="left",
+            wraplength=wrap_length,
         )
-        result_display.grid(row=0, column=0, sticky="nsew")
-        result_display.tag_config("bold", font=("Segoe UI", 16, "bold"))
-        result_display.configure(state="disabled", fg_color="transparent", border_width=0)
-        result_display.bind("<ButtonPress-1>", self._on_drag_start)
-        result_display.bind("<B1-Motion>", self._on_drag_motion)
-        result_display.bind("<ButtonRelease-1>", self._on_drag_end)
-        self._result_display = result_display
+        result_label.grid(row=0, column=0, sticky="ew")
+        result_label.bind("<ButtonPress-1>", self._on_drag_start)
+        result_label.bind("<B1-Motion>", self._on_drag_motion)
+        result_label.bind("<ButtonRelease-1>", self._on_drag_end)
+        self._result_label = result_label
+
+        total_label = ctk.CTkLabel(
+            result_frame,
+            textvariable=self.total_var,
+            anchor="w",
+            font=("Segoe UI", 20, "bold"),
+            justify="left",
+        )
+        total_label.grid(row=1, column=0, sticky="ew", pady=(4, 0))
+        total_label.bind("<ButtonPress-1>", self._on_drag_start)
+        total_label.bind("<B1-Motion>", self._on_drag_motion)
+        total_label.bind("<ButtonRelease-1>", self._on_drag_end)
+        self._total_label = total_label
 
         close_button = ctk.CTkButton(content, text="✕", width=32, height=30, command=self._on_close)
         close_button.grid(row=0, column=6, padx=(6, 8), pady=4, sticky="e")
 
         self._update_collapse_button()
-
-        self._update_result_display("Enter a dice formula and roll.")
 
         if self._formula_entry is not None:
             self.after(0, self._formula_entry.focus_set)
@@ -190,8 +205,9 @@ class DiceBarWindow(ctk.CTkToplevel):
         canonical = result.canonical()
         self.formula_var.set(canonical)
 
-        display_text, bold_ranges = self._format_roll_output(result, separate)
-        self._update_result_display(display_text, bold_ranges)
+        breakdown_text, total_text = self._format_roll_output(result, separate)
+        self.result_var.set(breakdown_text)
+        self.total_var.set(total_text)
 
     def _append_die(self, faces: int) -> None:
         fragment = f"1d{faces}"
@@ -203,41 +219,25 @@ class DiceBarWindow(ctk.CTkToplevel):
             self._show_error(str(exc))
             return
         self.formula_var.set(parsed.canonical())
-        self._update_result_display(f"Added {fragment} to formula.")
+        self.result_var.set(f"Added {fragment} to formula.")
+        self.total_var.set("")
 
     def _clear_formula(self) -> None:
         self.formula_var.set("")
-        self._update_result_display("Formula cleared.")
+        self.result_var.set("Formula cleared.")
+        self.total_var.set("")
         if self._formula_entry is not None:
             self._formula_entry.focus_set()
 
-    def _update_result_display(
-        self, text: str, bold_ranges: List[Tuple[int, int]] | None = None
-    ) -> None:
-        box = self._result_display
-        if box is None:
-            return
-        box.configure(state="normal")
-        box.delete("1.0", "end")
-        box.insert("1.0", text)
-        box.tag_remove("bold", "1.0", "end")
-        if bold_ranges:
-            for start, end in bold_ranges:
-                if end <= start:
-                    continue
-                box.tag_add("bold", f"1.0+{start}c", f"1.0+{end}c")
-        box.configure(state="disabled")
-
     def _format_roll_output(
         self, result: dice_engine.RollResult, separate: bool
-    ) -> tuple[str, List[Tuple[int, int]]]:
+    ) -> tuple[str, str]:
         canonical = result.canonical()
         modifier = result.modifier
         total = result.total
 
-        segments: List[Tuple[str, List[Tuple[int, int]]]] = []
-
         if separate:
+            parts: List[str] = []
             counters: dict[int, int] = {}
             for chain in result.chains:
                 counters[chain.faces] = counters.get(chain.faces, 0) + 1
@@ -246,65 +246,29 @@ class DiceBarWindow(ctk.CTkToplevel):
                     label = f"{label}#{counters[chain.faces]}"
                 values = ", ".join(chain.display_values)
                 if values:
-                    segment = f"{label}:[{values}] RESULT {chain.total}"
+                    parts.append(f"{label}:[{values}] RESULT {chain.total}")
                 else:
-                    segment = f"{label} RESULT {chain.total}"
-                fragment = f"RESULT {chain.total}"
-                index = segment.rfind(fragment)
-                highlights = [(index, index + len(fragment))] if index != -1 else []
-                segments.append((segment, highlights))
-        else:
-            for summary in result.face_summaries:
-                values = summary.display_values
-                if not values:
-                    continue
-                segment = (
-                    f"{summary.base_count}d{summary.faces}:[{', '.join(values)}] RESULT {summary.total}"
-                )
-                fragment = f"RESULT {summary.total}"
-                index = segment.rfind(fragment)
-                highlights = [(index, index + len(fragment))] if index != -1 else []
-                segments.append((segment, highlights))
+                    parts.append(f"{label} RESULT {chain.total}")
+            if modifier:
+                parts.append(f"mod {modifier:+d}")
+            breakdown = " | ".join(parts) if parts else "0"
+            base_text = f"{canonical} -> {breakdown}" if canonical else breakdown
+            total_text = f"TOTAL: {total}"
+            return base_text, total_text
 
+        summary_parts: List[str] = []
+        for summary in result.face_summaries:
+            values = summary.display_values
+            if not values:
+                continue
+            summary_parts.append(
+                f"{summary.base_count}d{summary.faces}:[{', '.join(values)}] RESULT {summary.total}"
+            )
         if modifier:
-            segments.append((f"mod {modifier:+d}", []))
-
-        breakdown_text: str
-        breakdown_highlights: List[Tuple[int, int]]
-        if segments:
-            separator = " | "
-            pieces: List[str] = []
-            breakdown_highlights = []
-            offset = 0
-            for idx, (segment_text, local_highlights) in enumerate(segments):
-                if idx:
-                    pieces.append(separator)
-                    offset += len(separator)
-                pieces.append(segment_text)
-                for start, end in local_highlights:
-                    if start < 0 or end <= start:
-                        continue
-                    breakdown_highlights.append((offset + start, offset + end))
-                offset += len(segment_text)
-            breakdown_text = "".join(pieces)
-        else:
-            breakdown_text = "0"
-            breakdown_highlights = []
-
-        prefix = f"{canonical} -> " if canonical else ""
-        prefix_length = len(prefix)
-        final_highlights = [
-            (start + prefix_length, end + prefix_length) for start, end in breakdown_highlights
-        ]
-
-        separator = " | "
-        total_fragment = f"TOTAL: {total}"
-        total_start = prefix_length + len(breakdown_text) + len(separator)
-        total_end = total_start + len(total_fragment)
-        final_highlights.append((total_start, total_end))
-
-        full_text = prefix + breakdown_text + f"{separator}{total_fragment}"
-        return full_text, final_highlights
+            summary_parts.append(f"mod {modifier:+d}")
+        breakdown = " | ".join(summary_parts) if summary_parts else "0"
+        summary_text = f"{canonical} -> {breakdown}" if canonical else breakdown
+        return summary_text, f"TOTAL: {total}"
 
     # ------------------------------------------------------------------
     # Window helpers
@@ -361,7 +325,8 @@ class DiceBarWindow(ctk.CTkToplevel):
             pass
 
     def _show_error(self, message: str) -> None:
-        self._update_result_display(f"⚠️ {message}")
+        self.result_var.set(f"⚠️ {message}")
+        self.total_var.set("")
 
     def _toggle_collapsed(self) -> None:
         self._set_collapsed(not self._is_collapsed)
