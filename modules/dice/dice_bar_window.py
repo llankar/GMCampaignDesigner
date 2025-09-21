@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import tkinter as tk
+from dataclasses import dataclass
 from typing import List, Tuple
 
 import customtkinter as ctk
@@ -15,6 +16,14 @@ log_module_import(__name__)
 SUPPORTED_DICE_SIZES: Tuple[int, ...] = dice_engine.DEFAULT_DICE_SIZES
 INTER_BAR_GAP = 0
 HEIGHT_PADDING = 10
+
+
+@dataclass(frozen=True)
+class TextSegment:
+    """Represents a portion of result text and its emphasis preference."""
+
+    text: str
+    emphasize: bool = False
 
 
 class DiceBarWindow(ctk.CTkToplevel):
@@ -38,10 +47,14 @@ class DiceBarWindow(ctk.CTkToplevel):
         self._content_frame: ctk.CTkFrame | None = None
         self._content_grid_options: dict[str, object] | None = None
         self._collapse_button: ctk.CTkButton | None = None
-        self._result_label: ctk.CTkLabel | None = None
+        self._result_container: ctk.CTkFrame | None = None
         self._formula_entry: ctk.CTkEntry | None = None
         self._is_collapsed = False
         self._total_label: ctk.CTkLabel | None = None
+        self._total_prefix_label: ctk.CTkLabel | None = None
+
+        self._result_normal_font = ctk.CTkFont(size=16)
+        self._result_emphasis_font = ctk.CTkFont(size=18, weight="bold")
 
         self._build_ui()
         self._apply_geometry()
@@ -147,31 +160,43 @@ class DiceBarWindow(ctk.CTkToplevel):
         result_frame.grid_columnconfigure(0, weight=1)
         result_frame.grid_columnconfigure(1, weight=0)
 
-        result_label = ctk.CTkLabel(
-            result_frame,
-            textvariable=self.result_var,
-            anchor="w",
-            font=("Segoe UI", 16, "bold"),
-            justify="left",
-        )
-        result_label.grid(row=0, column=0, padx=(0, 8), sticky="ew")
-        result_label.bind("<ButtonPress-1>", self._on_drag_start)
-        result_label.bind("<B1-Motion>", self._on_drag_motion)
-        result_label.bind("<ButtonRelease-1>", self._on_drag_end)
-        self._result_label = result_label
+        result_container = ctk.CTkFrame(result_frame, fg_color="transparent")
+        result_container.grid(row=0, column=0, padx=(0, 8), sticky="nsew")
+        result_container.grid_columnconfigure(0, weight=1)
+        self._register_drag_target(result_container)
+        self._result_container = result_container
 
-        total_label = ctk.CTkLabel(
-            result_frame,
-            textvariable=self.total_var,
+        total_container = ctk.CTkFrame(result_frame, fg_color="transparent")
+        total_container.grid(row=0, column=1, padx=(8, 0), sticky="e")
+        total_container.grid_columnconfigure(0, weight=0)
+        total_container.grid_columnconfigure(1, weight=0)
+        self._register_drag_target(total_container)
+
+        total_prefix = ctk.CTkLabel(
+            total_container,
+            text="Total",
+            font=self._result_normal_font,
             anchor="e",
-            font=("Segoe UI", 16, "bold"),
             justify="right",
         )
-        total_label.grid(row=0, column=1, padx=(8, 0), sticky="e")
-        total_label.bind("<ButtonPress-1>", self._on_drag_start)
-        total_label.bind("<B1-Motion>", self._on_drag_motion)
-        total_label.bind("<ButtonRelease-1>", self._on_drag_end)
+        total_prefix.grid(row=0, column=0, padx=(0, 6), sticky="e")
+        self._register_drag_target(total_prefix)
+        self._total_prefix_label = total_prefix
+
+        total_label = ctk.CTkLabel(
+            total_container,
+            textvariable=self.total_var,
+            font=self._result_emphasis_font,
+            anchor="e",
+            justify="right",
+        )
+        total_label.grid(row=0, column=1, sticky="e")
+        self._register_drag_target(total_label)
         self._total_label = total_label
+
+        self._set_total_text(self.total_var.get())
+
+        self._display_segments([TextSegment(self.result_var.get())])
 
         close_button = ctk.CTkButton(content, text="✕", width=32, height=30, command=self._on_close)
         close_button.grid(row=0, column=7, padx=(4, 8), pady=4, sticky="e")
@@ -204,9 +229,9 @@ class DiceBarWindow(ctk.CTkToplevel):
         canonical = result.canonical()
         self.formula_var.set(canonical)
 
-        breakdown_text, total_text = self._format_roll_output(result, separate)
-        self.result_var.set(breakdown_text)
-        self.total_var.set(total_text)
+        segments, total_text = self._format_roll_output(result, separate)
+        self._display_segments(segments)
+        self._set_total_text(total_text)
 
     def _append_die(self, faces: int) -> None:
         fragment = f"1d{faces}"
@@ -218,25 +243,30 @@ class DiceBarWindow(ctk.CTkToplevel):
             self._show_error(str(exc))
             return
         self.formula_var.set(parsed.canonical())
-        self.result_var.set(f"Added {fragment} to formula.")
-        self.total_var.set("")
+        self._display_segments([TextSegment(f"Added {fragment} to formula.")])
+        self._set_total_text("")
 
     def _clear_formula(self) -> None:
         self.formula_var.set("")
-        self.result_var.set("Formula cleared.")
-        self.total_var.set("")
+        self._display_segments([TextSegment("Formula cleared.")])
+        self._set_total_text("")
         if self._formula_entry is not None:
             self._formula_entry.focus_set()
 
     def _format_roll_output(
         self, result: dice_engine.RollResult, separate: bool
-    ) -> tuple[str, str]:
+    ) -> tuple[List[TextSegment], str]:
         canonical = result.canonical()
         modifier = result.modifier
         total = result.total
 
+        segments: List[TextSegment] = []
+        if canonical:
+            canonical_text = f"{canonical} -> "
+            segments.append(TextSegment(canonical_text))
+
         if separate:
-            parts: List[str] = []
+            parts: List[List[TextSegment]] = []
             counters: dict[int, int] = {}
             for chain in result.chains:
                 counters[chain.faces] = counters.get(chain.faces, 0) + 1
@@ -244,30 +274,43 @@ class DiceBarWindow(ctk.CTkToplevel):
                 if result.parsed.dice.get(chain.faces, 0) > 1:
                     label = f"{label}#{counters[chain.faces]}"
                 values = ", ".join(chain.display_values)
-                if values:
-                    parts.append(f"{label}:[{values}] RESULT {chain.total}")
-                else:
-                    parts.append(f"{label} RESULT {chain.total}")
+                prefix = f"{label}:[{values}] " if values else f"{label} "
+                parts.append(
+                    [TextSegment(prefix), TextSegment(str(chain.total), emphasize=True)]
+                )
             if modifier:
-                parts.append(f"mod {modifier:+d}")
-            breakdown = " | ".join(parts) if parts else "0"
-            base_text = f"{canonical} -> {breakdown}" if canonical else breakdown
-            total_text = f"TOTAL: {total}"
-            return base_text, total_text
+                parts.append([TextSegment(f"mod {modifier:+d}")])
+            breakdown_segments = self._join_parts(parts)
+            segments.extend(breakdown_segments)
+            if not breakdown_segments:
+                segments.append(TextSegment("0", emphasize=True))
+            total_text = f"{total}"
+            return segments, total_text
 
-        summary_parts: List[str] = []
+        parts: List[List[TextSegment]] = []
         for summary in result.face_summaries:
             values = summary.display_values
             if not values:
                 continue
-            summary_parts.append(
-                f"{summary.base_count}d{summary.faces}:[{', '.join(values)}] RESULT {summary.total}"
+            prefix = f"{summary.base_count}d{summary.faces}:[{', '.join(values)}] "
+            parts.append(
+                [TextSegment(prefix), TextSegment(str(summary.total), emphasize=True)]
             )
         if modifier:
-            summary_parts.append(f"mod {modifier:+d}")
-        breakdown = " | ".join(summary_parts) if summary_parts else "0"
-        summary_text = f"{canonical} -> {breakdown}" if canonical else breakdown
-        return summary_text, f"TOTAL: {total}"
+            parts.append([TextSegment(f"mod {modifier:+d}")])
+        breakdown_segments = self._join_parts(parts)
+        segments.extend(breakdown_segments)
+        if not breakdown_segments:
+            segments.append(TextSegment("0", emphasize=True))
+        return segments, f"{total}"
+
+    def _join_parts(self, parts: List[List[TextSegment]]) -> List[TextSegment]:
+        segments: List[TextSegment] = []
+        for index, part in enumerate(parts):
+            if index:
+                segments.append(TextSegment(" | "))
+            segments.extend(part)
+        return segments
 
     # ------------------------------------------------------------------
     # Window helpers
@@ -324,8 +367,8 @@ class DiceBarWindow(ctk.CTkToplevel):
             pass
 
     def _show_error(self, message: str) -> None:
-        self.result_var.set(f"⚠️ {message}")
-        self.total_var.set("")
+        self._display_segments([TextSegment(f"⚠️ {message}")])
+        self._set_total_text("")
 
     def _toggle_collapsed(self) -> None:
         self._set_collapsed(not self._is_collapsed)
@@ -367,3 +410,42 @@ class DiceBarWindow(ctk.CTkToplevel):
 
     def _on_close(self) -> None:
         self.destroy()
+
+    def _display_segments(self, segments: List[TextSegment]) -> None:
+        self.result_var.set("".join(segment.text for segment in segments))
+
+        container = self._result_container
+        if container is None:
+            return
+
+        for child in container.winfo_children():
+            child.destroy()
+
+        if not segments:
+            return
+
+        for column, segment in enumerate(segments):
+            if not segment.text:
+                continue
+            label = ctk.CTkLabel(
+                container,
+                text=segment.text,
+                font=self._result_emphasis_font if segment.emphasize else self._result_normal_font,
+                anchor="w",
+                justify="left",
+            )
+            label.grid(row=0, column=column, sticky="w")
+            self._register_drag_target(label)
+
+        container.grid_columnconfigure(len(segments), weight=1)
+
+    def _register_drag_target(self, widget: tk.Widget) -> None:
+        widget.bind("<ButtonPress-1>", self._on_drag_start)
+        widget.bind("<B1-Motion>", self._on_drag_motion)
+        widget.bind("<ButtonRelease-1>", self._on_drag_end)
+
+    def _set_total_text(self, text: str) -> None:
+        self.total_var.set(text)
+        prefix = self._total_prefix_label
+        if prefix is not None:
+            prefix.configure(text="Total" if text else "")
