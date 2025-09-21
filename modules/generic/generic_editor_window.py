@@ -13,6 +13,8 @@ from tkinter import filedialog,  messagebox
 from modules.helpers.swarmui_helper import get_available_models
 from modules.helpers.config_helper import ConfigHelper
 from modules.generic.generic_model_wrapper import GenericModelWrapper
+from modules.generic.generic_list_selection_view import GenericListSelectionView
+from modules.helpers.template_loader import load_template
 import tkinter as tk
 import random
 from modules.helpers.text_helpers import format_longtext
@@ -372,42 +374,275 @@ class GenericEditorWindow(ctk.CTkToplevel):
         container.pack(fill="x", pady=5)
 
         editors = []
+        entity_type_map = {
+            "NPCs": "npcs",
+            "Creatures": "creatures",
+            "Places": "places",
+        }
+        entity_wrappers = {}
+        entity_templates = {}
 
-        def add_scene(initial_text=""):
-            row = ctk.CTkFrame(container)
-            row.pack(fill="x", pady=(0, 5))
-            ctk.CTkLabel(row, text=f"Scene {len(editors)+1}").pack(anchor="w")
-            
-            # here’s the only duplication left:
-            rte = self._make_richtext_editor(row, initial_text, hide_toolbar=True)
+        def _get_wrapper(label):
+            if label not in entity_wrappers:
+                key = entity_type_map[label]
+                entity_wrappers[label] = GenericModelWrapper(key)
+                entity_templates[label] = load_template(key)
+            return entity_wrappers[label], entity_templates[label]
 
-            # Remove button
-            btn = ctk.CTkButton(
-                row, text="– Remove", width=80,
-                command=lambda: (row.destroy(), editors.remove(rte))
+        def renumber_scenes():
+            for idx, state in enumerate(editors, start=1):
+                label = state.get("index_label")
+                if label:
+                    label.configure(text=f"Scene {idx}")
+
+        def remove_scene(state):
+            if state in editors:
+                editors.remove(state)
+                try:
+                    state["frame"].destroy()
+                except Exception:
+                    pass
+                renumber_scenes()
+
+        def _coerce_names(value):
+            if value is None:
+                return []
+            if isinstance(value, list):
+                return [str(v).strip() for v in value if str(v).strip()]
+            if isinstance(value, (set, tuple)):
+                return [str(v).strip() for v in value if str(v).strip()]
+            text = str(value).strip()
+            if not text:
+                return []
+            parts = [part.strip() for part in text.split(",") if part.strip()]
+            return parts or [text]
+
+        def _coerce_links(value):
+            result = []
+            if value is None:
+                return result
+            if isinstance(value, list):
+                for item in value:
+                    result.extend(_coerce_links(item))
+                return result
+            if isinstance(value, dict):
+                target = None
+                text = None
+                for key in ("Target", "target", "Scene", "scene", "Next", "next", "Id", "id"):
+                    if key in value:
+                        target = value[key]
+                        break
+                for key in ("Text", "text", "Label", "label", "Description", "description", "Choice", "choice"):
+                    if key in value:
+                        text = value[key]
+                        break
+                result.append({"target": target, "text": text})
+                return result
+            if isinstance(value, (int, float)):
+                result.append({"target": int(value), "text": ""})
+                return result
+            text = str(value).strip()
+            if text:
+                result.append({"target": text, "text": text})
+            return result
+
+        def refresh_entity_chips(state, label):
+            frame = state["entity_chip_frames"].get(label)
+            if not frame:
+                return
+            for child in frame.winfo_children():
+                child.destroy()
+            for name in state["entities"].get(label, []):
+                chip = ctk.CTkFrame(frame, fg_color="#3A3A3A")
+                chip.pack(side="left", padx=4, pady=2)
+                ctk.CTkLabel(chip, text=name).pack(side="left", padx=(6, 2))
+
+                def _remove(n=name, lbl=label, st=state, widget=chip):
+                    st["entities"][lbl] = [x for x in st["entities"].get(lbl, []) if x != n]
+                    widget.destroy()
+
+                ctk.CTkButton(chip, text="×", width=24, command=_remove).pack(side="left", padx=(0, 6))
+
+        def add_entity(state, label, name):
+            cleaned = str(name).strip()
+            if not cleaned:
+                return
+            entries = state["entities"].setdefault(label, [])
+            if cleaned in entries:
+                return
+            entries.append(cleaned)
+            refresh_entity_chips(state, label)
+
+        def open_entity_picker(state, label):
+            wrapper, template = _get_wrapper(label)
+            dialog = ctk.CTkToplevel(self)
+            dialog.title(f"Select {label[:-1] if label.endswith('s') else label}")
+            dialog.geometry("1200x700")
+            dialog.transient(self)
+            dialog.grab_set()
+
+            def _on_select(entity_type, name):
+                add_entity(state, label, name)
+                if dialog.winfo_exists():
+                    dialog.destroy()
+
+            view = GenericListSelectionView(
+                dialog,
+                label,
+                wrapper,
+                template,
+                on_select_callback=_on_select,
             )
-            btn.pack(anchor="e", pady=(2, 0))
+            view.pack(fill="both", expand=True)
+            dialog.wait_window()
 
-            editors.append(rte)
+        def remove_link(state, link_state):
+            if link_state in state.get("link_rows", []):
+                state["link_rows"].remove(link_state)
+                try:
+                    link_state["frame"].destroy()
+                except Exception:
+                    pass
 
-        # pre-populate
-        scenes_data = self.item.get(field["name"]) # Get the raw value first
-        # If the key exists and its value is None, or if the key doesn't exist (though .get would give default),
-        # ensure we iterate over an empty list to prevent TypeError.
-        # The original .get(field["name"], []) only helps if the key is missing, not if value is None.
-        if scenes_data is None:
-            scenes_data = []
-        
-        for scene in scenes_data:
+        def add_link_row(state, link=None):
+            link_row = ctk.CTkFrame(state["links_container"], fg_color="transparent")
+            link_row.pack(fill="x", pady=2)
+            target_entry = ctk.CTkEntry(link_row, placeholder_text="Target scene (name or number)")
+            target_entry.pack(side="left", fill="x", expand=True, padx=(0, 8))
+            text_entry = ctk.CTkEntry(link_row, placeholder_text="Displayed link text")
+            text_entry.pack(side="left", fill="x", expand=True, padx=(0, 8))
+            link_state = {
+                "frame": link_row,
+                "target_entry": target_entry,
+                "text_entry": text_entry,
+            }
+            ctk.CTkButton(
+                link_row,
+                text="–",
+                width=40,
+                command=lambda st=state, ls=link_state: remove_link(st, ls),
+            ).pack(side="left")
+
+            if isinstance(link, dict):
+                target_val = link.get("target")
+                text_val = link.get("text")
+                if target_val is not None:
+                    target_entry.insert(0, str(target_val))
+                if text_val:
+                    text_entry.insert(0, str(text_val))
+
+            state.setdefault("link_rows", []).append(link_state)
+
+        def add_scene(initial_data=None):
+            data = initial_data
+            if data is None:
+                data = {}
+            elif isinstance(data, (str, list)):
+                data = {"Text": data}
+            elif not isinstance(data, dict):
+                data = {"Text": data}
+
+            row = ctk.CTkFrame(container)
+            row.pack(fill="x", pady=(0, 12))
+
+            header = ctk.CTkFrame(row, fg_color="transparent")
+            header.pack(fill="x", pady=(0, 4))
+
+            scene_state = {"frame": row}
+
+            index_label = ctk.CTkLabel(header, text="")
+            index_label.pack(side="left")
+            scene_state["index_label"] = index_label
+
+            title_entry = ctk.CTkEntry(header, placeholder_text="Scene title")
+            title_entry.pack(side="left", fill="x", expand=True, padx=(10, 0))
+            title_value = data.get("Title") or data.get("Scene") or ""
+            if isinstance(title_value, str) and title_value.strip():
+                title_entry.insert(0, title_value.strip())
+            scene_state["title_entry"] = title_entry
+
+            ctk.CTkButton(
+                header,
+                text="– Remove",
+                width=100,
+                command=lambda st=scene_state: remove_scene(st),
+            ).pack(side="right")
+
+            text_data = data.get("Text") or data.get("text") or ""
+            rte = self._make_richtext_editor(row, text_data, hide_toolbar=True)
+            scene_state["editor"] = rte
+
+            entity_section = ctk.CTkFrame(row, fg_color="transparent")
+            entity_section.pack(fill="x", padx=4, pady=(4, 2))
+            scene_state["entities"] = {}
+            scene_state["entity_chip_frames"] = {}
+
+            for label in entity_type_map:
+                block = ctk.CTkFrame(entity_section, fg_color="transparent")
+                block.pack(fill="x", pady=(2, 0))
+
+                header_frame = ctk.CTkFrame(block, fg_color="transparent")
+                header_frame.pack(fill="x")
+                ctk.CTkLabel(header_frame, text=f"{label}:").pack(side="left")
+                ctk.CTkButton(
+                    header_frame,
+                    text=f"+ Add {label[:-1] if label.endswith('s') else label}",
+                    width=160,
+                    command=lambda st=scene_state, lbl=label: open_entity_picker(st, lbl),
+                ).pack(side="left", padx=(8, 0))
+
+                chip_frame = ctk.CTkFrame(block, fg_color="transparent")
+                chip_frame.pack(fill="x", padx=20, pady=(2, 0))
+                scene_state["entity_chip_frames"][label] = chip_frame
+                scene_state["entities"][label] = _coerce_names(data.get(label))
+                refresh_entity_chips(scene_state, label)
+
+            links_outer = ctk.CTkFrame(row, fg_color="transparent")
+            links_outer.pack(fill="x", padx=4, pady=(6, 0))
+            ctk.CTkLabel(links_outer, text="Scene Links:").pack(anchor="w")
+
+            links_container = ctk.CTkFrame(links_outer, fg_color="transparent")
+            links_container.pack(fill="x", padx=16, pady=(2, 4))
+            scene_state["links_container"] = links_container
+            scene_state["link_rows"] = []
+
+            for link in _coerce_links(data.get("Links")):
+                add_link_row(scene_state, link)
+
+            ctk.CTkButton(
+                links_outer,
+                text="+ Add Link",
+                width=110,
+                command=lambda st=scene_state: add_link_row(st),
+            ).pack(anchor="w", padx=16, pady=(0, 4))
+
+            editors.append(scene_state)
+            renumber_scenes()
+            return scene_state
+
+        scenes_data = self.item.get(field["name"])
+        if isinstance(scenes_data, dict) and isinstance(scenes_data.get("Scenes"), list):
+            scenes_iterable = scenes_data.get("Scenes", [])
+        elif isinstance(scenes_data, list):
+            scenes_iterable = scenes_data
+        elif scenes_data is None:
+            scenes_iterable = []
+        else:
+            scenes_iterable = [scenes_data]
+
+        for scene in scenes_iterable:
             add_scene(scene)
-        # add-new button
+
         ctk.CTkButton(
-            container, text="+ Add Scene", command=add_scene
+            container,
+            text="+ Add Scene",
+            command=lambda: add_scene({}),
         ).pack(anchor="w", pady=(5, 0))
 
         self.field_widgets[field["name"]] = editors
         self.field_widgets[f"{field['name']}_container"] = container
         self.field_widgets[f"{field['name']}_add_scene"] = add_scene
+        self.field_widgets[f"{field['name']}_renumber"] = renumber_scenes
     
     def create_file_field(self, field):
         frame = ctk.CTkFrame(self.scroll_frame)
@@ -848,7 +1083,53 @@ class GenericEditorWindow(ctk.CTkToplevel):
 
         if self.model_wrapper.entity_type== 'creatures':
             ctk.CTkButton(action_bar, text='AI Generate Creature', command=self.ai_generate_full_creature).pack(side='left', padx=5)
-    
+
+    def _serialize_scene_states(self, states):
+        serialized = []
+        for state in states:
+            if not isinstance(state, dict):
+                continue
+            editor = state.get("editor")
+            if editor is None:
+                continue
+            text_data = editor.get_text_data() if hasattr(editor, "get_text_data") else editor.text_widget.get("1.0", "end-1c")
+            scene_payload = {}
+
+            title_entry = state.get("title_entry")
+            if title_entry:
+                title = title_entry.get().strip()
+                if title:
+                    scene_payload["Title"] = title
+
+            if isinstance(text_data, dict):
+                scene_payload["Text"] = text_data
+            else:
+                scene_payload["Text"] = {"text": str(text_data)}
+
+            for label, names in (state.get("entities") or {}).items():
+                if names:
+                    scene_payload[label] = list(names)
+
+            links_payload = []
+            for link_state in state.get("link_rows", []):
+                target_entry = link_state.get("target_entry")
+                text_entry = link_state.get("text_entry")
+                target_val = target_entry.get().strip() if target_entry else ""
+                text_val = text_entry.get().strip() if text_entry else ""
+                if not target_val and not text_val:
+                    continue
+                link_record = {}
+                if target_val:
+                    link_record["Target"] = target_val
+                if text_val:
+                    link_record["Text"] = text_val
+                links_payload.append(link_record)
+            if links_payload:
+                scene_payload["Links"] = links_payload
+
+            serialized.append(scene_payload)
+        return serialized
+
     # === Sauvegarde ===
     def save(self):
         for field in self.template["fields"]:
@@ -856,12 +1137,14 @@ class GenericEditorWindow(ctk.CTkToplevel):
                 continue
             widget = self.field_widgets[field["name"]]
             if field["type"] == "list_longtext":
-                # grab each editor’s serialized data
-                self.item[field["name"]] = [
-                    rte.get_text_data() if hasattr(rte, "get_text_data")
-                                        else rte.text_widget.get("1.0","end-1c")
-                for rte in widget
-                ]
+                if field["name"] == "Scenes":
+                    self.item[field["name"]] = self._serialize_scene_states(widget)
+                else:
+                    self.item[field["name"]] = [
+                        rte.get_text_data() if hasattr(rte, "get_text_data")
+                                            else rte.text_widget.get("1.0", "end-1c")
+                        for rte in widget
+                    ]
             elif field["type"] == "longtext":
                 data = widget.get_text_data()
                 if isinstance(data, dict) and not data.get("text", "").strip():
@@ -1945,26 +2228,60 @@ class GenericEditorWindow(ctk.CTkToplevel):
             if isinstance(scenes, (list, tuple)):
                 editors = self.field_widgets.get("Scenes", [])
                 add_scene = self.field_widgets.get("Scenes_add_scene")
+                renumber = self.field_widgets.get("Scenes_renumber")
                 # Grow to needed count
                 while len(editors) < len(scenes) and callable(add_scene):
-                    add_scene("")
+                    add_scene({})
                     editors = self.field_widgets.get("Scenes", [])
                 # Shrink extra
                 if len(editors) > len(scenes):
-                    for ed in editors[len(scenes):]:
+                    for state in editors[len(scenes):]:
                         try:
-                            ed.master.destroy()
+                            state["frame"].destroy()
                         except Exception:
                             pass
-                    editors = editors[:len(scenes)]
-                    self.field_widgets["Scenes"] = editors
+                    del editors[len(scenes):]
+                    if callable(renumber):
+                        renumber()
                 # Populate content
-                for ed, sc in zip(editors, scenes):
+                for state, sc in zip(editors, scenes):
+                    editor = state.get("editor")
+                    if not editor:
+                        continue
+                    title_entry = state.get("title_entry")
+                    for existing in list(state.get("link_rows", [])):
+                        try:
+                            existing["frame"].destroy()
+                        except Exception:
+                            pass
+                    state["link_rows"] = []
+                    for label, frame in (state.get("entity_chip_frames") or {}).items():
+                        state["entities"][label] = []
+                        for widget in list(frame.winfo_children()):
+                            try:
+                                widget.destroy()
+                            except Exception:
+                                pass
+                    raw_text = sc
+                    title_value = None
+                    if isinstance(sc, dict):
+                        title_value = sc.get("Title") or sc.get("Scene")
+                        raw_text = sc.get("Text") or sc.get("text") or sc.get("Summary") or sc
+                    if title_entry is not None:
+                        try:
+                            title_entry.delete(0, "end")
+                            if title_value:
+                                title_entry.insert(0, str(title_value))
+                        except Exception:
+                            pass
                     try:
-                        ed.load_text_data(ai_text_to_rtf_json(str(sc)))
+                        if isinstance(raw_text, dict) and "text" in raw_text:
+                            editor.load_text_data(raw_text)
+                        else:
+                            editor.load_text_data(ai_text_to_rtf_json(str(raw_text)))
                     except Exception:
-                        ed.text_widget.delete("1.0", "end")
-                        ed.text_widget.insert("1.0", str(sc))
+                        editor.text_widget.delete("1.0", "end")
+                        editor.text_widget.insert("1.0", str(raw_text))
 
             # End-of-function: UI lists remain as displayed
 

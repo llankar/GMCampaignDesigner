@@ -8,7 +8,7 @@ import ctypes
 from ctypes import wintypes
 #import logging
 import tkinter as tk
-from tkinter import filedialog, messagebox, ttk, Menu
+from tkinter import filedialog, messagebox, simpledialog, ttk, Menu
 from PIL import Image, ImageTk
 
 from modules.helpers.template_loader import load_template
@@ -81,6 +81,9 @@ class ScenarioGraphEditor(ctk.CTkFrame):
         self.selected_items = []
         self.drag_start = None
         self.original_positions = {}
+        self.canvas_link_items = {}
+        self.scene_flow_scenes = []
+        self.scene_flow_scene_lookup = {}
 
         self.init_toolbar()
         postit_path = "assets/images/post-it.png"
@@ -477,6 +480,7 @@ class ScenarioGraphEditor(ctk.CTkFrame):
 
         self.graph = {"nodes": [], "links": []}
         self.node_positions.clear()
+        self.scene_flow_scenes = normalized_scenes
 
         count = len(normalized_scenes)
         cols = min(4, max(1, int(math.ceil(math.sqrt(count)))))
@@ -509,8 +513,12 @@ class ScenarioGraphEditor(ctk.CTkFrame):
             self.node_positions[node_tag] = (x, y)
 
         lookup, index_lookup = self._build_scene_lookup(normalized_scenes)
+        self.scene_flow_scene_lookup = {
+            scene.get("tag"): scene for scene in normalized_scenes if scene.get("tag")
+        }
 
         existing_links = set()
+        tag_lookup = self.scene_flow_scene_lookup
         for scene in normalized_scenes:
             from_tag = scene.get("tag")
             if not from_tag:
@@ -543,10 +551,21 @@ class ScenarioGraphEditor(ctk.CTkFrame):
                 if key in existing_links:
                     continue
                 existing_links.add(key)
+                target_scene = tag_lookup.get(target_tag)
+                if target_scene and not isinstance(link.get("target_index"), int):
+                    link["target_index"] = target_scene.get("index")
+                link["target_tag"] = target_tag
+                link["source_tag"] = from_tag
+                link["source_scene_index"] = scene.get("index")
+                if target_scene:
+                    link["target_scene_index"] = target_scene.get("index")
                 self.graph["links"].append({
                     "from": from_tag,
                     "to": target_tag,
-                    "text": text
+                    "text": text,
+                    "source_scene_index": scene.get("index"),
+                    "target_scene_index": target_scene.get("index") if target_scene else None,
+                    "link_data": link,
                 })
 
         self.original_positions = dict(self.node_positions)
@@ -603,9 +622,20 @@ class ScenarioGraphEditor(ctk.CTkFrame):
                     text_fragments.append(value)
                 elif isinstance(value, list):
                     text_fragments.extend(str(v) for v in value if v)
+                elif isinstance(value, dict):
+                    if isinstance(value.get("text"), str):
+                        text_fragments.append(value.get("text"))
+                    else:
+                        text_fragments.extend(
+                            str(v) for v in value.values() if isinstance(v, str)
+                        )
             raw_text = "\n\n".join(fragment for fragment in text_fragments if str(fragment).strip())
-            if not raw_text and isinstance(entry.get("text"), str):
-                raw_text = entry.get("text")
+            if not raw_text:
+                alt = entry.get("text")
+                if isinstance(alt, dict):
+                    raw_text = alt.get("text", "")
+                elif isinstance(alt, str):
+                    raw_text = alt
         elif isinstance(entry, str):
             raw_text = entry
         else:
@@ -788,7 +818,8 @@ class ScenarioGraphEditor(ctk.CTkFrame):
             "entities": entities,
             "links": normalised_links,
             "color": self._scene_color_from_entry(entry),
-            "identifiers": identifiers
+            "identifiers": identifiers,
+            "source_entry": entry if isinstance(entry, dict) else None,
         }
 
     def _scene_color_from_entry(self, entry):
@@ -1401,6 +1432,7 @@ class ScenarioGraphEditor(ctk.CTkFrame):
             )
 
     def draw_links(self):
+        self.canvas_link_items = {}
         for link in self.graph["links"]:
             self.draw_one_link(link)
         self.canvas.tag_lower("link_line")
@@ -1415,6 +1447,7 @@ class ScenarioGraphEditor(ctk.CTkFrame):
             x1, y1, x2, y2, fill="black", width=2, tags=("link", "link_line")
         )
         self.canvas.tag_lower(line_id)
+        self.canvas_link_items[line_id] = link
 
         text = (link.get("text") or "").strip()
         if text:
@@ -1429,7 +1462,7 @@ class ScenarioGraphEditor(ctk.CTkFrame):
             label_x = mid_x + offset_x
             label_y = mid_y + offset_y
             label_font = tkFont.Font(family="Arial", size=max(8, int(9 * self.canvas_scale)))
-            self.canvas.create_text(
+            label_id = self.canvas.create_text(
                 label_x,
                 label_y,
                 text=text,
@@ -1439,6 +1472,7 @@ class ScenarioGraphEditor(ctk.CTkFrame):
                 justify="center",
                 tags=("link", "link_label")
             )
+            self.canvas_link_items[label_id] = link
 
     def start_drag(self, event):
         x = self.canvas.canvasx(event.x)
@@ -1512,6 +1546,7 @@ class ScenarioGraphEditor(ctk.CTkFrame):
         item_id = items[0]
         tags = self.canvas.gettags(item_id)
         if "link" in tags:
+            self.edit_link_text(item_id)
             return
         node_tag = None
         for t in tags:
@@ -1639,6 +1674,119 @@ class ScenarioGraphEditor(ctk.CTkFrame):
         if self.selected_node in self.node_positions:
             del self.node_positions[self.selected_node]
         self.draw_graph()
+
+    def edit_link_text(self, item_id):
+        link_record = self.canvas_link_items.get(item_id)
+        if not link_record:
+            return
+        current_text = link_record.get("text", "")
+        new_text = simpledialog.askstring(
+            "Edit Link",
+            "Link label:",
+            initialvalue=current_text,
+            parent=self,
+        )
+        if new_text is None:
+            return
+        new_text = new_text.strip()
+        link_record["text"] = new_text
+        link_data = link_record.get("link_data")
+        if isinstance(link_data, dict):
+            link_data["text"] = new_text
+        self.canvas.delete("link")
+        self.draw_links()
+        try:
+            self._persist_scene_links()
+            self._save_scenario_changes()
+        except Exception as exc:
+            messagebox.showerror("Save Error", f"Failed to update link text: {exc}")
+
+    def _get_scenario_scenes_list(self):
+        scenes_raw = self.scenario.get("Scenes") if self.scenario else None
+        if isinstance(scenes_raw, dict):
+            if isinstance(scenes_raw.get("Scenes"), list):
+                return scenes_raw["Scenes"]
+            scenes_raw["Scenes"] = []
+            return scenes_raw["Scenes"]
+        if isinstance(scenes_raw, list):
+            return scenes_raw
+        if scenes_raw is None:
+            self.scenario["Scenes"] = []
+            return self.scenario["Scenes"]
+        if isinstance(scenes_raw, str):
+            self.scenario["Scenes"] = [scenes_raw]
+        else:
+            self.scenario["Scenes"] = [scenes_raw]
+        return self.scenario["Scenes"]
+
+    def _ensure_scene_entry(self, index):
+        scenes_list = self._get_scenario_scenes_list()
+        while len(scenes_list) <= index:
+            scenes_list.append({})
+        entry = scenes_list[index]
+        if not isinstance(entry, dict):
+            entry = {"Text": entry if isinstance(entry, str) else str(entry)}
+            scenes_list[index] = entry
+        return entry
+
+    def _persist_scene_links(self):
+        if not isinstance(self.scene_flow_scenes, list):
+            return
+        tag_lookup = self.scene_flow_scene_lookup or {}
+        for scene in self.scene_flow_scenes:
+            idx = scene.get("index")
+            if idx is None:
+                continue
+            entry = self._ensure_scene_entry(idx)
+            links_payload = []
+            for link in scene.get("links", []):
+                text_val = (link.get("text") or "").strip()
+                link_record = {}
+                target_scene = None
+                target_tag = link.get("target_tag")
+                if target_tag:
+                    target_scene = tag_lookup.get(target_tag)
+                target_idx = link.get("target_scene_index")
+                if target_scene is None and isinstance(target_idx, int):
+                    target_scene = next(
+                        (sc for sc in self.scene_flow_scenes if sc.get("index") == target_idx),
+                        None,
+                    )
+                if target_scene:
+                    target_title = target_scene.get("title") or target_scene.get("display_name")
+                    if target_title:
+                        link_record["Target"] = target_title
+                    else:
+                        link_record["Target"] = target_scene.get("index", 0) + 1
+                    link_record["TargetIndex"] = target_scene.get("index")
+                else:
+                    raw_target = link.get("target") or link.get("target_key") or link.get("target_index")
+                    if isinstance(raw_target, (int, float)):
+                        link_record["Target"] = int(raw_target)
+                    elif raw_target:
+                        link_record["Target"] = raw_target
+                if text_val:
+                    link_record["Text"] = text_val
+                links_payload.append(link_record)
+            entry["Links"] = links_payload
+
+    def _save_scenario_changes(self):
+        if not self.scenario_wrapper or not self.scenario:
+            return
+        try:
+            items = self.scenario_wrapper.load_items()
+            title = self.scenario.get("Title")
+            saved = False
+            for idx, item in enumerate(items):
+                if item.get("Title") == title:
+                    items[idx] = self.scenario
+                    saved = True
+                    break
+            if not saved:
+                items.append(self.scenario)
+            self.scenario_wrapper.save_items(items)
+        except Exception as exc:
+            raise RuntimeError(exc)
 
     def save_graph(self):
         file_path = filedialog.asksaveasfilename(defaultextension=".json")

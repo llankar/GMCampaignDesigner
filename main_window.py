@@ -1426,12 +1426,26 @@ class MainWindow(ctk.CTk):
             if scenes:
                 doc.add_heading("Scenes", level=3)
                 for scene in scenes:
+                    scene_title = ""
+                    text_payload = scene
+                    links_payload = []
                     if isinstance(scene, dict):
+                        scene_title = scene.get("Title") or scene.get("Scene") or ""
+                        text_payload = scene.get("Text") or scene.get("text") or scene
+                        links_payload = scene.get("Links") or []
+                    if scene_title:
+                        doc.add_paragraph(scene_title, style="List Bullet")
+                    if isinstance(text_payload, dict):
                         p = doc.add_paragraph()
-                        run = p.add_run(scene.get("text", ""))
-                        self.apply_formatting(run, scene.get("formatting", {}))
+                        run = p.add_run(text_payload.get("text", ""))
+                        self.apply_formatting(run, text_payload.get("formatting", {}))
                     else:
-                        doc.add_paragraph(str(scene))
+                        doc.add_paragraph(str(text_payload))
+                    if links_payload:
+                        for link in links_payload:
+                            target = link.get("Target") or link.get("target") or ""
+                            text = link.get("Text") or link.get("text") or "Continue"
+                            doc.add_paragraph(f"  → {text}: {target}")
             
             # Places Section
             doc.add_heading("Places", level=3)

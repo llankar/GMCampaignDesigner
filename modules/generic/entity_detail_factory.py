@@ -461,42 +461,161 @@ def insert_places_table(parent, header, place_names, open_entity_callback):
         table.grid_rowconfigure(r, weight=1)
         
 @log_function
-def insert_list_longtext(parent, header, items):
-    """Insert a header + several collapsed CTkLabels, each wrapping to the parent width."""
+def insert_list_longtext(parent, header, items, open_entity_callback=None):
+    """Insert collapsible sections for long text lists such as scenario scenes."""
     ctk.CTkLabel(parent, text=f"{header}:", font=("Arial", 14, "bold")) \
-       .pack(anchor="w", padx=10, pady=(10, 2))
+        .pack(anchor="w", padx=10, pady=(10, 2))
 
-    for idx, scene in enumerate(items, start=1):
-        raw = scene.get("text", "") if isinstance(scene, dict) else str(scene)
+    def _coerce_names(value):
+        if value is None:
+            return []
+        if isinstance(value, list):
+            return [str(v).strip() for v in value if str(v).strip()]
+        if isinstance(value, (set, tuple)):
+            return [str(v).strip() for v in value if str(v).strip()]
+        text = str(value).strip()
+        if not text:
+            return []
+        parts = [part.strip() for part in text.split(",") if part.strip()]
+        return parts or [text]
+
+    def _coerce_links(value):
+        links = []
+        if value is None:
+            return links
+        if isinstance(value, list):
+            for item in value:
+                links.extend(_coerce_links(item))
+            return links
+        if isinstance(value, dict):
+            target = None
+            text = None
+            for key in ("Target", "target", "Scene", "scene", "Next", "next", "Id", "id", "Reference", "reference"):
+                if key in value:
+                    target = value[key]
+                    break
+            for key in ("Text", "text", "Label", "label", "Description", "description", "Choice", "choice"):
+                if key in value:
+                    text = value[key]
+                    break
+            links.append({"target": target, "text": text})
+            return links
+        if isinstance(value, (int, float)):
+            links.append({"target": int(value), "text": ""})
+            return links
+        text_val = str(value).strip()
+        if text_val:
+            links.append({"target": text_val, "text": text_val})
+        return links
+
+    if items is None:
+        items = []
+    elif not isinstance(items, (list, tuple)):
+        items = [items]
+
+    for idx, entry in enumerate(items, start=1):
+        scene_dict = entry if isinstance(entry, dict) else {"Text": entry}
+        text_payload = scene_dict.get("Text") or scene_dict.get("text") or ""
+        if isinstance(text_payload, dict):
+            body_text = text_payload.get("text", "")
+        elif isinstance(text_payload, list):
+            body_text = "\n".join(str(v) for v in text_payload if v)
+        else:
+            body_text = str(text_payload or "")
+        body_text = format_multiline_text(body_text, max_length=2000)
+
+        title_value = scene_dict.get("Title") or scene_dict.get("Scene") or ""
+        title_clean = str(title_value).strip()
+
+        npc_names = _coerce_names(scene_dict.get("NPCs"))
+        creature_names = _coerce_names(scene_dict.get("Creatures"))
+        place_names = _coerce_names(scene_dict.get("Places"))
+        links = _coerce_links(scene_dict.get("Links"))
 
         outer = ctk.CTkFrame(parent, fg_color="transparent")
-        outer.pack(fill="x", expand=True, padx=20, pady=2)
+        outer.pack(fill="x", expand=True, padx=20, pady=4)
         body = ctk.CTkFrame(outer, fg_color="transparent")
 
-        # Create label with zero wraplength for now
-        lbl = ctk.CTkLabel(body, text=raw, wraplength=0, justify="left", font=("Arial", 16))
-        lbl.pack(fill="x", padx=10, pady=5)
+        body_label = ctk.CTkLabel(
+            body,
+            text=body_text or "(No scene notes)",
+            wraplength=0,
+            justify="left",
+            font=("Arial", 14),
+        )
+        body_label.pack(fill="x", padx=12, pady=(6, 6))
+
+        def _make_entity_section(names, label_text):
+            if not names:
+                return
+            section = ctk.CTkFrame(body, fg_color="transparent")
+            section.pack(fill="x", padx=12, pady=(0, 4))
+            ctk.CTkLabel(section, text=f"{label_text}:", font=("Arial", 13, "bold"))\
+                .pack(anchor="w")
+            chips = ctk.CTkFrame(section, fg_color="transparent")
+            chips.pack(fill="x", padx=10, pady=(2, 0))
+            for name in names:
+                chip = ctk.CTkLabel(
+                    chips,
+                    text=name,
+                    text_color="#00BFFF" if callable(open_entity_callback) else "white",
+                    cursor="hand2" if callable(open_entity_callback) else "",
+                )
+                chip.pack(side="left", padx=4, pady=2)
+                if callable(open_entity_callback):
+                    chip.bind("<Button-1>", lambda e, t=label_text, n=name: open_entity_callback(t, n))
+
+        _make_entity_section(npc_names, "NPCs")
+        _make_entity_section(creature_names, "Creatures")
+        _make_entity_section(place_names, "Places")
+
+        if links:
+            link_section = ctk.CTkFrame(body, fg_color="transparent")
+            link_section.pack(fill="x", padx=12, pady=(4, 6))
+            ctk.CTkLabel(link_section, text="Links:", font=("Arial", 13, "bold"))\
+                .pack(anchor="w")
+            for link in links:
+                text_val = str(link.get("text") or "Continue").strip()
+                target_val = link.get("target")
+                if isinstance(target_val, (int, float)):
+                    target_display = f"Scene {int(target_val)}"
+                elif target_val:
+                    target_display = str(target_val)
+                else:
+                    target_display = "(unspecified)"
+                CTkLabel(
+                    link_section,
+                    text=f"• {text_val} → {target_display}",
+                    font=("Arial", 12),
+                    justify="left",
+                ).pack(anchor="w", padx=12, pady=1)
 
         expanded = ctk.BooleanVar(value=False)
+        button_text = f"▶ Scene {idx}"
+        if title_clean:
+            button_text += f" – {title_clean}"
         btn = ctk.CTkButton(
             outer,
-            text=f"▶ Scene {idx}",
+            text=button_text,
             fg_color="transparent",
             anchor="w",
         )
 
-        def _toggle(btn=btn, body=body, lbl=lbl, expanded=expanded, idx=idx):
+        def _toggle(btn=btn, body=body, lbl=body_label, expanded=expanded, idx=idx, title=title_clean):
             if expanded.get():
                 body.pack_forget()
-                btn.configure(text=f"▶ Scene {idx}")
+                label = f"▶ Scene {idx}"
+                if title:
+                    label += f" – {title}"
+                btn.configure(text=label)
             else:
-                # 1) show the body
-                body.pack(fill="x", padx=10, pady=5)
-                btn.configure(text=f"▼ Scene {idx}")
-                # 2) force geometry update so width is correct
+                body.pack(fill="x", padx=8, pady=6)
+                label = f"▼ Scene {idx}"
+                if title:
+                    label += f" – {title}"
+                btn.configure(text=label)
                 outer.update_idletasks()
-                # 3) set wraplength to the actual label width minus padding
-                wrap_px = lbl.winfo_width()
+                wrap_px = max(200, lbl.winfo_width())
                 lbl.configure(wraplength=wrap_px)
             expanded.set(not expanded.get())
 
@@ -583,7 +702,7 @@ def create_scenario_detail_frame(entity_type, scenario_item, master, open_entity
         if ftype == "text":
             insert_text(frame, name, value)
         elif ftype == "list_longtext":
-            insert_list_longtext(frame, name, value)
+            insert_list_longtext(frame, name, value, open_entity_callback)
         elif ftype == "longtext":
             insert_longtext(frame, name, value)
         elif ftype == "list":
