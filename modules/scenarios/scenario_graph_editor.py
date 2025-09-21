@@ -1513,8 +1513,22 @@ class ScenarioGraphEditor(ctk.CTkFrame):
         tag_to = link["to"]
         x1, y1 = self.node_positions.get(tag_from, (0, 0))
         x2, y2 = self.node_positions.get(tag_to, (0, 0))
+        default_line_color = "#5BB8FF"
+        line_color = (
+            link.get("line_color")
+            or link.get("color")
+            or default_line_color
+        )
+        try:
+            line_width = float(link.get("line_width") or link.get("width") or 2)
+        except (TypeError, ValueError):
+            line_width = 2
+
         line_id = self.canvas.create_line(
-            x1, y1, x2, y2, fill="black", width=2, tags=("link", "link_line")
+            x1, y1, x2, y2,
+            fill=line_color,
+            width=line_width,
+            tags=("link", "link_line")
         )
         self.canvas.tag_lower(line_id)
         self.canvas_link_items[line_id] = link
@@ -1531,13 +1545,43 @@ class ScenarioGraphEditor(ctk.CTkFrame):
             offset_y = dx / length * offset
             label_x = mid_x + offset_x
             label_y = mid_y + offset_y
-            label_font = tkFont.Font(family="Arial", size=max(8, int(9 * self.canvas_scale)))
+            default_font_size = max(8, int(10 * self.canvas_scale))
+
+            font_spec = link.get("label_font") or link.get("font")
+            if isinstance(font_spec, (tuple, list)) and font_spec:
+                family = font_spec[0]
+                size = None
+                weight = None
+                if len(font_spec) > 1:
+                    try:
+                        size = int(font_spec[1])
+                    except (TypeError, ValueError):
+                        size = None
+                if len(font_spec) > 2:
+                    weight = font_spec[2]
+            else:
+                family = link.get("label_font_family") or link.get("font_family") or "Arial"
+                try:
+                    size = int(link.get("label_font_size") or link.get("font_size") or default_font_size)
+                except (TypeError, ValueError):
+                    size = default_font_size
+                weight = link.get("label_font_weight") or link.get("font_weight") or "bold"
+
+            if size is None:
+                size = default_font_size
+            if not family:
+                family = "Arial"
+            if not weight:
+                weight = "bold"
+
+            label_font = tkFont.Font(family=family, size=size, weight=weight)
+            label_color = link.get("label_color") or link.get("text_color") or "#FFFFFF"
             label_id = self.canvas.create_text(
                 label_x,
                 label_y,
                 text=text,
                 font=label_font,
-                fill="#1f1f1f",
+                fill=label_color,
                 width=180,
                 justify="center",
                 tags=("link", "link_label")
