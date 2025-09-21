@@ -65,13 +65,15 @@ class ScenarioGraphEditor(ctk.CTkFrame):
         self.scenario = None
         self.canvas_scale = 1.0
         self.zoom_factor = 1.1
-        self.type_icons = {
-            "npc":      self.load_icon("assets/npc_icon.png",      32, 0.6),
-            "place":    self.load_icon("assets/places_icon.png",    32, 0.6),
-            "scenario": self.load_icon("assets/gm_screen_icon.png", 32, 0.6),
-            "creature": self.load_icon("assets/creature_icon.png", 32, 0.6),
-            "scene":    self.load_icon("assets/scenario_icon.png", 32, 0.6)
+        self.type_icon_paths = {
+            "npc": "assets/npc_icon.png",
+            "place": "assets/places_icon.png",
+            "scenario": "assets/gm_screen_icon.png",
+            "creature": "assets/creature_icon.png",
+            "scene": "assets/scenario_icon.png",
         }
+        self.type_icons = {}
+        self._scaled_type_icons = {}
         
         # Graph structure.
         self.graph = {"nodes": [], "links": []}
@@ -131,12 +133,14 @@ class ScenarioGraphEditor(ctk.CTkFrame):
                 tags="background"
             )
             self.canvas.tag_lower("background")
-           
+
+        self._load_default_type_icons()
+
         self.h_scrollbar.grid(row=1, column=0, sticky="ew")
         self.v_scrollbar.grid(row=0, column=1, sticky="ns")
         self.canvas_frame.grid_rowconfigure(0, weight=1)
         self.canvas_frame.grid_columnconfigure(0, weight=1)
-       
+
         # Global mouse events.
         self.canvas.bind("<Button-1>", self.start_drag)
         self.canvas.bind("<B1-Motion>", self.on_drag)
@@ -1404,7 +1408,37 @@ class ScenarioGraphEditor(ctk.CTkFrame):
             "location": "#4f8750",
         }
         return color_map.get(base, "#666666")
-    
+
+    def _load_default_type_icons(self):
+        self.type_icons.clear()
+        self._scaled_type_icons.clear()
+        for icon_type, path in self.type_icon_paths.items():
+            icon = self.load_icon(path, 32, 0.6)
+            if icon:
+                self.type_icons[icon_type] = icon
+                self._scaled_type_icons[(icon_type, 32)] = icon
+
+    def _get_scaled_type_icon(self, entity_type, size):
+        entity_key = (entity_type or "").lower()
+        if not entity_key:
+            return None
+        try:
+            target_size = int(size)
+        except (TypeError, ValueError):
+            return None
+        if target_size <= 0:
+            return None
+        cache_key = (entity_key, target_size)
+        if cache_key in self._scaled_type_icons:
+            return self._scaled_type_icons[cache_key]
+        path = self.type_icon_paths.get(entity_key)
+        if not path:
+            return None
+        icon = self.load_icon(path, target_size, 0.6)
+        if icon:
+            self._scaled_type_icons[cache_key] = icon
+        return icon
+
     def draw_nodes(self):
 
         scale = self.canvas_scale
@@ -1506,7 +1540,7 @@ class ScenarioGraphEditor(ctk.CTkFrame):
             body_font = tkFont.Font(family="Arial",
                                     size=max(1, int(9 * scale)))
 
-            thumb_size = max(24, int(40 * scale))
+            thumb_size = max(48, int(80 * scale))
             thumb_gap = max(4, int(6 * scale))
             icons_height = thumb_size if entity_entries else 0
             icon_row_width = (
@@ -1648,12 +1682,12 @@ class ScenarioGraphEditor(ctk.CTkFrame):
                     icon = None
                     if portrait_path:
                         icon = self.load_thumbnail(portrait_path, thumb_key, (thumb_size, thumb_size))
+                    entity_type_value = entity.get("type") or entity.get("Type") or ""
+                    entity_type = (entity_type_value or "").lower()
                     if icon is None:
-                        entity_type_value = entity.get("type") or entity.get("Type") or ""
-                        entity_type = entity_type_value.lower()
-                        icon = self.type_icons.get(entity_type)
-                    else:
-                        entity_type_value = entity.get("type") or entity.get("Type") or ""
+                        icon = self._get_scaled_type_icon(entity_type, thumb_size)
+                        if icon is not None:
+                            self.node_images[thumb_key] = icon
                     tooltip_synopsis = self._get_entity_synopsis_for_display(entity)
                     tooltip_info = {
                         "name": name,
@@ -1672,7 +1706,7 @@ class ScenarioGraphEditor(ctk.CTkFrame):
                         )
                         self._bind_entity_tooltip(entity_tag, tooltip_info)
                     else:
-                        color = self._entity_placeholder_color(entity.get("type"))
+                        color = self._entity_placeholder_color(entity_type_value)
                         radius = thumb_size / 2
                         self.canvas.create_oval(
                             icon_x - radius,
@@ -2191,11 +2225,13 @@ class ScenarioGraphEditor(ctk.CTkFrame):
         self.graph = state.get("graph", {})
         self.node_positions = state.get("node_positions", {})
         self.draw_graph()
-    def load_icon(self,path, size, opacity):
+    def load_icon(self, path, size, opacity):
+        if not path or not os.path.exists(path):
+            return None
         img = Image.open(path).convert("RGBA").resize((size, size), Image.Resampling.LANCZOS)
         alpha = img.split()[3].point(lambda p: int(p * opacity))
         img.putalpha(alpha)
-        return ImageTk.PhotoImage(img, master=self._canvas)
+        return ImageTk.PhotoImage(img, master=self.canvas)
         
 def make_watermarked_postit(base_path, icon_path, size=(200,200), icon_size=32, margin=8, opacity=80):
         # 1) load base
