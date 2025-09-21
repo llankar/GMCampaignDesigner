@@ -61,23 +61,25 @@ class DiceBarWindow(ctk.CTkToplevel):
         self.grid_columnconfigure(0, weight=1)
 
         container = ctk.CTkFrame(self, corner_radius=0, fg_color="#101a2a")
-        container.grid(row=0, column=0, sticky="nsew")
+        container.grid(row=0, column=0, sticky="nsew", padx=2, pady=(0, 2))
         container.grid_columnconfigure(0, weight=0)
         container.grid_columnconfigure(1, weight=0)
         container.grid_columnconfigure(2, weight=1)
 
-        handle = ctk.CTkLabel(container, text="🎲", width=36, font=("Segoe UI", 18))
-        handle.grid(row=0, column=0, padx=(12, 4), pady=2, sticky="w")
+        handle = ctk.CTkLabel(container, text="🎲", width=32, font=("Segoe UI", 18))
+        handle.grid(row=0, column=0, padx=(10, 4), pady=0, sticky="w")
         handle.bind("<ButtonPress-1>", self._on_drag_start)
         handle.bind("<B1-Motion>", self._on_drag_motion)
         handle.bind("<ButtonRelease-1>", self._on_drag_end)
 
-        collapse_button = ctk.CTkButton(container, text="▼", width=28, command=self._toggle_collapsed)
-        collapse_button.grid(row=0, column=1, padx=(0, 6), pady=2, sticky="nsw")
+        collapse_button = ctk.CTkButton(
+            container, text="▼", width=26, height=28, command=self._toggle_collapsed
+        )
+        collapse_button.grid(row=0, column=1, padx=(0, 6), pady=0, sticky="nsw")
         self._collapse_button = collapse_button
 
         content = ctk.CTkFrame(container, corner_radius=0, fg_color="transparent")
-        self._content_grid_options = {"row": 0, "column": 2, "padx": (0, 12), "pady": 2, "sticky": "nsew"}
+        self._content_grid_options = {"row": 0, "column": 2, "padx": (0, 10), "pady": 0, "sticky": "nsew"}
         content.grid(**self._content_grid_options)
         content.grid_columnconfigure(0, weight=2)
         content.grid_columnconfigure(1, weight=0)
@@ -90,8 +92,8 @@ class DiceBarWindow(ctk.CTkToplevel):
         content.grid_columnconfigure(8, weight=0)
         self._content_frame = content
 
-        entry = ctk.CTkEntry(content, textvariable=self.formula_var, width=260)
-        entry.grid(row=0, column=0, padx=(6, 6), pady=2, sticky="ew")
+        entry = ctk.CTkEntry(content, textvariable=self.formula_var, width=260, height=30)
+        entry.grid(row=0, column=0, padx=(4, 6), pady=0, sticky="ew")
         entry.bind("<Return>", lambda _event: self.roll())
         self._formula_entry = entry
 
@@ -99,29 +101,32 @@ class DiceBarWindow(ctk.CTkToplevel):
             content,
             text="Explode",
             variable=self.exploding_var,
+            checkbox_height=18,
         )
-        explode_box.grid(row=0, column=1, padx=4, pady=2, sticky="w")
+        explode_box.grid(row=0, column=1, padx=4, pady=0, sticky="w")
 
         separate_box = ctk.CTkCheckBox(
             content,
             text="Separate",
             variable=self.separate_var,
+            checkbox_height=18,
         )
-        separate_box.grid(row=0, column=2, padx=4, pady=2, sticky="w")
+        separate_box.grid(row=0, column=2, padx=4, pady=0, sticky="w")
 
-        roll_button = ctk.CTkButton(content, text="Roll", width=70, command=self.roll)
-        roll_button.grid(row=0, column=3, padx=4, pady=2, sticky="ew")
+        roll_button = ctk.CTkButton(content, text="Roll", width=70, height=30, command=self.roll)
+        roll_button.grid(row=0, column=3, padx=4, pady=0, sticky="ew")
 
         preset_frame = ctk.CTkFrame(content, fg_color="transparent")
-        preset_frame.grid(row=0, column=4, padx=6, pady=2, sticky="w")
+        preset_frame.grid(row=0, column=4, padx=6, pady=0, sticky="w")
         for idx, faces in enumerate(SUPPORTED_DICE_SIZES):
             button = ctk.CTkButton(
                 preset_frame,
                 text=f"d{faces}",
                 width=48,
+                height=30,
                 command=lambda f=faces: self._append_die(f),
             )
-            button.grid(row=0, column=idx, padx=2, pady=2)
+            button.grid(row=0, column=idx, padx=2, pady=0)
 
         result_label = ctk.CTkLabel(
             content,
@@ -129,7 +134,7 @@ class DiceBarWindow(ctk.CTkToplevel):
             anchor="w",
             font=("Segoe UI", 14, "bold"),
         )
-        result_label.grid(row=0, column=5, padx=6, pady=2, sticky="ew")
+        result_label.grid(row=0, column=5, padx=6, pady=0, sticky="ew")
         result_label.bind("<ButtonPress-1>", self._on_drag_start)
         result_label.bind("<B1-Motion>", self._on_drag_motion)
         result_label.bind("<ButtonRelease-1>", self._on_drag_end)
@@ -141,16 +146,17 @@ class DiceBarWindow(ctk.CTkToplevel):
             values=[HISTORY_PLACEHOLDER],
             command=self._on_history_selected,
             width=240,
+            height=30,
         )
-        history_menu.grid(row=0, column=6, padx=6, pady=2, sticky="ew")
+        history_menu.grid(row=0, column=6, padx=6, pady=0, sticky="ew")
         history_menu.configure(state="disabled")
         self._history_menu = history_menu
 
-        clear_button = ctk.CTkButton(content, text="Clear", width=70, command=self._clear_history)
-        clear_button.grid(row=0, column=7, padx=6, pady=2, sticky="ew")
+        clear_button = ctk.CTkButton(content, text="Clear", width=70, height=30, command=self._clear_history)
+        clear_button.grid(row=0, column=7, padx=6, pady=0, sticky="ew")
 
-        close_button = ctk.CTkButton(content, text="✕", width=36, command=self._on_close)
-        close_button.grid(row=0, column=8, padx=(6, 10), pady=2, sticky="e")
+        close_button = ctk.CTkButton(content, text="✕", width=32, height=30, command=self._on_close)
+        close_button.grid(row=0, column=8, padx=(6, 8), pady=0, sticky="e")
 
         self._update_collapse_button()
 
@@ -306,12 +312,19 @@ class DiceBarWindow(ctk.CTkToplevel):
 
         if self._is_collapsed:
             min_height = 32
+            target = self._collapse_button or self
         else:
-            min_height = 48
+            min_height = 40
+            target = self._content_frame or self
 
         requested = int(self.winfo_reqheight() or 0)
-        current = int(self.winfo_height() or 0)
-        height = max(min_height, requested, current)
+        try:
+            target_height = int(target.winfo_reqheight() or 0)
+        except Exception:
+            target_height = 0
+        if target_height:
+            requested = max(requested, target_height)
+        height = max(min_height, requested)
         x = 0
         y = max(screen_height - height, 0)
 
@@ -320,7 +333,8 @@ class DiceBarWindow(ctk.CTkToplevel):
             try:
                 if audio_window.winfo_exists():
                     audio_window.update_idletasks()
-                    if audio_window.winfo_viewable():
+                    is_mapped = bool(getattr(audio_window, "winfo_ismapped", lambda: True)())
+                    if is_mapped:
                         audio_height = int(audio_window.winfo_height() or 0)
                         if audio_height <= 1:
                             geometry = audio_window.geometry()
