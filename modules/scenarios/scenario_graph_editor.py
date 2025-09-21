@@ -730,9 +730,7 @@ class ScenarioGraphEditor(ctk.CTkFrame):
                     continue
                 seen_pairs.add(key)
                 record = self._lookup_entity_by_name(ent_type, cleaned)
-                portrait = ""
-                if record:
-                    portrait = record.get("Portrait") or record.get("portrait") or ""
+                portrait = self._extract_entity_image(record, ent_type) if record else ""
                 entities.append({
                     "type": ent_type,
                     "name": cleaned,
@@ -1091,11 +1089,79 @@ class ScenarioGraphEditor(ctk.CTkFrame):
         self.canvas.tag_raise("link")  # Put links behind everything
         self.canvas.tag_raise("node")  # Bring nodes to the top
 
+    def _extract_entity_image(self, record, entity_type):
+        if not isinstance(record, dict):
+            return ""
+        priority_keys = ["Portrait", "portrait", "Image", "image", "TokenImage", "tokenImage", "Token", "token"]
+        if entity_type == "place":
+            priority_keys = ["Image", "image", "Portrait", "portrait", "TokenImage", "tokenImage", "Token", "token"]
+        for key in priority_keys:
+            value = record.get(key)
+            if value:
+                return value
+        return ""
+
+    def _resolve_scene_entity_portrait(self, entity):
+        if not isinstance(entity, dict):
+            return ""
+        for key in ("portrait", "Portrait", "image", "Image", "tokenImage", "TokenImage", "token", "Token"):
+            value = entity.get(key)
+            if value:
+                return value
+        return ""
+
+    def _iter_image_candidates(self, value):
+        if value is None:
+            return
+
+        if isinstance(value, dict):
+            for key in ("path", "Path", "file", "File", "image", "Image", "portrait", "Portrait", "value", "Value", "text", "Text"):
+                if key in value:
+                    yield from self._iter_image_candidates(value[key])
+            return
+
+        if isinstance(value, (list, tuple, set)):
+            for item in value:
+                yield from self._iter_image_candidates(item)
+            return
+
+        text = str(value).strip()
+        if not text:
+            return
+
+        expanded = os.path.expandvars(os.path.expanduser(text))
+        normalized = expanded.replace("\\", os.sep)
+        yield normalized
+
+        if not os.path.isabs(normalized):
+            campaign_dir = ConfigHelper.get_campaign_dir()
+            if campaign_dir:
+                yield os.path.join(campaign_dir, normalized)
+            if PORTRAIT_FOLDER:
+                normalized_lower = normalized.replace("\\", "/").lower()
+                if not normalized_lower.startswith("assets/"):
+                    yield os.path.join(PORTRAIT_FOLDER, normalized)
+
+    def _resolve_existing_image_path(self, portrait_path):
+        seen = set()
+        for candidate in self._iter_image_candidates(portrait_path):
+            if not candidate:
+                continue
+            normalized = os.path.normpath(candidate)
+            if normalized in seen:
+                continue
+            seen.add(normalized)
+            if os.path.exists(normalized):
+                return normalized
+        return None
+
     def load_portrait(self, portrait_path, node_tag):
-        if not portrait_path or not os.path.exists(portrait_path):
+        resolved_path = self._resolve_existing_image_path(portrait_path)
+        if not resolved_path:
             return None, (0, 0)
         try:
-            img = Image.open(portrait_path)
+            with Image.open(resolved_path) as pil_img:
+                img = pil_img.copy()
             resample_method = getattr(Image, "Resampling", Image).LANCZOS
             img.thumbnail(MAX_PORTRAIT_SIZE, resample_method)
             portrait_image = ImageTk.PhotoImage(img, master=self.canvas)
@@ -1106,10 +1172,12 @@ class ScenarioGraphEditor(ctk.CTkFrame):
             return None, (0, 0)
 
     def load_portrait_scaled(self, portrait_path, node_tag, scale=1.0):
-        if not portrait_path or not os.path.exists(portrait_path):
+        resolved_path = self._resolve_existing_image_path(portrait_path)
+        if not resolved_path:
             return None, (0, 0)
         try:
-            img = Image.open(portrait_path)
+            with Image.open(resolved_path) as pil_img:
+                img = pil_img.copy()
             size = int(MAX_PORTRAIT_SIZE[0] * scale), int(MAX_PORTRAIT_SIZE[1] * scale)
             resample_method = getattr(Image, "Resampling", Image).LANCZOS
             img.thumbnail(size, resample_method)
@@ -1121,10 +1189,12 @@ class ScenarioGraphEditor(ctk.CTkFrame):
             return None, (0, 0)
 
     def load_thumbnail(self, portrait_path, cache_key, size):
-        if not portrait_path or not os.path.exists(portrait_path):
+        resolved_path = self._resolve_existing_image_path(portrait_path)
+        if not resolved_path:
             return None
         try:
-            img = Image.open(portrait_path)
+            with Image.open(resolved_path) as pil_img:
+                img = pil_img.copy()
             resample_method = getattr(Image, "Resampling", Image).LANCZOS
             img.thumbnail(size, resample_method)
             thumb = ImageTk.PhotoImage(img, master=self.canvas)
@@ -1383,7 +1453,7 @@ class ScenarioGraphEditor(ctk.CTkFrame):
                 icons_y = text_bottom + GAP + icons_height / 2
                 for idx, entity in enumerate(entity_entries):
                     name = entity.get("name") or entity.get("Name") or ""
-                    portrait_path = entity.get("portrait") or entity.get("Portrait") or ""
+                    portrait_path = self._resolve_scene_entity_portrait(entity)
                     thumb_key = f"{node_tag}_thumb_{idx}"
                     icon = None
                     if portrait_path:
