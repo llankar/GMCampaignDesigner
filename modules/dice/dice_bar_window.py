@@ -23,7 +23,6 @@ class DiceBarWindow(ctk.CTkToplevel):
         self.overrideredirect(True)
         self.resizable(False, False)
         self.attributes("-topmost", True)
-        self.configure(fg_color="#111c2a")
 
         self._drag_offset: Tuple[int, int] | None = None
 
@@ -32,6 +31,7 @@ class DiceBarWindow(ctk.CTkToplevel):
         self.separate_var = tk.BooleanVar(value=False)
         self.result_var = tk.StringVar(value="Enter a dice formula and roll.")
 
+        self._bar_frame: ctk.CTkFrame | None = None
         self._content_frame: ctk.CTkFrame | None = None
         self._content_grid_options: dict[str, object] | None = None
         self._collapse_button: ctk.CTkButton | None = None
@@ -52,26 +52,26 @@ class DiceBarWindow(ctk.CTkToplevel):
         self.grid_rowconfigure(0, weight=1)
         self.grid_columnconfigure(0, weight=1)
 
-        container = ctk.CTkFrame(self, corner_radius=0, fg_color="#101a2a")
-        container.grid(row=0, column=0, sticky="nsew", padx=2, pady=(0, 2))
-        container.grid_columnconfigure(0, weight=0)
-        container.grid_columnconfigure(1, weight=0)
-        container.grid_columnconfigure(2, weight=1)
-
-        handle = ctk.CTkLabel(container, text="🎲", width=32, font=("Segoe UI", 18))
-        handle.grid(row=0, column=0, padx=(10, 4), pady=0, sticky="w")
-        handle.bind("<ButtonPress-1>", self._on_drag_start)
-        handle.bind("<B1-Motion>", self._on_drag_motion)
-        handle.bind("<ButtonRelease-1>", self._on_drag_end)
+        bar = ctk.CTkFrame(self, corner_radius=0)
+        bar.grid(row=0, column=0, sticky="nsew", padx=8, pady=8)
+        bar.grid_columnconfigure(0, weight=0)
+        bar.grid_columnconfigure(1, weight=1)
+        bar.bind("<ButtonPress-1>", self._on_drag_start)
+        bar.bind("<B1-Motion>", self._on_drag_motion)
+        bar.bind("<ButtonRelease-1>", self._on_drag_end)
+        self._bar_frame = bar
 
         collapse_button = ctk.CTkButton(
-            container, text="▼", width=26, height=28, command=self._toggle_collapsed
+            bar,
+            text="◀",
+            width=32,
+            command=self._toggle_collapsed,
         )
-        collapse_button.grid(row=0, column=1, padx=(0, 6), pady=0, sticky="nsw")
+        collapse_button.grid(row=0, column=0, padx=(4, 6), pady=4, sticky="nsw")
         self._collapse_button = collapse_button
 
-        content = ctk.CTkFrame(container, corner_radius=0, fg_color="transparent")
-        self._content_grid_options = {"row": 0, "column": 2, "padx": (0, 10), "pady": 0, "sticky": "nsew"}
+        content = ctk.CTkFrame(bar, corner_radius=0)
+        self._content_grid_options = {"row": 0, "column": 1, "padx": 0, "pady": 0, "sticky": "nsew"}
         content.grid(**self._content_grid_options)
         content.grid_columnconfigure(0, weight=2)
         content.grid_columnconfigure(1, weight=0)
@@ -83,7 +83,7 @@ class DiceBarWindow(ctk.CTkToplevel):
         self._content_frame = content
 
         entry = ctk.CTkEntry(content, textvariable=self.formula_var, width=260, height=30)
-        entry.grid(row=0, column=0, padx=(4, 6), pady=0, sticky="ew")
+        entry.grid(row=0, column=0, padx=(4, 6), pady=4, sticky="ew")
         entry.bind("<Return>", lambda _event: self.roll())
         self._formula_entry = entry
 
@@ -93,7 +93,7 @@ class DiceBarWindow(ctk.CTkToplevel):
             variable=self.exploding_var,
             checkbox_height=18,
         )
-        explode_box.grid(row=0, column=1, padx=4, pady=0, sticky="w")
+        explode_box.grid(row=0, column=1, padx=4, pady=4, sticky="w")
 
         separate_box = ctk.CTkCheckBox(
             content,
@@ -101,7 +101,7 @@ class DiceBarWindow(ctk.CTkToplevel):
             variable=self.separate_var,
             checkbox_height=18,
         )
-        separate_box.grid(row=0, column=2, padx=4, pady=0, sticky="w")
+        separate_box.grid(row=0, column=2, padx=4, pady=4, sticky="w")
 
         roll_button = ctk.CTkButton(
             content,
@@ -113,10 +113,10 @@ class DiceBarWindow(ctk.CTkToplevel):
             hover_color="#23865a",
             font=("Segoe UI", 14, "bold"),
         )
-        roll_button.grid(row=0, column=3, padx=4, pady=0, sticky="ew")
+        roll_button.grid(row=0, column=3, padx=4, pady=4, sticky="ew")
 
         preset_frame = ctk.CTkFrame(content, fg_color="transparent")
-        preset_frame.grid(row=0, column=4, padx=6, pady=0, sticky="w")
+        preset_frame.grid(row=0, column=4, padx=6, pady=4, sticky="w")
         for idx, faces in enumerate(SUPPORTED_DICE_SIZES):
             button = ctk.CTkButton(
                 preset_frame,
@@ -134,14 +134,14 @@ class DiceBarWindow(ctk.CTkToplevel):
             font=("Segoe UI", 14, "bold"),
             justify="left",
         )
-        result_label.grid(row=0, column=5, padx=6, pady=0, sticky="ew")
+        result_label.grid(row=0, column=5, padx=6, pady=4, sticky="ew")
         result_label.bind("<ButtonPress-1>", self._on_drag_start)
         result_label.bind("<B1-Motion>", self._on_drag_motion)
         result_label.bind("<ButtonRelease-1>", self._on_drag_end)
         self._result_label = result_label
 
         close_button = ctk.CTkButton(content, text="✕", width=32, height=30, command=self._on_close)
-        close_button.grid(row=0, column=6, padx=(6, 8), pady=0, sticky="e")
+        close_button.grid(row=0, column=6, padx=(6, 8), pady=4, sticky="e")
 
         self._update_collapse_button()
 
@@ -243,79 +243,70 @@ class DiceBarWindow(ctk.CTkToplevel):
             pass
 
     def _apply_geometry(self) -> None:
-        screen_width = self.winfo_screenwidth()
-        screen_height = self.winfo_screenheight()
         try:
             self.update_idletasks()
+            if self._is_collapsed:
+                target = self._collapse_button or self
+                width = max(80, int(target.winfo_reqwidth() + 16))
+                height_source = target
+            else:
+                width = self.winfo_screenwidth()
+                height_source = self._bar_frame or self
+            height = max(36, int((height_source.winfo_reqheight() if height_source else 36) + 16))
+            screen_height = self.winfo_screenheight()
+            y = screen_height - height
+
+            audio_window = getattr(self.master, "audio_bar_window", None)
+            if audio_window is not None and audio_window.winfo_exists():
+                try:
+                    audio_window.update_idletasks()
+                    audio_height = int(audio_window.winfo_height() or 0)
+                    if audio_height <= 1:
+                        geometry = audio_window.geometry()
+                        try:
+                            size_part = geometry.split("x", 1)[1]
+                            height_part = size_part.split("+", 1)[0]
+                            audio_height = int(height_part)
+                        except (IndexError, ValueError):
+                            audio_height = 0
+                    audio_y = int(audio_window.winfo_rooty())
+                    if audio_y <= 0 and audio_height:
+                        audio_y = screen_height - audio_height
+                    y = audio_y - height
+                except Exception:
+                    pass
+
+            self.geometry(f"{width}x{height}+0+{max(0, y)}")
         except Exception:
             pass
-
-        if self._is_collapsed:
-            min_height = 32
-            target = self._collapse_button or self
-        else:
-            min_height = 40
-            target = self._content_frame or self
-
-        requested = int(self.winfo_reqheight() or 0)
-        try:
-            target_height = int(target.winfo_reqheight() or 0)
-        except Exception:
-            target_height = 0
-        if target_height:
-            requested = max(requested, target_height)
-        height = max(min_height, requested)
-        x = 0
-        y = max(screen_height - height, 0)
-
-        audio_window = getattr(self.master, "audio_bar_window", None)
-        if audio_window is not None:
-            try:
-                if audio_window.winfo_exists():
-                    audio_window.update_idletasks()
-                    is_mapped = bool(getattr(audio_window, "winfo_ismapped", lambda: True)())
-                    if is_mapped:
-                        audio_height = int(audio_window.winfo_height() or 0)
-                        if audio_height <= 1:
-                            geometry = audio_window.geometry()
-                            try:
-                                size_part = geometry.split("x", 1)[1]
-                                height_part = size_part.split("+", 1)[0]
-                                audio_height = int(height_part)
-                            except (IndexError, ValueError):
-                                audio_height = 0
-                        audio_y = int(audio_window.winfo_rooty())
-                        if audio_y <= 0 and audio_height:
-                            audio_y = screen_height - audio_height
-                        spacing = 8
-                        y = max(audio_y - height - spacing, 0)
-            except Exception:
-                pass
-
-        self.geometry(f"{screen_width}x{height}+{x}+{y}")
 
     def _show_error(self, message: str) -> None:
         self.result_var.set(f"⚠️ {message}")
 
     def _toggle_collapsed(self) -> None:
-        self._is_collapsed = not self._is_collapsed
+        self._set_collapsed(not self._is_collapsed)
+
+    def _set_collapsed(self, collapsed: bool) -> None:
+        if collapsed == self._is_collapsed:
+            return
+        self._is_collapsed = collapsed
         frame = self._content_frame
         if frame is not None:
-            if self._is_collapsed:
+            if collapsed:
                 frame.grid_remove()
             else:
                 options = self._content_grid_options or {}
                 if options:
                     frame.grid(**options)
                 else:
-                    frame.grid(row=0, column=2, padx=(0, 12), pady=2, sticky="nsew")
+                    frame.grid(row=0, column=1, padx=0, pady=0, sticky="nsew")
         self._update_collapse_button()
-        self.after(0, self._apply_geometry)
+        self._apply_geometry()
 
     def _update_collapse_button(self) -> None:
         if self._collapse_button is None:
             return
-        self._collapse_button.configure(text="▲" if self._is_collapsed else "▼")
+        self._collapse_button.configure(text="▶" if self._is_collapsed else "◀")
 
     def _on_drag_start(self, event: tk.Event) -> None:
         self._drag_offset = (event.x_root - self.winfo_x(), event.y_root - self.winfo_y())
