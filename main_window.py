@@ -1716,7 +1716,7 @@ class MainWindow(ctk.CTk):
             try:
                 self.map_controller.close_web_display()
             except Exception:
-                logging.exception("Error while closing web display")
+                log_exception("Error while closing web display")
             top.destroy()
 
         top.protocol("WM_DELETE_WINDOW", _on_close)
