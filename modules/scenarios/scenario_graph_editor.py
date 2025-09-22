@@ -585,7 +585,35 @@ class ScenarioGraphEditor(ctk.CTkFrame):
         if not self.scenario:
             messagebox.showinfo("Select Scenario", "Please select a scenario first to build the scene flow view.")
             return
-        self.load_scenario_scene_flow(self.scenario)
+        if getattr(self, "_scene_flow_window", None) and self._scene_flow_window.winfo_exists():
+            try:
+                self._scene_flow_window.focus()
+                self._scene_flow_window.lift()
+            except Exception:
+                pass
+            return
+
+        try:
+            from modules.scenarios.scene_flow_viewer import SceneFlowViewerWindow
+        except ImportError as exc:  # pragma: no cover - defensive guard
+            messagebox.showerror(
+                "Scene Flow",
+                f"Unable to open the scene flow viewer: {exc}",
+            )
+            return
+
+        def _on_close():
+            self._scene_flow_window = None
+
+        self._scene_flow_window = SceneFlowViewerWindow(
+            self.winfo_toplevel(),
+            scenario_wrapper=self.scenario_wrapper,
+            npc_wrapper=self.npc_wrapper,
+            creature_wrapper=self.creature_wrapper,
+            place_wrapper=self.place_wrapper,
+            initial_scenario=self.scenario,
+            on_close=_on_close,
+        )
 
     def show_entity_view(self):
         if not self.scenario:
