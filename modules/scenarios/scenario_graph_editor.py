@@ -955,9 +955,11 @@ class ScenarioGraphEditor(ctk.CTkFrame):
         self.draw_graph()
         self.canvas.update_idletasks()
 
+        bbox_nodes = self.canvas.bbox("node")
         bbox_all = self.canvas.bbox("all")
-        if bbox_all:
-            x0, y0, x1, y1 = bbox_all
+        target_bbox = bbox_nodes or bbox_all
+        if target_bbox:
+            x0, y0, x1, y1 = target_bbox
             canvas_width = self.canvas.winfo_width() or 1
             canvas_height = self.canvas.winfo_height() or 1
             center_x = (x0 + x1) / 2
