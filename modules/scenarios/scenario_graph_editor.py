@@ -10,12 +10,12 @@ from ctypes import wintypes
 import tkinter as tk
 from tkinter import filedialog, messagebox, simpledialog, ttk, Menu
 from PIL import Image, ImageTk
+import textwrap
 
 from modules.helpers.template_loader import load_template
 from modules.generic.generic_model_wrapper import GenericModelWrapper
 from modules.generic.generic_editor_window import GenericEditorWindow
 from modules.generic.generic_list_selection_view import GenericListSelectionView
-from modules.generic.entity_detail_factory import create_entity_detail_frame, open_entity_window
 from modules.helpers.config_helper import ConfigHelper
 from modules.helpers.text_helpers import format_longtext
 from modules.ui.image_viewer import show_portrait
@@ -30,6 +30,26 @@ MAX_PORTRAIT_SIZE = (128, 128)
 ctk.set_appearance_mode("Dark")
 ctk.set_default_color_theme("blue")
 #logging.basicConfig(level=logging.DEBUG)
+
+SCENE_CARD_WIDTHS = {
+    "S": 260,
+    "M": 320,
+    "L": 380,
+}
+
+SCENE_TYPE_STYLE_MAP = {
+    "setup": {"label": "Setup", "color": "#3B82F6"},
+    "choice": {"label": "Choice", "color": "#8B5CF6"},
+    "investigation": {"label": "Investigation", "color": "#F59E0B"},
+    "combat": {"label": "Combat", "color": "#EF4444"},
+    "outcome": {"label": "Outcome", "color": "#10B981"},
+    "social": {"label": "Social", "color": "#6366F1"},
+    "travel": {"label": "Travel", "color": "#0EA5E9"},
+    "downtime": {"label": "Downtime", "color": "#A855F7"},
+}
+
+SCENE_CARD_BG = "#23262F"
+SCENE_CARD_BORDER = "#3B3F4C"
 
 
 def clean_longtext(data, max_length=2000):
@@ -93,12 +113,25 @@ class ScenarioGraphEditor(ctk.CTkFrame):
         self._entity_tooltip_pending = None
 
         self.init_toolbar()
+        self.active_detail_scene_tag = None
         postit_path = "assets/images/post-it.png"
         pin_path = "assets/images/thumbtack.png"
-             
-        # Create canvas with scrollbars.
-        self.canvas_frame = ctk.CTkFrame(self)
-        self.canvas_frame.pack(fill="both", expand=True)
+
+        # Layout container combining canvas and side panel
+        self.main_container = ctk.CTkFrame(self)
+        self.main_container.pack(fill="both", expand=True)
+
+        self.canvas_frame = ctk.CTkFrame(self.main_container)
+        self.canvas_frame.grid(row=0, column=0, sticky="nsew")
+        self.detail_panel = ctk.CTkFrame(self.main_container, fg_color="#1B1D23", corner_radius=0)
+        self.detail_panel.grid(row=0, column=1, sticky="nsew")
+        self.detail_panel.configure(width=320)
+        self.detail_panel.grid_propagate(False)
+
+        self.main_container.grid_rowconfigure(0, weight=1)
+        self.main_container.grid_columnconfigure(0, weight=1)
+        self.main_container.grid_columnconfigure(1, weight=0)
+
         self.canvas = ctk.CTkCanvas(self.canvas_frame, bg="#2B2B2B", highlightthickness=0)
         self.h_scrollbar = ttk.Scrollbar(self.canvas_frame, orient="horizontal", command=self.canvas.xview)
         self.v_scrollbar = ttk.Scrollbar(self.canvas_frame, orient="vertical", command=self.canvas.yview)
@@ -140,6 +173,7 @@ class ScenarioGraphEditor(ctk.CTkFrame):
         self.v_scrollbar.grid(row=0, column=1, sticky="ns")
         self.canvas_frame.grid_rowconfigure(0, weight=1)
         self.canvas_frame.grid_columnconfigure(0, weight=1)
+        self._init_detail_panel()
 
         # Global mouse events.
         self.canvas.bind("<Button-1>", self.start_drag)
@@ -218,6 +252,297 @@ class ScenarioGraphEditor(ctk.CTkFrame):
         ctk.CTkButton(toolbar, text="Save Graph", command=self.save_graph).pack(side="left", padx=5)
         ctk.CTkButton(toolbar, text="Load Graph", command=self.load_graph).pack(side="left", padx=5)
         ctk.CTkButton(toolbar, text="Reset Zoom", command=self.reset_zoom).pack(side="left", padx=5)
+
+    def _init_detail_panel(self):
+        self.detail_panel_title = ctk.CTkLabel(
+            self.detail_panel,
+            text="Scene Details",
+            font=ctk.CTkFont(size=16, weight="bold"),
+            anchor="w",
+        )
+        self.detail_panel_title.pack(fill="x", padx=12, pady=(12, 4))
+
+        self.detail_panel_meta = ctk.CTkLabel(
+            self.detail_panel,
+            text="Select a scene card to view its full content.",
+            justify="left",
+            anchor="w",
+            wraplength=280,
+        )
+        self.detail_panel_meta.pack(fill="x", padx=12)
+
+        self.detail_textbox = ctk.CTkTextbox(
+            self.detail_panel,
+            wrap="word",
+        )
+        self.detail_textbox.pack(fill="both", expand=True, padx=12, pady=(8, 12))
+        self.detail_textbox.configure(state="disabled")
+        self._clear_detail_panel()
+
+    def _clear_detail_panel(self):
+        self.active_detail_scene_tag = None
+        if hasattr(self, "detail_panel_title"):
+            self.detail_panel_title.configure(text="Scene Details")
+        if hasattr(self, "detail_panel_meta"):
+            self.detail_panel_meta.configure(
+                text="Select a scene card to view its full content.",
+                text_color="#94A3B8",
+            )
+        if hasattr(self, "detail_textbox"):
+            self.detail_textbox.configure(state="normal")
+            self.detail_textbox.delete("1.0", "end")
+            self.detail_textbox.insert("1.0", "Select a scene card to view its full content.")
+            self.detail_textbox.configure(state="disabled")
+
+    def _show_node_detail(self, node_tag):
+        if not node_tag or not node_tag.startswith("scene_"):
+            return
+        if node_tag == self.active_detail_scene_tag:
+            return
+        scene_data = (self.scene_flow_scene_lookup or {}).get(node_tag)
+        if scene_data is None:
+            scene_data = self._build_scene_payload_from_graph(node_tag)
+        if scene_data is None:
+            self._clear_detail_panel()
+            return
+        self._populate_detail_panel(scene_data)
+        self.active_detail_scene_tag = node_tag
+
+    def _populate_detail_panel(self, scene_data):
+        title = scene_data.get("title") or scene_data.get("display_name") or scene_data.get("name") or "Scene"
+        source_entry = scene_data.get("source_entry") or {}
+        scene_color = scene_data.get("color") or "#3B82F6"
+        type_label, header_color, _ = self._resolve_scene_type_style(source_entry, scene_color)
+        badges = self._extract_scene_badges(source_entry)
+
+        if hasattr(self, "detail_panel_title"):
+            self.detail_panel_title.configure(text=title)
+        meta_parts = []
+        if type_label:
+            meta_parts.append(type_label)
+        if badges:
+            meta_parts.extend(f"{badge['label']}: {badge['value']}" for badge in badges)
+        meta_text = " • ".join(meta_parts) if meta_parts else "No metadata"
+        if hasattr(self, "detail_panel_meta"):
+            self.detail_panel_meta.configure(text=meta_text, text_color=header_color or "#CBD5F5")
+
+        full_text = scene_data.get("text") or scene_data.get("Text") or "No scene notes provided."
+        full_text = full_text.strip() or "No scene notes provided."
+        entities = scene_data.get("entities") or scene_data.get("Entities") or []
+
+        if hasattr(self, "detail_textbox"):
+            self.detail_textbox.configure(state="normal")
+            self.detail_textbox.delete("1.0", "end")
+            self.detail_textbox.insert("1.0", full_text)
+            if entities:
+                self.detail_textbox.insert("end", "\n\nKey Entities:\n")
+                for ent in entities:
+                    if not isinstance(ent, dict):
+                        continue
+                    name = ent.get("name") or "Unnamed"
+                    ent_type = ent.get("type") or ""
+                    synopsis = ent.get("synopsis") or ""
+                    bullet = f"- {name}"
+                    if ent_type:
+                        bullet += f" ({ent_type.title()})"
+                    self.detail_textbox.insert("end", bullet + "\n")
+                    if synopsis:
+                        self.detail_textbox.insert("end", f"    {synopsis.strip()}\n")
+            self.detail_textbox.configure(state="disabled")
+
+    def _build_scene_payload_from_graph(self, node_tag):
+        for node in self.graph.get("nodes", []):
+            name = node.get("name", "")
+            tag = f"{node.get('type', '')}_{name.replace(' ', '_')}"
+            if tag != node_tag:
+                continue
+            data = node.get("data", {}) or {}
+            payload = {
+                "title": node.get("name"),
+                "display_name": node.get("name"),
+                "text": data.get("Text") or data.get("text") or "",
+                "entities": data.get("Entities") or [],
+                "source_entry": data.get("SourceEntry") or {},
+                "color": node.get("color"),
+            }
+            if not payload["text"] and isinstance(payload["source_entry"], dict):
+                payload["text"] = payload["source_entry"].get("Text", "")
+            return payload
+        return None
+
+    def _measure_text_height(self, text, font_obj, wrap_width):
+        safe_width = max(int(wrap_width), 10)
+        temp_id = self.canvas.create_text(
+            0,
+            0,
+            text=text or "",
+            font=font_obj,
+            width=safe_width,
+            anchor="nw",
+        )
+        bbox = self.canvas.bbox(temp_id)
+        self.canvas.delete(temp_id)
+        if bbox:
+            return bbox[3] - bbox[1]
+        return 0
+
+    def _summarize_scene_text(self, text, max_lines=4, min_lines=2):
+        if not text:
+            return ["No scene notes provided."], False
+        normalized = str(text).replace("\r", "\n")
+        fragments = [frag.strip() for frag in normalized.splitlines() if frag.strip()]
+        if len(fragments) < min_lines:
+            sentences = re.split(r"(?<=[.!?])\s+", normalized)
+            for sentence in sentences:
+                cleaned = sentence.strip()
+                if cleaned and cleaned not in fragments:
+                    fragments.append(cleaned)
+        cleaned_lines = []
+        seen = set()
+        for fragment in fragments:
+            cleaned = re.sub(r"\s+", " ", fragment).strip()
+            if not cleaned:
+                continue
+            key = cleaned.lower()
+            if key in seen:
+                continue
+            seen.add(key)
+            cleaned_lines.append(cleaned)
+            if len(cleaned_lines) >= max_lines:
+                break
+        truncated = len(cleaned_lines) < len(fragments)
+        if not cleaned_lines:
+            return ["No scene notes provided."], False
+        if len(cleaned_lines) < min_lines:
+            wrapped = textwrap.wrap(normalized, width=90)
+            for chunk in wrapped:
+                chunk_clean = re.sub(r"\s+", " ", chunk).strip()
+                if not chunk_clean:
+                    continue
+                key = chunk_clean.lower()
+                if key in seen:
+                    continue
+                cleaned_lines.append(chunk_clean)
+                seen.add(key)
+                if len(cleaned_lines) >= min_lines:
+                    break
+        cleaned_lines = cleaned_lines[:max_lines]
+        truncated = truncated or len(cleaned_lines) < len(fragments)
+        return cleaned_lines, truncated
+
+    def _truncate_line(self, text, width):
+        if not text:
+            return ""
+        safe_width = max(int(width), 8)
+        try:
+            return textwrap.shorten(str(text), width=safe_width, placeholder="…")
+        except ValueError:
+            return str(text)
+
+    def _determine_scene_card_size(self, text, entity_count):
+        length = len(text or "")
+        if entity_count >= 5 or length > 900:
+            return "L"
+        if length < 280 and entity_count <= 2:
+            return "S"
+        return "M"
+
+    def _extract_scene_type_label(self, entry, explicit_type=None):
+        if isinstance(explicit_type, str) and explicit_type.strip():
+            return explicit_type.strip()
+        if isinstance(entry, dict):
+            for key in ("SceneType", "Type", "Category", "Mood", "Role"):
+                value = entry.get(key)
+                if isinstance(value, str) and value.strip():
+                    return value.strip()
+        if isinstance(entry, str):
+            return entry.strip()
+        return ""
+
+    def _classify_scene_type(self, type_label):
+        text = (type_label or "").lower()
+        if any(token in text for token in ("setup", "intro", "hook", "opening")):
+            return "setup"
+        if any(token in text for token in ("choice", "decision", "branch", "option")):
+            return "choice"
+        if any(token in text for token in ("invest", "myster", "clue", "explor", "detect")):
+            return "investigation"
+        if any(token in text for token in ("combat", "battle", "fight", "skirmish", "attack")):
+            return "combat"
+        if any(token in text for token in ("outcome", "result", "resolution", "aftermath", "conclusion")):
+            return "outcome"
+        if any(token in text for token in ("social", "roleplay", "diplom", "parley", "talk")):
+            return "social"
+        if any(token in text for token in ("travel", "journey", "chase", "pursuit", "voyage")):
+            return "travel"
+        if any(token in text for token in ("downtime", "rest", "interlude", "camp")):
+            return "downtime"
+        return "scene"
+
+    def _resolve_scene_type_style(self, source_entry, fallback_color, explicit_type=None):
+        raw_label = self._extract_scene_type_label(source_entry, explicit_type)
+        canonical = self._classify_scene_type(raw_label)
+        style = SCENE_TYPE_STYLE_MAP.get(canonical)
+        if style:
+            return style["label"], style["color"], canonical
+        label = raw_label if raw_label else "Scene"
+        color = fallback_color or SCENE_TYPE_STYLE_MAP.get("setup", {}).get("color", "#3B82F6")
+        return label, color, canonical
+
+    def _extract_scene_badges(self, source_entry):
+        if not isinstance(source_entry, dict):
+            return []
+        badges = []
+        difficulty = source_entry.get("Difficulty") or source_entry.get("difficulty")
+        if difficulty:
+            badges.append({"label": "Difficulty", "value": self._normalize_badge_value(difficulty)})
+        rewards = (
+            source_entry.get("Rewards")
+            or source_entry.get("Reward")
+            or source_entry.get("Treasure")
+            or source_entry.get("Loot")
+        )
+        if rewards:
+            badges.append({"label": "Rewards", "value": self._normalize_badge_value(rewards)})
+        clue = (
+            source_entry.get("Clue")
+            or source_entry.get("ClueNumber")
+            or source_entry.get("Clue #")
+            or source_entry.get("ClueID")
+        )
+        if clue:
+            badges.append({"label": "Clue #", "value": self._normalize_badge_value(clue)})
+        return [badge for badge in badges if badge["value"]]
+
+    def _normalize_badge_value(self, value):
+        if value is None:
+            return ""
+        if isinstance(value, (list, tuple, set)):
+            joined = ", ".join(str(item).strip() for item in value if str(item).strip())
+            return self._truncate_line(joined, 40)
+        if isinstance(value, dict):
+            parts = [f"{key}: {val}" for key, val in value.items() if val]
+            return self._truncate_line(", ".join(parts), 40)
+        text = str(value).strip()
+        return self._truncate_line(text, 40)
+
+    def _compute_badge_layout(self, texts, font_obj, max_width, badge_height, gap, inner_padding):
+        if not texts:
+            return 0, []
+        safe_width = max(int(max_width), 50)
+        positions = []
+        x_offset = 0
+        y_offset = 0
+        for text in texts:
+            text_width = font_obj.measure(text) + inner_padding * 2
+            text_width = min(text_width, safe_width)
+            if x_offset > 0 and x_offset + text_width > safe_width:
+                x_offset = 0
+                y_offset += badge_height + gap
+            positions.append((x_offset, y_offset, text_width))
+            x_offset += text_width + gap
+        total_height = positions[-1][1] + badge_height
+        return total_height, positions
 
 
     def show_scene_flow(self):
@@ -304,6 +629,7 @@ class ScenarioGraphEditor(ctk.CTkFrame):
         self.scenario = scenario
         self.graph = {"nodes": [], "links": []}
         self.node_positions.clear()
+        self._clear_detail_panel()
 
         center_x, center_y = 400, 300
         scenario_title = scenario.get("Title", "No Title")
@@ -494,6 +820,7 @@ class ScenarioGraphEditor(ctk.CTkFrame):
         self.graph = {"nodes": [], "links": []}
         self.node_positions.clear()
         self.scene_flow_scenes = normalized_scenes
+        self._clear_detail_panel()
 
         count = len(normalized_scenes)
         cols = min(4, max(1, int(math.ceil(math.sqrt(count)))))
@@ -519,7 +846,11 @@ class ScenarioGraphEditor(ctk.CTkFrame):
                 "color": scene.get("color", "#d1a86d"),
                 "data": {
                     "Text": scene.get("text", ""),
-                    "Entities": scene.get("entities", [])
+                    "FullText": scene.get("text", ""),
+                    "Entities": scene.get("entities", []),
+                    "SourceEntry": scene.get("source_entry"),
+                    "SceneType": self._extract_scene_type_label(scene.get("source_entry")),
+                    "CardSize": self._determine_scene_card_size(scene.get("text", ""), len(scene.get("entities", [])))
                 }
             }
             self.graph["nodes"].append(node_data)
@@ -1456,18 +1787,6 @@ class ScenarioGraphEditor(ctk.CTkFrame):
         else:
             self.node_bboxes.clear()
 
-        # Helper to measure wrapped text height
-        def measure_text_height(text, font_obj, wrap_width):
-            temp_id = self.canvas.create_text(0, 0, text=text,
-                                            font=font_obj,
-                                            width=wrap_width,
-                                            anchor="nw")
-            bbox = self.canvas.bbox(temp_id)
-            self.canvas.delete(temp_id)
-            if bbox:
-                return bbox[3] - bbox[1]
-            return 0
-
         for node in self.graph["nodes"]:
             node_type = node["type"]
             node_name = node["name"]
@@ -1475,6 +1794,10 @@ class ScenarioGraphEditor(ctk.CTkFrame):
             x, y = node["x"], node["y"]
             data = node.get("data", {}) or {}
             title_text = node_name
+
+            if node_type == "scene":
+                self._draw_scene_card(node, scale)
+                continue
 
             entity_entries = []
 
@@ -1553,8 +1876,8 @@ class ScenarioGraphEditor(ctk.CTkFrame):
             )
 
             # Measure text heights
-            title_h = measure_text_height(title_text, title_font, wrap_width)
-            body_h  = measure_text_height(body_text,  body_font,  wrap_width)
+            title_h = self._measure_text_height(title_text, title_font, wrap_width)
+            body_h  = self._measure_text_height(body_text,  body_font,  wrap_width)
             gap     = int(4 * scale)
             text_h  = title_h + gap + body_h
 
@@ -1748,6 +2071,284 @@ class ScenarioGraphEditor(ctk.CTkFrame):
         self.canvas.tag_lower("link_line")
         self.canvas.tag_raise("link_label")
 
+    def _draw_scene_card(self, node, scale):
+        node_name = node.get("name", "Scene")
+        node_tag = f"scene_{node_name.replace(' ', '_')}"
+        x, y = node.get("x", 0), node.get("y", 0)
+        data = node.get("data", {}) or {}
+
+        lookup_entry = (self.scene_flow_scene_lookup or {}).get(node_tag)
+        source_entry = data.get("SourceEntry")
+        if lookup_entry and not source_entry:
+            source_entry = lookup_entry.get("source_entry")
+        explicit_type = (
+            data.get("SceneType")
+            or data.get("SceneTypeLabel")
+            or data.get("Type")
+        )
+
+        full_text = ""
+        if lookup_entry and lookup_entry.get("text"):
+            full_text = lookup_entry.get("text")
+        full_text = full_text or data.get("FullText") or data.get("Text") or data.get("text") or ""
+
+        entity_entries = []
+        if lookup_entry and isinstance(lookup_entry.get("entities"), list):
+            entity_entries = lookup_entry.get("entities")
+        elif isinstance(data.get("Entities"), list):
+            entity_entries = data.get("Entities")
+
+        card_size_key = (data.get("CardSize") or data.get("Size") or self._determine_scene_card_size(full_text, len(entity_entries)) or "M")
+        card_size_key = str(card_size_key).upper()
+        card_width = int(SCENE_CARD_WIDTHS.get(card_size_key, SCENE_CARD_WIDTHS["M"]) * scale)
+
+        header_height = max(int(40 * scale), 32)
+        padding_x = max(int(16 * scale), 12)
+        body_padding_y = max(int(12 * scale), 10)
+        body_wrap_width = max(card_width - 2 * padding_x, int(160 * scale))
+
+        bullet_lines, truncated = self._summarize_scene_text(full_text, max_lines=4)
+        bullet_lines = [self._truncate_line(line, 96) for line in bullet_lines]
+        more_line_needed = truncated
+        if more_line_needed and len(bullet_lines) >= 4:
+            bullet_lines = bullet_lines[:3]
+
+        if not bullet_lines:
+            bullet_lines = ["No scene notes provided."]
+            more_line_needed = False
+
+        bullet_text = "\n".join(f"• {line}" for line in bullet_lines)
+        body_font = tkFont.Font(family="Arial", size=max(1, int(10 * scale)))
+        more_font = tkFont.Font(family="Arial", size=max(1, int(10 * scale)), slant="italic")
+        body_text_height = self._measure_text_height(bullet_text, body_font, body_wrap_width)
+        more_line_height = self._measure_text_height("• More…", more_font, body_wrap_width) if more_line_needed else 0
+        more_line_spacing = int(4 * scale) if more_line_needed else 0
+        body_height = body_padding_y * 2 + body_text_height + (more_line_height + more_line_spacing if more_line_needed else 0)
+
+        chip_entities = [
+            ent
+            for ent in (entity_entries or [])
+            if isinstance(ent, dict)
+            and (ent.get("type") or "").lower() in {"npc", "creature", "place"}
+        ]
+        chip_count = min(len(chip_entities), 6)
+        chip_size = max(int(32 * scale), 24)
+        chip_gap = max(int(8 * scale), 4)
+        chip_vertical_padding = max(int(8 * scale), 4)
+        chips_height = chip_vertical_padding * 2 + chip_size if chip_count else 0
+
+        badge_font = tkFont.Font(family="Arial", size=max(1, int(9 * scale)), weight="bold")
+        badge_height = max(int(24 * scale), 18)
+        badge_gap = max(int(6 * scale), 4)
+        badge_inner_pad = max(int(8 * scale), 4)
+        badges = self._extract_scene_badges(source_entry or data)
+        badge_texts = [f"{badge['label']}: {badge['value']}" for badge in badges]
+        layout_width = max(card_width - 2 * padding_x, int(160 * scale))
+        badge_section_height = 0
+        badge_positions = []
+        if badge_texts:
+            badge_section_height, badge_positions = self._compute_badge_layout(
+                badge_texts,
+                badge_font,
+                layout_width,
+                badge_height,
+                badge_gap,
+                badge_inner_pad,
+            )
+        footer_padding = max(int(10 * scale), 6)
+        footer_height = badge_section_height + 2 * footer_padding if badge_positions else 0
+
+        card_height = header_height + body_height + chips_height + footer_height
+        left = x - card_width / 2
+        top = y - card_height / 2
+        right = x + card_width / 2
+        bottom = y + card_height / 2
+
+        self.canvas.create_rectangle(
+            left,
+            top,
+            right,
+            bottom,
+            fill=SCENE_CARD_BG,
+            outline=SCENE_CARD_BORDER,
+            width=max(1, int(1 * scale)),
+            tags=("node", node_tag, "scene_card"),
+        )
+
+        type_label, header_color, _ = self._resolve_scene_type_style(source_entry or data, node.get("color"), explicit_type)
+        header_rect = self.canvas.create_rectangle(
+            left,
+            top,
+            right,
+            top + header_height,
+            fill=header_color,
+            outline="",
+            tags=("node", node_tag, "scene_card_header"),
+        )
+        self.node_rectangles[node_tag] = header_rect
+
+        header_font = tkFont.Font(family="Arial", size=max(1, int(12 * scale)), weight="bold")
+        type_font = tkFont.Font(family="Arial", size=max(1, int(10 * scale)), weight="bold")
+
+        type_text = type_label.upper() if type_label else ""
+        type_width = type_font.measure(type_text) if type_text else 0
+        available_title_width = card_width - 2 * padding_x - (type_width + (int(12 * scale) if type_text else 0))
+        approx_chars = max(int(available_title_width / max(6 * scale, 1)), 12)
+        title_display = self._truncate_line(node_name, approx_chars)
+
+        self.canvas.create_text(
+            left + padding_x,
+            top + header_height / 2,
+            text=title_display,
+            font=header_font,
+            fill="#F8FAFC",
+            anchor="w",
+            width=available_title_width,
+            tags=("node", node_tag),
+        )
+        if type_text:
+            self.canvas.create_text(
+                right - padding_x,
+                top + header_height / 2,
+                text=type_text,
+                font=type_font,
+                fill="#F8FAFC",
+                anchor="e",
+                tags=("node", node_tag),
+            )
+
+        self.canvas.create_line(
+            left,
+            top + header_height,
+            right,
+            top + header_height,
+            fill=SCENE_CARD_BORDER,
+            width=max(1, int(1 * scale)),
+            tags=("node", node_tag),
+        )
+
+        body_top = top + header_height
+        body_text_top = body_top + body_padding_y
+        self.canvas.create_text(
+            left + padding_x,
+            body_text_top,
+            text=bullet_text,
+            font=body_font,
+            fill="#E2E8F0",
+            width=body_wrap_width,
+            anchor="nw",
+            tags=("node", node_tag),
+        )
+        text_drawn_height = self._measure_text_height(bullet_text, body_font, body_wrap_width)
+        current_y = body_text_top + text_drawn_height
+        if more_line_needed:
+            current_y += more_line_spacing
+            self.canvas.create_text(
+                left + padding_x,
+                current_y,
+                text="• More…",
+                font=more_font,
+                fill="#C7D2FE",
+                anchor="nw",
+                tags=("node", node_tag, f"{node_tag}_more"),
+            )
+            current_y += more_line_height
+        current_y = body_top + body_height
+
+        if chip_count:
+            chips_top = body_top + body_height
+            chip_center_y = chips_top + chip_vertical_padding + chip_size / 2
+            row_width = chip_count * chip_size + (chip_count - 1) * chip_gap
+            chip_left = x - row_width / 2
+            for idx, entity in enumerate(chip_entities[:chip_count]):
+                chip_x = chip_left + idx * (chip_size + chip_gap) + chip_size / 2
+                entity_tag = f"{node_tag}_entity_{idx}"
+                portrait_path = entity.get("portrait") or self._resolve_scene_entity_portrait(entity)
+                thumb_key = f"{node_tag}_chip_{idx}"
+                bg_left = chip_x - chip_size / 2
+                bg_top = chip_center_y - chip_size / 2
+                bg_right = chip_x + chip_size / 2
+                bg_bottom = chip_center_y + chip_size / 2
+                self.canvas.create_rectangle(
+                    bg_left,
+                    bg_top,
+                    bg_right,
+                    bg_bottom,
+                    fill="#1F2933",
+                    outline="#475569",
+                    width=max(1, int(1 * scale)),
+                    tags=("node", node_tag, entity_tag),
+                )
+                icon = None
+                if portrait_path:
+                    icon = self.load_thumbnail(portrait_path, thumb_key, (chip_size, chip_size))
+                if icon:
+                    self.node_images[thumb_key] = icon
+                    self.canvas.create_image(
+                        chip_x,
+                        chip_center_y,
+                        image=icon,
+                        anchor="center",
+                        tags=("node", node_tag, entity_tag),
+                    )
+                else:
+                    color = self._entity_placeholder_color(entity.get("type"))
+                    self.canvas.create_oval(
+                        bg_left,
+                        bg_top,
+                        bg_right,
+                        bg_bottom,
+                        fill=color,
+                        outline="",
+                        tags=("node", node_tag, entity_tag),
+                    )
+                    marker_font = tkFont.Font(family="Arial", size=max(1, int(10 * scale)), weight="bold")
+                    initial = (entity.get("name") or "?")[0].upper()
+                    self.canvas.create_text(
+                        chip_x,
+                        chip_center_y,
+                        text=initial,
+                        font=marker_font,
+                        fill="#FFFFFF",
+                        tags=("node", node_tag, entity_tag),
+                    )
+                tooltip_info = {
+                    "name": entity.get("name") or "",
+                    "type": entity.get("type") or "",
+                    "synopsis": entity.get("synopsis") or "",
+                }
+                self._bind_entity_tooltip(entity_tag, tooltip_info)
+
+        if badge_positions:
+            badge_area_left = left + padding_x
+            badge_area_top = bottom - footer_height + footer_padding
+            for (offset_x, offset_y, badge_width), badge_text in zip(badge_positions, badge_texts):
+                rect_left = badge_area_left + offset_x
+                rect_top = badge_area_top + offset_y
+                rect_right = rect_left + badge_width
+                rect_bottom = rect_top + badge_height
+                self.canvas.create_rectangle(
+                    rect_left,
+                    rect_top,
+                    rect_right,
+                    rect_bottom,
+                    fill="#2F3545",
+                    outline="#4A5161",
+                    width=max(1, int(1 * scale)),
+                    tags=("node", node_tag),
+                )
+                self.canvas.create_text(
+                    rect_left + badge_width / 2,
+                    rect_top + badge_height / 2,
+                    text=badge_text,
+                    font=badge_font,
+                    fill="#E2E8F0",
+                    anchor="c",
+                    tags=("node", node_tag),
+                )
+
+        self.node_bboxes[node_tag] = (left, top, right, bottom)
+
     def draw_one_link(self, link):
         tag_from = link["from"]
         tag_to = link["to"]
@@ -1849,6 +2450,7 @@ class ScenarioGraphEditor(ctk.CTkFrame):
             self.selected_node = node_tag
             self.selected_items = self.canvas.find_withtag(node_tag)
             self.drag_start = (x, y)
+            self._show_node_detail(node_tag)
         else:
             self.selected_node = None
             self.drag_start = None
@@ -2181,6 +2783,7 @@ class ScenarioGraphEditor(ctk.CTkFrame):
             with open(file_path, "r", encoding="utf-8") as f:
                 self.graph = json.load(f)
             self.node_positions.clear()
+            self._clear_detail_panel()
             for node in self.graph["nodes"]:
                 if node["type"] == "scenario":
                     node_tag = f"scenario_{node['name'].replace(' ', '_')}"
