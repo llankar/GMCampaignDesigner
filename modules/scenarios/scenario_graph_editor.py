@@ -51,6 +51,9 @@ SCENE_TYPE_STYLE_MAP = {
 SCENE_CARD_BG = "#23262F"
 SCENE_CARD_BORDER = "#3B3F4C"
 
+DETAIL_PANEL_WIDTH = 260
+DETAIL_PANEL_PADDING = 12
+
 
 def clean_longtext(data, max_length=2000):
     # First, get the plain text using your existing helper.
@@ -107,6 +110,10 @@ class ScenarioGraphEditor(ctk.CTkFrame):
         self.scene_flow_scenes = []
         self.scene_flow_scene_lookup = {}
 
+        self.detail_panel_width = DETAIL_PANEL_WIDTH
+        self.detail_panel_padding = DETAIL_PANEL_PADDING
+        self._detail_panel_visible = True
+
         # Tooltip state for scene entity portraits
         self._entity_tooltip_window = None
         self._entity_tooltip_after_id = None
@@ -125,12 +132,12 @@ class ScenarioGraphEditor(ctk.CTkFrame):
         self.canvas_frame.grid(row=0, column=0, sticky="nsew")
         self.detail_panel = ctk.CTkFrame(self.main_container, fg_color="#1B1D23", corner_radius=0)
         self.detail_panel.grid(row=0, column=1, sticky="nsew")
-        self.detail_panel.configure(width=320)
+        self.detail_panel.configure(width=self.detail_panel_width)
         self.detail_panel.grid_propagate(False)
 
         self.main_container.grid_rowconfigure(0, weight=1)
         self.main_container.grid_columnconfigure(0, weight=1)
-        self.main_container.grid_columnconfigure(1, weight=0)
+        self.main_container.grid_columnconfigure(1, weight=0, minsize=self.detail_panel_width)
 
         self.canvas = ctk.CTkCanvas(self.canvas_frame, bg="#2B2B2B", highlightthickness=0)
         self.h_scrollbar = ttk.Scrollbar(self.canvas_frame, orient="horizontal", command=self.canvas.xview)
@@ -174,6 +181,9 @@ class ScenarioGraphEditor(ctk.CTkFrame):
         self.canvas_frame.grid_rowconfigure(0, weight=1)
         self.canvas_frame.grid_columnconfigure(0, weight=1)
         self._init_detail_panel()
+
+        # Start with the detail panel hidden until the scene flow view is shown.
+        self._hide_detail_panel()
 
         # Global mouse events.
         self.canvas.bind("<Button-1>", self.start_drag)
@@ -254,30 +264,50 @@ class ScenarioGraphEditor(ctk.CTkFrame):
         ctk.CTkButton(toolbar, text="Reset Zoom", command=self.reset_zoom).pack(side="left", padx=5)
 
     def _init_detail_panel(self):
+        pad = self.detail_panel_padding
+        wrap_length = max(10, self.detail_panel_width - 2 * pad)
         self.detail_panel_title = ctk.CTkLabel(
             self.detail_panel,
             text="Scene Details",
             font=ctk.CTkFont(size=16, weight="bold"),
             anchor="w",
         )
-        self.detail_panel_title.pack(fill="x", padx=12, pady=(12, 4))
+        self.detail_panel_title.pack(fill="x", padx=pad, pady=(pad, 4))
 
         self.detail_panel_meta = ctk.CTkLabel(
             self.detail_panel,
             text="Select a scene card to view its full content.",
             justify="left",
             anchor="w",
-            wraplength=280,
+            wraplength=wrap_length,
         )
-        self.detail_panel_meta.pack(fill="x", padx=12)
+        self.detail_panel_meta.pack(fill="x", padx=pad)
 
         self.detail_textbox = ctk.CTkTextbox(
             self.detail_panel,
             wrap="word",
         )
-        self.detail_textbox.pack(fill="both", expand=True, padx=12, pady=(8, 12))
+        self.detail_textbox.pack(fill="both", expand=True, padx=pad, pady=(8, pad))
         self.detail_textbox.configure(state="disabled")
         self._clear_detail_panel()
+
+    def _show_detail_panel(self):
+        if self._detail_panel_visible:
+            return
+        self.detail_panel.grid(row=0, column=1, sticky="nsew")
+        self.detail_panel.configure(width=self.detail_panel_width)
+        self.main_container.grid_columnconfigure(1, weight=0, minsize=self.detail_panel_width)
+        wrap_length = max(10, self.detail_panel_width - 2 * self.detail_panel_padding)
+        if hasattr(self, "detail_panel_meta"):
+            self.detail_panel_meta.configure(wraplength=wrap_length)
+        self._detail_panel_visible = True
+
+    def _hide_detail_panel(self):
+        if not self._detail_panel_visible:
+            return
+        self.detail_panel.grid_remove()
+        self.main_container.grid_columnconfigure(1, weight=0, minsize=0)
+        self._detail_panel_visible = False
 
     def _clear_detail_panel(self):
         self.active_detail_scene_tag = None
@@ -295,6 +325,8 @@ class ScenarioGraphEditor(ctk.CTkFrame):
             self.detail_textbox.configure(state="disabled")
 
     def _show_node_detail(self, node_tag):
+        if not self._detail_panel_visible:
+            return
         if not node_tag or not node_tag.startswith("scene_"):
             return
         if node_tag == self.active_detail_scene_tag:
@@ -629,6 +661,7 @@ class ScenarioGraphEditor(ctk.CTkFrame):
         self.scenario = scenario
         self.graph = {"nodes": [], "links": []}
         self.node_positions.clear()
+        self._hide_detail_panel()
         self._clear_detail_panel()
 
         center_x, center_y = 400, 300
@@ -820,6 +853,7 @@ class ScenarioGraphEditor(ctk.CTkFrame):
         self.graph = {"nodes": [], "links": []}
         self.node_positions.clear()
         self.scene_flow_scenes = normalized_scenes
+        self._show_detail_panel()
         self._clear_detail_panel()
 
         count = len(normalized_scenes)
@@ -2783,7 +2817,17 @@ class ScenarioGraphEditor(ctk.CTkFrame):
             with open(file_path, "r", encoding="utf-8") as f:
                 self.graph = json.load(f)
             self.node_positions.clear()
+            contains_scene_nodes = any(
+                (node.get("type") or "").lower() == "scene"
+                for node in self.graph.get("nodes", [])
+            )
+            if contains_scene_nodes:
+                self._show_detail_panel()
+            else:
+                self._hide_detail_panel()
             self._clear_detail_panel()
+            self.scene_flow_scenes = []
+            self.scene_flow_scene_lookup = {}
             for node in self.graph["nodes"]:
                 if node["type"] == "scenario":
                     node_tag = f"scenario_{node['name'].replace(' ', '_')}"
