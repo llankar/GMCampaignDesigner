@@ -51,7 +51,7 @@ SCENE_TYPE_STYLE_MAP = {
 SCENE_CARD_BG = "#23262F"
 SCENE_CARD_BORDER = "#3B3F4C"
 
-DETAIL_PANEL_WIDTH = 260
+DETAIL_PANEL_WIDTH = 350
 DETAIL_PANEL_PADDING = 12
 
 
@@ -257,8 +257,6 @@ class ScenarioGraphEditor(ctk.CTkFrame):
         toolbar = ctk.CTkFrame(self)
         toolbar.pack(fill="x", padx=5, pady=5)
         ctk.CTkButton(toolbar, text="Select Scenario", command=self.select_scenario).pack(side="left", padx=5)
-        ctk.CTkButton(toolbar, text="Scenes Flow View", command=self.show_scene_flow).pack(side="left", padx=5)
-        ctk.CTkButton(toolbar, text="Entity Overview", command=self.show_entity_view).pack(side="left", padx=5)
         ctk.CTkButton(toolbar, text="Save Graph", command=self.save_graph).pack(side="left", padx=5)
         ctk.CTkButton(toolbar, text="Load Graph", command=self.load_graph).pack(side="left", padx=5)
         ctk.CTkButton(toolbar, text="Reset Zoom", command=self.reset_zoom).pack(side="left", padx=5)
@@ -614,13 +612,6 @@ class ScenarioGraphEditor(ctk.CTkFrame):
             initial_scenario=self.scenario,
             on_close=_on_close,
         )
-
-    def show_entity_view(self):
-        if not self.scenario:
-            messagebox.showinfo("Select Scenario", "Please select a scenario first to display its entity overview.")
-            return
-        self.load_scenario(self.scenario)
-
 
     def select_scenario(self):
         def on_scenario_selected(scenario_name):

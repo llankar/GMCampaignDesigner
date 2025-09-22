@@ -226,6 +226,7 @@ class MainWindow(ctk.CTk):
             "dice_bar": self.load_icon("dice_roller_icon.png", size=(60, 60)),
             "sound_manager": self.load_icon("sound_manager_icon.png", size=(60, 60)),
             "audio_controls": self.load_icon("sound_manager_icon.png", size=(60, 60)),
+            "scene_flow_viewer": self.load_icon("scenes_flow_icon.png", size=(60, 60)),
         }
 
     def open_custom_fields_editor(self):

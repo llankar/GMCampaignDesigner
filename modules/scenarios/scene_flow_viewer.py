@@ -130,14 +130,6 @@ class SceneFlowViewerFrame(ScenarioGraphEditor):
         )
         self.refresh_button.pack(side="left")
 
-        self.load_button = ctk.CTkButton(
-            toolbar,
-            text="Open Flow",
-            command=self._load_selected_scenario,
-            width=110,
-        )
-        self.load_button.pack(side="left", padx=(8, 0))
-
         self.detail_toggle = ctk.CTkSwitch(
             toolbar,
             text="Show Details",
