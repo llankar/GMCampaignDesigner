@@ -1725,9 +1725,25 @@ class GenericEditorWindow(ctk.CTkToplevel):
 
         npc_name = self.item.get('Name', 'Unnamed').replace(' ', '_')
         ext = os.path.splitext(src_path)[-1].lower()
+        valid_exts = {'.png', '.jpg', '.jpeg', '.webp'}
+        if ext not in valid_exts:
+            ext = '.png'
+
         dest_filename = f"{npc_name}_{id(self)}{ext}"
         dest_path = portrait_folder / dest_filename
-        shutil.copy(src_path, dest_path)
+
+        with Image.open(src_path) as pil_img:
+            img = pil_img.copy()
+
+        resampling = getattr(Image, "Resampling", Image)
+        img.thumbnail(MAX_PORTRAIT_SIZE, resampling.LANCZOS)
+
+        if ext in {'.jpg', '.jpeg'} and img.mode not in ("RGB", "L"):
+            img = img.convert("RGB")
+        elif ext in {'.png', '.webp'} and img.mode not in ("RGBA", "LA"):
+            img = img.convert("RGBA")
+
+        img.save(dest_path)
 
         try:
             relative = dest_path.relative_to(campaign_dir).as_posix()
