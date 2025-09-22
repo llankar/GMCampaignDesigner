@@ -37,6 +37,10 @@ class FactionGraphEditor(ctk.CTkFrame):
         self.canvas.bind("<B1-Motion>", self.do_drag)
         self.canvas.bind("<ButtonRelease-1>", self.end_drag)
         self.canvas.bind("<Button-3>", self.on_right_click)
+        self._is_panning = False
+        self.canvas.bind("<Button-2>", self._start_canvas_pan)
+        self.canvas.bind("<B2-Motion>", self._do_canvas_pan)
+        self.canvas.bind("<ButtonRelease-2>", self._end_canvas_pan)
 
         # toolbar
         self._dragging = None
@@ -167,6 +171,18 @@ class FactionGraphEditor(ctk.CTkFrame):
 
     def end_drag(self, evt):
         self._drag_tag=None
+
+    def _start_canvas_pan(self, event):
+        self._is_panning = True
+        self.canvas.scan_mark(event.x, event.y)
+
+    def _do_canvas_pan(self, event):
+        if not self._is_panning:
+            return
+        self.canvas.scan_dragto(event.x, event.y, gain=1)
+
+    def _end_canvas_pan(self, _event):
+        self._is_panning = False
 
     # --- right-click menu to delete ---
     def on_right_click(self, evt):

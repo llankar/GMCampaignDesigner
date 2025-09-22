@@ -116,6 +116,10 @@ class PCGraphEditor(ctk.CTkFrame):
         self.canvas.bind("<Shift-Button-5>", self._on_mousewheel_x)
     # Bind double-click on any PC element to open the editor window
         self.canvas.bind("<Double-Button-1>", self.open_pc_editor)
+        self._is_panning = False
+        self.canvas.bind("<Button-2>", self._start_canvas_pan)
+        self.canvas.bind("<B2-Motion>", self._do_canvas_pan)
+        self.canvas.bind("<ButtonRelease-2>", self._end_canvas_pan)
 
  # ─────────────────────────────────────────────────────────────────────────
     # FUNCTION: open_pc_editor
@@ -201,6 +205,18 @@ class PCGraphEditor(ctk.CTkFrame):
             self.canvas.xview_scroll(-1, "units")
         elif event.num == 5 or event.delta < 0:
             self.canvas.xview_scroll(1, "units")
+
+    def _start_canvas_pan(self, event):
+        self._is_panning = True
+        self.canvas.scan_mark(event.x, event.y)
+
+    def _do_canvas_pan(self, event):
+        if not self._is_panning:
+            return
+        self.canvas.scan_dragto(event.x, event.y, gain=1)
+
+    def _end_canvas_pan(self, _event):
+        self._is_panning = False
 
     # ─────────────────────────────────────────────────────────────────────────
     # FUNCTION: init_toolbar
