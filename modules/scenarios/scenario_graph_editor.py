@@ -271,6 +271,8 @@ class ScenarioGraphEditor(ctk.CTkFrame):
             text="Scene Details",
             font=ctk.CTkFont(size=16, weight="bold"),
             anchor="w",
+            justify="left",
+            wraplength=wrap_length,
         )
         self.detail_panel_title.pack(fill="x", padx=pad, pady=(pad, 4))
 
@@ -298,6 +300,8 @@ class ScenarioGraphEditor(ctk.CTkFrame):
         self.detail_panel.configure(width=self.detail_panel_width)
         self.main_container.grid_columnconfigure(1, weight=0, minsize=self.detail_panel_width)
         wrap_length = max(10, self.detail_panel_width - 2 * self.detail_panel_padding)
+        if hasattr(self, "detail_panel_title"):
+            self.detail_panel_title.configure(wraplength=wrap_length)
         if hasattr(self, "detail_panel_meta"):
             self.detail_panel_meta.configure(wraplength=wrap_length)
         self._detail_panel_visible = True
