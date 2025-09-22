@@ -27,6 +27,7 @@ log_module_import(__name__)
 # Global constants
 PORTRAIT_FOLDER = os.path.join(ConfigHelper.get_campaign_dir(), "assets", "portraits")
 MAX_PORTRAIT_SIZE = (128, 128)
+ENTITY_TOOLTIP_PORTRAIT_MAX_SIZE = (180, 180)
 ctk.set_appearance_mode("Dark")
 ctk.set_default_color_theme("blue")
 #logging.basicConfig(level=logging.DEBUG)
@@ -118,6 +119,7 @@ class ScenarioGraphEditor(ctk.CTkFrame):
         self._entity_tooltip_window = None
         self._entity_tooltip_after_id = None
         self._entity_tooltip_pending = None
+        self._entity_tooltip_image_cache = {}
 
         self.init_toolbar()
         self.active_detail_scene_tag = None
@@ -1428,6 +1430,53 @@ class ScenarioGraphEditor(ctk.CTkFrame):
             return f"{header}\n\n{fallback}"
         return fallback
 
+    def _load_entity_tooltip_portrait(self, entity_info):
+        if not isinstance(entity_info, dict):
+            return None
+
+        portrait_path = ""
+        for key in (
+            "portrait_path",
+            "portrait",
+            "Portrait",
+            "image",
+            "Image",
+            "tokenImage",
+            "TokenImage",
+            "token",
+            "Token",
+        ):
+            value = entity_info.get(key)
+            if value:
+                portrait_path = value
+                break
+
+        if not portrait_path:
+            return None
+
+        resolved_path = self._resolve_existing_image_path(portrait_path)
+        if not resolved_path and os.path.exists(portrait_path):
+            resolved_path = portrait_path
+
+        if not resolved_path:
+            return None
+
+        cache_key = (resolved_path, ENTITY_TOOLTIP_PORTRAIT_MAX_SIZE)
+        cached = self._entity_tooltip_image_cache.get(cache_key)
+        if cached is not None:
+            return cached
+
+        try:
+            with Image.open(resolved_path) as pil_img:
+                img = pil_img.copy()
+            resample_method = getattr(Image, "Resampling", Image).LANCZOS
+            img.thumbnail(ENTITY_TOOLTIP_PORTRAIT_MAX_SIZE, resample_method)
+            photo = ImageTk.PhotoImage(img, master=self)
+            self._entity_tooltip_image_cache[cache_key] = photo
+            return photo
+        except Exception:
+            return None
+
     def _cancel_entity_tooltip_schedule(self):
         if self._entity_tooltip_after_id:
             try:
@@ -1473,19 +1522,41 @@ class ScenarioGraphEditor(ctk.CTkFrame):
         offset_x = int(root_x + 16)
         offset_y = int(root_y + 24)
         tw.wm_geometry(f"+{offset_x}+{offset_y}")
-        label = tk.Label(
+        container = tk.Frame(
             tw,
+            background="#ffffe0",
+            borderwidth=1,
+            relief="solid",
+        )
+        container.pack()
+
+        portrait_image = self._load_entity_tooltip_portrait(entity_info)
+        if portrait_image is not None:
+            portrait_label = tk.Label(
+                container,
+                image=portrait_image,
+                background="#ffffe0",
+                borderwidth=0,
+                highlightthickness=0,
+                padx=6,
+                pady=0,
+            )
+            portrait_label.image = portrait_image
+            portrait_label.pack(pady=(6, 4))
+
+        text_padding = (4, 6) if portrait_image is not None else (6, 6)
+        label = tk.Label(
+            container,
             text=text,
             justify="left",
             background="#ffffe0",
-            relief="solid",
-            borderwidth=1,
+            borderwidth=0,
             font=("Segoe UI", 9, "normal"),
             padx=6,
             pady=4,
             wraplength=320,
         )
-        label.pack()
+        label.pack(pady=text_padding)
         self._entity_tooltip_window = tw
 
     def _on_entity_hover_enter(self, event, entity_info):
@@ -2068,6 +2139,11 @@ class ScenarioGraphEditor(ctk.CTkFrame):
                 for idx, entity in enumerate(entity_entries):
                     name = entity.get("name") or entity.get("Name") or ""
                     portrait_path = self._resolve_scene_entity_portrait(entity)
+                    resolved_portrait_path = (
+                        self._resolve_existing_image_path(portrait_path)
+                        if portrait_path
+                        else None
+                    )
                     thumb_key = f"{node_tag}_thumb_{idx}"
                     icon = None
                     if portrait_path:
@@ -2084,6 +2160,10 @@ class ScenarioGraphEditor(ctk.CTkFrame):
                         "type": entity_type_value or entity.get("type") or "",
                         "synopsis": tooltip_synopsis,
                     }
+                    if portrait_path:
+                        tooltip_info["portrait_path"] = (
+                            resolved_portrait_path or portrait_path
+                        )
                     entity_tag = f"{node_tag}_entity_{idx}"
                     icon_x = row_left + idx * (thumb_size + thumb_gap) + thumb_size / 2
                     if icon is not None:
@@ -2380,6 +2460,13 @@ class ScenarioGraphEditor(ctk.CTkFrame):
                     "type": entity.get("type") or "",
                     "synopsis": entity.get("synopsis") or "",
                 }
+                resolved_portrait_path = None
+                if portrait_path:
+                    resolved_portrait_path = self._resolve_existing_image_path(portrait_path)
+                if portrait_path:
+                    tooltip_info["portrait_path"] = (
+                        resolved_portrait_path or portrait_path
+                    )
                 self._bind_entity_tooltip(entity_tag, tooltip_info)
 
         if badge_positions:
