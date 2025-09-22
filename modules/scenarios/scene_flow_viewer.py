@@ -67,6 +67,7 @@ class SceneFlowViewerFrame(ScenarioGraphEditor):
 
     GRID_EXTENT_WIDTH = 6000
     GRID_EXTENT_HEIGHT = 4000
+    PORTRAIT_SCALE_MULTIPLIER = 2.0
 
     def __init__(
         self,
@@ -96,6 +97,23 @@ class SceneFlowViewerFrame(ScenarioGraphEditor):
 
         self._apply_scene_flow_styling()
         self._populate_scenario_menu()
+
+    # ------------------------------------------------------------------
+    # Portrait handling
+    # ------------------------------------------------------------------
+    def load_portrait_scaled(self, portrait_path, node_tag, scale: float = 1.0):  # type: ignore[override]
+        """Load node portraits at twice the base size used by the editor.
+
+        The underlying graph editor already supports zoom scaling via the
+        ``scale`` parameter. By multiplying the provided scale we effectively
+        double the rendered size of portraits in the dedicated scene flow
+        viewer while still respecting zoom changes.
+        """
+
+        effective_scale = (scale or 0.0) * self.PORTRAIT_SCALE_MULTIPLIER
+        if effective_scale <= 0:
+            effective_scale = self.PORTRAIT_SCALE_MULTIPLIER
+        return super().load_portrait_scaled(portrait_path, node_tag, effective_scale)
 
     # ------------------------------------------------------------------
     # Toolbar configuration
