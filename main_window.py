@@ -386,6 +386,7 @@ class MainWindow(ctk.CTk):
             ("pc_graph", "Open PC Graph Editor", self.open_pc_graph_editor),
             ("faction_graph", "Open Factions Graph Editor", self.open_faction_graph_editor),
             ("scenario_graph", "Open Scenario Graph Editor", self.open_scenario_graph_editor),
+            ("scene_flow_viewer", "Open Scene Flow Viewer", self.open_scene_flow_viewer),
             ("world_map", "Open World Map", self.open_world_map),
         ]
         utilities = [
@@ -915,6 +916,30 @@ class MainWindow(ctk.CTk):
         container.graph_editor = editor
         self.current_open_view   = container
         self.current_open_entity = None
+
+    def open_scene_flow_viewer(self):
+        from modules.scenarios.scene_flow_viewer import SceneFlowViewerWindow
+
+        if getattr(self, "_scene_flow_window", None) and self._scene_flow_window.winfo_exists():
+            try:
+                self._scene_flow_window.focus()
+                self._scene_flow_window.lift()
+            except Exception:
+                pass
+            return
+
+        def _on_close():
+            self._scene_flow_window = None
+
+        window = SceneFlowViewerWindow(
+            self,
+            scenario_wrapper=GenericModelWrapper("scenarios"),
+            npc_wrapper=GenericModelWrapper("npcs"),
+            creature_wrapper=GenericModelWrapper("creatures"),
+            place_wrapper=GenericModelWrapper("places"),
+            on_close=_on_close,
+        )
+        self._scene_flow_window = window
 
     def export_foundry(self):
         preview_and_export_foundry(self)
