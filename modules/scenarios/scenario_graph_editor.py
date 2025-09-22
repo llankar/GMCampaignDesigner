@@ -1680,8 +1680,12 @@ class ScenarioGraphEditor(ctk.CTkFrame):
                 bbox[2] + padding, bbox[3] + padding
             ))
         # Ensure proper layering
-        if hasattr(self, "background_id"):
-            self.canvas.tag_lower(self.background_id)
+        if getattr(self, "background_id", None) is not None:
+            # Use the tag assigned during creation so Tk always receives
+            # a valid identifier. Passing a missing/empty identifier leads
+            # to a Tcl "wrong # args" error on some platforms when the
+            # image was not created successfully.
+            self.canvas.tag_lower("background")
 
         self.canvas.tag_raise("link")  # Put links behind everything
         self.canvas.tag_raise("node")  # Bring nodes to the top
