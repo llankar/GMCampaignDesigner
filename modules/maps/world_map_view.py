@@ -35,6 +35,9 @@ class WorldMapWindow(ctk.CTkToplevel):
     """Interactive world map viewer with nested map support."""
 
     CANVAS_BG = "#05070D"
+    ZOOM_MIN = 0.25
+    ZOOM_MAX = 6.0
+    ZOOM_FACTOR = 1.1
 
     def __init__(self, master=None):
         super().__init__(master)
@@ -68,6 +71,12 @@ class WorldMapWindow(ctk.CTkToplevel):
         self.base_photo = None
         self.render_params = None
         self.image_cache: dict[str, Image.Image] = {}
+
+        self.zoom = 1.0
+        self.pan_x = 0.0
+        self.pan_y = 0.0
+        self._pan_anchor: tuple[float, float, float, float] | None = None
+        self._pending_view_state: dict | None = None
 
         self._suppress_map_change = False
 
@@ -138,6 +147,12 @@ class WorldMapWindow(ctk.CTkToplevel):
         )
         self.canvas.pack(fill="both", expand=True, padx=12, pady=12)
         self.canvas.bind("<Configure>", lambda e: self._draw_scene())
+        self.canvas.bind("<MouseWheel>", self._on_mouse_wheel)
+        self.canvas.bind("<Button-4>", lambda e: self._on_mouse_wheel(e, direction=1))
+        self.canvas.bind("<Button-5>", lambda e: self._on_mouse_wheel(e, direction=-1))
+        self.canvas.bind("<ButtonPress-2>", self._on_pan_start)
+        self.canvas.bind("<B2-Motion>", self._on_pan_move)
+        self.canvas.bind("<ButtonRelease-2>", self._on_pan_end)
 
         self.inspector_container = ctk.CTkFrame(workspace, fg_color="#11182A", corner_radius=18, width=380)
         self.inspector_container.grid(row=0, column=1, sticky="nsew")
@@ -159,6 +174,7 @@ class WorldMapWindow(ctk.CTkToplevel):
         self.summary_box = ctk.CTkTextbox(self.inspector_container, wrap="word", font=("Segoe UI", 13))
 
         self.bind("<Delete>", self._delete_selected_token)
+        self.bind("<Control-s>", self._on_save_shortcut)
         self.summary_box.pack(fill="both", expand=True, padx=16, pady=(0, 16))
         self.summary_box.configure(state="disabled")
 
@@ -253,6 +269,22 @@ class WorldMapWindow(ctk.CTkToplevel):
 
         self.current_map_name = map_name
         self.current_world_map = entry
+
+        view_state = entry.get("view_state") if isinstance(entry, dict) else None
+        if isinstance(view_state, dict):
+            zoom_value = view_state.get("zoom")
+            if isinstance(zoom_value, (int, float)):
+                self.zoom = self._clamp_zoom(float(zoom_value))
+            else:
+                self.zoom = 1.0
+            self.pan_x = 0.0
+            self.pan_y = 0.0
+            self._pending_view_state = view_state
+        else:
+            self.zoom = 1.0
+            self.pan_x = 0.0
+            self.pan_y = 0.0
+            self._pending_view_state = None
 
         if self.map_selector.get() != map_name:
             self._suppress_map_change = True
@@ -428,6 +460,11 @@ class WorldMapWindow(ctk.CTkToplevel):
                 }
             )
         self.current_world_map["tokens"] = serialized
+        view_state = self._capture_view_state()
+        if view_state is not None:
+            self.current_world_map["view_state"] = view_state
+        else:
+            self.current_world_map.pop("view_state", None)
         self.world_maps[self.current_map_name] = self.current_world_map
         self._save_world_map_store()
         log_debug("World map tokens saved", func_name="WorldMapWindow._persist_tokens")
@@ -465,18 +502,164 @@ class WorldMapWindow(ctk.CTkToplevel):
 
         self.canvas.delete("all")
         base_w, base_h = self.base_image.size
-        scale = min(canvas_w / base_w, canvas_h / base_h)
-        scaled_w, scaled_h = int(base_w * scale), int(base_h * scale)
-        offset_x = (canvas_w - scaled_w) // 2
-        offset_y = (canvas_h - scaled_h) // 2
+        if base_w <= 0 or base_h <= 0:
+            return
+
+        base_scale = min(canvas_w / base_w, canvas_h / base_h)
+        if base_scale <= 0:
+            return
+
+        self.zoom = self._clamp_zoom(self.zoom)
+        if self._pending_view_state:
+            self._apply_pending_view_state(base_scale, base_w, base_h)
+
+        scale = base_scale * self.zoom
+        scaled_w = base_w * scale
+        scaled_h = base_h * scale
+        offset_x = (canvas_w - scaled_w) / 2 + self.pan_x
+        offset_y = (canvas_h - scaled_h) / 2 + self.pan_y
         self.render_params = (scale, offset_x, offset_y, base_w, base_h)
 
-        resized = self.base_image.resize((scaled_w, scaled_h), Image.LANCZOS)
+        resized = self.base_image.resize(
+            (max(1, int(round(scaled_w))), max(1, int(round(scaled_h)))),
+            Image.LANCZOS,
+        )
         self.base_photo = ImageTk.PhotoImage(resized)
         self.canvas.create_image(offset_x, offset_y, anchor="nw", image=self.base_photo)
 
         for token in self.tokens:
             self._draw_token(token)
+
+    def _apply_pending_view_state(self, base_scale: float, base_w: int, base_h: int) -> None:
+        view_state = self._pending_view_state
+        if not isinstance(view_state, dict):
+            return
+        pan_norm = view_state.get("pan_norm")
+        if isinstance(pan_norm, (list, tuple)) and len(pan_norm) >= 2:
+            try:
+                self.pan_x = float(pan_norm[0]) * base_w * base_scale
+                self.pan_y = float(pan_norm[1]) * base_h * base_scale
+            except (TypeError, ValueError):
+                self.pan_x = 0.0
+                self.pan_y = 0.0
+        else:
+            pan_dict = view_state.get("pan") if isinstance(view_state.get("pan"), dict) else None
+            if pan_dict:
+                pan_x_val = pan_dict.get("x") if pan_dict.get("x") is not None else pan_dict.get("pan_x")
+                pan_y_val = pan_dict.get("y") if pan_dict.get("y") is not None else pan_dict.get("pan_y")
+            else:
+                pan_x_val = view_state.get("pan_x")
+                pan_y_val = view_state.get("pan_y")
+            self.pan_x = self._safe_float(pan_x_val)
+            self.pan_y = self._safe_float(pan_y_val)
+        self._pending_view_state = None
+
+    def _capture_view_state(self) -> dict | None:
+        if not self.render_params:
+            return None
+        scale, _, _, base_w, base_h = self.render_params
+        if base_w <= 0 or base_h <= 0:
+            return None
+        if self.zoom <= 0:
+            return None
+        base_scale = scale / self.zoom
+        if base_scale <= 0:
+            return None
+        pan_norm_x = self.pan_x / (base_w * base_scale)
+        pan_norm_y = self.pan_y / (base_h * base_scale)
+        return {
+            "zoom": round(self.zoom, 4),
+            "pan_norm": [round(pan_norm_x, 4), round(pan_norm_y, 4)],
+        }
+
+    def _clamp_zoom(self, zoom: float) -> float:
+        if zoom <= 0:
+            return self.ZOOM_MIN
+        return max(self.ZOOM_MIN, min(self.ZOOM_MAX, zoom))
+
+    def _on_mouse_wheel(self, event, direction: int | None = None):
+        if direction is None:
+            delta = getattr(event, "delta", 0)
+            if delta == 0:
+                return
+            direction = 1 if delta > 0 else -1
+        if direction == 0:
+            return
+        factor = self.ZOOM_FACTOR if direction > 0 else 1 / self.ZOOM_FACTOR
+        self._adjust_zoom(factor, focus=(event.x, event.y))
+        return "break"
+
+    def _adjust_zoom(self, factor: float, focus: tuple[float, float] | None = None) -> None:
+        if not self.base_image or not self.render_params:
+            return
+        if factor <= 0:
+            return
+        focus_x: float
+        focus_y: float
+        if focus is None:
+            focus_x = self.canvas.winfo_width() / 2
+            focus_y = self.canvas.winfo_height() / 2
+        else:
+            focus_x, focus_y = focus
+
+        old_zoom = self.zoom
+        new_zoom = self._clamp_zoom(old_zoom * factor)
+        if abs(new_zoom - old_zoom) < 1e-4:
+            return
+
+        scale, offset_x, offset_y, base_w, base_h = self.render_params
+        if base_w <= 0 or base_h <= 0 or scale <= 0 or old_zoom <= 0:
+            return
+
+        base_scale = scale / old_zoom
+        image_x = (focus_x - offset_x) / scale
+        image_y = (focus_y - offset_y) / scale
+
+        self.zoom = new_zoom
+        new_scale = base_scale * new_zoom
+        canvas_w = self.canvas.winfo_width()
+        canvas_h = self.canvas.winfo_height()
+        new_base_offset_x = (canvas_w - base_w * new_scale) / 2
+        new_base_offset_y = (canvas_h - base_h * new_scale) / 2
+
+        self.pan_x = focus_x - new_base_offset_x - image_x * new_scale
+        self.pan_y = focus_y - new_base_offset_y - image_y * new_scale
+
+        self._draw_scene()
+
+    def _on_pan_start(self, event):
+        if not self.base_image:
+            return
+        self._pan_anchor = (event.x, event.y, self.pan_x, self.pan_y)
+        self.canvas.configure(cursor="fleur")
+        return "break"
+
+    def _on_pan_move(self, event):
+        if not self._pan_anchor:
+            return
+        start_x, start_y, origin_x, origin_y = self._pan_anchor
+        self.pan_x = origin_x + (event.x - start_x)
+        self.pan_y = origin_y + (event.y - start_y)
+        self._draw_scene()
+        return "break"
+
+    def _on_pan_end(self, _event):
+        if not self._pan_anchor:
+            return
+        self._pan_anchor = None
+        self.canvas.configure(cursor="")
+        return "break"
+
+    def _on_save_shortcut(self, _event=None):
+        self._persist_tokens()
+        return "break"
+
+    @staticmethod
+    def _safe_float(value, default: float = 0.0) -> float:
+        try:
+            return float(value)
+        except (TypeError, ValueError):
+            return default
     def _draw_token(self, token: dict) -> None:
         if not self.render_params:
             return
