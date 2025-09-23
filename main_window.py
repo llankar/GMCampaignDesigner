@@ -219,6 +219,7 @@ class MainWindow(ctk.CTk):
             "generate_portraits": self.load_icon("generate_icon.png", size=(60, 60)),
             "associate_portraits": self.load_icon("associate_icon.png", size=(60, 60)),
             "import_scenario": self.load_icon("import_icon.png", size=(60, 60)),
+            "import_creatures_pdf": self.load_icon("import_icon.png", size=(60, 60)),
             "export_foundry": self.load_icon("export_foundry_icon.png", size=(60, 60)),
             "map_tool": self.load_icon("map_tool_icon.png", size=(60, 60)),
             "generate_scenario": self.load_icon("generate_scenario_icon.png", size=(60, 60)),
@@ -393,6 +394,7 @@ class MainWindow(ctk.CTk):
         utilities = [
             ("generate_scenario", "Generate Scenario", self.open_scenario_generator),
             ("import_scenario", "Import Scenario", self.open_scenario_importer),
+            ("import_creatures_pdf", "Import Creatures from PDF", self.open_creature_importer),
             ("gm_screen", "Open GM Screen", self.open_gm_screen),
             ("export_scenarios", "Export Scenarios", self.preview_and_export_scenarios),
             ("export_foundry", "Export Scenarios for Foundry", self.export_foundry),
@@ -956,6 +958,14 @@ class MainWindow(ctk.CTk):
         container = ctk.CTkFrame(self.content_frame)
         container.grid(row=0, column=0, sticky="nsew")
         ScenarioImportWindow(container)
+
+    def open_creature_importer(self):
+        from modules.creatures.creature_importer import CreatureImportWindow
+
+        self.clear_current_content()
+        container = ctk.CTkFrame(self.content_frame)
+        container.grid(row=0, column=0, sticky="nsew")
+        CreatureImportWindow(container)
 
     def open_scenario_generator(self):
         self.clear_current_content()
