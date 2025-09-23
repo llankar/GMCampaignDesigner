@@ -89,6 +89,8 @@ class WorldMapWindow(ctk.CTkToplevel):
         else:
             self._show_empty_state()
 
+        self._update_map_tool_button_state()
+
         self.bind("<Destroy>", self._on_destroy, add="+")
 
     # ------------------------------------------------------------------
@@ -128,7 +130,17 @@ class WorldMapWindow(ctk.CTkToplevel):
         ctk.CTkButton(entity_group, text="Add Place", command=lambda: self._open_picker("Place")).pack(side="left", padx=4)
         ctk.CTkButton(entity_group, text="Add Map", command=lambda: self._open_picker("Map")).pack(side="left", padx=4)
 
-        ctk.CTkButton(toolbar, text="Save", width=120, command=self._persist_tokens).pack(side="right", padx=12)
+        self.save_button = ctk.CTkButton(toolbar, text="Save", width=120, command=self._persist_tokens)
+        self.save_button.pack(side="right", padx=12)
+
+        self.map_tool_button = ctk.CTkButton(
+            toolbar,
+            text="Open in Map Tool",
+            width=160,
+            command=self._open_in_map_tool,
+            state=ctk.DISABLED,
+        )
+        self.map_tool_button.pack(side="right", padx=(0, 12))
 
         workspace = ctk.CTkFrame(self, fg_color="transparent")
         workspace.pack(fill="both", expand=True, padx=12, pady=12)
@@ -244,6 +256,9 @@ class WorldMapWindow(ctk.CTkToplevel):
             fill="#FFFFFF",
             font=("Segoe UI", 18, "bold"),
         )
+        self.current_map_name = None
+        self.current_world_map = None
+        self._update_map_tool_button_state()
 
     # ------------------------------------------------------------------
     # Map navigation
@@ -259,6 +274,9 @@ class WorldMapWindow(ctk.CTkToplevel):
         entry = self._ensure_world_map_entry(map_name)
         if entry is None:
             log_warning(f"World map entry '{map_name}' could not be created", func_name="WorldMapWindow.load_map")
+            self.current_map_name = None
+            self.current_world_map = None
+            self._update_map_tool_button_state()
             return
 
         if push_history and self.current_map_name:
@@ -269,6 +287,7 @@ class WorldMapWindow(ctk.CTkToplevel):
 
         self.current_map_name = map_name
         self.current_world_map = entry
+        self._update_map_tool_button_state()
 
         view_state = entry.get("view_state") if isinstance(entry, dict) else None
         if isinstance(view_state, dict):
@@ -316,6 +335,44 @@ class WorldMapWindow(ctk.CTkToplevel):
             self.back_button.configure(state=ctk.NORMAL, text=f"Back to {self.map_stack[-1]}")
         else:
             self.back_button.configure(state=ctk.DISABLED, text="Back")
+
+    def _update_map_tool_button_state(self) -> None:
+        if not hasattr(self, "map_tool_button"):
+            return
+        state = ctk.NORMAL if self.current_map_name else ctk.DISABLED
+        self.map_tool_button.configure(state=state)
+
+    def _open_in_map_tool(self) -> None:
+        target_map = None
+        if self.selected_token and self.selected_token.get("type") == "map":
+            target_map = self.selected_token.get("linked_map") or self.selected_token.get("entity_id")
+        if not target_map:
+            target_map = self.current_map_name
+        if not target_map:
+            messagebox.showinfo("No Map Available", "Select a map to open in Map Tool.")
+            return
+
+        master = getattr(self, "master", None)
+        if not master or not hasattr(master, "map_tool"):
+            messagebox.showwarning("Map Tool Unavailable", "The Map Tool is not available from this window.")
+            return
+
+        try:
+            master.map_tool(map_name=target_map)
+        except TypeError:
+            master.map_tool(target_map)
+        except Exception as exc:
+            log_error(
+                f"Failed to open Map Tool for '{target_map}': {exc}",
+                func_name="WorldMapWindow._open_in_map_tool",
+            )
+            messagebox.showerror("Error", f"Could not open '{target_map}' in Map Tool.\n{exc}")
+            return
+
+        log_info(
+            f"Opened map '{target_map}' in Map Tool",
+            func_name="WorldMapWindow._open_in_map_tool",
+        )
 
     # ------------------------------------------------------------------
     # Token creation & persistence
