@@ -43,19 +43,21 @@ class GenericListSelectionView(ctk.CTkFrame):
         # --- Create a local ttk style for the Treeview ---
         style = ttk.Style(self)
         style.theme_use("clam")
+        body_font = ("Segoe UI", 11)
+        heading_font = ("Segoe UI", 12, "bold")
         style.configure(
             "Custom.Treeview",
             background="#2B2B2B",
             fieldbackground="#2B2B2B",
             foreground="white",
-            rowheight=25,
-            font=("Segoe UI", 10),
+            rowheight=30,
+            font=body_font,
         )
         style.configure(
             "Custom.Treeview.Heading",
             background="#2B2B2B",
             foreground="white",
-            font=("Segoe UI", 10, "bold"),
+            font=heading_font,
         )
         style.map("Custom.Treeview", background=[("selected", "#2B2B2B")])
 
@@ -73,14 +75,14 @@ class GenericListSelectionView(ctk.CTkFrame):
             text=self.unique_field,
             command=lambda c=self.unique_field: self.sort_column(c),
         )
-        self.tree.column("#0", width=150, anchor="w")
+        self.tree.column("#0", width=240, minwidth=180, anchor="w", stretch=True)
         for col in self.columns:
             self.tree.heading(
                 col,
                 text=col,
                 command=lambda c=col: self.sort_column(c),
             )
-            self.tree.column(col, width=100, anchor="w")
+            self.tree.column(col, width=160, minwidth=120, anchor="w", stretch=True)
 
         # --- Add vertical and horizontal scrollbars ---
         vsb = ttk.Scrollbar(tree_frame, orient="vertical", command=self.tree.yview)
