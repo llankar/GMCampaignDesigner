@@ -399,7 +399,13 @@ class WorldMapWindow(ctk.CTkToplevel):
 
         picker = ctk.CTkToplevel(self)
         picker.title(f"Select {entity_type}")
-        picker.geometry("900x600")
+        picker.geometry("960x640")
+        picker.minsize(720, 520)
+        picker.transient(self)
+        picker.lift()
+        picker.after(10, picker.lift)
+        picker.grab_set()
+        picker.focus_set()
 
         def on_select(_, name):
             picker.destroy()
