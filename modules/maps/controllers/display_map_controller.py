@@ -1,7 +1,7 @@
 import os
 import json
 from pathlib import Path
-from tkinter import colorchooser
+from tkinter import colorchooser, messagebox
 import tkinter as tk
 import customtkinter as ctk
 from modules.maps.views.map_selector import select_map, _on_display_map
@@ -109,6 +109,16 @@ class DisplayMapController:
         
         self._maps = {m["Name"]: m for m in maps_wrapper.load_items()}
         self.select_map()
+
+    def open_map_by_name(self, map_name):
+        target = (map_name or "").strip()
+        if not target:
+            return False
+        if target not in self._maps:
+            messagebox.showwarning("Not Found", f"Map '{target}' not found.")
+            return False
+        self._on_display_map("maps", target)
+        return True
 
     def open_global_search(self, event=None):
         if self.drawing_mode != "token":

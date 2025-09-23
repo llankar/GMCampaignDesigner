@@ -1684,42 +1684,58 @@ class MainWindow(ctk.CTk):
         if event.widget is self.dice_roller_window:
             self.dice_roller_window = None
 
-    def map_tool(self):
-        # 1) Wrap your 'maps' table as before
+    def map_tool(self, map_name=None):
+        log_info(
+            f"Opening Map Tool (map={map_name})",
+            func_name="main_window.MainWindow.map_tool",
+        )
+
+        existing = getattr(self, "_map_tool_window", None)
+        if existing is not None and existing.winfo_exists():
+            existing.lift()
+            existing.focus_force()
+            existing.attributes("-topmost", True)
+            existing.after_idle(lambda: existing.attributes("-topmost", False))
+            controller = getattr(self, "map_controller", None)
+            if map_name and controller and hasattr(controller, "open_map_by_name"):
+                controller.open_map_by_name(map_name)
+            return
+
         maps_wrapper = GenericModelWrapper("maps")
 
-        # 2) Create a brand-new top-level window for map editing
         top = ctk.CTkToplevel(self)
-        
-        # Bring it to front right now…
         top.lift()
-        # …and give it focus
         top.focus_force()
-        # …temporarily make it topmost, then immediately turn that off
         top.attributes("-topmost", True)
         top.after_idle(lambda: top.attributes("-topmost", False))
         top.title("Map Tool")
-        top.geometry("1920x1080+0+0")  # or whatever size you prefer
+        top.geometry("1920x1080+0+0")
 
-        # 3) Inside that window, create a single frame to hold your map UI
         map_frame = ctk.CTkFrame(top)
         map_frame.pack(fill="both", expand=True)
 
-        # 4) Pass that frame into your map controller
         self.map_controller = DisplayMapController(
             map_frame,
             maps_wrapper,
             load_template("maps")
         )
+        if map_name and hasattr(self.map_controller, "open_map_by_name"):
+            self.map_controller.open_map_by_name(map_name)
 
         def _on_close():
             try:
-                self.map_controller.close_web_display()
+                controller = getattr(self, "map_controller", None)
+                if controller is not None:
+                    controller.close_web_display()
             except Exception:
                 log_exception("Error while closing web display")
-            top.destroy()
+            finally:
+                self._map_tool_window = None
+                self.map_controller = None
+                top.destroy()
 
         top.protocol("WM_DELETE_WINDOW", _on_close)
+        self._map_tool_window = top
 
 if __name__ == "__main__":
     app = MainWindow()
