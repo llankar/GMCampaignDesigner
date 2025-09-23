@@ -1,12 +1,42 @@
 {
   "fields": [
-      {"name": "Name", "type": "text"},
-      {"name": "Role", "type": "text"},
-      {"name": "Background", "type": "longtext"},
-      {"name": "Secret", "type": "longtext"},
-      {"name": "Traits", "type": "longtext"},
-      {"name": "Factions", "type": "list", "linked_type": "Factions"},
-      {"name": "Objects", "type": "list", "linked_type": "Objects"},
-      {"name": "Portrait", "type": "text"}
+    {
+      "name": "Name",
+      "type": "text"
+    },
+    {
+      "name": "Role",
+      "type": "text"
+    },
+    {
+      "name": "Background",
+      "type": "longtext"
+    },
+    {
+      "name": "Secret",
+      "type": "longtext"
+    },
+    {
+      "name": "Traits",
+      "type": "longtext"
+    },
+    {
+      "name": "Factions",
+      "type": "list",
+      "linked_type": "Factions"
+    },
+    {
+      "name": "Objects",
+      "type": "list",
+      "linked_type": "Objects"
+    },
+    {
+      "name": "Portrait",
+      "type": "text"
+    },
+    {
+      "name": "Audio",
+      "type": "text"
+    }
   ]
 }
