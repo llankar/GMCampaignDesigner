@@ -53,6 +53,9 @@ SCENE_TYPE_STYLE_MAP = {
 SCENE_CARD_BG = "#23262F"
 SCENE_CARD_BORDER = "#3B3F4C"
 
+TAG_SANITIZE_PATTERN = re.compile(r"[^0-9A-Za-z_]")
+TAG_UNDERSCORE_COLLAPSE_PATTERN = re.compile(r"_+")
+
 DETAIL_PANEL_WIDTH = 350
 DETAIL_PANEL_PADDING = 12
 
@@ -203,7 +206,21 @@ class ScenarioGraphEditor(ctk.CTkFrame):
         self.canvas.bind("<Button-2>", self._start_canvas_pan)
         self.canvas.bind("<B2-Motion>", self._do_canvas_pan)
         self.canvas.bind("<ButtonRelease-2>", self._end_canvas_pan)
-    
+
+    def _sanitize_tag_component(self, value):
+        text = str(value or "")
+        text = text.replace(" ", "_")
+        text = TAG_SANITIZE_PATTERN.sub("_", text)
+        text = TAG_UNDERSCORE_COLLAPSE_PATTERN.sub("_", text)
+        return text
+
+    def _build_tag(self, prefix, name=None):
+        prefix_part = self._sanitize_tag_component(prefix)
+        if name is None:
+            return prefix_part
+        name_part = self._sanitize_tag_component(name)
+        return f"{prefix_part}_{name_part}"
+
     def _on_zoom(self, event):
         if event.delta > 0 or event.num == 4:
             scale = self.zoom_factor
@@ -229,7 +246,7 @@ class ScenarioGraphEditor(ctk.CTkFrame):
 
             # Update x/y in the node data as well
             for node in self.graph["nodes"]:
-                node_tag = f"{node['type']}_{node['name'].replace(' ', '_')}"
+                node_tag = self._build_tag(node.get('type', ''), node.get('name', ''))
                 if node_tag == tag:
                     node["x"], node["y"] = new_x, new_y
                     break
@@ -242,7 +259,7 @@ class ScenarioGraphEditor(ctk.CTkFrame):
 
         # Restore original node positions
         for node in self.graph["nodes"]:
-            tag = f"{node['type']}_{node['name'].replace(' ', '_')}"
+            tag = self._build_tag(node.get('type', ''), node.get('name', ''))
             if tag in self.original_positions:
                 x, y = self.original_positions[tag]
                 node["x"] = x
@@ -250,7 +267,7 @@ class ScenarioGraphEditor(ctk.CTkFrame):
 
         # Rebuild node_positions from graph data
         self.node_positions = {
-            f"{node['type']}_{node['name'].replace(' ', '_')}": (node["x"], node["y"])
+            self._build_tag(node.get('type', ''), node.get('name', '')): (node["x"], node["y"])
             for node in self.graph["nodes"]
         }
 
@@ -390,7 +407,7 @@ class ScenarioGraphEditor(ctk.CTkFrame):
     def _build_scene_payload_from_graph(self, node_tag):
         for node in self.graph.get("nodes", []):
             name = node.get("name", "")
-            tag = f"{node.get('type', '')}_{name.replace(' ', '_')}"
+            tag = self._build_tag(node.get('type', ''), name)
             if tag != node_tag:
                 continue
             data = node.get("data", {}) or {}
@@ -692,7 +709,7 @@ class ScenarioGraphEditor(ctk.CTkFrame):
 
         center_x, center_y = 400, 300
         scenario_title = scenario.get("Title", "No Title")
-        scenario_tag = f"scenario_{scenario_title.replace(' ', '_')}"
+        scenario_tag = self._build_tag("scenario", scenario_title)
         self.graph["nodes"].append({
             "type": "scenario",
             "name": scenario_title,
@@ -726,7 +743,7 @@ class ScenarioGraphEditor(ctk.CTkFrame):
                 traits = npc_data.get("Traits", "")
                 traits = clean_longtext(traits, max_length=5000)
                 npc_data["Traits"] = traits
-                npc_tag = f"npc_{npc_name.replace(' ', '_')}"
+                npc_tag = self._build_tag("npc", npc_name)
                 self.graph["nodes"].append({
                     "type": "npc",
                     "name": npc_name,
@@ -766,7 +783,7 @@ class ScenarioGraphEditor(ctk.CTkFrame):
                 secret = place_data.get("Secret", "")
                 secret = clean_longtext(secret, max_length=5000)
                 place_data["Secret"] = secret
-                place_tag = f"place_{place_name.replace(' ', '_')}"
+                place_tag = self._build_tag("place", place_name)
                 self.graph["nodes"].append({
                     "type": "place",
                     "name": place_name,
@@ -807,7 +824,7 @@ class ScenarioGraphEditor(ctk.CTkFrame):
                 weakness = creature_data.get("Weakness", "")
                 weakness = clean_longtext(weakness, max_length=5000)
                 creature_data["Weakness"] = weakness
-                creature_tag = f"creature_{creature_name.replace(' ', '_')}"
+                creature_tag = self._build_tag("creature", creature_name)
                 self.graph["nodes"].append({
                     "type": "creature",
                     "name": creature_name,
@@ -896,7 +913,7 @@ class ScenarioGraphEditor(ctk.CTkFrame):
             y = origin_y + row * y_spacing
 
             display_name = scene.get("display_name") or f"Scene {idx + 1}"
-            node_tag = f"scene_{display_name.replace(' ', '_')}"
+            node_tag = self._build_tag("scene", display_name)
             scene["tag"] = node_tag
             node_data = {
                 "type": "scene",
@@ -1925,7 +1942,7 @@ class ScenarioGraphEditor(ctk.CTkFrame):
         for node in self.graph["nodes"]:
             node_type = node["type"]
             node_name = node["name"]
-            node_tag = f"{node_type}_{node_name.replace(' ', '_')}"
+            node_tag = self._build_tag(node_type, node_name)
             x, y = node["x"], node["y"]
             data = node.get("data", {}) or {}
             title_text = node_name
@@ -2217,7 +2234,7 @@ class ScenarioGraphEditor(ctk.CTkFrame):
 
     def _draw_scene_card(self, node, scale):
         node_name = node.get("name", "Scene")
-        node_tag = f"scene_{node_name.replace(' ', '_')}"
+        node_tag = self._build_tag("scene", node_name)
         x, y = node.get("x", 0), node.get("y", 0)
         data = node.get("data", {}) or {}
 
@@ -2627,7 +2644,7 @@ class ScenarioGraphEditor(ctk.CTkFrame):
         new_pos = (old_x + dx, old_y + dy)
         self.node_positions[self.selected_node] = new_pos
         for node in self.graph["nodes"]:
-            tag = f"{node['type']}_{node['name'].replace(' ', '_')}"
+            tag = self._build_tag(node.get('type', ''), node.get('name', ''))
             if tag == self.selected_node:
                 node["x"], node["y"] = new_pos
                 break
@@ -2807,14 +2824,7 @@ class ScenarioGraphEditor(ctk.CTkFrame):
         if rect_id:
             self.canvas.itemconfig(rect_id, fill=color)
         for node in self.graph["nodes"]:
-            if node["type"] == "scenario":
-                tag = f"scenario_{node['name'].replace(' ', '_')}"
-            elif node["type"] == "npc":
-                tag = f"npc_{node['name'].replace(' ', '_')}"
-            elif node["type"] == "creature":
-                tag = f"creature_{node['name'].replace(' ', '_')}"
-            else:
-                tag = f"place_{node['name'].replace(' ', '_')}"
+            tag = self._build_tag(node.get('type', ''), node.get('name', ''))
             if tag == self.selected_node:
                 node["color"] = color
                 break
@@ -2948,18 +2958,7 @@ class ScenarioGraphEditor(ctk.CTkFrame):
         file_path = filedialog.asksaveasfilename(defaultextension=".json")
         if file_path:
             for node in self.graph["nodes"]:
-                if node["type"] == "scenario":
-                    node_tag = f"scenario_{node['name'].replace(' ', '_')}"
-                elif node["type"] == "npc":
-                    node_tag = f"npc_{node['name'].replace(' ', '_')}"
-                elif node["type"] == "creature":
-                    node_tag = f"creature_{node['name'].replace(' ', '_')}"
-                elif node["type"] == "place":
-                    node_tag = f"place_{node['name'].replace(' ', '_')}"
-                elif node["type"] == "scene":
-                    node_tag = f"scene_{node['name'].replace(' ', '_')}"
-                else:
-                    node_tag = f"{node['type']}_{node['name'].replace(' ', '_')}"
+                node_tag = self._build_tag(node.get('type', ''), node.get('name', ''))
                 x, y = self.node_positions.get(node_tag, (node["x"], node["y"]))
                 node["x"], node["y"] = x, y
             with open(file_path, "w", encoding="utf-8") as f:
@@ -2983,18 +2982,7 @@ class ScenarioGraphEditor(ctk.CTkFrame):
             self.scene_flow_scenes = []
             self.scene_flow_scene_lookup = {}
             for node in self.graph["nodes"]:
-                if node["type"] == "scenario":
-                    node_tag = f"scenario_{node['name'].replace(' ', '_')}"
-                elif node["type"] == "npc":
-                    node_tag = f"npc_{node['name'].replace(' ', '_')}"
-                elif node["type"] == "creature":
-                    node_tag = f"creature_{node['name'].replace(' ', '_')}"
-                elif node["type"] == "place":
-                    node_tag = f"place_{node['name'].replace(' ', '_')}"
-                elif node["type"] == "scene":
-                    node_tag = f"scene_{node['name'].replace(' ', '_')}"
-                else:
-                    node_tag = f"{node['type']}_{node['name'].replace(' ', '_')}"
+                node_tag = self._build_tag(node.get('type', ''), node.get('name', ''))
                 self.node_positions[node_tag] = (node["x"], node["y"])
             self.draw_graph()
         # Try to find the scenario node and set self.scenario
@@ -3008,14 +2996,14 @@ class ScenarioGraphEditor(ctk.CTkFrame):
             else:
                 print(f"[WARNING] Scenario titled '{title}' not found in data.")
         for node in self.graph["nodes"]:
-            tag = f"{node['type']}_{node['name'].replace(' ', '_')}"
+            tag = self._build_tag(node.get('type', ''), node.get('name', ''))
             self.original_positions[tag] = (node["x"], node["y"])
         
         # --- Scroll to center on the scenario node ---
         self.canvas.update_idletasks()
         scenario_node = next((n for n in self.graph["nodes"] if n["type"] == "scenario"), None)
         if scenario_node:
-            tag = f"scenario_{scenario_node['name'].replace(' ', '_')}"
+            tag = self._build_tag("scenario", scenario_node.get('name', ''))
             if tag in self.node_positions:
                 x, y = self.node_positions[tag]
 

@@ -306,7 +306,7 @@ class SceneFlowViewerFrame(ScenarioGraphEditor):
         super()._draw_scene_card(node, scale)
 
         node_name = node.get("name", "Scene")
-        node_tag = f"scene_{node_name.replace(' ', '_')}"
+        node_tag = self._build_tag("scene", node_name)
         bbox = self.node_bboxes.get(node_tag)
         if not bbox:
             return
