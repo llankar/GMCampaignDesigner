@@ -5,6 +5,7 @@
       {"name": "NPCs", "type": "list", "linked_type": "NPCs"},
       {"name": "PlayerDisplay", "type": "boolean"},
       {"name": "Secrets", "type": "longtext"},
-      {"name": "Portrait", "type": "text"}
+      {"name": "Portrait", "type": "text"},
+      {"name": "Audio", "type": "audio"}
   ]
 }

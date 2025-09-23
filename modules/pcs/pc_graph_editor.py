@@ -19,6 +19,7 @@ import re
 from tkinter.font import Font  # add at top of file
 from modules.ui.image_viewer import show_portrait
 from modules.helpers.config_helper import ConfigHelper
+from modules.audio.entity_audio import play_entity_audio, stop_entity_audio
 from modules.helpers.logging_helper import log_module_import
 
 log_module_import(__name__)
@@ -591,6 +592,19 @@ class PCGraphEditor(ctk.CTkFrame):
         node_menu.add_separator()
         node_menu.add_command(label="Change Color", command=lambda: self.show_color_menu(x, y))
         node_menu.add_command(label="Display Portrait Window", command=self.display_portrait_window)
+        record = None
+        entity_name = None
+        if self.selected_node and self.selected_node.startswith("pc_"):
+            entity_name = self.selected_node.replace("pc_", "").replace("_", " ")
+            record = self.pcs.get(entity_name, {})
+        audio_value = self._get_entity_audio(record)
+        if audio_value:
+            node_menu.add_separator()
+            node_menu.add_command(
+                label="Play Audio",
+                command=lambda n=entity_name, r=record: self._play_entity_audio(r, n),
+            )
+            node_menu.add_command(label="Stop Audio", command=stop_entity_audio)
         node_menu.post(int(x), int(y))
 
     # ─────────────────────────────────────────────────────────────────────────
@@ -625,6 +639,24 @@ class PCGraphEditor(ctk.CTkFrame):
     def redraw_after_drag(self):
         self.draw_graph()
         self._redraw_scheduled = False
+
+
+    def _get_entity_audio(self, record):
+        if not isinstance(record, dict):
+            return ""
+        value = record.get("Audio") or ""
+        if isinstance(value, dict):
+            value = value.get("path") or value.get("text") or ""
+        return str(value).strip()
+
+    def _play_entity_audio(self, record, name):
+        audio_value = self._get_entity_audio(record)
+        if not audio_value:
+            messagebox.showinfo("Audio", "No audio file configured for this PC.")
+            return
+        label = name or "PC"
+        if not play_entity_audio(audio_value, entity_label=str(label)):
+            messagebox.showwarning("Audio", f"Unable to play audio for {label}.")
 
 
     # ─────────────────────────────────────────────────────────────────────────

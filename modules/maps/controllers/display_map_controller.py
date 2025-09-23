@@ -22,6 +22,7 @@ from modules.helpers.text_helpers import format_longtext
 from modules.helpers.config_helper import ConfigHelper
 from modules.ui.image_viewer import show_portrait
 from modules.helpers.logging_helper import log_module_import
+from modules.audio.entity_audio import play_entity_audio, stop_entity_audio
 
 log_module_import(__name__)
 
@@ -734,11 +735,49 @@ class DisplayMapController:
         menu.add_command(label="Bring to Front", command=lambda t=token: self._bring_item_to_front(t))
         menu.add_command(label="Send to Back", command=lambda t=token: self._send_item_to_back(t))
         menu.add_command(label="Show Portrait", command=lambda t=token: show_portrait(t["image_path"], t.get("entity_type")))
+        audio_value = self._get_token_audio_value(token)
+        if audio_value:
+            menu.add_separator()
+            menu.add_command(label="Play Audio", command=lambda t=token: self._play_token_audio(t))
+            menu.add_command(label="Stop Audio", command=stop_entity_audio)
         # Display the menu
         try:
             menu.tk_popup(event.x_root, event.y_root)
         except tk.TclError as e:
             print(f"Error displaying token menu: {e}")
+
+    def _get_token_audio_value(self, token):
+        record = token.get("entity_record") or {}
+        value = record.get("Audio") or ""
+        if isinstance(value, dict):
+            value = value.get("path") or value.get("text") or ""
+        value = str(value).strip()
+        if value:
+            return value
+        entity_type = token.get("entity_type")
+        entity_id = token.get("entity_id")
+        wrapper = self._model_wrappers.get(entity_type)
+        if not wrapper or not entity_id:
+            return ""
+        try:
+            for item in wrapper.load_items():
+                if item.get("Name") == entity_id:
+                    raw = item.get("Audio") or ""
+                    if isinstance(raw, dict):
+                        raw = raw.get("path") or raw.get("text") or ""
+                    return str(raw).strip()
+        except Exception:
+            return ""
+        return ""
+
+    def _play_token_audio(self, token):
+        audio_value = self._get_token_audio_value(token)
+        if not audio_value:
+            messagebox.showinfo("Audio", "No audio file configured for this token.")
+            return
+        name = token.get("entity_id") or token.get("entity_type") or "Entity"
+        if not play_entity_audio(audio_value, entity_label=str(name)):
+            messagebox.showwarning("Audio", f"Unable to play audio for {name}.")
 
     def _prompt_change_token_border_color(self, token):
         """
