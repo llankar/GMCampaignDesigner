@@ -9,6 +9,7 @@ from modules.generic.generic_editor_window import GenericEditorWindow
 from modules.ui.image_viewer import show_portrait
 from modules.ui.second_screen_display import show_entity_on_second_screen
 from modules.helpers.config_helper import ConfigHelper
+from modules.audio.entity_audio import play_entity_audio, stop_entity_audio
 from modules.scenarios.gm_screen_view import GMScreenView
 from modules.ai.authoring_wizard import AuthoringWizardView
 import shutil
@@ -533,6 +534,14 @@ class GenericListView(ctk.CTkFrame):
                 command=lambda: self.set_row_color(iid, None)
             )
             menu.add_cascade(label="Row Color", menu=color_menu)
+            audio_value = self._get_audio_value(item)
+            if audio_value:
+                menu.add_separator()
+                menu.add_command(
+                    label="Play Audio",
+                    command=lambda i=item: self.play_item_audio(i)
+                )
+                menu.add_command(label="Stop Audio", command=stop_entity_audio)
         menu.post(event.x_root, event.y_root)
 
     def display_on_second_screen(self, iid):
@@ -543,6 +552,23 @@ class GenericListView(ctk.CTkFrame):
         title = str(item.get(self.unique_field, ""))
         fields = list(self.display_fields) if getattr(self, 'display_fields', None) else list(self.columns[:3])
         show_entity_on_second_screen(item=item, title=title, fields=fields)
+
+    def _get_audio_value(self, item):
+        if not item:
+            return ""
+        value = item.get("Audio") or ""
+        if isinstance(value, dict):
+            return value.get("path") or value.get("text") or ""
+        return str(value).strip()
+
+    def play_item_audio(self, item):
+        audio_value = self._get_audio_value(item)
+        if not audio_value:
+            messagebox.showinfo("Audio", "No audio file configured for this entry.")
+            return
+        name = str(item.get(self.unique_field, "Entity"))
+        if not play_entity_audio(audio_value, entity_label=name):
+            messagebox.showwarning("Audio", f"Unable to play audio for {name}.")
 
     def delete_item(self, iid):
         log_info(f"Deleting {self.model_wrapper.entity_type} item: {iid}", func_name="GenericListView.delete_item")

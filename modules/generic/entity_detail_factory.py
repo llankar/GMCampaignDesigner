@@ -8,10 +8,12 @@ from modules.generic.generic_model_wrapper import GenericModelWrapper
 from tkinter import Toplevel, messagebox
 from tkinter import ttk
 import tkinter.font as tkfont
+import tkinter as tk
 from modules.ui.image_viewer import show_portrait
 from modules.ui.tooltip import ToolTip
 from modules.generic.generic_editor_window import GenericEditorWindow
 from modules.helpers.config_helper import ConfigHelper
+from modules.audio.entity_audio import play_entity_audio, resolve_audio_path, stop_entity_audio
 from modules.helpers.logging_helper import (
     log_function,
     log_info,
@@ -843,7 +845,7 @@ def create_entity_detail_frame(entity_type, entity, master, open_entity_callback
     content_frame = ctk.CTkFrame(master)
     content_frame.pack(fill="both", expand=True, padx=10, pady=10)
     # — Add an “Edit” button so GMs can open the generic editor for this entity —
-    
+
     # rebuild_frame will clear & re-populate this same content_frame
     def rebuild_frame(updated_item):
         # 1) Destroy the old frame
@@ -867,20 +869,58 @@ def create_entity_detail_frame(entity_type, entity, master, open_entity_callback
         gm_view.tabs[tab_name]["content_frame"] = new_frame
         
 
+    button_bar = ctk.CTkFrame(content_frame)
+    button_bar.pack(fill="x", pady=(0, 10))
+
+    audio_value = entity.get("Audio") or ""
+    entity_label = entity.get("Name") or entity.get("Title") or entity_type[:-1]
+
+    def _audio_display_name(value: str) -> str:
+        if not value:
+            return "🎵 Audio"
+        base = os.path.basename(str(value)) or "Audio"
+        resolved = resolve_audio_path(value)
+        if resolved and os.path.exists(resolved):
+            return f"🎵 {base}"
+        return f"🎵 {base} (missing)"
+
+    def _play_audio_from_menu() -> None:
+        if not audio_value:
+            messagebox.showinfo("Audio", "No audio file configured for this entry.")
+            return
+        if not play_entity_audio(audio_value, entity_label=str(entity_label)):
+            messagebox.showwarning("Audio", "Unable to play the associated audio track.")
+
+    if audio_value:
+        audio_label = ctk.CTkLabel(
+            button_bar,
+            text=_audio_display_name(audio_value),
+            cursor="hand2",
+        )
+
+        def _show_audio_menu(event) -> None:
+            menu = tk.Menu(button_bar, tearoff=0)
+            menu.add_command(label="Play Audio", command=_play_audio_from_menu)
+            menu.add_command(label="Stop Audio", command=stop_entity_audio)
+            menu.tk_popup(event.x_root, event.y_root)
+
+        audio_label.bind("<Button-3>", _show_audio_menu)
+        audio_label.pack(side="right", padx=(0, 6), pady=6)
+
     edit_btn = ctk.CTkButton(
-       content_frame,
-       text="Edit",
-       command=lambda et=entity_type, en=entity: EditWindow(
-           content_frame,
-           en,
-           load_template(et.lower()),
-           wrappers[et],
-           creation_mode=False,
-           on_save=rebuild_frame
-       )
-   )
-       
-    edit_btn.pack(anchor="ne", padx=10, pady=(0, 10))
+        button_bar,
+        text="Edit",
+        command=lambda et=entity_type, en=entity: EditWindow(
+            content_frame,
+            en,
+            load_template(et.lower()),
+            wrappers[et],
+            creation_mode=False,
+            on_save=rebuild_frame
+        )
+    )
+
+    edit_btn.pack(side="right", padx=10, pady=6)
 
     # This local cache is used for portrait images (if any).
     content_frame.portrait_images = {}

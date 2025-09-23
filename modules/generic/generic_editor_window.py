@@ -23,6 +23,7 @@ from modules.ai.local_ai_client import LocalAIClient
 import json
 from io import BytesIO
 from pathlib import Path
+from modules.audio.entity_audio import play_entity_audio, resolve_audio_path, stop_entity_audio
 from modules.helpers.logging_helper import (
     log_function,
     log_info,
@@ -260,6 +261,8 @@ class GenericEditorWindow(ctk.CTkToplevel):
                 self.create_dynamic_combobox_list(field)
             elif field["type"] == "boolean":
                 self.create_boolean_field(field)
+            elif field["type"] == "audio":
+                self.create_audio_field(field)
             elif field["type"] == "file":
                 self.create_file_field(field)
             else:
@@ -643,7 +646,71 @@ class GenericEditorWindow(ctk.CTkToplevel):
         self.field_widgets[f"{field['name']}_container"] = container
         self.field_widgets[f"{field['name']}_add_scene"] = add_scene
         self.field_widgets[f"{field['name']}_renumber"] = renumber_scenes
-    
+
+    def create_audio_field(self, field):
+        frame = ctk.CTkFrame(self.scroll_frame)
+        frame.pack(fill="x", pady=5)
+
+        raw_value = self.item.get(field["name"], "") or ""
+        normalized_value = self._campaign_relative_path(raw_value)
+        audio_var = tk.StringVar(value=normalized_value)
+
+        display_label = ctk.CTkLabel(
+            frame,
+            text=self._format_audio_label(audio_var.get()),
+            anchor="w",
+        )
+        display_label.pack(fill="x", padx=5, pady=(5, 0))
+
+        button_row = ctk.CTkFrame(frame)
+        button_row.pack(fill="x", pady=(5, 0))
+
+        def update_value(new_value: str) -> None:
+            audio_var.set(new_value)
+            display_label.configure(text=self._format_audio_label(new_value))
+
+        def on_select() -> None:
+            file_path = filedialog.askopenfilename(
+                title="Select Audio File",
+                filetypes=[
+                    (
+                        "Audio Files",
+                        "*.mp3 *.wav *.ogg *.oga *.flac *.aac *.m4a *.opus *.webm",
+                    ),
+                    ("All Files", "*.*"),
+                ],
+            )
+            if not file_path:
+                return
+            try:
+                relative = self.copy_audio_asset(file_path)
+            except Exception as exc:
+                messagebox.showerror("Select Audio", f"Could not copy audio file:\n{exc}")
+                return
+            update_value(relative)
+
+        def on_clear() -> None:
+            update_value("")
+
+        def on_play() -> None:
+            value = audio_var.get()
+            if not value:
+                messagebox.showinfo("Audio", "No audio file selected.")
+                return
+            name_hint = self.item.get("Name") or self.item.get("Title") or "Entity"
+            if not play_entity_audio(value, entity_label=str(name_hint)):
+                messagebox.showwarning("Audio", "Unable to play the selected audio file.")
+
+        def on_stop() -> None:
+            stop_entity_audio()
+
+        ctk.CTkButton(button_row, text="Select Audio", command=on_select).pack(side="left", padx=5)
+        ctk.CTkButton(button_row, text="Clear", command=on_clear).pack(side="left", padx=5)
+        ctk.CTkButton(button_row, text="Play", command=on_play).pack(side="left", padx=5)
+        ctk.CTkButton(button_row, text="Stop", command=on_stop).pack(side="left", padx=5)
+
+        self.field_widgets[field["name"]] = audio_var
+
     def create_file_field(self, field):
         frame = ctk.CTkFrame(self.scroll_frame)
         frame.pack(fill="x", pady=5)
@@ -1157,6 +1224,9 @@ class GenericEditorWindow(ctk.CTkToplevel):
             elif field["type"] == "file":
                 # store the filename (not full path) into the model
                 self.item[field["name"]] = getattr(self, "attachment_filename", "")
+            elif field["type"] == "audio":
+                value = widget.get() if hasattr(widget, "get") else str(widget)
+                self.item[field["name"]] = self._campaign_relative_path(value)
             elif field["name"] == "Portrait":
                 self.item[field["name"]] = self._campaign_relative_path(self.portrait_path)
             elif field["name"] == "Image":
@@ -1677,6 +1747,15 @@ class GenericEditorWindow(ctk.CTkToplevel):
                 return candidate.resolve().as_posix()
         return candidate.as_posix()
 
+    def _format_audio_label(self, value: str) -> str:
+        if not value:
+            return "[No Audio]"
+        resolved = Path(resolve_audio_path(value))
+        name = os.path.basename(str(value)) or "Audio"
+        if resolved.exists():
+            return name
+        return f"{name} (missing)"
+
     def _update_portrait_preview(self):
         campaign_dir = Path(ConfigHelper.get_campaign_dir())
         if self.portrait_path:
@@ -1727,6 +1806,32 @@ class GenericEditorWindow(ctk.CTkToplevel):
         ext = os.path.splitext(src_path)[-1].lower()
         dest_filename = f"{npc_name}_{id(self)}{ext}"
         dest_path = portrait_folder / dest_filename
+        shutil.copy(src_path, dest_path)
+
+        try:
+            relative = dest_path.relative_to(campaign_dir).as_posix()
+        except ValueError:
+            relative = dest_path.as_posix()
+        return relative
+
+    def copy_audio_asset(self, src_path: str) -> str:
+        campaign_dir = Path(ConfigHelper.get_campaign_dir())
+        audio_folder = campaign_dir / 'assets' / 'audio'
+        audio_folder.mkdir(parents=True, exist_ok=True)
+
+        base_name = (
+            self.item.get('Name')
+            or self.item.get('Title')
+            or os.path.splitext(os.path.basename(src_path))[0]
+            or 'audio'
+        )
+        sanitized = ''.join(ch if ch.isalnum() or ch in {'_', '-'} else '_' for ch in str(base_name))
+        if not sanitized:
+            sanitized = 'audio'
+        ext = os.path.splitext(src_path)[-1]
+        timestamp = int(time.time())
+        dest_filename = f"{sanitized}_{timestamp}{ext}"
+        dest_path = audio_folder / dest_filename
         shutil.copy(src_path, dest_path)
 
         try:
