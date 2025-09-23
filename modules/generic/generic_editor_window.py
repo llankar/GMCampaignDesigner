@@ -247,23 +247,26 @@ class GenericEditorWindow(ctk.CTkToplevel):
             self.create_image_field(image_field)
 
         for field in other_fields:
-            if (field["name"] == "FogMaskPath" or field["name"] == "Tokens" or field["name"] == "token_size"):
+            field_name = str(field.get("name", ""))
+            field_type = str(field.get("type", "")).lower()
+
+            if field_name in {"FogMaskPath", "Tokens", "token_size"}:
                 continue
-            if (field["name"] == "Image"):
+            if field_name == "Image":
                 continue
-            ctk.CTkLabel(self.scroll_frame, text=field["name"]).pack(pady=(5, 0), anchor="w")
-            if field["type"] == "list_longtext":
+            ctk.CTkLabel(self.scroll_frame, text=field_name).pack(pady=(5, 0), anchor="w")
+            if field_type == "list_longtext":
                 self.create_dynamic_longtext_list(field)
-            elif field["type"] == "longtext":
+            elif field_type == "longtext":
                 self.create_longtext_field(field)
-            elif field["name"] in ["NPCs", "Places", "Factions", "Objects", "Creatures", "PCs"] or \
-                 (field.get("type") == "list" and field.get("linked_type")):
+            elif field_name in ["NPCs", "Places", "Factions", "Objects", "Creatures", "PCs"] or \
+                 (field_type == "list" and field.get("linked_type")):
                 self.create_dynamic_combobox_list(field)
-            elif field["type"] == "boolean":
+            elif field_type == "boolean":
                 self.create_boolean_field(field)
-            elif field["type"] == "audio":
+            elif field_type == "audio" or field_name.lower() == "audio":
                 self.create_audio_field(field)
-            elif field["type"] == "file":
+            elif field_type == "file":
                 self.create_file_field(field)
             else:
                 self.create_text_entry(field)
@@ -1200,42 +1203,45 @@ class GenericEditorWindow(ctk.CTkToplevel):
     # === Sauvegarde ===
     def save(self):
         for field in self.template["fields"]:
-            if field["name"] in ["FogMaskPath", "Tokens", "token_size"]:
+            field_name = str(field.get("name", ""))
+            field_type = str(field.get("type", "")).lower()
+
+            if field_name in ["FogMaskPath", "Tokens", "token_size"]:
                 continue
-            widget = self.field_widgets[field["name"]]
-            if field["type"] == "list_longtext":
-                if field["name"] == "Scenes":
-                    self.item[field["name"]] = self._serialize_scene_states(widget)
+            widget = self.field_widgets[field_name]
+            if field_type == "list_longtext":
+                if field_name == "Scenes":
+                    self.item[field_name] = self._serialize_scene_states(widget)
                 else:
-                    self.item[field["name"]] = [
+                    self.item[field_name] = [
                         rte.get_text_data() if hasattr(rte, "get_text_data")
                                             else rte.text_widget.get("1.0", "end-1c")
                         for rte in widget
                     ]
-            elif field["type"] == "longtext":
+            elif field_type == "longtext":
                 data = widget.get_text_data()
                 if isinstance(data, dict) and not data.get("text", "").strip():
-                    self.item[field["name"]] = ""
+                    self.item[field_name] = ""
                 else:
-                    self.item[field["name"]] = data
-            elif field["name"] in ["Places", "NPCs", "Factions", "Objects", "Creatures", "PCs"] or \
-                 (field.get("type") == "list" and field.get("linked_type")):
-                self.item[field["name"]] = [cb.get() for cb in widget if cb.get()]
-            elif field["type"] == "file":
+                    self.item[field_name] = data
+            elif field_name in ["Places", "NPCs", "Factions", "Objects", "Creatures", "PCs"] or \
+                 (field_type == "list" and field.get("linked_type")):
+                self.item[field_name] = [cb.get() for cb in widget if cb.get()]
+            elif field_type == "file":
                 # store the filename (not full path) into the model
-                self.item[field["name"]] = getattr(self, "attachment_filename", "")
-            elif field["type"] == "audio":
+                self.item[field_name] = getattr(self, "attachment_filename", "")
+            elif field_type == "audio" or field_name.lower() == "audio":
                 value = widget.get() if hasattr(widget, "get") else str(widget)
-                self.item[field["name"]] = self._campaign_relative_path(value)
-            elif field["name"] == "Portrait":
-                self.item[field["name"]] = self._campaign_relative_path(self.portrait_path)
-            elif field["name"] == "Image":
-                self.item[field["name"]] = self._campaign_relative_path(self.image_path)
-            elif field["type"] == "boolean":
+                self.item[field_name] = self._campaign_relative_path(value)
+            elif field_name == "Portrait":
+                self.item[field_name] = self._campaign_relative_path(self.portrait_path)
+            elif field_name == "Image":
+                self.item[field_name] = self._campaign_relative_path(self.image_path)
+            elif field_type == "boolean":
                 # widget is stored as (option_menu, StringVar); convert to Boolean.
-                self.item[field["name"]] = True if widget[1].get() == "True" else False
+                self.item[field_name] = True if widget[1].get() == "True" else False
             else:
-                self.item[field["name"]] = widget.get()
+                self.item[field_name] = widget.get()
         self.saved = True
         self.destroy()
 
