@@ -18,6 +18,7 @@ FIELD_TYPES = [
     "list",
     "list_longtext",
     "file",
+    "audio",
 ]
 
 

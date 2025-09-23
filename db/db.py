@@ -17,9 +17,10 @@ _SQLITE_TYPE = {
     "text":     "TEXT",
     "longtext": "TEXT",
     "boolean":  "BOOLEAN",
-    "list":     "TEXT", # we’ll store lists as JSON strings
+    "list":     "TEXT",  # we’ll store lists as JSON strings
     "file":     "TEXT",
     "float":    "REAL",
+    "audio":    "TEXT",
 }
 
 def load_schema_from_json(entity_name):

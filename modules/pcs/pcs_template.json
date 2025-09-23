@@ -8,6 +8,6 @@
       {"name": "Factions", "type": "list", "linked_type": "Factions"},
       {"name": "Objects", "type": "list", "linked_type": "Objects"},
       {"name": "Portrait", "type": "text"},
-      {"name": "Audio", "type": "audio"}
+      {"name": "Audio", "type": "text"}
   ]
 }
