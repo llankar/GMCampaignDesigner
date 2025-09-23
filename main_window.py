@@ -887,10 +887,16 @@ class MainWindow(ctk.CTk):
         log_info("Opening World Map window", func_name="main_window.MainWindow.open_world_map")
         existing = getattr(self, "_world_map_window", None)
         if existing and existing.winfo_exists():
-            existing.focus()
+            existing.focus_force()
             existing.lift()
+            existing.attributes("-topmost", True)
+            existing.after_idle(lambda: existing.attributes("-topmost", False))
             return
         window = WorldMapWindow(self)
+        window.lift()
+        window.focus_force()
+        window.attributes("-topmost", True)
+        window.after_idle(lambda: window.attributes("-topmost", False))
         self._world_map_window = window
 
     def open_scenario_graph_editor(self):
