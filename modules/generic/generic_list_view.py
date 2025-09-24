@@ -105,6 +105,7 @@ class GenericListView(ctk.CTkFrame):
         super().__init__(master, *args, **kwargs)
         self.model_wrapper = model_wrapper
         self.template = template
+        self.media_field = self._detect_media_field()
         os.makedirs(PORTRAIT_FOLDER, exist_ok=True)
 
         self.items = self.model_wrapper.load_items()
@@ -121,13 +122,17 @@ class GenericListView(ctk.CTkFrame):
         except Exception:
             self.group_column = None
 
+        skip_for_unique = set()
+        if self.media_field:
+            skip_for_unique.add(self.media_field)
         self.unique_field = next(
-            (f["name"] for f in self.template["fields"] if f["name"] != "Portrait"),
+            (f["name"] for f in self.template["fields"] if f["name"] not in skip_for_unique),
             None
         )
+        skip_for_columns = {self.media_field, self.unique_field}
         self.columns = [
             f["name"] for f in self.template["fields"]
-            if f["name"] not in ("Portrait", self.unique_field)
+            if f["name"] not in skip_for_columns
         ]
 
         # --- Column configuration ---
@@ -368,17 +373,50 @@ class GenericListView(ctk.CTkFrame):
             bind_open(card)
             bind_open(name_label)
 
-    def _resolve_portrait_path(self, portrait_path):
-        if not portrait_path:
+    def _detect_media_field(self):
+        fields = self.template.get("fields", []) if isinstance(self.template, dict) else []
+        # Prefer explicit image type first.
+        for field in fields:
+            try:
+                field_type = str(field.get("type", "")).strip().lower()
+            except AttributeError:
+                continue
+            if field_type == "image":
+                name = field.get("name")
+                if isinstance(name, str) and name.strip():
+                    return name.strip()
+        # Build lookup of normalized names so we can match Portrait/Image variants.
+        normalized = {}
+        for field in fields:
+            name = field.get("name") if isinstance(field, dict) else None
+            if not isinstance(name, str):
+                continue
+            stripped = name.strip()
+            if not stripped:
+                continue
+            normalized[stripped.lower()] = stripped
+        for key in ("portrait", "image"):
+            if key in normalized:
+                return normalized[key]
+        for key in ("portrait", "image"):
+            for lower, original in normalized.items():
+                if key in lower:
+                    return original
+        return None
+
+    def _resolve_media_path(self, media_path):
+        if not media_path:
             return None
-        if os.path.isabs(portrait_path) and os.path.exists(portrait_path):
-            return portrait_path
-        candidate = os.path.join(ConfigHelper.get_campaign_dir(), portrait_path)
+        if os.path.isabs(media_path) and os.path.exists(media_path):
+            return media_path
+        candidate = os.path.join(ConfigHelper.get_campaign_dir(), media_path)
         return candidate if os.path.exists(candidate) else None
 
     def _load_grid_image(self, item):
-        portrait_path = item.get("Portrait", "")
-        resolved = self._resolve_portrait_path(portrait_path)
+        media_value = ""
+        if self.media_field:
+            media_value = item.get(self.media_field, "")
+        resolved = self._resolve_media_path(media_value)
         image_obj = None
         if resolved:
             try:
