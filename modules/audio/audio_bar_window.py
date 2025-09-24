@@ -55,6 +55,7 @@ class AudioBarWindow(ctk.CTkToplevel):
         self._remembered_track_label: Optional[str] = None
         self._building_ui = False
         self._build_ui()
+        self._set_collapsed(True)
         self._register_controller_listener()
         self._refresh_from_state()
         self.after(0, self._apply_geometry)

@@ -57,6 +57,7 @@ class DiceBarWindow(ctk.CTkToplevel):
         self._result_emphasis_font = ctk.CTkFont(size=18, weight="bold")
 
         self._build_ui()
+        self._set_collapsed(True)
         self._apply_geometry()
 
         self.bind("<Escape>", lambda _event: self._on_close())
