@@ -6,7 +6,10 @@ import subprocess
 import time
 import requests
 import shutil
+import re
+import unicodedata
 import tkinter as tk
+from difflib import SequenceMatcher
 from tkinter import filedialog, messagebox, Toplevel, Listbox, MULTIPLE, PhotoImage, simpledialog
 
 import customtkinter as ctk
@@ -218,6 +221,7 @@ class MainWindow(ctk.CTk):
             "world_map": self.load_icon("maps_icon.png", size=(60, 60)),
             "generate_portraits": self.load_icon("generate_icon.png", size=(60, 60)),
             "associate_portraits": self.load_icon("associate_icon.png", size=(60, 60)),
+            "import_portraits": self.load_icon("import_icon.png", size=(60, 60)),
             "import_scenario": self.load_icon("import_icon.png", size=(60, 60)),
             "import_creatures_pdf": self.load_icon("import_icon.png", size=(60, 60)),
             "export_foundry": self.load_icon("export_foundry_icon.png", size=(60, 60)),
@@ -400,6 +404,7 @@ class MainWindow(ctk.CTk):
             ("export_foundry", "Export Scenarios for Foundry", self.export_foundry),
             ("generate_portraits", "Generate Portraits", self.generate_missing_portraits),
             ("associate_portraits", "Associate NPC Portraits", self.associate_npc_portraits),
+            ("import_portraits", "Import Portraits from Folder", self.import_portraits_from_directory),
             ("map_tool", "Map Tool", self.map_tool),
             ("sound_manager", "Sound & Music Manager", self.open_sound_manager),
             ("audio_controls", "Audio Controls Bar", self.open_audio_bar),
@@ -1404,6 +1409,208 @@ class MainWindow(ctk.CTk):
             img.save(dest_path)
         return dest_path
 
+    def import_portraits_from_directory(self):
+        """Match and import portraits from a directory for all portrait-capable entities."""
+        directory = filedialog.askdirectory(title="Select Portrait Directory")
+        if not directory:
+            log_info(
+                "Portrait import cancelled: no directory selected",
+                func_name="main_window.MainWindow.import_portraits_from_directory",
+            )
+            return
+
+        supported_exts = {".png", ".jpg", ".jpeg", ".gif", ".bmp", ".webp"}
+        image_candidates = []
+
+        for root, _dirs, files in os.walk(directory):
+            for file_name in files:
+                ext = os.path.splitext(file_name)[1].lower()
+                if ext not in supported_exts:
+                    continue
+                base_name = os.path.splitext(file_name)[0]
+                normalized = self.normalize_name(base_name)
+                cleaned = re.sub(
+                    r"\b(portrait|token|image|img|picture|photo|pic)\b",
+                    " ",
+                    normalized,
+                )
+                cleaned = " ".join(cleaned.split())
+                candidate = cleaned or normalized
+                if not candidate:
+                    continue
+                image_candidates.append((candidate, os.path.join(root, file_name)))
+
+        if not image_candidates:
+            log_info(
+                "Portrait import aborted: no compatible images discovered",
+                func_name="main_window.MainWindow.import_portraits_from_directory",
+            )
+            messagebox.showinfo(
+                "Import Portraits",
+                "No image files were found in the selected directory.",
+            )
+            return
+
+        replace_existing = messagebox.askyesno(
+            "Import Portraits",
+            "Replace existing portraits when a match is found?\n\n"
+            "Choose 'Yes' to overwrite existing portraits, or 'No' to update only missing ones.",
+            icon="question",
+            default="no",
+        )
+
+        entity_configs = [
+            ("npcs", "Name"),
+            ("pcs", "Name"),
+            ("creatures", "Name"),
+            ("places", "Name"),
+            ("objects", "Name"),
+            ("clues", "Name"),
+        ]
+        display_names = {
+            "npcs": "NPCs",
+            "pcs": "PCs",
+            "creatures": "Creatures",
+            "places": "Places",
+            "objects": "Objects",
+            "clues": "Clues",
+        }
+
+        def best_image_match(normalized_name):
+            best_path = None
+            best_score = 0.0
+            if not normalized_name:
+                return best_path, best_score
+            compact_name = normalized_name.replace(" ", "")
+            for img_name, img_path in image_candidates:
+                score_full = SequenceMatcher(None, normalized_name, img_name).ratio()
+                score_compact = SequenceMatcher(
+                    None,
+                    compact_name,
+                    img_name.replace(" ", ""),
+                ).ratio()
+                score = max(score_full, score_compact)
+                if score > best_score:
+                    best_score = score
+                    best_path = img_path
+            return best_path, best_score
+
+        db_path = ConfigHelper.get("Database", "path", fallback="default_campaign.db")
+        conn = sqlite3.connect(db_path)
+        conn.row_factory = sqlite3.Row
+        total_updates = 0
+        skipped_existing = 0
+        skipped_low_score = 0
+        per_entity_updates = []
+
+        try:
+            cursor = conn.cursor()
+            for table, key_field in entity_configs:
+                cursor.execute(f"SELECT {key_field}, Portrait FROM {table}")
+                rows = cursor.fetchall()
+                updated_here = 0
+                for row in rows:
+                    raw_name = row[key_field]
+                    if raw_name is None:
+                        continue
+                    name = str(raw_name).strip()
+                    if not name:
+                        continue
+                    existing_portrait = str(row["Portrait"] or "").strip()
+                    if existing_portrait and not replace_existing:
+                        skipped_existing += 1
+                        continue
+
+                    normalized_name = self.normalize_name(name)
+                    best_path, score = best_image_match(normalized_name)
+                    if not best_path or score < 0.85:
+                        skipped_low_score += 1
+                        continue
+
+                    try:
+                        new_path = self.copy_and_resize_portrait({"Name": name}, best_path)
+                    except Exception as exc:
+                        log_exception(
+                            f"Failed to copy portrait for {name}: {exc}",
+                            func_name="main_window.MainWindow.import_portraits_from_directory",
+                        )
+                        continue
+
+                    cursor.execute(
+                        f"UPDATE {table} SET Portrait = ? WHERE {key_field} = ?",
+                        (new_path, name),
+                    )
+                    updated_here += 1
+                    total_updates += 1
+                    log_info(
+                        f"Imported portrait for {display_names.get(table, table.title())} '{name}' (score {score * 100:.1f}%)",
+                        func_name="main_window.MainWindow.import_portraits_from_directory",
+                    )
+
+                if updated_here:
+                    per_entity_updates.append(
+                        f"{display_names.get(table, table.title())}: {updated_here}"
+                    )
+
+            if total_updates:
+                conn.commit()
+            else:
+                conn.rollback()
+
+        except Exception as exc:
+            conn.rollback()
+            log_exception(
+                f"Portrait import failed: {exc}",
+                func_name="main_window.MainWindow.import_portraits_from_directory",
+            )
+            messagebox.showerror(
+                "Import Portraits",
+                f"Portrait import failed:\n{exc}",
+            )
+            return
+        finally:
+            conn.close()
+
+        if total_updates:
+            log_info(
+                f"Imported {total_updates} portraits from directory {directory}",
+                func_name="main_window.MainWindow.import_portraits_from_directory",
+            )
+            summary_lines = [
+                "Imported portraits for the following entities:",
+                *per_entity_updates,
+            ]
+            if not per_entity_updates:
+                summary_lines.append("(No entities were updated despite successful matches.)")
+            if skipped_existing and not replace_existing:
+                summary_lines.append(
+                    f"Skipped {skipped_existing} entries that already had portraits."
+                )
+            if skipped_low_score:
+                summary_lines.append(
+                    f"Skipped {skipped_low_score} entries without a ≥85% name match."
+                )
+            messagebox.showinfo("Import Portraits", "\n".join(summary_lines))
+        else:
+            log_info(
+                "No portraits met the similarity threshold during import",
+                func_name="main_window.MainWindow.import_portraits_from_directory",
+            )
+            details = []
+            if skipped_existing and not replace_existing:
+                details.append(
+                    f"{skipped_existing} entities already had portraits (not replaced)."
+                )
+            if skipped_low_score:
+                details.append(
+                    f"{skipped_low_score} entities had no image above the 85% similarity threshold."
+                )
+            if not details:
+                details.append(
+                    "Ensure image file names closely match entity names (≥85% similarity)."
+                )
+            messagebox.showinfo("Import Portraits", "\n".join(details))
+
     def preview_and_export_scenarios(self):
         scenario_wrapper = GenericModelWrapper("scenarios")
         scenario_items = scenario_wrapper.load_items()
@@ -1550,7 +1757,13 @@ class MainWindow(ctk.CTk):
             run.underline = True
 
     def normalize_name(self, name):
-        return name.lower().replace('_', ' ').strip()
+        if name is None:
+            return ""
+        text = unicodedata.normalize("NFKD", str(name))
+        text = "".join(ch for ch in text if not unicodedata.combining(ch))
+        text = text.lower().replace('_', ' ')
+        text = re.sub(r"[^a-z0-9]+", " ", text)
+        return " ".join(text.split())
 
     def build_portrait_mapping(self):
         mapping = {}
