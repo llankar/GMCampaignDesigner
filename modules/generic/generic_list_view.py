@@ -5,6 +5,7 @@ import customtkinter as ctk
 import tkinter as tk
 from tkinter import ttk, messagebox, filedialog
 import copy
+from PIL import Image
 from modules.generic.generic_editor_window import GenericEditorWindow
 from modules.ui.image_viewer import show_portrait
 from modules.ui.second_screen_display import show_entity_on_second_screen
@@ -26,6 +27,11 @@ log_module_import(__name__)
 PORTRAIT_FOLDER = os.path.join(ConfigHelper.get_campaign_dir(), "assets", "portraits")
 ctk.set_appearance_mode("Dark")
 ctk.set_default_color_theme("blue")
+
+try:
+    RESAMPLE_MODE = Image.Resampling.LANCZOS
+except AttributeError:  # Pillow < 9.1 fallback
+    RESAMPLE_MODE = Image.LANCZOS
 
 
 @log_function
@@ -168,6 +174,21 @@ class GenericListView(ctk.CTkFrame):
         self.tree_frame.grid_rowconfigure(0, weight=1)
         self.tree_frame.grid_columnconfigure(0, weight=1)
 
+        self.grid_frame = ctk.CTkFrame(self, fg_color="#2B2B2B")
+        self.grid_controls = ctk.CTkFrame(self.grid_frame, fg_color="#2B2B2B")
+        self.grid_controls.pack(fill="x", padx=5, pady=(5, 0))
+        self.grid_back_button = ctk.CTkButton(
+            self.grid_controls,
+            text="Back to List View",
+            command=self.show_list_view,
+        )
+        self.grid_back_button.pack(side="left", padx=5, pady=5)
+        self.grid_container = ctk.CTkScrollableFrame(
+            self.grid_frame, fg_color="#2B2B2B"
+        )
+        self.grid_container.pack(fill="both", expand=True, padx=5, pady=5)
+        self.grid_images = []
+
         style = ttk.Style(self)
         style.theme_use("clam")
         style.configure("Custom.Treeview",
@@ -244,6 +265,19 @@ class GenericListView(ctk.CTkFrame):
 
         self._tooltip = _ToolTip(self.tree)
 
+        self.footer_frame = ctk.CTkFrame(self)
+        self.footer_frame.pack(fill="x", padx=5, pady=(0, 5))
+        self.count_label = ctk.CTkLabel(self.footer_frame, text="")
+        self.count_label.pack(side="left", padx=5)
+        self.grid_toggle_button = ctk.CTkButton(
+            self.footer_frame,
+            text="Grid View",
+            command=self.show_grid_view,
+        )
+        self.grid_toggle_button.pack(side="right", padx=5, pady=5)
+
+        self.view_mode = "list"
+
         self.refresh_list()
 
     def show_portrait_window(self, iid):
@@ -265,6 +299,112 @@ class GenericListView(ctk.CTkFrame):
             self.insert_grouped_items()
         else:
             self.insert_next_batch()
+        if self.view_mode == "grid":
+            self.populate_grid()
+        self.update_entity_count()
+
+    def update_entity_count(self):
+        total = len(self.filtered_items)
+        overall = len(self.items)
+        text = f"Displaying {total} of {overall} entities"
+        self.count_label.configure(text=text)
+
+    def show_grid_view(self):
+        if self.view_mode == "grid":
+            return
+        self.view_mode = "grid"
+        self.tree_frame.pack_forget()
+        self.grid_frame.pack(
+            fill="both", expand=True, padx=5, pady=5, before=self.footer_frame
+        )
+        if self.grid_toggle_button.winfo_manager():
+            self.grid_toggle_button.pack_forget()
+        self.populate_grid()
+        self.update_entity_count()
+
+    def show_list_view(self):
+        if self.view_mode == "list":
+            return
+        self.view_mode = "list"
+        self.grid_frame.pack_forget()
+        self.tree_frame.pack(
+            fill="both", expand=True, padx=5, pady=5, before=self.footer_frame
+        )
+        if not self.grid_toggle_button.winfo_manager():
+            self.grid_toggle_button.pack(side="right", padx=5, pady=5)
+        self.update_entity_count()
+
+    def populate_grid(self):
+        if not hasattr(self, "grid_container"):
+            return
+        for child in self.grid_container.winfo_children():
+            child.destroy()
+        self.grid_images.clear()
+        columns = 4
+        for col in range(columns):
+            self.grid_container.grid_columnconfigure(col, weight=1)
+        if not self.filtered_items:
+            ctk.CTkLabel(self.grid_container, text="No entities to display").grid(
+                row=0, column=0, padx=10, pady=10, sticky="w"
+            )
+            return
+        for idx, item in enumerate(self.filtered_items):
+            row, col = divmod(idx, columns)
+            card = ctk.CTkFrame(self.grid_container, corner_radius=8, fg_color="#1E1E1E")
+            card.grid(row=row, column=col, padx=10, pady=10, sticky="nsew")
+            image = self._load_grid_image(item)
+            image_label = ctk.CTkLabel(card, text="", image=image)
+            image_label.grid(row=0, column=0, padx=10, pady=(10, 5))
+            name = self.clean_value(item.get(self.unique_field, "")) or "Unnamed"
+            name_label = ctk.CTkLabel(
+                card, text=name, justify="center", wraplength=160
+            )
+            name_label.grid(row=1, column=0, padx=10, pady=(0, 10))
+
+            def bind_open(widget):
+                widget.bind("<Double-Button-1>", lambda e, it=item: self._edit_item(it))
+
+            bind_open(image_label)
+            bind_open(card)
+            bind_open(name_label)
+
+    def _resolve_portrait_path(self, portrait_path):
+        if not portrait_path:
+            return None
+        if os.path.isabs(portrait_path) and os.path.exists(portrait_path):
+            return portrait_path
+        candidate = os.path.join(ConfigHelper.get_campaign_dir(), portrait_path)
+        return candidate if os.path.exists(candidate) else None
+
+    def _load_grid_image(self, item):
+        portrait_path = item.get("Portrait", "")
+        resolved = self._resolve_portrait_path(portrait_path)
+        image_obj = None
+        if resolved:
+            try:
+                with Image.open(resolved) as img:
+                    image_obj = img.copy()
+                image_obj.thumbnail((160, 160), RESAMPLE_MODE)
+            except Exception:
+                image_obj = None
+        if image_obj is None:
+            image_obj = Image.new("RGBA", (160, 160), color="#3A3A3A")
+        ctk_image = ctk.CTkImage(light_image=image_obj, size=(160, 160))
+        self.grid_images.append(ctk_image)
+        return ctk_image
+
+    def _edit_item(self, item):
+        editor = GenericEditorWindow(
+            self.master,
+            item,
+            self.template,
+            self.model_wrapper,
+            creation_mode=False,
+        )
+        self.master.wait_window(editor)
+        if getattr(editor, "saved", False):
+            self.model_wrapper.save_items(self.items)
+            self.refresh_list()
 
     def on_button_press(self, event):
         region = self.tree.identify("region", event.x, event.y)
@@ -462,14 +602,7 @@ class GenericListView(ctk.CTkFrame):
             return
         item, _ = self._find_item_by_iid(iid)
         if item:
-            editor = GenericEditorWindow(
-                self.master, item, self.template,
-                self.model_wrapper, creation_mode=False
-            )
-            self.master.wait_window(editor)
-            if getattr(editor, "saved", False):
-                self.model_wrapper.save_items(self.items)
-                self.refresh_list()
+            self._edit_item(item)
 
     def on_right_click(self, event):
         region = self.tree.identify("region", event.x, event.y)
