@@ -237,7 +237,8 @@ class PortraitImportReviewWindow:
         detail_frame = ctk.CTkFrame(container)
         detail_frame.grid(row=2, column=1, sticky="nsew")
         detail_frame.grid_columnconfigure(0, weight=1)
-        detail_frame.grid_rowconfigure(4, weight=1)
+        detail_frame.grid_rowconfigure(4, weight=0)
+        detail_frame.grid_rowconfigure(6, weight=1)
 
         self.entity_title_label = ctk.CTkLabel(
             detail_frame,
@@ -276,7 +277,6 @@ class PortraitImportReviewWindow:
             orient="horizontal",
             command=self._on_slider_change,
         )
-        self.slider.set(85.0)
         self.slider.grid(row=0, column=1, sticky="we")
 
         self.threshold_spin = tk.Spinbox(
@@ -314,6 +314,7 @@ class PortraitImportReviewWindow:
             highlightthickness=0,
             selectbackground="#3a7ebf",
             selectforeground="#ffffff",
+            height=6,
         )
         self.match_listbox.grid(row=0, column=0, sticky="nsew")
 
@@ -352,6 +353,9 @@ class PortraitImportReviewWindow:
 
         self.match_listbox.bind("<<ListboxSelect>>", self._on_match_select)
         self.match_listbox.bind("<Double-Button-1>", self._assign_selected_portrait)
+
+        # Ensure the slider reflects the default threshold once dependent widgets exist.
+        self.slider.set(self.threshold_var.get())
 
     def _populate_entities(self):
         for record in self.entity_review_data:
