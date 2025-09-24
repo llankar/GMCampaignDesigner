@@ -47,40 +47,77 @@ class LocalAIClient:
 
     @staticmethod
     def _parse_json_safe(s: str):
-        """Parse JSON from a string that may contain extra leading/trailing text.
+        """Parse JSON from a string that may contain extra leading/trailing text."""
 
-        Returns the first JSON object/array found.
-        """
         if s is None:
             raise RuntimeError("Empty response")
         s = s if isinstance(s, str) else str(s)
         s = s.strip()
         if not s:
             raise RuntimeError("Empty response")
+
+        # Fast path: the entire string is valid JSON
         try:
             return json.loads(s)
         except Exception:
-            from json import JSONDecoder
-            dec = JSONDecoder()
-            i = 0
-            n = len(s)
-            while i < n and s[i] not in '{[':
-                i += 1
-            if i >= n:
-                raise RuntimeError("No JSON object found in response")
+            pass
+
+        # Some local AI servers (e.g. Ollama) return newline-delimited JSON
+        # fragments even when `stream` is false. Stitch them together so the
+        # caller receives the full response text instead of the first chunk.
+        json_lines = []
+        for line in s.splitlines():
+            line = line.strip()
+            if not line or line[0] not in "[{":
+                continue
             try:
-                obj, end = dec.raw_decode(s, idx=i)
-                return obj
+                json_lines.append(json.loads(line))
             except Exception:
-                for line in s.splitlines():
-                    line = line.strip()
-                    if not line or line[0] not in '{[':
+                continue
+        if json_lines:
+            if len(json_lines) == 1:
+                return json_lines[0]
+            aggregated = {}
+            responses = []
+            for item in json_lines:
+                if not isinstance(item, dict):
+                    continue
+                text = item.get("response")
+                if isinstance(text, str):
+                    responses.append(text)
+                for key, value in item.items():
+                    if key == "response":
                         continue
-                    try:
-                        return json.loads(line)
-                    except Exception:
-                        continue
-                raise
+                    aggregated[key] = value
+            if responses:
+                aggregated["response"] = "".join(responses)
+                return aggregated or {"response": "".join(responses)}
+            # No response fragments found, return the last JSON object
+            return json_lines[-1]
+
+        # Fall back to locating the first JSON object within the payload
+        from json import JSONDecoder
+
+        decoder = JSONDecoder()
+        index = 0
+        length = len(s)
+        while index < length and s[index] not in "{[":
+            index += 1
+        if index >= length:
+            raise RuntimeError("No JSON object found in response")
+        try:
+            obj, _ = decoder.raw_decode(s, idx=index)
+            return obj
+        except Exception:
+            for line in s.splitlines():
+                line = line.strip()
+                if not line or line[0] not in "{[":
+                    continue
+                try:
+                    return json.loads(line)
+                except Exception:
+                    continue
+            raise
 
     def _powershell_generate(self, url, payload, headers):
         """POST to url using PowerShell Invoke-WebRequest.
