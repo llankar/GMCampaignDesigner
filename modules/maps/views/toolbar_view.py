@@ -55,10 +55,13 @@ def _build_toolbar(self):
     # Brush shape selector (for fog)
     shape_label = ctk.CTkLabel(toolbar, text="Fog Shape:") # Clarified label
     shape_label.pack(side="left", padx=(10,2), pady=8)
+    dropdown_width = 120
+
     self.shape_menu = ctk.CTkOptionMenu(
         toolbar,
         values=["Rectangle", "Circle"],
-        command=self._on_brush_shape_change # This is for fog brush shape
+        command=self._on_brush_shape_change, # This is for fog brush shape
+        width=dropdown_width,
     )
     self.shape_menu.set("Rectangle") # Default fog brush shape
     self.shape_menu.pack(side="left", padx=5, pady=8)
@@ -77,7 +80,8 @@ def _build_toolbar(self):
     self.brush_size_menu = ctk.CTkOptionMenu(
         toolbar,
         values=brush_size_values,
-        command=self._on_brush_size_change # This is for fog brush size
+        command=self._on_brush_size_change, # This is for fog brush size
+        width=dropdown_width,
     )
     self.brush_size_menu.set(str(current_brush_size))
     self.brush_size_menu.pack(side="left", padx=5, pady=8)
@@ -100,7 +104,8 @@ def _build_toolbar(self):
     self.token_size_menu = ctk.CTkOptionMenu(
         toolbar,
         values=token_size_values,
-        command=self._on_token_size_change
+        command=self._on_token_size_change,
+        width=dropdown_width,
     )
     self.token_size_menu.set(str(current_token_size))
     self.token_size_menu.pack(side="left", padx=5, pady=8)
@@ -125,7 +130,8 @@ def _build_toolbar(self):
     self.hover_font_size_menu = ctk.CTkOptionMenu(
         toolbar,
         values=font_size_values,
-        command=self._on_hover_font_size_change
+        command=self._on_hover_font_size_change,
+        width=dropdown_width,
     )
     self.hover_font_size_menu.set(str(current_hover_size))
     self.hover_font_size_menu.pack(side="left", padx=5, pady=8)
@@ -136,7 +142,8 @@ def _build_toolbar(self):
     self.drawing_tool_menu = ctk.CTkOptionMenu(
         toolbar,
         values=["Token", "Rectangle", "Oval"],
-        command=self._on_drawing_tool_change # To be created in DisplayMapController
+        command=self._on_drawing_tool_change, # To be created in DisplayMapController
+        width=dropdown_width,
     )
     # Ensure self.drawing_mode is initialized in DisplayMapController before this
     self.drawing_tool_menu.set(self.drawing_mode.capitalize() if hasattr(self, 'drawing_mode') else "Token")
@@ -148,7 +155,8 @@ def _build_toolbar(self):
     self.shape_fill_mode_menu = ctk.CTkOptionMenu(
         toolbar,
         values=["Filled", "Border Only"],
-        command=self._on_shape_fill_mode_change # To be created in DisplayMapController
+        command=self._on_shape_fill_mode_change, # To be created in DisplayMapController
+        width=dropdown_width,
     )
     # Ensure self.shape_is_filled is initialized
     self.shape_fill_mode_menu.set("Filled" if hasattr(self, 'shape_is_filled') and self.shape_is_filled else "Border Only")
