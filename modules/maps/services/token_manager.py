@@ -290,7 +290,7 @@ def _persist_tokens(self):
     data = []
     try:
         if isinstance(getattr(self, "current_map", None), dict):
-            hover_size = int(getattr(self, "hover_font_size", 12))
+            hover_size = int(getattr(self, "hover_font_size", 14))
             if hover_size > 0:
                 self.current_map["hover_font_size"] = hover_size
     except Exception:

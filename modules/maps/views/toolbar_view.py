@@ -66,12 +66,21 @@ def _build_toolbar(self):
     # Brush‐size control in dark mode (for fog)
     size_label = ctk.CTkLabel(toolbar, text="Fog Brush Size:") # Clarified label
     size_label.pack(side="left", padx=(10,2), pady=8)
-    self.brush_slider = ctk.CTkSlider(
-        toolbar, from_=4, to=128,
+
+    brush_size_options = list(getattr(self, "brush_size_options", list(range(4, 129, 4))))
+    current_brush_size = int(getattr(self, "brush_size", brush_size_options[0] if brush_size_options else 32))
+    if current_brush_size not in brush_size_options:
+        brush_size_options.append(current_brush_size)
+        brush_size_options = sorted(set(brush_size_options))
+    self.brush_size_options = list(brush_size_options)
+    brush_size_values = [str(size) for size in self.brush_size_options]
+    self.brush_size_menu = ctk.CTkOptionMenu(
+        toolbar,
+        values=brush_size_values,
         command=self._on_brush_size_change # This is for fog brush size
     )
-    self.brush_slider.set(self.brush_size)
-    self.brush_slider.pack(side="left", padx=5, pady=8)
+    self.brush_size_menu.set(str(current_brush_size))
+    self.brush_size_menu.pack(side="left", padx=5, pady=8)
 
     # Key bindings for bracket adjustments (for fog brush)
     self.parent.bind("[", lambda e: self._change_brush(-4))
@@ -81,12 +90,20 @@ def _build_toolbar(self):
     token_size_label = ctk.CTkLabel(toolbar, text="Token Size:") # Renamed label variable
     token_size_label.pack(side="left", padx=(10,2), pady=8)
 
-    self.token_slider = ctk.CTkSlider(
-        toolbar, from_=16, to=128,
+    token_size_options = list(getattr(self, "token_size_options", list(range(16, 129, 8))))
+    current_token_size = int(getattr(self, "token_size", token_size_options[0] if token_size_options else 48))
+    if current_token_size not in token_size_options:
+        token_size_options.append(current_token_size)
+        token_size_options = sorted(set(token_size_options))
+    self.token_size_options = list(token_size_options)
+    token_size_values = [str(size) for size in self.token_size_options]
+    self.token_size_menu = ctk.CTkOptionMenu(
+        toolbar,
+        values=token_size_values,
         command=self._on_token_size_change
     )
-    self.token_slider.set(self.token_size)
-    self.token_slider.pack(side="left", padx=5, pady=8)
+    self.token_size_menu.set(str(current_token_size))
+    self.token_size_menu.pack(side="left", padx=5, pady=8)
     
     self.token_size_value_label = ctk.CTkLabel(
         toolbar,
@@ -100,7 +117,7 @@ def _build_toolbar(self):
     hover_font_label.pack(side="left", padx=(10,2), pady=8)
 
     font_sizes = getattr(self, "hover_font_size_options", [10, 12, 14, 16, 18, 20, 24, 28, 32])
-    current_hover_size = getattr(self, "hover_font_size", 12)
+    current_hover_size = getattr(self, "hover_font_size", 14)
     if current_hover_size not in font_sizes:
         font_sizes = sorted(set(list(font_sizes) + [current_hover_size]))
     self.hover_font_size_options = list(font_sizes)
@@ -160,26 +177,63 @@ def _build_toolbar(self):
 
 def _on_brush_size_change(self, val): # This is for FOG brush
     try:
-        self.brush_size = int(val)
-    except ValueError:
-        pass
+        size = int(val)
+    except (TypeError, ValueError):
+        return
+    self.brush_size = size
+    options = list(getattr(self, "brush_size_options", []))
+    if size not in options:
+        options.append(size)
+        options = sorted(set(options))
+        menu = getattr(self, "brush_size_menu", None)
+        if menu:
+            try:
+                menu.configure(values=[str(v) for v in options])
+            except tk.TclError:
+                pass
+    self.brush_size_options = list(options)
 
 def _on_brush_shape_change(self, val): # This is for FOG brush
     # normalize to lowercase for comparisons
     self.brush_shape = val.lower()
 
 def _change_brush(self, delta): # This is for FOG brush
-    new = max(4, min(128, self.brush_size + delta))
-    self.brush_size = new
-    self.brush_slider.set(new)
+    options = list(getattr(self, "brush_size_options", list(range(4, 129, 4))))
+    if not options:
+        return
+    min_size = min(options)
+    max_size = max(options)
+    new = max(min_size, min(max_size, self.brush_size + delta))
+    self._on_brush_size_change(new)
+    menu = getattr(self, "brush_size_menu", None)
+    if menu:
+        try:
+            menu.set(str(self.brush_size))
+        except tk.TclError:
+            pass
 
 def _on_token_size_change(self, val):
     try:
-        self.token_size = int(val)
-        if hasattr(self, 'token_size_value_label'): # Check if label exists
+        size = int(val)
+    except (TypeError, ValueError):
+        return
+    self.token_size = size
+    options = list(getattr(self, "token_size_options", []))
+    if size not in options:
+        options.append(size)
+        options = sorted(set(options))
+        menu = getattr(self, "token_size_menu", None)
+        if menu:
+            try:
+                menu.configure(values=[str(v) for v in options])
+            except tk.TclError:
+                pass
+    self.token_size_options = list(options)
+    if hasattr(self, 'token_size_value_label'): # Check if label exists
+        try:
             self.token_size_value_label.configure(text=str(self.token_size))
-    except ValueError:
-        pass
+        except tk.TclError:
+            pass
 
 # Placeholder for new callbacks in DisplayMapController - these will be defined there.
 # def _on_drawing_tool_change(self, selected_tool):

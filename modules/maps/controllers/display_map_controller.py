@@ -74,9 +74,11 @@ class DisplayMapController:
         self.clipboard_token = None # Copied item data (token or shape)
     
         self.brush_size  = DEFAULT_BRUSH_SIZE
+        self.brush_size_options = list(range(4, 129, 4))
         self.token_size  = 48
+        self.token_size_options = list(range(16, 129, 8))
         self.hover_font_size_options = [10, 12, 14, 16, 18, 20, 24, 28, 32]
-        self.hover_font_size = 12
+        self.hover_font_size = 14
         self.hover_font = ctk.CTkFont(size=self.hover_font_size)
         self.brush_shape = "rectangle"
         self.fog_mode    = "add"
@@ -2042,7 +2044,7 @@ class DisplayMapController:
             "pan_x": self.pan_x,
             "pan_y": self.pan_y,
             "zoom": self.zoom,
-            "hover_font_size": getattr(self, "hover_font_size", 12)
+            "hover_font_size": getattr(self, "hover_font_size", 14)
         })
         all_maps = list(self._maps.values()); self.maps.save_items(all_maps)
         try:
