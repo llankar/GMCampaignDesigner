@@ -1327,7 +1327,11 @@ class GenericEditorWindow(ctk.CTkToplevel):
                 dest_path = portrait_folder / dest_filename
 
                 img = data
-                if img.mode in ('P', 'RGBA'):
+                if img.mode == 'P':
+                    # Convert palette images to RGBA to preserve transparency information
+                    img = img.convert('RGBA')
+                elif img.mode not in ('RGB', 'RGBA'):
+                    # Fallback for other color modes that are not directly supported
                     img = img.convert('RGB')
 
                 img.save(dest_path, format='PNG')
