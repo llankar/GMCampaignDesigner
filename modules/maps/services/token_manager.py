@@ -298,15 +298,10 @@ def _persist_tokens(self):
                 entry_widget = t.get("entry_widget")
                 if entry_widget and entry_widget.winfo_exists():
                     t["text"] = entry_widget.get()
-                desc_widget = t.get("description_widget")
-                if desc_widget and desc_widget.winfo_exists() and hasattr(desc_widget, "_textbox"):
-                    t["description"] = desc_widget._textbox.get("1.0", "end").rstrip()
                 item_data.update({
                     "text": t.get("text", ""),
                     "description": t.get("description", ""),
                     "entry_width": t.get("entry_width", 180),
-                    "description_width": t.get("description_width", 240),
-                    "description_height": t.get("description_height", 140),
                 })
             else:
                 # Silently skip unknown types for now

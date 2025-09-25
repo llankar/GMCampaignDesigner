@@ -4,6 +4,7 @@ from pathlib import Path
 from tkinter import colorchooser, messagebox
 import tkinter as tk
 from tkinter import font as tkfont
+from types import SimpleNamespace
 import customtkinter as ctk
 from modules.maps.views.map_selector import select_map, _on_display_map
 from modules.maps.views.toolbar_view import _build_toolbar, _on_brush_size_change, _on_brush_shape_change, _change_brush, _on_token_size_change
@@ -174,13 +175,11 @@ class DisplayMapController:
             "text": "New Marker",
             "description": "Marker description",
             "entry_widget": None,
-            "description_widget": None,
-            "description_window_id": None,
+            "description_popup": None,
+            "description_label": None,
             "description_hide_job": None,
             "description_visible": False,
             "entry_width": 180,
-            "description_width": 240,
-            "description_height": 140,
             "focus_pending": True,
         }
 
@@ -203,14 +202,17 @@ class DisplayMapController:
         self._show_marker_description(marker)
         return "break"
 
-    def _on_marker_description_change(self, marker, persist=False):
-        widget = marker.get("description_widget")
-        if widget and widget.winfo_exists() and hasattr(widget, "_textbox"):
-            text = widget._textbox.get("1.0", "end").rstrip()
-            if marker.get("description") != text:
-                marker["description"] = text
-                if persist:
-                    self._persist_tokens()
+    def _on_marker_description_change(self, marker, new_text=None, persist=False):
+        if not marker:
+            return
+        if new_text is None:
+            new_text = marker.get("description", "")
+        new_text = (new_text or "").rstrip()
+        if marker.get("description") != new_text:
+            marker["description"] = new_text
+            if persist:
+                self._persist_tokens()
+        self._refresh_marker_description_popup(marker)
 
     def _update_marker_entry_dimensions(self, marker):
         entry = marker.get("entry_widget")
@@ -223,35 +225,25 @@ class DisplayMapController:
             measured = tk_font.measure(text or " ")
         except Exception:
             measured = max(8 * len(text), 80)
-        base_width = max(120, min(280, measured + 28))
-        expanded_width = max(base_width, min(520, measured + 40))
+        base_width = max(100, min(measured + 32, 600))
+        expanded_width = max(base_width, min(measured + 96, 800))
         marker["entry_width"] = base_width
         marker["entry_expanded_width"] = expanded_width
-        desc_width = marker.get("description_width", 240)
-        marker["description_width"] = max(desc_width, base_width)
         entry.configure(width=base_width)
-        desc_widget = marker.get("description_widget")
-        if desc_widget and desc_widget.winfo_exists():
-            desc_widget.configure(width=marker["description_width"])
 
     def _expand_marker_entry(self, marker):
         entry = marker.get("entry_widget")
         expanded = marker.get("entry_expanded_width") or marker.get("entry_width")
         if entry and entry.winfo_exists() and expanded:
             entry.configure(width=expanded)
-        desc_widget = marker.get("description_widget")
-        if desc_widget and desc_widget.winfo_exists():
-            expanded_desc = max(marker.get("description_width", 240), expanded or 0)
-            desc_widget.configure(width=expanded_desc)
+        self._refresh_marker_description_popup(marker)
 
     def _collapse_marker_entry(self, marker):
         entry = marker.get("entry_widget")
         base = marker.get("entry_width")
         if entry and entry.winfo_exists() and base:
             entry.configure(width=base)
-        desc_widget = marker.get("description_widget")
-        if desc_widget and desc_widget.winfo_exists():
-            desc_widget.configure(width=marker.get("description_width", 240))
+        self._refresh_marker_description_popup(marker)
 
     def _on_marker_entry_enter(self, marker):
         self._expand_marker_entry(marker)
@@ -263,15 +255,10 @@ class DisplayMapController:
 
     def _show_marker_description(self, marker):
         canvas = getattr(self, "canvas", None)
-        desc_id = marker.get("description_window_id")
-        widget = marker.get("description_widget")
-        if widget and widget.winfo_exists():
-            focused_widget = widget.focus_get()
-            inner = getattr(widget, "_textbox", None)
-            if focused_widget is widget or (inner is not None and focused_widget is inner):
-                marker["description_visible"] = True
-                return
-        if not canvas or not desc_id:
+        if not canvas:
+            return
+        popup = self._ensure_marker_description_popup(marker)
+        if not popup:
             return
         job = marker.get("description_hide_job")
         if job:
@@ -280,7 +267,9 @@ class DisplayMapController:
             except ValueError:
                 pass
             marker["description_hide_job"] = None
-        canvas.itemconfigure(desc_id, state="normal")
+        self._refresh_marker_description_popup(marker)
+        popup.deiconify()
+        popup.lift()
         marker["description_visible"] = True
 
     def _schedule_hide_marker_description(self, marker, delay=250):
@@ -293,13 +282,15 @@ class DisplayMapController:
                 canvas.after_cancel(job)
             except ValueError:
                 pass
+
         def _hide():
             self._hide_marker_description(marker)
+
         marker["description_hide_job"] = canvas.after(delay, _hide)
 
     def _hide_marker_description(self, marker):
         canvas = getattr(self, "canvas", None)
-        desc_id = marker.get("description_window_id")
+        popup = marker.get("description_popup")
         marker["description_visible"] = False
         job = marker.get("description_hide_job")
         if job and canvas:
@@ -308,20 +299,12 @@ class DisplayMapController:
             except ValueError:
                 pass
         marker["description_hide_job"] = None
-        widget = marker.get("description_widget")
-        if widget and widget.winfo_exists():
-            focused_widget = widget.focus_get()
-            inner = getattr(widget, "_textbox", None)
-            if focused_widget is widget or (inner is not None and focused_widget is inner):
-                marker["description_visible"] = True
-                return
-        if not canvas or not desc_id:
-            return
-        canvas.itemconfigure(desc_id, state="hidden")
+        if popup and popup.winfo_exists():
+            popup.withdraw()
 
     def _show_marker_menu(self, event, marker):
         menu = tk.Menu(self.canvas, tearoff=0)
-        menu.add_command(label="Edit Description", command=lambda m=marker: self._edit_marker_description(m))
+        menu.add_command(label="Edit Description", command=lambda m=marker: self._open_marker_description_editor(m))
         menu.add_separator()
         menu.add_command(label="Delete Marker", command=lambda m=marker: self._delete_item(m))
         menu.tk_popup(event.x_root, event.y_root)
@@ -331,12 +314,167 @@ class DisplayMapController:
             pass
 
     def _edit_marker_description(self, marker):
-        self._show_marker_description(marker)
-        widget = marker.get("description_widget")
-        if widget and widget.winfo_exists():
-            widget.focus_set()
-            if hasattr(widget, "_textbox"):
-                widget._textbox.focus_set()
+        self._open_marker_description_editor(marker)
+
+    def _ensure_marker_description_popup(self, marker):
+        if not marker:
+            return None
+        popup = marker.get("description_popup")
+        label = marker.get("description_label")
+        if popup and popup.winfo_exists() and label and label.winfo_exists():
+            return popup
+        if popup and popup.winfo_exists():
+            popup.destroy()
+        canvas = getattr(self, "canvas", None)
+        if not canvas:
+            return None
+        toplevel = ctk.CTkToplevel(canvas)
+        toplevel.withdraw()
+        toplevel.overrideredirect(True)
+        try:
+            toplevel.transient(canvas.winfo_toplevel())
+        except tk.TclError:
+            pass
+        try:
+            toplevel.attributes("-topmost", True)
+        except tk.TclError:
+            pass
+        frame = ctk.CTkFrame(toplevel, corner_radius=8, fg_color="#1f1f1f")
+        frame.pack(fill="both", expand=True)
+        text_label = ctk.CTkLabel(frame, text="", justify="left", anchor="w")
+        text_label.pack(fill="both", expand=True, padx=12, pady=10)
+        for widget in (toplevel, frame, text_label):
+            widget.bind("<Enter>", lambda e, m=marker: self._cancel_marker_hide(m))
+            widget.bind("<Leave>", lambda e, m=marker: self._schedule_hide_marker_description(m))
+        marker["description_popup"] = toplevel
+        marker["description_label"] = text_label
+        return toplevel
+
+    def _refresh_marker_description_popup(self, marker):
+        popup = marker.get("description_popup")
+        label = marker.get("description_label")
+        canvas = getattr(self, "canvas", None)
+        if not canvas or not popup or not popup.winfo_exists() or not label or not label.winfo_exists():
+            return
+        description_text = marker.get("description", "").strip()
+        if not description_text:
+            description_text = "(No description)"
+        label.configure(text=description_text, justify="left", anchor="w", wraplength=600)
+        try:
+            popup.update_idletasks()
+        except tk.TclError:
+            return
+        width = max(label.winfo_reqwidth() + 20, 140)
+        height = max(label.winfo_reqheight() + 16, 60)
+        entry_id = marker.get("entry_canvas_id")
+        sx = sy = None
+        if entry_id:
+            try:
+                coords = canvas.coords(entry_id)
+            except tk.TclError:
+                coords = None
+            if coords:
+                sx, sy = coords[0], coords[1]
+        if sx is None or sy is None:
+            xw, yw = marker.get("position", (0, 0))
+            sx = int(xw * self.zoom + self.pan_x)
+            sy = int(yw * self.zoom + self.pan_y)
+        entry_widget = marker.get("entry_widget")
+        entry_height = 0
+        if entry_widget and entry_widget.winfo_exists():
+            try:
+                entry_height = entry_widget.winfo_height()
+            except tk.TclError:
+                entry_height = entry_widget.winfo_reqheight()
+        if not entry_height:
+            entry_height = 28
+        screen_x = canvas.winfo_rootx() + int(sx)
+        screen_y = canvas.winfo_rooty() + int(sy) + int(entry_height) + 6
+        popup.geometry(f"{int(width)}x{int(height)}+{screen_x}+{screen_y}")
+
+    def _cancel_marker_hide(self, marker):
+        canvas = getattr(self, "canvas", None)
+        if not canvas:
+            return
+        job = marker.get("description_hide_job")
+        if job:
+            try:
+                canvas.after_cancel(job)
+            except ValueError:
+                pass
+            marker["description_hide_job"] = None
+
+    def _open_marker_description_editor(self, marker):
+        if not marker:
+            return
+        canvas = getattr(self, "canvas", None)
+        if not canvas:
+            return
+        editor = marker.get("description_editor")
+        if editor and editor.winfo_exists():
+            editor.lift()
+            editor.focus_set()
+            return
+        editor = ctk.CTkToplevel(canvas)
+        editor.title("Edit Marker Description")
+        editor.geometry("420x320")
+        marker["description_editor"] = editor
+
+        textbox = ctk.CTkTextbox(editor, wrap="word")
+        textbox.pack(fill="both", expand=True, padx=12, pady=(12, 6))
+        textbox.insert("1.0", marker.get("description", ""))
+
+        button_frame = ctk.CTkFrame(editor)
+        button_frame.pack(fill="x", padx=12, pady=(0, 12))
+
+        def on_save():
+            new_text = textbox.get("1.0", "end").rstrip()
+            self._on_marker_description_change(marker, new_text=new_text, persist=True)
+            marker["description_editor"] = None
+            editor.destroy()
+
+        def on_cancel():
+            marker["description_editor"] = None
+            editor.destroy()
+
+        save_btn = ctk.CTkButton(button_frame, text="Save", command=on_save)
+        save_btn.pack(side="right", padx=(6, 0))
+        cancel_btn = ctk.CTkButton(button_frame, text="Cancel", command=on_cancel)
+        cancel_btn.pack(side="right", padx=(0, 6))
+
+        editor.protocol("WM_DELETE_WINDOW", on_cancel)
+        editor.transient(canvas.winfo_toplevel())
+        editor.grab_set()
+        textbox.focus_set()
+
+    def _widget_event_to_canvas_event(self, event):
+        canvas = getattr(self, "canvas", None)
+        if not canvas:
+            return None
+        try:
+            x = event.x_root - canvas.winfo_rootx()
+            y = event.y_root - canvas.winfo_rooty()
+        except tk.TclError:
+            return None
+        return SimpleNamespace(x=x, y=y)
+
+    def _on_marker_handle_press(self, event, marker):
+        converted = self._widget_event_to_canvas_event(event)
+        if converted:
+            self._on_item_press(converted, marker)
+        return "break"
+
+    def _on_marker_handle_drag(self, event, marker):
+        converted = self._widget_event_to_canvas_event(event)
+        if converted:
+            self._on_item_move(converted, marker)
+        return "break"
+
+    def _on_marker_handle_release(self, event, marker):
+        converted = self._widget_event_to_canvas_event(event)
+        if converted:
+            self._on_item_release(converted, marker)
+        return "break"
 
     def _push_fog_history(self):
         if self.mask_img is not None:
@@ -701,8 +839,6 @@ class DisplayMapController:
             elif item_type == "marker":
                 item.setdefault("entry_width", 180)
                 item.setdefault("entry_expanded_width", item.get("entry_width", 180))
-                item.setdefault("description_width", 240)
-                item.setdefault("description_height", 140)
                 item.setdefault("description_visible", False)
                 item.setdefault("handle_width", 22)
                 sx, sy = int(xw*self.zoom + self.pan_x), int(yw*self.zoom + self.pan_y)
@@ -733,29 +869,6 @@ class DisplayMapController:
                 focus_pending = item.pop("focus_pending", False)
                 if focus_pending:
                     entry.focus_set(); entry.select_range(0, tk.END)
-                desc_widget = item.get("description_widget")
-                desired_desc = item.get("description", "")
-                if not desc_widget or not desc_widget.winfo_exists():
-                    desc_widget = ctk.CTkTextbox(
-                        self.canvas,
-                        width=item.get("description_width", 240),
-                        height=item.get("description_height", 140),
-                        wrap="word"
-                    )
-                    desc_widget._textbox.delete("1.0", "end")
-                    desc_widget._textbox.insert("1.0", desired_desc)
-                    desc_widget.bind("<Enter>", lambda e, i=item: self._on_marker_entry_enter(i))
-                    desc_widget.bind("<Leave>", lambda e, i=item: self._on_marker_entry_leave(i))
-                    desc_widget._textbox.bind("<KeyRelease>", lambda e, i=item: self._on_marker_description_change(i, persist=False))
-                    desc_widget._textbox.bind("<FocusOut>", lambda e, i=item: self._on_marker_description_change(i, persist=True))
-                    desc_widget._textbox.bind("<Enter>", lambda e, i=item: self._on_marker_entry_enter(i))
-                    desc_widget._textbox.bind("<Leave>", lambda e, i=item: self._on_marker_entry_leave(i))
-                    item["description_widget"] = desc_widget
-                else:
-                    existing_desc = desc_widget._textbox.get("1.0", "end").rstrip()
-                    if existing_desc != desired_desc.rstrip():
-                        desc_widget._textbox.delete("1.0", "end")
-                        desc_widget._textbox.insert("1.0", desired_desc)
                 entry_height = entry.winfo_reqheight() if entry.winfo_exists() else 28
                 handle_width = item.get("handle_width", 22)
                 handle_x = sx - handle_width - 6
@@ -765,6 +878,9 @@ class DisplayMapController:
                     handle_widget.configure(cursor="fleur")
                     handle_widget.bind("<Enter>", lambda e, i=item: self._on_marker_entry_enter(i))
                     handle_widget.bind("<Leave>", lambda e, i=item: self._on_marker_entry_leave(i))
+                    handle_widget.bind("<ButtonPress-1>", lambda e, i=item: self._on_marker_handle_press(e, i))
+                    handle_widget.bind("<B1-Motion>", lambda e, i=item: self._on_marker_handle_drag(e, i))
+                    handle_widget.bind("<ButtonRelease-1>", lambda e, i=item: self._on_marker_handle_release(e, i))
                     item["handle_widget"] = handle_widget
                 handle_widget.configure(height=entry_height)
                 handle_id = item.get("handle_canvas_id")
@@ -777,23 +893,12 @@ class DisplayMapController:
                 self._bind_item_events(item)
                 if entry_id:
                     self.canvas.tag_bind(entry_id, "<Button-3>", lambda e, i=item: self._on_item_right_click(e, i))
-                desc_x = sx
-                desc_y = sy + entry_height + 6
-                desc_id = item.get("description_window_id")
-                if desc_id:
-                    try:
-                        self.canvas.coords(desc_id, desc_x, desc_y)
-                    except tk.TclError:
-                        desc_id = None
-                if not desc_id:
-                    desc_id = self.canvas.create_window(desc_x, desc_y, anchor='nw', window=desc_widget)
-                item["description_window_id"] = desc_id
                 if focus_pending:
                     self._show_marker_description(item)
-                if item.get("description_visible"):
-                    self.canvas.itemconfigure(desc_id, state='normal')
                 else:
-                    self.canvas.itemconfigure(desc_id, state='hidden')
+                    if item.get("description_visible"):
+                        self._show_marker_description(item)
+                self._refresh_marker_description_popup(item)
             elif item_type in ["rectangle", "oval"]:
                 shape_width_unscaled = item.get("width", DEFAULT_SHAPE_WIDTH); shape_height_unscaled = item.get("height", DEFAULT_SHAPE_HEIGHT)
                 shape_width = shape_width_unscaled * self.zoom; shape_height = shape_height_unscaled * self.zoom
@@ -869,8 +974,8 @@ class DisplayMapController:
             if item.get("hp_canvas_ids"):
                 for hp_cid in item["hp_canvas_ids"]:
                     if hp_cid: self.canvas.move(hp_cid, dx, dy)
-        elif item.get("type") == "marker" and item.get("description_window_id"):
-            self.canvas.move(item["description_window_id"], dx, dy)
+        elif item.get("type") == "marker":
+            self._refresh_marker_description_popup(item)
         item["drag_data"] = {"x": event.x, "y": event.y}
         main_canvas_id = item["canvas_ids"][0] if item.get("canvas_ids") else None
         if main_canvas_id:
@@ -1091,8 +1196,9 @@ class DisplayMapController:
                            'canvas_ids', 'hp_canvas_ids', 'name_id', 'info_widget_id',
                            'hp_entry_widget', 'hp_entry_widget_id',
                            'max_hp_entry_widget', 'max_hp_entry_widget_id',
-                           'entry_widget', 'description_widget', 'description_window_id',
-                           'description_hide_job', 'handle_widget', 'handle_canvas_id', 'entry_canvas_id']:
+                           'entry_widget', 'description_popup', 'description_label',
+                           'description_hide_job', 'handle_widget', 'handle_canvas_id', 'entry_canvas_id',
+                           'description_editor']:
             self.clipboard_token.pop(key_to_pop, None)
 
     def _paste_item(self, event=None):
@@ -1138,13 +1244,12 @@ class DisplayMapController:
             new_item_data.setdefault("text", "New Marker")
             new_item_data.setdefault("description", "Marker description")
             new_item_data["entry_widget"] = None
-            new_item_data["description_widget"] = None
-            new_item_data["description_window_id"] = None
+            new_item_data["description_popup"] = None
+            new_item_data["description_label"] = None
             new_item_data["description_hide_job"] = None
             new_item_data["description_visible"] = False
             new_item_data.setdefault("entry_width", 180)
-            new_item_data.setdefault("description_width", 240)
-            new_item_data.setdefault("description_height", 140)
+            new_item_data["description_editor"] = None
             new_item_data["focus_pending"] = True
 
         elif item_type in ["rectangle", "oval"]:
@@ -1181,18 +1286,15 @@ class DisplayMapController:
                     self.canvas.after_cancel(hide_job)
                 except ValueError:
                     pass
-            desc_id = item_to_delete.get("description_window_id")
-            if desc_id:
-                try:
-                    self.canvas.delete(desc_id)
-                except tk.TclError:
-                    pass
             entry_widget = item_to_delete.get("entry_widget")
             if entry_widget and entry_widget.winfo_exists():
                 entry_widget.destroy()
-            desc_widget = item_to_delete.get("description_widget")
-            if desc_widget and desc_widget.winfo_exists():
-                desc_widget.destroy()
+            popup = item_to_delete.get("description_popup")
+            if popup and popup.winfo_exists():
+                popup.destroy()
+            editor = item_to_delete.get("description_editor")
+            if editor and editor.winfo_exists():
+                editor.destroy()
             handle_widget = item_to_delete.get("handle_widget")
             if handle_widget and handle_widget.winfo_exists():
                 handle_widget.destroy()
@@ -1237,8 +1339,9 @@ class DisplayMapController:
                     for hp_cid_lift in item['hp_canvas_ids']:
                         if hp_cid_lift: self.canvas.lift(hp_cid_lift)
             elif item.get("type") == "marker":
-                desc_id = item.get("description_window_id")
-                if desc_id: self.canvas.lift(desc_id)
+                popup = item.get("description_popup")
+                if popup and popup.winfo_exists():
+                    popup.lift()
             self._update_canvas_images(); self._persist_tokens()
 
     def _send_item_to_back(self, item):
@@ -1259,10 +1362,7 @@ class DisplayMapController:
                     canvas_ids_to_manage.extend(hp_id for hp_id in item['hp_canvas_ids'] if hp_id)
                 # Note: info_widget is a Tkinter widget in a canvas window, its stacking is different.
                 # We primarily care about canvas items drawn directly.
-            elif item.get("type") == "marker":
-                desc_id = item.get("description_window_id")
-                if desc_id:
-                    canvas_ids_to_manage.append(desc_id)
+            # Marker popups are separate toplevel windows and are not managed via canvas stacking.
 
             for c_id in canvas_ids_to_manage:
                 if c_id:
