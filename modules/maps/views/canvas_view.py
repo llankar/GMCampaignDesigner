@@ -47,6 +47,13 @@ def _build_canvas(self):
     if hasattr(self, "_on_canvas_pointer_leave"):
         self.canvas.bind("<Leave>", self._on_canvas_pointer_leave)
 
+    if hasattr(self, "_on_canvas_focus_out"):
+        self.canvas.bind("<FocusOut>", self._on_canvas_focus_out)
+
+    if hasattr(self, "_on_application_focus_out") and not getattr(self, "_focus_bindings_registered", False):
+        root.bind("<FocusOut>", lambda e: self._on_application_focus_out(), add="+")
+        self._focus_bindings_registered = True
+
 
 def _on_delete_key(self, event=None):
     """Delete the hovered marker or the currently selected item when Delete is pressed."""

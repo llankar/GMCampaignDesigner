@@ -96,6 +96,8 @@ class DisplayMapController:
         self._marker_max_r    = 25
         self._hovered_marker  = None
 
+        self._focus_bindings_registered = False
+
         # For interactive shape resizing (re-adding)
         self._resize_handles = []
         self._active_resize_handle_info = None # Stores info about current resize op
@@ -226,7 +228,7 @@ class DisplayMapController:
             measured = tk_font.measure(text or " ")
         except Exception:
             measured = max(8 * len(text), 80)
-        base_width = max(100, min(measured + 32, 600))
+        base_width = max(60, min(measured + 32, 600))
         expanded_width = max(base_width, min(measured + 96, 800))
         marker["entry_width"] = base_width
         marker["entry_expanded_width"] = expanded_width
@@ -305,6 +307,24 @@ class DisplayMapController:
         marker["description_hide_job"] = None
         if popup and popup.winfo_exists():
             popup.withdraw()
+
+    def _hide_all_marker_descriptions(self):
+        for item in getattr(self, "tokens", []):
+            if isinstance(item, dict) and item.get("type") == "marker":
+                self._hide_marker_description(item)
+
+    def _hide_all_token_hovers(self):
+        for token in getattr(self, "tokens", []):
+            if isinstance(token, dict) and token.get("hover_visible"):
+                self._hide_token_hover(token)
+
+    def _on_canvas_focus_out(self, event=None):
+        self._hide_all_marker_descriptions()
+        self._hide_all_token_hovers()
+
+    def _on_application_focus_out(self, event=None):
+        self._hide_all_marker_descriptions()
+        self._hide_all_token_hovers()
 
     def _show_marker_menu(self, event, marker):
         self._hovered_marker = marker
@@ -585,6 +605,8 @@ class DisplayMapController:
                 continue
             if token.get("hover_visible"):
                 self._schedule_hide_token_hover(token)
+            if token.get("type") == "marker" and token.get("description_visible"):
+                self._schedule_hide_marker_description(token)
 
     def _open_marker_description_editor(self, marker):
         if not marker:
