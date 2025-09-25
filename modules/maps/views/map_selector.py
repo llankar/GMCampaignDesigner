@@ -3,6 +3,7 @@ import ast
 import json
 import os
 import tkinter as tk
+import customtkinter as ctk
 from PIL import Image, ImageTk, ImageDraw
 from modules.helpers.config_helper import ConfigHelper
 from modules.helpers.template_loader import load_template
@@ -38,6 +39,18 @@ def _on_display_map(self, entity_type, map_name): # entity_type here is the map'
     size = item.get("token_size")
     if isinstance(size, int):
         self.token_size = size
+
+    # Restore hover font size if persisted
+    hover_size = item.get("hover_font_size")
+    if isinstance(hover_size, int) and hover_size > 0:
+        self.hover_font_size = hover_size
+        if hover_size not in getattr(self, "hover_font_size_options", []):
+            self.hover_font_size_options.append(hover_size)
+            self.hover_font_size_options = sorted(set(self.hover_font_size_options))
+        try:
+            self.hover_font.configure(size=self.hover_font_size)
+        except Exception:
+            self.hover_font = ctk.CTkFont(size=self.hover_font_size)
 
     # 2) Tear down any existing UI & build toolbar + canvas
     for w in self.parent.winfo_children():
