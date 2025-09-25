@@ -49,10 +49,32 @@ def _build_canvas(self):
 
 
 def _on_delete_key(self, event=None):
-    """If an item (token or shape) is selected, delete it on Delete key."""
+    """Delete the hovered marker or the currently selected item when Delete is pressed."""
+    hovered_marker = getattr(self, "_hovered_marker", None)
+    if hovered_marker and hovered_marker in getattr(self, "tokens", []):
+        entry_widget = hovered_marker.get("entry_widget")
+        entry_has_focus = False
+        if entry_widget and entry_widget.winfo_exists():
+            try:
+                focus_widget = entry_widget.focus_get()
+            except tk.TclError:
+                focus_widget = None
+            else:
+                candidate_widgets = [entry_widget]
+                candidate_widgets.extend(
+                    getattr(entry_widget, attr_name, None)
+                    for attr_name in ("entry", "_entry")
+                )
+                entry_has_focus = focus_widget in [w for w in candidate_widgets if w is not None]
+        if not entry_has_focus:
+            self._delete_item(hovered_marker)
+            if getattr(self, "_hovered_marker", None) is hovered_marker:
+                self._hovered_marker = None
+            return "break"
+
     if not self.selected_token: # selected_token now refers to the selected item
         return
-    
+
     item_to_delete = self.selected_token
     self.selected_token = None # Clear selection before deleting
     self._delete_item(item_to_delete) # Use the generic delete method
