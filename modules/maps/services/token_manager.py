@@ -24,8 +24,9 @@ def add_token(self, path, entity_type, entity_name, entity_record=None):
         )
         return
 
-    pil_img = Image.open(img_path).convert("RGBA")
-    pil_img = pil_img.resize((self.token_size, self.token_size), resample=Image.LANCZOS)
+    source_img = Image.open(img_path).convert("RGBA")
+    logical_size = int(self.token_size)
+    pil_img = source_img.resize((logical_size, logical_size), resample=Image.LANCZOS)
 
     # Get canvas center in world coords
     self.canvas.update_idletasks()
@@ -38,6 +39,8 @@ def add_token(self, path, entity_type, entity_name, entity_record=None):
         "entity_type":  entity_type,
         "entity_id":    entity_name,
         "image_path":   img_path,
+        "size":         logical_size,
+        "source_image": source_img,
         "pil_image":    pil_img,
         "position":     (xw_center, yw_center),
         "border_color": "#0000ff",
@@ -136,15 +139,17 @@ def _paste_token(self, event=None):
     vcy = (self.canvas.winfo_height() // 2 - self.pan_y) / self.zoom
 
     # Re-create the PIL image at the original token size
-    pil_img = Image.open(c["image_path"]).convert("RGBA") \
-                .resize((c["size"], c["size"]), Image.LANCZOS)
+    source_img = Image.open(c["image_path"]).convert("RGBA")
+    size = int(c["size"])
+    pil_img = source_img.resize((size, size), Image.LANCZOS)
 
     # Clone all relevant fields into a new token dict
     token = {
         "entity_type":  c["entity_type"],
         "entity_id":    c["entity_id"],
         "image_path":   c["image_path"],
-        "size":         c["size"],
+        "size":         size,
+        "source_image": source_img,
         "border_color": c["border_color"],
         "pil_image":    pil_img,
         "position":     (vcx, vcy),
@@ -172,13 +177,15 @@ def _resize_token_dialog(self, token):
 
     # 1) update the token’s PIL image & stored size
     try:
-        pil = Image.open(token["image_path"]) \
-                .convert("RGBA") \
-                .resize((new_size, new_size), Image.LANCZOS)
+        source_img = token.get("source_image")
+        if source_img is None:
+            source_img = Image.open(token["image_path"]).convert("RGBA")
+        pil = source_img.resize((new_size, new_size), Image.LANCZOS)
     except Exception as e:
         messagebox.showerror("Error", f"Could not resize token image:\n{e}")
         return
 
+    token["source_image"] = source_img
     token["pil_image"] = pil
     token["size"]      = new_size
 
