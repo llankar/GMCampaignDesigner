@@ -89,6 +89,8 @@ def _render_map_image(self):
         xw, yw = item.get('position', (0, 0))
         sx = int(xw * self.zoom + self.pan_x - min_x)
         sy = int(yw * self.zoom + self.pan_y - min_y)
+        if item_type == 'marker':
+            continue
         if item_type == 'token':
             pil = item.get('pil_image')
             if pil:

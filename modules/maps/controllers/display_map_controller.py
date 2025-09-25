@@ -153,7 +153,140 @@ class DisplayMapController:
             popup.destroy()
         entry.bind("<Return>", lambda e: on_select()); listbox.bind("<Return>", lambda e: on_select())
         listbox.bind("<Double-Button-1>", on_select)
-        
+
+    def add_marker(self):
+        if not getattr(self, "canvas", None):
+            return
+        try:
+            self.canvas.update_idletasks()
+            cw = self.canvas.winfo_width() or 0
+            ch = self.canvas.winfo_height() or 0
+        except tk.TclError:
+            cw = ch = 0
+        zoom = self.zoom if self.zoom not in (None, 0) else 1.0
+        xw_center = (cw / 2 - self.pan_x) / zoom if zoom else 0
+        yw_center = (ch / 2 - self.pan_y) / zoom if zoom else 0
+
+        marker = {
+            "type": "marker",
+            "position": (xw_center, yw_center),
+            "text": "New Marker",
+            "description": "Marker description",
+            "entry_widget": None,
+            "description_widget": None,
+            "description_window_id": None,
+            "description_hide_job": None,
+            "description_visible": False,
+            "entry_width": 180,
+            "description_width": 240,
+            "description_height": 140,
+            "focus_pending": True,
+        }
+
+        self.tokens.append(marker)
+        self._update_canvas_images()
+        self._persist_tokens()
+
+    def _on_marker_text_change(self, marker, persist=False):
+        entry = marker.get("entry_widget")
+        if entry and entry.winfo_exists():
+            text = entry.get()
+            if marker.get("text") != text:
+                marker["text"] = text
+                if persist:
+                    self._persist_tokens()
+
+    def _on_marker_entry_return(self, event, marker):
+        self._on_marker_text_change(marker, persist=True)
+        self._show_marker_description(marker)
+        return "break"
+
+    def _on_marker_description_change(self, marker, persist=False):
+        widget = marker.get("description_widget")
+        if widget and widget.winfo_exists() and hasattr(widget, "_textbox"):
+            text = widget._textbox.get("1.0", "end").rstrip()
+            if marker.get("description") != text:
+                marker["description"] = text
+                if persist:
+                    self._persist_tokens()
+
+    def _show_marker_description(self, marker):
+        canvas = getattr(self, "canvas", None)
+        desc_id = marker.get("description_window_id")
+        widget = marker.get("description_widget")
+        if widget and widget.winfo_exists():
+            focused_widget = widget.focus_get()
+            inner = getattr(widget, "_textbox", None)
+            if focused_widget is widget or (inner is not None and focused_widget is inner):
+                marker["description_visible"] = True
+                return
+        if not canvas or not desc_id:
+            return
+        job = marker.get("description_hide_job")
+        if job:
+            try:
+                canvas.after_cancel(job)
+            except ValueError:
+                pass
+            marker["description_hide_job"] = None
+        canvas.itemconfigure(desc_id, state="normal")
+        marker["description_visible"] = True
+
+    def _schedule_hide_marker_description(self, marker, delay=250):
+        canvas = getattr(self, "canvas", None)
+        if not canvas:
+            return
+        job = marker.get("description_hide_job")
+        if job:
+            try:
+                canvas.after_cancel(job)
+            except ValueError:
+                pass
+        def _hide():
+            self._hide_marker_description(marker)
+        marker["description_hide_job"] = canvas.after(delay, _hide)
+
+    def _hide_marker_description(self, marker):
+        canvas = getattr(self, "canvas", None)
+        desc_id = marker.get("description_window_id")
+        marker["description_visible"] = False
+        job = marker.get("description_hide_job")
+        if job and canvas:
+            try:
+                canvas.after_cancel(job)
+            except ValueError:
+                pass
+        marker["description_hide_job"] = None
+        widget = marker.get("description_widget")
+        if widget and widget.winfo_exists():
+            focused_widget = widget.focus_get()
+            inner = getattr(widget, "_textbox", None)
+            if focused_widget is widget or (inner is not None and focused_widget is inner):
+                marker["description_visible"] = True
+                return
+        if not canvas or not desc_id:
+            return
+        canvas.itemconfigure(desc_id, state="hidden")
+
+    def _show_marker_menu(self, event, marker):
+        menu = tk.Menu(self.canvas, tearoff=0)
+        menu.add_command(label="Edit Description", command=lambda m=marker: self._edit_marker_description(m))
+        menu.add_separator()
+        menu.add_command(label="Delete Marker", command=lambda m=marker: self._delete_item(m))
+        menu.tk_popup(event.x_root, event.y_root)
+        try:
+            menu.grab_release()
+        except tk.TclError:
+            pass
+
+    def _edit_marker_description(self, marker):
+        self._show_marker_description(marker)
+        widget = marker.get("description_widget")
+        if widget and widget.winfo_exists():
+            widget.focus_set()
+            if hasattr(widget, "_textbox"):
+                widget._textbox.focus_set()
+
     def _push_fog_history(self):
         if self.mask_img is not None:
             MAX_UNDO = 20; self.fog_history.append(self.mask_img.copy())
@@ -514,6 +647,79 @@ class DisplayMapController:
                     entry_info.bind("<Enter>", lambda e, iid=info_id: self.canvas.itemconfigure(iid, state='normal'))
                     entry_info.bind("<Leave>", lambda e, iid=info_id: self.canvas.itemconfigure(iid, state='hidden'))
                     self._bind_item_events(item)
+            elif item_type == "marker":
+                item.setdefault("entry_width", 180)
+                item.setdefault("description_width", 240)
+                item.setdefault("description_height", 140)
+                item.setdefault("description_visible", False)
+                sx, sy = int(xw*self.zoom + self.pan_x), int(yw*self.zoom + self.pan_y)
+                entry = item.get("entry_widget")
+                desired_text = item.get("text", "")
+                if not entry or not entry.winfo_exists():
+                    entry = ctk.CTkEntry(self.canvas, width=item.get("entry_width", 180))
+                    entry.insert(0, desired_text)
+                    entry.bind("<KeyRelease>", lambda e, i=item: self._on_marker_text_change(i, persist=False))
+                    entry.bind("<FocusOut>", lambda e, i=item: self._on_marker_text_change(i, persist=True))
+                    entry.bind("<Return>", lambda e, i=item: self._on_marker_entry_return(e, i))
+                    entry.bind("<Enter>", lambda e, i=item: self._show_marker_description(i))
+                    entry.bind("<Leave>", lambda e, i=item: self._schedule_hide_marker_description(i))
+                    item["entry_widget"] = entry
+                else:
+                    current_text = entry.get()
+                    if current_text != desired_text:
+                        entry.delete(0, tk.END)
+                        entry.insert(0, desired_text)
+                entry_id = item.get("canvas_ids", (None,))[0] if item.get("canvas_ids") else None
+                if entry_id:
+                    self.canvas.coords(entry_id, sx, sy)
+                else:
+                    entry_id = self.canvas.create_window(sx, sy, anchor='nw', window=entry)
+                    item["canvas_ids"] = (entry_id,)
+                    self._bind_item_events(item)
+                focus_pending = item.pop("focus_pending", False)
+                if focus_pending:
+                    entry.focus_set(); entry.select_range(0, tk.END)
+                desc_widget = item.get("description_widget")
+                desired_desc = item.get("description", "")
+                if not desc_widget or not desc_widget.winfo_exists():
+                    desc_widget = ctk.CTkTextbox(
+                        self.canvas,
+                        width=item.get("description_width", 240),
+                        height=item.get("description_height", 140),
+                        wrap="word"
+                    )
+                    desc_widget._textbox.delete("1.0", "end")
+                    desc_widget._textbox.insert("1.0", desired_desc)
+                    desc_widget.bind("<Enter>", lambda e, i=item: self._show_marker_description(i))
+                    desc_widget.bind("<Leave>", lambda e, i=item: self._schedule_hide_marker_description(i))
+                    desc_widget._textbox.bind("<KeyRelease>", lambda e, i=item: self._on_marker_description_change(i, persist=False))
+                    desc_widget._textbox.bind("<FocusOut>", lambda e, i=item: self._on_marker_description_change(i, persist=True))
+                    desc_widget._textbox.bind("<Enter>", lambda e, i=item: self._show_marker_description(i))
+                    desc_widget._textbox.bind("<Leave>", lambda e, i=item: self._schedule_hide_marker_description(i))
+                    item["description_widget"] = desc_widget
+                else:
+                    existing_desc = desc_widget._textbox.get("1.0", "end").rstrip()
+                    if existing_desc != desired_desc.rstrip():
+                        desc_widget._textbox.delete("1.0", "end")
+                        desc_widget._textbox.insert("1.0", desired_desc)
+                entry_height = entry.winfo_reqheight() if entry.winfo_exists() else 28
+                desc_x = sx
+                desc_y = sy + entry_height + 6
+                desc_id = item.get("description_window_id")
+                if desc_id:
+                    try:
+                        self.canvas.coords(desc_id, desc_x, desc_y)
+                    except tk.TclError:
+                        desc_id = None
+                if not desc_id:
+                    desc_id = self.canvas.create_window(desc_x, desc_y, anchor='nw', window=desc_widget)
+                item["description_window_id"] = desc_id
+                if focus_pending:
+                    self._show_marker_description(item)
+                if item.get("description_visible"):
+                    self.canvas.itemconfigure(desc_id, state='normal')
+                else:
+                    self.canvas.itemconfigure(desc_id, state='hidden')
             elif item_type in ["rectangle", "oval"]:
                 shape_width_unscaled = item.get("width", DEFAULT_SHAPE_WIDTH); shape_height_unscaled = item.get("height", DEFAULT_SHAPE_HEIGHT)
                 shape_width = shape_width_unscaled * self.zoom; shape_height = shape_height_unscaled * self.zoom
@@ -587,6 +793,8 @@ class DisplayMapController:
             if item.get("hp_canvas_ids"):
                 for hp_cid in item["hp_canvas_ids"]:
                     if hp_cid: self.canvas.move(hp_cid, dx, dy)
+        elif item.get("type") == "marker" and item.get("description_window_id"):
+            self.canvas.move(item["description_window_id"], dx, dy)
         item["drag_data"] = {"x": event.x, "y": event.y}
         main_canvas_id = item["canvas_ids"][0] if item.get("canvas_ids") else None
         if main_canvas_id:
@@ -608,8 +816,9 @@ class DisplayMapController:
 
     def _on_item_right_click(self, event, item):
         item_type = item.get("type", "token")
-        if item_type == "token": return self._on_token_right_click(event, item) 
+        if item_type == "token": return self._on_token_right_click(event, item)
         elif item_type in ["rectangle", "oval"]: self._show_shape_menu(event, item)
+        elif item_type == "marker": self._show_marker_menu(event, item)
 
     def _show_shape_menu(self, event, shape):
         menu = tk.Menu(self.canvas, tearoff=0)
@@ -802,10 +1011,12 @@ class DisplayMapController:
         active_item = item_to_copy if item_to_copy else self.selected_token
         #if not active_item: return
         self.clipboard_token = active_item.copy()
-        for key_to_pop in ['pil_image', 'tk_image', 'info_widget', 'entity_record', 
+        for key_to_pop in ['pil_image', 'tk_image', 'info_widget', 'entity_record',
                            'canvas_ids', 'hp_canvas_ids', 'name_id', 'info_widget_id',
-                           'hp_entry_widget', 'hp_entry_widget_id', 
-                           'max_hp_entry_widget', 'max_hp_entry_widget_id']:
+                           'hp_entry_widget', 'hp_entry_widget_id',
+                           'max_hp_entry_widget', 'max_hp_entry_widget_id',
+                           'entry_widget', 'description_widget', 'description_window_id',
+                           'description_hide_job']:
             self.clipboard_token.pop(key_to_pop, None)
 
     def _paste_item(self, event=None):
@@ -847,6 +1058,19 @@ class DisplayMapController:
             new_item_data.setdefault("max_hp", 10)
             # entity_record and info_widget are not typically part of clipboard_token
 
+        elif item_type == "marker":
+            new_item_data.setdefault("text", "New Marker")
+            new_item_data.setdefault("description", "Marker description")
+            new_item_data["entry_widget"] = None
+            new_item_data["description_widget"] = None
+            new_item_data["description_window_id"] = None
+            new_item_data["description_hide_job"] = None
+            new_item_data["description_visible"] = False
+            new_item_data.setdefault("entry_width", 180)
+            new_item_data.setdefault("description_width", 240)
+            new_item_data.setdefault("description_height", 140)
+            new_item_data["focus_pending"] = True
+
         elif item_type in ["rectangle", "oval"]:
             # Shape-specific defaults if any were missed in copy (unlikely if copy is good)
             new_item_data.setdefault("shape_type", item_type)
@@ -874,6 +1098,25 @@ class DisplayMapController:
             if item_to_delete.get("info_widget_id"): self.canvas.delete(item_to_delete["info_widget_id"])
             if item_to_delete.get("info_widget") and hasattr(item_to_delete["info_widget"], 'destroy'):
                  item_to_delete["info_widget"].destroy()
+        elif item_to_delete.get("type") == "marker":
+            hide_job = item_to_delete.get("description_hide_job")
+            if hide_job:
+                try:
+                    self.canvas.after_cancel(hide_job)
+                except ValueError:
+                    pass
+            desc_id = item_to_delete.get("description_window_id")
+            if desc_id:
+                try:
+                    self.canvas.delete(desc_id)
+                except tk.TclError:
+                    pass
+            entry_widget = item_to_delete.get("entry_widget")
+            if entry_widget and entry_widget.winfo_exists():
+                entry_widget.destroy()
+            desc_widget = item_to_delete.get("description_widget")
+            if desc_widget and desc_widget.winfo_exists():
+                desc_widget.destroy()
         # Clean up fullscreen canvas artifacts if present
         if getattr(self, "fs_canvas", None):
             if item_to_delete.get("fs_canvas_ids"):
@@ -914,6 +1157,9 @@ class DisplayMapController:
                 if item.get('hp_canvas_ids'):
                     for hp_cid_lift in item['hp_canvas_ids']:
                         if hp_cid_lift: self.canvas.lift(hp_cid_lift)
+            elif item.get("type") == "marker":
+                desc_id = item.get("description_window_id")
+                if desc_id: self.canvas.lift(desc_id)
             self._update_canvas_images(); self._persist_tokens()
 
     def _send_item_to_back(self, item):
@@ -934,6 +1180,10 @@ class DisplayMapController:
                     canvas_ids_to_manage.extend(hp_id for hp_id in item['hp_canvas_ids'] if hp_id)
                 # Note: info_widget is a Tkinter widget in a canvas window, its stacking is different.
                 # We primarily care about canvas items drawn directly.
+            elif item.get("type") == "marker":
+                desc_id = item.get("description_window_id")
+                if desc_id:
+                    canvas_ids_to_manage.append(desc_id)
 
             for c_id in canvas_ids_to_manage:
                 if c_id:

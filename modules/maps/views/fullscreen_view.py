@@ -75,6 +75,9 @@ def _update_fullscreen_map(self):
         sx = int(xw * self.zoom + self.pan_x)
         sy = int(yw * self.zoom + self.pan_y)
 
+        if item_type == "marker":
+            continue
+
         if item_type == "token":
             pil = item.get('pil_image')
             if not pil:
