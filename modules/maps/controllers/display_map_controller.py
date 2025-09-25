@@ -395,6 +395,11 @@ class DisplayMapController:
         self._hide_all_marker_descriptions()
         self._hide_all_token_hovers()
 
+    def clear_hover_windows(self):
+        """Hide all hover-related popups such as token hovers and marker descriptions."""
+        self._hide_all_token_hovers()
+        self._hide_all_marker_descriptions()
+
     def _on_application_focus_out(self, event=None):
         self._hide_all_marker_descriptions()
         self._hide_all_token_hovers()
