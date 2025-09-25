@@ -191,13 +191,12 @@ def _on_display_map(self, entity_type, map_name): # entity_type here is the map'
                 "text": rec.get("text", "New Marker"),
                 "description": rec.get("description", "Marker description"),
                 "entry_width": rec.get("entry_width", 180),
-                "description_width": rec.get("description_width", 240),
-                "description_height": rec.get("description_height", 140),
                 "entry_widget": None,
-                "description_widget": None,
-                "description_window_id": None,
+                "description_popup": None,
+                "description_label": None,
                 "description_hide_job": None,
                 "description_visible": False,
+                "description_editor": None,
                 "focus_pending": False,
             })
         else:
