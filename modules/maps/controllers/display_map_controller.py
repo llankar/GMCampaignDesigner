@@ -187,6 +187,7 @@ class DisplayMapController:
             "position": (xw_center, yw_center),
             "text": "New Marker",
             "description": "Marker description",
+            "border_color": "#00ff00",
             "entry_widget": None,
             "description_popup": None,
             "description_label": None,
@@ -194,6 +195,7 @@ class DisplayMapController:
             "description_visible": False,
             "entry_width": 180,
             "focus_pending": True,
+            "border_canvas_id": None,
         }
 
         self.tokens.append(marker)
@@ -461,6 +463,7 @@ class DisplayMapController:
         self._hovered_marker = marker
         menu = tk.Menu(self.canvas, tearoff=0)
         menu.add_command(label="Edit Description", command=lambda m=marker: self._open_marker_description_editor(m))
+        menu.add_command(label="Change Border Color", command=lambda m=marker: self._change_marker_border_color(m))
         menu.add_separator()
         menu.add_command(label="Delete Marker", command=lambda m=marker: self._delete_item(m))
         menu.tk_popup(event.x_root, event.y_root)
@@ -468,6 +471,16 @@ class DisplayMapController:
             menu.grab_release()
         except tk.TclError:
             pass
+
+    def _change_marker_border_color(self, marker):
+        if not marker:
+            return
+        current_color = marker.get("border_color", "#00ff00")
+        result = colorchooser.askcolor(parent=self.canvas, color=current_color, title="Choose Marker Border Color")
+        if result and result[1]:
+            marker["border_color"] = result[1]
+            self._update_canvas_images()
+            self._persist_tokens()
 
     def _edit_marker_description(self, marker):
         self._open_marker_description_editor(marker)
@@ -1185,6 +1198,7 @@ class DisplayMapController:
                 item.setdefault("entry_expanded_width", item.get("entry_width", 180))
                 item.setdefault("description_visible", False)
                 item.setdefault("handle_width", 22)
+                item.setdefault("border_color", "#00ff00")
                 sx, sy = int(xw*self.zoom + self.pan_x), int(yw*self.zoom + self.pan_y)
                 entry = item.get("entry_widget")
                 desired_text = item.get("text", "")
@@ -1235,7 +1249,70 @@ class DisplayMapController:
                 else:
                     handle_id = self.canvas.create_window(handle_x, sy, anchor='nw', window=handle_widget)
                     item["handle_canvas_id"] = handle_id
-                item["canvas_ids"] = (entry_id, handle_id)
+                border_color = item.get("border_color", "#00ff00")
+                border_id = item.get("border_canvas_id")
+                try:
+                    self.canvas.update_idletasks()
+                except tk.TclError:
+                    pass
+                entry_bbox = self.canvas.bbox(entry_id) if entry_id else None
+                handle_bbox = self.canvas.bbox(handle_id) if handle_id else None
+                entry_height_px = entry_height or entry.winfo_height()
+                if not entry_bbox:
+                    entry_width_px = entry.winfo_width() or entry.winfo_reqwidth() or item.get("entry_width", 180)
+                    entry_bbox = (sx, sy, sx + entry_width_px, sy + entry_height_px)
+                if handle_id and not handle_bbox:
+                    handle_width_px = handle_widget.winfo_width() or handle_width
+                    handle_height_px = handle_widget.winfo_height() or entry_height_px
+                    handle_bbox = (handle_x, sy, handle_x + handle_width_px, sy + handle_height_px)
+                xs, ys = [], []
+                if entry_bbox:
+                    xs.extend([entry_bbox[0], entry_bbox[2]])
+                    ys.extend([entry_bbox[1], entry_bbox[3]])
+                if handle_bbox:
+                    xs.extend([handle_bbox[0], handle_bbox[2]])
+                    ys.extend([handle_bbox[1], handle_bbox[3]])
+                border_margin = item.get("border_margin", 4)
+                if xs and ys:
+                    bx1 = min(xs) - border_margin
+                    by1 = min(ys) - border_margin
+                    bx2 = max(xs) + border_margin
+                    by2 = max(ys) + border_margin
+                    if border_id:
+                        self.canvas.coords(border_id, bx1, by1, bx2, by2)
+                        self.canvas.itemconfig(border_id, outline=border_color)
+                    else:
+                        border_id = self.canvas.create_rectangle(
+                            bx1, by1, bx2, by2, outline=border_color, width=3, fill=""
+                        )
+                        item["border_canvas_id"] = border_id
+                    if border_id:
+                        try:
+                            self.canvas.tag_lower(border_id)
+                            if self.base_id:
+                                self.canvas.lift(border_id, self.base_id)
+                        except tk.TclError:
+                            pass
+                        if entry_id:
+                            try:
+                                self.canvas.tag_raise(entry_id)
+                            except tk.TclError:
+                                pass
+                        if handle_id:
+                            try:
+                                self.canvas.tag_raise(handle_id)
+                            except tk.TclError:
+                                pass
+                else:
+                    if border_id:
+                        self.canvas.delete(border_id)
+                        border_id = None
+                        item["border_canvas_id"] = None
+                item["border_canvas_id"] = border_id
+                canvas_ids = [entry_id, handle_id]
+                if border_id:
+                    canvas_ids.append(border_id)
+                item["canvas_ids"] = tuple(cid for cid in canvas_ids if cid)
                 self._bind_item_events(item)
                 if entry_id:
                     self.canvas.tag_bind(entry_id, "<Button-3>", lambda e, i=item: self._on_item_right_click(e, i))
@@ -1555,6 +1632,7 @@ class DisplayMapController:
                            'max_hp_entry_widget', 'max_hp_entry_widget_id',
                            'entry_widget', 'description_popup', 'description_label',
                            'description_hide_job', 'handle_widget', 'handle_canvas_id', 'entry_canvas_id',
+                           'border_canvas_id',
                            'description_editor', 'hover_popup', 'hover_label',
                            'hover_hide_job', 'hover_bbox', 'hover_visible', '_hover_bound']:
             self.clipboard_token.pop(key_to_pop, None)
@@ -1607,6 +1685,7 @@ class DisplayMapController:
         elif item_type == "marker":
             new_item_data.setdefault("text", "New Marker")
             new_item_data.setdefault("description", "Marker description")
+            new_item_data.setdefault("border_color", "#00ff00")
             new_item_data["entry_widget"] = None
             new_item_data["description_popup"] = None
             new_item_data["description_label"] = None
@@ -1615,6 +1694,7 @@ class DisplayMapController:
             new_item_data.setdefault("entry_width", 180)
             new_item_data["description_editor"] = None
             new_item_data["focus_pending"] = True
+            new_item_data["border_canvas_id"] = None
 
         elif item_type in ["rectangle", "oval"]:
             # Shape-specific defaults if any were missed in copy (unlikely if copy is good)
