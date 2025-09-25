@@ -74,7 +74,10 @@ class DisplayMapController:
         self.clipboard_token = None # Copied item data (token or shape)
     
         self.brush_size  = DEFAULT_BRUSH_SIZE
-        self.token_size  = 48 
+        self.token_size  = 48
+        self.hover_font_size_options = [10, 12, 14, 16, 18, 20, 24, 28, 32]
+        self.hover_font_size = 12
+        self.hover_font = ctk.CTkFont(size=self.hover_font_size)
         self.brush_shape = "rectangle"
         self.fog_mode    = "add"
         self.tokens      = [] # List of all items (tokens and shapes)
@@ -510,7 +513,13 @@ class DisplayMapController:
             pass
         frame = ctk.CTkFrame(toplevel, corner_radius=8, fg_color="#1f1f1f")
         frame.pack(fill="both", expand=True)
-        text_label = ctk.CTkLabel(frame, text="", justify="left", anchor="w")
+        text_label = ctk.CTkLabel(
+            frame,
+            text="",
+            justify="left",
+            anchor="w",
+            font=getattr(self, "hover_font", None)
+        )
         text_label.pack(fill="both", expand=True, padx=12, pady=10)
         for widget in (toplevel, frame, text_label):
             widget.bind("<Leave>", lambda e, m=marker: self._schedule_hide_marker_description(m))
@@ -536,7 +545,13 @@ class DisplayMapController:
         description_text = marker.get("description", "").strip()
         if not description_text:
             description_text = "(No description)"
-        label.configure(text=description_text, justify="left", anchor="w", wraplength=600)
+        label.configure(
+            text=description_text,
+            justify="left",
+            anchor="w",
+            wraplength=600,
+            font=getattr(self, "hover_font", None)
+        )
         try:
             popup.update_idletasks()
         except tk.TclError:
@@ -568,6 +583,62 @@ class DisplayMapController:
         screen_x = canvas.winfo_rootx() + int(sx)
         screen_y = canvas.winfo_rooty() + int(sy) + int(entry_height) + 6
         popup.geometry(f"{int(width)}x{int(height)}+{screen_x}+{screen_y}")
+
+    def _on_hover_font_size_change(self, value):
+        try:
+            size = int(value)
+        except (TypeError, ValueError):
+            return
+        if size <= 0:
+            return
+        self.hover_font_size = size
+        if size not in self.hover_font_size_options:
+            self.hover_font_size_options.append(size)
+            self.hover_font_size_options = sorted(set(self.hover_font_size_options))
+        hover_font = getattr(self, "hover_font", None)
+        if hover_font is None:
+            self.hover_font = ctk.CTkFont(size=size)
+            hover_font = self.hover_font
+        else:
+            try:
+                hover_font.configure(size=size)
+            except Exception:
+                self.hover_font = ctk.CTkFont(size=size)
+                hover_font = self.hover_font
+
+        for item in getattr(self, "tokens", []):
+            if not isinstance(item, dict):
+                continue
+            label = item.get("hover_label")
+            if label and label.winfo_exists():
+                try:
+                    label.configure(font=hover_font)
+                    self._refresh_token_hover_popup(item)
+                except tk.TclError:
+                    pass
+            if item.get("type") == "marker":
+                desc_label = item.get("description_label")
+                if desc_label and desc_label.winfo_exists():
+                    try:
+                        desc_label.configure(font=hover_font)
+                        self._refresh_marker_description_popup(item)
+                    except tk.TclError:
+                        pass
+
+        if hasattr(self, "hover_font_size_menu"):
+            try:
+                values = [str(v) for v in self.hover_font_size_options]
+                self.hover_font_size_menu.configure(values=values)
+                self.hover_font_size_menu.set(str(size))
+            except tk.TclError:
+                pass
+
+        if isinstance(getattr(self, "current_map", None), dict):
+            self.current_map["hover_font_size"] = size
+        try:
+            self.maps.save_items(list(self._maps.values()))
+        except Exception as exc:
+            print(f"[hover_font_size] Failed to persist hover font size: {exc}")
 
     def _cancel_marker_hide(self, marker):
         canvas = getattr(self, "canvas", None)
@@ -623,7 +694,13 @@ class DisplayMapController:
             pass
         frame = ctk.CTkFrame(popup, corner_radius=8, fg_color="#1f1f1f")
         frame.pack(fill="both", expand=True)
-        label = ctk.CTkLabel(frame, text="", justify="left", anchor="w")
+        label = ctk.CTkLabel(
+            frame,
+            text="",
+            justify="left",
+            anchor="w",
+            font=getattr(self, "hover_font", None)
+        )
         label.pack(fill="both", expand=True, padx=12, pady=10)
         for widget in (popup, frame, label):
             widget.bind("<Leave>", lambda e, t=token: self._schedule_hide_token_hover(t))
@@ -650,7 +727,13 @@ class DisplayMapController:
         canvas = getattr(self, "canvas", None)
         if not canvas or not popup or not popup.winfo_exists() or not label or not label.winfo_exists():
             return
-        label.configure(text=self._get_token_hover_text(token), justify="left", anchor="w", wraplength=400)
+        label.configure(
+            text=self._get_token_hover_text(token),
+            justify="left",
+            anchor="w",
+            wraplength=400,
+            font=getattr(self, "hover_font", None)
+        )
         try:
             popup.update_idletasks()
         except tk.TclError:
@@ -1954,7 +2037,13 @@ class DisplayMapController:
         if self.mask_img: self.mask_img.save(abs_mask_path, format="PNG")
         else: print("Warning: No fog mask image to save.")
         self.current_map["FogMaskPath"] = rel_mask_path; self._persist_tokens()
-        self.current_map.update({"token_size": self.token_size, "pan_x": self.pan_x, "pan_y": self.pan_y, "zoom": self.zoom})
+        self.current_map.update({
+            "token_size": self.token_size,
+            "pan_x": self.pan_x,
+            "pan_y": self.pan_y,
+            "zoom": self.zoom,
+            "hover_font_size": getattr(self, "hover_font_size", 12)
+        })
         all_maps = list(self._maps.values()); self.maps.save_items(all_maps)
         try:
             if getattr(self, 'fs', None) and self.fs.winfo_exists() and \

@@ -95,6 +95,24 @@ def _build_toolbar(self):
     )
     self.token_size_value_label.pack(side="left", padx=(2,10), pady=8)
 
+    # Hover font size selector
+    hover_font_label = ctk.CTkLabel(toolbar, text="Hover Font Size:")
+    hover_font_label.pack(side="left", padx=(10,2), pady=8)
+
+    font_sizes = getattr(self, "hover_font_size_options", [10, 12, 14, 16, 18, 20, 24, 28, 32])
+    current_hover_size = getattr(self, "hover_font_size", 12)
+    if current_hover_size not in font_sizes:
+        font_sizes = sorted(set(list(font_sizes) + [current_hover_size]))
+    self.hover_font_size_options = list(font_sizes)
+    font_size_values = [str(size) for size in self.hover_font_size_options]
+    self.hover_font_size_menu = ctk.CTkOptionMenu(
+        toolbar,
+        values=font_size_values,
+        command=self._on_hover_font_size_change
+    )
+    self.hover_font_size_menu.set(str(current_hover_size))
+    self.hover_font_size_menu.pack(side="left", padx=5, pady=8)
+
     # --- Drawing Tool Selector ---
     tool_label = ctk.CTkLabel(toolbar, text="Active Tool:")
     tool_label.pack(side="left", padx=(20,2), pady=8)

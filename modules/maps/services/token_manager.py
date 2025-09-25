@@ -288,6 +288,13 @@ def _persist_tokens(self):
     """Quickly capture token state, then hand off the heavy write to a daemon thread."""
     # 1) Build the JSON in–memory (cheap)
     data = []
+    try:
+        if isinstance(getattr(self, "current_map", None), dict):
+            hover_size = int(getattr(self, "hover_font_size", 12))
+            if hover_size > 0:
+                self.current_map["hover_font_size"] = hover_size
+    except Exception:
+        pass
     for t in self.tokens:
         try:
             x, y = t["position"]
