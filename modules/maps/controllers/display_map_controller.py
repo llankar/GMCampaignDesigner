@@ -411,6 +411,11 @@ class DisplayMapController:
         if hovered_token:
             hovered_popup = hovered_token.get("hover_popup")
 
+        hovered_marker_popup = None
+        hovered_marker = getattr(self, "_hovered_marker", None)
+        if hovered_marker and isinstance(hovered_marker, dict):
+            hovered_marker_popup = hovered_marker.get("description_popup")
+
         for popup in list(self._active_hover_popups):
             try:
                 exists = popup.winfo_exists()
@@ -419,6 +424,8 @@ class DisplayMapController:
             if not exists:
                 continue
             if hovered_popup and popup is hovered_popup:
+                continue
+            if hovered_marker_popup and popup is hovered_marker_popup:
                 continue
             if _pointer_over_widget(popup):
                 continue
