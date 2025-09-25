@@ -412,6 +412,168 @@ class DisplayMapController:
                 pass
             marker["description_hide_job"] = None
 
+    def _get_token_hover_text(self, token):
+        record = token.get("entity_record") or {}
+        entity_type = token.get("entity_type")
+        raw_stats_text = ""
+        if entity_type == "Creature":
+            raw_stats_text = record.get("Stats", "")
+        elif entity_type == "PC":
+            raw_stats_text = record.get("Stats", "")
+        elif entity_type == "NPC":
+            raw_stats_text = record.get("Traits", "")
+        display_stats_text = format_longtext(raw_stats_text)
+        if isinstance(display_stats_text, (list, tuple)):
+            display_stats_text = "\n".join(map(str, display_stats_text))
+        else:
+            display_stats_text = str(display_stats_text or "")
+        if not display_stats_text.strip():
+            display_stats_text = "(No details available)"
+        return display_stats_text
+
+    def _ensure_token_hover_popup(self, token):
+        popup = token.get("hover_popup")
+        label = token.get("hover_label")
+        canvas = getattr(self, "canvas", None)
+        if popup and popup.winfo_exists() and label and label.winfo_exists():
+            return popup
+        if popup and popup.winfo_exists():
+            popup.destroy()
+        if not canvas:
+            return None
+        popup = ctk.CTkToplevel(canvas)
+        popup.withdraw()
+        popup.overrideredirect(True)
+        try:
+            popup.transient(canvas.winfo_toplevel())
+        except tk.TclError:
+            pass
+        try:
+            popup.attributes("-topmost", True)
+        except tk.TclError:
+            pass
+        frame = ctk.CTkFrame(popup, corner_radius=8, fg_color="#1f1f1f")
+        frame.pack(fill="both", expand=True)
+        label = ctk.CTkLabel(frame, text="", justify="left", anchor="w")
+        label.pack(fill="both", expand=True, padx=12, pady=10)
+        for widget in (popup, frame, label):
+            widget.bind("<Enter>", lambda e, t=token: self._cancel_token_hover_hide(t))
+            widget.bind("<Leave>", lambda e, t=token: self._schedule_hide_token_hover(t))
+        token["hover_popup"] = popup
+        token["hover_label"] = label
+        return popup
+
+    def _refresh_token_hover_popup(self, token):
+        popup = token.get("hover_popup")
+        label = token.get("hover_label")
+        canvas = getattr(self, "canvas", None)
+        if not canvas or not popup or not popup.winfo_exists() or not label or not label.winfo_exists():
+            return
+        label.configure(text=self._get_token_hover_text(token), justify="left", anchor="w", wraplength=400)
+        try:
+            popup.update_idletasks()
+        except tk.TclError:
+            return
+        width = max(label.winfo_reqwidth() + 20, 160)
+        height = max(label.winfo_reqheight() + 16, 80)
+        bbox = token.get("hover_bbox")
+        sx = sy = None
+        if bbox:
+            sx, sy = bbox[0], bbox[3]
+        else:
+            main_id = token.get("canvas_ids", (None,))[0]
+            if main_id:
+                try:
+                    mbbox = canvas.bbox(main_id)
+                except tk.TclError:
+                    mbbox = None
+                if mbbox:
+                    sx, sy = mbbox[0], mbbox[3]
+        if sx is None or sy is None:
+            xw, yw = token.get("position", (0, 0))
+            sx = int(xw * self.zoom + self.pan_x)
+            sy = int(yw * self.zoom + self.pan_y)
+        screen_x = canvas.winfo_rootx() + int(sx)
+        screen_y = canvas.winfo_rooty() + int(sy) + 6
+        popup.geometry(f"{int(width)}x{int(height)}+{screen_x}+{screen_y}")
+
+    def _show_token_hover(self, token):
+        canvas = getattr(self, "canvas", None)
+        if not canvas:
+            return
+        popup = self._ensure_token_hover_popup(token)
+        if not popup:
+            return
+        job = token.get("hover_hide_job")
+        if job:
+            try:
+                canvas.after_cancel(job)
+            except ValueError:
+                pass
+            token["hover_hide_job"] = None
+        self._refresh_token_hover_popup(token)
+        popup.deiconify()
+        popup.lift()
+        token["hover_visible"] = True
+
+    def _schedule_hide_token_hover(self, token, delay=250):
+        canvas = getattr(self, "canvas", None)
+        if not canvas:
+            return
+        job = token.get("hover_hide_job")
+        if job:
+            try:
+                canvas.after_cancel(job)
+            except ValueError:
+                pass
+
+        def _hide():
+            self._hide_token_hover(token)
+
+        token["hover_hide_job"] = canvas.after(delay, _hide)
+
+    def _cancel_token_hover_hide(self, token):
+        canvas = getattr(self, "canvas", None)
+        if not canvas:
+            return
+        job = token.get("hover_hide_job")
+        if job:
+            try:
+                canvas.after_cancel(job)
+            except ValueError:
+                pass
+            token["hover_hide_job"] = None
+
+    def _hide_token_hover(self, token):
+        canvas = getattr(self, "canvas", None)
+        popup = token.get("hover_popup")
+        token["hover_visible"] = False
+        job = token.get("hover_hide_job")
+        if job and canvas:
+            try:
+                canvas.after_cancel(job)
+            except ValueError:
+                pass
+        token["hover_hide_job"] = None
+        if popup and popup.winfo_exists():
+            popup.withdraw()
+
+    def _on_token_hover_enter(self, token):
+        self._show_token_hover(token)
+
+    def _on_token_hover_leave(self, token):
+        self._schedule_hide_token_hover(token)
+
+    def _bind_token_hover_targets(self, token, target_ids):
+        canvas = getattr(self, "canvas", None)
+        if not canvas:
+            return
+        for cid in target_ids or []:
+            if not cid:
+                continue
+            self.canvas.tag_bind(cid, "<Enter>", lambda e, t=token: self._on_token_hover_enter(t))
+            self.canvas.tag_bind(cid, "<Leave>", lambda e, t=token: self._on_token_hover_leave(t))
+
     def _open_marker_description_editor(self, marker):
         if not marker:
             return
@@ -644,12 +806,16 @@ class DisplayMapController:
                 if item.get("type", "token") == "token":
                     if item.get("name_id"):
                         self.canvas.move(item["name_id"], dx, dy)
-                    if item.get("info_widget_id"):
-                        self.canvas.move(item["info_widget_id"], dx, dy)
                     if item.get("hp_canvas_ids"):
                         for hp_cid in item["hp_canvas_ids"]:
                             if hp_cid:
                                 self.canvas.move(hp_cid, dx, dy)
+                    if item.get("hover_bbox"):
+                        x1, y1, x2, y2 = item["hover_bbox"]
+                        item["hover_bbox"] = (x1 + dx, y1 + dy, x2 + dx, y2 + dy)
+                    self._refresh_token_hover_popup(item)
+                    if item.get("hover_visible"):
+                        self._show_token_hover(item)
             # Move resize handles if displayed
             for hid in getattr(self, '_resize_handles', []) or []:
                 try:
@@ -804,15 +970,17 @@ class DisplayMapController:
                         self.canvas.coords(tid, cx + circle_diam // 2, cy + circle_diam // 2); self.canvas.itemconfig(tid, text=str(hp))
                     name_id = item.get('name_id')
                     if name_id: tx = sx + nw/2; ty = sy + nh + 2; self.canvas.coords(name_id, tx, ty); self.canvas.itemconfig(name_id, text=item.get('entity_id', ''))
-                    if item.get('info_widget_id') and item.get('info_widget'):
-                        ix = sx + nw + 10; iy = sy + nh/2; self.canvas.coords(item['info_widget_id'], ix, iy)
-                        rec = item.get('entity_record', {}); entity_type_for_stats = item.get('entity_type'); new_text_stats = ""
-                        if entity_type_for_stats == "Creature": new_text_stats = rec.get("Stats", "")
-                        elif entity_type_for_stats == "PC": new_text_stats = rec.get("Stats", "")
-                        elif entity_type_for_stats == "NPC": new_text_stats = rec.get("Traits", "")
-                        new_text = format_longtext(new_text_stats); tb = item['info_widget']
-                        tb._textbox.delete("1.0", "end"); tb._textbox.insert("1.0", new_text)
-                else: 
+                    item['hover_bbox'] = (sx - 3, sy - 3, sx + nw + 3, sy + nh + 3)
+                    if not item.get('_hover_bound'):
+                        hover_targets = [b_id, i_id, item.get('name_id')]
+                        if item.get('hp_canvas_ids'):
+                            hover_targets.extend(item['hp_canvas_ids'])
+                        self._bind_token_hover_targets(item, hover_targets)
+                        item['_hover_bound'] = True
+                    self._refresh_token_hover_popup(item)
+                    if item.get("hover_visible"):
+                        self._show_token_hover(item)
+                else:
                     b_id = self.canvas.create_rectangle(sx-3, sy-3, sx+nw+3, sy+nh+3, outline=item.get('border_color','#0000ff'), width=3)
                     i_id = self.canvas.create_image(sx, sy, image=tkimg, anchor='nw')
                     tx = sx + nw/2; ty = sy + nh + 2; name_id = self.canvas.create_text(tx, ty, text=item.get('entity_id',''), fill='white', anchor='n'); item['name_id'] = name_id
@@ -825,25 +993,13 @@ class DisplayMapController:
                     for item_id_hp in (cid, tid):
                         self.canvas.tag_bind(item_id_hp, "<Double-Button-1>", lambda e, t=item: self._on_hp_double_click(e, t))
                         self.canvas.tag_bind(item_id_hp, "<Button-3>", lambda e, t=item: self._on_max_hp_menu_click(e, t))
-                    rec = item.get('entity_record', {}); entity_type_for_stats = item.get('entity_type'); raw_stats_text = ""
-                    if entity_type_for_stats == "Creature": raw_stats_text = rec.get("Stats", "")
-                    elif entity_type_for_stats == "PC": raw_stats_text = rec.get("Stats", "")
-                    elif entity_type_for_stats == "NPC": raw_stats_text = rec.get("Traits", "")
-                    display_stats_text = format_longtext(raw_stats_text)
-                    if isinstance(display_stats_text, (list, tuple)): display_stats_text = "\n".join(map(str, display_stats_text))
-                    else: display_stats_text = str(display_stats_text)
-                    height_info = item.get("size", self.token_size) * 2; entry_info = item.get("info_widget")
-                    if not entry_info: entry_info = ctk.CTkTextbox(self.canvas, width=100, height=height_info, wrap="word"); item["info_widget"] = entry_info
-                    entry_info._textbox.delete("1.0", "end"); entry_info._textbox.insert("1.0", display_stats_text)
-                    ix = sx + nw + 10; iy = sy + nh/2; info_id = self.canvas.create_window(ix, iy, anchor='w', window=entry_info)
-                    self.canvas.itemconfigure(info_id, state='hidden')
-                    item.update({'canvas_ids': (b_id, i_id), 'name_id': name_id, 'info_widget_id': info_id, 'info_widget': entry_info})
-                    for cid_bind in (b_id, i_id):
-                        self.canvas.tag_bind(cid_bind, "<Enter>", lambda e, iid=info_id: self.canvas.itemconfigure(iid, state='normal'))
-                        self.canvas.tag_bind(cid_bind, "<Leave>", lambda e, iid=info_id: self.canvas.itemconfigure(iid, state='hidden'))
-                    entry_info.bind("<Enter>", lambda e, iid=info_id: self.canvas.itemconfigure(iid, state='normal'))
-                    entry_info.bind("<Leave>", lambda e, iid=info_id: self.canvas.itemconfigure(iid, state='hidden'))
+                    item.update({'canvas_ids': (b_id, i_id), 'name_id': name_id})
+                    hover_targets = [b_id, i_id, name_id, cid, tid]
                     self._bind_item_events(item)
+                    self._bind_token_hover_targets(item, hover_targets)
+                    item['_hover_bound'] = True
+                    item['hover_bbox'] = (sx - 3, sy - 3, sx + nw + 3, sy + nh + 3)
+                    self._refresh_token_hover_popup(item)
             elif item_type == "marker":
                 item.setdefault("entry_width", 180)
                 item.setdefault("entry_expanded_width", item.get("entry_width", 180))
@@ -978,10 +1134,21 @@ class DisplayMapController:
             if cid: self.canvas.move(cid, dx, dy)
         if item.get("type", "token") == "token":
             if item.get("name_id"): self.canvas.move(item["name_id"], dx, dy)
-            if item.get("info_widget_id"): self.canvas.move(item["info_widget_id"], dx, dy)
             if item.get("hp_canvas_ids"):
                 for hp_cid in item["hp_canvas_ids"]:
                     if hp_cid: self.canvas.move(hp_cid, dx, dy)
+            main_id = item.get("canvas_ids", (None,))[0]
+            bbox = None
+            if main_id:
+                try:
+                    bbox = self.canvas.bbox(main_id)
+                except tk.TclError:
+                    bbox = None
+            if bbox:
+                item["hover_bbox"] = bbox
+            self._refresh_token_hover_popup(item)
+            if item.get("hover_visible"):
+                self._show_token_hover(item)
         elif item.get("type") == "marker":
             self._refresh_marker_description_popup(item)
         item["drag_data"] = {"x": event.x, "y": event.y}
@@ -1200,13 +1367,14 @@ class DisplayMapController:
         active_item = item_to_copy if item_to_copy else self.selected_token
         #if not active_item: return
         self.clipboard_token = active_item.copy()
-        for key_to_pop in ['pil_image', 'tk_image', 'info_widget', 'entity_record',
-                           'canvas_ids', 'hp_canvas_ids', 'name_id', 'info_widget_id',
+        for key_to_pop in ['pil_image', 'tk_image', 'entity_record',
+                           'canvas_ids', 'hp_canvas_ids', 'name_id',
                            'hp_entry_widget', 'hp_entry_widget_id',
                            'max_hp_entry_widget', 'max_hp_entry_widget_id',
                            'entry_widget', 'description_popup', 'description_label',
                            'description_hide_job', 'handle_widget', 'handle_canvas_id', 'entry_canvas_id',
-                           'description_editor']:
+                           'description_editor', 'hover_popup', 'hover_label',
+                           'hover_hide_job', 'hover_bbox', 'hover_visible', '_hover_bound']:
             self.clipboard_token.pop(key_to_pop, None)
 
     def _paste_item(self, event=None):
@@ -1246,7 +1414,13 @@ class DisplayMapController:
             new_item_data.setdefault("size", self.token_size)
             new_item_data.setdefault("hp", 10)
             new_item_data.setdefault("max_hp", 10)
-            # entity_record and info_widget are not typically part of clipboard_token
+            new_item_data.setdefault("hover_popup", None)
+            new_item_data.setdefault("hover_label", None)
+            new_item_data.setdefault("hover_hide_job", None)
+            new_item_data.setdefault("hover_visible", False)
+            new_item_data.setdefault("hover_bbox", None)
+            new_item_data.setdefault("_hover_bound", False)
+            # entity_record is not typically part of clipboard_token
 
         elif item_type == "marker":
             new_item_data.setdefault("text", "New Marker")
@@ -1284,9 +1458,21 @@ class DisplayMapController:
             if item_to_delete.get("hp_canvas_ids"):
                 for hp_cid in item_to_delete["hp_canvas_ids"]:
                     if hp_cid: self.canvas.delete(hp_cid)
-            if item_to_delete.get("info_widget_id"): self.canvas.delete(item_to_delete["info_widget_id"])
-            if item_to_delete.get("info_widget") and hasattr(item_to_delete["info_widget"], 'destroy'):
-                 item_to_delete["info_widget"].destroy()
+            hide_job = item_to_delete.get("hover_hide_job")
+            if hide_job:
+                try:
+                    self.canvas.after_cancel(hide_job)
+                except ValueError:
+                    pass
+            popup = item_to_delete.get("hover_popup")
+            if popup and popup.winfo_exists():
+                popup.destroy()
+            item_to_delete["hover_popup"] = None
+            item_to_delete["hover_label"] = None
+            item_to_delete["hover_hide_job"] = None
+            item_to_delete["hover_visible"] = False
+            item_to_delete.pop("hover_bbox", None)
+            item_to_delete.pop("_hover_bound", None)
         elif item_to_delete.get("type") == "marker":
             hide_job = item_to_delete.get("description_hide_job")
             if hide_job:
@@ -1368,8 +1554,7 @@ class DisplayMapController:
                     canvas_ids_to_manage.append(item['name_id'])
                 if item.get('hp_canvas_ids'):
                     canvas_ids_to_manage.extend(hp_id for hp_id in item['hp_canvas_ids'] if hp_id)
-                # Note: info_widget is a Tkinter widget in a canvas window, its stacking is different.
-                # We primarily care about canvas items drawn directly.
+                # Token hover popups are separate toplevel windows and managed outside the canvas stacking order.
             # Marker popups are separate toplevel windows and are not managed via canvas stacking.
 
             for c_id in canvas_ids_to_manage:
