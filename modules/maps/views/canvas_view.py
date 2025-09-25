@@ -54,6 +54,9 @@ def _build_canvas(self):
         root.bind("<FocusOut>", lambda e: self._on_application_focus_out(), add="+")
         self._focus_bindings_registered = True
 
+    if hasattr(self, "_start_hover_cleanup_loop"):
+        self._start_hover_cleanup_loop()
+
 
 def _on_delete_key(self, event=None):
     """Delete the hovered marker or the currently selected item when Delete is pressed."""

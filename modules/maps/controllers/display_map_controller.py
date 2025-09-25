@@ -39,6 +39,7 @@ ZOOM_STEP = 0.1  # 10% per wheel notch
 ctk.set_appearance_mode("dark")
 
 HOVER_DISMISS_DELAY_MS = 600
+HOVER_CLEANUP_INTERVAL_MS = 200
 
 class DisplayMapController:
     def __init__(self, parent, maps_wrapper, map_template):
@@ -97,6 +98,8 @@ class DisplayMapController:
         self._marker_min_r    = 6
         self._marker_max_r    = 25
         self._hovered_marker  = None
+
+        self._hover_cleanup_job = None
 
         self._focus_bindings_registered = False
 
@@ -336,6 +339,57 @@ class DisplayMapController:
                 continue
             if isinstance(token, dict) and token.get("hover_visible"):
                 self._hide_token_hover(token)
+
+    def _start_hover_cleanup_loop(self):
+        canvas = getattr(self, "canvas", None)
+        if not canvas or not canvas.winfo_exists():
+            return
+        if self._hover_cleanup_job:
+            try:
+                canvas.after_cancel(self._hover_cleanup_job)
+            except ValueError:
+                pass
+        self._hover_cleanup_job = canvas.after(HOVER_CLEANUP_INTERVAL_MS, self._run_hover_cleanup)
+
+    def _run_hover_cleanup(self):
+        canvas = getattr(self, "canvas", None)
+        if not canvas or not canvas.winfo_exists():
+            self._hover_cleanup_job = None
+            return
+
+        pointer_in_canvas = False
+        canvas_x = canvas_y = None
+        try:
+            pointer_x, pointer_y = canvas.winfo_pointerxy()
+            canvas_x = pointer_x - canvas.winfo_rootx()
+            canvas_y = pointer_y - canvas.winfo_rooty()
+            pointer_in_canvas = (
+                0 <= canvas_x <= (canvas.winfo_width() or 0)
+                and 0 <= canvas_y <= (canvas.winfo_height() or 0)
+            )
+        except tk.TclError:
+            pointer_in_canvas = False
+
+        hovered_token = None
+        if pointer_in_canvas:
+            for token in getattr(self, "tokens", []):
+                if not isinstance(token, dict):
+                    continue
+                bbox = token.get("hover_bbox")
+                if not bbox:
+                    continue
+                x1, y1, x2, y2 = bbox
+                if x1 <= canvas_x <= x2 and y1 <= canvas_y <= y2:
+                    hovered_token = token
+                    break
+
+        for token in list(getattr(self, "tokens", [])):
+            if not isinstance(token, dict):
+                continue
+            if token.get("hover_visible") and token is not hovered_token:
+                self._hide_token_hover(token)
+
+        self._hover_cleanup_job = canvas.after(HOVER_CLEANUP_INTERVAL_MS, self._run_hover_cleanup)
 
     def _on_canvas_focus_out(self, event=None):
         self._hide_all_marker_descriptions()
