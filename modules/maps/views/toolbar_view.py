@@ -55,7 +55,7 @@ def _build_toolbar(self):
     # Brush shape selector (for fog)
     shape_label = ctk.CTkLabel(toolbar, text="Fog Shape:") # Clarified label
     shape_label.pack(side="left", padx=(10,2), pady=8)
-    dropdown_width = 120
+    dropdown_width = 100
 
     self.shape_menu = ctk.CTkOptionMenu(
         toolbar,
