@@ -1,6 +1,5 @@
 import json
-from PIL import Image, ImageTk
-import customtkinter as ctk
+from PIL import Image
 from tkinter import messagebox, colorchooser
 import os
 from modules.helpers.config_helper import ConfigHelper
@@ -35,14 +34,6 @@ def add_token(self, path, entity_type, entity_name, entity_record=None):
     xw_center = (cw/2 - self.pan_x) / self.zoom
     yw_center = (ch/2 - self.pan_y) / self.zoom
 
-    # Hydrate the info box
-    raw = entity_record.get("Stats", "") if entity_type == "Creature" else entity_record.get("Traits", "")
-    display = "\n".join(map(str, raw)) if isinstance(raw, (list, tuple)) else str(raw)
-    height = self.token_size * 2
-    info_widget = ctk.CTkTextbox(self.canvas, width=100, height=height, wrap="word")
-    info_widget._textbox.delete("1.0", "end")
-    info_widget._textbox.insert("1.0", display)
-
     token = {
         "entity_type":  entity_type,
         "entity_id":    entity_name,
@@ -51,11 +42,16 @@ def add_token(self, path, entity_type, entity_name, entity_record=None):
         "position":     (xw_center, yw_center),
         "border_color": "#0000ff",
         "entity_record": entity_record or {},
-        "info_widget": info_widget,  # ✅ fix crash here
         "hp": 10,
         "hp_label_id": None,
         "hp_entry": None,
-        "hp_entry_id": None
+        "hp_entry_id": None,
+        "hover_popup": None,
+        "hover_label": None,
+        "hover_hide_job": None,
+        "hover_visible": False,
+        "hover_bbox": None,
+        "_hover_bound": False,
     }
 
     self.tokens.append(token)
@@ -83,14 +79,24 @@ def _on_token_move(self, event, token):
     if name_id:
         self.canvas.move(name_id, dx, dy)
     token["drag_data"] = {"x": event.x, "y": event.y}
-    info_widget_id = token.get("info_widget_id")
-    if info_widget_id:
-        self.canvas.move(info_widget_id, dx, dy)
     sx, sy = self.canvas.coords(i_id)
     if "hp_canvas_ids" in token:
         cid, tid = token["hp_canvas_ids"]
         self.canvas.move(cid, dx, dy)
         self.canvas.move(tid, dx, dy)
+    try:
+        bbox = self.canvas.bbox(b_id)
+    except tk.TclError:
+        bbox = None
+    if bbox:
+        token["hover_bbox"] = bbox
+    refresh = getattr(self, "_refresh_token_hover_popup", None)
+    if callable(refresh):
+        refresh(token)
+        if token.get("hover_visible"):
+            show_fn = getattr(self, "_show_token_hover", None)
+            if callable(show_fn):
+                show_fn(token)
     token["position"] = ((sx - self.pan_x)/self.zoom, (sy - self.pan_y)/self.zoom)
 
 def _on_token_release(self, event, token):
@@ -238,10 +244,21 @@ def _delete_token(self, token):
         del token["max_hp_entry_widget"], token["max_hp_entry_widget_id"]
 
     # 6) The info widget on the right
-    if "info_widget_id" in token:
-        self.canvas.delete(token["info_widget_id"])
-        token["info_widget"].destroy()
-        del token["info_widget"], token["info_widget_id"]
+    hide_job = token.get("hover_hide_job")
+    if hide_job:
+        try:
+            self.canvas.after_cancel(hide_job)
+        except ValueError:
+            pass
+    popup = token.get("hover_popup")
+    if popup and popup.winfo_exists():
+        popup.destroy()
+    token["hover_popup"] = None
+    token["hover_label"] = None
+    token["hover_hide_job"] = None
+    token["hover_visible"] = False
+    token.pop("hover_bbox", None)
+    token.pop("_hover_bound", None)
 
     # 7) Fullscreen mirror items, if present
     if getattr(self, "fs_canvas", None):

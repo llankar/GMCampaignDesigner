@@ -3,7 +3,6 @@ import ast
 import json
 import os
 import tkinter as tk
-import customtkinter as ctk
 from PIL import Image, ImageTk, ImageDraw
 from modules.helpers.config_helper import ConfigHelper
 from modules.helpers.template_loader import load_template
@@ -205,50 +204,41 @@ def _on_display_map(self, entity_type, map_name): # entity_type here is the map'
 
         self.tokens.append(item_data)
 
-    # 8) Hydrate info box (ONLY FOR TOKENS)
-    for current_item in self.tokens: # Renamed to current_item
+    # 8) Hydrate token metadata for hover display (ONLY FOR TOKENS)
+    for current_item in self.tokens:
         if current_item.get("type", "token") == "token":
-            # Ensure entity_type is present for token, critical for lookup
             token_entity_type = current_item.get("entity_type")
             token_entity_id = current_item.get("entity_id")
 
             if not token_entity_type or not token_entity_id:
                 print(f"[_on_display_map] Token missing entity_type or entity_id, cannot hydrate info: {current_item}")
-                current_item["info_widget"] = None
                 current_item["entity_record"] = {}
-                continue
-
-            record = {}
-            raw_txt = ""
-            if token_entity_type == "Creature":
-                record = creatures.get(token_entity_id, {})
-                raw_txt = record.get("Stats", "")
-            elif token_entity_type == "PC":
-                record = pcs.get(token_entity_id, {})
-                raw_txt = record.get("Stats", "") # Assuming PCs also use "Stats"
-            elif token_entity_type == "NPC":
-                record = npcs.get(token_entity_id, {})
-                raw_txt = record.get("Traits", "")
             else:
-                print(f"[_on_display_map] Unknown entity_type '{token_entity_type}' for token ID '{token_entity_id}'. Cannot hydrate info.")
-            
-            current_item["entity_record"] = record
+                record = {}
+                if token_entity_type == "Creature":
+                    record = creatures.get(token_entity_id, {})
+                elif token_entity_type == "PC":
+                    record = pcs.get(token_entity_id, {})
+                elif token_entity_type == "NPC":
+                    record = npcs.get(token_entity_id, {})
+                else:
+                    print(f"[_on_display_map] Unknown entity_type '{token_entity_type}' for token ID '{token_entity_id}'. Cannot hydrate info.")
+                current_item["entity_record"] = record
 
-            if isinstance(raw_txt, (list, tuple)):
-                info_text = "\n".join(map(str, raw_txt))
-            else:
-                info_text = str(raw_txt or "")
-            
-            # Use actual token size for info box height calculation
-            token_actual_size = current_item.get("size", self.token_size) 
-            info_box_height = token_actual_size * 2
-            tb = ctk.CTkTextbox(self.canvas, width=100, height=info_box_height, wrap="word")
-            tb._textbox.delete("1.0", "end")
-            tb._textbox.insert("1.0", info_text)
-            current_item["info_widget"] = tb
-        else: # For shapes, ensure info_widget is None
-            current_item["info_widget"] = None
-            current_item["entity_record"] = {} # Shapes don't have entity records
+            current_item["hover_popup"] = None
+            current_item["hover_label"] = None
+            current_item["hover_hide_job"] = None
+            current_item["hover_visible"] = False
+            current_item["hover_bbox"] = None
+            current_item["_hover_bound"] = False
+        else:
+            current_item["entity_record"] = {}
+            current_item["hover_popup"] = None
+            current_item["hover_label"] = None
+            current_item["hover_hide_job"] = None
+            current_item["hover_visible"] = False
+            current_item["hover_bbox"] = None
+            current_item["_hover_bound"] = False
 
     # 9) Finally draw everything onto the canvas
     self._update_canvas_images()
