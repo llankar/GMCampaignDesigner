@@ -574,6 +574,13 @@ class DisplayMapController:
             self.canvas.tag_bind(cid, "<Enter>", lambda e, t=token: self._on_token_hover_enter(t))
             self.canvas.tag_bind(cid, "<Leave>", lambda e, t=token: self._on_token_hover_leave(t))
 
+    def _on_canvas_pointer_leave(self, event=None):
+        for token in getattr(self, "tokens", []):
+            if not isinstance(token, dict):
+                continue
+            if token.get("hover_visible"):
+                self._schedule_hide_token_hover(token)
+
     def _open_marker_description_editor(self, marker):
         if not marker:
             return
