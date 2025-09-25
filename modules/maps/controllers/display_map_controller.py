@@ -94,6 +94,7 @@ class DisplayMapController:
         self._marker_anim_dir = 1
         self._marker_min_r    = 6
         self._marker_max_r    = 25
+        self._hovered_marker  = None
 
         # For interactive shape resizing (re-adding)
         self._resize_handles = []
@@ -246,12 +247,15 @@ class DisplayMapController:
         self._refresh_marker_description_popup(marker)
 
     def _on_marker_entry_enter(self, marker):
+        self._hovered_marker = marker
         self._expand_marker_entry(marker)
         self._show_marker_description(marker)
 
     def _on_marker_entry_leave(self, marker):
         self._collapse_marker_entry(marker)
         self._schedule_hide_marker_description(marker)
+        if getattr(self, "_hovered_marker", None) is marker:
+            self._hovered_marker = None
 
     def _show_marker_description(self, marker):
         canvas = getattr(self, "canvas", None)
@@ -303,6 +307,7 @@ class DisplayMapController:
             popup.withdraw()
 
     def _show_marker_menu(self, event, marker):
+        self._hovered_marker = marker
         menu = tk.Menu(self.canvas, tearoff=0)
         menu.add_command(label="Edit Description", command=lambda m=marker: self._open_marker_description_editor(m))
         menu.add_separator()
@@ -1023,6 +1028,7 @@ class DisplayMapController:
                     entry.bind("<Return>", lambda e, i=item: self._on_marker_entry_return(e, i))
                     entry.bind("<Enter>", lambda e, i=item: self._on_marker_entry_enter(i))
                     entry.bind("<Leave>", lambda e, i=item: self._on_marker_entry_leave(i))
+                    entry.bind("<Button-3>", lambda e, i=item: self._on_item_right_click(e, i))
                     item["entry_widget"] = entry
                 else:
                     current_text = entry.get()
@@ -1052,6 +1058,7 @@ class DisplayMapController:
                     handle_widget.bind("<ButtonPress-1>", lambda e, i=item: self._on_marker_handle_press(e, i))
                     handle_widget.bind("<B1-Motion>", lambda e, i=item: self._on_marker_handle_drag(e, i))
                     handle_widget.bind("<ButtonRelease-1>", lambda e, i=item: self._on_marker_handle_release(e, i))
+                    handle_widget.bind("<Button-3>", lambda e, i=item: self._on_item_right_click(e, i))
                     item["handle_widget"] = handle_widget
                 handle_widget.configure(height=entry_height)
                 handle_id = item.get("handle_canvas_id")
@@ -1519,6 +1526,8 @@ class DisplayMapController:
                 del item_to_delete["fs_cross_ids"]
         if item_to_delete in self.tokens: self.tokens.remove(item_to_delete)
         if self.selected_token is item_to_delete: self.selected_token = None
+        if getattr(self, "_hovered_marker", None) is item_to_delete:
+            self._hovered_marker = None
         self._persist_tokens(); self._update_canvas_images()
         try:
             if getattr(self, 'fs_canvas', None) and self.fs_canvas.winfo_exists():
