@@ -346,6 +346,14 @@ class DisplayMapController:
         for widget in (toplevel, frame, text_label):
             widget.bind("<Enter>", lambda e, m=marker: self._cancel_marker_hide(m))
             widget.bind("<Leave>", lambda e, m=marker: self._schedule_hide_marker_description(m))
+
+        def _on_description_double_click(event, m=marker):
+            self._cancel_marker_hide(m)
+            self._open_marker_description_editor(m)
+            return "break"
+
+        text_label.bind("<Double-Button-1>", _on_description_double_click)
+        frame.bind("<Double-Button-1>", _on_description_double_click)
         marker["description_popup"] = toplevel
         marker["description_label"] = text_label
         return toplevel
