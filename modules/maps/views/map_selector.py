@@ -142,7 +142,7 @@ def _on_display_map(self, entity_type, map_name): # entity_type here is the map'
         }
 
         if item_type_from_rec == "token":
-            
+
             campaign_dir = ConfigHelper.get_campaign_dir()
             portrait_path = rec.get("image_path")
             path = os.path.join(campaign_dir, portrait_path)
@@ -186,10 +186,24 @@ def _on_display_map(self, entity_type, map_name): # entity_type here is the map'
                 "height":       rec.get("height", 50),# Default height for shapes
                 "pil_image":    None, # Shapes don't use PIL image for drawing
             })
+        elif item_type_from_rec == "marker":
+            item_data.update({
+                "text": rec.get("text", "New Marker"),
+                "description": rec.get("description", "Marker description"),
+                "entry_width": rec.get("entry_width", 180),
+                "description_width": rec.get("description_width", 240),
+                "description_height": rec.get("description_height", 140),
+                "entry_widget": None,
+                "description_widget": None,
+                "description_window_id": None,
+                "description_hide_job": None,
+                "description_visible": False,
+                "focus_pending": False,
+            })
         else:
             print(f"[_on_display_map] Unknown item type '{item_type_from_rec}' in map data. Skipping: {rec}")
             continue
-        
+
         self.tokens.append(item_data)
 
     # 8) Hydrate info box (ONLY FOR TOKENS)
