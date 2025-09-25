@@ -266,6 +266,7 @@ class DisplayMapController:
         popup = self._ensure_marker_description_popup(marker)
         if not popup:
             return
+        self._hide_other_marker_descriptions(marker)
         job = marker.get("description_hide_job")
         if job:
             try:
@@ -313,8 +314,22 @@ class DisplayMapController:
             if isinstance(item, dict) and item.get("type") == "marker":
                 self._hide_marker_description(item)
 
+    def _hide_other_marker_descriptions(self, active_marker):
+        for item in getattr(self, "tokens", []):
+            if item is active_marker:
+                continue
+            if isinstance(item, dict) and item.get("type") == "marker" and item.get("description_visible"):
+                self._hide_marker_description(item)
+
     def _hide_all_token_hovers(self):
         for token in getattr(self, "tokens", []):
+            if isinstance(token, dict) and token.get("hover_visible"):
+                self._hide_token_hover(token)
+
+    def _hide_other_token_hovers(self, active_token):
+        for token in getattr(self, "tokens", []):
+            if token is active_token:
+                continue
             if isinstance(token, dict) and token.get("hover_visible"):
                 self._hide_token_hover(token)
 
@@ -529,6 +544,7 @@ class DisplayMapController:
         popup = self._ensure_token_hover_popup(token)
         if not popup:
             return
+        self._hide_other_token_hovers(token)
         job = token.get("hover_hide_job")
         if job:
             try:
