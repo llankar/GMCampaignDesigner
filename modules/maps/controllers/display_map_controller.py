@@ -103,6 +103,11 @@ class DisplayMapController:
 
         self._focus_bindings_registered = False
 
+        # Maintain a registry of all hover popup windows (token hovers and marker
+        # descriptions) so the toolbar button can reliably dismiss every one of
+        # them even if internal bookkeeping for a token becomes desynchronised.
+        self._active_hover_popups = set()
+
         # For interactive shape resizing (re-adding)
         self._resize_handles = []
         self._active_resize_handle_info = None # Stores info about current resize op
@@ -399,6 +404,17 @@ class DisplayMapController:
         """Hide all hover-related popups such as token hovers and marker descriptions."""
         self._hide_all_token_hovers()
         self._hide_all_marker_descriptions()
+        # Explicitly withdraw any hover popup windows that may not be linked to
+        # a currently tracked token (for example, if a token was deleted while its
+        # hover window remained). This guarantees that pressing the toolbar button
+        # truly clears every hover window from the screen.
+        for popup in list(self._active_hover_popups):
+            try:
+                exists = popup.winfo_exists()
+            except tk.TclError:
+                exists = False
+            if exists:
+                popup.withdraw()
 
     def _on_application_focus_out(self, event=None):
         self._hide_all_marker_descriptions()
@@ -456,6 +472,7 @@ class DisplayMapController:
 
         text_label.bind("<Double-Button-1>", _on_description_double_click)
         frame.bind("<Double-Button-1>", _on_description_double_click)
+        self._register_hover_popup(toplevel)
         marker["description_popup"] = toplevel
         marker["description_label"] = text_label
         return toplevel
@@ -560,9 +577,22 @@ class DisplayMapController:
         label.pack(fill="both", expand=True, padx=12, pady=10)
         for widget in (popup, frame, label):
             widget.bind("<Leave>", lambda e, t=token: self._schedule_hide_token_hover(t))
+        self._register_hover_popup(popup)
         token["hover_popup"] = popup
         token["hover_label"] = label
         return popup
+
+    def _register_hover_popup(self, popup):
+        """Keep a reference to created hover popups for global dismissal."""
+        if popup in self._active_hover_popups:
+            return
+
+        self._active_hover_popups.add(popup)
+
+        def _on_destroy(event, pop=popup):
+            self._active_hover_popups.discard(pop)
+
+        popup.bind("<Destroy>", _on_destroy, add="+")
 
     def _refresh_token_hover_popup(self, token):
         popup = token.get("hover_popup")
