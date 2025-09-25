@@ -277,9 +277,8 @@ class CreatureImportWindow(ctk.CTkToplevel):
             "Do not invent numbers or abilities—leave the field empty if the PDF omits them.\n"
             "Preserve line breaks so the stat block stays readable.\n\n"
             "Schema:\n" + json.dumps(schema, ensure_ascii=False, indent=2) + "\n\n"
-            "Examples of Stats formatting from the current database:\n" + json.dumps(stats_examples, ensure_ascii=False, indent=2) + "\n\n"
             f"Source: {source_label or 'Unknown'}\n"
-            "PDF text (may be truncated):\n" + raw_text[:50000]
+            "PDF text (may be truncated):\n" + raw_text[:5000000]
         )
 
         response = client.chat([
