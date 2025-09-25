@@ -364,6 +364,7 @@ class DisplayMapController:
 
         pointer_in_canvas = False
         canvas_x = canvas_y = None
+        pointer_x = pointer_y = None
         try:
             pointer_x, pointer_y = canvas.winfo_pointerxy()
             canvas_x = pointer_x - canvas.winfo_rootx()
@@ -393,6 +394,35 @@ class DisplayMapController:
                 continue
             if token.get("hover_visible") and token is not hovered_token:
                 self._hide_token_hover(token)
+
+        def _pointer_over_widget(widget):
+            if pointer_x is None or pointer_y is None:
+                return False
+            try:
+                x1 = widget.winfo_rootx()
+                y1 = widget.winfo_rooty()
+                x2 = x1 + widget.winfo_width()
+                y2 = y1 + widget.winfo_height()
+            except tk.TclError:
+                return False
+            return x1 <= pointer_x <= x2 and y1 <= pointer_y <= y2
+
+        hovered_popup = None
+        if hovered_token:
+            hovered_popup = hovered_token.get("hover_popup")
+
+        for popup in list(self._active_hover_popups):
+            try:
+                exists = popup.winfo_exists()
+            except tk.TclError:
+                exists = False
+            if not exists:
+                continue
+            if hovered_popup and popup is hovered_popup:
+                continue
+            if _pointer_over_widget(popup):
+                continue
+            popup.withdraw()
 
         self._hover_cleanup_job = canvas.after(HOVER_CLEANUP_INTERVAL_MS, self._run_hover_cleanup)
 
