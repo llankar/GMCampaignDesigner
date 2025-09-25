@@ -44,6 +44,9 @@ def _build_canvas(self):
     # Configure binding might be better on self.canvas if self.parent is not the direct container that resizes
     self.parent.bind("<Configure>",        lambda e: self._update_canvas_images() if self.base_img else None)
 
+    if hasattr(self, "_on_canvas_pointer_leave"):
+        self.canvas.bind("<Leave>", self._on_canvas_pointer_leave)
+
 
 def _on_delete_key(self, event=None):
     """If an item (token or shape) is selected, delete it on Delete key."""
