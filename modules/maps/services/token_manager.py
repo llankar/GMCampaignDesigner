@@ -319,6 +319,7 @@ def _persist_tokens(self):
                     "text": t.get("text", ""),
                     "description": t.get("description", ""),
                     "entry_width": t.get("entry_width", 180),
+                    "border_color": t.get("border_color", "#00ff00"),
                 })
             else:
                 # Silently skip unknown types for now
