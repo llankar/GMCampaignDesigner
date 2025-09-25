@@ -47,8 +47,6 @@ def _build_toolbar(self):
         .pack(side="left", padx=2)
     create_icon_button(toolbar, icons["marker"], "Add Marker", command=self.add_marker)\
         .pack(side="left", padx=2)
-    create_icon_button(toolbar, None, "Close Hover Windows", command=self.clear_hover_windows)\
-        .pack(side="left", padx=2)
     create_icon_button(toolbar, icons["fs"],    "Fullscreen",   command=self.open_fullscreen)\
         .pack(side="left", padx=2)
     create_icon_button(toolbar, icons["fs"],    "Web Display",   command=self.open_web_display)\
