@@ -38,6 +38,8 @@ MIN_ZOOM = 0.1
 ZOOM_STEP = 0.1  # 10% per wheel notch
 ctk.set_appearance_mode("dark")
 
+HOVER_DISMISS_DELAY_MS = 600
+
 class DisplayMapController:
     def __init__(self, parent, maps_wrapper, map_template):
         self.parent = parent
@@ -279,10 +281,12 @@ class DisplayMapController:
         popup.lift()
         marker["description_visible"] = True
 
-    def _schedule_hide_marker_description(self, marker, delay=250):
+    def _schedule_hide_marker_description(self, marker, delay=None):
         canvas = getattr(self, "canvas", None)
         if not canvas:
             return
+        if delay is None:
+            delay = HOVER_DISMISS_DELAY_MS
         job = marker.get("description_hide_job")
         if job:
             try:
@@ -384,7 +388,6 @@ class DisplayMapController:
         text_label = ctk.CTkLabel(frame, text="", justify="left", anchor="w")
         text_label.pack(fill="both", expand=True, padx=12, pady=10)
         for widget in (toplevel, frame, text_label):
-            widget.bind("<Enter>", lambda e, m=marker: self._cancel_marker_hide(m))
             widget.bind("<Leave>", lambda e, m=marker: self._schedule_hide_marker_description(m))
 
         def _on_description_double_click(event, m=marker):
@@ -497,7 +500,6 @@ class DisplayMapController:
         label = ctk.CTkLabel(frame, text="", justify="left", anchor="w")
         label.pack(fill="both", expand=True, padx=12, pady=10)
         for widget in (popup, frame, label):
-            widget.bind("<Enter>", lambda e, t=token: self._cancel_token_hover_hide(t))
             widget.bind("<Leave>", lambda e, t=token: self._schedule_hide_token_hover(t))
         token["hover_popup"] = popup
         token["hover_label"] = label
@@ -557,10 +559,12 @@ class DisplayMapController:
         popup.lift()
         token["hover_visible"] = True
 
-    def _schedule_hide_token_hover(self, token, delay=250):
+    def _schedule_hide_token_hover(self, token, delay=None):
         canvas = getattr(self, "canvas", None)
         if not canvas:
             return
+        if delay is None:
+            delay = HOVER_DISMISS_DELAY_MS
         job = token.get("hover_hide_job")
         if job:
             try:

@@ -33,6 +33,8 @@ ctk.set_appearance_mode("Dark")
 ctk.set_default_color_theme("blue")
 #logging.basicConfig(level=logging.DEBUG)
 
+ENTITY_TOOLTIP_HIDE_DELAY_MS = 600
+
 SCENE_CARD_WIDTHS = {
     "S": 260,
     "M": 320,
@@ -124,6 +126,8 @@ class ScenarioGraphEditor(ctk.CTkFrame):
         self._entity_tooltip_after_id = None
         self._entity_tooltip_pending = None
         self._entity_tooltip_image_cache = {}
+        self._entity_tooltip_hide_after_id = None
+        self._entity_tooltip_active_tag = None
 
         self.init_toolbar()
         self.active_detail_scene_tag = None
@@ -1504,33 +1508,50 @@ class ScenarioGraphEditor(ctk.CTkFrame):
             self._entity_tooltip_after_id = None
         self._entity_tooltip_pending = None
 
+    def _cancel_entity_tooltip_hide(self):
+        if self._entity_tooltip_hide_after_id:
+            try:
+                self.after_cancel(self._entity_tooltip_hide_after_id)
+            except Exception:
+                pass
+            self._entity_tooltip_hide_after_id = None
+
     def _hide_entity_tooltip(self):
+        self._cancel_entity_tooltip_hide()
         if self._entity_tooltip_window:
             try:
                 self._entity_tooltip_window.destroy()
             except Exception:
                 pass
             self._entity_tooltip_window = None
+        self._entity_tooltip_active_tag = None
 
     def _dismiss_entity_tooltip(self):
         self._cancel_entity_tooltip_schedule()
         self._hide_entity_tooltip()
 
-    def _schedule_entity_tooltip(self, root_x, root_y, entity_info):
+    def _schedule_entity_tooltip_hide(self, tag, delay=ENTITY_TOOLTIP_HIDE_DELAY_MS):
+        if tag and self._entity_tooltip_active_tag and tag != self._entity_tooltip_active_tag:
+            return
+        self._cancel_entity_tooltip_hide()
+        self._entity_tooltip_hide_after_id = self.after(delay, self._dismiss_entity_tooltip)
+
+    def _schedule_entity_tooltip(self, root_x, root_y, entity_info, tag):
         self._cancel_entity_tooltip_schedule()
-        self._entity_tooltip_pending = (root_x, root_y, entity_info)
+        self._entity_tooltip_pending = (root_x, root_y, entity_info, tag)
         self._entity_tooltip_after_id = self.after(
             250,
-            lambda: self._show_entity_tooltip_at(root_x, root_y, entity_info)
+            lambda: self._show_entity_tooltip_at(root_x, root_y, entity_info, tag)
         )
 
-    def _show_entity_tooltip_at(self, root_x, root_y, entity_info):
+    def _show_entity_tooltip_at(self, root_x, root_y, entity_info, tag):
         self._entity_tooltip_after_id = None
         self._entity_tooltip_pending = None
         text = self._compose_entity_tooltip_text(entity_info)
         if not text:
             return
         self._hide_entity_tooltip()
+        self._entity_tooltip_active_tag = tag
         tw = tk.Toplevel(self.canvas)
         tw.wm_overrideredirect(True)
         try:
@@ -1577,13 +1598,15 @@ class ScenarioGraphEditor(ctk.CTkFrame):
         label.pack(pady=text_padding)
         self._entity_tooltip_window = tw
 
-    def _on_entity_hover_enter(self, event, entity_info):
+    def _on_entity_hover_enter(self, event, entity_info, tag):
         root_x = self.canvas.winfo_rootx() + event.x
         root_y = self.canvas.winfo_rooty() + event.y
-        self._schedule_entity_tooltip(root_x, root_y, entity_info)
+        self._entity_tooltip_active_tag = tag
+        self._cancel_entity_tooltip_hide()
+        self._schedule_entity_tooltip(root_x, root_y, entity_info, tag)
 
-    def _on_entity_hover_leave(self, event=None):
-        self._dismiss_entity_tooltip()
+    def _on_entity_hover_leave(self, event=None, tag=None):
+        self._schedule_entity_tooltip_hide(tag)
 
     def _bind_entity_tooltip(self, tag, entity_info):
         if not self.canvas:
@@ -1591,11 +1614,11 @@ class ScenarioGraphEditor(ctk.CTkFrame):
         self.canvas.tag_bind(
             tag,
             "<Enter>",
-            lambda event, info=entity_info: self._on_entity_hover_enter(event, info),
+            lambda event, info=entity_info, t=tag: self._on_entity_hover_enter(event, info, t),
             add="+"
         )
-        self.canvas.tag_bind(tag, "<Leave>", self._on_entity_hover_leave, add="+")
-        self.canvas.tag_bind(tag, "<ButtonPress>", self._on_entity_hover_leave, add="+")
+        self.canvas.tag_bind(tag, "<Leave>", lambda event, t=tag: self._on_entity_hover_leave(event, t), add="+")
+        self.canvas.tag_bind(tag, "<ButtonPress>", lambda event, t=tag: self._on_entity_hover_leave(event, t), add="+")
 
     def _find_mentions(self, text, candidates):
         if not text or not candidates:
