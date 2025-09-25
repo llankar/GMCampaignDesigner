@@ -92,13 +92,37 @@ def _render_map_image(self):
         if item_type == 'marker':
             continue
         if item_type == 'token':
+            source = item.get('source_image')
             pil = item.get('pil_image')
-            if pil:
+            size_px = item.get('size')
+            if size_px is None:
+                if source is not None:
+                    size_px = source.size[0]
+                elif pil is not None:
+                    size_px = pil.size[0]
+                else:
+                    size_px = getattr(self, 'token_size', 64)
+            try:
+                size_px = max(1, int(size_px))
+            except Exception:
+                size_px = max(1, int(getattr(self, 'token_size', 64)))
+
+            if source is not None:
+                nw = nh = max(1, int(size_px * self.zoom))
+                if nw <= 0 or nh <= 0:
+                    continue
+                img_r = source.resize((nw, nh), Image.LANCZOS)
+            elif pil:
                 tw, th = pil.size
                 nw, nh = int(tw * self.zoom), int(th * self.zoom)
+                if nw <= 0 or nh <= 0:
+                    continue
                 img_r = pil.resize((nw, nh), Image.LANCZOS)
-                img.paste(img_r, (sx, sy), img_r.convert('RGBA'))
-                draw.rectangle([sx - 3, sy - 3, sx + nw + 3, sy + nh + 3], outline=item.get('border_color', '#0000ff'), width=3)
+            else:
+                continue
+
+            img.paste(img_r, (sx, sy), img_r.convert('RGBA'))
+            draw.rectangle([sx - 3, sy - 3, sx + nw + 3, sy + nh + 3], outline=item.get('border_color', '#0000ff'), width=3)
         elif item_type in ['rectangle', 'oval']:
             shape_w = int(item.get('width', 50) * self.zoom)
             shape_h = int(item.get('height', 50) * self.zoom)

@@ -1143,11 +1143,34 @@ class DisplayMapController:
         for item in self.tokens:
             item_type = item.get("type", "token"); xw, yw = item['position']
             if item_type == "token":
-                pil = item.get('pil_image');
-                if not pil: continue
-                tw, th = pil.size; nw, nh = int(tw*self.zoom), int(th*self.zoom)
-                if nw <=0 or nh <=0: continue
-                img_r = pil.resize((nw,nh), resample=resample); tkimg = ImageTk.PhotoImage(img_r); item['tk_image'] = tkimg
+                source = item.get('source_image')
+                pil = item.get('pil_image')
+                size_px = item.get('size')
+                if size_px is None:
+                    if source is not None:
+                        size_px = source.size[0]
+                    elif pil is not None:
+                        size_px = pil.size[0]
+                    else:
+                        size_px = self.token_size
+                try:
+                    size_px = max(1, int(size_px))
+                except Exception:
+                    size_px = max(1, int(self.token_size))
+
+                if source is not None:
+                    nw = nh = max(1, int(size_px * self.zoom))
+                    if nw <= 0 or nh <= 0:
+                        continue
+                    img_r = source.resize((nw, nh), resample=resample)
+                else:
+                    if not pil:
+                        continue
+                    tw, th = pil.size; nw, nh = int(tw*self.zoom), int(th*self.zoom)
+                    if nw <=0 or nh <=0: continue
+                    img_r = pil.resize((nw,nh), resample=resample)
+
+                tkimg = ImageTk.PhotoImage(img_r); item['tk_image'] = tkimg
                 sx, sy = int(xw*self.zoom + self.pan_x), int(yw*self.zoom + self.pan_y)
                 if item.get('canvas_ids'):
                     b_id, i_id = item['canvas_ids']
@@ -1504,22 +1527,24 @@ class DisplayMapController:
 
         if new_size is not None and new_size > 0:
             token["size"] = new_size
-            
-            # If the token's visual representation (pil_image) depends on its size
-            # and is loaded from an image_path, it needs to be re-processed.
+
+            source_img = token.get("source_image")
+
+            # If the token's visual representation depends on a disk image,
+            # reuse the cached high-resolution copy when possible.
             if "image_path" in token and token["image_path"]:
                 try:
-                    # Image is already imported from PIL at the top of the file
-                    pil_img = Image.open(token["image_path"]).convert("RGBA")
-                    # Assuming square tokens for simplicity, adjust if aspect ratio is preserved
-                    token["pil_image"] = pil_img.resize((new_size, new_size), Image.LANCZOS)
+                    if source_img is None:
+                        source_img = Image.open(token["image_path"]).convert("RGBA")
+                    token["source_image"] = source_img
+                    token["pil_image"] = source_img.resize((new_size, new_size), Image.LANCZOS)
                 except FileNotFoundError:
                     print(f"Error: Image file not found for token: {token['image_path']}")
-                    # Decide on fallback: keep old image, clear image, or use placeholder
                 except Exception as e:
                     print(f"Error reloading image for resized token: {e}")
-                    # Keep old pil_image or set to None
-            
+            elif source_img is not None:
+                token["pil_image"] = source_img.resize((new_size, new_size), Image.LANCZOS)
+
             self._update_canvas_images() # Redraw canvas to reflect new token size
             self._persist_tokens()       # Save the changes
         # else:
@@ -1626,7 +1651,7 @@ class DisplayMapController:
         active_item = item_to_copy if item_to_copy else self.selected_token
         #if not active_item: return
         self.clipboard_token = active_item.copy()
-        for key_to_pop in ['pil_image', 'tk_image', 'entity_record',
+        for key_to_pop in ['pil_image', 'source_image', 'tk_image', 'entity_record',
                            'canvas_ids', 'hp_canvas_ids', 'name_id',
                            'hp_entry_widget', 'hp_entry_widget_id',
                            'max_hp_entry_widget', 'max_hp_entry_widget_id',
@@ -1659,13 +1684,16 @@ class DisplayMapController:
             if "image_path" in new_item_data and new_item_data["image_path"]:
                 try:
                     sz = new_item_data.get("size", self.token_size)
-                    pil_img = Image.open(new_item_data["image_path"]).convert("RGBA")
-                    new_item_data["pil_image"] = pil_img.resize((sz, sz), Image.LANCZOS)
+                    source_img = Image.open(new_item_data["image_path"]).convert("RGBA")
+                    new_item_data["source_image"] = source_img
+                    new_item_data["pil_image"] = source_img.resize((sz, sz), Image.LANCZOS)
                 except Exception as e:
                     print(f"Error reloading image for pasted token: {e}")
+                    new_item_data["source_image"] = None
                     new_item_data["pil_image"] = None # Or a placeholder
             else: # No image_path, or it was removed during copy
-                 new_item_data["pil_image"] = None # Or a placeholder
+                new_item_data["source_image"] = None # Or a placeholder
+                new_item_data["pil_image"] = None # Or a placeholder
             
             # Ensure token-specific fields that might not be in clipboard are defaulted
             new_item_data.setdefault("entity_type", "Unknown") # Default if missing

@@ -79,19 +79,39 @@ def _update_fullscreen_map(self):
             continue
 
         if item_type == "token":
+            source = item.get('source_image')
             pil = item.get('pil_image')
-            if not pil:
-                continue
+            size_px = item.get('size')
+            if size_px is None:
+                if source is not None:
+                    size_px = source.size[0]
+                elif pil is not None:
+                    size_px = pil.size[0]
+                else:
+                    size_px = getattr(self, 'token_size', 64)
+            try:
+                size_px = max(1, int(size_px))
+            except Exception:
+                size_px = max(1, int(getattr(self, 'token_size', 64)))
 
-            tw, th = pil.size
-            if tw <= 0 or th <= 0:
-                continue
-            
-            nw, nh = int(tw * self.zoom), int(th * self.zoom)
-            if nw <= 0 or nh <= 0:
-                continue
-            
-            img_r = pil.resize((nw, nh), resample=Image.LANCZOS)
+            if source is not None:
+                nw = nh = max(1, int(size_px * self.zoom))
+                if nw <= 0 or nh <= 0:
+                    continue
+                img_r = source.resize((nw, nh), resample=Image.LANCZOS)
+            else:
+                if not pil:
+                    continue
+
+                tw, th = pil.size
+                if tw <= 0 or th <= 0:
+                    continue
+
+                nw, nh = int(tw * self.zoom), int(th * self.zoom)
+                if nw <= 0 or nh <= 0:
+                    continue
+
+                img_r = pil.resize((nw, nh), resample=Image.LANCZOS)
             fsimg = ImageTk.PhotoImage(img_r)
             item['fs_tk'] = fsimg # Store the PhotoImage to prevent garbage collection
 

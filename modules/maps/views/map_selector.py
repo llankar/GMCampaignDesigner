@@ -148,24 +148,29 @@ def _on_display_map(self, entity_type, map_name): # entity_type here is the map'
             
             sz   = rec.get("size", self.token_size) # Use self.token_size as default
             pil_image = None
+            source_image = None
             try:
                 if path and os.path.exists(path): # Check if path exists
-                    pil_image = Image.open(path).convert("RGBA")
-                    pil_image = pil_image.resize((sz, sz), resample=Image.LANCZOS)
+                    source_image = Image.open(path).convert("RGBA")
+                    pil_image = source_image.resize((sz, sz), resample=Image.LANCZOS)
                 elif path: # Path provided but does not exist
                      print(f"[_on_display_map] Token image path not found: '{path}'. Creating placeholder.")
                      pil_image = Image.new("RGBA", (sz, sz), (255, 0, 0, 128)) # Red placeholder
+                     source_image = pil_image
                 else: # No path provided for a token
                     print(f"[_on_display_map] Token missing image_path. Creating placeholder for ID: {rec.get('entity_id')}.")
                     pil_image = Image.new("RGBA", (sz, sz), (255, 0, 0, 128)) # Red placeholder
+                    source_image = pil_image
             except Exception as e:
                 print(f"[_on_display_map] Failed to load token image '{path}': {e}. Creating placeholder.")
                 pil_image = Image.new("RGBA", (sz, sz), (255, 0, 0, 128)) # Red placeholder on any error
+                source_image = pil_image
 
             item_data.update({
                 "entity_type":  rec.get("entity_type"), # Must come from record for tokens
                 "entity_id":    rec.get("entity_id"),
                 "image_path":   path,
+                "source_image": source_image,
                 "pil_image":    pil_image,
                 "border_color": rec.get("border_color", "#0000ff"), # Default blue for tokens
                 "size":         sz,
