@@ -237,9 +237,9 @@ class DisplayMapController:
             tk_font = tkfont.nametofont(font_name) if font_name else tkfont.nametofont("TkDefaultFont")
             measured = tk_font.measure(text or " ")
         except Exception:
-            measured = max(8 * len(text), 80)
-        base_width = max(60, min(measured + 32, 600))
-        expanded_width = max(base_width, min(measured + 96, 800))
+            measured = max(6 * max(len(text), 1), 20)
+        base_width = max(40, min(measured + 24, 480))
+        expanded_width = max(base_width, min(measured + 80, 700))
         marker["entry_width"] = base_width
         marker["entry_expanded_width"] = expanded_width
         entry.configure(width=base_width)
