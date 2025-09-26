@@ -296,12 +296,13 @@ class GenericEditorWindow(ctk.CTkToplevel):
         if self._ai_client is None:
             self._ai_client = LocalAIClient()
         return self._ai_client
-    def _make_richtext_editor(self, parent, initial_text, hide_toolbar=True):
+    def _make_richtext_editor(self, parent, initial_text, hide_toolbar=True, max_lines=None):
         """
         Shared initialization for any RichTextEditor-based field.
         Returns the editor instance.
         """
-        editor = RichTextEditor(parent)
+        line_limit = 100 if max_lines is None else max_lines
+        editor = RichTextEditor(parent, max_lines=line_limit)
         editor.text_widget.configure(
             bg="#2B2B2B", fg="white", insertbackground="white"
         )
@@ -575,7 +576,7 @@ class GenericEditorWindow(ctk.CTkToplevel):
             ).pack(side="right")
 
             text_data = data.get("Text") or data.get("text") or ""
-            rte = self._make_richtext_editor(row, text_data, hide_toolbar=True)
+            rte = self._make_richtext_editor(row, text_data, hide_toolbar=True, max_lines=12)
             rte.pack_configure(pady=4)
             scene_state["editor"] = rte
 
