@@ -7,8 +7,9 @@ from modules.helpers.logging_helper import log_module_import
 log_module_import(__name__)
 
 class RichTextEditor(ctk.CTkFrame):
-    def __init__(self, master, initial_text=""):
+    def __init__(self, master, initial_text="", max_lines=100):
         super().__init__(master)
+        self.max_lines = max_lines
         # Global toolbar at the top (exposed as self.toolbar)
         self.toolbar = ctk.CTkFrame(self)
         self.toolbar.pack(fill="x", padx=5, pady=5)
@@ -52,7 +53,7 @@ class RichTextEditor(ctk.CTkFrame):
     
     def update_text_height(self, event=None):
         lines = int(self.text_widget.count("1.0", "end", "displaylines")[0])
-        clamped = max(1, min(lines, 100))
+        clamped = max(1, min(lines, self.max_lines))
         self.text_widget.configure(height=clamped)
     # ----------------------
     # Formatting Functions
