@@ -523,8 +523,16 @@ class GenericEditorWindow(ctk.CTkToplevel):
                 except Exception:
                     pass
 
+            container = state.get("links_container")
+            if container is not None and not container.winfo_children():
+                container.pack_forget()
+
         def add_link_row(state, link=None):
-            link_row = ctk.CTkFrame(state["links_container"], fg_color="transparent")
+            container = state["links_container"]
+            if not container.winfo_manager():
+                container.pack(fill="x", padx=16, pady=(2, 2))
+
+            link_row = ctk.CTkFrame(container, fg_color="transparent")
             link_row.pack(fill="x", pady=1)
             target_entry = ctk.CTkEntry(link_row, placeholder_text="Target scene (name or number)")
             target_entry.pack(side="left", fill="x", expand=True, padx=(0, 8))
@@ -621,7 +629,6 @@ class GenericEditorWindow(ctk.CTkToplevel):
             ctk.CTkLabel(links_outer, text="Scene Links:").pack(anchor="w")
 
             links_container = ctk.CTkFrame(links_outer, fg_color="transparent")
-            links_container.pack(fill="x", padx=16, pady=(2, 2))
             scene_state["links_container"] = links_container
             scene_state["link_rows"] = []
 
