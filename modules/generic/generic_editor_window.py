@@ -459,7 +459,17 @@ class GenericEditorWindow(ctk.CTkToplevel):
                 return
             for child in frame.winfo_children():
                 child.destroy()
-            for name in state["entities"].get(label, []):
+
+            entries = state["entities"].get(label, [])
+            if not entries:
+                if frame.winfo_manager():
+                    frame.pack_forget()
+                return
+
+            if not frame.winfo_manager():
+                frame.pack(fill="x", padx=20, pady=(1, 0))
+
+            for name in entries:
                 chip = ctk.CTkFrame(frame, fg_color="#3A3A3A")
                 chip.pack(side="left", padx=4, pady=2)
                 ctk.CTkLabel(chip, text=name).pack(side="left", padx=(6, 2))
@@ -467,6 +477,8 @@ class GenericEditorWindow(ctk.CTkToplevel):
                 def _remove(n=name, lbl=label, st=state, widget=chip):
                     st["entities"][lbl] = [x for x in st["entities"].get(lbl, []) if x != n]
                     widget.destroy()
+                    if not st["entities"].get(lbl):
+                        frame.pack_forget()
 
                 ctk.CTkButton(chip, text="×", width=24, command=_remove).pack(side="left", padx=(0, 6))
 
@@ -600,7 +612,6 @@ class GenericEditorWindow(ctk.CTkToplevel):
                 ).pack(side="left", padx=(8, 0))
 
                 chip_frame = ctk.CTkFrame(block, fg_color="transparent")
-                chip_frame.pack(fill="x", padx=20, pady=(1, 0))
                 scene_state["entity_chip_frames"][label] = chip_frame
                 scene_state["entities"][label] = _coerce_names(data.get(label))
                 refresh_entity_chips(scene_state, label)
