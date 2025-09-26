@@ -377,7 +377,7 @@ class GenericEditorWindow(ctk.CTkToplevel):
 
     def create_dynamic_longtext_list(self, field):
         container = ctk.CTkFrame(self.scroll_frame)
-        container.pack(fill="x", pady=5)
+        container.pack(fill="x", pady=4)
 
         editors = []
         entity_type_map = {
@@ -512,7 +512,7 @@ class GenericEditorWindow(ctk.CTkToplevel):
 
         def add_link_row(state, link=None):
             link_row = ctk.CTkFrame(state["links_container"], fg_color="transparent")
-            link_row.pack(fill="x", pady=2)
+            link_row.pack(fill="x", pady=1)
             target_entry = ctk.CTkEntry(link_row, placeholder_text="Target scene (name or number)")
             target_entry.pack(side="left", fill="x", expand=True, padx=(0, 8))
             text_entry = ctk.CTkEntry(link_row, placeholder_text="Displayed link text")
@@ -549,10 +549,10 @@ class GenericEditorWindow(ctk.CTkToplevel):
                 data = {"Text": data}
 
             row = ctk.CTkFrame(container)
-            row.pack(fill="x", pady=(0, 12))
+            row.pack(fill="x", pady=(0, 8))
 
             header = ctk.CTkFrame(row, fg_color="transparent")
-            header.pack(fill="x", pady=(0, 4))
+            header.pack(fill="x", pady=(0, 2))
 
             scene_state = {"frame": row}
 
@@ -576,16 +576,17 @@ class GenericEditorWindow(ctk.CTkToplevel):
 
             text_data = data.get("Text") or data.get("text") or ""
             rte = self._make_richtext_editor(row, text_data, hide_toolbar=True)
+            rte.pack_configure(pady=4)
             scene_state["editor"] = rte
 
             entity_section = ctk.CTkFrame(row, fg_color="transparent")
-            entity_section.pack(fill="x", padx=4, pady=(4, 2))
+            entity_section.pack(fill="x", padx=4, pady=(2, 2))
             scene_state["entities"] = {}
             scene_state["entity_chip_frames"] = {}
 
             for label in entity_type_map:
                 block = ctk.CTkFrame(entity_section, fg_color="transparent")
-                block.pack(fill="x", pady=(2, 0))
+                block.pack(fill="x", pady=(1, 0))
 
                 header_frame = ctk.CTkFrame(block, fg_color="transparent")
                 header_frame.pack(fill="x")
@@ -598,17 +599,17 @@ class GenericEditorWindow(ctk.CTkToplevel):
                 ).pack(side="left", padx=(8, 0))
 
                 chip_frame = ctk.CTkFrame(block, fg_color="transparent")
-                chip_frame.pack(fill="x", padx=20, pady=(2, 0))
+                chip_frame.pack(fill="x", padx=20, pady=(1, 0))
                 scene_state["entity_chip_frames"][label] = chip_frame
                 scene_state["entities"][label] = _coerce_names(data.get(label))
                 refresh_entity_chips(scene_state, label)
 
             links_outer = ctk.CTkFrame(row, fg_color="transparent")
-            links_outer.pack(fill="x", padx=4, pady=(6, 0))
+            links_outer.pack(fill="x", padx=4, pady=(4, 0))
             ctk.CTkLabel(links_outer, text="Scene Links:").pack(anchor="w")
 
             links_container = ctk.CTkFrame(links_outer, fg_color="transparent")
-            links_container.pack(fill="x", padx=16, pady=(2, 4))
+            links_container.pack(fill="x", padx=16, pady=(2, 2))
             scene_state["links_container"] = links_container
             scene_state["link_rows"] = []
 
@@ -620,7 +621,7 @@ class GenericEditorWindow(ctk.CTkToplevel):
                 text="+ Add Link",
                 width=110,
                 command=lambda st=scene_state: add_link_row(st),
-            ).pack(anchor="w", padx=16, pady=(0, 4))
+            ).pack(anchor="w", padx=16, pady=(0, 2))
 
             editors.append(scene_state)
             renumber_scenes()
@@ -643,7 +644,7 @@ class GenericEditorWindow(ctk.CTkToplevel):
             container,
             text="+ Add Scene",
             command=lambda: add_scene({}),
-        ).pack(anchor="w", pady=(5, 0))
+        ).pack(anchor="w", pady=(4, 0))
 
         self.field_widgets[field["name"]] = editors
         self.field_widgets[f"{field['name']}_container"] = container
