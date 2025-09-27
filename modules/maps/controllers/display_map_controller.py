@@ -7,7 +7,14 @@ from tkinter import font as tkfont
 from types import SimpleNamespace
 import customtkinter as ctk
 from modules.maps.views.map_selector import select_map, _on_display_map
-from modules.maps.views.toolbar_view import _build_toolbar, _on_brush_size_change, _on_brush_shape_change, _change_brush, _on_token_size_change
+from modules.maps.views.toolbar_view import (
+    _build_toolbar,
+    _on_brush_size_change,
+    _on_brush_shape_change,
+    _change_brush,
+    _on_token_size_change,
+    _update_fog_button_states,
+)
 from modules.maps.views.canvas_view import _build_canvas, _on_delete_key
 from modules.maps.services.fog_manager import _set_fog, clear_fog, reset_fog, on_paint
 # Removed direct imports from token_manager, as methods are now part of this controller or generic
@@ -1933,6 +1940,7 @@ class DisplayMapController:
     _on_display_map = _on_display_map
     
     _on_token_size_change = _on_token_size_change # Global token size slider
+    _update_fog_button_states = _update_fog_button_states
     _persist_tokens = _persist_tokens # From token_manager, saves self.tokens
     _resize_token_dialog = _resize_token_dialog # Specific to tokens via old menu
     _set_fog = _set_fog
