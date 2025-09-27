@@ -78,7 +78,7 @@ class DisplayMapController:
         self.hover_font_size = 14
         self.hover_font = ctk.CTkFont(size=self.hover_font_size)
         self.brush_shape = "rectangle"
-        self.fog_mode    = "add"
+        self.fog_mode    = None
         self.tokens      = [] # List of all items (tokens and shapes)
         
         self.drawing_mode = "token"

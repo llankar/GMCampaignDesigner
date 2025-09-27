@@ -87,6 +87,8 @@ def on_paint2(self, event):
     """Paint or erase fog using a square brush of size self.brush_size,
        with semi-transparent black (alpha=128) for fog."""
     # Prevent fog painting if a drag operation is in progress for any item
+    if self.fog_mode not in ("add", "rem"):
+        return
     if any(t.get('drag_data') for t in self.tokens):
         return
     if not self.mask_img:
