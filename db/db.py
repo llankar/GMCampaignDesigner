@@ -20,6 +20,7 @@ _SQLITE_TYPE = {
     "list":     "TEXT",  # we’ll store lists as JSON strings
     "file":     "TEXT",
     "float":    "REAL",
+    "int":      "INTEGER",
     "audio":    "TEXT",
 }
 
