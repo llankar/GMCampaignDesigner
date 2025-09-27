@@ -1,6 +1,6 @@
 import sqlite3
 import json
-from db.db import get_connection
+from db.db import get_connection, load_schema_from_json
 from modules.helpers.logging_helper import log_module_import
 
 log_module_import(__name__)
@@ -35,48 +35,94 @@ class GenericModelWrapper:
         return items
 
 
+    def _ensure_schema(self, cursor, items):
+        """Ensure that any new fields present in ``items`` exist in the table."""
+        cursor.execute(f"PRAGMA table_info({self.table})")
+        existing_columns = {row[1] for row in cursor.fetchall()}
+
+        # Attempt to load template information for better type inference
+        try:
+            template_schema = {col: typ for col, typ in load_schema_from_json(self.table)}
+        except Exception:
+            template_schema = {}
+
+        for item in items:
+            for key, value in item.items():
+                if key in existing_columns:
+                    continue
+
+                column_type = template_schema.get(key)
+                if not column_type:
+                    if isinstance(value, bool):
+                        column_type = "BOOLEAN"
+                    elif isinstance(value, int):
+                        column_type = "INTEGER"
+                    elif isinstance(value, float):
+                        column_type = "REAL"
+                    else:
+                        column_type = "TEXT"
+
+                try:
+                    cursor.execute(
+                        f"ALTER TABLE {self.table} ADD COLUMN {key} {column_type}"
+                    )
+                    existing_columns.add(key)
+                except sqlite3.OperationalError as exc:
+                    if "duplicate column name" in str(exc).lower():
+                        existing_columns.add(key)
+                    else:
+                        raise
+
+        return existing_columns
+
     def save_items(self, items):
         conn = get_connection()
+        conn.execute("PRAGMA busy_timeout = 5000")
         cursor = conn.cursor()
-        
-        # Détermine le champ unique à utiliser
-        if items:
-            sample_item = items[0]
-            if "Name" in sample_item:
-                unique_field = "Name"
-            elif "Title" in sample_item:
-                unique_field = "Title"
-            else:
-                unique_field = list(sample_item.keys())[0]
-        else:
-            unique_field = "Name"  # Valeur par défaut si la liste est vide
 
-        # Insertion ou mise à jour (INSERT OR REPLACE)
-        for item in items:
-            keys = list(item.keys())
-            values = []
-            for key in keys:
-                val = item[key]
-                if isinstance(val, (list, dict)):
-                    val = json.dumps(val)
-                values.append(val)
-            placeholders = ", ".join("?" for _ in keys)
-            cols = ", ".join(keys)
-            sql = f"INSERT OR REPLACE INTO {self.table} ({cols}) VALUES ({placeholders})"
-            cursor.execute(sql, values)
-        
-        # Gestion du cas de suppression :
-        # On construit la liste des identifiants uniques présents dans les items
-        unique_ids = [item[unique_field] for item in items if unique_field in item]
-        
-        if unique_ids:
-            placeholders = ", ".join("?" for _ in unique_ids)
-            delete_sql = f"DELETE FROM {self.table} WHERE {unique_field} NOT IN ({placeholders})"
-            cursor.execute(delete_sql, unique_ids)
-        else:
-            # S'il n'y a aucun item, supprimer tous les enregistrements de la table
-            delete_sql = f"DELETE FROM {self.table}"
-            cursor.execute(delete_sql)
-        
-        conn.commit()
-        conn.close()
+        try:
+            existing_columns = self._ensure_schema(cursor, items)
+
+            # Détermine le champ unique à utiliser
+            if items:
+                sample_item = items[0]
+                if "Name" in sample_item:
+                    unique_field = "Name"
+                elif "Title" in sample_item:
+                    unique_field = "Title"
+                else:
+                    unique_field = list(sample_item.keys())[0]
+            else:
+                unique_field = "Name"  # Valeur par défaut si la liste est vide
+
+            # Insertion ou mise à jour (INSERT OR REPLACE)
+            for item in items:
+                keys = [key for key in item.keys() if key in existing_columns]
+                values = []
+                for key in keys:
+                    val = item[key]
+                    if isinstance(val, (list, dict)):
+                        val = json.dumps(val)
+                    values.append(val)
+                placeholders = ", ".join("?" for _ in keys)
+                cols = ", ".join(keys)
+                sql = f"INSERT OR REPLACE INTO {self.table} ({cols}) VALUES ({placeholders})"
+                if keys:
+                    cursor.execute(sql, values)
+
+            # Gestion du cas de suppression :
+            # On construit la liste des identifiants uniques présents dans les items
+            unique_ids = [item[unique_field] for item in items if unique_field in item]
+
+            if unique_ids:
+                placeholders = ", ".join("?" for _ in unique_ids)
+                delete_sql = f"DELETE FROM {self.table} WHERE {unique_field} NOT IN ({placeholders})"
+                cursor.execute(delete_sql, unique_ids)
+            else:
+                # S'il n'y a aucun item, supprimer tous les enregistrements de la table
+                delete_sql = f"DELETE FROM {self.table}"
+                cursor.execute(delete_sql)
+
+            conn.commit()
+        finally:
+            conn.close()
