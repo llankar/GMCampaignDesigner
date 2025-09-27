@@ -32,8 +32,36 @@ def _build_toolbar(self):
     }
 
     # Fog controls
-    create_icon_button(toolbar, icons["add"],   "Add Fog",     command=lambda: self._set_fog("add")).pack(side="left")
-    create_icon_button(toolbar, icons["rem"],   "Remove Fog",  command=lambda: self._set_fog("rem")).pack(side="left")
+    self._fog_button_default_style = {
+        "fg_color": "#0077CC",
+        "hover_color": "#005fa3",
+        "border_color": "#005fa3",
+    }
+    self._fog_button_active_style = {
+        "fg_color": "#004c80",
+        "hover_color": "#004c80",
+        "border_color": "#33a8ff",
+    }
+    self._fog_buttons = {}
+
+    add_fog_container = create_icon_button(
+        toolbar,
+        icons["add"],
+        "Add Fog",
+        command=lambda: self._set_fog("add")
+    )
+    add_fog_container.pack(side="left")
+    self._fog_buttons["add"] = getattr(add_fog_container, "button", None)
+
+    rem_fog_container = create_icon_button(
+        toolbar,
+        icons["rem"],
+        "Remove Fog",
+        command=lambda: self._set_fog("rem")
+    )
+    rem_fog_container.pack(side="left")
+    self._fog_buttons["rem"] = getattr(rem_fog_container, "button", None)
+
     create_icon_button(toolbar, icons["clear"], "Clear Fog",   command=self.clear_fog).pack(side="left")
     create_icon_button(toolbar, icons["reset"], "Reset Fog",   command=self.reset_fog).pack(side="left")
     create_icon_button(toolbar, icons["save"],  "Save Map",    command=self.save_map).pack(side="left")
@@ -183,6 +211,8 @@ def _build_toolbar(self):
     if hasattr(self, '_update_shape_controls_visibility'):
         self._update_shape_controls_visibility()
 
+    self._update_fog_button_states()
+
 def _on_brush_size_change(self, val): # This is for FOG brush
     try:
         size = int(val)
@@ -242,6 +272,24 @@ def _on_token_size_change(self, val):
             self.token_size_value_label.configure(text=str(self.token_size))
         except tk.TclError:
             pass
+
+
+def _update_fog_button_states(self):
+    """Update fog button appearance to reflect the active fog tool."""
+    buttons = getattr(self, "_fog_buttons", {})
+    default_style = getattr(self, "_fog_button_default_style", {})
+    active_style = getattr(self, "_fog_button_active_style", {})
+    active_mode = getattr(self, "fog_mode", None)
+
+    for mode, button in buttons.items():
+        if not button:
+            continue
+        style = active_style if mode == active_mode else default_style
+        try:
+            button.configure(**style)
+        except tk.TclError:
+            # If the button has been destroyed, ignore the update.
+            continue
 
 # Placeholder for new callbacks in DisplayMapController - these will be defined there.
 # def _on_drawing_tool_change(self, selected_tool):

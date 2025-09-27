@@ -36,6 +36,12 @@ def create_icon_button(parent, icon, tooltip_text, command):
         btn.configure(font=("Segoe UI", 14, "bold"))
 
     btn.pack(fill="both", expand=True)
+
+    # Expose the underlying button widget so callers can adjust its
+    # configuration after creation (for example, to reflect toggled states).
+    # This keeps backwards compatibility by still returning the container.
+    container.icon_button = btn
+    container.button = btn
     ToolTip(btn, tooltip_text)
     return container
 

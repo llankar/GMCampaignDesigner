@@ -4,7 +4,18 @@ from modules.helpers.logging_helper import log_module_import
 log_module_import(__name__)
 
 def _set_fog(self, mode):
-    self.fog_mode = mode
+    """Toggle the active fog brush mode between add/remove/none."""
+    if mode not in ("add", "rem"):
+        new_mode = None
+    else:
+        current = getattr(self, "fog_mode", None)
+        new_mode = None if current == mode else mode
+
+    self.fog_mode = new_mode
+
+    updater = getattr(self, "_update_fog_button_states", None)
+    if callable(updater):
+        updater()
 
 def clear_fog(self):
     self.mask_img = Image.new("RGBA", self.base_img.size, (0,0,0,0))
@@ -17,6 +28,8 @@ def reset_fog(self):
 def on_paint(self, event):
     """Paint or erase fog using a square brush of size self.brush_size,
        with semi-transparent black (alpha=128) for fog."""
+    if self.fog_mode not in ("add", "rem"):
+        return
     if any('drag_data' in t for t in self.tokens):
         return
     if not self.mask_img:
