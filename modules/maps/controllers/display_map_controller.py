@@ -205,11 +205,17 @@ class DisplayMapController:
         entry = marker.get("entry_widget")
         if entry and entry.winfo_exists():
             text = entry.get()
-            if marker.get("text") != text:
-                marker["text"] = text
-                self._update_marker_entry_dimensions(marker)
-                if persist:
-                    self._persist_tokens()
+        else:
+            text = marker.get("text", "") or ""
+
+        previous_text = marker.get("text", "") or ""
+        if previous_text != text:
+            marker["text"] = text
+            self._update_marker_entry_dimensions(marker, expand=True)
+            if persist:
+                self._persist_tokens()
+        elif persist:
+            self._persist_tokens()
 
     def _on_marker_entry_return(self, event, marker):
         self._on_marker_text_change(marker, persist=True)
@@ -228,10 +234,11 @@ class DisplayMapController:
                 self._persist_tokens()
         self._refresh_marker_description_popup(marker)
 
-    def _update_marker_entry_dimensions(self, marker):
+    def _update_marker_entry_dimensions(self, marker, expand=False):
         entry = marker.get("entry_widget")
         if not entry or not entry.winfo_exists():
             return
+
         text = marker.get("text", "") or ""
         try:
             font_name = entry.cget("font")
@@ -239,18 +246,21 @@ class DisplayMapController:
             measured = tk_font.measure(text or " ")
         except Exception:
             measured = max(6 * max(len(text), 1), 20)
+
         base_width = max(40, min(measured + 24, 480))
         expanded_width = max(base_width, min(measured + 80, 700))
+
         marker["entry_width"] = base_width
         marker["entry_expanded_width"] = expanded_width
+
         entry.configure(width=base_width)
+        if expand and expanded_width > base_width:
+            entry.configure(width=expanded_width)
+
+        self._refresh_marker_description_popup(marker)
 
     def _expand_marker_entry(self, marker):
-        entry = marker.get("entry_widget")
-        expanded = marker.get("entry_expanded_width") or marker.get("entry_width")
-        if entry and entry.winfo_exists() and expanded:
-            entry.configure(width=expanded)
-        self._refresh_marker_description_popup(marker)
+        self._update_marker_entry_dimensions(marker, expand=True)
 
     def _collapse_marker_entry(self, marker):
         entry = marker.get("entry_widget")
@@ -260,7 +270,7 @@ class DisplayMapController:
         self._refresh_marker_description_popup(marker)
 
     def _on_marker_entry_focus_in(self, marker):
-        self._expand_marker_entry(marker)
+        self._refresh_marker_description_popup(marker)
 
     def _on_marker_entry_focus_out(self, marker):
         self._on_marker_text_change(marker, persist=True)
@@ -912,6 +922,12 @@ class DisplayMapController:
             print(f"[DEBUG] _on_mouse_down: Canvas item ID under cursor: {current_ids_under_cursor[0]}, tags: {self.canvas.gettags(current_ids_under_cursor[0])}")
         else:
             print("[DEBUG] _on_mouse_down: No canvas item directly under cursor ('current').")
+
+        if getattr(event, "widget", None) is self.canvas:
+            try:
+                self.canvas.focus_set()
+            except tk.TclError:
+                pass
 
         current_tags = self.canvas.gettags("current")
         handle_type = None
