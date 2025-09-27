@@ -117,8 +117,8 @@ def _build_toolbar(self):
     )
     self.token_size_value_label.pack(side="left", padx=(2,10), pady=8)
 
-    # Hover font size selector
-    hover_font_label = ctk.CTkLabel(toolbar, text="Hover Font Size:")
+    # Info card font size selector
+    hover_font_label = ctk.CTkLabel(toolbar, text="Info Card Font Size:")
     hover_font_label.pack(side="left", padx=(10,2), pady=8)
 
     font_sizes = getattr(self, "hover_font_size_options", [10, 12, 14, 16, 18, 20, 24, 28, 32])

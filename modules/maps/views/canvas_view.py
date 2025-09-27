@@ -44,18 +44,12 @@ def _build_canvas(self):
     # Configure binding might be better on self.canvas if self.parent is not the direct container that resizes
     self.parent.bind("<Configure>",        lambda e: self._update_canvas_images() if self.base_img else None)
 
-    if hasattr(self, "_on_canvas_pointer_leave"):
-        self.canvas.bind("<Leave>", self._on_canvas_pointer_leave)
-
     if hasattr(self, "_on_canvas_focus_out"):
         self.canvas.bind("<FocusOut>", self._on_canvas_focus_out)
 
     if hasattr(self, "_on_application_focus_out") and not getattr(self, "_focus_bindings_registered", False):
         root.bind("<FocusOut>", lambda e: self._on_application_focus_out(), add="+")
         self._focus_bindings_registered = True
-
-    if hasattr(self, "_start_hover_cleanup_loop"):
-        self._start_hover_cleanup_loop()
 
 
 def _on_delete_key(self, event=None):

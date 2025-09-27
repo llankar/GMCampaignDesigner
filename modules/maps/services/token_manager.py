@@ -51,10 +51,8 @@ def add_token(self, path, entity_type, entity_name, entity_record=None):
         "hp_entry_id": None,
         "hover_popup": None,
         "hover_label": None,
-        "hover_hide_job": None,
         "hover_visible": False,
         "hover_bbox": None,
-        "_hover_bound": False,
     }
 
     self.tokens.append(token)
@@ -251,21 +249,13 @@ def _delete_token(self, token):
         del token["max_hp_entry_widget"], token["max_hp_entry_widget_id"]
 
     # 6) The info widget on the right
-    hide_job = token.get("hover_hide_job")
-    if hide_job:
-        try:
-            self.canvas.after_cancel(hide_job)
-        except ValueError:
-            pass
     popup = token.get("hover_popup")
     if popup and popup.winfo_exists():
         popup.destroy()
     token["hover_popup"] = None
     token["hover_label"] = None
-    token["hover_hide_job"] = None
     token["hover_visible"] = False
     token.pop("hover_bbox", None)
-    token.pop("_hover_bound", None)
 
     # 7) Fullscreen mirror items, if present
     if getattr(self, "fs_canvas", None):
