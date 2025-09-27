@@ -36,11 +36,13 @@ def _build_toolbar(self):
         "fg_color": "#0077CC",
         "hover_color": "#005fa3",
         "border_color": "#005fa3",
+        "border_width": 1,
     }
     self._fog_button_active_style = {
         "fg_color": "#004c80",
         "hover_color": "#004c80",
-        "border_color": "#33a8ff",
+        "border_color": "#d7263d",
+        "border_width": 3,
     }
     self._fog_buttons = {}
 
