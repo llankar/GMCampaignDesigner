@@ -213,7 +213,6 @@ def _on_display_map(self, entity_type, map_name): # entity_type here is the map'
                 "entry_widget": None,
                 "description_popup": None,
                 "description_label": None,
-                "description_hide_job": None,
                 "description_visible": False,
                 "description_editor": None,
                 "focus_pending": False,
@@ -224,7 +223,7 @@ def _on_display_map(self, entity_type, map_name): # entity_type here is the map'
 
         self.tokens.append(item_data)
 
-    # 8) Hydrate token metadata for hover display (ONLY FOR TOKENS)
+    # 8) Hydrate token metadata for info card display (ONLY FOR TOKENS)
     for current_item in self.tokens:
         if current_item.get("type", "token") == "token":
             token_entity_type = current_item.get("entity_type")
@@ -244,21 +243,13 @@ def _on_display_map(self, entity_type, map_name): # entity_type here is the map'
                 else:
                     print(f"[_on_display_map] Unknown entity_type '{token_entity_type}' for token ID '{token_entity_id}'. Cannot hydrate info.")
                 current_item["entity_record"] = record
-
-            current_item["hover_popup"] = None
-            current_item["hover_label"] = None
-            current_item["hover_hide_job"] = None
-            current_item["hover_visible"] = False
-            current_item["hover_bbox"] = None
-            current_item["_hover_bound"] = False
         else:
             current_item["entity_record"] = {}
-            current_item["hover_popup"] = None
-            current_item["hover_label"] = None
-            current_item["hover_hide_job"] = None
-            current_item["hover_visible"] = False
-            current_item["hover_bbox"] = None
-            current_item["_hover_bound"] = False
+
+        current_item["hover_popup"] = None
+        current_item["hover_label"] = None
+        current_item["hover_visible"] = False
+        current_item["hover_bbox"] = None
 
     # 9) Finally draw everything onto the canvas
     self._update_canvas_images()

@@ -38,9 +38,6 @@ MIN_ZOOM = 0.1
 ZOOM_STEP = 0.1  # 10% per wheel notch
 ctk.set_appearance_mode("dark")
 
-HOVER_DISMISS_DELAY_MS = 600
-HOVER_CLEANUP_INTERVAL_MS = 200
-
 class DisplayMapController:
     def __init__(self, parent, maps_wrapper, map_template):
         self.parent = parent
@@ -104,11 +101,9 @@ class DisplayMapController:
         self._marker_max_r    = 25
         self._hovered_marker  = None
 
-        self._hover_cleanup_job = None
-
         self._focus_bindings_registered = False
 
-        # Maintain a registry of all hover popup windows (token hovers and marker
+        # Maintain a registry of all popup windows (token info cards and marker
         # descriptions) so the toolbar button can reliably dismiss every one of
         # them even if internal bookkeeping for a token becomes desynchronised.
         self._active_hover_popups = set()
@@ -196,7 +191,6 @@ class DisplayMapController:
             "entry_widget": None,
             "description_popup": None,
             "description_label": None,
-            "description_hide_job": None,
             "description_visible": False,
             "entry_width": 180,
             "focus_pending": True,
@@ -265,16 +259,19 @@ class DisplayMapController:
             entry.configure(width=base)
         self._refresh_marker_description_popup(marker)
 
-    def _on_marker_entry_enter(self, marker):
-        self._hovered_marker = marker
+    def _on_marker_entry_focus_in(self, marker):
         self._expand_marker_entry(marker)
-        self._show_marker_description(marker)
 
-    def _on_marker_entry_leave(self, marker):
+    def _on_marker_entry_focus_out(self, marker):
+        self._on_marker_text_change(marker, persist=True)
         self._collapse_marker_entry(marker)
-        self._schedule_hide_marker_description(marker)
-        if getattr(self, "_hovered_marker", None) is marker:
-            self._hovered_marker = None
+
+    def _on_marker_entry_click(self, event, marker):
+        widget = getattr(event, "widget", None)
+        already_focused = widget is not None and widget.focus_get() is widget
+        if marker.get("description_visible") and already_focused:
+            return
+        self._handle_item_click(event, marker)
 
     def _show_marker_description(self, marker):
         canvas = getattr(self, "canvas", None)
@@ -283,50 +280,22 @@ class DisplayMapController:
         popup = self._ensure_marker_description_popup(marker)
         if not popup:
             return
+        self._hide_all_token_hovers()
         self._hide_other_marker_descriptions(marker)
-        job = marker.get("description_hide_job")
-        if job:
-            try:
-                canvas.after_cancel(job)
-            except ValueError:
-                pass
-            marker["description_hide_job"] = None
         self._refresh_marker_description_popup(marker)
         popup.deiconify()
         popup.lift()
         marker["description_visible"] = True
-
-    def _schedule_hide_marker_description(self, marker, delay=None):
-        canvas = getattr(self, "canvas", None)
-        if not canvas:
-            return
-        if delay is None:
-            delay = HOVER_DISMISS_DELAY_MS
-        job = marker.get("description_hide_job")
-        if job:
-            try:
-                canvas.after_cancel(job)
-            except ValueError:
-                pass
-
-        def _hide():
-            self._hide_marker_description(marker)
-
-        marker["description_hide_job"] = canvas.after(delay, _hide)
+        self._hovered_marker = marker
 
     def _hide_marker_description(self, marker):
         canvas = getattr(self, "canvas", None)
         popup = marker.get("description_popup")
         marker["description_visible"] = False
-        job = marker.get("description_hide_job")
-        if job and canvas:
-            try:
-                canvas.after_cancel(job)
-            except ValueError:
-                pass
-        marker["description_hide_job"] = None
         if popup and popup.winfo_exists():
             popup.withdraw()
+        if getattr(self, "_hovered_marker", None) is marker:
+            self._hovered_marker = None
 
     def _hide_all_marker_descriptions(self):
         for item in getattr(self, "tokens", []):
@@ -352,105 +321,17 @@ class DisplayMapController:
             if isinstance(token, dict) and token.get("hover_visible"):
                 self._hide_token_hover(token)
 
-    def _start_hover_cleanup_loop(self):
-        canvas = getattr(self, "canvas", None)
-        if not canvas or not canvas.winfo_exists():
-            return
-        if self._hover_cleanup_job:
-            try:
-                canvas.after_cancel(self._hover_cleanup_job)
-            except ValueError:
-                pass
-        self._hover_cleanup_job = canvas.after(HOVER_CLEANUP_INTERVAL_MS, self._run_hover_cleanup)
-
-    def _run_hover_cleanup(self):
-        canvas = getattr(self, "canvas", None)
-        if not canvas or not canvas.winfo_exists():
-            self._hover_cleanup_job = None
-            return
-
-        pointer_in_canvas = False
-        canvas_x = canvas_y = None
-        pointer_x = pointer_y = None
-        try:
-            pointer_x, pointer_y = canvas.winfo_pointerxy()
-            canvas_x = pointer_x - canvas.winfo_rootx()
-            canvas_y = pointer_y - canvas.winfo_rooty()
-            pointer_in_canvas = (
-                0 <= canvas_x <= (canvas.winfo_width() or 0)
-                and 0 <= canvas_y <= (canvas.winfo_height() or 0)
-            )
-        except tk.TclError:
-            pointer_in_canvas = False
-
-        hovered_token = None
-        if pointer_in_canvas:
-            for token in getattr(self, "tokens", []):
-                if not isinstance(token, dict):
-                    continue
-                bbox = token.get("hover_bbox")
-                if not bbox:
-                    continue
-                x1, y1, x2, y2 = bbox
-                if x1 <= canvas_x <= x2 and y1 <= canvas_y <= y2:
-                    hovered_token = token
-                    break
-
-        for token in list(getattr(self, "tokens", [])):
-            if not isinstance(token, dict):
-                continue
-            if token.get("hover_visible") and token is not hovered_token:
-                self._hide_token_hover(token)
-
-        def _pointer_over_widget(widget):
-            if pointer_x is None or pointer_y is None:
-                return False
-            try:
-                x1 = widget.winfo_rootx()
-                y1 = widget.winfo_rooty()
-                x2 = x1 + widget.winfo_width()
-                y2 = y1 + widget.winfo_height()
-            except tk.TclError:
-                return False
-            return x1 <= pointer_x <= x2 and y1 <= pointer_y <= y2
-
-        hovered_popup = None
-        if hovered_token:
-            hovered_popup = hovered_token.get("hover_popup")
-
-        hovered_marker_popup = None
-        hovered_marker = getattr(self, "_hovered_marker", None)
-        if hovered_marker and isinstance(hovered_marker, dict):
-            hovered_marker_popup = hovered_marker.get("description_popup")
-
-        for popup in list(self._active_hover_popups):
-            try:
-                exists = popup.winfo_exists()
-            except tk.TclError:
-                exists = False
-            if not exists:
-                continue
-            if hovered_popup and popup is hovered_popup:
-                continue
-            if hovered_marker_popup and popup is hovered_marker_popup:
-                continue
-            if _pointer_over_widget(popup):
-                continue
-            popup.withdraw()
-
-        self._hover_cleanup_job = canvas.after(HOVER_CLEANUP_INTERVAL_MS, self._run_hover_cleanup)
-
     def _on_canvas_focus_out(self, event=None):
         self._hide_all_marker_descriptions()
         self._hide_all_token_hovers()
 
     def clear_hover_windows(self):
-        """Hide all hover-related popups such as token hovers and marker descriptions."""
+        """Hide all token and marker info popups."""
         self._hide_all_token_hovers()
         self._hide_all_marker_descriptions()
         # Explicitly withdraw any hover popup windows that may not be linked to
         # a currently tracked token (for example, if a token was deleted while its
-        # hover window remained). This guarantees that pressing the toolbar button
+        # info card remained). This guarantees that pressing the toolbar button
         # truly clears every hover window from the screen.
         for popup in list(self._active_hover_popups):
             try:
@@ -523,11 +404,7 @@ class DisplayMapController:
             font=getattr(self, "hover_font", None)
         )
         text_label.pack(fill="both", expand=True, padx=12, pady=10)
-        for widget in (toplevel, frame, text_label):
-            widget.bind("<Leave>", lambda e, m=marker: self._schedule_hide_marker_description(m))
-
         def _on_description_double_click(event, m=marker):
-            self._cancel_marker_hide(m)
             self._open_marker_description_editor(m)
             return "break"
 
@@ -642,18 +519,6 @@ class DisplayMapController:
         except Exception as exc:
             print(f"[hover_font_size] Failed to persist hover font size: {exc}")
 
-    def _cancel_marker_hide(self, marker):
-        canvas = getattr(self, "canvas", None)
-        if not canvas:
-            return
-        job = marker.get("description_hide_job")
-        if job:
-            try:
-                canvas.after_cancel(job)
-            except ValueError:
-                pass
-            marker["description_hide_job"] = None
-
     def _get_token_hover_text(self, token):
         record = token.get("entity_record") or {}
         entity_type = token.get("entity_type")
@@ -704,8 +569,6 @@ class DisplayMapController:
             font=getattr(self, "hover_font", None)
         )
         label.pack(fill="both", expand=True, padx=12, pady=10)
-        for widget in (popup, frame, label):
-            widget.bind("<Leave>", lambda e, t=token: self._schedule_hide_token_hover(t))
         self._register_hover_popup(popup)
         token["hover_popup"] = popup
         token["hover_label"] = label
@@ -771,86 +634,17 @@ class DisplayMapController:
         if not popup:
             return
         self._hide_other_token_hovers(token)
-        job = token.get("hover_hide_job")
-        if job:
-            try:
-                canvas.after_cancel(job)
-            except ValueError:
-                pass
-            token["hover_hide_job"] = None
         self._refresh_token_hover_popup(token)
         popup.deiconify()
         popup.lift()
         token["hover_visible"] = True
 
-    def _schedule_hide_token_hover(self, token, delay=None):
-        canvas = getattr(self, "canvas", None)
-        if not canvas:
-            return
-        if delay is None:
-            delay = HOVER_DISMISS_DELAY_MS
-        job = token.get("hover_hide_job")
-        if job:
-            try:
-                canvas.after_cancel(job)
-            except ValueError:
-                pass
-
-        def _hide():
-            self._hide_token_hover(token)
-
-        token["hover_hide_job"] = canvas.after(delay, _hide)
-
-    def _cancel_token_hover_hide(self, token):
-        canvas = getattr(self, "canvas", None)
-        if not canvas:
-            return
-        job = token.get("hover_hide_job")
-        if job:
-            try:
-                canvas.after_cancel(job)
-            except ValueError:
-                pass
-            token["hover_hide_job"] = None
-
     def _hide_token_hover(self, token):
         canvas = getattr(self, "canvas", None)
         popup = token.get("hover_popup")
         token["hover_visible"] = False
-        job = token.get("hover_hide_job")
-        if job and canvas:
-            try:
-                canvas.after_cancel(job)
-            except ValueError:
-                pass
-        token["hover_hide_job"] = None
         if popup and popup.winfo_exists():
             popup.withdraw()
-
-    def _on_token_hover_enter(self, token):
-        self._show_token_hover(token)
-
-    def _on_token_hover_leave(self, token):
-        self._schedule_hide_token_hover(token)
-
-    def _bind_token_hover_targets(self, token, target_ids):
-        canvas = getattr(self, "canvas", None)
-        if not canvas:
-            return
-        for cid in target_ids or []:
-            if not cid:
-                continue
-            self.canvas.tag_bind(cid, "<Enter>", lambda e, t=token: self._on_token_hover_enter(t))
-            self.canvas.tag_bind(cid, "<Leave>", lambda e, t=token: self._on_token_hover_leave(t))
-
-    def _on_canvas_pointer_leave(self, event=None):
-        for token in getattr(self, "tokens", []):
-            if not isinstance(token, dict):
-                continue
-            if token.get("hover_visible"):
-                self._schedule_hide_token_hover(token)
-            if token.get("type") == "marker" and token.get("description_visible"):
-                self._schedule_hide_marker_description(token)
 
     def _open_marker_description_editor(self, marker):
         if not marker:
@@ -1146,6 +940,8 @@ class DisplayMapController:
                     break
         
         if not clicked_an_item: # Clicked on empty canvas space
+            self._hide_all_token_hovers()
+            self._hide_all_marker_descriptions()
             if self._graphical_edit_mode_item: # If graphical edit was active, deactivate it
                 self._remove_resize_handles()
                 self._graphical_edit_mode_item = None
@@ -1272,12 +1068,6 @@ class DisplayMapController:
                     name_id = item.get('name_id')
                     if name_id: tx = sx + nw/2; ty = sy + nh + 2; self.canvas.coords(name_id, tx, ty); self.canvas.itemconfig(name_id, text=item.get('entity_id', ''))
                     item['hover_bbox'] = (sx - 3, sy - 3, sx + nw + 3, sy + nh + 3)
-                    if not item.get('_hover_bound'):
-                        hover_targets = [b_id, i_id, item.get('name_id')]
-                        if item.get('hp_canvas_ids'):
-                            hover_targets.extend(item['hp_canvas_ids'])
-                        self._bind_token_hover_targets(item, hover_targets)
-                        item['_hover_bound'] = True
                     self._refresh_token_hover_popup(item)
                     if item.get("hover_visible"):
                         self._show_token_hover(item)
@@ -1295,10 +1085,7 @@ class DisplayMapController:
                         self.canvas.tag_bind(item_id_hp, "<Double-Button-1>", lambda e, t=item: self._on_hp_double_click(e, t))
                         self.canvas.tag_bind(item_id_hp, "<Button-3>", lambda e, t=item: self._on_max_hp_menu_click(e, t))
                     item.update({'canvas_ids': (b_id, i_id), 'name_id': name_id})
-                    hover_targets = [b_id, i_id, name_id, cid, tid]
                     self._bind_item_events(item)
-                    self._bind_token_hover_targets(item, hover_targets)
-                    item['_hover_bound'] = True
                     item['hover_bbox'] = (sx - 3, sy - 3, sx + nw + 3, sy + nh + 3)
                     self._refresh_token_hover_popup(item)
             elif item_type == "marker":
@@ -1314,10 +1101,10 @@ class DisplayMapController:
                     entry = ctk.CTkEntry(self.canvas, width=item.get("entry_width", 180))
                     entry.insert(0, desired_text)
                     entry.bind("<KeyRelease>", lambda e, i=item: self._on_marker_text_change(i, persist=False))
-                    entry.bind("<FocusOut>", lambda e, i=item: self._on_marker_text_change(i, persist=True))
+                    entry.bind("<FocusIn>", lambda e, i=item: self._on_marker_entry_focus_in(i))
+                    entry.bind("<FocusOut>", lambda e, i=item: self._on_marker_entry_focus_out(i))
                     entry.bind("<Return>", lambda e, i=item: self._on_marker_entry_return(e, i))
-                    entry.bind("<Enter>", lambda e, i=item: self._on_marker_entry_enter(i))
-                    entry.bind("<Leave>", lambda e, i=item: self._on_marker_entry_leave(i))
+                    entry.bind("<ButtonRelease-1>", lambda e, i=item: self._on_marker_entry_click(e, i))
                     entry.bind("<Button-3>", lambda e, i=item: self._on_item_right_click(e, i))
                     item["entry_widget"] = entry
                 else:
@@ -1343,8 +1130,6 @@ class DisplayMapController:
                 if not handle_widget or not handle_widget.winfo_exists():
                     handle_widget = ctk.CTkLabel(self.canvas, text="≡", width=handle_width, fg_color="#2f2f2f")
                     handle_widget.configure(cursor="fleur")
-                    handle_widget.bind("<Enter>", lambda e, i=item: self._on_marker_entry_enter(i))
-                    handle_widget.bind("<Leave>", lambda e, i=item: self._on_marker_entry_leave(i))
                     handle_widget.bind("<ButtonPress-1>", lambda e, i=item: self._on_marker_handle_press(e, i))
                     handle_widget.bind("<B1-Motion>", lambda e, i=item: self._on_marker_handle_drag(e, i))
                     handle_widget.bind("<ButtonRelease-1>", lambda e, i=item: self._on_marker_handle_release(e, i))
@@ -1487,7 +1272,7 @@ class DisplayMapController:
 
 
         self.selected_token = item
-        item["drag_data"] = {"x": event.x, "y": event.y}
+        item["drag_data"] = {"x": event.x, "y": event.y, "moved": False}
         # Handles are only drawn if "Edit Shape" is chosen from context menu.
 
     def _on_item_move(self, event, item):
@@ -1495,8 +1280,13 @@ class DisplayMapController:
             # If currently resizing this item, let the handle move logic take over.
             return
 
-        if "drag_data" not in item: return
-        dx = event.x - item["drag_data"]["x"]; dy = event.y - item["drag_data"]["y"]
+        drag_data = item.get("drag_data")
+        if not drag_data:
+            return
+        dx = event.x - drag_data["x"]
+        dy = event.y - drag_data["y"]
+        if not drag_data.get("moved") and (abs(dx) > 2 or abs(dy) > 2):
+            drag_data["moved"] = True
         for cid in item.get("canvas_ids", []):
             if cid: self.canvas.move(cid, dx, dy)
         if item.get("type", "token") == "token":
@@ -1518,7 +1308,8 @@ class DisplayMapController:
                 self._show_token_hover(item)
         elif item.get("type") == "marker":
             self._refresh_marker_description_popup(item)
-        item["drag_data"] = {"x": event.x, "y": event.y}
+        drag_data["x"] = event.x
+        drag_data["y"] = event.y
         main_canvas_id = item["canvas_ids"][0] if item.get("canvas_ids") else None
         if main_canvas_id:
             coords = self.canvas.coords(main_canvas_id)
@@ -1535,7 +1326,27 @@ class DisplayMapController:
             # The actual release logic is in _on_resize_handle_release
             return
 
-        item.pop("drag_data", None); self._persist_tokens()
+        drag_data = item.pop("drag_data", None)
+        if drag_data and not drag_data.get("moved"):
+            self._handle_item_click(event, item)
+        self._persist_tokens()
+
+    def _handle_item_click(self, event, item):
+        item_type = item.get("type", "token")
+        if item_type == "token":
+            if item.get("hover_visible"):
+                self._hide_token_hover(item)
+            else:
+                self._hide_all_marker_descriptions()
+                self._hide_all_token_hovers()
+                self._show_token_hover(item)
+        elif item_type == "marker":
+            if item.get("description_visible"):
+                self._hide_marker_description(item)
+            else:
+                self._hide_all_token_hovers()
+                self._hide_all_marker_descriptions()
+                self._show_marker_description(item)
 
     def _on_item_right_click(self, event, item):
         item_type = item.get("type", "token")
@@ -1741,10 +1552,10 @@ class DisplayMapController:
                            'hp_entry_widget', 'hp_entry_widget_id',
                            'max_hp_entry_widget', 'max_hp_entry_widget_id',
                            'entry_widget', 'description_popup', 'description_label',
-                           'description_hide_job', 'handle_widget', 'handle_canvas_id', 'entry_canvas_id',
+                           'handle_widget', 'handle_canvas_id', 'entry_canvas_id',
                            'border_canvas_id',
                            'description_editor', 'hover_popup', 'hover_label',
-                           'hover_hide_job', 'hover_bbox', 'hover_visible', '_hover_bound']:
+                           'hover_bbox', 'hover_visible']:
             self.clipboard_token.pop(key_to_pop, None)
 
     def _paste_item(self, event=None):
@@ -1789,10 +1600,8 @@ class DisplayMapController:
             new_item_data.setdefault("max_hp", 10)
             new_item_data.setdefault("hover_popup", None)
             new_item_data.setdefault("hover_label", None)
-            new_item_data.setdefault("hover_hide_job", None)
             new_item_data.setdefault("hover_visible", False)
             new_item_data.setdefault("hover_bbox", None)
-            new_item_data.setdefault("_hover_bound", False)
             # entity_record is not typically part of clipboard_token
 
         elif item_type == "marker":
@@ -1802,7 +1611,6 @@ class DisplayMapController:
             new_item_data["entry_widget"] = None
             new_item_data["description_popup"] = None
             new_item_data["description_label"] = None
-            new_item_data["description_hide_job"] = None
             new_item_data["description_visible"] = False
             new_item_data.setdefault("entry_width", 180)
             new_item_data["description_editor"] = None
@@ -1833,28 +1641,14 @@ class DisplayMapController:
             if item_to_delete.get("hp_canvas_ids"):
                 for hp_cid in item_to_delete["hp_canvas_ids"]:
                     if hp_cid: self.canvas.delete(hp_cid)
-            hide_job = item_to_delete.get("hover_hide_job")
-            if hide_job:
-                try:
-                    self.canvas.after_cancel(hide_job)
-                except ValueError:
-                    pass
             popup = item_to_delete.get("hover_popup")
             if popup and popup.winfo_exists():
                 popup.destroy()
             item_to_delete["hover_popup"] = None
             item_to_delete["hover_label"] = None
-            item_to_delete["hover_hide_job"] = None
             item_to_delete["hover_visible"] = False
             item_to_delete.pop("hover_bbox", None)
-            item_to_delete.pop("_hover_bound", None)
         elif item_to_delete.get("type") == "marker":
-            hide_job = item_to_delete.get("description_hide_job")
-            if hide_job:
-                try:
-                    self.canvas.after_cancel(hide_job)
-                except ValueError:
-                    pass
             entry_widget = item_to_delete.get("entry_widget")
             if entry_widget and entry_widget.winfo_exists():
                 entry_widget.destroy()
