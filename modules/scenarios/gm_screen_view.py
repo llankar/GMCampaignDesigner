@@ -52,6 +52,13 @@ class GMScreenView(ctk.CTkFrame):
 
         self._load_persisted_state()
 
+        # Track transient key bindings when this view owns its toplevel window
+        self._bound_shortcut_owner = None
+        self._ctrl_f_binding = None
+        self._ctrl_F_binding = None
+        self.bind("<Destroy>", self._on_destroy, add="+")
+        self._setup_toplevel_shortcuts()
+
         # Load your detach and reattach icon files (adjust file paths and sizes as needed)
         self.detach_icon = CTkImage(light_image=Image.open("assets/detach_icon.png"),
                                     dark_image=Image.open("assets/detach_icon.png"),
@@ -192,6 +199,47 @@ class GMScreenView(ctk.CTkFrame):
         if isinstance(notes, str):
             self._note_cache = notes
         self._state_loaded = True
+
+    def _setup_toplevel_shortcuts(self):
+        """Bind Ctrl+F locally when the view is hosted in its own window."""
+        master = getattr(self, "master", None)
+        if master is None:
+            return
+        try:
+            top = master.winfo_toplevel()
+        except Exception:
+            return
+        if top is None or master is not top:
+            return
+        try:
+            self._bound_shortcut_owner = top
+            self._ctrl_f_binding = top.bind("<Control-f>", self.open_global_search, add="+")
+            self._ctrl_F_binding = top.bind("<Control-F>", self.open_global_search, add="+")
+        except Exception:
+            self._bound_shortcut_owner = None
+            self._ctrl_f_binding = None
+            self._ctrl_F_binding = None
+
+    def _teardown_toplevel_shortcuts(self):
+        top = self._bound_shortcut_owner
+        if not top:
+            return
+        try:
+            if self._ctrl_f_binding:
+                top.unbind("<Control-f>", self._ctrl_f_binding)
+            if self._ctrl_F_binding:
+                top.unbind("<Control-F>", self._ctrl_F_binding)
+        except Exception:
+            pass
+        finally:
+            self._bound_shortcut_owner = None
+            self._ctrl_f_binding = None
+            self._ctrl_F_binding = None
+
+    def _on_destroy(self, event=None):
+        if event is not None and event.widget is not self:
+            return
+        self._teardown_toplevel_shortcuts()
 
     def _persist_scene_state(self):
         if not self._state_loaded:
@@ -1195,17 +1243,21 @@ class GMScreenView(ctk.CTkFrame):
         log_info(f"Opening entity tab {entity_type}: {name}", func_name="GMScreenView.open_entity_tab")
         """
         Open a new tab for a specific entity with its details.
-        
+
         Args:
             entity_type (str): The type of entity (e.g., 'Scenarios', 'NPCs', 'Creatures').
             name (str): The name or title of the specific entity to display.
         
         Raises:
             messagebox.showerror: If the specified entity cannot be found in the wrapper.
-        
+
         Creates a new tab with the entity's details using a shared factory function,
         and provides a mechanism to recursively open related entities.
         """
+        existing = self._find_existing_entity_tab(entity_type, name)
+        if existing:
+            self._focus_existing_tab(existing)
+            return
         wrapper = self.wrappers[entity_type]
         items = wrapper.load_items()
         key = "Title" if (entity_type == "Scenarios" or entity_type == "Informations") else "Name"
@@ -1226,6 +1278,32 @@ class GMScreenView(ctk.CTkFrame):
                 "entity_name": name,
             },
         )
+
+    def _focus_existing_tab(self, tab_name):
+        if tab_name not in self.tabs:
+            return
+        self.show_tab(tab_name)
+        tab_info = self.tabs.get(tab_name, {})
+        if tab_info.get("detached"):
+            window = tab_info.get("window")
+            if window and window.winfo_exists():
+                try:
+                    window.deiconify()
+                    window.lift()
+                    window.focus_force()
+                except Exception:
+                    pass
+
+    def _find_existing_entity_tab(self, entity_type, entity_name):
+        for tab_name, tab_info in self.tabs.items():
+            meta = tab_info.get("meta") or {}
+            if (
+                meta.get("kind") == "entity"
+                and meta.get("entity_type") == entity_type
+                and meta.get("entity_name") == entity_name
+            ):
+                return tab_name
+        return None
 
     def create_scenario_graph_frame(self, master=None):
         log_info(f"Creating scenario graph frame", func_name="GMScreenView.create_scenario_graph_frame")
