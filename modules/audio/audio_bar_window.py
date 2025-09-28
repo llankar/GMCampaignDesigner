@@ -56,6 +56,8 @@ class AudioBarWindow(ctk.CTkToplevel):
         self._is_collapsed = False
         self._remembered_track_label: Optional[str] = None
         self._building_ui = False
+        self._search_results_label_max_chars = 60
+        self._now_playing_label_max_chars = 60
         self._build_ui()
         self._set_collapsed(True)
         self._register_controller_listener()
@@ -361,8 +363,23 @@ class AudioBarWindow(ctk.CTkToplevel):
             return
 
         placeholder = f"{len(results)} result(s)"
-        values = [placeholder] + [label for label, _info in results]
-        self._search_results_lookup = {label: info for label, info in results}
+        values = [placeholder]
+        lookup: dict[str, Dict[str, Any]] = {}
+        existing_labels: set[str] = {placeholder}
+
+        for label, info in results:
+            display_label = self._make_dropdown_label(
+                label,
+                existing_labels,
+                self._search_results_label_max_chars,
+            )
+            existing_labels.add(display_label)
+            enriched = dict(info)
+            enriched["full_label"] = label
+            lookup[display_label] = enriched
+            values.append(display_label)
+
+        self._search_results_lookup = lookup
         self.search_results_menu.configure(values=values)
         self.search_results_var.set(placeholder)
         self.search_results_menu.configure(state="normal")
@@ -389,7 +406,10 @@ class AudioBarWindow(ctk.CTkToplevel):
             label = self._find_label_for_identifier(identifier)
             if label:
                 self._set_selected_track_by_label(label)
-                self._remembered_track_label = self._format_track_label(track) or self._remembered_track_label
+                self._remembered_track_label = self._truncate_with_suffix(
+                    self._format_track_label(track) or self._remembered_track_label or "",
+                    self._now_playing_label_max_chars,
+                ) or self._remembered_track_label
                 self._pending_search_track_id = None
                 return
 
@@ -403,7 +423,10 @@ class AudioBarWindow(ctk.CTkToplevel):
             return
 
         self._pending_search_track_id = identifier
-        self._remembered_track_label = self._format_track_label(track) or self._remembered_track_label
+        self._remembered_track_label = self._truncate_with_suffix(
+            self._format_track_label(track) or self._remembered_track_label or "",
+            self._now_playing_label_max_chars,
+        ) or self._remembered_track_label
         self.controller.set_playlist(self._active_section, playlist, category=category)
 
     def _clear_search_results(self) -> None:
@@ -472,7 +495,10 @@ class AudioBarWindow(ctk.CTkToplevel):
             track = state.get("current_track") or state.get("last_track")
 
         if track:
-            self._remembered_track_label = self._format_track_label(track) or None
+            label = self._format_track_label(track) or ""
+            self._remembered_track_label = (
+                self._truncate_with_suffix(label, self._now_playing_label_max_chars) if label else None
+            )
             label = self._find_label_for_track(track)
             if label:
                 self._set_selected_track_by_label(label)
@@ -550,14 +576,16 @@ class AudioBarWindow(ctk.CTkToplevel):
     def _update_playlist_menu(self, playlist: list[Dict[str, Any]]) -> None:
         self._playlist_lookup = {}
         values: list[str] = []
+        existing_labels: set[str] = set()
         for index, track in enumerate(playlist):
             identifier = self._track_identifier(track)
             base_label = self._format_track_label(track) or f"Track {index + 1}"
-            label = base_label
-            suffix = 2
-            while label in self._playlist_lookup:
-                label = f"{base_label} ({suffix})"
-                suffix += 1
+            label = self._make_dropdown_label(
+                base_label,
+                existing_labels,
+                self._now_playing_label_max_chars,
+            )
+            existing_labels.add(label)
             self._playlist_lookup[label] = {
                 "identifier": identifier,
                 "index": index,
@@ -640,6 +668,44 @@ class AudioBarWindow(ctk.CTkToplevel):
         if isinstance(path, str) and path:
             return os.path.basename(path)
         return ""
+
+    def _make_dropdown_label(
+        self,
+        label: str,
+        existing: set[str],
+        max_chars: int,
+    ) -> str:
+        display = self._truncate_with_suffix(label, max_chars)
+        if display not in existing:
+            return display
+
+        suffix_index = 2
+        while True:
+            suffix = f" ({suffix_index})"
+            display = self._truncate_with_suffix(label, max_chars, suffix=suffix)
+            if display not in existing:
+                return display
+            suffix_index += 1
+
+    @staticmethod
+    def _truncate_with_suffix(label: str, max_chars: int, suffix: str = "") -> str:
+        suffix = suffix or ""
+        if max_chars <= 0:
+            return suffix[:max_chars]
+
+        available = max_chars - len(suffix)
+        if available <= 0:
+            return suffix[:max_chars]
+
+        if len(label) <= available:
+            return label + suffix
+
+        if available <= 1:
+            truncated = label[:available]
+        else:
+            truncated = label[: available - 1].rstrip() + "…"
+
+        return truncated + suffix
 
     def _section_button_label(self, section: str) -> str:
         if section == "effects":
