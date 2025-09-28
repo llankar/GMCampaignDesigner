@@ -1,10 +1,13 @@
-﻿import os
+import json
+import os
+import threading
 import tkinter as tk
 from tkinter import filedialog, messagebox, simpledialog
 
 import customtkinter as ctk
 from typing import Any
 
+from modules.ai.local_ai_client import LocalAIClient
 from modules.audio.audio_library import AUDIO_EXTENSIONS
 from modules.audio.audio_controller import AudioController, get_audio_controller
 from modules.audio.audio_constants import SECTION_TITLES
@@ -149,7 +152,7 @@ class SoundManagerWindow(ctk.CTkToplevel):
         track_list.configure(yscrollcommand=track_scroll.set)
         track_buttons = ctk.CTkFrame(tracks_frame)
         track_buttons.grid(row=2, column=0, columnspan=2, sticky="ew", padx=8, pady=(0, 8))
-        for idx in range(4):
+        for idx in range(5):
             track_buttons.grid_columnconfigure(idx, weight=1)
 
         ctk.CTkButton(
@@ -172,11 +175,17 @@ class SoundManagerWindow(ctk.CTkToplevel):
 
         ctk.CTkButton(
             track_buttons,
+            text="AI Sorting",
+            command=lambda s=section: self._ai_sort_directory(s),
+        ).grid(row=0, column=3, sticky="ew", padx=3)
+
+        ctk.CTkButton(
+            track_buttons,
             text="Remove",
             fg_color="#8b1d1d",
             hover_color="#6f1414",
             command=lambda s=section: self._remove_tracks(s),
-        ).grid(row=0, column=3, sticky="ew", padx=(6, 0))
+        ).grid(row=0, column=4, sticky="ew", padx=(6, 0))
         playback_frame = ctk.CTkFrame(tracks_frame)
         playback_frame.grid(row=3, column=0, columnspan=2, sticky="ew", padx=8, pady=(0, 8))
         for idx in range(6):
@@ -481,6 +490,19 @@ class SoundManagerWindow(ctk.CTkToplevel):
         state["current_category"] = current
         self._refresh_tracks(section)
 
+    def _select_category(self, section: str, category: str) -> None:
+        state = self._get_state(section)
+        categories = self.library.get_categories(section)
+        if category not in categories:
+            return
+        index = categories.index(category)
+        listbox = state["category_list"]
+        listbox.select_clear(0, "end")
+        listbox.select_set(index)
+        listbox.see(index)
+        state["current_category"] = category
+        self._refresh_tracks(section)
+
     def _refresh_tracks(self, section: str) -> None:
         state = self._get_state(section)
         category = state.get("current_category")
@@ -668,6 +690,243 @@ class SoundManagerWindow(ctk.CTkToplevel):
         removed = len(result.get("removed", []))
         self._set_status(section, f"Rescan complete. Added {added}, removed {removed}.")
         self._refresh_tracks(section)
+
+    def _ai_sort_directory(self, section: str) -> None:
+        directory = filedialog.askdirectory(parent=self, title="Select Folder for AI Sorting")
+        if not directory:
+            return
+        audio_files = self._gather_audio_files(directory)
+        if not audio_files:
+            messagebox.showinfo("AI Sorting", "No audio files found in the selected folder.", parent=self)
+            return
+        self._set_status(section, "Preparing AI sorting request...")
+
+        thread = threading.Thread(
+            target=self._ai_sort_directory_worker,
+            args=(section, directory, audio_files),
+            daemon=True,
+        )
+        thread.start()
+
+    def _ai_sort_directory_worker(
+        self, section: str, directory: str, audio_files: list[dict[str, str]]
+    ) -> None:
+        self.after(0, lambda: self._set_status(section, "Contacting local AI for sorting..."))
+        try:
+            assignments = self._invoke_ai_sort(audio_files)
+        except Exception as exc:
+            log_exception(
+                f"SoundManagerWindow._ai_sort_directory_worker - AI sorting failed: {exc}",
+                func_name="SoundManagerWindow._ai_sort_directory_worker",
+            )
+            self.after(
+                0,
+                lambda: (
+                    messagebox.showerror("AI Sorting Failed", str(exc), parent=self),
+                    self._set_status(section, "AI sorting failed."),
+                ),
+            )
+            return
+
+        self.after(
+            0,
+            lambda: self._apply_ai_sort_results(section, directory, audio_files, assignments),
+        )
+
+    def _invoke_ai_sort(self, audio_files: list[dict[str, str]]) -> dict[str, list[str]]:
+        client = LocalAIClient()
+        payload = [
+            {
+                "relative_path": entry["relative"],
+                "file_name": entry["filename"],
+            }
+            for entry in audio_files
+        ]
+        prompt = (
+            "You organize tabletop audio assets by analyzing their file names only.\n"
+            "Group the provided files into categories that describe their purpose, mood, or use at the table.\n"
+            "Return STRICT JSON matching this schema exactly:\n"
+            "{\n  \"categories\": [\n    {\n      \"name\": \"Category Name\",\n      \"files\": [\"relative/path.ext\"]\n    }\n  ]\n}\n"
+            "Rules:\n"
+            "- Every file must appear in exactly one category.\n"
+            "- Use the provided relative_path strings verbatim in your output.\n"
+            "- If uncertain, create a category named \"Unsorted\".\n"
+            "- Do not invent files or extra fields.\n\n"
+            f"Files (JSON):\n{json.dumps(payload, ensure_ascii=False, indent=2)}"
+        )
+
+        response = client.chat(
+            [
+                {
+                    "role": "system",
+                    "content": "Classify audio file names into useful tabletop categories. Respond with strict JSON only.",
+                },
+                {"role": "user", "content": prompt},
+            ],
+            temperature=0.2,
+            max_tokens=800,
+        )
+
+        data = LocalAIClient._parse_json_safe(response)
+        if not isinstance(data, dict):
+            raise RuntimeError("AI response was not a JSON object.")
+        categories = data.get("categories")
+        if not isinstance(categories, list):
+            raise RuntimeError("AI response missing 'categories' list.")
+
+        assignments: dict[str, list[str]] = {}
+        for entry in categories:
+            if not isinstance(entry, dict):
+                continue
+            name = entry.get("name")
+            files = entry.get("files")
+            if not isinstance(name, str):
+                continue
+            clean_name = name.strip()
+            if not clean_name:
+                continue
+            if not isinstance(files, list):
+                continue
+            for file_ref in files:
+                if not isinstance(file_ref, str):
+                    continue
+                clean_ref = file_ref.strip()
+                if not clean_ref:
+                    continue
+                assignments.setdefault(clean_name, []).append(clean_ref)
+
+        if not assignments:
+            raise RuntimeError("AI response did not provide any file assignments.")
+        return assignments
+
+    def _apply_ai_sort_results(
+        self,
+        section: str,
+        directory: str,
+        audio_files: list[dict[str, str]],
+        assignments: dict[str, list[str]],
+    ) -> None:
+        path_lookup: dict[str, str] = {}
+        all_paths: set[str] = set()
+        for entry in audio_files:
+            absolute = entry["path"]
+            relative = entry["relative"]
+            filename = entry["filename"]
+            all_paths.add(absolute)
+            for key in {
+                relative,
+                relative.replace("\\", "/"),
+                os.path.normpath(relative),
+                filename,
+            }:
+                path_lookup[key.casefold()] = absolute
+
+        category_paths: dict[str, list[str]] = {}
+        assigned_paths: set[str] = set()
+        for category, files in assignments.items():
+            clean_category = category.strip()
+            if not clean_category:
+                continue
+            for reference in files:
+                normalized = reference.strip().replace("\\", "/")
+                if not normalized:
+                    continue
+                path = path_lookup.get(normalized.casefold())
+                if not path:
+                    alt_key = os.path.normpath(reference).casefold()
+                    path = path_lookup.get(alt_key)
+                if not path:
+                    continue
+                if path in assigned_paths:
+                    continue
+                bucket = category_paths.setdefault(clean_category, [])
+                if path not in bucket:
+                    bucket.append(path)
+                    assigned_paths.add(path)
+
+        unassigned = sorted(all_paths - assigned_paths)
+        if unassigned:
+            unsorted_bucket = category_paths.setdefault("Unsorted", [])
+            for path in unassigned:
+                if path not in unsorted_bucket:
+                    unsorted_bucket.append(path)
+
+        existing_categories = set(self.library.get_categories(section))
+        created_categories: list[str] = []
+        for category in category_paths:
+            if category not in existing_categories:
+                try:
+                    self.library.add_category(section, category)
+                    created_categories.append(category)
+                    existing_categories.add(category)
+                except ValueError:
+                    continue
+
+        added_counts: dict[str, int] = {}
+        focus_category: str | None = None
+        for category, paths in category_paths.items():
+            unique_paths: list[str] = []
+            seen: set[str] = set()
+            for path in paths:
+                normalized = os.path.normpath(path)
+                if normalized in seen:
+                    continue
+                seen.add(normalized)
+                unique_paths.append(path)
+            if not unique_paths:
+                added_counts[category] = 0
+                continue
+            try:
+                added = self.library.add_tracks(section, category, unique_paths)
+            except KeyError:
+                added_counts[category] = 0
+                continue
+            added_counts[category] = len(added)
+            if added and focus_category is None:
+                focus_category = category
+
+        total_added = sum(added_counts.values())
+        self.library.set_setting(section, "last_directory", directory)
+        self._refresh_categories(section)
+        if focus_category:
+            self._select_category(section, focus_category)
+
+        details = []
+        for category, count in sorted(added_counts.items()):
+            details.append(f"{category}: {count} new track(s)")
+        if created_categories:
+            details.append(f"Created categories: {', '.join(sorted(created_categories))}")
+        summary = "\n".join(details) if details else "No assignments were applied."
+
+        if total_added:
+            status = f"AI sorting complete. Added {total_added} track(s)."
+        else:
+            status = "AI sorting complete. No new tracks were added."
+        self._set_status(section, status)
+
+        messagebox.showinfo("AI Sorting Complete", summary, parent=self)
+
+    def _gather_audio_files(self, directory: str) -> list[dict[str, str]]:
+        collected: list[dict[str, str]] = []
+        if not os.path.isdir(directory):
+            return collected
+
+        for root, _dirs, files in os.walk(directory):
+            for filename in files:
+                extension = os.path.splitext(filename)[1].lower()
+                if extension not in AUDIO_EXTENSIONS:
+                    continue
+                absolute = os.path.join(root, filename)
+                relative = os.path.relpath(absolute, directory).replace(os.sep, "/")
+                collected.append(
+                    {
+                        "path": absolute,
+                        "relative": relative,
+                        "filename": filename,
+                    }
+                )
+        collected.sort(key=lambda item: item["relative"].lower())
+        return collected
 
     def _play_selected(self, section: str) -> None:
         state = self._get_state(section)
