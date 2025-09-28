@@ -117,6 +117,7 @@ class AudioBarWindow(ctk.CTkToplevel):
         self.search_entry.bind("<KeyRelease>", self._on_search_text_changed)
 
         self._search_results_menu_width = 200
+        self._now_playing_menu_width = 320
         self.search_results_var = tk.StringVar(value="No results")
         self.search_results_menu = ctk.CTkOptionMenu(
             content,
@@ -134,10 +135,11 @@ class AudioBarWindow(ctk.CTkToplevel):
             variable=self.now_playing_var,
             values=["No tracks available"],
             command=self._on_track_selected,
-            width=320,
+            width=self._now_playing_menu_width,
         )
         self.now_playing_menu.grid(row=0, column=3, padx=4, pady=4, sticky="ew")
         self.now_playing_menu.configure(state="disabled")
+        self.now_playing_var.trace_add("write", self._keep_now_playing_dropdown_width)
 
         self.prev_button = ctk.CTkButton(content, text="Prev", command=self._on_prev_clicked, width=70)
         self.prev_button.grid(row=0, column=4, padx=4, pady=4, sticky="ew")
@@ -193,6 +195,23 @@ class AudioBarWindow(ctk.CTkToplevel):
     def _keep_search_dropdown_width(self, *_args: Any) -> None:
         width = getattr(self, "_search_results_menu_width", None)
         menu = getattr(self, "search_results_menu", None)
+        if not width or menu is None:
+            return
+
+        def _apply() -> None:
+            try:
+                menu.configure(width=width)
+            except Exception:
+                pass
+
+        try:
+            self.after(0, _apply)
+        except Exception:
+            _apply()
+
+    def _keep_now_playing_dropdown_width(self, *_args: Any) -> None:
+        width = getattr(self, "_now_playing_menu_width", None)
+        menu = getattr(self, "now_playing_menu", None)
         if not width or menu is None:
             return
 
@@ -462,6 +481,7 @@ class AudioBarWindow(ctk.CTkToplevel):
                 if display:
                     self.now_playing_menu.configure(values=[display], state="disabled")
                     self.now_playing_var.set(display)
+                    self._keep_now_playing_dropdown_width()
                 else:
                     self.now_playing_var.set("No tracks available")
                 self._selected_track_key = None
@@ -473,6 +493,7 @@ class AudioBarWindow(ctk.CTkToplevel):
             if self._remembered_track_label:
                 self.now_playing_menu.configure(values=[self._remembered_track_label], state="disabled")
                 self.now_playing_var.set(self._remembered_track_label)
+                self._keep_now_playing_dropdown_width()
             else:
                 self.now_playing_var.set("No tracks available")
             self._selected_track_key = None
@@ -552,13 +573,16 @@ class AudioBarWindow(ctk.CTkToplevel):
                 self._selected_track_key = values[0]
                 self.now_playing_var.set(values[0])
             self.now_playing_menu.configure(state="normal")
+            self._keep_now_playing_dropdown_width()
         else:
             if self._remembered_track_label:
                 self.now_playing_menu.configure(values=[self._remembered_track_label], state="disabled")
                 self.now_playing_var.set(self._remembered_track_label)
+                self._keep_now_playing_dropdown_width()
             else:
                 self.now_playing_menu.configure(values=["No tracks available"], state="disabled")
                 self.now_playing_var.set("No tracks available")
+                self._keep_now_playing_dropdown_width()
             self._selected_track_key = None
 
     def _find_label_for_track(self, track: Dict[str, Any]) -> Optional[str]:
@@ -582,6 +606,7 @@ class AudioBarWindow(ctk.CTkToplevel):
         self._selected_track_key = label
         self.now_playing_var.set(label)
         self.now_playing_menu.configure(state="normal")
+        self._keep_now_playing_dropdown_width()
 
     def _get_selected_track_info(self) -> Optional[Dict[str, Any]]:
         if self._selected_track_key is None:
