@@ -13,7 +13,7 @@ class GMScreenLayoutManager:
 
     def __init__(self):
         self.path = os.path.join(ConfigHelper.get_campaign_dir(), self.FILE_NAME)
-        self.data: Dict[str, Any] = {"layouts": {}, "scenario_defaults": {}}
+        self.data: Dict[str, Any] = {"layouts": {}, "scenario_defaults": {}, "scenario_state": {}}
         self._load()
 
     # ------------------------------------------------------------------
@@ -28,17 +28,19 @@ class GMScreenLayoutManager:
                 raw = json.load(fh) or {}
             layouts = raw.get("layouts") or {}
             scenario_defaults = raw.get("scenario_defaults") or {}
-            if not isinstance(layouts, dict) or not isinstance(scenario_defaults, dict):
+            scenario_state = raw.get("scenario_state") or {}
+            if not isinstance(layouts, dict) or not isinstance(scenario_defaults, dict) or not isinstance(scenario_state, dict):
                 raise ValueError("Layout file malformed")
             self.data["layouts"] = layouts
             self.data["scenario_defaults"] = scenario_defaults
+            self.data["scenario_state"] = scenario_state
         except Exception as exc:
             log_exception(exc, func_name="GMScreenLayoutManager._load")
             log_warning(
                 f"Failed to load GM layouts from {self.path}. Reinitializing empty store.",
                 func_name="GMScreenLayoutManager._load",
             )
-            self.data = {"layouts": {}, "scenario_defaults": {}}
+            self.data = {"layouts": {}, "scenario_defaults": {}, "scenario_state": {}}
 
     def _write(self) -> None:
         os.makedirs(os.path.dirname(self.path), exist_ok=True)
@@ -82,6 +84,41 @@ class GMScreenLayoutManager:
             defaults[scenario_title] = layout_name
         else:
             defaults.pop(scenario_title, None)
+        self._write()
+
+    # ------------------------------------------------------------------
+    # Scenario state (notes, scene completion)
+    # ------------------------------------------------------------------
+    def get_scenario_state(self, scenario_title: str) -> Dict[str, Any]:
+        if not scenario_title:
+            return {}
+        state = self.data.get("scenario_state", {}).get(scenario_title)
+        if state is None:
+            return {}
+        return json.loads(json.dumps(state))
+
+    def update_scenario_state(self, scenario_title: str, *, scenes: Optional[Dict[str, Any]] = None, notes: Optional[str] = None) -> None:
+        if not scenario_title:
+            return
+        store = self.data.setdefault("scenario_state", {})
+        entry: Dict[str, Any] = store.setdefault(scenario_title, {})
+
+        if scenes is not None:
+            normalized = {key: bool(value) for key, value in (scenes or {}).items() if bool(value)}
+            if normalized:
+                entry["scenes"] = normalized
+            else:
+                entry.pop("scenes", None)
+
+        if notes is not None:
+            if notes:
+                entry["notes"] = notes
+            else:
+                entry.pop("notes", None)
+
+        if not entry:
+            store.pop(scenario_title, None)
+
         self._write()
 
 

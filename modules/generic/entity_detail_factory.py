@@ -674,18 +674,18 @@ def insert_list_longtext(parent, header, items, open_entity_callback=None, entit
             check_var = ctk.BooleanVar(master=outer, value=initial_state)
             header_row = ctk.CTkFrame(outer, fg_color="transparent")
             header_row.pack(fill="x", expand=True)
-            checkbox = ctk.CTkCheckBox(
-                header_row,
-                text="Completed",
-                variable=check_var,
-            )
-            checkbox.pack(side="left", padx=(0, 8), pady=(2, 2))
             btn = ctk.CTkButton(
                 header_row,
                 text=button_text,
                 fg_color="transparent",
                 anchor="w",
             )
+            checkbox = ctk.CTkCheckBox(
+                header_row,
+                text="",
+                variable=check_var,
+            )
+            checkbox.pack(side="right", padx=(8, 0), pady=(2, 2))
         else:
             check_var = None
             checkbox = None
