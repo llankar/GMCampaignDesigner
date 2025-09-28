@@ -116,16 +116,18 @@ class AudioBarWindow(ctk.CTkToplevel):
         self.search_entry.bind("<KP_Enter>", self._on_search_submitted)
         self.search_entry.bind("<KeyRelease>", self._on_search_text_changed)
 
+        self._search_results_menu_width = 200
         self.search_results_var = tk.StringVar(value="No results")
         self.search_results_menu = ctk.CTkOptionMenu(
             content,
             variable=self.search_results_var,
             values=["No results"],
             command=self._on_search_result_selected,
-            width=200,
+            width=self._search_results_menu_width,
         )
         self.search_results_menu.grid(row=0, column=2, padx=4, pady=4, sticky="ew")
         self.search_results_menu.configure(state="disabled")
+        self.search_results_var.trace_add("write", self._keep_search_dropdown_width)
 
         self.now_playing_menu = ctk.CTkOptionMenu(
             content,
@@ -187,6 +189,23 @@ class AudioBarWindow(ctk.CTkToplevel):
 
         self._building_ui = False
         self._update_collapse_button()
+
+    def _keep_search_dropdown_width(self, *_args: Any) -> None:
+        width = getattr(self, "_search_results_menu_width", None)
+        menu = getattr(self, "search_results_menu", None)
+        if not width or menu is None:
+            return
+
+        def _apply() -> None:
+            try:
+                menu.configure(width=width)
+            except Exception:
+                pass
+
+        try:
+            self.after(0, _apply)
+        except Exception:
+            _apply()
 
     # ------------------------------------------------------------------
     # Controller listener handling
@@ -328,6 +347,7 @@ class AudioBarWindow(ctk.CTkToplevel):
         self.search_results_menu.configure(values=values)
         self.search_results_var.set(placeholder)
         self.search_results_menu.configure(state="normal")
+        self._keep_search_dropdown_width()
 
     def _on_search_result_selected(self, choice: str) -> None:
         if choice not in self._search_results_lookup:
@@ -375,6 +395,7 @@ class AudioBarWindow(ctk.CTkToplevel):
         menu.configure(values=["No results"])
         self.search_results_var.set("No results")
         menu.configure(state="disabled")
+        self._keep_search_dropdown_width()
 
     def _on_play_clicked(self) -> None:
         info = self._get_selected_track_info()
