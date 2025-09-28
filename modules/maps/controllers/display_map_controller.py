@@ -79,6 +79,9 @@ class DisplayMapController:
         self.pan_x       = 0
         self.pan_y       = 0
         self.selected_token  = None # Selected item (token or shape)
+        self.selected_items  = []   # Track all selected items to prepare for multi-select workflows
+        self._selection_overlays = {}
+        self._selection_icon_cache = {}
         self.clipboard_token = None # Copied item data (token or shape)
     
         self.brush_size  = DEFAULT_BRUSH_SIZE
@@ -136,6 +139,207 @@ class DisplayMapController:
         
         self._maps = {m["Name"]: m for m in maps_wrapper.load_items()}
         self.select_map()
+
+    def _set_selection(self, items):
+        """Centralised helper to assign the current selection list."""
+        unique_items = []
+        for candidate in items or []:
+            if candidate and candidate not in unique_items:
+                unique_items.append(candidate)
+        self.selected_items = unique_items
+        self.selected_token = unique_items[-1] if unique_items else None
+
+        # If the graphical edit mode item is no longer part of the selection, clear its handles.
+        if self._graphical_edit_mode_item and self._graphical_edit_mode_item not in self.selected_items:
+            self._remove_resize_handles()
+            self._graphical_edit_mode_item = None
+
+        self._update_selection_indicators()
+
+    def _clear_selection(self):
+        if not self.selected_items and not self.selected_token:
+            return
+        self._set_selection([])
+
+    def _is_shift_pressed(self, event):
+        state = getattr(event, "state", 0)
+        return bool(state & 0x0001)  # Tk shift mask
+
+    def _is_ctrl_pressed(self, event):
+        state = getattr(event, "state", 0)
+        # Control mask works for Windows/Linux; on macOS Command also maps to 0x0004 in Tk
+        return bool(state & 0x0004)
+
+    def _update_selection_state(self, item, event=None):
+        if not item:
+            self._clear_selection()
+            return False
+
+        additive = self._is_shift_pressed(event)
+        toggle = self._is_ctrl_pressed(event)
+
+        new_selection = list(self.selected_items)
+        item_already_selected = item in new_selection
+        item_active = True
+
+        if additive:
+            if not item_already_selected:
+                new_selection.append(item)
+        elif toggle:
+            if item_already_selected:
+                new_selection = [entry for entry in new_selection if entry is not item]
+                item_active = False
+            else:
+                new_selection.append(item)
+        else:
+            if len(new_selection) == 1 and new_selection[0] is item:
+                new_selection = []
+                item_active = False
+            else:
+                new_selection = [item]
+
+        self._set_selection(new_selection)
+        return item_active and item in self.selected_items
+
+    def _get_selection_icon_image(self, width, height):
+        width = max(1, int(width))
+        height = max(1, int(height))
+        key = (width, height)
+        cached = self._selection_icon_cache.get(key)
+        if cached:
+            return cached, key
+
+        pad = max(12, min(32, int(min(width, height) * 0.25)))
+        w = width + pad
+        h = height + pad
+        min_dim = max(1, min(w, h))
+        thickness = max(2, min(8, int(min_dim * 0.08)))
+        radius = max(thickness * 2, int(min_dim * 0.18))
+        radius = min(radius, min_dim // 2 - 1 if min_dim // 2 > 1 else radius)
+
+        img = Image.new("RGBA", (w, h), (0, 0, 0, 0))
+        draw = ImageDraw.Draw(img)
+        inset = thickness // 2 + 1
+        rect = (inset, inset, w - inset, h - inset)
+        draw.rounded_rectangle(rect, radius=radius, outline=(0, 196, 255, 230), width=thickness)
+
+        dot_radius = max(2, thickness)
+        corners = [
+            (rect[0], rect[1]),
+            (rect[2], rect[1]),
+            (rect[2], rect[3]),
+            (rect[0], rect[3]),
+        ]
+        for cx, cy in corners:
+            draw.ellipse(
+                (cx - dot_radius, cy - dot_radius, cx + dot_radius, cy + dot_radius),
+                fill=(0, 196, 255, 255),
+            )
+
+        tk_image = ImageTk.PhotoImage(img)
+        self._selection_icon_cache[key] = tk_image
+        return tk_image, key
+
+    def _calculate_item_bbox(self, item):
+        if not item or not getattr(self, "canvas", None):
+            return None
+
+        canvas_ids = [cid for cid in (item.get("canvas_ids") or ()) if cid]
+        preferred_ids = []
+
+        item_type = item.get("type")
+        if item_type == "token" and canvas_ids:
+            preferred_ids.append(canvas_ids[0])  # Border rectangle gives a nice bounds
+        preferred_ids.extend(canvas_ids)
+
+        if item_type == "token":
+            extra = []
+            if item.get("hp_canvas_ids"):
+                extra.extend([cid for cid in item["hp_canvas_ids"] if cid])
+            if item.get("name_id"):
+                extra.append(item.get("name_id"))
+            preferred_ids.extend(extra)
+        elif item_type == "marker":
+            preferred_ids.extend(
+                [
+                    item.get("border_canvas_id"),
+                    item.get("entry_canvas_id"),
+                    item.get("handle_canvas_id"),
+                ]
+            )
+
+        for cid in preferred_ids:
+            if not cid:
+                continue
+            try:
+                bbox = self.canvas.bbox(cid)
+            except tk.TclError:
+                bbox = None
+            if bbox:
+                return bbox
+        return None
+
+    def _remove_selection_overlay(self, item=None, key=None):
+        dict_key = key if key is not None else (id(item) if item is not None else None)
+        if dict_key is None:
+            return
+        entry = self._selection_overlays.pop(dict_key, None)
+        if entry and getattr(self, "canvas", None):
+            try:
+                self.canvas.delete(entry.get("canvas_id"))
+            except tk.TclError:
+                pass
+
+    def _update_selection_indicators(self):
+        if not getattr(self, "canvas", None):
+            return
+
+        active_ids = {id(item) for item in self.selected_items}
+        for key, entry in list(self._selection_overlays.items()):
+            item_ref = entry.get("item")
+            if id(item_ref) not in active_ids:
+                self._remove_selection_overlay(item_ref, key=key)
+
+        for item in self.selected_items:
+            bbox = self._calculate_item_bbox(item)
+            if not bbox:
+                continue
+            x1, y1, x2, y2 = bbox
+            width = max(1, x2 - x1)
+            height = max(1, y2 - y1)
+            icon_image, cache_key = self._get_selection_icon_image(width, height)
+            cx = (x1 + x2) / 2
+            cy = (y1 + y2) / 2
+
+            existing = self._selection_overlays.get(id(item))
+            if existing:
+                canvas_id = existing.get("canvas_id")
+                try:
+                    self.canvas.coords(canvas_id, cx, cy)
+                    if existing.get("cache_key") != cache_key:
+                        self.canvas.itemconfig(canvas_id, image=icon_image)
+                        existing["cache_key"] = cache_key
+                    self.canvas.itemconfig(canvas_id, state="disabled")
+                    self.canvas.tag_raise(canvas_id)
+                    existing["image"] = icon_image
+                except tk.TclError:
+                    self._remove_selection_overlay(item)
+                else:
+                    continue
+
+            try:
+                canvas_id = self.canvas.create_image(
+                    cx, cy, image=icon_image, state="disabled", tags=("selection_indicator",)
+                )
+                self.canvas.tag_raise(canvas_id)
+            except tk.TclError:
+                continue
+            self._selection_overlays[id(item)] = {
+                "canvas_id": canvas_id,
+                "image": icon_image,
+                "cache_key": cache_key,
+                "item": item,
+            }
 
     def open_map_by_name(self, map_name):
         target = (map_name or "").strip()
@@ -972,9 +1176,9 @@ class DisplayMapController:
             if self._graphical_edit_mode_item: # If graphical edit was active, deactivate it
                 self._remove_resize_handles()
                 self._graphical_edit_mode_item = None
-            if self.selected_token: # Deselect any item
-                self.selected_token = None
-            
+            if self.selected_items or self.selected_token:
+                self._clear_selection()
+
             if self.drawing_mode in ["rectangle", "oval"]: # Create new shape if in drawing mode
                 # Create new shape - This block needs to be indented
                 world_x = (event.x - self.pan_x) / self.zoom; world_y = (event.y - self.pan_y) / self.zoom
@@ -1259,6 +1463,7 @@ class DisplayMapController:
                     elif item_type == "oval": shape_id = self.canvas.create_oval(sx, sy, sx + shape_width, sy + shape_height, fill=fill_color, outline=border_color, width=2)
                     item['canvas_ids'] = (shape_id,) if shape_id else ();
                     if shape_id: self._bind_item_events(item)
+        self._update_selection_indicators()
         if self.fs_canvas:
             self._update_fullscreen_map()
         if getattr(self, '_web_server_thread', None):
@@ -1298,7 +1503,11 @@ class DisplayMapController:
              self._remove_resize_handles()
 
 
-        self.selected_token = item
+        item_is_active = self._update_selection_state(item, event)
+        if not item_is_active:
+            item.pop("drag_data", None)
+            return
+
         item["drag_data"] = {"x": event.x, "y": event.y, "moved": False}
         # Handles are only drawn if "Edit Shape" is chosen from context menu.
 
@@ -1346,6 +1555,8 @@ class DisplayMapController:
         if item == self._graphical_edit_mode_item and item.get("type") in ["rectangle", "oval"]:
             self._draw_resize_handles(item)
 
+        self._update_selection_indicators()
+
 
     def _on_item_release(self, event, item):
         # If a resize operation was active for this item, it's handled by _on_resize_handle_release
@@ -1357,6 +1568,7 @@ class DisplayMapController:
         if drag_data and not drag_data.get("moved"):
             self._handle_item_click(event, item)
         self._persist_tokens()
+        self._update_selection_indicators()
 
     def _handle_item_click(self, event, item):
         item_type = item.get("type", "token")
@@ -1717,7 +1929,9 @@ class DisplayMapController:
                             pass
                 del item_to_delete["fs_cross_ids"]
         if item_to_delete in self.tokens: self.tokens.remove(item_to_delete)
-        if self.selected_token is item_to_delete: self.selected_token = None
+        if item_to_delete in self.selected_items or self.selected_token is item_to_delete:
+            remaining = [itm for itm in self.selected_items if itm is not item_to_delete]
+            self._set_selection(remaining)
         if getattr(self, "_hovered_marker", None) is item_to_delete:
             self._hovered_marker = None
         self._persist_tokens(); self._update_canvas_images()
@@ -1976,16 +2190,7 @@ class DisplayMapController:
     def _activate_graphical_resize(self, shape):
         print(f"[DEBUG] _activate_graphical_resize called for shape: {shape.get('canvas_ids')}")
         if shape and shape.get("type") in ["rectangle", "oval"]:
-            if self.selected_token != shape: # If not already selected, select it
-                # Simulate a press to ensure selection logic runs (clears other handles etc.)
-                # This is a bit indirect; ideally _on_item_press would be callable without an event
-                # For now, we assume right-click already selected it, or this will select it.
-                # A cleaner way might be to have a dedicated _select_item(item) method.
-                if self.selected_token != shape: # If a different item was selected
-                    if self._graphical_edit_mode_item: # And another item was in graphical edit mode
-                         self._remove_resize_handles() # This will also clear _graphical_edit_mode_item
-                self.selected_token = shape # Directly select
-            
+            self._set_selection([shape])
             # Set the item for graphical edit mode *before* drawing handles
             self._graphical_edit_mode_item = shape
             self._draw_resize_handles(shape) # This calls _remove_resize_handles first
