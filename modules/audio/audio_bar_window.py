@@ -33,6 +33,8 @@ class AudioBarWindow(ctk.CTkToplevel):
         self._section_cycle: tuple[str, ...] = tuple(SECTION_TITLES.keys())
         self._playlist_lookup: Dict[str, Dict[str, Any]] = {}
         self._selected_track_key: Optional[str] = None
+        self._search_results_lookup: Dict[str, Dict[str, Any]] = {}
+        self._pending_search_track_id: Optional[str] = None
 
         self.overrideredirect(True)
         self.resizable(False, False)
@@ -88,9 +90,11 @@ class AudioBarWindow(ctk.CTkToplevel):
         self._content_grid_options = {"row": 0, "column": 1, "padx": 0, "pady": 0, "sticky": "nsew"}
         content.grid(**self._content_grid_options)
         content.grid_columnconfigure(0, weight=0)
-        content.grid_columnconfigure(1, weight=2)
-        content.grid_columnconfigure(10, weight=3)
-        content.grid_columnconfigure(12, weight=2)
+        content.grid_columnconfigure(1, weight=1)
+        content.grid_columnconfigure(2, weight=1)
+        content.grid_columnconfigure(3, weight=2)
+        content.grid_columnconfigure(12, weight=3)
+        content.grid_columnconfigure(14, weight=2)
         self._content_frame = content
 
         self.section_toggle_button = ctk.CTkButton(
@@ -101,6 +105,28 @@ class AudioBarWindow(ctk.CTkToplevel):
         )
         self.section_toggle_button.grid(row=0, column=0, padx=(4, 8), pady=4, sticky="ew")
 
+        self.search_var = tk.StringVar(value="")
+        self.search_entry = ctk.CTkEntry(
+            content,
+            textvariable=self.search_var,
+            placeholder_text="Search",
+        )
+        self.search_entry.grid(row=0, column=1, padx=4, pady=4, sticky="ew")
+        self.search_entry.bind("<Return>", self._on_search_submitted)
+        self.search_entry.bind("<KP_Enter>", self._on_search_submitted)
+        self.search_entry.bind("<KeyRelease>", self._on_search_text_changed)
+
+        self.search_results_var = tk.StringVar(value="No results")
+        self.search_results_menu = ctk.CTkOptionMenu(
+            content,
+            variable=self.search_results_var,
+            values=["No results"],
+            command=self._on_search_result_selected,
+            width=200,
+        )
+        self.search_results_menu.grid(row=0, column=2, padx=4, pady=4, sticky="ew")
+        self.search_results_menu.configure(state="disabled")
+
         self.now_playing_menu = ctk.CTkOptionMenu(
             content,
             variable=self.now_playing_var,
@@ -108,23 +134,23 @@ class AudioBarWindow(ctk.CTkToplevel):
             command=self._on_track_selected,
             width=320,
         )
-        self.now_playing_menu.grid(row=0, column=1, padx=4, pady=4, sticky="ew")
+        self.now_playing_menu.grid(row=0, column=3, padx=4, pady=4, sticky="ew")
         self.now_playing_menu.configure(state="disabled")
 
         self.prev_button = ctk.CTkButton(content, text="Prev", command=self._on_prev_clicked, width=70)
-        self.prev_button.grid(row=0, column=2, padx=4, pady=4, sticky="ew")
+        self.prev_button.grid(row=0, column=4, padx=4, pady=4, sticky="ew")
 
         self.play_button = ctk.CTkButton(content, text="Play", command=self._on_play_clicked, width=70)
-        self.play_button.grid(row=0, column=3, padx=4, pady=4, sticky="ew")
+        self.play_button.grid(row=0, column=5, padx=4, pady=4, sticky="ew")
 
         self.pause_button = ctk.CTkButton(content, text="Pause", command=self._on_pause_clicked, width=70)
-        self.pause_button.grid(row=0, column=4, padx=4, pady=4, sticky="ew")
+        self.pause_button.grid(row=0, column=6, padx=4, pady=4, sticky="ew")
 
         self.stop_button = ctk.CTkButton(content, text="Stop", command=self._on_stop_clicked, width=70)
-        self.stop_button.grid(row=0, column=5, padx=4, pady=4, sticky="ew")
+        self.stop_button.grid(row=0, column=7, padx=4, pady=4, sticky="ew")
 
         self.next_button = ctk.CTkButton(content, text="Next", command=self._on_next_clicked, width=70)
-        self.next_button.grid(row=0, column=6, padx=4, pady=4, sticky="ew")
+        self.next_button.grid(row=0, column=8, padx=4, pady=4, sticky="ew")
 
         self.shuffle_checkbox = ctk.CTkCheckBox(
             content,
@@ -132,7 +158,7 @@ class AudioBarWindow(ctk.CTkToplevel):
             variable=self.shuffle_var,
             command=self._on_shuffle_toggle,
         )
-        self.shuffle_checkbox.grid(row=0, column=7, padx=6, pady=4, sticky="w")
+        self.shuffle_checkbox.grid(row=0, column=9, padx=6, pady=4, sticky="w")
 
         self.loop_checkbox = ctk.CTkCheckBox(
             content,
@@ -140,10 +166,10 @@ class AudioBarWindow(ctk.CTkToplevel):
             variable=self.loop_var,
             command=self._on_loop_toggle,
         )
-        self.loop_checkbox.grid(row=0, column=8, padx=6, pady=4, sticky="w")
+        self.loop_checkbox.grid(row=0, column=10, padx=6, pady=4, sticky="w")
 
         volume_label = ctk.CTkLabel(content, text="Volume")
-        volume_label.grid(row=0, column=9, padx=(12, 4), pady=4, sticky="e")
+        volume_label.grid(row=0, column=11, padx=(12, 4), pady=4, sticky="e")
 
         self.volume_slider = ctk.CTkSlider(
             content,
@@ -151,13 +177,13 @@ class AudioBarWindow(ctk.CTkToplevel):
             to=100,
             command=self._on_volume_changed,
         )
-        self.volume_slider.grid(row=0, column=10, padx=4, pady=4, sticky="ew")
+        self.volume_slider.grid(row=0, column=12, padx=4, pady=4, sticky="ew")
 
         self.volume_value_label = ctk.CTkLabel(content, textvariable=self.volume_value_var, width=60)
-        self.volume_value_label.grid(row=0, column=11, padx=(4, 12), pady=4, sticky="e")
+        self.volume_value_label.grid(row=0, column=13, padx=(4, 12), pady=4, sticky="e")
 
         self.status_label = ctk.CTkLabel(content, textvariable=self.status_var, anchor="w")
-        self.status_label.grid(row=0, column=12, padx=(8, 4), pady=4, sticky="ew")
+        self.status_label.grid(row=0, column=14, padx=(8, 4), pady=4, sticky="ew")
 
         self._building_ui = False
         self._update_collapse_button()
@@ -226,12 +252,129 @@ class AudioBarWindow(ctk.CTkToplevel):
         next_index = (current_index + 1) % len(self._section_cycle)
         self._active_section = self._section_cycle[next_index]
         self.section_toggle_var.set(self._section_button_label(self._active_section))
+        if hasattr(self, "search_var"):
+            self.search_var.set("")
+        self._clear_search_results()
         self._refresh_from_state(self._active_section)
 
     def _on_track_selected(self, choice: str) -> None:
         if choice not in self._playlist_lookup:
             return
         self._selected_track_key = choice
+
+    def _on_search_submitted(self, _event: tk.Event | None = None) -> None:
+        self._perform_search()
+
+    def _on_search_text_changed(self, _event: tk.Event | None = None) -> None:
+        if not (self.search_var.get() or "").strip():
+            self._clear_search_results()
+
+    def _perform_search(self) -> None:
+        query = (self.search_var.get() or "").strip()
+        if not query:
+            self._clear_search_results()
+            return
+
+        controller_library = getattr(self.controller, "library", None)
+        if controller_library is None:
+            self._clear_search_results()
+            return
+
+        lowered = query.lower()
+        results: list[tuple[str, Dict[str, Any]]] = []
+        seen_labels: set[str] = set()
+
+        try:
+            categories = controller_library.get_categories(self._active_section)
+        except Exception:  # pragma: no cover - defensive
+            categories = []
+
+        for category in categories:
+            try:
+                tracks = controller_library.list_tracks(self._active_section, category)
+            except KeyError:
+                continue
+            for track in tracks:
+                name = self._format_track_label(track) or os.path.basename(track.get("path", ""))
+                display_name = name or "Track"
+                haystack = f"{display_name.lower()}|{category.lower()}|{str(track.get('path', '')).lower()}"
+                if lowered not in haystack:
+                    continue
+                base_label = f"{display_name} ({category})"
+                label = base_label
+                suffix = 2
+                while label in seen_labels:
+                    label = f"{base_label} ({suffix})"
+                    suffix += 1
+                seen_labels.add(label)
+                results.append(
+                    (
+                        label,
+                        {
+                            "track": track,
+                            "category": category,
+                            "identifier": self._track_identifier(track),
+                        },
+                    )
+                )
+
+        if not results:
+            self._clear_search_results()
+            return
+
+        placeholder = f"{len(results)} result(s)"
+        values = [placeholder] + [label for label, _info in results]
+        self._search_results_lookup = {label: info for label, info in results}
+        self.search_results_menu.configure(values=values)
+        self.search_results_var.set(placeholder)
+        self.search_results_menu.configure(state="normal")
+
+    def _on_search_result_selected(self, choice: str) -> None:
+        if choice not in self._search_results_lookup:
+            return
+        info = self._search_results_lookup.get(choice)
+        if not info:
+            return
+        self._apply_search_result(info)
+
+    def _apply_search_result(self, info: Dict[str, Any]) -> None:
+        track = info.get("track")
+        category = info.get("category")
+        identifier = str(info.get("identifier") or "")
+        if not track or not category or not identifier:
+            return
+
+        state = self.controller.get_state(self._active_section) or {}
+        current_category = state.get("category")
+        if current_category == category:
+            label = self._find_label_for_identifier(identifier)
+            if label:
+                self._set_selected_track_by_label(label)
+                self._remembered_track_label = self._format_track_label(track) or self._remembered_track_label
+                self._pending_search_track_id = None
+                return
+
+        controller_library = getattr(self.controller, "library", None)
+        if controller_library is None:
+            return
+
+        try:
+            playlist = controller_library.list_tracks(self._active_section, category)
+        except KeyError:
+            return
+
+        self._pending_search_track_id = identifier
+        self._remembered_track_label = self._format_track_label(track) or self._remembered_track_label
+        self.controller.set_playlist(self._active_section, playlist, category=category)
+
+    def _clear_search_results(self) -> None:
+        menu = getattr(self, "search_results_menu", None)
+        if menu is None:
+            return
+        self._search_results_lookup = {}
+        menu.configure(values=["No results"])
+        self.search_results_var.set("No results")
+        menu.configure(state="disabled")
 
     def _on_play_clicked(self) -> None:
         info = self._get_selected_track_info()
@@ -318,6 +461,7 @@ class AudioBarWindow(ctk.CTkToplevel):
         self._apply_volume((state or {}).get("volume", 0.0))
         self._update_status_from_state(section)
         self._update_button_states(state or {})
+        self._apply_pending_selection()
 
     def _apply_volume(self, value: Any) -> None:
         try:
@@ -403,6 +547,14 @@ class AudioBarWindow(ctk.CTkToplevel):
                 return label
         return None
 
+    def _find_label_for_identifier(self, identifier: str) -> Optional[str]:
+        if not identifier:
+            return None
+        for label, info in self._playlist_lookup.items():
+            if info.get("identifier") == identifier:
+                return label
+        return None
+
     def _set_selected_track_by_label(self, label: str) -> None:
         if label not in self._playlist_lookup:
             return
@@ -414,6 +566,14 @@ class AudioBarWindow(ctk.CTkToplevel):
         if self._selected_track_key is None:
             return None
         return self._playlist_lookup.get(self._selected_track_key)
+
+    def _apply_pending_selection(self) -> None:
+        if not self._pending_search_track_id:
+            return
+        label = self._find_label_for_identifier(self._pending_search_track_id)
+        if label:
+            self._set_selected_track_by_label(label)
+        self._pending_search_track_id = None
 
     @staticmethod
     def _track_identifier(track: Dict[str, Any]) -> str:
