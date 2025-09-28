@@ -2,7 +2,7 @@ import customtkinter as ctk
 import tkinter as tk
 import os
 import json
-from tkinter import filedialog, messagebox, simpledialog
+from tkinter import filedialog, messagebox
 from PIL import Image
 from functools import partial
 from modules.generic.generic_model_wrapper import GenericModelWrapper
@@ -370,21 +370,95 @@ class GMScreenView(ctk.CTkFrame):
         }
 
     def _prompt_save_layout(self):
-        layout_name = simpledialog.askstring("Save Layout", "Layout name:", parent=self)
-        if not layout_name:
-            return
         data = self._serialize_current_layout()
         if not data["tabs"]:
             messagebox.showwarning("Empty Layout", "There are no tabs to save yet.")
             return
-        self.layout_manager.save_layout(layout_name, data)
-        if messagebox.askyesno(
-            "Set Default?",
-            f"Use '{layout_name}' whenever '{self.scenario_name}' is opened?",
-        ):
-            self.layout_manager.set_scenario_default(self.scenario_name, layout_name)
-        messagebox.showinfo("Layout Saved", f"Layout '{layout_name}' saved successfully.")
-        self._update_layout_status(layout_name)
+
+        existing_layouts = self.layout_manager.list_layouts()
+
+        dialog = ctk.CTkToplevel(self)
+        dialog.title("Save Layout")
+        dialog.geometry("340x400")
+        dialog.transient(self.winfo_toplevel())
+        dialog.grab_set()
+
+        ctk.CTkLabel(
+            dialog,
+            text="Choose an existing layout to overwrite or enter a new name:",
+            wraplength=300,
+            justify="left",
+        ).pack(fill="x", padx=10, pady=(10, 5))
+
+        listbox = tk.Listbox(dialog, activestyle="none")
+        listbox.pack(fill="both", expand=True, padx=10, pady=(0, 5))
+
+        existing_names = sorted(existing_layouts.keys())
+        for name in existing_names:
+            listbox.insert("end", name)
+
+        entry_var = tk.StringVar(dialog, value=(self.current_layout_name or ""))
+        entry = ctk.CTkEntry(dialog, textvariable=entry_var)
+        entry.pack(fill="x", padx=10, pady=(0, 10))
+        entry.focus_set()
+
+        button_bar = ctk.CTkFrame(dialog)
+        button_bar.pack(fill="x", padx=10, pady=(0, 10))
+
+        def _close_dialog():
+            if dialog.winfo_exists():
+                try:
+                    dialog.grab_release()
+                except Exception:
+                    pass
+                dialog.destroy()
+
+        def _do_save():
+            layout_name = entry_var.get().strip()
+            if not layout_name:
+                messagebox.showwarning("Invalid Name", "Please enter a name for the layout.")
+                return
+            if layout_name in existing_layouts and not messagebox.askyesno(
+                "Overwrite Layout?",
+                f"A layout named '{layout_name}' already exists. Overwrite it?",
+            ):
+                return
+
+            _close_dialog()
+            self.layout_manager.save_layout(layout_name, data)
+            if messagebox.askyesno(
+                "Set Default?",
+                f"Use '{layout_name}' whenever '{self.scenario_name}' is opened?",
+            ):
+                self.layout_manager.set_scenario_default(self.scenario_name, layout_name)
+            messagebox.showinfo("Layout Saved", f"Layout '{layout_name}' saved successfully.")
+            self._update_layout_status(layout_name)
+
+        def _populate_entry(_event=None):
+            selection = listbox.curselection()
+            if selection:
+                entry_var.set(listbox.get(selection[0]))
+
+        if existing_names:
+            try:
+                default_index = existing_names.index(self.current_layout_name)
+            except ValueError:
+                default_index = 0
+            listbox.selection_set(default_index)
+            listbox.see(default_index)
+            if not entry_var.get().strip():
+                entry_var.set(existing_names[default_index])
+
+        listbox.bind("<<ListboxSelect>>", _populate_entry)
+        listbox.bind("<Double-Button-1>", lambda _e: _do_save())
+        dialog.bind("<Return>", lambda _e: _do_save())
+
+        save_btn = ctk.CTkButton(button_bar, text="Save", command=_do_save)
+        save_btn.pack(side="right")
+        cancel_btn = ctk.CTkButton(button_bar, text="Cancel", command=_close_dialog)
+        cancel_btn.pack(side="right", padx=(0, 5))
+
+        dialog.protocol("WM_DELETE_WINDOW", _close_dialog)
 
     def _open_load_layout_dialog(self):
         layouts = self.layout_manager.list_layouts()
