@@ -201,6 +201,27 @@ class DisplayMapController:
         self._set_selection(new_selection)
         return item_active and item in self.selected_items
 
+    def _prepare_item_selection(self, item, event=None):
+        if self._active_resize_handle_info:
+            return False
+
+        if self._graphical_edit_mode_item and self._graphical_edit_mode_item != item:
+            self._remove_resize_handles()
+            self._graphical_edit_mode_item = None
+        elif not self._graphical_edit_mode_item and self._resize_handles:
+            self._remove_resize_handles()
+
+        return self._update_selection_state(item, event)
+
+    def _ensure_selection_for_context_menu(self, item):
+        if not item:
+            return False
+
+        if item not in self.selected_items:
+            self._set_selection([item])
+
+        return item in self.selected_items
+
     def _get_selection_icon_image(self, width, height):
         width = max(1, int(width))
         height = max(1, int(height))
@@ -213,7 +234,7 @@ class DisplayMapController:
         w = width + pad
         h = height + pad
         min_dim = max(1, min(w, h))
-        thickness = max(2, min(8, int(min_dim * 0.08)))
+        thickness = max(2, min(5, int(min_dim * 0.05)))
         radius = max(thickness * 2, int(min_dim * 0.18))
         radius = min(radius, min_dim // 2 - 1 if min_dim // 2 > 1 else radius)
 
@@ -223,7 +244,7 @@ class DisplayMapController:
         rect = (inset, inset, w - inset, h - inset)
         draw.rounded_rectangle(rect, radius=radius, outline=(0, 196, 255, 230), width=thickness)
 
-        dot_radius = max(2, thickness)
+        dot_radius = max(2, thickness - 1)
         corners = [
             (rect[0], rect[1]),
             (rect[2], rect[1]),
@@ -491,7 +512,13 @@ class DisplayMapController:
         self._on_marker_text_change(marker, persist=True)
         self._collapse_marker_entry(marker)
 
+    def _on_marker_entry_press(self, event, marker):
+        item_active = self._prepare_item_selection(marker, event)
+        if not item_active:
+            marker.pop("drag_data", None)
+
     def _on_marker_entry_click(self, event, marker):
+        marker.pop("drag_data", None)
         widget = getattr(event, "widget", None)
         already_focused = widget is not None and widget.focus_get() is widget
         if marker.get("description_visible") and already_focused:
@@ -923,7 +950,8 @@ class DisplayMapController:
             y = event.y_root - canvas.winfo_rooty()
         except tk.TclError:
             return None
-        return SimpleNamespace(x=x, y=y)
+        state = getattr(event, "state", 0)
+        return SimpleNamespace(x=x, y=y, state=state)
 
     def _on_marker_handle_press(self, event, marker):
         converted = self._widget_event_to_canvas_event(event)
@@ -956,6 +984,8 @@ class DisplayMapController:
 
     def _on_token_right_click(self, event, token):
         print(f"Token right click on: {token.get('entity_id', 'Unknown Token')}")
+        if not self._ensure_selection_for_context_menu(token):
+            return
         if token.get("type") == "token" and "hp_canvas_ids" in token and token["hp_canvas_ids"]: # Ensure it's a token
             hp_cid, _ = token["hp_canvas_ids"]
             if hp_cid:
@@ -1335,6 +1365,7 @@ class DisplayMapController:
                     entry.bind("<FocusIn>", lambda e, i=item: self._on_marker_entry_focus_in(i))
                     entry.bind("<FocusOut>", lambda e, i=item: self._on_marker_entry_focus_out(i))
                     entry.bind("<Return>", lambda e, i=item: self._on_marker_entry_return(e, i))
+                    entry.bind("<ButtonPress-1>", lambda e, i=item: self._on_marker_entry_press(e, i))
                     entry.bind("<ButtonRelease-1>", lambda e, i=item: self._on_marker_entry_click(e, i))
                     entry.bind("<Button-3>", lambda e, i=item: self._on_item_right_click(e, i))
                     item["entry_widget"] = entry
@@ -1494,16 +1525,7 @@ class DisplayMapController:
             print("[DEBUG] _on_item_press: Active resize handle info exists, returning.")
             return
 
-        # If the newly selected item is different from the one in graphical edit mode,
-        # or if no item was in graphical edit mode, remove handles.
-        if self._graphical_edit_mode_item and self._graphical_edit_mode_item != item:
-            self._remove_resize_handles()
-            self._graphical_edit_mode_item = None
-        elif not self._graphical_edit_mode_item and self._resize_handles: # Handles visible but no item in edit mode (shouldn't happen)
-             self._remove_resize_handles()
-
-
-        item_is_active = self._update_selection_state(item, event)
+        item_is_active = self._prepare_item_selection(item, event)
         if not item_is_active:
             item.pop("drag_data", None)
             return
@@ -1588,6 +1610,8 @@ class DisplayMapController:
                 self._show_marker_description(item)
 
     def _on_item_right_click(self, event, item):
+        if not self._ensure_selection_for_context_menu(item):
+            return
         item_type = item.get("type", "token")
         if item_type == "token": return self._on_token_right_click(event, item)
         elif item_type in ["rectangle", "oval"]: self._show_shape_menu(event, item)
