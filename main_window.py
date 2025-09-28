@@ -8,6 +8,8 @@ import requests
 import shutil
 import re
 import unicodedata
+import threading
+from pathlib import Path
 import tkinter as tk
 from tkinter import (
     filedialog,
@@ -28,6 +30,12 @@ from docx import Document
 from modules.helpers.window_helper import position_window_at_top
 from modules.helpers.template_loader import load_template
 from modules.helpers.config_helper import ConfigHelper
+from modules.helpers.backup_helper import (
+    BackupError,
+    ManifestError,
+    create_backup_archive,
+    restore_backup_archive,
+)
 from modules.helpers.swarmui_helper import get_available_models
 from modules.helpers.logging_helper import (
     initialize_logging,
@@ -412,6 +420,8 @@ class MainWindow(ctk.CTk):
             ("gm_screen", "Open GM Screen", self.open_gm_screen),
             ("export_scenarios", "Export Scenarios", self.preview_and_export_scenarios),
             ("export_foundry", "Export Scenarios for Foundry", self.export_foundry),
+            ("create_backup", "Create Campaign Backup", self.prompt_campaign_backup),
+            ("restore_backup", "Restore Campaign Backup", self.prompt_campaign_restore),
             ("generate_portraits", "Generate Portraits", self.generate_missing_portraits),
             ("associate_portraits", "Associate NPC Portraits", self.associate_npc_portraits),
             ("import_portraits", "Import Portraits from Folder", self.import_portraits_from_directory),
@@ -967,6 +977,180 @@ class MainWindow(ctk.CTk):
 
     def export_foundry(self):
         preview_and_export_foundry(self)
+
+    def _run_progress_task(self, title, worker, success_message, detail_builder=None):
+        progress_win = ctk.CTkToplevel(self)
+        progress_win.title(title)
+        progress_win.geometry("420x180")
+        progress_win.resizable(False, False)
+        progress_win.transient(self)
+        progress_win.grab_set()
+        progress_win.lift()
+        progress_win.focus_force()
+        progress_win.protocol("WM_DELETE_WINDOW", lambda: None)
+
+        progress_label = ctk.CTkLabel(progress_win, text="Starting...", wraplength=360, justify="center")
+        progress_label.pack(fill="x", padx=20, pady=(20, 10))
+        progress_bar = ctk.CTkProgressBar(progress_win, mode="determinate")
+        progress_bar.pack(fill="x", padx=20, pady=(0, 20))
+        progress_bar.set(0.0)
+
+        def update(message: str, fraction: float) -> None:
+            def _apply():
+                progress_label.configure(text=message)
+                try:
+                    progress_bar.set(max(0.0, min(1.0, float(fraction))))
+                except Exception:
+                    progress_bar.set(0.0)
+
+            self.after(0, _apply)
+
+        def close_window():
+            if progress_win.winfo_exists():
+                try:
+                    progress_win.grab_release()
+                except Exception:
+                    pass
+                progress_win.destroy()
+
+        def handle_error(title: str, detail: str) -> None:
+            close_window()
+            messagebox.showerror(title, detail)
+
+        def on_success(result):
+            close_window()
+            detail = detail_builder(result) if detail_builder else None
+            message = success_message or "Operation completed."
+            if detail:
+                message = f"{message}\n\n{detail}"
+            messagebox.showinfo("Success", message)
+
+        def run_worker():
+            try:
+                result = worker(update)
+            except PermissionError as exc:
+                self.after(0, lambda: handle_error("Permission Denied", str(exc)))
+                return
+            except ManifestError as exc:
+                self.after(0, lambda: handle_error("Invalid Backup", str(exc)))
+                return
+            except BackupError as exc:
+                self.after(0, lambda: handle_error("Backup Error", str(exc)))
+                return
+            except Exception as exc:
+                log_exception(
+                    f"Unexpected error during {title}: {exc}",
+                    func_name="main_window.MainWindow._run_progress_task",
+                )
+                self.after(0, lambda: handle_error("Unexpected Error", str(exc)))
+                return
+
+            self.after(0, lambda: on_success(result))
+
+        threading.Thread(target=run_worker, daemon=True).start()
+
+    def _format_backup_summary(self, manifest: dict | None, *, include_target: bool) -> str:
+        if not manifest:
+            return ""
+
+        lines: list[str] = []
+        campaign_name = manifest.get("campaign_name")
+        if campaign_name:
+            lines.append(f"Campaign: {campaign_name}")
+
+        created = manifest.get("created_at")
+        if created:
+            lines.append(f"Created: {created}")
+
+        archive_path = manifest.get("archive_path")
+        if archive_path:
+            lines.append(f"Archive: {archive_path}")
+
+        if include_target:
+            target = manifest.get("restored_to")
+            if target:
+                lines.append(f"Restored to: {target}")
+
+        files = manifest.get("files")
+        if isinstance(files, (list, tuple)):
+            lines.append(f"Files included: {len(files)}")
+
+        missing = manifest.get("missing") or []
+        if missing:
+            lines.append(f"Missing at creation: {len(missing)}")
+
+        return "\n".join(lines)
+
+    def prompt_campaign_backup(self):
+        campaign_dir = Path(ConfigHelper.get_campaign_dir()).resolve()
+        if not campaign_dir.exists():
+            messagebox.showerror(
+                "Campaign Directory Missing",
+                f"The configured campaign directory was not found:\n{campaign_dir}",
+            )
+            return
+
+        timestamp = time.strftime("%Y%m%d_%H%M%S")
+        default_name = f"{campaign_dir.name or 'campaign'}_{timestamp}.zip"
+        destination = filedialog.asksaveasfilename(
+            title="Create Campaign Backup",
+            initialdir=str(campaign_dir),
+            initialfile=default_name,
+            defaultextension=".zip",
+            filetypes=[("Zip Archives", "*.zip")],
+        )
+        if not destination:
+            return
+
+        if os.path.exists(destination) and not messagebox.askyesno(
+            "Overwrite Existing File",
+            f"The selected file already exists:\n{destination}\n\nOverwrite it?",
+        ):
+            return
+
+        if not messagebox.askyesno(
+            "Confirm Backup",
+            f"Create a backup archive at:\n{destination}?",
+        ):
+            return
+
+        self._run_progress_task(
+            "Creating Backup",
+            lambda cb: create_backup_archive(destination, cb),
+            "Backup archive created successfully.",
+            lambda manifest: self._format_backup_summary(manifest, include_target=False),
+        )
+
+    def prompt_campaign_restore(self):
+        campaign_dir = Path(ConfigHelper.get_campaign_dir()).resolve()
+        if campaign_dir.exists():
+            initial_dir = campaign_dir
+        else:
+            try:
+                initial_dir = Path.home()
+            except Exception:
+                initial_dir = Path.cwd()
+        archive = filedialog.askopenfilename(
+            title="Select Backup Archive",
+            initialdir=str(initial_dir),
+            filetypes=[("Zip Archives", "*.zip"), ("All Files", "*.*")],
+        )
+        if not archive:
+            return
+
+        if not messagebox.askyesno(
+            "Confirm Restore",
+            "Restoring a backup will overwrite files in:\n"
+            f"{campaign_dir}\n\nArchive:\n{archive}\n\nProceed?",
+        ):
+            return
+
+        self._run_progress_task(
+            "Restoring Backup",
+            lambda cb: restore_backup_archive(archive, campaign_dir, cb),
+            "Backup restored successfully.",
+            lambda manifest: self._format_backup_summary(manifest, include_target=True),
+        )
 
     def open_scenario_importer(self):
         self.clear_current_content()
