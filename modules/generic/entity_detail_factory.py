@@ -515,7 +515,7 @@ def insert_places_table(parent, header, place_names, open_entity_callback):
         table.grid_rowconfigure(r, weight=1)
         
 @log_function
-def insert_list_longtext(parent, header, items, open_entity_callback=None, entity_collector=None):
+def insert_list_longtext(parent, header, items, open_entity_callback=None, entity_collector=None, gm_view=None):
     """Insert collapsible sections for long text lists such as scenario scenes."""
     ctk.CTkLabel(parent, text=f"{header}:", font=("Arial", 16, "bold")) \
         .pack(anchor="w", padx=10, pady=(10, 2))
@@ -566,6 +566,18 @@ def insert_list_longtext(parent, header, items, open_entity_callback=None, entit
         items = []
     elif not isinstance(items, (list, tuple)):
         items = [items]
+
+    is_scenes_field = str(header or "").strip().lower() == "scenes"
+    gm_view_ref = gm_view if is_scenes_field else None
+
+    def _build_scene_key(index, data):
+        if not isinstance(data, dict):
+            return str(index)
+        for key in ("Id", "ID", "Scene", "scene", "Title", "title"):
+            value = data.get(key)
+            if value:
+                return f"{index}:{value}"
+        return str(index)
 
     for idx, entry in enumerate(items, start=1):
         scene_dict = entry if isinstance(entry, dict) else {"Text": entry}
@@ -652,14 +664,39 @@ def insert_list_longtext(parent, header, items, open_entity_callback=None, entit
         button_text = f"▶ Scene {idx}"
         if title_clean:
             button_text += f" – {title_clean}"
-        btn = ctk.CTkButton(
-            outer,
-            text=button_text,
-            fg_color="transparent",
-            anchor="w",
-        )
 
-        def _toggle(btn=btn, body=body, lbl=body_label, expanded=expanded, idx=idx, title=title_clean):
+        scene_key = _build_scene_key(idx, scene_dict)
+
+        if gm_view_ref:
+            initial_state = False
+            if hasattr(gm_view_ref, "get_scene_completion"):
+                initial_state = bool(gm_view_ref.get_scene_completion(scene_key))
+            check_var = ctk.BooleanVar(master=outer, value=initial_state)
+            header_row = ctk.CTkFrame(outer, fg_color="transparent")
+            header_row.pack(fill="x", expand=True)
+            checkbox = ctk.CTkCheckBox(
+                header_row,
+                text="Completed",
+                variable=check_var,
+            )
+            checkbox.pack(side="left", padx=(0, 8), pady=(2, 2))
+            btn = ctk.CTkButton(
+                header_row,
+                text=button_text,
+                fg_color="transparent",
+                anchor="w",
+            )
+        else:
+            check_var = None
+            checkbox = None
+            btn = ctk.CTkButton(
+                outer,
+                text=button_text,
+                fg_color="transparent",
+                anchor="w",
+            )
+
+        def _toggle(btn=btn, body=body, lbl=body_label, expanded=expanded, idx=idx, title=title_clean, key=scene_key):
             if expanded.get():
                 body.pack_forget()
                 label = f"▶ Scene {idx}"
@@ -675,10 +712,32 @@ def insert_list_longtext(parent, header, items, open_entity_callback=None, entit
                 outer.update_idletasks()
                 wrap_px = max(200, lbl.winfo_width())
                 lbl.configure(wraplength=wrap_px)
+                if gm_view_ref and hasattr(gm_view_ref, "set_active_scene"):
+                    gm_view_ref.set_active_scene(key)
             expanded.set(not expanded.get())
 
         btn.configure(command=_toggle)
-        btn.pack(fill="x", expand=True)
+        if gm_view_ref:
+            btn.pack(fill="x", expand=True, padx=(0, 4))
+            if hasattr(gm_view_ref, "register_scene_widget") and check_var is not None:
+                gm_view_ref.register_scene_widget(scene_key, check_var, checkbox, display_label=button_text)
+
+            def _on_check(key=scene_key):
+                if gm_view_ref and hasattr(gm_view_ref, "set_active_scene"):
+                    gm_view_ref.set_active_scene(key)
+
+            checkbox.configure(command=_on_check)
+            if hasattr(gm_view_ref, "set_active_scene"):
+                btn.bind(
+                    "<Button-1>",
+                    lambda event, key=scene_key: gm_view_ref.set_active_scene(key),
+                )
+            menu_handler = getattr(gm_view_ref, "_show_context_menu", None)
+            if callable(menu_handler):
+                btn.bind("<Button-3>", menu_handler)
+                btn.bind("<Control-Button-1>", menu_handler)
+        else:
+            btn.pack(fill="x", expand=True)
 
 @log_function
 def create_scenario_detail_frame(entity_type, scenario_item, master, open_entity_callback=None):
@@ -689,6 +748,7 @@ def create_scenario_detail_frame(entity_type, scenario_item, master, open_entity
     """
     frame = ctk.CTkFrame(master)
     frame.pack(fill="both", expand=True, padx=20, pady=10)
+    gm_view_instance = getattr(open_entity_callback, "__self__", None)
     edit_btn = ctk.CTkButton(
         frame,
         text="Edit",
@@ -717,11 +777,13 @@ def create_scenario_detail_frame(entity_type, scenario_item, master, open_entity
 
         # 3) Update the GM-view’s tabs dict so show_tab() refers to the new widget
         #    open_entity_callback is bound to the GMScreenView instance
-        gm_view = open_entity_callback.__self__
-        # pick the right key—"Title" for scenarios, else "Name"
-        key_field = "Title" if entity_type == "Scenarios" else "Name"
-        tab_name = updated_item.get(key_field)
-        gm_view.tabs[tab_name]["content_frame"] = new_frame
+        gm_view = getattr(open_entity_callback, "__self__", None)
+        if gm_view is not None:
+            # pick the right key—"Title" for scenarios, else "Name"
+            key_field = "Title" if entity_type == "Scenarios" else "Name"
+            tab_name = updated_item.get(key_field)
+            if tab_name in gm_view.tabs:
+                gm_view.tabs[tab_name]["content_frame"] = new_frame
         
     ttk.Separator(frame, orient="horizontal").pack(fill="x", pady=1)
     # ——— HEADER ———
@@ -752,6 +814,9 @@ def create_scenario_detail_frame(entity_type, scenario_item, master, open_entity
     other_fields = [f for f in body_fields if f not in scenes_fields +  npc_fields + place_fields + creature_fields]
     ordered_fields = scenes_fields + npc_fields + creature_fields + place_fields + other_fields
 
+    if gm_view_instance and hasattr(gm_view_instance, "reset_scene_widgets"):
+        gm_view_instance.reset_scene_widgets()
+
     # render in that order
     for field in ordered_fields:
         name  = field["name"]
@@ -767,6 +832,7 @@ def create_scenario_detail_frame(entity_type, scenario_item, master, open_entity
                 value,
                 open_entity_callback,
                 entity_collector=scene_entity_tracker,
+                gm_view=gm_view_instance,
             )
         elif ftype == "longtext":
             insert_longtext(frame, name, value)
@@ -788,7 +854,7 @@ def create_scenario_detail_frame(entity_type, scenario_item, master, open_entity
             else:
                 insert_links(frame, name, items, linked, open_entity_callback)
 
-        ttk.Separator(frame, orient="horizontal").pack(fill="x", pady=1)
+    ttk.Separator(frame, orient="horizontal").pack(fill="x", pady=1)
     CTkLabel(frame, text="Secrets", font=("Arial", 18))\
     .pack(anchor="w", pady=(0, 5))
     CTkLabel(
@@ -799,6 +865,30 @@ def create_scenario_detail_frame(entity_type, scenario_item, master, open_entity
         justify="left"
     ).pack(fill="x", pady=(0, 15))
     ttk.Separator(frame, orient="horizontal").pack(fill="x", pady=10)
+
+    if gm_view_instance and hasattr(gm_view_instance, "register_note_widget"):
+        notes_section = ctk.CTkFrame(frame, fg_color="transparent")
+        notes_section.pack(fill="both", expand=True, padx=10, pady=(0, 10))
+        ctk.CTkLabel(
+            notes_section,
+            text="GM Notes",
+            font=("Arial", 16, "bold"),
+        ).pack(anchor="w", pady=(0, 6))
+
+        toolbar = ctk.CTkFrame(notes_section, fg_color="transparent")
+        toolbar.pack(fill="x", pady=(0, 6))
+        add_timestamp = getattr(gm_view_instance, "add_timestamped_note", None)
+        if callable(add_timestamp):
+            ctk.CTkButton(
+                toolbar,
+                text="Add Timestamp",
+                command=add_timestamp,
+                width=140,
+            ).pack(side="left", padx=(0, 6))
+
+        note_box = CTkTextbox(notes_section, wrap="word", height=160)
+        note_box.pack(fill="both", expand=True)
+        gm_view_instance.register_note_widget(note_box)
     return frame
 
 @log_function
