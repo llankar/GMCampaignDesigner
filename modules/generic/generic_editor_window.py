@@ -392,6 +392,7 @@ class GenericEditorWindow(ctk.CTkToplevel):
             "NPCs": "npcs",
             "Creatures": "creatures",
             "Places": "places",
+            "Maps": "maps",
         }
         entity_wrappers = {}
         entity_templates = {}
