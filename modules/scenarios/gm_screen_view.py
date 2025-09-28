@@ -274,20 +274,44 @@ class GMScreenView(ctk.CTkFrame):
         if not target:
             return
 
-        host = self.winfo_toplevel()
-        if hasattr(host, "map_tool"):
-            try:
-                host.map_tool(target)
-            except Exception as exc:
-                log_warning(
-                    f"Failed to open map tool for '{target}': {exc}",
-                    func_name="GMScreenView.open_map_tool",
-                )
-        else:
-            log_warning(
-                "Top-level window does not expose a map_tool method.",
-                func_name="GMScreenView.open_map_tool",
-            )
+        candidates = []
+        try:
+            host = self.winfo_toplevel()
+        except Exception:
+            host = None
+
+        if host is not None:
+            candidates.append(host)
+
+        current = getattr(host, "master", None)
+        while current is not None and current not in candidates:
+            candidates.append(current)
+            current = getattr(current, "master", None)
+
+        try:
+            root = self._root()
+        except Exception:
+            root = None
+
+        if root is not None and root not in candidates:
+            candidates.append(root)
+
+        for owner in candidates:
+            if hasattr(owner, "map_tool"):
+                try:
+                    owner.map_tool(target)
+                    return
+                except Exception as exc:
+                    log_warning(
+                        f"Failed to open map tool for '{target}': {exc}",
+                        func_name="GMScreenView.open_map_tool",
+                    )
+                    return
+
+        log_warning(
+            "No widget in hierarchy exposes a map_tool method.",
+            func_name="GMScreenView.open_map_tool",
+        )
 
     def _load_persisted_state(self):
         manager = getattr(self, "layout_manager", None)
