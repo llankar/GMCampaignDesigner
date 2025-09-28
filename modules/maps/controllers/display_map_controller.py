@@ -31,7 +31,11 @@ from modules.helpers.text_helpers import format_longtext
 from modules.helpers.config_helper import ConfigHelper
 from modules.ui.image_viewer import show_portrait
 from modules.helpers.logging_helper import log_module_import
-from modules.audio.entity_audio import play_entity_audio, stop_entity_audio
+from modules.audio.entity_audio import (
+    get_entity_audio_value,
+    play_entity_audio,
+    stop_entity_audio,
+)
 
 log_module_import(__name__)
 
@@ -1515,11 +1519,7 @@ class DisplayMapController:
             print(f"Error displaying token menu: {e}")
 
     def _get_token_audio_value(self, token):
-        record = token.get("entity_record") or {}
-        value = record.get("Audio") or ""
-        if isinstance(value, dict):
-            value = value.get("path") or value.get("text") or ""
-        value = str(value).strip()
+        value = get_entity_audio_value(token.get("entity_record"))
         if value:
             return value
         entity_type = token.get("entity_type")
@@ -1530,10 +1530,9 @@ class DisplayMapController:
         try:
             for item in wrapper.load_items():
                 if item.get("Name") == entity_id:
-                    raw = item.get("Audio") or ""
-                    if isinstance(raw, dict):
-                        raw = raw.get("path") or raw.get("text") or ""
-                    return str(raw).strip()
+                    raw_value = get_entity_audio_value(item)
+                    if raw_value:
+                        return raw_value
         except Exception:
             return ""
         return ""

@@ -231,12 +231,16 @@ class GenericEditorWindow(ctk.CTkToplevel):
         fields = self.template["fields"]
         portrait_field = None
         image_field = None
+        audio_field = None
         other_fields = []
         for field in fields:
-            if field["name"] == "Portrait":
+            name = field.get("name")
+            if name == "Portrait":
                 portrait_field = field
-            elif field["name"] == "Image":
+            elif name == "Image":
                 image_field = field
+            elif name == "Audio":
+                audio_field = field
             else:
                 other_fields.append(field)
         if portrait_field:
@@ -245,6 +249,9 @@ class GenericEditorWindow(ctk.CTkToplevel):
         if image_field:
             ctk.CTkLabel(self.scroll_frame, text=image_field["name"]).pack(pady=(5, 0), anchor="w")
             self.create_image_field(image_field)
+        if audio_field:
+            ctk.CTkLabel(self.scroll_frame, text=audio_field["name"]).pack(pady=(5, 0), anchor="w")
+            self.create_audio_field(audio_field)
 
         for field in other_fields:
             field_name = str(field.get("name", ""))

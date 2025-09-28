@@ -13,7 +13,12 @@ from modules.ui.image_viewer import show_portrait
 from modules.ui.tooltip import ToolTip
 from modules.generic.generic_editor_window import GenericEditorWindow
 from modules.helpers.config_helper import ConfigHelper
-from modules.audio.entity_audio import play_entity_audio, resolve_audio_path, stop_entity_audio
+from modules.audio.entity_audio import (
+    get_entity_audio_value,
+    play_entity_audio,
+    resolve_audio_path,
+    stop_entity_audio,
+)
 from modules.helpers.logging_helper import (
     log_function,
     log_info,
@@ -962,7 +967,7 @@ def create_entity_detail_frame(entity_type, entity, master, open_entity_callback
     button_bar = ctk.CTkFrame(content_frame)
     button_bar.pack(fill="x", pady=(0, 10))
 
-    audio_value = entity.get("Audio") or ""
+    audio_value = get_entity_audio_value(entity)
     entity_label = entity.get("Name") or entity.get("Title") or entity_type[:-1]
 
     def _audio_display_name(value: str) -> str:
