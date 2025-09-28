@@ -2,6 +2,7 @@ import customtkinter as ctk
 import tkinter as tk
 import os
 import json
+from datetime import datetime
 from tkinter import filedialog, messagebox
 from PIL import Image
 from functools import partial
@@ -40,6 +41,13 @@ class GMScreenView(ctk.CTkFrame):
         self.scenario_name = scenario_item.get("Title") or scenario_item.get("Name") or "Scenario"
         self.layout_manager = layout_manager or GMScreenLayoutManager()
         self._pending_initial_layout = initial_layout
+        self._scene_completion_state = {}
+        self._scene_vars = {}
+        self._scene_order = []
+        self._active_scene_key = None
+        self._note_cache = ""
+        self.note_widget = None
+        self._context_menu = None
 
         # Load your detach and reattach icon files (adjust file paths and sizes as needed)
         self.detach_icon = CTkImage(light_image=Image.open("assets/detach_icon.png"),
@@ -144,6 +152,7 @@ class GMScreenView(ctk.CTkFrame):
         # Main content area for scenario details
         self.content_area = ctk.CTkScrollableFrame(self)
         self.content_area.pack(fill="both", expand=True)
+        self._initialize_context_menu()
     
         # Example usage: create the first tab from the scenario_item
         scenario_name = scenario_item.get("Title", "Unnamed Scenario")
@@ -339,6 +348,128 @@ class GMScreenView(ctk.CTkFrame):
         if not layout_name:
             return
         self.load_layout(layout_name, silent=True)
+
+    def _initialize_context_menu(self):
+        if self._context_menu is not None:
+            return
+
+        self._context_menu = tk.Menu(self, tearoff=0)
+        self._context_menu.add_command(
+            label="Mark Active Scene Complete",
+            command=self.mark_active_scene_complete,
+        )
+        self._context_menu.add_command(
+            label="Mark Next Scene Complete",
+            command=self.mark_next_scene_complete,
+        )
+        self._context_menu.add_separator()
+        self._context_menu.add_command(
+            label="Add Timestamped Note",
+            command=self.add_timestamped_note,
+        )
+
+        targets = [self, self.content_area, getattr(self.content_area, "_scrollable_frame", None)]
+        for widget in targets:
+            if widget is None:
+                continue
+            widget.bind("<Button-3>", self._show_context_menu)
+            widget.bind("<Control-Button-1>", self._show_context_menu)
+
+    def reset_scene_widgets(self):
+        self._scene_vars = {}
+        self._scene_order = []
+
+    def register_scene_widget(self, scene_key, var, checkbox, display_label=None):
+        self._scene_vars[scene_key] = (var, checkbox, display_label)
+        if scene_key not in self._scene_order:
+            self._scene_order.append(scene_key)
+        self._scene_completion_state.setdefault(scene_key, bool(var.get()))
+
+        def _on_change(*_):
+            self._on_scene_var_change(scene_key)
+
+        try:
+            var.trace_add("write", _on_change)
+        except AttributeError:
+            var.trace("w", _on_change)  # fallback for older tkinter versions
+
+        if checkbox is not None:
+            checkbox.bind("<Button-3>", self._show_context_menu)
+            checkbox.bind("<Control-Button-1>", self._show_context_menu)
+
+    def _on_scene_var_change(self, scene_key):
+        var_tuple = self._scene_vars.get(scene_key)
+        if not var_tuple:
+            return
+        var = var_tuple[0]
+        self._scene_completion_state[scene_key] = bool(var.get())
+
+    def get_scene_completion(self, scene_key):
+        return self._scene_completion_state.get(scene_key, False)
+
+    def _set_scene_var(self, scene_key, value):
+        var_tuple = self._scene_vars.get(scene_key)
+        if not var_tuple:
+            self._scene_completion_state[scene_key] = bool(value)
+            return
+        var = var_tuple[0]
+        if bool(var.get()) == bool(value):
+            self._scene_completion_state[scene_key] = bool(value)
+            return
+        var.set(bool(value))
+        self._scene_completion_state[scene_key] = bool(value)
+
+    def set_active_scene(self, scene_key):
+        self._active_scene_key = scene_key
+
+    def mark_active_scene_complete(self):
+        if self._active_scene_key and self._active_scene_key in self._scene_vars:
+            self._set_scene_var(self._active_scene_key, True)
+            return True
+        return self.mark_next_scene_complete()
+
+    def mark_next_scene_complete(self):
+        for key in self._scene_order:
+            if not self._scene_completion_state.get(key, False):
+                self._active_scene_key = key
+                self._set_scene_var(key, True)
+                return True
+        return False
+
+    def add_timestamped_note(self):
+        if not self.note_widget:
+            return
+        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M")
+        existing = self.note_widget.get("1.0", "end-1c").strip()
+        prefix = "\n" if existing else ""
+        self.note_widget.insert("end", f"{prefix}[{timestamp}] ")
+        self.note_widget.see("end")
+        self._update_note_cache()
+
+    def _update_note_cache(self, event=None):
+        if self.note_widget:
+            self._note_cache = self.note_widget.get("1.0", "end-1c")
+
+    def register_note_widget(self, widget):
+        self.note_widget = widget
+        widget.delete("1.0", "end")
+        if self._note_cache:
+            widget.insert("1.0", self._note_cache)
+        widget.bind("<KeyRelease>", self._update_note_cache)
+        widget.bind("<FocusOut>", self._update_note_cache)
+        widget.bind("<Button-3>", self._show_context_menu)
+        widget.bind("<Control-Button-1>", self._show_context_menu)
+
+    def get_note_text(self):
+        return self._note_cache
+
+    def _show_context_menu(self, event):
+        if not self._context_menu:
+            return
+        try:
+            self._context_menu.tk_popup(event.x_root, event.y_root)
+        finally:
+            self._context_menu.grab_release()
 
     def _update_layout_status(self, name=None):
         self.current_layout_name = name
