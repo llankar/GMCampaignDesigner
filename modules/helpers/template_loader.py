@@ -65,6 +65,39 @@ def load_template(entity_name: str) -> dict:
     return {"fields": merged}
 
 
+def _render_template_content(fields: list, custom_fields: list) -> str:
+    """Return the canonical JSON body for a template file."""
+
+    def _render_items(items):
+        rendered = []
+        for item in items:
+            line = json.dumps(item, ensure_ascii=False, separators=(", ", ": "))
+            rendered.append("    " + line)
+        return rendered
+
+    out = ["{"]
+    out.append("  \"fields\": [")
+    field_lines = _render_items(fields)
+    if field_lines:
+        out.append(",\n".join(field_lines))
+    out.append("  ],")
+    out.append("  \"custom_fields\": [")
+    custom_lines = _render_items(custom_fields)
+    if custom_lines:
+        out.append(",\n".join(custom_lines))
+    out.append("  ]")
+    out.append("}\n")
+    return "\n".join(out)
+
+
+def _write_template_file(path: str, fields: list, custom_fields: list):
+    """Write template content to ``path`` using canonical formatting."""
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    text = _render_template_content(fields, custom_fields)
+    with open(path, "w", encoding="utf-8") as fh:
+        fh.write(text)
+
+
 @log_function
 def save_custom_fields(entity_name: str, fields: list):
     """Write custom fields into the entity template file under "custom_fields" key.
@@ -81,42 +114,70 @@ def save_custom_fields(entity_name: str, fields: list):
     else:
         with open(_default_template_path(entity_name), "r", encoding="utf-8") as f:
             data = json.load(f)
-        os.makedirs(os.path.dirname(path), exist_ok=True)
 
-    # Render fields (built-in) with one object per line
     base_fields = list(data.get("fields", []))
-    fields_item_lines = []
-    for item in base_fields:
-        line = json.dumps(item, ensure_ascii=False, separators=(", ", ": "))
-        fields_item_lines.append("    " + line)
-
-    # Render custom_fields with one object per line
-    custom_list = fields or []
-    item_lines = []
-    for item in custom_list:
-        # Compact object: keys on one line, with spaces after colon/commas
-        line = json.dumps(item, ensure_ascii=False, separators=(", ", ": "))
-        # Indent list items by 4 spaces to match indent=2 in base
-        item_lines.append("    " + line)
-
-    # Build final JSON with both arrays in single-line-per-item style
-    out = ["{"]
-    out.append("  \"fields\": [")
-    if fields_item_lines:
-        out.append(",\n".join(fields_item_lines))
-    out.append("  ],")
-    out.append("  \"custom_fields\": [")
-    if item_lines:
-        out.append(",\n".join(item_lines))
-    out.append("  ]")
-    out.append("}\n")
-    final_text = "\n".join(out)
-    with open(path, "w", encoding="utf-8") as f:
-        f.write(final_text)
+    custom_list = list(fields or [])
+    _write_template_file(path, base_fields, custom_list)
     log_info(
         f"Saved {len(custom_list)} custom fields for '{entity_name}'",
         func_name="modules.helpers.template_loader.save_custom_fields",
     )
+
+
+@log_function
+def sync_campaign_template(entity_name: str) -> bool:
+    """Ensure the campaign template for ``entity_name`` matches the default fields.
+
+    Returns ``True`` when the campaign template file was created or updated.
+    Existing ``custom_fields`` are preserved when rewriting the file.
+    """
+
+    default_path = _default_template_path(entity_name)
+    if not os.path.exists(default_path):
+        log_warning(
+            f"Default template missing for '{entity_name}'",
+            func_name="modules.helpers.template_loader.sync_campaign_template",
+        )
+        return False
+
+    try:
+        with open(default_path, "r", encoding="utf-8") as fh:
+            default_data = json.load(fh)
+    except Exception as exc:
+        log_warning(
+            f"Unable to load default template for '{entity_name}': {exc}",
+            func_name="modules.helpers.template_loader.sync_campaign_template",
+        )
+        return False
+
+    default_fields = list(default_data.get("fields", []))
+    campaign_path = _campaign_template_path(entity_name)
+    custom_fields = []
+    current_fields = None
+
+    if os.path.exists(campaign_path):
+        try:
+            with open(campaign_path, "r", encoding="utf-8") as fh:
+                campaign_data = json.load(fh)
+            custom_fields = list(campaign_data.get("custom_fields", []))
+            current_fields = list(campaign_data.get("fields", []))
+        except Exception as exc:
+            log_warning(
+                f"Unable to read campaign template for '{entity_name}': {exc}",
+                func_name="modules.helpers.template_loader.sync_campaign_template",
+            )
+    else:
+        custom_fields = list(default_data.get("custom_fields", []))
+
+    if current_fields is not None and current_fields == default_fields:
+        return False
+
+    _write_template_file(campaign_path, default_fields, custom_fields)
+    log_info(
+        f"Synchronized template for '{entity_name}'",
+        func_name="modules.helpers.template_loader.sync_campaign_template",
+    )
+    return True
 
 
 @log_function
