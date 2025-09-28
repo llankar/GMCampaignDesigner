@@ -60,7 +60,7 @@
     },
     {
       "name": "Audio",
-      "type": "text"
+      "type": "audio"
     }
   ]
 }

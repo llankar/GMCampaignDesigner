@@ -3,8 +3,9 @@
 from __future__ import annotations
 
 import os
+from collections.abc import Mapping
 from pathlib import Path
-from typing import Optional
+from typing import Any, Optional
 
 from modules.audio.audio_player import AudioPlayer
 from modules.helpers.config_helper import ConfigHelper
@@ -18,6 +19,34 @@ from modules.helpers.logging_helper import (
 log_module_import(__name__)
 
 _ENTITY_PLAYER: Optional[AudioPlayer] = None
+
+
+def normalize_audio_reference(value: Any) -> str:
+    """Normalize stored audio metadata into a plain string reference."""
+
+    if not value:
+        return ""
+    if isinstance(value, Mapping):
+        for key in ("path", "text", "value", "url"):
+            candidate = value.get(key)
+            if candidate:
+                try:
+                    return str(candidate).strip()
+                except Exception:
+                    continue
+        return ""
+    try:
+        return str(value).strip()
+    except Exception:
+        return ""
+
+
+def get_entity_audio_value(record: Any) -> str:
+    """Extract an audio reference from an entity record or value."""
+
+    if isinstance(record, Mapping):
+        return normalize_audio_reference(record.get("Audio"))
+    return normalize_audio_reference(record)
 
 
 def _get_player() -> AudioPlayer:
@@ -116,6 +145,8 @@ def stop_entity_audio() -> None:
         )
 
 __all__ = [
+    "get_entity_audio_value",
+    "normalize_audio_reference",
     "play_entity_audio",
     "resolve_audio_path",
     "stop_entity_audio",

@@ -10,7 +10,11 @@ from modules.generic.generic_editor_window import GenericEditorWindow
 from modules.ui.image_viewer import show_portrait
 from modules.ui.second_screen_display import show_entity_on_second_screen
 from modules.helpers.config_helper import ConfigHelper
-from modules.audio.entity_audio import play_entity_audio, stop_entity_audio
+from modules.audio.entity_audio import (
+    get_entity_audio_value,
+    play_entity_audio,
+    stop_entity_audio,
+)
 from modules.scenarios.gm_screen_view import GMScreenView
 from modules.ai.authoring_wizard import AuthoringWizardView
 import shutil
@@ -727,10 +731,7 @@ class GenericListView(ctk.CTkFrame):
     def _get_audio_value(self, item):
         if not item:
             return ""
-        value = item.get("Audio") or ""
-        if isinstance(value, dict):
-            return value.get("path") or value.get("text") or ""
-        return str(value).strip()
+        return get_entity_audio_value(item)
 
     def play_item_audio(self, item):
         audio_value = self._get_audio_value(item)

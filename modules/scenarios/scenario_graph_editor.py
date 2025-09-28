@@ -20,7 +20,11 @@ from modules.helpers.config_helper import ConfigHelper
 from modules.helpers.text_helpers import format_longtext
 from modules.ui.image_viewer import show_portrait
 from modules.helpers.template_loader import load_template
-from modules.audio.entity_audio import play_entity_audio, stop_entity_audio
+from modules.audio.entity_audio import (
+    get_entity_audio_value,
+    play_entity_audio,
+    stop_entity_audio,
+)
 from modules.helpers.logging_helper import log_module_import
 
 log_module_import(__name__)
@@ -2814,12 +2818,7 @@ class ScenarioGraphEditor(ctk.CTkFrame):
         node_menu.post(int(x), int(y))
 
     def _get_entity_audio(self, record):
-        if not isinstance(record, dict):
-            return ""
-        value = record.get("Audio") or ""
-        if isinstance(value, dict):
-            value = value.get("path") or value.get("text") or ""
-        return str(value).strip()
+        return get_entity_audio_value(record)
 
     def _play_entity_audio(self, record, name):
         audio_value = self._get_entity_audio(record)
