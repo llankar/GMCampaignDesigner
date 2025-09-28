@@ -1,116 +1,1841 @@
 {
   "music": {
-    "categories": {
-      "Fantasy": {
-        "tracks": [
-          {
-            "id": "7e2089a10aee43b48e6ccf6353cf2c7b",
-            "name": "01. Koi! Halation THE WAR～without Freyja～",
-            "path": "D:\\Music\\Macross Δ - 1st Album - Walküre Attack! - Walküre\\01. Koi! Halation THE WAR～without Freyja～.mp3",
-            "category": "Fantasy"
-          },
-          {
-            "id": "57facf913eb947b2a22f383eeaba212d",
-            "name": "02. Ichido dakeno Koi nara",
-            "path": "D:\\Music\\Macross Δ - 1st Album - Walküre Attack! - Walküre\\02. Ichido dakeno Koi nara.mp3",
-            "category": "Fantasy"
-          },
-          {
-            "id": "f49aae5eca784e829b084dbd1449ec76",
-            "name": "03. Jiritikku♡BEGINNER",
-            "path": "D:\\Music\\Macross Δ - 1st Album - Walküre Attack! - Walküre\\03. Jiritikku♡BEGINNER.mp3",
-            "category": "Fantasy"
-          },
-          {
-            "id": "0c71a95e6f33425ab252d0dff89efbcb",
-            "name": "04. Fukakuteisei☆COSMIC MOVEMENT",
-            "path": "D:\\Music\\Macross Δ - 1st Album - Walküre Attack! - Walküre\\04. Fukakuteisei☆COSMIC MOVEMENT.mp3",
-            "category": "Fantasy"
-          },
-          {
-            "id": "37efb10b871d49e08cd9b87165a26dae",
-            "name": "05. Bokura no Senjou",
-            "path": "D:\\Music\\Macross Δ - 1st Album - Walküre Attack! - Walküre\\05. Bokura no Senjou.mp3",
-            "category": "Fantasy"
-          },
-          {
-            "id": "f611a6ecd6c54610acc632c585b079ef",
-            "name": "06. NEO STREAM",
-            "path": "D:\\Music\\Macross Δ - 1st Album - Walküre Attack! - Walküre\\06. NEO STREAM.mp3",
-            "category": "Fantasy"
-          },
-          {
-            "id": "351756cf61db48e8aa738935e5c53ba0",
-            "name": "07. AXIA～Daisuki de Daikirai～",
-            "path": "D:\\Music\\Macross Δ - 1st Album - Walküre Attack! - Walküre\\07. AXIA～Daisuki de Daikirai～.mp3",
-            "category": "Fantasy"
-          },
-          {
-            "id": "f17c940c41004d6594d4fac805f7081a",
-            "name": "08. GIRAFFE BLUES",
-            "path": "D:\\Music\\Macross Δ - 1st Album - Walküre Attack! - Walküre\\08. GIRAFFE BLUES.mp3",
-            "category": "Fantasy"
-          },
-          {
-            "id": "70eafcd310b342388e32b361b3566bcf",
-            "name": "09. Walküre Attack!",
-            "path": "D:\\Music\\Macross Δ - 1st Album - Walküre Attack! - Walküre\\09. Walküre Attack!.mp3",
-            "category": "Fantasy"
-          },
-          {
-            "id": "70d50fc4dfa443858edfce1714367806",
-            "name": "10. Rune ga Pikatto Hikattara ～Album Version～",
-            "path": "D:\\Music\\Macross Δ - 1st Album - Walküre Attack! - Walküre\\10. Rune ga Pikatto Hikattara ～Album Version～.mp3",
-            "category": "Fantasy"
-          },
-          {
-            "id": "f6ec1d266fdc4224b1960684ca5431a9",
-            "name": "11. Ikenai Border Line ～Album Version～",
-            "path": "D:\\Music\\Macross Δ - 1st Album - Walküre Attack! - Walküre\\11. Ikenai Border Line ～Album Version～.mp3",
-            "category": "Fantasy"
-          },
-          {
-            "id": "9e352f29f07d46f5a926748e407f7606",
-            "name": "12. Koi! Halation THE WAR ～Album Version～",
-            "path": "D:\\Music\\Macross Δ - 1st Album - Walküre Attack! - Walküre\\12. Koi! Halation THE WAR ～Album Version～.mp3",
-            "category": "Fantasy"
-          }
-        ],
-        "directories": [
-          "D:\\Music\\Macross Δ - 1st Album - Walküre Attack! - Walküre"
-        ]
-      }
-    },
+    "categories": {},
     "settings": {
       "volume": 1.0,
       "shuffle": true,
       "loop": true,
-      "last_directory": "D:/Music/Macross Δ - 1st Album - Walküre Attack! - Walküre",
-      "last_category": "Fantasy",
-      "last_track_id": "f611a6ecd6c54610acc632c585b079ef"
+      "continue": true,
+      "last_directory": "D:/Sounds",
+      "last_category": "",
+      "last_track_id": ""
     }
   },
   "effects": {
     "categories": {
-      "Horror": {
+      "Alien Interface": {
         "tracks": [
           {
-            "id": "a164b6f680aa4fff96d7cc105b01a7ca",
-            "name": "06. NEO STREAM",
-            "path": "D:\\Music\\Macross Δ - 1st Album - Walküre Attack! - Walküre\\06. NEO STREAM.mp3",
-            "category": "Horror"
+            "id": "27a10d9b6b664badab8e32799aab2f88",
+            "name": "Bluezone_BC0300_alien_interface_sci_fi_texture_003",
+            "path": "D:\\Sounds\\BluezoneCorp - Alien Interface\\Bluezone_BC0300_alien_interface_sci_fi_texture_003.wav",
+            "category": "Alien Interface"
+          },
+          {
+            "id": "e31112c27ef3471a894df53ed5a5ba5c",
+            "name": "Bluezone_BC0300_alien_interface_sci_fi_texture_046",
+            "path": "D:\\Sounds\\BluezoneCorp - Alien Interface\\Bluezone_BC0300_alien_interface_sci_fi_texture_046.wav",
+            "category": "Alien Interface"
+          },
+          {
+            "id": "c577599647af42e09718b7c53cc2ad5f",
+            "name": "Bluezone_BC0300_alien_interface_sci_fi_transition_004",
+            "path": "D:\\Sounds\\BluezoneCorp - Alien Interface\\Bluezone_BC0300_alien_interface_sci_fi_transition_004.wav",
+            "category": "Alien Interface"
+          },
+          {
+            "id": "dd3004e2eeee4cf39b7a6b9d4845a724",
+            "name": "Bluezone_BC0300_alien_interface_sci_fi_transition_008",
+            "path": "D:\\Sounds\\BluezoneCorp - Alien Interface\\Bluezone_BC0300_alien_interface_sci_fi_transition_008.wav",
+            "category": "Alien Interface"
+          }
+        ],
+        "directories": []
+      },
+      "Alien Tripod": {
+        "tracks": [
+          {
+            "id": "82fae88b7eaa4d13881c111f66ac9594",
+            "name": "Bluezone_BC0292_alien_tripod_debris_glass_falling_003",
+            "path": "D:\\Sounds\\BluezoneCorp - Alien Tripod\\Bluezone_BC0292_alien_tripod_debris_glass_falling_003.wav",
+            "category": "Alien Tripod"
+          },
+          {
+            "id": "297d5c4cd8034dcbb3ecbf70cf0e2b16",
+            "name": "Bluezone_BC0292_alien_tripod_debris_rock_collapse_earthquake_rumble_large_005",
+            "path": "D:\\Sounds\\BluezoneCorp - Alien Tripod\\Bluezone_BC0292_alien_tripod_debris_rock_collapse_earthquake_rumble_large_005.wav",
+            "category": "Alien Tripod"
+          },
+          {
+            "id": "cf07c92e94484184b6fa060337b36ba4",
+            "name": "Bluezone_BC0292_alien_tripod_pneumatic_chemical_weapon_black_smoke_001",
+            "path": "D:\\Sounds\\BluezoneCorp - Alien Tripod\\Bluezone_BC0292_alien_tripod_pneumatic_chemical_weapon_black_smoke_001.wav",
+            "category": "Alien Tripod"
+          },
+          {
+            "id": "5ede896d887c467f9d9b221f3aa08a65",
+            "name": "Bluezone_BC0292_alien_tripod_texture_organic_liquid_005",
+            "path": "D:\\Sounds\\BluezoneCorp - Alien Tripod\\Bluezone_BC0292_alien_tripod_texture_organic_liquid_005.wav",
+            "category": "Alien Tripod"
+          }
+        ],
+        "directories": []
+      },
+      "Designed Water": {
+        "tracks": [
+          {
+            "id": "cdee60c9a060444d8f6a55a21bf482a2",
+            "name": "Bluezone_BC0298_designed_water_impact_006",
+            "path": "D:\\Sounds\\BluezoneCorp - Designed Water\\Bluezone_BC0298_designed_water_impact_006.wav",
+            "category": "Designed Water"
+          },
+          {
+            "id": "55ca9283bd4b4fef8304e9ed1b3f82d5",
+            "name": "Bluezone_BC0298_designed_water_texture_014",
+            "path": "D:\\Sounds\\BluezoneCorp - Designed Water\\Bluezone_BC0298_designed_water_texture_014.wav",
+            "category": "Designed Water"
+          },
+          {
+            "id": "def9c777bfd547b3a6f7ca395b7af4cb",
+            "name": "Bluezone_BC0298_designed_water_transition_impact_017",
+            "path": "D:\\Sounds\\BluezoneCorp - Designed Water\\Bluezone_BC0298_designed_water_transition_impact_017.wav",
+            "category": "Designed Water"
+          },
+          {
+            "id": "517350c77b4d4f97a82b2c00796904a6",
+            "name": "Bluezone_BC0298_designed_water_underwater_005",
+            "path": "D:\\Sounds\\BluezoneCorp - Designed Water\\Bluezone_BC0298_designed_water_underwater_005.wav",
+            "category": "Designed Water"
+          }
+        ],
+        "directories": []
+      },
+      "Futuristic User Interface": {
+        "tracks": [
+          {
+            "id": "ef356694a8ff421f8281a86af3775ff6",
+            "name": "Bluezone_BC0303_futuristic_user_interface_alert_003",
+            "path": "D:\\Sounds\\BluezoneCorp - Futuristic User Interface\\Bluezone_BC0303_futuristic_user_interface_alert_003.wav",
+            "category": "Futuristic User Interface"
+          },
+          {
+            "id": "9108d91515e14745ae5ee3a03b9d2f51",
+            "name": "Bluezone_BC0303_futuristic_user_interface_data_glitch_003",
+            "path": "D:\\Sounds\\BluezoneCorp - Futuristic User Interface\\Bluezone_BC0303_futuristic_user_interface_data_glitch_003.wav",
+            "category": "Futuristic User Interface"
+          },
+          {
+            "id": "a37ca72254d24c8fb81a9f3ad564d8b8",
+            "name": "Bluezone_BC0303_futuristic_user_interface_high_tech_beep_038",
+            "path": "D:\\Sounds\\BluezoneCorp - Futuristic User Interface\\Bluezone_BC0303_futuristic_user_interface_high_tech_beep_038.wav",
+            "category": "Futuristic User Interface"
+          },
+          {
+            "id": "bc3744cb4f3048b499a1a360be17a6eb",
+            "name": "Bluezone_BC0303_futuristic_user_interface_transition_006",
+            "path": "D:\\Sounds\\BluezoneCorp - Futuristic User Interface\\Bluezone_BC0303_futuristic_user_interface_transition_006.wav",
+            "category": "Futuristic User Interface"
+          }
+        ],
+        "directories": []
+      },
+      "High Voltage": {
+        "tracks": [
+          {
+            "id": "527c84fc82f14af685601ef092bbaaad",
+            "name": "Bluezone_BC0299_electricity_electronic_lighter_button_click_on_off_002_02",
+            "path": "D:\\Sounds\\BluezoneCorp - High Voltage\\Bluezone_BC0299_electricity_electronic_lighter_button_click_on_off_002_02.wav",
+            "category": "High Voltage"
+          },
+          {
+            "id": "c14abefc3cbf434fabec0da78b094f73",
+            "name": "Bluezone_BC0299_electricity_surge_discharge_electrical_arc_crackling_002_01",
+            "path": "D:\\Sounds\\BluezoneCorp - High Voltage\\Bluezone_BC0299_electricity_surge_discharge_electrical_arc_crackling_002_01.wav",
+            "category": "High Voltage"
+          },
+          {
+            "id": "0326dffc5dff41b79c8273a424287e40",
+            "name": "Bluezone_BC0299_electricity_texture_sizzling_crackling_006",
+            "path": "D:\\Sounds\\BluezoneCorp - High Voltage\\Bluezone_BC0299_electricity_texture_sizzling_crackling_006.wav",
+            "category": "High Voltage"
+          },
+          {
+            "id": "f3661134b6504396b1d919a97179d60e",
+            "name": "Bluezone_BC0299_electricity_transformer_hum_low_003",
+            "path": "D:\\Sounds\\BluezoneCorp - High Voltage\\Bluezone_BC0299_electricity_transformer_hum_low_003.wav",
+            "category": "High Voltage"
+          }
+        ],
+        "directories": []
+      },
+      "Industrial Lever Switch": {
+        "tracks": [
+          {
+            "id": "1b5636fe5c24476ab2aaeb9bc3cc1b5b",
+            "name": "Bluezone_BC0302_industrial_lever_switch_014",
+            "path": "D:\\Sounds\\BluezoneCorp - Industrial Lever Switch\\Bluezone_BC0302_industrial_lever_switch_014.wav",
+            "category": "Industrial Lever Switch"
+          },
+          {
+            "id": "2c56e97617d34155b213b77da7101b6b",
+            "name": "Bluezone_BC0302_industrial_lever_switch_039",
+            "path": "D:\\Sounds\\BluezoneCorp - Industrial Lever Switch\\Bluezone_BC0302_industrial_lever_switch_039.wav",
+            "category": "Industrial Lever Switch"
+          },
+          {
+            "id": "d234134b254a4e65b72df2e9c0f79c6b",
+            "name": "Bluezone_BC0302_industrial_lever_switch_small_003",
+            "path": "D:\\Sounds\\BluezoneCorp - Industrial Lever Switch\\Bluezone_BC0302_industrial_lever_switch_small_003.wav",
+            "category": "Industrial Lever Switch"
+          }
+        ],
+        "directories": []
+      },
+      "Cinematic Impact": {
+        "tracks": [
+          {
+            "id": "514fb48495af4b279c12e182b0a7f237",
+            "name": "Bluezone_BC0294_modern_cinematic_impact_022",
+            "path": "D:\\Sounds\\BluezoneCorp - Modern Cinematic Impact\\Bluezone_BC0294_modern_cinematic_impact_022.wav",
+            "category": "Cinematic Impact"
+          },
+          {
+            "id": "e41a4c9efb9d40bb9da89c0adbe68fcd",
+            "name": "Bluezone_BC0294_modern_cinematic_impact_boom_003",
+            "path": "D:\\Sounds\\BluezoneCorp - Modern Cinematic Impact\\Bluezone_BC0294_modern_cinematic_impact_boom_003.wav",
+            "category": "Cinematic Impact"
+          },
+          {
+            "id": "6c1a06c7d5c242dd8e961a32c6f26869",
+            "name": "Bluezone_BC0294_modern_cinematic_impact_percussion_009",
+            "path": "D:\\Sounds\\BluezoneCorp - Modern Cinematic Impact\\Bluezone_BC0294_modern_cinematic_impact_percussion_009.wav",
+            "category": "Cinematic Impact"
+          }
+        ],
+        "directories": []
+      },
+      "Retrofuturistic Computer": {
+        "tracks": [
+          {
+            "id": "47eddb0dbcd9464ba634f0fecff71191",
+            "name": "Bluezone_BC0304_retrofuturistic_computer_alarm_005",
+            "path": "D:\\Sounds\\BluezoneCorp - Retrofuturistic Computer\\Bluezone_BC0304_retrofuturistic_computer_alarm_005.wav",
+            "category": "Retrofuturistic Computer"
+          },
+          {
+            "id": "8c286b0ebf734ec598bc2a60b6ef5ef8",
+            "name": "Bluezone_BC0304_retrofuturistic_computer_button_013",
+            "path": "D:\\Sounds\\BluezoneCorp - Retrofuturistic Computer\\Bluezone_BC0304_retrofuturistic_computer_button_013.wav",
+            "category": "Retrofuturistic Computer"
+          },
+          {
+            "id": "8867b28d0310482a83d048ede8a77ed2",
+            "name": "Bluezone_BC0304_retrofuturistic_computer_data_processing_006",
+            "path": "D:\\Sounds\\BluezoneCorp - Retrofuturistic Computer\\Bluezone_BC0304_retrofuturistic_computer_data_processing_006.wav",
+            "category": "Retrofuturistic Computer"
+          },
+          {
+            "id": "6be0f7025d74489b8e27caa9bd0232e3",
+            "name": "Bluezone_BC0304_retrofuturistic_computer_glitch_malfunction_004",
+            "path": "D:\\Sounds\\BluezoneCorp - Retrofuturistic Computer\\Bluezone_BC0304_retrofuturistic_computer_glitch_malfunction_004.wav",
+            "category": "Retrofuturistic Computer"
+          }
+        ],
+        "directories": []
+      },
+      "Sci-Fi Weapon": {
+        "tracks": [
+          {
+            "id": "dcf83f72d3c94d1b84934b7f01d15a2b",
+            "name": "Bluezone_BC0295_sci_fi_weapon_cannon_shot_002",
+            "path": "D:\\Sounds\\BluezoneCorp - Sci Fi Weapon\\Bluezone_BC0295_sci_fi_weapon_cannon_shot_002.wav",
+            "category": "Sci-Fi Weapon"
+          },
+          {
+            "id": "add20f8b0f5c4df78f62825969431372",
+            "name": "Bluezone_BC0295_sci_fi_weapon_gun_shot_008",
+            "path": "D:\\Sounds\\BluezoneCorp - Sci Fi Weapon\\Bluezone_BC0295_sci_fi_weapon_gun_shot_008.wav",
+            "category": "Sci-Fi Weapon"
+          },
+          {
+            "id": "9f297efab7474b8686968990bb2d84f6",
+            "name": "Bluezone_BC0295_sci_fi_weapon_texture_007",
+            "path": "D:\\Sounds\\BluezoneCorp - Sci Fi Weapon\\Bluezone_BC0295_sci_fi_weapon_texture_007.wav",
+            "category": "Sci-Fi Weapon"
+          }
+        ],
+        "directories": []
+      },
+      "Steampunk Machines": {
+        "tracks": [
+          {
+            "id": "75b19959f5494c1bb62bab23c78383e9",
+            "name": "Bluezone_BC0305_steampunk_machine_mechanical_sequence_start_stop_025",
+            "path": "D:\\Sounds\\BluezoneCorp - Steampunk Machines\\Bluezone_BC0305_steampunk_machine_mechanical_sequence_start_stop_025.wav",
+            "category": "Steampunk Machines"
+          },
+          {
+            "id": "c4a3d23694fe4aa4b11487c0c7bf33bf",
+            "name": "Bluezone_BC0305_steampunk_machine_mechanical_texture_038",
+            "path": "D:\\Sounds\\BluezoneCorp - Steampunk Machines\\Bluezone_BC0305_steampunk_machine_mechanical_texture_038.wav",
+            "category": "Steampunk Machines"
+          },
+          {
+            "id": "d74df6a1372a4da6b942eb1001b2846e",
+            "name": "Bluezone_BC0305_steampunk_machine_mechanical_texture_053",
+            "path": "D:\\Sounds\\BluezoneCorp - Steampunk Machines\\Bluezone_BC0305_steampunk_machine_mechanical_texture_053.wav",
+            "category": "Steampunk Machines"
+          },
+          {
+            "id": "892d03f55506401ab315d884d1df8f59",
+            "name": "Bluezone_BC0305_steampunk_machine_mechanical_texture_heavy_impact_011",
+            "path": "D:\\Sounds\\BluezoneCorp - Steampunk Machines\\Bluezone_BC0305_steampunk_machine_mechanical_texture_heavy_impact_011.wav",
+            "category": "Steampunk Machines"
+          }
+        ],
+        "directories": []
+      },
+      "Steampunk Weapon": {
+        "tracks": [
+          {
+            "id": "f3ceb662e7744c008012dc4600da0cd9",
+            "name": "Bluezone_BC0296_steampunk_weapon_cannon_shot_013_02",
+            "path": "D:\\Sounds\\BluezoneCorp - Steampunk Weapon And Textures\\Bluezone_BC0296_steampunk_weapon_cannon_shot_013_02.wav",
+            "category": "Steampunk Weapon"
+          },
+          {
+            "id": "4846090acf5941ec930528fe554d20ab",
+            "name": "Bluezone_BC0296_steampunk_weapon_flare_shot_explosion_003",
+            "path": "D:\\Sounds\\BluezoneCorp - Steampunk Weapon And Textures\\Bluezone_BC0296_steampunk_weapon_flare_shot_explosion_003.wav",
+            "category": "Steampunk Weapon"
+          },
+          {
+            "id": "9184533f25244d5e91e419bb6948209d",
+            "name": "Bluezone_BC0296_steampunk_weapon_gun_shot_026_02",
+            "path": "D:\\Sounds\\BluezoneCorp - Steampunk Weapon And Textures\\Bluezone_BC0296_steampunk_weapon_gun_shot_026_02.wav",
+            "category": "Steampunk Weapon"
+          },
+          {
+            "id": "61bff62ae44a49f2a59444c4cf514674",
+            "name": "Bluezone_BC0296_steampunk_weapon_mechanism_texture_007",
+            "path": "D:\\Sounds\\BluezoneCorp - Steampunk Weapon And Textures\\Bluezone_BC0296_steampunk_weapon_mechanism_texture_007.wav",
+            "category": "Steampunk Weapon"
+          }
+        ],
+        "directories": []
+      },
+      "Stone Impact": {
+        "tracks": [
+          {
+            "id": "a38ede6d25ed4b579dd72821861d5ac5",
+            "name": "Bluezone_BC0297_stone_impact_015",
+            "path": "D:\\Sounds\\BluezoneCorp - Stone Impact\\Bluezone_BC0297_stone_impact_015.wav",
+            "category": "Stone Impact"
+          },
+          {
+            "id": "59b1e2d2fb8b4efa84d44df4ee18e597",
+            "name": "Bluezone_BC0297_stone_impact_041",
+            "path": "D:\\Sounds\\BluezoneCorp - Stone Impact\\Bluezone_BC0297_stone_impact_041.wav",
+            "category": "Stone Impact"
+          },
+          {
+            "id": "1d0e2b448e0f4b33b57915c0cdfeedd8",
+            "name": "Bluezone_BC0297_stone_impact_hammer_015",
+            "path": "D:\\Sounds\\BluezoneCorp - Stone Impact\\Bluezone_BC0297_stone_impact_hammer_015.wav",
+            "category": "Stone Impact"
+          },
+          {
+            "id": "815ebec44b684c69b6a7068744e59eef",
+            "name": "Bluezone_BC0297_stone_impact_steel_bar_01_010",
+            "path": "D:\\Sounds\\BluezoneCorp - Stone Impact\\Bluezone_BC0297_stone_impact_steel_bar_01_010.wav",
+            "category": "Stone Impact"
+          }
+        ],
+        "directories": []
+      },
+      "Tiny Gears": {
+        "tracks": [
+          {
+            "id": "5a29a2080c3041ddb99c03ec26943ffd",
+            "name": "Bluezone_BC0301_tiny_gears_small_mechanism_click_003",
+            "path": "D:\\Sounds\\BluezoneCorp - Tiny Gears - Small Mechanism\\Bluezone_BC0301_tiny_gears_small_mechanism_click_003.wav",
+            "category": "Tiny Gears"
+          },
+          {
+            "id": "7d7e563ddc8b4a83bf96c57804a7190c",
+            "name": "Bluezone_BC0301_tiny_gears_small_mechanism_click_complex_011",
+            "path": "D:\\Sounds\\BluezoneCorp - Tiny Gears - Small Mechanism\\Bluezone_BC0301_tiny_gears_small_mechanism_click_complex_011.wav",
+            "category": "Tiny Gears"
+          },
+          {
+            "id": "4dce2b8b60914940850ccda4f0b6fee8",
+            "name": "Bluezone_BC0301_tiny_gears_small_mechanism_sequence_045",
+            "path": "D:\\Sounds\\BluezoneCorp - Tiny Gears - Small Mechanism\\Bluezone_BC0301_tiny_gears_small_mechanism_sequence_045.wav",
+            "category": "Tiny Gears"
+          },
+          {
+            "id": "427af30158ab4daeb8e49685dcbde610",
+            "name": "Bluezone_BC0301_tiny_gears_small_mechanism_sequence_spinning_008",
+            "path": "D:\\Sounds\\BluezoneCorp - Tiny Gears - Small Mechanism\\Bluezone_BC0301_tiny_gears_small_mechanism_sequence_spinning_008.wav",
+            "category": "Tiny Gears"
+          }
+        ],
+        "directories": []
+      },
+      "ARP Synth": {
+        "tracks": [
+          {
+            "id": "9f1011191e0546178a4c6073fc8298f8",
+            "name": "DSGNBass_Crunchy Bass Dive Dissonant_BOLT_ARP2600",
+            "path": "D:\\Sounds\\Bolt - ARP 2600- Droids, Blips, Drones & more\\DSGNBass_Crunchy Bass Dive Dissonant_BOLT_ARP2600.wav",
+            "category": "ARP Synth"
+          },
+          {
+            "id": "c0d0aa4e83c349de84221d93908700fa",
+            "name": "MECHMisc_TRS Cable Plug In Solid Metal Thump_BOLT_ARP2600",
+            "path": "D:\\Sounds\\Bolt - ARP 2600- Droids, Blips, Drones & more\\MECHMisc_TRS Cable Plug In Solid Metal Thump_BOLT_ARP2600.wav",
+            "category": "ARP Synth"
+          },
+          {
+            "id": "bbc627ffb1d04165bf162f6aa83fbb30",
+            "name": "ROBTVox_Android Talking Wah Goofy 01_BOLT_ARP2600",
+            "path": "D:\\Sounds\\Bolt - ARP 2600- Droids, Blips, Drones & more\\ROBTVox_Android Talking Wah Goofy 01_BOLT_ARP2600.wav",
+            "category": "ARP Synth"
+          },
+          {
+            "id": "9349d49697a64131920c1e7ca49ade33",
+            "name": "SCICmpt_Retro Computer Glitches Sawtooth Chaotic_BOLT_ARP2600",
+            "path": "D:\\Sounds\\Bolt - ARP 2600- Droids, Blips, Drones & more\\SCICmpt_Retro Computer Glitches Sawtooth Chaotic_BOLT_ARP2600.wav",
+            "category": "ARP Synth"
+          }
+        ],
+        "directories": []
+      },
+      "Berlin Ambient": {
+        "tracks": [
+          {
+            "id": "48f04082710e4d9d957735dd0dc59ec4",
+            "name": "AMBPark_Berlin Zoo Kids Talking Walla Birdsong_BOLT_H1 9624",
+            "path": "D:\\Sounds\\Bolt - Berlin Vignettes - Ambiences and Sonic Curiosities\\AMBPark_Berlin Zoo Kids Talking Walla Birdsong_BOLT_H1 9624.wav",
+            "category": "Berlin Ambient"
+          },
+          {
+            "id": "318cbfcd00bd4d15a349fb152e8bffcf",
+            "name": "AMBTran_Hannover Train Station Electric Locomotive Idling Distant Voices_BOLT_H1 9624",
+            "path": "D:\\Sounds\\Bolt - Berlin Vignettes - Ambiences and Sonic Curiosities\\AMBTran_Hannover Train Station Electric Locomotive Idling Distant Voices_BOLT_H1 9624.wav",
+            "category": "Berlin Ambient"
+          },
+          {
+            "id": "d7e44c11c7454621bcd43e76b478d3fb",
+            "name": "AMBUrbn_Berlin Balcony Late Afternoon Walla Ambulance Public Transport Church Bells_BOLT_Berlin Vignettes_H1 9624",
+            "path": "D:\\Sounds\\Bolt - Berlin Vignettes - Ambiences and Sonic Curiosities\\AMBUrbn_Berlin Balcony Late Afternoon Walla Ambulance Public Transport Church Bells_BOLT_Berlin Vignettes_H1 9624.wav",
+            "category": "Berlin Ambient"
+          }
+        ],
+        "directories": []
+      },
+      "Creek Ambient": {
+        "tracks": [
+          {
+            "id": "afaf2ec9e80c4653a0305b69f1564c63",
+            "name": "WATRFlow_Babbling Brook, Snow Melt, Calm, Constant, Bubbling_BOLT_Immersive Creek_RODE NTSF1 XY",
+            "path": "D:\\Sounds\\Bolt - Immersive Creek -  Ambisonic Recordings of Undisturbed Creeks in Vermont\\WATRFlow_Babbling Brook, Snow Melt, Calm, Constant, Bubbling_BOLT_Immersive Creek_RODE NTSF1 XY.wav",
+            "category": "Creek Ambient"
+          },
+          {
+            "id": "c649ccf84a494e37a442340e948d768b",
+            "name": "WATRFlow_Rapid Water Movement Next to Waterfall, Vibrations, Drone, Rumble_BOLT_Immersive Creek_Geofon",
+            "path": "D:\\Sounds\\Bolt - Immersive Creek -  Ambisonic Recordings of Undisturbed Creeks in Vermont\\WATRFlow_Rapid Water Movement Next to Waterfall, Vibrations, Drone, Rumble_BOLT_Immersive Creek_Geofon.wav",
+            "category": "Creek Ambient"
+          },
+          {
+            "id": "346411ec196b456a9b3ec7843aab49bd",
+            "name": "WATRFlow_Small Waterfall, Close, Constant, White Noise, Bubbling_Immersive Creek_RODE NTSF1 AmbiX",
+            "path": "D:\\Sounds\\Bolt - Immersive Creek -  Ambisonic Recordings of Undisturbed Creeks in Vermont\\WATRFlow_Small Waterfall, Close, Constant, White Noise, Bubbling_Immersive Creek_RODE NTSF1 AmbiX.wav",
+            "category": "Creek Ambient"
+          }
+        ],
+        "directories": []
+      },
+      "Vehicle Sounds": {
+        "tracks": [
+          {
+            "id": "973b31a8840545009ee2be1da529272f",
+            "name": "1993 Suzuki VS 800 GL Intruder, Foley, Saddlebags open, close, handling, Shotgun mic_2",
+            "path": "D:\\Sounds\\Cactuzz Sound - 1993 Suzuki VS 800 GL Intruder\\1993 Suzuki VS 800 GL Intruder, Foley, Saddlebags open, close, handling, Shotgun mic_2.wav",
+            "category": "Vehicle Sounds"
+          },
+          {
+            "id": "2b7093357863485897d703ac4a31f7da",
+            "name": "1993 Suzuki VS 800 GL Intruder, Onboard, Cruising, City, long engine start, slow cruise, Mix",
+            "path": "D:\\Sounds\\Cactuzz Sound - 1993 Suzuki VS 800 GL Intruder\\1993 Suzuki VS 800 GL Intruder, Onboard, Cruising, City, long engine start, slow cruise, Mix.wav",
+            "category": "Vehicle Sounds"
+          },
+          {
+            "id": "c8e6e801bf164cb8a1ac002e476c6093",
+            "name": "1993 Suzuki VS 800 GL Intruder, Onboard, idle, Mix, Loop, Short",
+            "path": "D:\\Sounds\\Cactuzz Sound - 1993 Suzuki VS 800 GL Intruder\\1993 Suzuki VS 800 GL Intruder, Onboard, idle, Mix, Loop, Short.wav",
+            "category": "Vehicle Sounds"
+          },
+          {
+            "id": "3757986080a047af82c1bb018a990587",
+            "name": "1993 Suzuki VS 800 GL Intruder, pass-by back to front, asphalt, M-S",
+            "path": "D:\\Sounds\\Cactuzz Sound - 1993 Suzuki VS 800 GL Intruder\\1993 Suzuki VS 800 GL Intruder, pass-by back to front, asphalt, M-S.wav",
+            "category": "Vehicle Sounds"
+          },
+          {
+            "id": "136085f227394e39afc729b1c130247d",
+            "name": "BOATMotr_Boat Mercury ONBOARD Ramp Up And Down Long ENGINE_DRCA_MERC_Kmr81i",
+            "path": "D:\\Sounds\\Dramatic Cat - Lake Boat - Mercury 4-stroke 60HP\\BOATMotr_Boat Mercury ONBOARD Ramp Up And Down Long ENGINE_DRCA_MERC_Kmr81i.wav",
+            "category": "Vehicle Sounds"
+          },
+          {
+            "id": "acd396bbbdce4aba934634bb68e13299",
+            "name": "BOATWash_Boat Mercury ONBOARD Riding Sequence Various Speeds 01 FRONT_DRCA_MERC_MKH8040",
+            "path": "D:\\Sounds\\Dramatic Cat - Lake Boat - Mercury 4-stroke 60HP\\BOATWash_Boat Mercury ONBOARD Riding Sequence Various Speeds 01 FRONT_DRCA_MERC_MKH8040.wav",
+            "category": "Vehicle Sounds"
+          },
+          {
+            "id": "c674c23d8af241aa9e565bbad3e358c7",
+            "name": "VEHAtv-Mono_Driveby 03_DDUMAIS_ATV ARCTIC CAT 650 H1",
+            "path": "D:\\Sounds\\DavidDumais - ATV Arctic Cat 650 H1\\VEHAtv-Mono_Driveby 03_DDUMAIS_ATV ARCTIC CAT 650 H1.wav",
+            "category": "Vehicle Sounds"
+          },
+          {
+            "id": "2b54a1fe22d34c6e955fd9e8142853fa",
+            "name": "VEHAtv-Mono_Medium Steady Rpm Loop 01_DDUMAIS_ATV ARCTIC CAT 650 H1",
+            "path": "D:\\Sounds\\DavidDumais - ATV Arctic Cat 650 H1\\VEHAtv-Mono_Medium Steady Rpm Loop 01_DDUMAIS_ATV ARCTIC CAT 650 H1.wav",
+            "category": "Vehicle Sounds"
+          },
+          {
+            "id": "222e145164cc4002a58067cb234a3948",
+            "name": "VEHAtv-Stereo01_Various Driving With Engine Start And Engine Shutoff 01_DDUMAIS_ATV ARCTIC CAT 650 H1",
+            "path": "D:\\Sounds\\DavidDumais - ATV Arctic Cat 650 H1\\VEHAtv-Stereo01_Various Driving With Engine Start And Engine Shutoff 01_DDUMAIS_ATV ARCTIC CAT 650 H1.wav",
+            "category": "Vehicle Sounds"
+          },
+          {
+            "id": "092377eb7dcf412b8313e4530cbbdada",
+            "name": "VEHAtv-Stereo02_Accessories Compartment Foley Various 07_DDUMAIS_ATV ARCTIC CAT 650 H1",
+            "path": "D:\\Sounds\\DavidDumais - ATV Arctic Cat 650 H1\\VEHAtv-Stereo02_Accessories Compartment Foley Various 07_DDUMAIS_ATV ARCTIC CAT 650 H1.wav",
+            "category": "Vehicle Sounds"
+          },
+          {
+            "id": "78ade1d731684010842ddf28b0b6b606",
+            "name": "VEHCar_1967 Corvette EXT-Group A  Approach In Accelerate MEDIUM Lead car then Vette Left to Right 02 M1_GoldSND_M1C 101419_aaOVPpPmTQSk",
+            "path": "D:\\Sounds\\Bryan Gold - 1967 Corvette Convertible Work-Up\\VEHCar_1967 Corvette EXT-Group A  Approach In Accelerate MEDIUM Lead car then Vette Left to Right 02 M1_GoldSND_M1C 101419_aaOVPpPmTQSk.wav",
+            "category": "Vehicle Sounds"
+          },
+          {
+            "id": "2ecc002fb71d466ea9b0c73ba679dd3d",
+            "name": "VEHCar_1967 Corvette OnBoard-Group B  ENGINE MIC, False Start_GoldSND_M1C 101419_aaOVPB0iRHSk",
+            "path": "D:\\Sounds\\Bryan Gold - 1967 Corvette Convertible Work-Up\\VEHCar_1967 Corvette OnBoard-Group B  ENGINE MIC, False Start_GoldSND_M1C 101419_aaOVPB0iRHSk.wav",
+            "category": "Vehicle Sounds"
+          },
+          {
+            "id": "c18ae7639e1a4ec68cb0c427d39ca49c",
+            "name": "VEHCar_1967 Corvette OnBoard-Group F  Intake MIC, Start Hot Lap 03_GoldSND_M1C 101419_aaOVP3tvPKSk",
+            "path": "D:\\Sounds\\Bryan Gold - 1967 Corvette Convertible Work-Up\\VEHCar_1967 Corvette OnBoard-Group F  Intake MIC, Start Hot Lap 03_GoldSND_M1C 101419_aaOVP3tvPKSk.wav",
+            "category": "Vehicle Sounds"
+          },
+          {
+            "id": "5c046d4423654a0cb8c4affa16a6d7c7",
+            "name": "VEHCar_Audi Q2 EXTERIOR Pass By Slow Decelerating Then Accelerating MSD_DRCA_AUQ2_MKH8040 MKH30",
+            "path": "D:\\Sounds\\Dramatic Cat - Audi Q2\\VEHCar_Audi Q2 EXTERIOR Pass By Slow Decelerating Then Accelerating MSD_DRCA_AUQ2_MKH8040 MKH30.wav",
+            "category": "Vehicle Sounds"
+          },
+          {
+            "id": "cfca4d4c42fa45958ec1a85c2db7fa89",
+            "name": "VEHCar_Audi Q2 ONBOARD Driving Sequence With Revs Up And Down EXHAUST RIGHT_DRCA_AUQ2_MKH8040",
+            "path": "D:\\Sounds\\Dramatic Cat - Audi Q2\\VEHCar_Audi Q2 ONBOARD Driving Sequence With Revs Up And Down EXHAUST RIGHT_DRCA_AUQ2_MKH8040.wav",
+            "category": "Vehicle Sounds"
+          },
+          {
+            "id": "b749e539f7574d8ba98bf7ee7a71a841",
+            "name": "VEHCar_Audi Q2 ONBOARD Turn On Start Long Idle Stop Shutoff EXHAUST CENTER_DRCA_AUQ2_UsiPro",
+            "path": "D:\\Sounds\\Dramatic Cat - Audi Q2\\VEHCar_Audi Q2 ONBOARD Turn On Start Long Idle Stop Shutoff EXHAUST CENTER_DRCA_AUQ2_UsiPro.wav",
+            "category": "Vehicle Sounds"
+          },
+          {
+            "id": "eff9a284fe1f49f6b4beda89c926785e",
+            "name": "VEHCar_Audi Q7 EXTERIOR Approach Fast Stop Drive Away Fast ORTF_DRCA_AUQ7_MK012",
+            "path": "D:\\Sounds\\Dramatic Cat - Audi Q7\\VEHCar_Audi Q7 EXTERIOR Approach Fast Stop Drive Away Fast ORTF_DRCA_AUQ7_MK012.wav",
+            "category": "Vehicle Sounds"
+          },
+          {
+            "id": "f269c8dcdca04c4287594ca064c1b009",
+            "name": "VEHCar_Audi Q7 ONBOARD Driving Sequence With Various Accelerations And Decelerations 02 ENGINE INTAKE_DRCA_AUQ7_MikroUsi",
+            "path": "D:\\Sounds\\Dramatic Cat - Audi Q7\\VEHCar_Audi Q7 ONBOARD Driving Sequence With Various Accelerations And Decelerations 02 ENGINE INTAKE_DRCA_AUQ7_MikroUsi.wav",
+            "category": "Vehicle Sounds"
+          },
+          {
+            "id": "31e8ab7ab72a484395880f3b6754eeca",
+            "name": "VEHDoor_1967 Corvette EXT-Drivers Door Open & Close 03_GoldSND_M1C 101419_aayuRl#mUfTk",
+            "path": "D:\\Sounds\\Bryan Gold - 1967 Corvette Convertible Work-Up\\VEHDoor_1967 Corvette EXT-Drivers Door Open & Close 03_GoldSND_M1C 101419_aayuRl#mUfTk.wav",
+            "category": "Vehicle Sounds"
+          },
+          {
+            "id": "1ea279099b4c4a2b977eddb02852f666",
+            "name": "VEHFarm_Tractor Magnum 7250 EXTERIOR Pass By 01 STEREO_DRCA_MAGN_MKH8040 MKH30",
+            "path": "D:\\Sounds\\Dramatic Cat - Magnum 7250\\VEHFarm_Tractor Magnum 7250 EXTERIOR Pass By 01 STEREO_DRCA_MAGN_MKH8040 MKH30.wav",
+            "category": "Vehicle Sounds"
+          },
+          {
+            "id": "c1b18ff522374c8b98bd1baa8321eee9",
+            "name": "VEHFarm_Tractor Magnum 7250 ONBOARD Driving Sequence Constant RPMs 01 INTERIOR_DRCA_MAGN_MK012",
+            "path": "D:\\Sounds\\Dramatic Cat - Magnum 7250\\VEHFarm_Tractor Magnum 7250 ONBOARD Driving Sequence Constant RPMs 01 INTERIOR_DRCA_MAGN_MK012.wav",
+            "category": "Vehicle Sounds"
+          },
+          {
+            "id": "ecb0a914816147d498b5104fc2ab82c3",
+            "name": "VEHFarm_Tractor Magnum 7250 ONBOARD Driving Sequence Idle And Revving ENGINE LEFT_DRCA_MAGN_UsiPro",
+            "path": "D:\\Sounds\\Dramatic Cat - Magnum 7250\\VEHFarm_Tractor Magnum 7250 ONBOARD Driving Sequence Idle And Revving ENGINE LEFT_DRCA_MAGN_UsiPro.wav",
+            "category": "Vehicle Sounds"
+          },
+          {
+            "id": "20defe4bcd6a4defa714fac51073bf28",
+            "name": "VEHHorn_Audi Q7 EXTERIOR Horn Short And Long MONO_DRCA_AUQ7_Kmr81i",
+            "path": "D:\\Sounds\\Dramatic Cat - Audi Q7\\VEHHorn_Audi Q7 EXTERIOR Horn Short And Long MONO_DRCA_AUQ7_Kmr81i.wav",
+            "category": "Vehicle Sounds"
+          }
+        ],
+        "directories": []
+      },
+      "Firearms": {
+        "tracks": [
+          {
+            "id": "9560a2732eb84673a58fcfc5e68d5de7",
+            "name": "GUNMech_Saiga 12 Cal.12 SOURCE Chamber Eject Bullet_DRCA_SG12_MKH416",
+            "path": "D:\\Sounds\\Dramatic Cat - Saiga-12\\GUNMech_Saiga 12 Cal.12 SOURCE Chamber Eject Bullet_DRCA_SG12_MKH416.wav",
+            "category": "Firearms"
+          },
+          {
+            "id": "1d86b13c5629478f8d8530a14b165112",
+            "name": "GUNShotg_Saiga 12 Cal.12 DESIGNED Single Shot Core Long_DRCA_SG12_Stereo",
+            "path": "D:\\Sounds\\Dramatic Cat - Saiga-12\\GUNShotg_Saiga 12 Cal.12 DESIGNED Single Shot Core Long_DRCA_SG12_Stereo.wav",
+            "category": "Firearms"
+          },
+          {
+            "id": "0933e570d34749c8ac8fd2168783f3bc",
+            "name": "GUNShotg_Saiga 12 Cal.12 SOURCE Single Shots 1m Side MKH8040_DRCA_SG12_MONO",
+            "path": "D:\\Sounds\\Dramatic Cat - Saiga-12\\GUNShotg_Saiga 12 Cal.12 SOURCE Single Shots 1m Side MKH8040_DRCA_SG12_MONO.wav",
+            "category": "Firearms"
+          }
+        ],
+        "directories": []
+      },
+      "UI Feedback": {
+        "tracks": [
+          {
+            "id": "e678e20ad5134c37b9bf5b939270143c",
+            "name": "UIClick_UI Click 33_CB Sounddesign_ACTIVATION2",
+            "path": "D:\\Sounds\\CB Sounddesign - Activation 2\\UIClick_UI Click 33_CB Sounddesign_ACTIVATION2.wav",
+            "category": "UI Feedback"
+          },
+          {
+            "id": "0fba1f205cd64edcaefeecad584b98d4",
+            "name": "UIData_Counter mid 54_CB Sounddesign_ACTIVATION2",
+            "path": "D:\\Sounds\\CB Sounddesign - Activation 2\\UIData_Counter mid 54_CB Sounddesign_ACTIVATION2.wav",
+            "category": "UI Feedback"
+          },
+          {
+            "id": "c7f6537fed1f497d9113b89cd2429410",
+            "name": "UIMisc_Feedback 36 up_CB Sounddesign_ACTIVATION2",
+            "path": "D:\\Sounds\\CB Sounddesign - Activation 2\\UIMisc_Feedback 36 up_CB Sounddesign_ACTIVATION2.wav",
+            "category": "UI Feedback"
+          },
+          {
+            "id": "46985afdbb094cc7beec7c52f435bdf1",
+            "name": "UIMvmt_UI Zooms 103_CB Soudndesign_ACTIVATION2",
+            "path": "D:\\Sounds\\CB Sounddesign - Activation 2\\UIMvmt_UI Zooms 103_CB Soudndesign_ACTIVATION2.wav",
+            "category": "UI Feedback"
+          }
+        ],
+        "directories": []
+      },
+      "Sci-Fi Voices": {
+        "tracks": [
+          {
+            "id": "1038f01d153242248246c5e077a6a543",
+            "name": "Androids detected",
+            "path": "D:\\Sounds\\CB Sounddesign - Sci-Fi Voices Volume 02 Big Battle Robot\\Androids detected.wav",
+            "category": "Sci-Fi Voices"
+          },
+          {
+            "id": "dcbd8a3610724e848c92dff594169100",
+            "name": "Carrying out orders",
+            "path": "D:\\Sounds\\CB Sounddesign - Sci-Fi Voices Volume 03 Advanced Android\\Carrying out orders.wav",
+            "category": "Sci-Fi Voices"
+          },
+          {
+            "id": "0e887fb211a54bac967bf557220e6ceb",
+            "name": "Hostile presence detected",
+            "path": "D:\\Sounds\\CB Sounddesign - Sci-Fi Voices Volume 03 Advanced Android\\Hostile presence detected.wav",
+            "category": "Sci-Fi Voices"
+          },
+          {
+            "id": "9cffab91428b40d88352d561cbfea725",
+            "name": "HQ rubble cleared Preparing for new construction",
+            "path": "D:\\Sounds\\CB Sounddesign - Sci-Fi Voices Volume 02 Big Battle Robot\\HQ rubble cleared Preparing for new construction.wav",
+            "category": "Sci-Fi Voices"
+          },
+          {
+            "id": "332668ec78214f18aceb2dca6cd18cea",
+            "name": "Maintenance complete",
+            "path": "D:\\Sounds\\CB Sounddesign - Sci-Fi Voices Volume 03 Advanced Android\\Maintenance complete.wav",
+            "category": "Sci-Fi Voices"
+          },
+          {
+            "id": "175c5cc6f50440a6b4b25e9173b25194",
+            "name": "Mothership_Access_denied",
+            "path": "D:\\Sounds\\CB Sounddesign - Sci-Fi Voices Volume 01 Mothership\\Mothership_Access_denied.wav",
+            "category": "Sci-Fi Voices"
+          },
+          {
+            "id": "43a2cb2b1e154df1b5f0bff329ac52fd",
+            "name": "Mothership_Awaiting_response",
+            "path": "D:\\Sounds\\CB Sounddesign - Sci-Fi Voices Volume 01 Mothership\\Mothership_Awaiting_response.wav",
+            "category": "Sci-Fi Voices"
+          },
+          {
+            "id": "aa48476e77514154a274064bcbcd026b",
+            "name": "Mothership_Entering_hostile_territory_All_crew_members_be_on_high_alert",
+            "path": "D:\\Sounds\\CB Sounddesign - Sci-Fi Voices Volume 01 Mothership\\Mothership_Entering_hostile_territory_All_crew_members_be_on_high_alert.wav",
+            "category": "Sci-Fi Voices"
+          },
+          {
+            "id": "41d530d9002f4ba9baeb1802a7a8cc08",
+            "name": "Mothership_Initiating_strike_teams_infiltrating_enemy_ships",
+            "path": "D:\\Sounds\\CB Sounddesign - Sci-Fi Voices Volume 01 Mothership\\Mothership_Initiating_strike_teams_infiltrating_enemy_ships.wav",
+            "category": "Sci-Fi Voices"
+          },
+          {
+            "id": "15627c227a7d4bd69bae91ac06e99cc6",
+            "name": "Progress insufficient",
+            "path": "D:\\Sounds\\CB Sounddesign - Sci-Fi Voices Volume 02 Big Battle Robot\\Progress insufficient.wav",
+            "category": "Sci-Fi Voices"
+          },
+          {
+            "id": "8cea8d28bc30426886e03a750a7a0cb1",
+            "name": "Target acquired Engaging stealth mode",
+            "path": "D:\\Sounds\\CB Sounddesign - Sci-Fi Voices Volume 02 Big Battle Robot\\Target acquired Engaging stealth mode.wav",
+            "category": "Sci-Fi Voices"
+          },
+          {
+            "id": "d8c6d9440f6243ef9d6078b362dec2d0",
+            "name": "Uploading information",
+            "path": "D:\\Sounds\\CB Sounddesign - Sci-Fi Voices Volume 03 Advanced Android\\Uploading information.wav",
+            "category": "Sci-Fi Voices"
+          }
+        ],
+        "directories": []
+      },
+      "Sci-Fi Sounds": {
+        "tracks": [
+          {
+            "id": "7d8e020687944f2899f9fdf6a4f72796",
+            "name": "DSGN VORTEX IN",
+            "path": "D:\\Sounds\\Chupapsound - Essential Scifi\\DSGN VORTEX IN.wav",
+            "category": "Sci-Fi Sounds"
+          },
+          {
+            "id": "a11bd4db24044f4d9fa7cce0beb1568c",
+            "name": "GRWL ROAR ANGRY",
+            "path": "D:\\Sounds\\Chupapsound - Essential Scifi\\GRWL ROAR ANGRY.wav",
+            "category": "Sci-Fi Sounds"
+          },
+          {
+            "id": "319b73c1a707408db93474a47fb1c3e8",
+            "name": "SPACESHIP PASS BY 9",
+            "path": "D:\\Sounds\\Chupapsound - Essential Scifi\\SPACESHIP PASS BY 9.wav",
+            "category": "Sci-Fi Sounds"
+          },
+          {
+            "id": "2cd259f1c14d48b3888e4fe47e0f1fb6",
+            "name": "WHOOSH PASS SF LOW",
+            "path": "D:\\Sounds\\Chupapsound - Essential Scifi\\WHOOSH PASS SF LOW.wav",
+            "category": "Sci-Fi Sounds"
+          }
+        ],
+        "directories": []
+      },
+      "Ambient Traffic": {
+        "tracks": [
+          {
+            "id": "ab57e8195599476ca3f43d86d18cf7e4",
+            "name": "HAUTEUR VILLE DOWNMIX",
+            "path": "D:\\Sounds\\Chupapsound - Traffic Car In Paris\\HAUTEUR VILLE DOWNMIX.wav",
+            "category": "Ambient Traffic"
+          },
+          {
+            "id": "26019b3fd26244b7b983c531977c0477",
+            "name": "PORTE ORLEANS PERIPH SURROUND",
+            "path": "D:\\Sounds\\Chupapsound - Traffic Car In Paris\\PORTE ORLEANS PERIPH SURROUND.wav",
+            "category": "Ambient Traffic"
+          }
+        ],
+        "directories": []
+      },
+      "Explosion Pack": {
+        "tracks": [
+          {
+            "id": "fe127d74a6224f49b537e3033ed5715c",
+            "name": "DESTRCrsh_Designed Car Explosion With Metal Breaking And Glass Shattering  06_DDUMAIS_NONE",
+            "path": "D:\\Sounds\\DavidDumais - Explosion SFX Pack\\DESTRCrsh_Designed Car Explosion With Metal Breaking And Glass Shattering  06_DDUMAIS_NONE.wav",
+            "category": "Explosion Pack"
+          },
+          {
+            "id": "548c449656094fc29d0cbd9eb31a52e0",
+            "name": "EXPLDsgn_Nuclear Explosion 07_DDUMAIS_NONE",
+            "path": "D:\\Sounds\\DavidDumais - Explosion SFX Pack\\EXPLDsgn_Nuclear Explosion 07_DDUMAIS_NONE.wav",
+            "category": "Explosion Pack"
+          },
+          {
+            "id": "c9a7a067b4b247fa9f4151dffbe634eb",
+            "name": "EXPLReal_Medium Realistic Explosion 15_DDUMAIS_NONE",
+            "path": "D:\\Sounds\\DavidDumais - Explosion SFX Pack\\EXPLReal_Medium Realistic Explosion 15_DDUMAIS_NONE.wav",
+            "category": "Explosion Pack"
+          },
+          {
+            "id": "9fc6319952f444fdad79130916b4b1a3",
+            "name": "WOODCrsh_Designed Wood Crash And Debris 13_DDUMAIS_NONE",
+            "path": "D:\\Sounds\\DavidDumais - Explosion SFX Pack\\WOODCrsh_Designed Wood Crash And Debris 13_DDUMAIS_NONE.wav",
+            "category": "Explosion Pack"
+          }
+        ],
+        "directories": []
+      },
+      "Robotic Creatures": {
+        "tracks": [
+          {
+            "id": "2ab2b3c7da704b608c2533d855cd38a3",
+            "name": "CREAMisc_Creature 05 Long Growl 31_DDUMAIS_MCSFX",
+            "path": "D:\\Sounds\\DavidDumais - Robotic Creatures Sound FX\\CREAMisc_Creature 05 Long Growl 31_DDUMAIS_MCSFX.wav",
+            "category": "Robotic Creatures"
+          },
+          {
+            "id": "95f985c03ce14d3e843cac9c8fd3659f",
+            "name": "CREAMisc_Creature Power On 14_DDUMAIS_MCSFX",
+            "path": "D:\\Sounds\\DavidDumais - Robotic Creatures Sound FX\\CREAMisc_Creature Power On 14_DDUMAIS_MCSFX.wav",
+            "category": "Robotic Creatures"
+          },
+          {
+            "id": "dbebddf1753a4524a343367acc7712a1",
+            "name": "CREAMisc_Heavy Mechanical Footsteps 03_DDUMAIS_MCSFX",
+            "path": "D:\\Sounds\\DavidDumais - Robotic Creatures Sound FX\\CREAMisc_Heavy Mechanical Footsteps 03_DDUMAIS_MCSFX.wav",
+            "category": "Robotic Creatures"
+          },
+          {
+            "id": "015b6c17bcd14c0f9ed2ea272ae17d8c",
+            "name": "UIData_Technology Scanner 05_DDUMAIS_MCSFX",
+            "path": "D:\\Sounds\\DavidDumais - Robotic Creatures Sound FX\\UIData_Technology Scanner 05_DDUMAIS_MCSFX.wav",
+            "category": "Robotic Creatures"
+          }
+        ],
+        "directories": []
+      },
+      "Anime Effects": {
+        "tracks": [
+          {
+            "id": "2de3fb47b5b84a53a9fd378a9707adfc",
+            "name": "Comedic_006",
+            "path": "D:\\Sounds\\Doex Studio - 90s Anime SFX Pack\\Comedic_006.wav",
+            "category": "Anime Effects"
+          },
+          {
+            "id": "5c76cd98775047a1804588315d24492a",
+            "name": "Laser_Beam_004",
+            "path": "D:\\Sounds\\Doex Studio - 90s Anime SFX Pack\\Laser_Beam_004.wav",
+            "category": "Anime Effects"
+          },
+          {
+            "id": "57c78e329d0243c282f7c01b56e4a5ec",
+            "name": "Noise_Punch_006",
+            "path": "D:\\Sounds\\Doex Studio - 90s Anime SFX Pack\\Noise_Punch_006.wav",
+            "category": "Anime Effects"
+          },
+          {
+            "id": "e85503c1e2ef4990b2e3ddd4f2b388c7",
+            "name": "Short_PowerUp_005",
+            "path": "D:\\Sounds\\Doex Studio - 90s Anime SFX Pack\\Short_PowerUp_005.wav",
+            "category": "Anime Effects"
+          }
+        ],
+        "directories": []
+      },
+      "UI Elements": {
+        "tracks": [
+          {
+            "id": "6407f0693c894970bc07c839a0648468",
+            "name": "UI_BACKGROUND_LOW_DarkDrone_01",
+            "path": "D:\\Sounds\\Doex Studio - Qantum UI\\UI_BACKGROUND_LOW_DarkDrone_01.wav",
+            "category": "UI Elements"
+          },
+          {
+            "id": "254269fd5644455fa2e37d2651e951ef",
+            "name": "UI_Noisy_Impact_09",
+            "path": "D:\\Sounds\\Doex Studio - Qantum UI\\UI_Noisy_Impact_09.wav",
+            "category": "UI Elements"
+          },
+          {
+            "id": "1c6bc5dbc8b245a6868f9a87cd750f94",
+            "name": "UI_Select_Plastic_05",
+            "path": "D:\\Sounds\\Doex Studio - Qantum UI\\UI_Select_Plastic_05.wav",
+            "category": "UI Elements"
+          },
+          {
+            "id": "e135bf5bcdaa447699f499b92017264e",
+            "name": "UI_Window_MEDIUM_SlideMetal_02_CLOSED",
+            "path": "D:\\Sounds\\Doex Studio - Qantum UI\\UI_Window_MEDIUM_SlideMetal_02_CLOSED.wav",
+            "category": "UI Elements"
+          }
+        ],
+        "directories": []
+      },
+      "Foley - Flask": {
+        "tracks": [
+          {
+            "id": "c4e0c773280a45cfb193920cc0add4d4",
+            "name": "OBJCont_Flask,aluminum,canteen,medium,feltcover,leatherbanding,aluminumrealcork,liquid,grab,squeeze,slosh_EWKR",
+            "path": "D:\\Sounds\\Eiravaein Works - Flask\\OBJCont_Flask,aluminum,canteen,medium,feltcover,leatherbanding,aluminumrealcork,liquid,grab,squeeze,slosh_EWKR.wav",
+            "category": "Foley - Flask"
+          },
+          {
+            "id": "41d9b5f416fc493da7ef8b64e3d74927",
+            "name": "OBJCont_Flask,glass,figuredbottle,realcork,liquid,remove,squeak,slosh,alt4_EWKR",
+            "path": "D:\\Sounds\\Eiravaein Works - Flask\\OBJCont_Flask,glass,figuredbottle,realcork,liquid,remove,squeak,slosh,alt4_EWKR.wav",
+            "category": "Foley - Flask"
+          },
+          {
+            "id": "9853cec6d5504f22911613ff9a99438c",
+            "name": "OBJCont_Flask,gourd,oblong,medium,plasticsiliconecork,liquid,replace,alt6_EWKR",
+            "path": "D:\\Sounds\\Eiravaein Works - Flask\\OBJCont_Flask,gourd,oblong,medium,plasticsiliconecork,liquid,replace,alt6_EWKR.wav",
+            "category": "Foley - Flask"
+          },
+          {
+            "id": "6943551cb4fa449fb14ff42a656fbde1",
+            "name": "OBJCont_Flask,wood,canteen,medium,clothstrap,metalbanding,woodcork,liquid,shaking,sloshing_EWKR",
+            "path": "D:\\Sounds\\Eiravaein Works - Flask\\OBJCont_Flask,wood,canteen,medium,clothstrap,metalbanding,woodcork,liquid,shaking,sloshing_EWKR.wav",
+            "category": "Foley - Flask"
+          }
+        ],
+        "directories": []
+      },
+      "Foley - Hair Dryer": {
+        "tracks": [
+          {
+            "id": "37a6bec0624d43cd8c18f2a0d4e98660",
+            "name": "OBJMisc_HairDryerFoleyCableTension01_InMotionAudio_BrokenHairDryer",
+            "path": "D:\\Sounds\\InMotionAudio - Broken Hair Dryer\\OBJMisc_HairDryerFoleyCableTension01_InMotionAudio_BrokenHairDryer.wav",
+            "category": "Foley - Hair Dryer"
+          },
+          {
+            "id": "cd6c204161eb449ab17e680b2d34b403",
+            "name": "OBJMisc_HairDryerOnOff04_InMotionAudio_BrokenHairDryer",
+            "path": "D:\\Sounds\\InMotionAudio - Broken Hair Dryer\\OBJMisc_HairDryerOnOff04_InMotionAudio_BrokenHairDryer.wav",
+            "category": "Foley - Hair Dryer"
+          },
+          {
+            "id": "7aa3aa7d46034e6992801be078a22720",
+            "name": "OBJMisc_HairDryerSwitch36_InMotionAudio_BrokenHairDryer",
+            "path": "D:\\Sounds\\InMotionAudio - Broken Hair Dryer\\OBJMisc_HairDryerSwitch36_InMotionAudio_BrokenHairDryer.wav",
+            "category": "Foley - Hair Dryer"
+          }
+        ],
+        "directories": []
+      },
+      "Ambient Cave": {
+        "tracks": [
+          {
+            "id": "640fcf4c6117445b9deef745b5ad966d",
+            "name": "AMBUndr_CaveDesign01_InMotionAudio_CaveDesign",
+            "path": "D:\\Sounds\\InMotionAudio - Cave Design\\AMBUndr_CaveDesign01_InMotionAudio_CaveDesign.wav",
+            "category": "Ambient Cave"
+          },
+          {
+            "id": "950be903832342c9affdd71690a0a621",
+            "name": "AMBUndwtr_WaterFlow05_InMotionAudio_CaveDesign",
+            "path": "D:\\Sounds\\InMotionAudio - Cave Design\\AMBUndwtr_WaterFlow05_InMotionAudio_CaveDesign.wav",
+            "category": "Ambient Cave"
+          },
+          {
+            "id": "c79a9b5a34be4cd38e8d4d92d88ac55a",
+            "name": "WATRDrip_SingleDrip03_InMotionAudio_CaveDesign",
+            "path": "D:\\Sounds\\InMotionAudio - Cave Design\\WATRDrip_SingleDrip03_InMotionAudio_CaveDesign.wav",
+            "category": "Ambient Cave"
+          },
+          {
+            "id": "e0e304ef6e3444beb77c1056f8e67153",
+            "name": "WATRDrip_SingleDripDesign05_InMotionAudio_CaveDesign",
+            "path": "D:\\Sounds\\InMotionAudio - Cave Design\\WATRDrip_SingleDripDesign05_InMotionAudio_CaveDesign.wav",
+            "category": "Ambient Cave"
+          }
+        ],
+        "directories": []
+      },
+      "Electromagnetic": {
+        "tracks": [
+          {
+            "id": "22a6a3c9b1754e1f952e175465854527",
+            "name": "ELECEmf_Electromagnetic05_InMotionAudio_Electromagnesis Samples Volume 1",
+            "path": "D:\\Sounds\\InMotionAudio - Electromagnesis\\ELECEmf_Electromagnetic05_InMotionAudio_Electromagnesis Samples Volume 1.wav",
+            "category": "Electromagnetic"
+          },
+          {
+            "id": "cacee1b38e6a4e0282325d8efc92e2d4",
+            "name": "ELECEmf_Electromagnetic32_InMotionAudio_Electromagnesis Samples Volume 1",
+            "path": "D:\\Sounds\\InMotionAudio - Electromagnesis\\ELECEmf_Electromagnetic32_InMotionAudio_Electromagnesis Samples Volume 1 .wav",
+            "category": "Electromagnetic"
+          },
+          {
+            "id": "d457471f0d1a46ed88e29c21e7066978",
+            "name": "ELECEmf_Electromagnetic59_InMotionAudio_Electromagnesis Samples Volume 1",
+            "path": "D:\\Sounds\\InMotionAudio - Electromagnesis\\ELECEmf_Electromagnetic59_InMotionAudio_Electromagnesis Samples Volume 1.wav",
+            "category": "Electromagnetic"
+          },
+          {
+            "id": "10306b3f42fa452fba71f9db951b5439",
+            "name": "ELECEmf_Electromagnetic66_InMotionAudio_Electromagnesis Samples Volume 1",
+            "path": "D:\\Sounds\\InMotionAudio - Electromagnesis\\ELECEmf_Electromagnetic66_InMotionAudio_Electromagnesis Samples Volume 1.wav",
+            "category": "Electromagnetic"
+          }
+        ],
+        "directories": []
+      },
+      "Geodrone": {
+        "tracks": [
+          {
+            "id": "68cf7919fab849b2af5cacfa70ae73c9",
+            "name": "DSGNDron_Geofon05_InMotionAudio_GEODRONE",
+            "path": "D:\\Sounds\\InMotionAudio - GEODRONE\\DSGNDron_Geofon05_InMotionAudio_GEODRONE.wav",
+            "category": "Geodrone"
+          },
+          {
+            "id": "bd2c13439d9342188dd643d53be8e1cf",
+            "name": "DSGNDron_Geofon17_InMotionAudio_GEODRONE",
+            "path": "D:\\Sounds\\InMotionAudio - GEODRONE\\DSGNDron_Geofon17_InMotionAudio_GEODRONE.wav",
+            "category": "Geodrone"
+          },
+          {
+            "id": "dde980fe377a485d94175572c671079d",
+            "name": "DSGNDron_Geofon24_InMotionAudio_GEODRONE",
+            "path": "D:\\Sounds\\InMotionAudio - GEODRONE\\DSGNDron_Geofon24_InMotionAudio_GEODRONE.wav",
+            "category": "Geodrone"
+          }
+        ],
+        "directories": []
+      },
+      "Lawn Mower": {
+        "tracks": [
+          {
+            "id": "ea6cf454e4f643b48b507b7855410f2c",
+            "name": "MOTRElec_LawnMowing01_InMotionAudio_LawnMowerAmbience",
+            "path": "D:\\Sounds\\InMotionAudio - Lawn Mower Ambience\\MOTRElec_LawnMowing01_InMotionAudio_LawnMowerAmbience.wav",
+            "category": "Lawn Mower"
+          }
+        ],
+        "directories": []
+      },
+      "Manchester Ambient": {
+        "tracks": [
+          {
+            "id": "336433a562cc40b79c0700612dd9d115",
+            "name": "AMBUrbn_CityAmbience07_InMotionAudio_ManchesterAmbience",
+            "path": "D:\\Sounds\\InMotionAudio - Manchester Ambience\\AMBUrbn_CityAmbience07_InMotionAudio_ManchesterAmbience.wav",
+            "category": "Manchester Ambient"
+          },
+          {
+            "id": "f67e97a3608a45e5aa99670e57c30a37",
+            "name": "AMBUrbn_CityAmbience17_InMotionAudio_ManchesterAmbience",
+            "path": "D:\\Sounds\\InMotionAudio - Manchester Ambience\\AMBUrbn_CityAmbience17_InMotionAudio_ManchesterAmbience.wav",
+            "category": "Manchester Ambient"
+          },
+          {
+            "id": "c4b295d7a2a34a64b46fb50858208218",
+            "name": "TRNTram_TramByPass04_InMotionAudio_ManchesterAmbience",
+            "path": "D:\\Sounds\\InMotionAudio - Manchester Ambience\\TRNTram_TramByPass04_InMotionAudio_ManchesterAmbience.wav",
+            "category": "Manchester Ambient"
+          }
+        ],
+        "directories": []
+      },
+      "Mask Foley": {
+        "tracks": [
+          {
+            "id": "154afd04deb04c819c83f1739ba87e7b",
+            "name": "FOLYMisc_3MMask_Movement04_InMotionAudio_MaskFoley",
+            "path": "D:\\Sounds\\InMotionAudio - Mask Foley\\FOLYMisc_3MMask_Movement04_InMotionAudio_MaskFoley.wav",
+            "category": "Mask Foley"
+          },
+          {
+            "id": "6ebc2b9cefa94997bd00ce56ac299817",
+            "name": "FOLYMisc_BluePPEMask_Elastic09_InMotionAudio_MaskFoley",
+            "path": "D:\\Sounds\\InMotionAudio - Mask Foley\\FOLYMisc_BluePPEMask_Elastic09_InMotionAudio_MaskFoley.wav",
+            "category": "Mask Foley"
+          },
+          {
+            "id": "65b9bb813a684c658078b7b29bdbd1e0",
+            "name": "FOLYMisc_FabricMask_Movement06_InMotionAudio_MaskFoley",
+            "path": "D:\\Sounds\\InMotionAudio - Mask Foley\\FOLYMisc_FabricMask_Movement06_InMotionAudio_MaskFoley.wav",
+            "category": "Mask Foley"
+          },
+          {
+            "id": "11a17ce37df94513a7cf94cb809f956f",
+            "name": "FOLYMisc_PlasticFaceShield_Movement04_InMotionAudio_MaskFoley",
+            "path": "D:\\Sounds\\InMotionAudio - Mask Foley\\FOLYMisc_PlasticFaceShield_Movement04_InMotionAudio_MaskFoley.wav",
+            "category": "Mask Foley"
+          }
+        ],
+        "directories": []
+      },
+      "Morse Code": {
+        "tracks": [
+          {
+            "id": "15d29bda74044c278326b97c5ba0be00",
+            "name": "COMTelm1_Left Parenthesis_InMotionAudio_MorseCodeSamples",
+            "path": "D:\\Sounds\\InMotionAudio - Morse Code\\COMTelm1_Left Parenthesis_InMotionAudio_MorseCodeSamples.wav",
+            "category": "Morse Code"
+          },
+          {
+            "id": "47c2db0bf802441daee89055c4e0ad08",
+            "name": "COMTelm3_QuotationMark_InMotionAudio_MorseCodeSamples",
+            "path": "D:\\Sounds\\InMotionAudio - Morse Code\\COMTelm3_QuotationMark_InMotionAudio_MorseCodeSamples.wav",
+            "category": "Morse Code"
+          },
+          {
+            "id": "2ec6b1421a1d4306ad66f7fe70e9f497",
+            "name": "COMTelm4_SOS_InMotionAudio_MorseCodeSamples",
+            "path": "D:\\Sounds\\InMotionAudio - Morse Code\\COMTelm4_SOS_InMotionAudio_MorseCodeSamples.wav",
+            "category": "Morse Code"
+          },
+          {
+            "id": "0a46523fb2f14b7cbd7f473433c3b582",
+            "name": "ELECEmf_Hum03_InMotionAudio_MorseCodeSamples",
+            "path": "D:\\Sounds\\InMotionAudio - Morse Code\\ELECEmf_Hum03_InMotionAudio_MorseCodeSamples.wav",
+            "category": "Morse Code"
+          }
+        ],
+        "directories": []
+      },
+      "Sinister Textures 1": {
+        "tracks": [
+          {
+            "id": "c51954d706634a58a34c882d81780782",
+            "name": "DSGNErie_EerieBoilerRoom06_InMotionAudio_Sinister Textures Volume 1",
+            "path": "D:\\Sounds\\InMotionAudio - Sinister Textures 1\\DSGNErie_EerieBoilerRoom06_InMotionAudio_Sinister Textures Volume 1.wav",
+            "category": "Sinister Textures 1"
+          },
+          {
+            "id": "961107358ce343b4bb161a5d12a4ac34",
+            "name": "DSGNErie_EerieSubway01_InMotionAudio_Sinister Textures Volume 1",
+            "path": "D:\\Sounds\\InMotionAudio - Sinister Textures 1\\DSGNErie_EerieSubway01_InMotionAudio_Sinister Textures Volume 1.wav",
+            "category": "Sinister Textures 1"
+          }
+        ],
+        "directories": []
+      },
+      "Sinister Textures 2": {
+        "tracks": [
+          {
+            "id": "1ffe193ef02442f0bbe8ccd7d32056d8",
+            "name": "DSGNErie_Eerie02_InMotionAudio_SinisterTexturesVolume2",
+            "path": "D:\\Sounds\\InMotionAudio - Sinister Textures 2\\DSGNErie_Eerie02_InMotionAudio_SinisterTexturesVolume2.wav",
+            "category": "Sinister Textures 2"
+          },
+          {
+            "id": "431887e3682247eda1dd49c27d3ec0c5",
+            "name": "DSGNErie_Eerie06_InMotionAudio_SinisterTexturesVolume2",
+            "path": "D:\\Sounds\\InMotionAudio - Sinister Textures 2\\DSGNErie_Eerie06_InMotionAudio_SinisterTexturesVolume2.wav",
+            "category": "Sinister Textures 2"
+          },
+          {
+            "id": "1bf0323c06144a0baaf8e1131e6dd828",
+            "name": "DSGNErie_Eerie23_InMotionAudio_SinisterTexturesVolume2",
+            "path": "D:\\Sounds\\InMotionAudio - Sinister Textures 2\\DSGNErie_Eerie23_InMotionAudio_SinisterTexturesVolume2.wav",
+            "category": "Sinister Textures 2"
+          }
+        ],
+        "directories": []
+      },
+      "Sinister Textures 3": {
+        "tracks": [
+          {
+            "id": "1599048f615d40f7abc806f89d0b9041",
+            "name": "CLOCKTick_Clock53_InMotionAudio_SinisterTextures3",
+            "path": "D:\\Sounds\\InMotionAudio - Sinister Textures 3\\CLOCKTick_Clock53_InMotionAudio_SinisterTextures3.wav",
+            "category": "Sinister Textures 3"
+          },
+          {
+            "id": "305c6b2839a24dc5a2d5c102b73e508a",
+            "name": "CLOCKTick_ClockMultiReverb11_InMotionAudio_SinisterTextures3",
+            "path": "D:\\Sounds\\InMotionAudio - Sinister Textures 3\\CLOCKTick_ClockMultiReverb11_InMotionAudio_SinisterTextures3.wav",
+            "category": "Sinister Textures 3"
+          },
+          {
+            "id": "6bd13296491042b1a435536b27729a42",
+            "name": "CLOCKTick_ClockMultiReverse51_InMotionAudio_SinisterTextures3",
+            "path": "D:\\Sounds\\InMotionAudio - Sinister Textures 3\\CLOCKTick_ClockMultiReverse51_InMotionAudio_SinisterTextures3.wav",
+            "category": "Sinister Textures 3"
+          },
+          {
+            "id": "a2ae391a13934020a689b2907d5e624b",
+            "name": "CLOCKTick_ClockMultiReverseReverb58_InMotionAudio_SinisterTextures3",
+            "path": "D:\\Sounds\\InMotionAudio - Sinister Textures 3\\CLOCKTick_ClockMultiReverseReverb58_InMotionAudio_SinisterTextures3.wav",
+            "category": "Sinister Textures 3"
+          }
+        ],
+        "directories": []
+      },
+      "Unsorted": {
+        "tracks": [
+          {
+            "id": "5b224ea6b1384f82b164f82751e33632",
+            "name": "BOATMotr_Boat Mercury EXTERIOR Pass By Ride Away STEREO_DRCA_MERC_MKH8040 MKH30",
+            "path": "D:\\Sounds\\Dramatic Cat - Lake Boat - Mercury 4-stroke 60HP\\BOATMotr_Boat Mercury EXTERIOR Pass By Ride Away STEREO_DRCA_MERC_MKH8040 MKH30.wav",
+            "category": "Unsorted"
+          },
+          {
+            "id": "7313656bd4634748b345824d1d9e0337",
+            "name": "GUNMech_SVD Dragunov 7.62×54R SOURCE Magazine Insert Slow_DRCA_DRAG_CO-100K",
+            "path": "D:\\Sounds\\Dramatic Cat - SVD Dragunov\\GUNMech_SVD Dragunov 7.62×54R SOURCE Magazine Insert Slow_DRCA_DRAG_CO-100K.wav",
+            "category": "Unsorted"
+          },
+          {
+            "id": "778f714bda72461d963601a2e6be69c1",
+            "name": "GUNRif_SVD Dragunov 7.62×54R DESIGNED Single Shot Core Long_DRCA_DRAG_Stereo_05",
+            "path": "D:\\Sounds\\Dramatic Cat - SVD Dragunov\\GUNRif_SVD Dragunov 7.62×54R DESIGNED Single Shot Core Long_DRCA_DRAG_Stereo_05.wav",
+            "category": "Unsorted"
+          },
+          {
+            "id": "6e551e4b5b754eef9e3ad609f5aed0a7",
+            "name": "GUNRif_SVD Dragunov 7.62×54R SOURCE Single Shots 30m Front MikroUsi_DRCA_DRAG_AB",
+            "path": "D:\\Sounds\\Dramatic Cat - SVD Dragunov\\GUNRif_SVD Dragunov 7.62×54R SOURCE Single Shots 30m Front MikroUsi_DRCA_DRAG_AB.wav",
+            "category": "Unsorted"
+          }
+        ],
+        "directories": []
+      },
+      "Combat": {
+        "tracks": [
+          {
+            "id": "5266f034c4d04a17a007ff48288da945",
+            "name": "magic1",
+            "path": "D:\\Sounds\\rpg\\battle\\magic1.wav",
+            "category": "Combat"
+          },
+          {
+            "id": "3f27b53824a345179fc4aa4478a148fd",
+            "name": "spell",
+            "path": "D:\\Sounds\\rpg\\battle\\spell.wav",
+            "category": "Combat"
+          },
+          {
+            "id": "cd4d00c6a421438ca1c7bf46a92db886",
+            "name": "swing",
+            "path": "D:\\Sounds\\rpg\\battle\\swing.wav",
+            "category": "Combat"
+          },
+          {
+            "id": "a33a204941a9446f8854c6055b577d7d",
+            "name": "swing2",
+            "path": "D:\\Sounds\\rpg\\battle\\swing2.wav",
+            "category": "Combat"
+          },
+          {
+            "id": "6057300c07e94ae694538d55f5ad962b",
+            "name": "swing3",
+            "path": "D:\\Sounds\\rpg\\battle\\swing3.wav",
+            "category": "Combat"
+          },
+          {
+            "id": "f2017f10875048419b649b2eb9c65574",
+            "name": "sword-unsheathe",
+            "path": "D:\\Sounds\\rpg\\battle\\sword-unsheathe.wav",
+            "category": "Combat"
+          },
+          {
+            "id": "19b016b8201c4dee895d0c3701d6a352",
+            "name": "sword-unsheathe2",
+            "path": "D:\\Sounds\\rpg\\battle\\sword-unsheathe2.wav",
+            "category": "Combat"
+          },
+          {
+            "id": "cb1f7432eaf749249f845c9319fe3785",
+            "name": "sword-unsheathe3",
+            "path": "D:\\Sounds\\rpg\\battle\\sword-unsheathe3.wav",
+            "category": "Combat"
+          },
+          {
+            "id": "8d7d41c27a1e497bb0b2495fb436a844",
+            "name": "sword-unsheathe4",
+            "path": "D:\\Sounds\\rpg\\battle\\sword-unsheathe4.wav",
+            "category": "Combat"
+          },
+          {
+            "id": "34b317377d954ce792910657daa935cd",
+            "name": "sword-unsheathe5",
+            "path": "D:\\Sounds\\rpg\\battle\\sword-unsheathe5.wav",
+            "category": "Combat"
+          }
+        ],
+        "directories": []
+      },
+      "UI": {
+        "tracks": [
+          {
+            "id": "901d088e1c3b4d4d865c37782fd10a24",
+            "name": "interface1",
+            "path": "D:\\Sounds\\rpg\\interface\\interface1.wav",
+            "category": "UI"
+          },
+          {
+            "id": "49b01c685cd84b8e8be3f452823d9db8",
+            "name": "interface2",
+            "path": "D:\\Sounds\\rpg\\interface\\interface2.wav",
+            "category": "UI"
+          },
+          {
+            "id": "3af789fc141d4358a3ac0f353f0a439e",
+            "name": "interface3",
+            "path": "D:\\Sounds\\rpg\\interface\\interface3.wav",
+            "category": "UI"
+          },
+          {
+            "id": "a4a5b0211ccf4f48a9f2111601ec6853",
+            "name": "interface4",
+            "path": "D:\\Sounds\\rpg\\interface\\interface4.wav",
+            "category": "UI"
+          },
+          {
+            "id": "b84ac9b01a1c47d4b25ab9c0a605438b",
+            "name": "interface5",
+            "path": "D:\\Sounds\\rpg\\interface\\interface5.wav",
+            "category": "UI"
+          },
+          {
+            "id": "e0237c28347c496ea5aefb80ac364917",
+            "name": "interface6",
+            "path": "D:\\Sounds\\rpg\\interface\\interface6.wav",
+            "category": "UI"
+          }
+        ],
+        "directories": []
+      },
+      "Inventory": {
+        "tracks": [
+          {
+            "id": "b3d0f7e8935d4edd95d8fc68fcdf14e0",
+            "name": "armor-light",
+            "path": "D:\\Sounds\\rpg\\inventory\\armor-light.wav",
+            "category": "Inventory"
+          },
+          {
+            "id": "edf196d988bc46489ff4e65f428fab50",
+            "name": "beads",
+            "path": "D:\\Sounds\\rpg\\inventory\\beads.wav",
+            "category": "Inventory"
+          },
+          {
+            "id": "0c38a1976b544048a6a1b3829ee0f8a8",
+            "name": "bottle",
+            "path": "D:\\Sounds\\rpg\\inventory\\bottle.wav",
+            "category": "Inventory"
+          },
+          {
+            "id": "bd10474a89124a299e8736ce004c7750",
+            "name": "bubble",
+            "path": "D:\\Sounds\\rpg\\inventory\\bubble.wav",
+            "category": "Inventory"
+          },
+          {
+            "id": "5672c39512dd4eeb92559b7eb603aa61",
+            "name": "bubble2",
+            "path": "D:\\Sounds\\rpg\\inventory\\bubble2.wav",
+            "category": "Inventory"
+          },
+          {
+            "id": "0cd886c50dec475e889ecfa9fc13374a",
+            "name": "bubble3",
+            "path": "D:\\Sounds\\rpg\\inventory\\bubble3.wav",
+            "category": "Inventory"
+          },
+          {
+            "id": "c2aa72c42da34289b0707328f5046d67",
+            "name": "chainmail1",
+            "path": "D:\\Sounds\\rpg\\inventory\\chainmail1.wav",
+            "category": "Inventory"
+          },
+          {
+            "id": "3970a30a0bc54e4aa349be142593f507",
+            "name": "chainmail2",
+            "path": "D:\\Sounds\\rpg\\inventory\\chainmail2.wav",
+            "category": "Inventory"
+          },
+          {
+            "id": "d9825d7b5058436cb39d9d1a86758209",
+            "name": "cloth",
+            "path": "D:\\Sounds\\rpg\\inventory\\cloth.wav",
+            "category": "Inventory"
+          },
+          {
+            "id": "3b8459cd4747479ab39ee1abe751b65c",
+            "name": "cloth-heavy",
+            "path": "D:\\Sounds\\rpg\\inventory\\cloth-heavy.wav",
+            "category": "Inventory"
+          },
+          {
+            "id": "22300a180a8741538d1d7fa632b2bfa9",
+            "name": "coin",
+            "path": "D:\\Sounds\\rpg\\inventory\\coin.wav",
+            "category": "Inventory"
+          },
+          {
+            "id": "f777a18cee5a460cb0ca55501f73a528",
+            "name": "coin2",
+            "path": "D:\\Sounds\\rpg\\inventory\\coin2.wav",
+            "category": "Inventory"
+          },
+          {
+            "id": "e90436c830894df8a6376327990df5e1",
+            "name": "coin3",
+            "path": "D:\\Sounds\\rpg\\inventory\\coin3.wav",
+            "category": "Inventory"
+          },
+          {
+            "id": "9e807e005cc34c22b38d4b6f57456990",
+            "name": "metal-ringing",
+            "path": "D:\\Sounds\\rpg\\inventory\\metal-ringing.wav",
+            "category": "Inventory"
+          },
+          {
+            "id": "0cf2ef6bba5749df89c77d19f9541225",
+            "name": "metal-small1",
+            "path": "D:\\Sounds\\rpg\\inventory\\metal-small1.wav",
+            "category": "Inventory"
+          },
+          {
+            "id": "25194fad7f684896be1de2b6dd737d01",
+            "name": "metal-small2",
+            "path": "D:\\Sounds\\rpg\\inventory\\metal-small2.wav",
+            "category": "Inventory"
+          },
+          {
+            "id": "5fe431bcc1244e0088a235bd13e5d420",
+            "name": "metal-small3",
+            "path": "D:\\Sounds\\rpg\\inventory\\metal-small3.wav",
+            "category": "Inventory"
+          },
+          {
+            "id": "cab36a5cf2c24f649b4c73d2a40b25ce",
+            "name": "wood-small",
+            "path": "D:\\Sounds\\rpg\\inventory\\wood-small.wav",
+            "category": "Inventory"
+          }
+        ],
+        "directories": []
+      },
+      "Creature": {
+        "tracks": [
+          {
+            "id": "12945d6485cb44e3a34811e29939cb68",
+            "name": "bite-small",
+            "path": "D:\\Sounds\\rpg\\NPC\\beetle\\bite-small.wav",
+            "category": "Creature"
+          },
+          {
+            "id": "2c1f7d81144d4950a24b0c7d085b737f",
+            "name": "bite-small2",
+            "path": "D:\\Sounds\\rpg\\NPC\\beetle\\bite-small2.wav",
+            "category": "Creature"
+          },
+          {
+            "id": "b55ad75c94fe4b368bac215a7d49aa94",
+            "name": "bite-small3",
+            "path": "D:\\Sounds\\rpg\\NPC\\beetle\\bite-small3.wav",
+            "category": "Creature"
+          },
+          {
+            "id": "04ae97fb453447d58a3c3271e27e0ced",
+            "name": "giant1",
+            "path": "D:\\Sounds\\rpg\\NPC\\giant\\giant1.wav",
+            "category": "Creature"
+          },
+          {
+            "id": "e335d09a329046518cdb9448a6e6bb97",
+            "name": "giant2",
+            "path": "D:\\Sounds\\rpg\\NPC\\giant\\giant2.wav",
+            "category": "Creature"
+          },
+          {
+            "id": "d40a93093fef4e21833d9ec7c6debbe0",
+            "name": "giant3",
+            "path": "D:\\Sounds\\rpg\\NPC\\giant\\giant3.wav",
+            "category": "Creature"
+          },
+          {
+            "id": "08022dd3e46d4147b4890b9d9724ee22",
+            "name": "giant4",
+            "path": "D:\\Sounds\\rpg\\NPC\\giant\\giant4.wav",
+            "category": "Creature"
+          },
+          {
+            "id": "1a99ac5dc29a4183a9c583b5d135c1ba",
+            "name": "giant5",
+            "path": "D:\\Sounds\\rpg\\NPC\\giant\\giant5.wav",
+            "category": "Creature"
+          },
+          {
+            "id": "ae03b6040eb2431cbfc8765d506031ba",
+            "name": "mnstr1",
+            "path": "D:\\Sounds\\rpg\\NPC\\gutteral beast\\mnstr1.wav",
+            "category": "Creature"
+          },
+          {
+            "id": "15ace4eb3af94615a1bd83c3da545d20",
+            "name": "mnstr10",
+            "path": "D:\\Sounds\\rpg\\NPC\\gutteral beast\\mnstr10.wav",
+            "category": "Creature"
+          },
+          {
+            "id": "ee99288784d9421db5b8c660f31cad08",
+            "name": "mnstr11",
+            "path": "D:\\Sounds\\rpg\\NPC\\gutteral beast\\mnstr11.wav",
+            "category": "Creature"
+          },
+          {
+            "id": "b8d24edbfa1a4667970e0f93b1cf5fc4",
+            "name": "mnstr12",
+            "path": "D:\\Sounds\\rpg\\NPC\\gutteral beast\\mnstr12.wav",
+            "category": "Creature"
+          },
+          {
+            "id": "75a855288de04f61bca935b2b74d7689",
+            "name": "mnstr13",
+            "path": "D:\\Sounds\\rpg\\NPC\\gutteral beast\\mnstr13.wav",
+            "category": "Creature"
+          },
+          {
+            "id": "89ff068da3ce44f1901410e1c35567e0",
+            "name": "mnstr14",
+            "path": "D:\\Sounds\\rpg\\NPC\\gutteral beast\\mnstr14.wav",
+            "category": "Creature"
+          },
+          {
+            "id": "eb4c96fa249a4b968021f6527f596fdc",
+            "name": "mnstr15",
+            "path": "D:\\Sounds\\rpg\\NPC\\gutteral beast\\mnstr15.wav",
+            "category": "Creature"
+          },
+          {
+            "id": "4f1a31da367e49099b7febedc7c58cb9",
+            "name": "mnstr2",
+            "path": "D:\\Sounds\\rpg\\NPC\\gutteral beast\\mnstr2.wav",
+            "category": "Creature"
+          },
+          {
+            "id": "f54a9d87d97144dca4b12fdb60048fca",
+            "name": "mnstr3",
+            "path": "D:\\Sounds\\rpg\\NPC\\gutteral beast\\mnstr3.wav",
+            "category": "Creature"
+          },
+          {
+            "id": "8299e7f394da472f9e27c91c7e8242f0",
+            "name": "mnstr4",
+            "path": "D:\\Sounds\\rpg\\NPC\\gutteral beast\\mnstr4.wav",
+            "category": "Creature"
+          },
+          {
+            "id": "5917090653a0423b901150d34f1b229b",
+            "name": "mnstr5",
+            "path": "D:\\Sounds\\rpg\\NPC\\gutteral beast\\mnstr5.wav",
+            "category": "Creature"
+          },
+          {
+            "id": "cd7b2c56602c4225abcd3df15230366c",
+            "name": "mnstr6",
+            "path": "D:\\Sounds\\rpg\\NPC\\gutteral beast\\mnstr6.wav",
+            "category": "Creature"
+          },
+          {
+            "id": "a832440d1605464589e8e0cfb66fd2c4",
+            "name": "mnstr7",
+            "path": "D:\\Sounds\\rpg\\NPC\\gutteral beast\\mnstr7.wav",
+            "category": "Creature"
+          },
+          {
+            "id": "aba7d1e218e84fab96cbb53fa26fbeff",
+            "name": "mnstr8",
+            "path": "D:\\Sounds\\rpg\\NPC\\gutteral beast\\mnstr8.wav",
+            "category": "Creature"
+          },
+          {
+            "id": "e62dec215c2a4e6eaf76c123e3f5e075",
+            "name": "mnstr9",
+            "path": "D:\\Sounds\\rpg\\NPC\\gutteral beast\\mnstr9.wav",
+            "category": "Creature"
+          },
+          {
+            "id": "952c0c615a314eca8c63f7eb4e38d961",
+            "name": "ogre1",
+            "path": "D:\\Sounds\\rpg\\NPC\\ogre\\ogre1.wav",
+            "category": "Creature"
+          },
+          {
+            "id": "acd87f13d79c45a89169cd1af46ee84e",
+            "name": "ogre2",
+            "path": "D:\\Sounds\\rpg\\NPC\\ogre\\ogre2.wav",
+            "category": "Creature"
+          },
+          {
+            "id": "5e05bf1e27f54d8482818c196a2535eb",
+            "name": "ogre3",
+            "path": "D:\\Sounds\\rpg\\NPC\\ogre\\ogre3.wav",
+            "category": "Creature"
+          },
+          {
+            "id": "5d7b0a5013c64859b933c42b6d533412",
+            "name": "ogre4",
+            "path": "D:\\Sounds\\rpg\\NPC\\ogre\\ogre4.wav",
+            "category": "Creature"
+          },
+          {
+            "id": "458f03529f62454faafb96fa76a5df75",
+            "name": "ogre5",
+            "path": "D:\\Sounds\\rpg\\NPC\\ogre\\ogre5.wav",
+            "category": "Creature"
+          },
+          {
+            "id": "dcf530a1d7bd49af9de28d7ed956c7be",
+            "name": "shade1",
+            "path": "D:\\Sounds\\rpg\\NPC\\shade\\shade1.wav",
+            "category": "Creature"
+          },
+          {
+            "id": "ec8d4eec77404720817427064f15a8d5",
+            "name": "shade10",
+            "path": "D:\\Sounds\\rpg\\NPC\\shade\\shade10.wav",
+            "category": "Creature"
+          },
+          {
+            "id": "9ca3bcb8c586437690938b5975da8076",
+            "name": "shade11",
+            "path": "D:\\Sounds\\rpg\\NPC\\shade\\shade11.wav",
+            "category": "Creature"
+          },
+          {
+            "id": "67a7253c8bcb498c8cf6e6d6baf60586",
+            "name": "shade12",
+            "path": "D:\\Sounds\\rpg\\NPC\\shade\\shade12.wav",
+            "category": "Creature"
+          },
+          {
+            "id": "5230eb7d96e64209baa044824016258c",
+            "name": "shade13",
+            "path": "D:\\Sounds\\rpg\\NPC\\shade\\shade13.wav",
+            "category": "Creature"
+          },
+          {
+            "id": "026361cff5824175892b3e60981f23be",
+            "name": "shade14",
+            "path": "D:\\Sounds\\rpg\\NPC\\shade\\shade14.wav",
+            "category": "Creature"
+          },
+          {
+            "id": "5ac519d6ec2f4ae19087827ff8cdc72e",
+            "name": "shade15",
+            "path": "D:\\Sounds\\rpg\\NPC\\shade\\shade15.wav",
+            "category": "Creature"
+          },
+          {
+            "id": "868b3fdf29784a9e9685adc531caa9bd",
+            "name": "shade2",
+            "path": "D:\\Sounds\\rpg\\NPC\\shade\\shade2.wav",
+            "category": "Creature"
+          },
+          {
+            "id": "f3dbd93cf6eb4c43b8de6e3138d96792",
+            "name": "shade3",
+            "path": "D:\\Sounds\\rpg\\NPC\\shade\\shade3.wav",
+            "category": "Creature"
+          },
+          {
+            "id": "1daa481afaf64c29afc6eb050dd0f04e",
+            "name": "shade4",
+            "path": "D:\\Sounds\\rpg\\NPC\\shade\\shade4.wav",
+            "category": "Creature"
+          },
+          {
+            "id": "02e6567252a54052a2d470056d7e439d",
+            "name": "shade5",
+            "path": "D:\\Sounds\\rpg\\NPC\\shade\\shade5.wav",
+            "category": "Creature"
+          },
+          {
+            "id": "f64e8110899c4329b4204866a7212d80",
+            "name": "shade6",
+            "path": "D:\\Sounds\\rpg\\NPC\\shade\\shade6.wav",
+            "category": "Creature"
+          },
+          {
+            "id": "3c9e444725a644c3b8546a7046ffa28e",
+            "name": "shade7",
+            "path": "D:\\Sounds\\rpg\\NPC\\shade\\shade7.wav",
+            "category": "Creature"
+          },
+          {
+            "id": "602aeee76c704de3a38110fb991760d1",
+            "name": "shade8",
+            "path": "D:\\Sounds\\rpg\\NPC\\shade\\shade8.wav",
+            "category": "Creature"
+          },
+          {
+            "id": "0dc4fa1b929240a28dd2ef4b95e6977a",
+            "name": "shade9",
+            "path": "D:\\Sounds\\rpg\\NPC\\shade\\shade9.wav",
+            "category": "Creature"
+          },
+          {
+            "id": "b8b1b284aed04b088bc3e971065573ca",
+            "name": "slime1",
+            "path": "D:\\Sounds\\rpg\\NPC\\slime\\slime1.wav",
+            "category": "Creature"
+          },
+          {
+            "id": "f72a0d743b514414a63d28cf7b8ceb31",
+            "name": "slime10",
+            "path": "D:\\Sounds\\rpg\\NPC\\slime\\slime10.wav",
+            "category": "Creature"
+          },
+          {
+            "id": "d54406d300a540ac94bff0352c072bc8",
+            "name": "slime2",
+            "path": "D:\\Sounds\\rpg\\NPC\\slime\\slime2.wav",
+            "category": "Creature"
+          },
+          {
+            "id": "515f169b22e343e3965aafe915f092c1",
+            "name": "slime3",
+            "path": "D:\\Sounds\\rpg\\NPC\\slime\\slime3.wav",
+            "category": "Creature"
+          },
+          {
+            "id": "86d76dd250c14d5fb18b0853dbb49108",
+            "name": "slime4",
+            "path": "D:\\Sounds\\rpg\\NPC\\slime\\slime4.wav",
+            "category": "Creature"
+          },
+          {
+            "id": "5bd36c4e8b6a48109ff3c6c39373eb2a",
+            "name": "slime5",
+            "path": "D:\\Sounds\\rpg\\NPC\\slime\\slime5.wav",
+            "category": "Creature"
+          },
+          {
+            "id": "0c308c126a0b4406877f3db268fda263",
+            "name": "slime6",
+            "path": "D:\\Sounds\\rpg\\NPC\\slime\\slime6.wav",
+            "category": "Creature"
+          },
+          {
+            "id": "58ef0c01e20f407e9abaff3deaf45a23",
+            "name": "slime7",
+            "path": "D:\\Sounds\\rpg\\NPC\\slime\\slime7.wav",
+            "category": "Creature"
+          },
+          {
+            "id": "30144cbdb70f4fb0904e728a84bd495e",
+            "name": "slime8",
+            "path": "D:\\Sounds\\rpg\\NPC\\slime\\slime8.wav",
+            "category": "Creature"
+          },
+          {
+            "id": "e64dccf8064c41dc88783e15fd14ba67",
+            "name": "slime9",
+            "path": "D:\\Sounds\\rpg\\NPC\\slime\\slime9.wav",
+            "category": "Creature"
+          },
+          {
+            "id": "4e60f8afecaf422db631bcd5f078d808",
+            "name": "wolfman",
+            "path": "D:\\Sounds\\rpg\\NPC\\misc\\wolfman.wav",
+            "category": "Creature"
+          }
+        ],
+        "directories": []
+      },
+      "Misc": {
+        "tracks": [
+          {
+            "id": "26deb2bb0424484d83ff54b75bcd3ba1",
+            "name": "burp",
+            "path": "D:\\Sounds\\rpg\\misc\\burp.wav",
+            "category": "Misc"
+          },
+          {
+            "id": "d92e1d8c8aa94701bcff8947625f6eb6",
+            "name": "random1",
+            "path": "D:\\Sounds\\rpg\\misc\\random1.wav",
+            "category": "Misc"
+          },
+          {
+            "id": "b702a273f2d04b1fa569580b8fd65e15",
+            "name": "random2",
+            "path": "D:\\Sounds\\rpg\\misc\\random2.wav",
+            "category": "Misc"
+          },
+          {
+            "id": "5654343de3c2415fa0b033ad9cdf3795",
+            "name": "random3",
+            "path": "D:\\Sounds\\rpg\\misc\\random3.wav",
+            "category": "Misc"
+          },
+          {
+            "id": "4cced31b1b0e46c99abfd9906ea16322",
+            "name": "random4",
+            "path": "D:\\Sounds\\rpg\\misc\\random4.wav",
+            "category": "Misc"
+          },
+          {
+            "id": "18bbbcbef2a44386a1ddc8b4665a3bc0",
+            "name": "random5",
+            "path": "D:\\Sounds\\rpg\\misc\\random5.wav",
+            "category": "Misc"
+          },
+          {
+            "id": "f3b57230b154497493b7064b529bbe76",
+            "name": "random6",
+            "path": "D:\\Sounds\\rpg\\misc\\random6.wav",
+            "category": "Misc"
+          }
+        ],
+        "directories": []
+      },
+      "Environment": {
+        "tracks": [
+          {
+            "id": "940e5157663045238a2f7148a0c5317b",
+            "name": "door",
+            "path": "D:\\Sounds\\rpg\\world\\door.wav",
+            "category": "Environment"
+          }
+        ],
+        "directories": []
+      },
+      "Weather": {
+        "tracks": [
+          {
+            "id": "2996159670bc462c91b951417f4ddf8c",
+            "name": "RAIN_Distant Thunder and Rain Long Thunderstorm C_BOLT_BackyardRain_UsiPro",
+            "path": "D:\\Sounds\\Bolt - Backyard Rain & Thunder - Suburban Rain Recordings\\RAIN_Distant Thunder and Rain Long Thunderstorm C_BOLT_BackyardRain_UsiPro.wav",
+            "category": "Weather"
+          },
+          {
+            "id": "5ba2d71cf0814b8f96c35691b56ad507",
+            "name": "RAIN_Rain at Night Slow Crescendo Calm Suburban_BOLT_BackyardRain_UsiPro",
+            "path": "D:\\Sounds\\Bolt - Backyard Rain & Thunder - Suburban Rain Recordings\\RAIN_Rain at Night Slow Crescendo Calm Suburban_BOLT_BackyardRain_UsiPro.wav",
+            "category": "Weather"
           }
         ],
         "directories": []
       }
     },
     "settings": {
-      "volume": 1.0,
-      "shuffle": false,
-      "loop": false,
-      "last_directory": "D:\\Music\\Macross Δ - 1st Album - Walküre Attack! - Walküre",
-      "last_category": "Horror",
-      "last_track_id": "a164b6f680aa4fff96d7cc105b01a7ca"
+      "volume": 0.15853658536585366,
+      "shuffle": true,
+      "loop": true,
+      "continue": true,
+      "last_directory": "D:/Sounds/rpg",
+      "last_category": "Sci-Fi Voices",
+      "last_track_id": "d8c6d9440f6243ef9d6078b362dec2d0"
     }
   }
 }

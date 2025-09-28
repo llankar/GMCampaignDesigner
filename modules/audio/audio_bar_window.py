@@ -150,8 +150,8 @@ class AudioBarWindow(ctk.CTkToplevel):
         self.play_button = ctk.CTkButton(content, text="Play", command=self._on_play_clicked, width=70)
         self.play_button.grid(row=0, column=5, padx=4, pady=4, sticky="ew")
 
-        self.pause_button = ctk.CTkButton(content, text="Pause", command=self._on_pause_clicked, width=70)
-        self.pause_button.grid(row=0, column=6, padx=4, pady=4, sticky="ew")
+        #self.pause_button = ctk.CTkButton(content, text="Pause", command=self._on_pause_clicked, width=70)
+        #self.pause_button.grid(row=0, column=6, padx=4, pady=4, sticky="ew")
 
         self.stop_button = ctk.CTkButton(content, text="Stop", command=self._on_stop_clicked, width=70)
         self.stop_button.grid(row=0, column=7, padx=4, pady=4, sticky="ew")
@@ -579,7 +579,7 @@ class AudioBarWindow(ctk.CTkToplevel):
         has_remembered = bool(self._remembered_track_label)
 
         self.play_button.configure(state=tk.NORMAL if has_tracks or has_remembered else tk.DISABLED)
-        self.pause_button.configure(state=tk.NORMAL if playing else tk.DISABLED)
+        #self.pause_button.configure(state=tk.NORMAL if playing else tk.DISABLED)
         self.stop_button.configure(state=tk.NORMAL if has_tracks else tk.DISABLED)
         self.next_button.configure(state=tk.NORMAL if multi_track else tk.DISABLED)
         self.prev_button.configure(state=tk.NORMAL if multi_track else tk.DISABLED)
