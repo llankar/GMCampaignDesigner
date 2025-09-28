@@ -78,6 +78,9 @@ class DisplayMapController:
         self.zoom        = 1.0
         self.pan_x       = 0
         self.pan_y       = 0
+        self._selected_items: list[dict] = []
+        self._selection_rect_id: int | None = None
+        self._selection_start: tuple[int, int] | None = None
         self.selected_token  = None # Selected item (token or shape)
         self.clipboard_token = None # Copied item data (token or shape)
     
@@ -118,6 +121,184 @@ class DisplayMapController:
         # descriptions) so the toolbar button can reliably dismiss every one of
         # them even if internal bookkeeping for a token becomes desynchronised.
         self._active_hover_popups = set()
+
+    @property
+    def selected_token(self):
+        return self._selected_items[-1] if self._selected_items else None
+
+    @selected_token.setter
+    def selected_token(self, value):
+        if value is None:
+            self._set_selected_items([])
+        else:
+            self._set_selected_items([value])
+
+    @property
+    def selected_items(self):
+        return list(self._selected_items)
+
+    def _set_selected_items(self, items: list[dict]):
+        valid_items = []
+        seen_ids = set()
+        for item in items:
+            if not item or item not in self.tokens:
+                continue
+            key = id(item)
+            if key in seen_ids:
+                continue
+            seen_ids.add(key)
+            valid_items.append(item)
+        self._selected_items = valid_items
+        self._refresh_selection_highlights()
+
+    def _select_item(self, item: dict, *, additive: bool = False, toggle: bool = False):
+        if not item or item not in self.tokens:
+            return
+        if toggle:
+            if item in self._selected_items:
+                self._selected_items = [i for i in self._selected_items if i is not item]
+            else:
+                self._selected_items.append(item)
+        elif additive:
+            if item not in self._selected_items:
+                self._selected_items.append(item)
+        else:
+            self._selected_items = [item]
+        self._refresh_selection_highlights()
+
+    def _clear_selection(self):
+        if self._selected_items:
+            self._selected_items.clear()
+            self._refresh_selection_highlights()
+
+    @staticmethod
+    def _event_has_shift(event) -> bool:
+        return bool(getattr(event, "state", 0) & 0x0001)
+
+    @staticmethod
+    def _event_has_control(event) -> bool:
+        return bool(getattr(event, "state", 0) & 0x0004)
+
+    def _resolve_operation_targets(self, primary: dict | None, *, item_types: set[str] | None = None) -> list[dict]:
+        candidates = [item for item in self._selected_items if item in self.tokens]
+        if item_types:
+            candidates = [item for item in candidates if item.get("type") in item_types]
+        if primary and primary not in candidates and (not item_types or primary.get("type") in item_types):
+            candidates.append(primary)
+        candidates = list(dict.fromkeys(candidates))
+        if len(candidates) > 1:
+            return candidates
+        return [primary] if primary else []
+
+    def _collect_item_bbox(self, item: dict) -> tuple[int, int, int, int] | None:
+        if not self.canvas:
+            return None
+        ids = []
+        item_type = item.get("type")
+        if item.get("canvas_ids"):
+            ids.extend(cid for cid in item["canvas_ids"] if cid)
+        if item_type == "token":
+            if item.get("hp_canvas_ids"):
+                ids.extend(cid for cid in item["hp_canvas_ids"] if cid)
+            if item.get("name_id"):
+                ids.append(item["name_id"])
+        elif item_type == "marker":
+            for key in ("entry_canvas_id", "handle_canvas_id", "border_canvas_id"):
+                cid = item.get(key)
+                if cid:
+                    ids.append(cid)
+        bbox = None
+        for cid in ids:
+            try:
+                cb = self.canvas.bbox(cid)
+            except tk.TclError:
+                cb = None
+            if not cb:
+                continue
+            if bbox is None:
+                bbox = list(cb)
+            else:
+                bbox[0] = min(bbox[0], cb[0])
+                bbox[1] = min(bbox[1], cb[1])
+                bbox[2] = max(bbox[2], cb[2])
+                bbox[3] = max(bbox[3], cb[3])
+        return tuple(bbox) if bbox else None
+
+    def _refresh_selection_highlights(self):
+        canvas = getattr(self, "canvas", None)
+        if not canvas:
+            return
+        selected_ids = {id(item) for item in self._selected_items}
+        for item in self.tokens:
+            is_selected = id(item) in selected_ids
+            indicator_id = item.get("selection_indicator_id")
+            if is_selected:
+                bbox = self._collect_item_bbox(item)
+                if not bbox:
+                    if indicator_id:
+                        try:
+                            canvas.delete(indicator_id)
+                        except tk.TclError:
+                            pass
+                        item["selection_indicator_id"] = None
+                    continue
+                margin = 6 if item.get("type") == "token" else 4
+                x1, y1, x2, y2 = bbox
+                x1 -= margin
+                y1 -= margin
+                x2 += margin
+                y2 += margin
+                if indicator_id:
+                    try:
+                        canvas.coords(indicator_id, x1, y1, x2, y2)
+                    except tk.TclError:
+                        indicator_id = None
+                if not indicator_id:
+                    try:
+                        indicator_id = canvas.create_rectangle(
+                            x1, y1, x2, y2, outline="#4cc3ff", width=2, dash=(4, 2), state="disabled"
+                        )
+                    except tk.TclError:
+                        indicator_id = None
+                if indicator_id:
+                    item["selection_indicator_id"] = indicator_id
+                    try:
+                        canvas.tag_raise(indicator_id)
+                    except tk.TclError:
+                        pass
+            else:
+                if indicator_id:
+                    try:
+                        canvas.delete(indicator_id)
+                    except tk.TclError:
+                        pass
+                    item["selection_indicator_id"] = None
+
+    @staticmethod
+    def _rectangles_intersect(a: tuple[int, int, int, int], b: tuple[int, int, int, int]) -> bool:
+        ax1, ay1, ax2, ay2 = a
+        bx1, by1, bx2, by2 = b
+        return not (ax2 < bx1 or bx2 < ax1 or ay2 < by1 or by2 < ay1)
+
+    def _apply_selection_rectangle(self, rect: tuple[int, int, int, int], event):
+        additive = self._event_has_shift(event)
+        toggle = self._event_has_control(event)
+        selected = []
+        for item in self.tokens:
+            bbox = self._collect_item_bbox(item)
+            if bbox and self._rectangles_intersect(rect, bbox):
+                selected.append(item)
+        if toggle:
+            for item in selected:
+                self._select_item(item, toggle=True)
+        elif additive:
+            merged = list(self._selected_items)
+            for item in selected:
+                if item not in merged:
+                    merged.append(item)
+            self._set_selected_items(merged)
+        else:
+            self._set_selected_items(selected)
 
         # For interactive shape resizing (re-adding)
         self._resize_handles = []
@@ -382,10 +563,12 @@ class DisplayMapController:
     def _change_marker_border_color(self, marker):
         if not marker:
             return
+        targets = self._resolve_operation_targets(marker, item_types={"marker"}) or [marker]
         current_color = marker.get("border_color", "#00ff00")
         result = colorchooser.askcolor(parent=self.canvas, color=current_color, title="Choose Marker Border Color")
         if result and result[1]:
-            marker["border_color"] = result[1]
+            for tgt in targets:
+                tgt["border_color"] = result[1]
             self._update_canvas_images()
             self._persist_tokens()
 
@@ -909,6 +1092,12 @@ class DisplayMapController:
                     self._refresh_token_hover_popup(item)
                     if item.get("hover_visible"):
                         self._show_token_hover(item)
+                indicator_id = item.get("selection_indicator_id")
+                if indicator_id:
+                    try:
+                        self.canvas.move(indicator_id, dx, dy)
+                    except tk.TclError:
+                        item["selection_indicator_id"] = None
             # Move resize handles if displayed
             for hid in getattr(self, '_resize_handles', []) or []:
                 try:
@@ -924,6 +1113,8 @@ class DisplayMapController:
         except tk.TclError:
             # Fallback to full redraw if something goes wrong
             self._update_canvas_images(resample=self._fast_resample)
+        else:
+            self._refresh_selection_highlights()
 
     def _on_mouse_down(self, event):
         # Check if a resize handle was clicked first
@@ -972,9 +1163,19 @@ class DisplayMapController:
             if self._graphical_edit_mode_item: # If graphical edit was active, deactivate it
                 self._remove_resize_handles()
                 self._graphical_edit_mode_item = None
-            if self.selected_token: # Deselect any item
-                self.selected_token = None
-            
+            if not (self._event_has_shift(event) or self._event_has_control(event)):
+                self._clear_selection()
+
+            if self.drawing_mode == "selection":
+                self._selection_start = (event.x, event.y)
+                if self._selection_rect_id:
+                    try:
+                        self.canvas.delete(self._selection_rect_id)
+                    except tk.TclError:
+                        pass
+                    self._selection_rect_id = None
+                return
+
             if self.drawing_mode in ["rectangle", "oval"]: # Create new shape if in drawing mode
                 # Create new shape - This block needs to be indented
                 world_x = (event.x - self.pan_x) / self.zoom; world_y = (event.y - self.pan_y) / self.zoom
@@ -994,16 +1195,51 @@ class DisplayMapController:
 
         if self.fog_mode in ("add", "rem") and not self._fog_action_active:
             self._push_fog_history(); self._fog_action_active = True
+        self._selection_start = None
         self._marker_start = (event.x, event.y)
         self._marker_after_id = self.canvas.after(500, self._create_marker)
 
     def _on_mouse_move(self, event):
+        if self._selection_start:
+            x0, y0 = self._selection_start
+            x1, y1 = event.x, event.y
+            if self._selection_rect_id:
+                try:
+                    self.canvas.coords(self._selection_rect_id, x0, y0, x1, y1)
+                except tk.TclError:
+                    self._selection_rect_id = None
+            if not self._selection_rect_id:
+                try:
+                    self._selection_rect_id = self.canvas.create_rectangle(
+                        x0, y0, x1, y1, outline="#4cc3ff", dash=(3, 2), state="disabled"
+                    )
+                except tk.TclError:
+                    self._selection_rect_id = None
+            return
+
         if self._marker_after_id and self._marker_start:
             dx = event.x - self._marker_start[0]; dy = event.y - self._marker_start[1]
             if abs(dx) > 5 or abs(dy) > 5: self.canvas.after_cancel(self._marker_after_id); self._marker_after_id = None
         self.on_paint(event)
 
     def _on_mouse_up(self, event):
+        if self._selection_start:
+            x0, y0 = self._selection_start
+            x1, y1 = event.x, event.y
+            rect = (min(x0, x1), min(y0, y1), max(x0, x1), max(y0, y1))
+            if rect[0] != rect[2] and rect[1] != rect[3]:
+                self._apply_selection_rectangle(rect, event)
+            elif not (self._event_has_shift(event) or self._event_has_control(event)):
+                # Click without drag clears unless modifiers held
+                self._clear_selection()
+            if self._selection_rect_id:
+                try:
+                    self.canvas.delete(self._selection_rect_id)
+                except tk.TclError:
+                    pass
+                self._selection_rect_id = None
+            self._selection_start = None
+
         if self._marker_after_id: self.canvas.after_cancel(self._marker_after_id); self._marker_after_id = None
         if self._marker_anim_after_id:
             try:
@@ -1259,6 +1495,7 @@ class DisplayMapController:
                     elif item_type == "oval": shape_id = self.canvas.create_oval(sx, sy, sx + shape_width, sy + shape_height, fill=fill_color, outline=border_color, width=2)
                     item['canvas_ids'] = (shape_id,) if shape_id else ();
                     if shape_id: self._bind_item_events(item)
+        self._refresh_selection_highlights()
         if self.fs_canvas:
             self._update_fullscreen_map()
         if getattr(self, '_web_server_thread', None):
@@ -1297,8 +1534,14 @@ class DisplayMapController:
         elif not self._graphical_edit_mode_item and self._resize_handles: # Handles visible but no item in edit mode (shouldn't happen)
              self._remove_resize_handles()
 
-
-        self.selected_token = item
+        if self._event_has_control(event):
+            self._select_item(item, toggle=True)
+        elif self._event_has_shift(event):
+            self._select_item(item, additive=True)
+        elif self.drawing_mode == "selection":
+            self._select_item(item)
+        else:
+            self.selected_token = item
         item["drag_data"] = {"x": event.x, "y": event.y, "moved": False}
         # Handles are only drawn if "Edit Shape" is chosen from context menu.
 
@@ -1341,10 +1584,12 @@ class DisplayMapController:
         if main_canvas_id:
             coords = self.canvas.coords(main_canvas_id)
             if coords: sx, sy = coords[0], coords[1]; item["position"] = ((sx - self.pan_x)/self.zoom, (sy - self.pan_y)/self.zoom)
-        
+
         # If moving a shape that is in graphical edit mode, redraw its handles
         if item == self._graphical_edit_mode_item and item.get("type") in ["rectangle", "oval"]:
             self._draw_resize_handles(item)
+
+        self._refresh_selection_highlights()
 
 
     def _on_item_release(self, event, item):
@@ -1376,6 +1621,13 @@ class DisplayMapController:
                 self._show_marker_description(item)
 
     def _on_item_right_click(self, event, item):
+        if item not in self._selected_items:
+            if self._event_has_control(event):
+                self._select_item(item, toggle=True)
+            elif self._event_has_shift(event):
+                self._select_item(item, additive=True)
+            else:
+                self._select_item(item)
         item_type = item.get("type", "token")
         if item_type == "token": return self._on_token_right_click(event, item)
         elif item_type in ["rectangle", "oval"]: self._show_shape_menu(event, item)
@@ -1396,24 +1648,29 @@ class DisplayMapController:
         menu.tk_popup(event.x_root, event.y_root)
 
     def _edit_shape_color_dialog(self, shape):
+        targets = self._resolve_operation_targets(shape, item_types={"rectangle", "oval"}) or [shape]
         current_fill = shape.get("fill_color", self.current_shape_fill_color)
-        # Pass self.canvas (or a relevant toplevel) as parent to colorchooser
         fill_res = colorchooser.askcolor(parent=self.canvas, color=current_fill, title="Choose Shape Fill Color")
-        if fill_res and fill_res[1]: shape["fill_color"] = fill_res[1]
-        
+        if fill_res and fill_res[1]:
+            for tgt in targets:
+                tgt["fill_color"] = fill_res[1]
+
         current_border = shape.get("border_color", self.current_shape_border_color)
         border_res = colorchooser.askcolor(parent=self.canvas, color=current_border, title="Choose Shape Border Color")
-        if border_res and border_res[1]: shape["border_color"] = border_res[1]
-        
+        if border_res and border_res[1]:
+            for tgt in targets:
+                tgt["border_color"] = border_res[1]
+
         self._update_canvas_images(); self._persist_tokens()
 
     def _resize_shape_dialog(self, shape):
-        # Pass self.canvas as parent to simpledialog
+        targets = self._resolve_operation_targets(shape, item_types={"rectangle", "oval"}) or [shape]
         new_width = tk.simpledialog.askinteger("Resize Shape", "New Width (pixels):", parent=self.canvas, initialvalue=shape.get("width", DEFAULT_SHAPE_WIDTH), minvalue=1)
         if new_width is None: return # User cancelled
         new_height = tk.simpledialog.askinteger("Resize Shape", "New Height (pixels):", parent=self.canvas, initialvalue=shape.get("height", DEFAULT_SHAPE_HEIGHT), minvalue=1)
         if new_height is None: return # User cancelled
-        shape["width"] = new_width; shape["height"] = new_height
+        for tgt in targets:
+            tgt["width"] = new_width; tgt["height"] = new_height
         self._update_canvas_images(); self._persist_tokens()
 
     # _adjust_shape_size_relative method is removed as per request.
@@ -1427,6 +1684,7 @@ class DisplayMapController:
             print("Error: Valid token not provided for resizing.")
             return
 
+        targets = self._resolve_operation_targets(token, item_types={"token"}) or [token]
         current_size = token.get("size", self.token_size)
         
         try:
@@ -1449,24 +1707,22 @@ class DisplayMapController:
 
 
         if new_size is not None and new_size > 0:
-            token["size"] = new_size
+            for tgt in targets:
+                tgt["size"] = new_size
+                source_img = tgt.get("source_image")
 
-            source_img = token.get("source_image")
-
-            # If the token's visual representation depends on a disk image,
-            # reuse the cached high-resolution copy when possible.
-            if "image_path" in token and token["image_path"]:
-                try:
-                    if source_img is None:
-                        source_img = Image.open(token["image_path"]).convert("RGBA")
-                    token["source_image"] = source_img
-                    token["pil_image"] = source_img.resize((new_size, new_size), Image.LANCZOS)
-                except FileNotFoundError:
-                    print(f"Error: Image file not found for token: {token['image_path']}")
-                except Exception as e:
-                    print(f"Error reloading image for resized token: {e}")
-            elif source_img is not None:
-                token["pil_image"] = source_img.resize((new_size, new_size), Image.LANCZOS)
+                if "image_path" in tgt and tgt["image_path"]:
+                    try:
+                        if source_img is None:
+                            source_img = Image.open(tgt["image_path"]).convert("RGBA")
+                        tgt["source_image"] = source_img
+                        tgt["pil_image"] = source_img.resize((new_size, new_size), Image.LANCZOS)
+                    except FileNotFoundError:
+                        print(f"Error: Image file not found for token: {tgt['image_path']}")
+                    except Exception as e:
+                        print(f"Error reloading image for resized token: {e}")
+                elif source_img is not None:
+                    tgt["pil_image"] = source_img.resize((new_size, new_size), Image.LANCZOS)
 
             self._update_canvas_images() # Redraw canvas to reflect new token size
             self._persist_tokens()       # Save the changes
@@ -1552,17 +1808,22 @@ class DisplayMapController:
         """
         if not token or token.get("type") != "token":
             return
-        
+
+        targets = self._resolve_operation_targets(token, item_types={"token"}) or [token]
         current_color = token.get("border_color", "#0000FF") # Default blue
         # Pass self.canvas as parent
         new_color_tuple = colorchooser.askcolor(parent=self.canvas, color=current_color, title="Choose Token Border Color")
-        
+
         if new_color_tuple and new_color_tuple[1]: # Check if a color was chosen
-            token["border_color"] = new_color_tuple[1]
+            for tgt in targets:
+                tgt["border_color"] = new_color_tuple[1]
             self._update_canvas_images() # Redraw to show new border color
             self._persist_tokens()       # Save changes
     def _toggle_shape_fill(self, shape):
-        shape["is_filled"] = not shape.get("is_filled", True)
+        targets = self._resolve_operation_targets(shape, item_types={"rectangle", "oval"}) or [shape]
+        new_state = not shape.get("is_filled", True)
+        for tgt in targets:
+            tgt["is_filled"] = new_state
         self._update_canvas_images(); self._persist_tokens()
 
     def _copy_item(self, item_to_copy=None):
@@ -1575,7 +1836,7 @@ class DisplayMapController:
                            'max_hp_entry_widget', 'max_hp_entry_widget_id',
                            'entry_widget', 'description_popup', 'description_label',
                            'handle_widget', 'handle_canvas_id', 'entry_canvas_id',
-                           'border_canvas_id',
+                           'border_canvas_id', 'selection_indicator_id',
                            'description_editor', 'hover_popup', 'hover_label',
                            'hover_bbox', 'hover_visible']:
             self.clipboard_token.pop(key_to_pop, None)
@@ -1669,15 +1930,52 @@ class DisplayMapController:
 
 
     def _delete_item(self, item_to_delete):
-        if not item_to_delete: return
+        if not item_to_delete:
+            return
+        if isinstance(item_to_delete, (list, tuple, set)):
+            targets = [itm for itm in item_to_delete if itm in self.tokens]
+        else:
+            if len(self._selected_items) > 1 and item_to_delete in self._selected_items:
+                targets = self._resolve_operation_targets(item_to_delete, item_types=None)
+            else:
+                targets = [item_to_delete] if item_to_delete in self.tokens else []
+        if not targets:
+            return
+        for target in targets:
+            self._delete_single_item(target)
+        remaining = [item for item in self._selected_items if item not in targets]
+        self._set_selected_items(remaining)
+        self._persist_tokens()
+        self._update_canvas_images()
+        try:
+            if getattr(self, 'fs_canvas', None) and self.fs_canvas.winfo_exists():
+                self._update_fullscreen_map()
+            if getattr(self, '_web_server_thread', None):
+                self._update_web_display_map()
+        except tk.TclError:
+            pass
+
+    def _delete_single_item(self, item_to_delete):
+        if not item_to_delete:
+            return
+        if item_to_delete.get("selection_indicator_id"):
+            try:
+                self.canvas.delete(item_to_delete["selection_indicator_id"])
+            except tk.TclError:
+                pass
+            item_to_delete["selection_indicator_id"] = None
         if item_to_delete.get("canvas_ids"):
             for cid in item_to_delete["canvas_ids"]:
-                if cid: self.canvas.delete(cid)
-        if item_to_delete.get("type", "token") == "token":
-            if item_to_delete.get("name_id"): self.canvas.delete(item_to_delete["name_id"])
+                if cid:
+                    self.canvas.delete(cid)
+        item_type = item_to_delete.get("type", "token")
+        if item_type == "token":
+            if item_to_delete.get("name_id"):
+                self.canvas.delete(item_to_delete["name_id"])
             if item_to_delete.get("hp_canvas_ids"):
                 for hp_cid in item_to_delete["hp_canvas_ids"]:
-                    if hp_cid: self.canvas.delete(hp_cid)
+                    if hp_cid:
+                        self.canvas.delete(hp_cid)
             popup = item_to_delete.get("hover_popup")
             if popup and popup.winfo_exists():
                 popup.destroy()
@@ -1685,7 +1983,7 @@ class DisplayMapController:
             item_to_delete["hover_label"] = None
             item_to_delete["hover_visible"] = False
             item_to_delete.pop("hover_bbox", None)
-        elif item_to_delete.get("type") == "marker":
+        elif item_type == "marker":
             entry_widget = item_to_delete.get("entry_widget")
             if entry_widget and entry_widget.winfo_exists():
                 entry_widget.destroy()
@@ -1707,7 +2005,7 @@ class DisplayMapController:
                             self.fs_canvas.delete(fs_id)
                         except tk.TclError:
                             pass
-                del item_to_delete["fs_canvas_ids"]
+                item_to_delete.pop("fs_canvas_ids", None)
             if item_to_delete.get("fs_cross_ids"):
                 for fs_id in item_to_delete["fs_cross_ids"]:
                     if fs_id:
@@ -1715,63 +2013,70 @@ class DisplayMapController:
                             self.fs_canvas.delete(fs_id)
                         except tk.TclError:
                             pass
-                del item_to_delete["fs_cross_ids"]
-        if item_to_delete in self.tokens: self.tokens.remove(item_to_delete)
-        if self.selected_token is item_to_delete: self.selected_token = None
+                item_to_delete.pop("fs_cross_ids", None)
+        if item_to_delete in self.tokens:
+            self.tokens.remove(item_to_delete)
         if getattr(self, "_hovered_marker", None) is item_to_delete:
             self._hovered_marker = None
-        self._persist_tokens(); self._update_canvas_images()
-        try:
-            if getattr(self, 'fs_canvas', None) and self.fs_canvas.winfo_exists():
-                self._update_fullscreen_map()
-            if getattr(self, '_web_server_thread', None):
-                self._update_web_display_map()
-        except tk.TclError:
-            pass
 
     def _bring_item_to_front(self, item):
-        if item in self.tokens:
-            self.tokens.remove(item); self.tokens.append(item)
-            if item.get('canvas_ids'):
-                for cid_lift in item['canvas_ids']:
-                    if cid_lift: self.canvas.lift(cid_lift)
-            if item.get("type", "token") == "token":
-                if item.get('name_id'): self.canvas.lift(item['name_id'])
-                if item.get('hp_canvas_ids'):
-                    for hp_cid_lift in item['hp_canvas_ids']:
-                        if hp_cid_lift: self.canvas.lift(hp_cid_lift)
-            elif item.get("type") == "marker":
-                popup = item.get("description_popup")
+        targets = self._resolve_operation_targets(item, item_types=None) or ([item] if item else [])
+        any_changed = False
+        for target in targets:
+            if target not in self.tokens:
+                continue
+            self.tokens.remove(target)
+            self.tokens.append(target)
+            if target.get('canvas_ids'):
+                for cid_lift in target['canvas_ids']:
+                    if cid_lift:
+                        self.canvas.lift(cid_lift)
+            if target.get("type", "token") == "token":
+                if target.get('name_id'):
+                    self.canvas.lift(target['name_id'])
+                if target.get('hp_canvas_ids'):
+                    for hp_cid_lift in target['hp_canvas_ids']:
+                        if hp_cid_lift:
+                            self.canvas.lift(hp_cid_lift)
+            elif target.get("type") == "marker":
+                popup = target.get("description_popup")
                 if popup and popup.winfo_exists():
                     popup.lift()
-            self._update_canvas_images(); self._persist_tokens()
+            any_changed = True
+        if any_changed:
+            self._update_canvas_images()
+            self._persist_tokens()
 
     def _send_item_to_back(self, item):
-        if item in self.tokens:
-            item_description = f"{item.get('type')} - {item.get('entity_id', item.get('canvas_ids'))}"
+        targets = self._resolve_operation_targets(item, item_types=None) or ([item] if item else [])
+        any_changed = False
+        for target in targets:
+            if target not in self.tokens:
+                continue
+            item_description = f"{target.get('type')} - {target.get('entity_id', target.get('canvas_ids'))}"
             print(f"[DEBUG] _send_item_to_back: Sending item to back: {item_description}")
-            self.tokens.remove(item)
-            self.tokens.insert(0, item) # Move item to the beginning of the logical list
+            self.tokens.remove(target)
+            self.tokens.insert(0, target)
 
             canvas_ids_to_manage = []
-            if item.get('canvas_ids'):
-                canvas_ids_to_manage.extend(c_id for c_id in item['canvas_ids'] if c_id)
-            
-            if item.get("type", "token"): # Tokens have additional elements
-                if item.get('name_id'):
-                    canvas_ids_to_manage.append(item['name_id'])
-                if item.get('hp_canvas_ids'):
-                    canvas_ids_to_manage.extend(hp_id for hp_id in item['hp_canvas_ids'] if hp_id)
-                # Token hover popups are separate toplevel windows and managed outside the canvas stacking order.
-            # Marker popups are separate toplevel windows and are not managed via canvas stacking.
+            if target.get('canvas_ids'):
+                canvas_ids_to_manage.extend(c_id for c_id in target['canvas_ids'] if c_id)
+
+            if target.get("type", "token"):
+                if target.get('name_id'):
+                    canvas_ids_to_manage.append(target['name_id'])
+                if target.get('hp_canvas_ids'):
+                    canvas_ids_to_manage.extend(hp_id for hp_id in target['hp_canvas_ids'] if hp_id)
 
             for c_id in canvas_ids_to_manage:
                 if c_id:
-                    self.canvas.lower(c_id) # Send to absolute bottom first
-                    if self.base_id: # If map base image exists
-                        self.canvas.lift(c_id, self.base_id) # Then lift it just above the map base image
-            
-            self._update_canvas_images() # Redraw everything; other items will be drawn on top
+                    self.canvas.lower(c_id)
+                    if self.base_id:
+                        self.canvas.lift(c_id, self.base_id)
+            any_changed = True
+
+        if any_changed:
+            self._update_canvas_images()
             self._persist_tokens()
             
     def _on_max_hp_menu_click(self, event, token):

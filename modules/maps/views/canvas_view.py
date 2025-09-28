@@ -76,12 +76,15 @@ def _on_delete_key(self, event=None):
                 self._hovered_marker = None
             return "break"
 
-    if not self.selected_token: # selected_token now refers to the selected item
+    targets = []
+    resolver = getattr(self, "_resolve_operation_targets", None)
+    if callable(resolver):
+        targets = resolver(self.selected_token, item_types=None)
+    elif self.selected_token:
+        targets = [self.selected_token]
+    if not targets:
         return
-
-    item_to_delete = self.selected_token
-    self.selected_token = None # Clear selection before deleting
-    self._delete_item(item_to_delete) # Use the generic delete method
+    self._delete_item(targets) # Use the generic delete method
 
 def on_paint2(self, event):
     """Paint or erase fog using a square brush of size self.brush_size,
