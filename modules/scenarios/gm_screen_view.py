@@ -30,6 +30,7 @@ log_module_import(__name__)
 
 PORTRAIT_FOLDER = os.path.join(ConfigHelper.get_campaign_dir(), "assets", "portraits")
 MAX_PORTRAIT_SIZE = (64, 64)  # Thumbnail size for lists
+DEFAULT_MAP_THUMBNAIL_SIZE = (200, 140)
 
 @log_methods
 class GMScreenView(ctk.CTkFrame):
@@ -78,6 +79,12 @@ class GMScreenView(ctk.CTkFrame):
             "Informations": GenericModelWrapper("informations"),
             "Objects": GenericModelWrapper("Objects")
         }
+
+        # Dedicated map store for thumbnails and quick lookup
+        self.map_wrapper = GenericModelWrapper("maps")
+        self._map_records = self._load_map_records()
+        self._map_thumbnail_cache = {}
+        self._map_thumbnail_size = DEFAULT_MAP_THUMBNAIL_SIZE
 
         self.templates = {
             "Scenarios": load_entity_template("scenarios"),
@@ -184,6 +191,103 @@ class GMScreenView(ctk.CTkFrame):
         # Apply either the caller-specified layout or the scenario default
         self.after(100, self._apply_initial_layout)
 
+
+    def _load_map_records(self):
+        try:
+            items = self.map_wrapper.load_items() if self.map_wrapper else []
+        except Exception as exc:
+            log_warning(
+                f"Unable to load maps: {exc}",
+                func_name="GMScreenView._load_map_records",
+            )
+            return {}
+
+        records = {}
+        for item in items or []:
+            name = str(item.get("Name") or "").strip()
+            if not name:
+                continue
+            records[name] = item
+        return records
+
+    def _get_map_record(self, map_name):
+        if not map_name:
+            return None
+        if map_name not in self._map_records:
+            self._map_records = self._load_map_records()
+        return self._map_records.get(map_name)
+
+    def get_map_thumbnail(self, map_name, size=None):
+        name = (map_name or "").strip()
+        if not name:
+            return None
+
+        if size is None:
+            size = self._map_thumbnail_size
+        size_tuple = tuple(size)
+        cache_key = (name, size_tuple)
+        cached = self._map_thumbnail_cache.get(cache_key)
+        if cached is not None:
+            return cached
+
+        record = self._get_map_record(name)
+        if not record:
+            return None
+
+        image_path = record.get("Image") or record.get("image")
+        if not image_path:
+            return None
+
+        if not os.path.isabs(image_path):
+            image_path = os.path.join(ConfigHelper.get_campaign_dir(), image_path)
+
+        if not os.path.exists(image_path):
+            log_warning(
+                f"Map image for '{name}' not found at {image_path}",
+                func_name="GMScreenView.get_map_thumbnail",
+            )
+            return None
+
+        try:
+            with Image.open(image_path) as img:
+                img = img.convert("RGBA")
+                target_w, target_h = size_tuple
+                ratio = min(target_w / img.width, target_h / img.height, 1.0)
+                new_size = (
+                    max(1, int(img.width * ratio)),
+                    max(1, int(img.height * ratio)),
+                )
+                resized = img.resize(new_size, Image.Resampling.LANCZOS)
+        except Exception as exc:
+            log_warning(
+                f"Failed to load thumbnail for map '{name}': {exc}",
+                func_name="GMScreenView.get_map_thumbnail",
+            )
+            return None
+
+        thumbnail = CTkImage(light_image=resized, dark_image=resized, size=new_size)
+        self._map_thumbnail_cache[cache_key] = thumbnail
+        return thumbnail
+
+    def open_map_tool(self, map_name):
+        target = (map_name or "").strip()
+        if not target:
+            return
+
+        host = self.winfo_toplevel()
+        if hasattr(host, "map_tool"):
+            try:
+                host.map_tool(target)
+            except Exception as exc:
+                log_warning(
+                    f"Failed to open map tool for '{target}': {exc}",
+                    func_name="GMScreenView.open_map_tool",
+                )
+        else:
+            log_warning(
+                "Top-level window does not expose a map_tool method.",
+                func_name="GMScreenView.open_map_tool",
+            )
 
     def _load_persisted_state(self):
         manager = getattr(self, "layout_manager", None)

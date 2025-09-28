@@ -601,10 +601,12 @@ def insert_list_longtext(parent, header, items, open_entity_callback=None, entit
         npc_names = _coerce_names(scene_dict.get("NPCs"))
         creature_names = _coerce_names(scene_dict.get("Creatures"))
         place_names = _coerce_names(scene_dict.get("Places"))
+        map_names = _coerce_names(scene_dict.get("Maps"))
         if entity_collector is not None:
             entity_collector.setdefault("NPCs", set()).update(npc_names)
             entity_collector.setdefault("Creatures", set()).update(creature_names)
             entity_collector.setdefault("Places", set()).update(place_names)
+            entity_collector.setdefault("Maps", set()).update(map_names)
         links = _coerce_links(scene_dict.get("Links"))
 
         outer = ctk.CTkFrame(parent, fg_color="transparent")
@@ -629,20 +631,87 @@ def insert_list_longtext(parent, header, items, open_entity_callback=None, entit
                 .pack(anchor="w")
             chips = ctk.CTkFrame(section, fg_color="transparent")
             chips.pack(fill="x", padx=10, pady=(2, 0))
+            allow_entity_open = callable(open_entity_callback) and label_text != "Maps"
             for name in names:
                 chip = ctk.CTkLabel(
                     chips,
                     text=name,
-                    text_color="#00BFFF" if callable(open_entity_callback) else "white",
-                    cursor="hand2" if callable(open_entity_callback) else "",
+                    text_color="#00BFFF" if allow_entity_open else "white",
+                    cursor="hand2" if allow_entity_open else "",
                 )
                 chip.pack(side="left", padx=4, pady=2)
-                if callable(open_entity_callback):
+                if allow_entity_open:
                     chip.bind("<Button-1>", lambda e, t=label_text, n=name: open_entity_callback(t, n))
 
         _make_entity_section(npc_names, "NPCs")
         _make_entity_section(creature_names, "Creatures")
         _make_entity_section(place_names, "Places")
+        
+        def _make_map_section(names):
+            if not names:
+                return
+            interactive = bool(gm_view_ref and hasattr(gm_view_ref, "open_map_tool"))
+            if not interactive:
+                _make_entity_section(names, "Maps")
+                return
+
+            section = ctk.CTkFrame(body, fg_color="transparent")
+            section.pack(fill="x", padx=12, pady=(0, 4))
+            ctk.CTkLabel(section, text="Maps:", font=("Arial", 13, "bold"))\
+                .pack(anchor="w")
+
+            gallery = ctk.CTkFrame(section, fg_color="transparent")
+            gallery.pack(fill="x", padx=10, pady=(2, 0))
+
+            has_thumbnail_provider = hasattr(gm_view_ref, "get_map_thumbnail")
+
+            for name in names:
+                display_name = name or "(Unnamed Map)"
+                tile = ctk.CTkFrame(gallery, fg_color="#2F2F2F", corner_radius=6)
+                tile.pack(side="left", padx=4, pady=4)
+                tile.configure(cursor="hand2")
+
+                thumbnail = None
+                if has_thumbnail_provider:
+                    try:
+                        thumbnail = gm_view_ref.get_map_thumbnail(name)
+                    except Exception:
+                        thumbnail = None
+
+                if thumbnail:
+                    img_label = CTkLabel(tile, image=thumbnail, text="")
+                    img_label.image = thumbnail
+                else:
+                    img_label = CTkLabel(
+                        tile,
+                        text="No Image",
+                        width=140,
+                        height=90,
+                        justify="center",
+                    )
+                img_label.pack(padx=6, pady=(6, 2))
+                img_label.configure(cursor="hand2")
+
+                name_label = CTkLabel(
+                    tile,
+                    text=display_name,
+                    wraplength=140,
+                    justify="center",
+                )
+                name_label.pack(padx=6, pady=(0, 6))
+                name_label.configure(cursor="hand2")
+
+                def _open_map(event, map_name=name):
+                    try:
+                        gm_view_ref.open_map_tool(map_name)
+                    except Exception:
+                        pass
+
+                tile.bind("<Button-1>", _open_map)
+                img_label.bind("<Button-1>", _open_map)
+                name_label.bind("<Button-1>", _open_map)
+
+        _make_map_section(map_names)
 
         if links:
             link_section = ctk.CTkFrame(body, fg_color="transparent")
@@ -803,7 +872,7 @@ def create_scenario_detail_frame(entity_type, scenario_item, master, open_entity
 
     # ——— BODY — prepare fields in the custom order ———
     tpl = load_template(entity_type.lower())
-    scene_entity_tracker = {"NPCs": set(), "Creatures": set(), "Places": set()}
+    scene_entity_tracker = {"NPCs": set(), "Creatures": set(), "Places": set(), "Maps": set()}
     # remove header fields
     body_fields = [
         f for f in tpl["fields"]
