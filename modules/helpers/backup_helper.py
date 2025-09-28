@@ -234,10 +234,47 @@ def create_backup_archive(
     return manifest
 
 
+def read_backup_manifest(archive_path: str | os.PathLike[str]) -> dict:
+    """Return the manifest stored inside ``archive_path``.
+
+    Raises :class:`ManifestError` when the manifest cannot be read or the
+    archive format is unsupported.
+    """
+
+    archive = Path(archive_path)
+    if not archive.exists():
+        raise BackupError(f"Backup archive not found: {archive}")
+
+    try:
+        with zipfile.ZipFile(archive, "r") as zf:
+            try:
+                manifest_data = json.loads(zf.read(BACKUP_MANIFEST_NAME))
+            except KeyError as exc:
+                raise ManifestError("Backup manifest missing from archive.") from exc
+            except json.JSONDecodeError as exc:
+                raise ManifestError("Backup manifest is corrupted.") from exc
+
+            if manifest_data.get("format_version") != BACKUP_FORMAT_VERSION:
+                raise ManifestError("Backup archive format is not supported.")
+    except ManifestError:
+        raise
+    except Exception as exc:  # pragma: no cover - defensive
+        log_exception(
+            f"Failed to read backup manifest: {exc}",
+            func_name="modules.helpers.backup_helper.read_backup_manifest",
+        )
+        raise BackupError(f"Failed to read backup manifest: {exc}") from exc
+
+    return manifest_data
+
+
 def restore_backup_archive(
     archive_path: str | os.PathLike[str],
     target_dir: Optional[str | os.PathLike[str]] = None,
     progress_callback: Optional[ProgressCallback] = None,
+    *,
+    campaign_name: Optional[str] = None,
+    database_filename: Optional[str] = None,
 ) -> dict:
     """Restore a campaign backup archive into ``target_dir`` and return the manifest."""
 
@@ -251,17 +288,15 @@ def restore_backup_archive(
 
     _call_progress(progress_callback, "Reading backup manifest...", 0.0)
 
+    original_db_name: Optional[str] = None
+
+    manifest_data = read_backup_manifest(archive)
+
     try:
         with zipfile.ZipFile(archive, "r") as zf:
-            try:
-                manifest_data = json.loads(zf.read(BACKUP_MANIFEST_NAME))
-            except KeyError as exc:
-                raise ManifestError("Backup manifest missing from archive.") from exc
-            except json.JSONDecodeError as exc:
-                raise ManifestError("Backup manifest is corrupted.") from exc
-
-            if manifest_data.get("format_version") != BACKUP_FORMAT_VERSION:
-                raise ManifestError("Backup archive format is not supported.")
+            original_db_path = manifest_data.get("database_path")
+            if isinstance(original_db_path, str) and original_db_path:
+                original_db_name = Path(original_db_path).name
 
             members = [
                 name for name in zf.namelist()
@@ -305,6 +340,39 @@ def restore_backup_archive(
 
     manifest_data["archive_path"] = str(archive)
     manifest_data["restored_to"] = str(destination)
+
+    if campaign_name:
+        manifest_data["campaign_name"] = campaign_name
+
+    if database_filename:
+        new_db_path = destination / database_filename
+        if original_db_name:
+            original_db_path = destination / original_db_name
+            if original_db_path.exists() and original_db_path != new_db_path:
+                try:
+                    if new_db_path.exists():
+                        new_db_path.unlink()
+                    original_db_path.rename(new_db_path)
+                except PermissionError as exc:
+                    raise PermissionError(
+                        f"Unable to rename restored database file: {exc}"
+                    ) from exc
+                except Exception as exc:
+                    log_exception(
+                        f"Failed to rename restored database file: {exc}",
+                        func_name="modules.helpers.backup_helper.restore_backup_archive",
+                    )
+                    raise BackupError(
+                        f"Failed to rename restored database file: {exc}"
+                    ) from exc
+
+            for entry in manifest_data.get("files", []):
+                if isinstance(entry, dict) and entry.get("path") == original_db_name:
+                    entry["path"] = database_filename
+
+        manifest_data["database_path"] = str(new_db_path)
+
+    manifest_data["campaign_directory"] = str(destination)
     log_info(
         f"Restored backup archive {archive} into {destination}",
         func_name="modules.helpers.backup_helper.restore_backup_archive",
