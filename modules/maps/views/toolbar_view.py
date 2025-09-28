@@ -171,7 +171,7 @@ def _build_toolbar(self):
     tool_label.pack(side="left", padx=(20,2), pady=8)
     self.drawing_tool_menu = ctk.CTkOptionMenu(
         toolbar,
-        values=["Selection", "Token", "Rectangle", "Oval"],
+        values=["Token", "Rectangle", "Oval"],
         command=self._on_drawing_tool_change, # To be created in DisplayMapController
         width=dropdown_width,
     )
