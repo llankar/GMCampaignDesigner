@@ -188,9 +188,9 @@ class SoundManagerWindow(ctk.CTkToplevel):
         ).grid(row=0, column=4, sticky="ew", padx=(6, 0))
         playback_frame = ctk.CTkFrame(tracks_frame)
         playback_frame.grid(row=3, column=0, columnspan=2, sticky="ew", padx=8, pady=(0, 8))
-        for idx in range(6):
+        for idx in range(7):
             playback_frame.grid_columnconfigure(idx, weight=0)
-        playback_frame.grid_columnconfigure(6, weight=1)
+        playback_frame.grid_columnconfigure(7, weight=1)
 
         prev_btn = ctk.CTkButton(
             playback_frame,
@@ -248,6 +248,20 @@ class SoundManagerWindow(ctk.CTkToplevel):
             command=lambda s=section: self._toggle_loop(s),
         )
         loop_cb.grid(row=0, column=5, padx=6, pady=(6, 6))
+
+        continue_initial = bool(
+            controller_state.get("continue")
+            if controller_state
+            else self.library.get_setting(section, "continue", True)
+        )
+        continue_var = tk.BooleanVar(value=continue_initial)
+        continue_cb = ctk.CTkCheckBox(
+            playback_frame,
+            text="Continue",
+            variable=continue_var,
+            command=lambda s=section: self._toggle_continue(s),
+        )
+        continue_cb.grid(row=0, column=6, padx=6, pady=(6, 6))
 
         volume_frame = ctk.CTkFrame(tracks_frame)
         volume_frame.grid(row=4, column=0, columnspan=2, sticky="ew", padx=8, pady=(0, 8))
@@ -314,6 +328,7 @@ class SoundManagerWindow(ctk.CTkToplevel):
             "now_playing_var": now_playing_var,
             "shuffle_var": shuffle_var,
             "loop_var": loop_var,
+            "continue_var": continue_var,
             "volume_slider": volume_slider,
             "volume_value_var": volume_value_var,
             "track_items": [],
@@ -384,6 +399,8 @@ class SoundManagerWindow(ctk.CTkToplevel):
             state["shuffle_var"].set(bool(payload.get("value")))
         elif event == "loop_changed":
             state["loop_var"].set(bool(payload.get("value")))
+        elif event == "continue_changed":
+            state["continue_var"].set(bool(payload.get("value")))
         elif event == "state_changed":
             data = payload.get("state")
             if isinstance(data, dict):
@@ -410,6 +427,8 @@ class SoundManagerWindow(ctk.CTkToplevel):
             state["shuffle_var"].set(bool(data.get("shuffle")))
         if "loop" in data:
             state["loop_var"].set(bool(data.get("loop")))
+        if "continue" in data:
+            state["continue_var"].set(bool(data.get("continue")))
 
         category = data.get("category")
         if isinstance(category, str) and category:
@@ -977,6 +996,12 @@ class SoundManagerWindow(ctk.CTkToplevel):
         value = bool(state["loop_var"].get())
         self.controller.set_loop(section, value)
         self._set_status(section, f"Loop {'enabled' if value else 'disabled'}.")
+
+    def _toggle_continue(self, section: str) -> None:
+        state = self._get_state(section)
+        value = bool(state["continue_var"].get())
+        self.controller.set_continue(section, value)
+        self._set_status(section, f"Continue {'enabled' if value else 'disabled'}.")
 
     def _on_volume_change(self, section: str, value: float) -> None:
         state = self._get_state(section)

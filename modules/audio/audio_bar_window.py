@@ -47,6 +47,7 @@ class AudioBarWindow(ctk.CTkToplevel):
         self.status_var = tk.StringVar(value="Status: Idle")
         self.shuffle_var = tk.BooleanVar(value=False)
         self.loop_var = tk.BooleanVar(value=False)
+        self.continue_var = tk.BooleanVar(value=True)
         self.volume_value_var = tk.StringVar(value="0%")
 
         self._bar_frame: Optional[ctk.CTkFrame] = None
@@ -95,8 +96,8 @@ class AudioBarWindow(ctk.CTkToplevel):
         content.grid_columnconfigure(1, weight=1)
         content.grid_columnconfigure(2, weight=1)
         content.grid_columnconfigure(3, weight=2)
-        content.grid_columnconfigure(12, weight=3)
-        content.grid_columnconfigure(14, weight=2)
+        content.grid_columnconfigure(13, weight=3)
+        content.grid_columnconfigure(15, weight=2)
         self._content_frame = content
 
         self.section_toggle_button = ctk.CTkButton(
@@ -174,8 +175,16 @@ class AudioBarWindow(ctk.CTkToplevel):
         )
         self.loop_checkbox.grid(row=0, column=10, padx=6, pady=4, sticky="w")
 
+        self.continue_checkbox = ctk.CTkCheckBox(
+            content,
+            text="Continue",
+            variable=self.continue_var,
+            command=self._on_continue_toggle,
+        )
+        self.continue_checkbox.grid(row=0, column=11, padx=6, pady=4, sticky="w")
+
         volume_label = ctk.CTkLabel(content, text="Volume")
-        volume_label.grid(row=0, column=11, padx=(12, 4), pady=4, sticky="e")
+        volume_label.grid(row=0, column=12, padx=(12, 4), pady=4, sticky="e")
 
         self.volume_slider = ctk.CTkSlider(
             content,
@@ -183,13 +192,13 @@ class AudioBarWindow(ctk.CTkToplevel):
             to=100,
             command=self._on_volume_changed,
         )
-        self.volume_slider.grid(row=0, column=12, padx=4, pady=4, sticky="ew")
+        self.volume_slider.grid(row=0, column=13, padx=4, pady=4, sticky="ew")
 
         self.volume_value_label = ctk.CTkLabel(content, textvariable=self.volume_value_var, width=60)
-        self.volume_value_label.grid(row=0, column=13, padx=(4, 12), pady=4, sticky="e")
+        self.volume_value_label.grid(row=0, column=14, padx=(4, 12), pady=4, sticky="e")
 
         self.status_label = ctk.CTkLabel(content, textvariable=self.status_var, anchor="w")
-        self.status_label.grid(row=0, column=14, padx=(8, 4), pady=4, sticky="ew")
+        self.status_label.grid(row=0, column=15, padx=(8, 4), pady=4, sticky="ew")
 
         self._building_ui = False
         self._update_collapse_button()
@@ -271,6 +280,8 @@ class AudioBarWindow(ctk.CTkToplevel):
             self.shuffle_var.set(bool(payload.get("value")))
         elif event == "loop_changed":
             self.loop_var.set(bool(payload.get("value")))
+        elif event == "continue_changed":
+            self.continue_var.set(bool(payload.get("value")))
         elif event == "error":
             message = payload.get("message") or "Playback failed."
             self.status_var.set(f"Error: {message}")
@@ -476,6 +487,10 @@ class AudioBarWindow(ctk.CTkToplevel):
         value = bool(self.loop_var.get())
         self.controller.set_loop(self._active_section, value)
 
+    def _on_continue_toggle(self) -> None:
+        value = bool(self.continue_var.get())
+        self.controller.set_continue(self._active_section, value)
+
     def _on_volume_changed(self, value: float) -> None:
         normalized = max(0.0, min(float(value) / 100.0, 1.0))
         self.volume_value_var.set(f"{int(normalized * 100)}%")
@@ -526,6 +541,7 @@ class AudioBarWindow(ctk.CTkToplevel):
 
         self.shuffle_var.set(bool((state or {}).get("shuffle", False)))
         self.loop_var.set(bool((state or {}).get("loop", False)))
+        self.continue_var.set(bool((state or {}).get("continue", True)))
         self._apply_volume((state or {}).get("volume", 0.0))
         self._update_status_from_state(section)
         self._update_button_states(state or {})

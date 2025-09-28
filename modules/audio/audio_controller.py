@@ -39,6 +39,7 @@ class AudioController:
             player.set_volume(initial_state["volume"])
             player.set_shuffle(initial_state["shuffle"])
             player.set_loop(initial_state["loop"])
+            player.set_continue(initial_state["continue"])
             self._restore_last_playlist(section)
 
     # ------------------------------------------------------------------
@@ -140,6 +141,11 @@ class AudioController:
         player.set_loop(bool(enabled))
         self.library.set_setting(section, "loop", bool(enabled))
 
+    def set_continue(self, section: str, enabled: bool) -> None:
+        player = self._get_player(section)
+        player.set_continue(bool(enabled))
+        self.library.set_setting(section, "continue", bool(enabled))
+
     def set_volume(self, section: str, value: float) -> None:
         player = self._get_player(section)
         normalized = max(0.0, min(float(value), 1.0))
@@ -163,10 +169,12 @@ class AudioController:
         volume = float(self.library.get_setting(section, "volume", 0.8) or 0.0)
         shuffle = bool(self.library.get_setting(section, "shuffle", False))
         loop = bool(self.library.get_setting(section, "loop", False))
+        continue_playback = bool(self.library.get_setting(section, "continue", True))
         return {
             "volume": max(0.0, min(volume, 1.0)),
             "shuffle": shuffle,
             "loop": loop,
+            "continue": continue_playback,
             "is_playing": False,
             "current_track": None,
             "last_track": None,
@@ -255,6 +263,8 @@ class AudioController:
                 state["shuffle"] = bool(payload.get("value", state.get("shuffle", False)))
             elif event == "loop_changed":
                 state["loop"] = bool(payload.get("value", state.get("loop", False)))
+            elif event == "continue_changed":
+                state["continue"] = bool(payload.get("value", state.get("continue", True)))
             elif event == "error":
                 state["last_error"] = str(payload.get("message", ""))
                 state["is_playing"] = False
