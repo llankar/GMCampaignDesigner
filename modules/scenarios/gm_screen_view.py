@@ -48,6 +48,9 @@ class GMScreenView(ctk.CTkFrame):
         self._note_cache = ""
         self.note_widget = None
         self._context_menu = None
+        self._state_loaded = False
+
+        self._load_persisted_state()
 
         # Load your detach and reattach icon files (adjust file paths and sizes as needed)
         self.detach_icon = CTkImage(light_image=Image.open("assets/detach_icon.png"),
@@ -153,7 +156,7 @@ class GMScreenView(ctk.CTkFrame):
         self.content_area = ctk.CTkScrollableFrame(self)
         self.content_area.pack(fill="both", expand=True)
         self._initialize_context_menu()
-    
+
         # Example usage: create the first tab from the scenario_item
         scenario_name = scenario_item.get("Title", "Unnamed Scenario")
         frame = create_entity_detail_frame("Scenarios", scenario_item, master=self.content_area, open_entity_callback=self.open_entity_tab)
@@ -173,8 +176,37 @@ class GMScreenView(ctk.CTkFrame):
 
         # Apply either the caller-specified layout or the scenario default
         self.after(100, self._apply_initial_layout)
-        
-    
+
+
+    def _load_persisted_state(self):
+        manager = getattr(self, "layout_manager", None)
+        if manager is None:
+            self._state_loaded = True
+            return
+        state = manager.get_scenario_state(self.scenario_name) or {}
+        scenes = state.get("scenes") or {}
+        if isinstance(scenes, dict):
+            for key, value in scenes.items():
+                self._scene_completion_state[key] = bool(value)
+        notes = state.get("notes")
+        if isinstance(notes, str):
+            self._note_cache = notes
+        self._state_loaded = True
+
+    def _persist_scene_state(self):
+        if not self._state_loaded:
+            return
+        manager = getattr(self, "layout_manager", None)
+        if manager is None:
+            return
+        scenes = {key: bool(val) for key, val in self._scene_completion_state.items()}
+        manager.update_scenario_state(
+            self.scenario_name,
+            scenes=scenes,
+            notes=self._note_cache,
+        )
+
+
     def open_global_search(self, event=None):
         # Create popup
         popup = ctk.CTkToplevel(self)
@@ -403,6 +435,7 @@ class GMScreenView(ctk.CTkFrame):
             return
         var = var_tuple[0]
         self._scene_completion_state[scene_key] = bool(var.get())
+        self._persist_scene_state()
 
     def get_scene_completion(self, scene_key):
         return self._scene_completion_state.get(scene_key, False)
@@ -415,6 +448,7 @@ class GMScreenView(ctk.CTkFrame):
         var = var_tuple[0]
         if bool(var.get()) == bool(value):
             self._scene_completion_state[scene_key] = bool(value)
+            self._persist_scene_state()
             return
         var.set(bool(value))
         self._scene_completion_state[scene_key] = bool(value)
@@ -449,6 +483,7 @@ class GMScreenView(ctk.CTkFrame):
     def _update_note_cache(self, event=None):
         if self.note_widget:
             self._note_cache = self.note_widget.get("1.0", "end-1c")
+            self._persist_scene_state()
 
     def register_note_widget(self, widget):
         self.note_widget = widget
