@@ -165,7 +165,7 @@ class AudioBarWindow(ctk.CTkToplevel):
             variable=self.shuffle_var,
             command=self._on_shuffle_toggle,
         )
-        self.shuffle_checkbox.grid(row=0, column=9, padx=6, pady=4, sticky="w")
+        self.shuffle_checkbox.grid(row=0, column=9, padx=(2, 0), pady=4, sticky="w")
 
         self.loop_checkbox = ctk.CTkCheckBox(
             content,
@@ -173,7 +173,7 @@ class AudioBarWindow(ctk.CTkToplevel):
             variable=self.loop_var,
             command=self._on_loop_toggle,
         )
-        self.loop_checkbox.grid(row=0, column=10, padx=6, pady=4, sticky="w")
+        self.loop_checkbox.grid(row=0, column=10, padx=(2, 0), pady=4, sticky="w")
 
         self.continue_checkbox = ctk.CTkCheckBox(
             content,
@@ -181,7 +181,7 @@ class AudioBarWindow(ctk.CTkToplevel):
             variable=self.continue_var,
             command=self._on_continue_toggle,
         )
-        self.continue_checkbox.grid(row=0, column=11, padx=6, pady=4, sticky="w")
+        self.continue_checkbox.grid(row=0, column=11, padx=(2, 4), pady=4, sticky="w")
 
         volume_label = ctk.CTkLabel(content, text="Volume")
         volume_label.grid(row=0, column=12, padx=(12, 4), pady=4, sticky="e")
