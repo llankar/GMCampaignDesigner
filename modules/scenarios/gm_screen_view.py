@@ -2,7 +2,7 @@ import customtkinter as ctk
 import tkinter as tk
 import os
 import json
-from tkinter import filedialog, messagebox
+from tkinter import filedialog, messagebox, simpledialog
 from PIL import Image
 from functools import partial
 from modules.generic.generic_model_wrapper import GenericModelWrapper
@@ -23,6 +23,7 @@ from modules.helpers.logging_helper import (
     log_warning,
     log_module_import,
 )
+from modules.scenarios.gm_layout_manager import GMScreenLayoutManager
 
 log_module_import(__name__)
 
@@ -31,11 +32,14 @@ MAX_PORTRAIT_SIZE = (64, 64)  # Thumbnail size for lists
 
 @log_methods
 class GMScreenView(ctk.CTkFrame):
-    def __init__(self, master, scenario_item, *args, **kwargs):
+    def __init__(self, master, scenario_item, *args, initial_layout=None, layout_manager=None, **kwargs):
         super().__init__(master, *args, **kwargs)
         # Persistent cache for portrait images
         self.portrait_images = {}
         self.scenario = scenario_item
+        self.scenario_name = scenario_item.get("Title") or scenario_item.get("Name") or "Scenario"
+        self.layout_manager = layout_manager or GMScreenLayoutManager()
+        self._pending_initial_layout = initial_layout
 
         # Load your detach and reattach icon files (adjust file paths and sizes as needed)
         self.detach_icon = CTkImage(light_image=Image.open("assets/detach_icon.png"),
@@ -72,6 +76,7 @@ class GMScreenView(ctk.CTkFrame):
         self.current_tab = None
         self.tab_order = []                  # ← new: keeps track of left-to-right order
         self.dragging = None                 # ← new: holds (tab_name, start_x)
+        self.current_layout_name = None
 
         # A container to hold both the scrollable tab area and the plus button
         self.tab_bar_container = ctk.CTkFrame(self, height=60)
@@ -118,6 +123,24 @@ class GMScreenView(ctk.CTkFrame):
         self.add_button.pack(side="left", padx=2, pady=5)
         self.random_button.pack(side="left", padx=2, pady=5)
 
+        # Layout control bar for persistence actions
+        self.layout_toolbar = ctk.CTkFrame(self)
+        self.layout_toolbar.pack(fill="x", padx=10, pady=(0, 5))
+        self.save_layout_button = ctk.CTkButton(
+            self.layout_toolbar,
+            text="Save Layout",
+            command=self._prompt_save_layout,
+        )
+        self.save_layout_button.pack(side="left", padx=(0, 5), pady=5)
+        self.load_layout_button = ctk.CTkButton(
+            self.layout_toolbar,
+            text="Load Layout",
+            command=self._open_load_layout_dialog,
+        )
+        self.load_layout_button.pack(side="left", pady=5)
+        self.layout_status_label = ctk.CTkLabel(self.layout_toolbar, text="")
+        self.layout_status_label.pack(side="right", pady=5)
+
         # Main content area for scenario details
         self.content_area = ctk.CTkScrollableFrame(self)
         self.content_area.pack(fill="both", expand=True)
@@ -131,8 +154,16 @@ class GMScreenView(ctk.CTkFrame):
         self.add_tab(
             scenario_name,
             frame,
-            content_factory=lambda master: create_entity_detail_frame("Scenarios", scenario_item, master=master, open_entity_callback=self.open_entity_tab)
+            content_factory=lambda master: create_entity_detail_frame("Scenarios", scenario_item, master=master, open_entity_callback=self.open_entity_tab),
+            layout_meta={
+                "kind": "entity",
+                "entity_type": "Scenarios",
+                "entity_name": scenario_name,
+            },
         )
+
+        # Apply either the caller-specified layout or the scenario default
+        self.after(100, self._apply_initial_layout)
         
     
     def open_global_search(self, event=None):
@@ -250,7 +281,7 @@ class GMScreenView(ctk.CTkFrame):
                     continue
         return {"fields": fields}
 
-    def add_tab(self, name, content_frame, content_factory=None):
+    def add_tab(self, name, content_frame, content_factory=None, layout_meta=None):
         log_info(f"Adding GM screen tab: {name}", func_name="GMScreenView.add_tab")
         tab_frame = ctk.CTkFrame(self.tab_bar)
         tab_frame.pack(side="left", padx=2, pady=5)
@@ -277,7 +308,8 @@ class GMScreenView(ctk.CTkFrame):
             "detached": False,
             "window": None,
             "portrait_label": portrait_label,
-            "factory": content_factory
+            "factory": content_factory,
+            "meta": layout_meta or {},
         }
 
         content_frame.pack_forget()
@@ -299,6 +331,252 @@ class GMScreenView(ctk.CTkFrame):
             w.bind("<ButtonRelease-1>", lambda e, n=name: self._on_tab_release(e, n))
 
         self.reposition_add_button()
+
+    def _apply_initial_layout(self):
+        layout_name = self._pending_initial_layout
+        if not layout_name:
+            layout_name = self.layout_manager.get_scenario_default(self.scenario_name)
+        if not layout_name:
+            return
+        self.load_layout(layout_name, silent=True)
+
+    def _update_layout_status(self, name=None):
+        self.current_layout_name = name
+        if name:
+            self.layout_status_label.configure(text=f"Layout: {name}")
+        else:
+            self.layout_status_label.configure(text="")
+
+    # ------------------------------------------------------------------
+    # Layout persistence helpers
+    # ------------------------------------------------------------------
+    def _serialize_current_layout(self):
+        layout_tabs = []
+        for tab_name in self.tab_order:
+            tab_info = self.tabs.get(tab_name)
+            if not tab_info:
+                continue
+            meta = dict(tab_info.get("meta") or {})
+            meta["title"] = tab_name
+            if meta.get("kind") == "note":
+                frame = tab_info.get("content_frame")
+                if frame is not None and hasattr(frame, "text_box"):
+                    meta["text"] = frame.text_box.get("1.0", "end-1c")
+            layout_tabs.append(meta)
+        return {
+            "scenario": self.scenario_name,
+            "tabs": layout_tabs,
+            "active": self.current_tab,
+        }
+
+    def _prompt_save_layout(self):
+        layout_name = simpledialog.askstring("Save Layout", "Layout name:", parent=self)
+        if not layout_name:
+            return
+        data = self._serialize_current_layout()
+        if not data["tabs"]:
+            messagebox.showwarning("Empty Layout", "There are no tabs to save yet.")
+            return
+        self.layout_manager.save_layout(layout_name, data)
+        if messagebox.askyesno(
+            "Set Default?",
+            f"Use '{layout_name}' whenever '{self.scenario_name}' is opened?",
+        ):
+            self.layout_manager.set_scenario_default(self.scenario_name, layout_name)
+        messagebox.showinfo("Layout Saved", f"Layout '{layout_name}' saved successfully.")
+        self._update_layout_status(layout_name)
+
+    def _open_load_layout_dialog(self):
+        layouts = self.layout_manager.list_layouts()
+        if not layouts:
+            messagebox.showinfo("No Layouts", "No saved GM screen layouts were found.")
+            return
+
+        dialog = ctk.CTkToplevel(self)
+        dialog.title("Load Layout")
+        dialog.geometry("320x360")
+        dialog.transient(self.winfo_toplevel())
+        dialog.grab_set()
+
+        ctk.CTkLabel(dialog, text="Select a layout to load:").pack(fill="x", padx=10, pady=(10, 5))
+        listbox = tk.Listbox(dialog, activestyle="none")
+        listbox.pack(fill="both", expand=True, padx=10, pady=(0, 5))
+        for name in layouts:
+            listbox.insert("end", name)
+        listbox.selection_set(0)
+
+        set_default_var = tk.BooleanVar(dialog, value=False)
+        chk = ctk.CTkCheckBox(dialog, text="Set as default for this scenario", variable=set_default_var)
+        chk.pack(fill="x", padx=10, pady=5)
+
+        button_bar = ctk.CTkFrame(dialog)
+        button_bar.pack(fill="x", padx=10, pady=(0, 10))
+
+        def _do_load():
+            selection = listbox.curselection()
+            if not selection:
+                return
+            chosen = listbox.get(selection[0])
+            dialog.grab_release()
+            dialog.destroy()
+            self.load_layout(chosen, set_default=set_default_var.get())
+
+        load_btn = ctk.CTkButton(button_bar, text="Load", command=_do_load)
+        load_btn.pack(side="right")
+        cancel_btn = ctk.CTkButton(button_bar, text="Cancel", command=lambda: dialog.destroy())
+        cancel_btn.pack(side="right", padx=(0, 5))
+
+        listbox.bind("<Double-Button-1>", lambda _e: _do_load())
+        dialog.bind("<Return>", lambda _e: _do_load())
+
+    def _clear_all_tabs(self):
+        for name, tab in list(self.tabs.items()):
+            if tab.get("detached") and tab.get("window") is not None:
+                try:
+                    tab["window"].destroy()
+                except Exception:
+                    pass
+            tab_frame = tab.get("button_frame")
+            if tab_frame is not None and tab_frame.winfo_exists():
+                tab_frame.destroy()
+            content = tab.get("content_frame")
+            if content is not None and content.winfo_exists():
+                content.destroy()
+        self.tabs.clear()
+        self.tab_order.clear()
+        self.current_tab = None
+        self.reposition_add_button()
+        self._update_layout_status(None)
+
+    def _restore_tab_from_config(self, tab_def):
+        kind = tab_def.get("kind")
+        title = tab_def.get("title")
+        if kind == "entity":
+            entity_type = tab_def.get("entity_type")
+            entity_name = tab_def.get("entity_name") or title
+            if not entity_type or not entity_name:
+                raise ValueError("Missing entity information")
+            self._open_entity_from_layout(entity_type, entity_name)
+        elif kind == "note":
+            text = tab_def.get("text", "")
+            name = title or f"Note {len(self.tabs) + 1}"
+            self.add_tab(
+                name,
+                self.create_note_frame(initial_text=text),
+                content_factory=lambda master, initial_text=text: self.create_note_frame(master=master, initial_text=initial_text),
+                layout_meta={"kind": "note"},
+            )
+        elif kind == "npc_graph":
+            self.add_tab(
+                title or "NPC Graph",
+                self.create_npc_graph_frame(),
+                content_factory=lambda master: self.create_npc_graph_frame(master),
+                layout_meta={"kind": "npc_graph"},
+            )
+        elif kind == "pc_graph":
+            self.add_tab(
+                title or "PC Graph",
+                self.create_pc_graph_frame(),
+                content_factory=lambda master: self.create_pc_graph_frame(master),
+                layout_meta={"kind": "pc_graph"},
+            )
+        elif kind == "scenario_graph":
+            self.add_tab(
+                title or "Scenario Graph Editor",
+                self.create_scenario_graph_frame(),
+                content_factory=lambda master: self.create_scenario_graph_frame(master),
+                layout_meta={"kind": "scenario_graph"},
+            )
+        else:
+            raise ValueError(f"Unsupported tab kind '{kind}'")
+
+    def load_layout(self, layout_name, set_default=False, silent=False):
+        layout = self.layout_manager.get_layout(layout_name)
+        if not layout:
+            if not silent:
+                messagebox.showwarning("Layout Missing", f"Layout '{layout_name}' was not found.")
+            return
+
+        tabs = layout.get("tabs", [])
+        if not tabs:
+            if not silent:
+                messagebox.showwarning("Empty Layout", f"Layout '{layout_name}' has no tabs saved.")
+            return
+
+        self._clear_all_tabs()
+
+        errors = []
+        for tab_def in tabs:
+            try:
+                self._restore_tab_from_config(tab_def)
+            except Exception as exc:
+                errors.append(f"{tab_def.get('title', 'Unknown')}: {exc}")
+
+        if not self.tabs:
+            scenario_name = self.scenario.get("Title") or self.scenario.get("Name") or "Scenario"
+            frame = create_entity_detail_frame(
+                "Scenarios",
+                self.scenario,
+                master=self.content_area,
+                open_entity_callback=self.open_entity_tab,
+            )
+            self.add_tab(
+                scenario_name,
+                frame,
+                content_factory=lambda master: create_entity_detail_frame(
+                    "Scenarios",
+                    self.scenario,
+                    master=master,
+                    open_entity_callback=self.open_entity_tab,
+                ),
+                layout_meta={
+                    "kind": "entity",
+                    "entity_type": "Scenarios",
+                    "entity_name": scenario_name,
+                },
+            )
+
+        active_name = layout.get("active")
+        if active_name and active_name in self.tabs:
+            self.show_tab(active_name)
+        elif self.tab_order:
+            self.show_tab(self.tab_order[0])
+
+        if set_default:
+            self.layout_manager.set_scenario_default(self.scenario_name, layout_name)
+        elif layout.get("scenario") == self.scenario_name and layout_name == self.layout_manager.get_scenario_default(self.scenario_name):
+            pass
+
+        if self.tabs:
+            status_name = layout_name if not errors else f"{layout_name} (partial)"
+            self._update_layout_status(status_name)
+
+        if errors and not silent:
+            messagebox.showwarning(
+                "Layout Issues",
+                "Some tabs could not be restored:\n" + "\n".join(errors),
+            )
+
+    def _open_entity_from_layout(self, entity_type, entity_name):
+        if entity_type == "Scenarios" and (self.scenario.get("Title") == entity_name or self.scenario.get("Name") == entity_name):
+            frame = create_entity_detail_frame(
+                "Scenarios",
+                self.scenario,
+                master=self.content_area,
+                open_entity_callback=self.open_entity_tab,
+            )
+            self.add_tab(
+                entity_name,
+                frame,
+                content_factory=lambda master: create_entity_detail_frame("Scenarios", self.scenario, master=master, open_entity_callback=self.open_entity_tab),
+                layout_meta={
+                    "kind": "entity",
+                    "entity_type": "Scenarios",
+                    "entity_name": entity_name,
+                },
+            )
+            return
+        self.open_entity_tab(entity_type, entity_name)
 
     def _on_tab_press(self, event, name):
         # 1) Make sure winfo_x/y are up-to-date
@@ -637,22 +915,26 @@ class GMScreenView(ctk.CTkFrame):
             self.add_tab(
                 f"Note {len(self.tabs) + 1}",
                 self.create_note_frame(),
-                content_factory=lambda master, initial_text="": self.create_note_frame(master=master, initial_text=initial_text)
+                content_factory=lambda master, initial_text="": self.create_note_frame(master=master, initial_text=initial_text),
+                layout_meta={"kind": "note"},
             )
             return
         elif entity_type == "NPC Graph":
             self.add_tab("NPC Graph", self.create_npc_graph_frame(),
-                        content_factory=lambda master: self.create_npc_graph_frame(master))
-            
+                        content_factory=lambda master: self.create_npc_graph_frame(master),
+                        layout_meta={"kind": "npc_graph"})
+
             return
         elif entity_type == "PC Graph":
             self.add_tab("PC Graph", self.create_pc_graph_frame(),
-                        content_factory=lambda master: self.create_pc_graph_frame(master))
-            
+                        content_factory=lambda master: self.create_pc_graph_frame(master),
+                        layout_meta={"kind": "pc_graph"})
+
             return
         elif entity_type == "Scenario Graph Editor":
             self.add_tab("Scenario Graph Editor", self.create_scenario_graph_frame(),
-                        content_factory=lambda master: self.create_scenario_graph_frame(master))
+                        content_factory=lambda master: self.create_scenario_graph_frame(master),
+                        layout_meta={"kind": "scenario_graph"})
             return
 
         model_wrapper = self.wrappers[entity_type]
@@ -697,7 +979,12 @@ class GMScreenView(ctk.CTkFrame):
         self.add_tab(
             name,
             frame,
-            content_factory=lambda master: create_entity_detail_frame(entity_type, item, master=master, open_entity_callback=self.open_entity_tab)
+            content_factory=lambda master: create_entity_detail_frame(entity_type, item, master=master, open_entity_callback=self.open_entity_tab),
+            layout_meta={
+                "kind": "entity",
+                "entity_type": entity_type,
+                "entity_name": name,
+            },
         )
 
     def create_scenario_graph_frame(self, master=None):

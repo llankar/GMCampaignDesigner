@@ -54,6 +54,7 @@ from modules.ui.portrait_importer import PortraitImporter
 from modules.generic.generic_list_view import GenericListView
 from modules.generic.generic_model_wrapper import GenericModelWrapper
 from modules.scenarios.gm_screen_view import GMScreenView
+from modules.scenarios.gm_layout_manager import GMScreenLayoutManager
 from modules.npcs.npc_graph_editor import NPCGraphEditor
 from modules.pcs.pc_graph_editor import PCGraphEditor
 from modules.scenarios.scenario_graph_editor import ScenarioGraphEditor
@@ -807,6 +808,13 @@ class MainWindow(ctk.CTk):
             messagebox.showwarning("No Scenarios", "No scenarios available.")
             return
 
+        layout_manager = GMScreenLayoutManager()
+        layout_map = layout_manager.list_layouts()
+        default_label = "Use Scenario Default"
+        layout_options = [default_label]
+        layout_options.extend(sorted(layout_map.keys()))
+        selected_layout_var = tk.StringVar(value=default_label)
+
         # 3) Ensure the PC‐banner is shown and up to date
         if getattr(self, 'banner_frame', None) and self.banner_frame.winfo_exists():
             if not self.banner_frame.winfo_ismapped():
@@ -825,6 +833,12 @@ class MainWindow(ctk.CTk):
             w.destroy()
         parent = self.inner_content_frame
 
+        layout_bar = ctk.CTkFrame(parent)
+        layout_bar.pack(fill="x", padx=10, pady=(5, 0))
+        ctk.CTkLabel(layout_bar, text="Layout when opening scenario:").pack(side="left", padx=(0, 10), pady=5)
+        layout_menu = ctk.CTkOptionMenu(layout_bar, variable=selected_layout_var, values=layout_options)
+        layout_menu.pack(side="left", pady=5)
+
         # 5) Callback to open a selected scenario in detail
         def on_scenario_select(entity_type, entity_name):
             selected = next(
@@ -840,7 +854,14 @@ class MainWindow(ctk.CTk):
                 w.destroy()
             detail_container = ctk.CTkFrame(parent)
             detail_container.grid(row=0, column=0, sticky="nsew")
-            view = GMScreenView(detail_container, scenario_item=selected)
+            chosen_layout = selected_layout_var.get()
+            initial_layout = None if chosen_layout == default_label else chosen_layout
+            view = GMScreenView(
+                detail_container,
+                scenario_item=selected,
+                initial_layout=initial_layout,
+                layout_manager=layout_manager,
+            )
             view.pack(fill="both", expand=True)
             # track the active GM-screen view for our Ctrl+F handler
             self.current_gm_view = view
