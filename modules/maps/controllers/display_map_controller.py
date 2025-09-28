@@ -1583,13 +1583,28 @@ class DisplayMapController:
     def _paste_item(self, event=None):
         if not self.clipboard_token: return
 
-        # Determine paste position (center of canvas for now, or mouse if event is available)
-        # This could be refined to paste near mouse cursor if event is passed from a keybind
+        # Determine paste position, prefer the pointer location when available
+        vcx, vcy = 100, 100  # Default fallback if canvas not ready (should not happen)
         if self.canvas:
+            # Start with the canvas center as the fallback position
             vcx = (self.canvas.winfo_width() // 2 - self.pan_x) / self.zoom
             vcy = (self.canvas.winfo_height() // 2 - self.pan_y) / self.zoom
-        else: # Fallback if canvas not ready (should not happen in normal flow)
-            vcx, vcy = 100, 100 
+
+            try:
+                pointer_x = self.canvas.winfo_pointerx() - self.canvas.winfo_rootx()
+                pointer_y = self.canvas.winfo_pointery() - self.canvas.winfo_rooty()
+            except tk.TclError:
+                pointer_x = pointer_y = None
+
+            if (
+                pointer_x is not None
+                and pointer_y is not None
+                and 0 <= pointer_x <= self.canvas.winfo_width()
+                and 0 <= pointer_y <= self.canvas.winfo_height()
+            ):
+                zoom = self.zoom if self.zoom else 1.0
+                vcx = (pointer_x - self.pan_x) / zoom
+                vcy = (pointer_y - self.pan_y) / zoom
 
         new_item_data = self.clipboard_token.copy() # Start with a copy of clipboard
         new_item_data["position"] = (vcx, vcy) # Set new position

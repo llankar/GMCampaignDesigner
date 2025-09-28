@@ -14,8 +14,8 @@ def _build_canvas(self):
     root = self.parent.winfo_toplevel()
     root.bind_all("<Control-c>", lambda event: self._copy_item()) # Use generic item copy
     root.bind_all("<Control-C>", lambda event: self._copy_item()) # Case insensitive
-    root.bind_all("<Control-v>", lambda event: self._paste_item()) # Use generic item paste
-    root.bind_all("<Control-V>", lambda event: self._paste_item()) # Case insensitive
+    root.bind_all("<Control-v>", lambda event: self._paste_item(event)) # Use generic item paste
+    root.bind_all("<Control-V>", lambda event: self._paste_item(event)) # Case insensitive
     root.bind_all("<Delete>", self._on_delete_key) # Calls updated _on_delete_key
     
     # Undo fog
