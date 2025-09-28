@@ -393,6 +393,8 @@ class MainWindow(ctk.CTk):
             ("change_db", "Change Data Storage", self.change_database_storage),
             ("swarm_path", "Set SwarmUI Path", self.select_swarmui_path),
             ("customize_fields", "Customize Fields", self.open_custom_fields_editor),
+            ("create_backup", "Create Campaign Backup", self.prompt_campaign_backup),
+            ("restore_backup", "Restore Campaign Backup", self.prompt_campaign_restore),
         ]
         content = [
             ("manage_scenarios", "Manage Scenarios", lambda: self.open_entity("scenarios")),
@@ -421,8 +423,6 @@ class MainWindow(ctk.CTk):
             ("gm_screen", "Open GM Screen", self.open_gm_screen),
             ("export_scenarios", "Export Scenarios", self.preview_and_export_scenarios),
             ("export_foundry", "Export Scenarios for Foundry", self.export_foundry),
-            ("create_backup", "Create Campaign Backup", self.prompt_campaign_backup),
-            ("restore_backup", "Restore Campaign Backup", self.prompt_campaign_restore),
             ("generate_portraits", "Generate Portraits", self.generate_missing_portraits),
             ("associate_portraits", "Associate NPC Portraits", self.associate_npc_portraits),
             ("import_portraits", "Import Portraits from Folder", self.import_portraits_from_directory),
