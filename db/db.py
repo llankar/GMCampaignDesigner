@@ -1,12 +1,14 @@
 # db.py
 import sqlite3
 import os
-import json
 import re
 import platform
-from shutil import copyfile
 from modules.helpers.config_helper import ConfigHelper
-from modules.helpers.template_loader import load_template, list_known_entities
+from modules.helpers.template_loader import (
+    load_template,
+    list_known_entities,
+    sync_campaign_template,
+)
 import logging
 from modules.helpers.logging_helper import log_module_import
 
@@ -38,21 +40,21 @@ def load_schema_from_json(entity_name):
 
 
 def _ensure_campaign_templates():
-    """Seed campaign templates directory from defaults if missing."""
+    """Ensure campaign templates exist and are kept in sync with defaults."""
     db_path = ConfigHelper.get("Database", "path", fallback="default_campaign.db") or "default_campaign.db"
     camp_dir = os.path.abspath(os.path.dirname(db_path))
     tpl_dir = os.path.join(camp_dir, "templates")
-    if os.path.isdir(tpl_dir):
-        return
     try:
         os.makedirs(tpl_dir, exist_ok=True)
-        for e in list_known_entities():
-            src = os.path.join(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")), "modules", e, f"{e}_template.json")
-            dst = os.path.join(tpl_dir, f"{e}_template.json")
-            if os.path.isfile(src) and not os.path.exists(dst):
-                copyfile(src, dst)
     except Exception:
         pass
+
+    for entity in list_known_entities():
+        try:
+            sync_campaign_template(entity)
+        except Exception:
+            # Individual template sync issues should not block DB startup.
+            continue
 
 def get_connection():
     raw_db_path = ConfigHelper.get("Database", "path", fallback="default_campaign.db").strip()
