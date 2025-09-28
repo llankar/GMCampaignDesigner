@@ -1,5 +1,6 @@
 import os
 import json
+import copy
 from pathlib import Path
 from tkinter import colorchooser, messagebox
 import tkinter as tk
@@ -80,6 +81,11 @@ class DisplayMapController:
         self.pan_y       = 0
         self.selected_token  = None # Selected item (token or shape)
         self.selected_items  = []   # Track all selected items to prepare for multi-select workflows
+        self._drag_select_start = None
+        self._drag_select_rect_id = None
+        self._drag_select_active = False
+        self._pre_drag_selection = []
+        self._drag_select_modifiers = {"shift": False, "ctrl": False}
         self._selection_overlays = {}
         self._selection_icon_cache = {}
         self.clipboard_token = None # Copied item data (token or shape)
@@ -212,6 +218,145 @@ class DisplayMapController:
             self._remove_resize_handles()
 
         return self._update_selection_state(item, event)
+
+    def _start_drag_selection(self, event, existing_selection=None):
+        self._drag_select_start = (event.x, event.y)
+        self._drag_select_rect_id = None
+        self._drag_select_active = False
+        self._drag_select_modifiers = {
+            "shift": self._is_shift_pressed(event),
+            "ctrl": self._is_ctrl_pressed(event),
+        }
+        if existing_selection is None:
+            existing_selection = list(self.selected_items)
+        self._pre_drag_selection = list(existing_selection)
+
+    def _rectangles_overlap(self, a, b):
+        if not a or not b:
+            return False
+        ax1, ay1, ax2, ay2 = a
+        bx1, by1, bx2, by2 = b
+        return not (ax2 < bx1 or bx2 < ax1 or ay2 < by1 or by2 < ay1)
+
+    def _collect_items_in_rect(self, x1, y1, x2, y2):
+        if x1 > x2:
+            x1, x2 = x2, x1
+        if y1 > y2:
+            y1, y2 = y2, y1
+        rect = (x1, y1, x2, y2)
+        items = []
+        for item in self.tokens:
+            bbox = self._calculate_item_bbox(item)
+            if bbox and self._rectangles_overlap(rect, bbox):
+                items.append(item)
+        return items
+
+    def _merge_drag_selection(self, items_in_rect):
+        base = list(self._pre_drag_selection)
+        ctrl = self._drag_select_modifiers.get("ctrl")
+        shift = self._drag_select_modifiers.get("shift")
+
+        if ctrl:
+            selection = [
+                existing for existing in base
+                if not any(existing is candidate for candidate in items_in_rect)
+            ]
+            for candidate in items_in_rect:
+                if not any(existing is candidate for existing in selection):
+                    selection.append(candidate)
+            return selection
+
+        if shift:
+            selection = list(base)
+            for candidate in items_in_rect:
+                if not any(existing is candidate for existing in selection):
+                    selection.append(candidate)
+            return selection
+
+        return list(items_in_rect)
+
+    def _update_drag_selection(self, event):
+        if not self._drag_select_start or not getattr(self, "canvas", None):
+            return
+
+        start_x, start_y = self._drag_select_start
+        dx = event.x - start_x
+        dy = event.y - start_y
+
+        if not self._drag_select_active:
+            if abs(dx) < 4 and abs(dy) < 4:
+                return
+            self._drag_select_active = True
+            try:
+                self._drag_select_rect_id = self.canvas.create_rectangle(
+                    start_x,
+                    start_y,
+                    event.x,
+                    event.y,
+                    outline="#4DA6FF",
+                    dash=(4, 2),
+                    width=1,
+                    fill="",
+                    tags=("drag_selection",),
+                )
+            except tk.TclError:
+                self._drag_select_rect_id = None
+
+        if not self._drag_select_active:
+            return
+
+        x1, y1 = min(start_x, event.x), min(start_y, event.y)
+        x2, y2 = max(start_x, event.x), max(start_y, event.y)
+
+        if self._drag_select_rect_id:
+            try:
+                self.canvas.coords(self._drag_select_rect_id, x1, y1, x2, y2)
+            except tk.TclError:
+                pass
+
+        items_in_rect = self._collect_items_in_rect(x1, y1, x2, y2)
+        selection = self._merge_drag_selection(items_in_rect)
+        self._set_selection(selection)
+
+    def _cleanup_drag_selection(self):
+        if self._drag_select_rect_id and getattr(self, "canvas", None):
+            try:
+                self.canvas.delete(self._drag_select_rect_id)
+            except tk.TclError:
+                pass
+        self._drag_select_rect_id = None
+        self._drag_select_start = None
+        self._drag_select_active = False
+        self._pre_drag_selection = []
+        self._drag_select_modifiers = {"shift": False, "ctrl": False}
+
+    def _finalize_drag_selection(self, event):
+        if not self._drag_select_start:
+            return False
+
+        handled = self._drag_select_active
+        if self._drag_select_active:
+            start_x, start_y = self._drag_select_start
+            end_x, end_y = event.x, event.y
+            items_in_rect = self._collect_items_in_rect(start_x, start_y, end_x, end_y)
+            selection = self._merge_drag_selection(items_in_rect)
+            self._set_selection(selection)
+        else:
+            if self._drag_select_modifiers.get("ctrl") or self._drag_select_modifiers.get("shift"):
+                self._set_selection(self._pre_drag_selection)
+            else:
+                self._clear_selection()
+
+        self._cleanup_drag_selection()
+        return handled
+
+    def _get_item_category(self, item):
+        if not isinstance(item, dict):
+            return None
+        item_type = item.get("type")
+        if item_type in ("rectangle", "oval"):
+            return "shape"
+        return item_type
 
     def _ensure_selection_for_context_menu(self, item):
         if not item:
@@ -597,28 +742,61 @@ class DisplayMapController:
         self._hide_all_marker_descriptions()
         self._hide_all_token_hovers()
 
-    def _show_marker_menu(self, event, marker):
-        self._hovered_marker = marker
+    def _show_marker_menu(self, event, markers):
+        valid_markers = [m for m in markers if isinstance(m, dict) and m.get("type") == "marker"]
+        if not valid_markers:
+            return
+
+        if len(valid_markers) == 1:
+            self._hovered_marker = valid_markers[0]
+        else:
+            self._hovered_marker = None
+
         menu = tk.Menu(self.canvas, tearoff=0)
-        menu.add_command(label="Edit Description", command=lambda m=marker: self._open_marker_description_editor(m))
-        menu.add_command(label="Change Border Color", command=lambda m=marker: self._change_marker_border_color(m))
+
+        if len(valid_markers) == 1:
+            menu.add_command(
+                label="Edit Description",
+                command=lambda: self._open_marker_description_editor(valid_markers[0]),
+            )
+
+        plural = "s" if len(valid_markers) != 1 else ""
+        menu.add_command(
+            label=f"Change Border Color{plural}",
+            command=lambda: self._change_markers_border_color(valid_markers),
+        )
         menu.add_separator()
-        menu.add_command(label="Delete Marker", command=lambda m=marker: self._delete_item(m))
+        menu.add_command(
+            label=f"Delete Marker{plural}",
+            command=lambda: self._delete_items(valid_markers),
+        )
+
         menu.tk_popup(event.x_root, event.y_root)
         try:
             menu.grab_release()
         except tk.TclError:
             pass
 
+    def _change_markers_border_color(self, markers):
+        valid_markers = [m for m in markers if isinstance(m, dict) and m.get("type") == "marker"]
+        if not valid_markers:
+            return
+        current_color = valid_markers[0].get("border_color", "#00ff00")
+        result = colorchooser.askcolor(
+            parent=self.canvas,
+            color=current_color,
+            title="Choose Marker Border Color",
+        )
+        if result and result[1]:
+            for marker in valid_markers:
+                marker["border_color"] = result[1]
+            self._update_canvas_images()
+            self._persist_tokens()
+
     def _change_marker_border_color(self, marker):
         if not marker:
             return
-        current_color = marker.get("border_color", "#00ff00")
-        result = colorchooser.askcolor(parent=self.canvas, color=current_color, title="Choose Marker Border Color")
-        if result and result[1]:
-            marker["border_color"] = result[1]
-            self._update_canvas_images()
-            self._persist_tokens()
+        self._change_markers_border_color([marker])
 
     def _edit_marker_description(self, marker):
         self._open_marker_description_editor(marker)
@@ -982,18 +1160,34 @@ class DisplayMapController:
     
     # _bind_token is now _bind_item_events
 
-    def _on_token_right_click(self, event, token):
-        print(f"Token right click on: {token.get('entity_id', 'Unknown Token')}")
-        if not self._ensure_selection_for_context_menu(token):
+    def _on_token_right_click(self, event, tokens, clicked_token):
+        valid_tokens = [t for t in tokens if isinstance(t, dict) and t.get("type") == "token"]
+        if not valid_tokens:
             return
-        if token.get("type") == "token" and "hp_canvas_ids" in token and token["hp_canvas_ids"]: # Ensure it's a token
-            hp_cid, _ = token["hp_canvas_ids"]
+
+        primary = clicked_token if clicked_token in valid_tokens else valid_tokens[0]
+        if (
+            len(valid_tokens) == 1
+            and primary.get("type") == "token"
+            and "hp_canvas_ids" in primary
+            and primary["hp_canvas_ids"]
+        ):
+            hp_cid, _ = primary["hp_canvas_ids"]
             if hp_cid:
-                x1, y1, x2, y2 = self.canvas.coords(hp_cid)
-                pad = 4
-                if x1 - pad <= event.x <= x2 + pad and y1 - pad <= event.y <= y2 + pad:
-                    return self._on_max_hp_menu_click(event, token)
-        return self._show_token_menu(event, token) # Fallback for token specific menu
+                try:
+                    x1, y1, x2, y2 = self.canvas.coords(hp_cid)
+                except tk.TclError:
+                    x1 = y1 = x2 = y2 = None
+                else:
+                    pad = 4
+                    if (
+                        x1 is not None
+                        and x1 - pad <= event.x <= x2 + pad
+                        and y1 - pad <= event.y <= y2 + pad
+                    ):
+                        return self._on_max_hp_menu_click(event, primary)
+
+        return self._show_token_menu(event, valid_tokens)
     
     def _on_token_double_click(self, event, token):
         print(f"Token double click on: {token.get('entity_id', 'Unknown Token')}")
@@ -1206,8 +1400,7 @@ class DisplayMapController:
             if self._graphical_edit_mode_item: # If graphical edit was active, deactivate it
                 self._remove_resize_handles()
                 self._graphical_edit_mode_item = None
-            if self.selected_items or self.selected_token:
-                self._clear_selection()
+            existing_selection = list(self.selected_items)
 
             if self.drawing_mode in ["rectangle", "oval"]: # Create new shape if in drawing mode
                 # Create new shape - This block needs to be indented
@@ -1220,6 +1413,8 @@ class DisplayMapController:
                 }
                 self.tokens.append(new_shape); self._update_canvas_images(); self._persist_tokens()
                 return # New shape created, done with this click.
+            if self.fog_mode not in ("add", "rem"):
+                self._start_drag_selection(event, existing_selection=existing_selection)
         # The following elif was part of a previous attempt and seems to be a leftover,
         # as item click handling is done by _on_item_press.
         # Removing it to simplify and avoid potential conflicts.
@@ -1235,9 +1430,12 @@ class DisplayMapController:
         if self._marker_after_id and self._marker_start:
             dx = event.x - self._marker_start[0]; dy = event.y - self._marker_start[1]
             if abs(dx) > 5 or abs(dy) > 5: self.canvas.after_cancel(self._marker_after_id); self._marker_after_id = None
+        if self._drag_select_start:
+            self._update_drag_selection(event)
         self.on_paint(event)
 
     def _on_mouse_up(self, event):
+        self._finalize_drag_selection(event)
         if self._marker_after_id: self.canvas.after_cancel(self._marker_after_id); self._marker_after_id = None
         if self._marker_anim_after_id:
             try:
@@ -1612,147 +1810,276 @@ class DisplayMapController:
     def _on_item_right_click(self, event, item):
         if not self._ensure_selection_for_context_menu(item):
             return
-        item_type = item.get("type", "token")
-        if item_type == "token": return self._on_token_right_click(event, item)
-        elif item_type in ["rectangle", "oval"]: self._show_shape_menu(event, item)
-        elif item_type == "marker": self._show_marker_menu(event, item)
+        selection = list(self.selected_items) or ([])
+        if not selection and self.selected_token:
+            selection = [self.selected_token]
+        if not selection:
+            selection = [item]
 
-    def _show_shape_menu(self, event, shape):
+        categories = {self._get_item_category(entry) for entry in selection if self._get_item_category(entry)}
+        if not categories or len(categories) != 1:
+            return
+
+        category = categories.pop()
+        if category == "token":
+            tokens = [entry for entry in selection if self._get_item_category(entry) == "token"]
+            return self._on_token_right_click(event, tokens, item)
+        if category == "shape":
+            shapes = [entry for entry in selection if self._get_item_category(entry) == "shape"]
+            return self._show_shape_menu(event, shapes)
+        if category == "marker":
+            markers = [entry for entry in selection if self._get_item_category(entry) == "marker"]
+            return self._show_marker_menu(event, markers)
+
+    def _show_shape_menu(self, event, shapes):
+        valid_shapes = [s for s in shapes if isinstance(s, dict) and s.get("type") in ("rectangle", "oval")]
+        if not valid_shapes:
+            return
+
+        count = len(valid_shapes)
+        plural = "s" if count != 1 else ""
         menu = tk.Menu(self.canvas, tearoff=0)
-        menu.add_command(label="Edit Shape Graphically", command=lambda s=shape: self._activate_graphical_resize(s))
-        menu.add_command(label="Edit Color", command=lambda s=shape: self._edit_shape_color_dialog(s))
-        menu.add_command(label="Edit Dimensions (Numeric)", command=lambda s=shape: self._resize_shape_dialog(s)) # Keep numeric input as separate option
-        menu.add_command(label="Toggle Fill", command=lambda s=shape: self._toggle_shape_fill(s))
+
+        if count == 1:
+            menu.add_command(
+                label="Edit Shape Graphically",
+                command=lambda: self._activate_graphical_resize(valid_shapes[0]),
+            )
+
+        menu.add_command(
+            label=f"Edit Color{plural}",
+            command=lambda: self._edit_shapes_color(valid_shapes),
+        )
+        menu.add_command(
+            label=f"Edit Dimensions (Numeric)",
+            command=lambda: self._resize_shapes_dialog(valid_shapes),
+        )
+        menu.add_command(
+            label=f"Toggle Fill{plural}",
+            command=lambda: self._toggle_shapes_fill(valid_shapes),
+        )
         menu.add_separator()
-        menu.add_command(label="Copy Shape", command=lambda s=shape: self._copy_item(s))
-        menu.add_command(label="Delete Shape", command=lambda s=shape: self._delete_item(s))
+        menu.add_command(
+            label=f"Copy Shape{plural}", command=lambda: self._copy_item(valid_shapes)
+        )
+        menu.add_command(
+            label=f"Delete Shape{plural}", command=lambda: self._delete_items(valid_shapes)
+        )
         menu.add_separator()
-        menu.add_command(label="Bring to Front", command=lambda s=shape: self._bring_item_to_front(s))
-        menu.add_command(label="Send to Back", command=lambda s=shape: self._send_item_to_back(s))
+        menu.add_command(
+            label="Bring to Front", command=lambda: self._bring_items_to_front(valid_shapes)
+        )
+        menu.add_command(
+            label="Send to Back", command=lambda: self._send_items_to_back(valid_shapes)
+        )
+
         menu.tk_popup(event.x_root, event.y_root)
 
+    def _edit_shapes_color(self, shapes):
+        valid_shapes = [s for s in shapes if isinstance(s, dict) and s.get("type") in ("rectangle", "oval")]
+        if not valid_shapes:
+            return
+
+        reference = valid_shapes[0]
+        current_fill = reference.get("fill_color", self.current_shape_fill_color)
+        fill_res = colorchooser.askcolor(
+            parent=self.canvas,
+            color=current_fill,
+            title="Choose Shape Fill Color",
+        )
+
+        current_border = reference.get("border_color", self.current_shape_border_color)
+        border_res = colorchooser.askcolor(
+            parent=self.canvas,
+            color=current_border,
+            title="Choose Shape Border Color",
+        )
+
+        if fill_res and fill_res[1]:
+            for shape in valid_shapes:
+                shape["fill_color"] = fill_res[1]
+
+        if border_res and border_res[1]:
+            for shape in valid_shapes:
+                shape["border_color"] = border_res[1]
+
+        if (fill_res and fill_res[1]) or (border_res and border_res[1]):
+            self._update_canvas_images()
+            self._persist_tokens()
+
+    def _resize_shapes_dialog(self, shapes):
+        valid_shapes = [s for s in shapes if isinstance(s, dict) and s.get("type") in ("rectangle", "oval")]
+        if not valid_shapes:
+            return
+
+        reference = valid_shapes[0]
+        width = reference.get("width", DEFAULT_SHAPE_WIDTH)
+        height = reference.get("height", DEFAULT_SHAPE_HEIGHT)
+
+        new_width = tk.simpledialog.askinteger(
+            "Resize Shape",
+            "New Width (pixels):",
+            parent=self.canvas,
+            initialvalue=width,
+            minvalue=1,
+        )
+        if new_width is None:
+            return
+
+        new_height = tk.simpledialog.askinteger(
+            "Resize Shape",
+            "New Height (pixels):",
+            parent=self.canvas,
+            initialvalue=height,
+            minvalue=1,
+        )
+        if new_height is None:
+            return
+
+        for shape in valid_shapes:
+            shape["width"] = new_width
+            shape["height"] = new_height
+
+        self._update_canvas_images()
+        self._persist_tokens()
+
+    def _toggle_shapes_fill(self, shapes):
+        valid_shapes = [s for s in shapes if isinstance(s, dict) and s.get("type") in ("rectangle", "oval")]
+        if not valid_shapes:
+            return
+        for shape in valid_shapes:
+            shape["is_filled"] = not shape.get("is_filled", True)
+        self._update_canvas_images()
+        self._persist_tokens()
+
     def _edit_shape_color_dialog(self, shape):
-        current_fill = shape.get("fill_color", self.current_shape_fill_color)
-        # Pass self.canvas (or a relevant toplevel) as parent to colorchooser
-        fill_res = colorchooser.askcolor(parent=self.canvas, color=current_fill, title="Choose Shape Fill Color")
-        if fill_res and fill_res[1]: shape["fill_color"] = fill_res[1]
-        
-        current_border = shape.get("border_color", self.current_shape_border_color)
-        border_res = colorchooser.askcolor(parent=self.canvas, color=current_border, title="Choose Shape Border Color")
-        if border_res and border_res[1]: shape["border_color"] = border_res[1]
-        
-        self._update_canvas_images(); self._persist_tokens()
+        self._edit_shapes_color([shape])
 
     def _resize_shape_dialog(self, shape):
-        # Pass self.canvas as parent to simpledialog
-        new_width = tk.simpledialog.askinteger("Resize Shape", "New Width (pixels):", parent=self.canvas, initialvalue=shape.get("width", DEFAULT_SHAPE_WIDTH), minvalue=1)
-        if new_width is None: return # User cancelled
-        new_height = tk.simpledialog.askinteger("Resize Shape", "New Height (pixels):", parent=self.canvas, initialvalue=shape.get("height", DEFAULT_SHAPE_HEIGHT), minvalue=1)
-        if new_height is None: return # User cancelled
-        shape["width"] = new_width; shape["height"] = new_height
-        self._update_canvas_images(); self._persist_tokens()
+        self._resize_shapes_dialog([shape])
 
     # _adjust_shape_size_relative method is removed as per request.
 
-    def _resize_token_dialog(self, token):
-        """
-        Opens a dialog to resize the given token.
-        """
-        if not token or token.get("type") != "token":
-            # Consider logging this or showing a user-facing error
-            print("Error: Valid token not provided for resizing.")
+    def _resize_tokens(self, tokens):
+        valid_tokens = [t for t in tokens if isinstance(t, dict) and t.get("type") == "token"]
+        if not valid_tokens:
             return
 
-        current_size = token.get("size", self.token_size)
-        
+        reference = valid_tokens[0]
+        current_size = reference.get("size", self.token_size)
+
         try:
-            # Ensure simpledialog is available; it's part of standard tkinter
             import tkinter.simpledialog as simpledialog
             new_size = simpledialog.askinteger(
                 "Resize Token",
                 "New Size (pixels):",
-                parent=self.canvas, # Associate dialog with the canvas/main window
+                parent=self.canvas,
                 initialvalue=current_size,
-                minvalue=8 # Define a reasonable minimum size
+                minvalue=8,
             )
-        except ImportError:
-            print("Error: tkinter.simpledialog not available for resizing token.")
-            # Potentially fall back to a CTk dialog or log error
-            return
-        except tk.TclError as e:
-            print(f"Error displaying resize token dialog: {e}")
+        except (ImportError, tk.TclError):
             return
 
+        if not new_size or new_size <= 0:
+            return
 
-        if new_size is not None and new_size > 0:
-            token["size"] = new_size
+        for token in valid_tokens:
+            self._apply_token_size(token, new_size)
 
-            source_img = token.get("source_image")
+        self._update_canvas_images()
+        self._persist_tokens()
 
-            # If the token's visual representation depends on a disk image,
-            # reuse the cached high-resolution copy when possible.
-            if "image_path" in token and token["image_path"]:
-                try:
-                    if source_img is None:
-                        source_img = Image.open(token["image_path"]).convert("RGBA")
-                    token["source_image"] = source_img
-                    token["pil_image"] = source_img.resize((new_size, new_size), Image.LANCZOS)
-                except FileNotFoundError:
-                    print(f"Error: Image file not found for token: {token['image_path']}")
-                except Exception as e:
-                    print(f"Error reloading image for resized token: {e}")
-            elif source_img is not None:
+    def _apply_token_size(self, token, new_size):
+        token["size"] = new_size
+        source_img = token.get("source_image")
+
+        if "image_path" in token and token["image_path"]:
+            try:
+                if source_img is None:
+                    source_img = Image.open(token["image_path"]).convert("RGBA")
+                token["source_image"] = source_img
                 token["pil_image"] = source_img.resize((new_size, new_size), Image.LANCZOS)
+            except FileNotFoundError:
+                print(f"Error: Image file not found for token: {token['image_path']}")
+            except Exception as exc:
+                print(f"Error reloading image for resized token: {exc}")
+        elif source_img is not None:
+            token["pil_image"] = source_img.resize((new_size, new_size), Image.LANCZOS)
 
-            self._update_canvas_images() # Redraw canvas to reflect new token size
-            self._persist_tokens()       # Save the changes
-        # else:
-            # User cancelled or entered invalid size, no action needed or log if desired
-            # print("Token resize cancelled or invalid size entered.")
-    def _show_token_menu(self, event, token):
-        """
-        Displays a context menu for the given token.
-        """
+    def _resize_token_dialog(self, token):
         if not token or token.get("type") != "token":
-            print("Error: Valid token not provided for menu.")
+            return
+        self._resize_tokens([token])
+    def _show_token_menu(self, event, tokens):
+        valid_tokens = [t for t in tokens if isinstance(t, dict) and t.get("type") == "token"]
+        if not valid_tokens:
             return
 
+        count = len(valid_tokens)
+        plural = "s" if count != 1 else ""
         menu = tk.Menu(self.canvas, tearoff=0)
-        
-        # Add commands relevant to tokens
-        # Example: Resize Token (using the method we just added/fixed)
-        menu.add_command(label="Resize Token", command=lambda t=token: self._resize_token_dialog(t))
-        
-        # Example: Change Border Color (assuming _change_token_border_color is or will be correctly handled)
-        # For now, let's assume it takes the token as an argument.
-        # If _change_token_border_color is an imported function that doesn't take `self`,
-        # it would be `_change_token_border_color(t)`
-        # If it's a method, it would be `self._change_token_border_color(t)`
-        # Based on line 12 and 685, it seems to be an imported function.
-        # However, a more typical OOP approach would be a method.
-        # For consistency with _resize_token_dialog, let's assume we'd want a method.
-        # If _change_token_border_color is indeed an external function,
-        # this lambda might need adjustment or _change_token_border_color needs to be wrapped.
-        # For now, let's add a placeholder or a call to a potential future method.
-        menu.add_command(label="Change Border Color", command=lambda t=token: self._prompt_change_token_border_color(t))
+
+        menu.add_command(
+            label=f"Resize Token{plural}",
+            command=lambda: self._resize_tokens(valid_tokens),
+        )
+        menu.add_command(
+            label=f"Change Border Color{plural}",
+            command=lambda: self._prompt_change_token_border_color(valid_tokens),
+        )
 
         menu.add_separator()
-        menu.add_command(label="Copy Token", command=lambda t=token: self._copy_item(t))
-        menu.add_command(label="Delete Token", command=lambda t=token: self._delete_item(t))
+        menu.add_command(
+            label=f"Copy Token{plural}",
+            command=lambda: self._copy_item(valid_tokens),
+        )
+        menu.add_command(
+            label=f"Delete Token{plural}",
+            command=lambda: self._delete_items(valid_tokens),
+        )
         menu.add_separator()
-        menu.add_command(label="Bring to Front", command=lambda t=token: self._bring_item_to_front(t))
-        menu.add_command(label="Send to Back", command=lambda t=token: self._send_item_to_back(t))
-        menu.add_command(label="Show Portrait", command=lambda t=token: show_portrait(t["image_path"], t.get("entity_type")))
-        audio_value = self._get_token_audio_value(token)
-        if audio_value:
+        menu.add_command(
+            label=f"Bring to Front", command=lambda: self._bring_items_to_front(valid_tokens)
+        )
+        menu.add_command(
+            label=f"Send to Back", command=lambda: self._send_items_to_back(valid_tokens)
+        )
+
+        if count == 1 and valid_tokens[0].get("image_path"):
+            menu.add_command(
+                label="Show Portrait",
+                command=lambda: show_portrait(
+                    valid_tokens[0]["image_path"], valid_tokens[0].get("entity_type")
+                ),
+            )
+        elif count > 1:
+            menu.add_command(
+                label="Show Portraits",
+                command=lambda: self._show_portraits_for_tokens(valid_tokens),
+            )
+
+        audio_tokens = [t for t in valid_tokens if self._get_token_audio_value(t)]
+        if audio_tokens:
             menu.add_separator()
-            menu.add_command(label="Play Audio", command=lambda t=token: self._play_token_audio(t))
+            menu.add_command(
+                label="Play Audio", command=lambda: self._play_audio_for_tokens(audio_tokens)
+            )
             menu.add_command(label="Stop Audio", command=stop_entity_audio)
-        # Display the menu
+
         try:
             menu.tk_popup(event.x_root, event.y_root)
         except tk.TclError as e:
             print(f"Error displaying token menu: {e}")
+
+    def _show_portraits_for_tokens(self, tokens):
+        for token in tokens:
+            path = token.get("image_path")
+            if path:
+                show_portrait(path, token.get("entity_type"))
+
+    def _play_audio_for_tokens(self, tokens):
+        for token in tokens:
+            self._play_token_audio(token)
 
     def _get_token_audio_value(self, token):
         value = get_entity_audio_value(token.get("entity_record"))
@@ -1782,47 +2109,138 @@ class DisplayMapController:
         if not play_entity_audio(audio_value, entity_label=str(name)):
             messagebox.showwarning("Audio", f"Unable to play audio for {name}.")
 
-    def _prompt_change_token_border_color(self, token):
-        """
-        Prompts the user for a new border color for the token.
-        """
-        if not token or token.get("type") != "token":
+    def _prompt_change_token_border_color(self, tokens):
+        valid_tokens = [t for t in tokens if isinstance(t, dict) and t.get("type") == "token"]
+        if not valid_tokens:
             return
-        
-        current_color = token.get("border_color", "#0000FF") # Default blue
-        # Pass self.canvas as parent
-        new_color_tuple = colorchooser.askcolor(parent=self.canvas, color=current_color, title="Choose Token Border Color")
-        
-        if new_color_tuple and new_color_tuple[1]: # Check if a color was chosen
-            token["border_color"] = new_color_tuple[1]
-            self._update_canvas_images() # Redraw to show new border color
-            self._persist_tokens()       # Save changes
+
+        current_color = valid_tokens[0].get("border_color", "#0000FF")
+        new_color_tuple = colorchooser.askcolor(
+            parent=self.canvas,
+            color=current_color,
+            title="Choose Token Border Color",
+        )
+
+        if not new_color_tuple or not new_color_tuple[1]:
+            return
+
+        new_color = new_color_tuple[1]
+        for token in valid_tokens:
+            token["border_color"] = new_color
+
+        self._update_canvas_images()
+        self._persist_tokens()
     def _toggle_shape_fill(self, shape):
-        shape["is_filled"] = not shape.get("is_filled", True)
-        self._update_canvas_images(); self._persist_tokens()
+        self._toggle_shapes_fill([shape])
+
+    def _delete_items(self, items):
+        for item in list(items):
+            self._delete_item(item)
+
+    def _bring_items_to_front(self, items):
+        for item in items:
+            self._bring_item_to_front(item)
+
+    def _send_items_to_back(self, items):
+        for item in items:
+            self._send_item_to_back(item)
 
     def _copy_item(self, item_to_copy=None):
-        active_item = item_to_copy if item_to_copy else self.selected_token
-        #if not active_item: return
-        self.clipboard_token = active_item.copy()
-        for key_to_pop in ['pil_image', 'source_image', 'tk_image', 'entity_record',
-                           'canvas_ids', 'hp_canvas_ids', 'name_id',
-                           'hp_entry_widget', 'hp_entry_widget_id',
-                           'max_hp_entry_widget', 'max_hp_entry_widget_id',
-                           'entry_widget', 'description_popup', 'description_label',
-                           'handle_widget', 'handle_canvas_id', 'entry_canvas_id',
-                           'border_canvas_id',
-                           'description_editor', 'hover_popup', 'hover_label',
-                           'hover_bbox', 'hover_visible']:
-            self.clipboard_token.pop(key_to_pop, None)
+        if isinstance(item_to_copy, (list, tuple, set)):
+            candidates = [itm for itm in item_to_copy if isinstance(itm, dict)]
+        elif item_to_copy is not None:
+            candidates = [item_to_copy]
+        elif self.selected_items:
+            candidates = list(self.selected_items)
+        elif self.selected_token:
+            candidates = [self.selected_token]
+        else:
+            candidates = []
+
+        if not candidates:
+            self.clipboard_token = None
+            return
+
+        reference_position = None
+        for item in candidates:
+            pos = item.get("position") if isinstance(item, dict) else None
+            if pos:
+                reference_position = pos
+                break
+        if reference_position is None:
+            reference_position = (0, 0)
+
+        clipboard_entries = []
+        for item in candidates:
+            clone = self._clone_item_for_clipboard(item, reference_position)
+            if clone:
+                clipboard_entries.append(clone)
+
+        self.clipboard_token = clipboard_entries if clipboard_entries else None
+
+    def _clone_item_for_clipboard(self, item, reference_position):
+        if not isinstance(item, dict):
+            return None
+
+        clone = dict(item)
+        keys_to_remove = [
+            "pil_image",
+            "source_image",
+            "tk_image",
+            "entity_record",
+            "canvas_ids",
+            "hp_canvas_ids",
+            "name_id",
+            "hp_entry_widget",
+            "hp_entry_widget_id",
+            "max_hp_entry_widget",
+            "max_hp_entry_widget_id",
+            "entry_widget",
+            "description_popup",
+            "description_label",
+            "handle_widget",
+            "handle_canvas_id",
+            "entry_canvas_id",
+            "border_canvas_id",
+            "description_editor",
+            "hover_popup",
+            "hover_label",
+            "hover_bbox",
+            "hover_visible",
+            "fs_canvas_ids",
+            "fs_cross_ids",
+            "drag_data",
+        ]
+        for key in keys_to_remove:
+            clone.pop(key, None)
+
+        pos = item.get("position") if isinstance(item.get("position"), tuple) else clone.get("position")
+        try:
+            offset = (
+                float(pos[0]) - float(reference_position[0]),
+                float(pos[1]) - float(reference_position[1]),
+            ) if pos else (0.0, 0.0)
+        except Exception:
+            offset = (0.0, 0.0)
+
+        clone.pop("_clipboard_offset", None)
+        clone["_clipboard_offset"] = offset
+        return clone
 
     def _paste_item(self, event=None):
-        if not self.clipboard_token: return
+        if not self.clipboard_token:
+            return
 
-        # Determine paste position, prefer the pointer location when available
-        vcx, vcy = 100, 100  # Default fallback if canvas not ready (should not happen)
+        clipboard_items = (
+            list(self.clipboard_token)
+            if isinstance(self.clipboard_token, list)
+            else [self.clipboard_token]
+        )
+        if not clipboard_items:
+            return
+
+        vcx, vcy = 100, 100
         if self.canvas:
-            # Start with the canvas center as the fallback position
             vcx = (self.canvas.winfo_width() // 2 - self.pan_x) / self.zoom
             vcy = (self.canvas.winfo_height() // 2 - self.pan_y) / self.zoom
 
@@ -1831,78 +2249,84 @@ class DisplayMapController:
                 pointer_y = self.canvas.winfo_pointery() - self.canvas.winfo_rooty()
             except tk.TclError:
                 pointer_x = pointer_y = None
+            else:
+                if (
+                    pointer_x is not None
+                    and pointer_y is not None
+                    and 0 <= pointer_x <= self.canvas.winfo_width()
+                    and 0 <= pointer_y <= self.canvas.winfo_height()
+                ):
+                    zoom = self.zoom if self.zoom else 1.0
+                    vcx = (pointer_x - self.pan_x) / zoom
+                    vcy = (pointer_y - self.pan_y) / zoom
 
-            if (
-                pointer_x is not None
-                and pointer_y is not None
-                and 0 <= pointer_x <= self.canvas.winfo_width()
-                and 0 <= pointer_y <= self.canvas.winfo_height()
-            ):
-                zoom = self.zoom if self.zoom else 1.0
-                vcx = (pointer_x - self.pan_x) / zoom
-                vcy = (pointer_y - self.pan_y) / zoom
+        pasted_items = []
+        for entry in clipboard_items:
+            if not isinstance(entry, dict):
+                continue
+            new_item_data = copy.deepcopy(entry)
+            offset = new_item_data.pop("_clipboard_offset", (0, 0))
+            try:
+                ox, oy = offset
+            except Exception:
+                ox = oy = 0
+            position = (vcx + ox, vcy + oy)
+            new_item_data["position"] = position
+            new_item_data["canvas_ids"] = ()
 
-        new_item_data = self.clipboard_token.copy() # Start with a copy of clipboard
-        new_item_data["position"] = (vcx, vcy) # Set new position
-        new_item_data["canvas_ids"] = () # Canvas items will be created by _update_canvas_images
+            item_type = new_item_data.get("type", "token")
 
-        item_type = new_item_data.get("type", "token")
-
-        if item_type == "token":
-            # For tokens, we need to reload the PIL image if image_path is present
-            if "image_path" in new_item_data and new_item_data["image_path"]:
-                try:
-                    sz = new_item_data.get("size", self.token_size)
-                    source_img = Image.open(new_item_data["image_path"]).convert("RGBA")
-                    new_item_data["source_image"] = source_img
-                    new_item_data["pil_image"] = source_img.resize((sz, sz), Image.LANCZOS)
-                except Exception as e:
-                    print(f"Error reloading image for pasted token: {e}")
+            if item_type == "token":
+                image_path = new_item_data.get("image_path")
+                if image_path:
+                    try:
+                        sz = new_item_data.get("size", self.token_size)
+                        source_img = Image.open(image_path).convert("RGBA")
+                        new_item_data["source_image"] = source_img
+                        new_item_data["pil_image"] = source_img.resize((sz, sz), Image.LANCZOS)
+                    except Exception as exc:
+                        print(f"Error reloading image for pasted token: {exc}")
+                        new_item_data["source_image"] = None
+                        new_item_data["pil_image"] = None
+                else:
                     new_item_data["source_image"] = None
-                    new_item_data["pil_image"] = None # Or a placeholder
-            else: # No image_path, or it was removed during copy
-                new_item_data["source_image"] = None # Or a placeholder
-                new_item_data["pil_image"] = None # Or a placeholder
-            
-            # Ensure token-specific fields that might not be in clipboard are defaulted
-            new_item_data.setdefault("entity_type", "Unknown") # Default if missing
-            new_item_data.setdefault("entity_id", "Pasted Token")
-            new_item_data.setdefault("border_color", "#0000FF")
-            new_item_data.setdefault("size", self.token_size)
-            new_item_data.setdefault("hp", 10)
-            new_item_data.setdefault("max_hp", 10)
-            new_item_data.setdefault("hover_popup", None)
-            new_item_data.setdefault("hover_label", None)
-            new_item_data.setdefault("hover_visible", False)
-            new_item_data.setdefault("hover_bbox", None)
-            # entity_record is not typically part of clipboard_token
+                    new_item_data["pil_image"] = None
+                new_item_data["hover_visible"] = False
+                new_item_data.pop("hover_popup", None)
+                new_item_data.pop("hover_label", None)
+                new_item_data.pop("hover_bbox", None)
+            elif item_type == "marker":
+                new_item_data.setdefault("text", "New Marker")
+                new_item_data.setdefault("description", "Marker description")
+                new_item_data.setdefault("border_color", "#00ff00")
+                new_item_data["entry_widget"] = None
+                new_item_data["description_popup"] = None
+                new_item_data["description_label"] = None
+                new_item_data["description_visible"] = False
+                new_item_data.setdefault("entry_width", 180)
+                new_item_data["description_editor"] = None
+                new_item_data["focus_pending"] = True
+                new_item_data["handle_widget"] = None
+                new_item_data["handle_canvas_id"] = None
+                new_item_data["entry_canvas_id"] = None
+                new_item_data["border_canvas_id"] = None
+            elif item_type in ["rectangle", "oval"]:
+                new_item_data.setdefault("shape_type", item_type)
+                new_item_data.setdefault("width", DEFAULT_SHAPE_WIDTH)
+                new_item_data.setdefault("height", DEFAULT_SHAPE_HEIGHT)
+                new_item_data.setdefault("fill_color", self.current_shape_fill_color)
+                new_item_data.setdefault("border_color", self.current_shape_border_color)
+                new_item_data.setdefault("is_filled", self.shape_is_filled)
 
-        elif item_type == "marker":
-            new_item_data.setdefault("text", "New Marker")
-            new_item_data.setdefault("description", "Marker description")
-            new_item_data.setdefault("border_color", "#00ff00")
-            new_item_data["entry_widget"] = None
-            new_item_data["description_popup"] = None
-            new_item_data["description_label"] = None
-            new_item_data["description_visible"] = False
-            new_item_data.setdefault("entry_width", 180)
-            new_item_data["description_editor"] = None
-            new_item_data["focus_pending"] = True
-            new_item_data["border_canvas_id"] = None
+            self.tokens.append(new_item_data)
+            pasted_items.append(new_item_data)
 
-        elif item_type in ["rectangle", "oval"]:
-            # Shape-specific defaults if any were missed in copy (unlikely if copy is good)
-            new_item_data.setdefault("shape_type", item_type)
-            new_item_data.setdefault("width", DEFAULT_SHAPE_WIDTH)
-            new_item_data.setdefault("height", DEFAULT_SHAPE_HEIGHT)
-            new_item_data.setdefault("fill_color", self.current_shape_fill_color)
-            new_item_data.setdefault("border_color", self.current_shape_border_color)
-            new_item_data.setdefault("is_filled", self.shape_is_filled)
-        
-        self.tokens.append(new_item_data)
-        self._update_canvas_images() # This will create canvas items and bind events
+        if not pasted_items:
+            return
+
+        self._update_canvas_images()
         self._persist_tokens()
-
+        self._set_selection(pasted_items)
 
     def _delete_item(self, item_to_delete):
         if not item_to_delete: return
