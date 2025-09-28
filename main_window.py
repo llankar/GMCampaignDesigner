@@ -220,6 +220,8 @@ class MainWindow(ctk.CTk):
         log_debug("Loading sidebar icons", func_name="main_window.MainWindow.load_icons")
         self.icons = {
             "change_db": self.load_icon("database_icon.png", size=(60, 60)),
+            "db_export": self.load_icon("database_export_icon.png", size=(60, 60)),
+            "db_import": self.load_icon("database_import_icon.png", size=(60, 60)),
             "swarm_path": self.load_icon("folder_icon.png", size=(60, 60)),
             "customize_fields": self.load_icon("customize_fields.png", size=(60, 60)),
             "manage_scenarios": self.load_icon("scenario_icon.png", size=(60, 60)),
@@ -394,8 +396,8 @@ class MainWindow(ctk.CTk):
             ("change_db", "Change Data Storage", self.change_database_storage),
             ("swarm_path", "Set SwarmUI Path", self.select_swarmui_path),
             ("customize_fields", "Customize Fields", self.open_custom_fields_editor),
-            ("create_backup", "Create Campaign Backup", self.prompt_campaign_backup),
-            ("restore_backup", "Restore Campaign Backup", self.prompt_campaign_restore),
+            ("db_export", "Create Campaign Backup", self.prompt_campaign_backup),
+            ("db_import", "Restore Campaign Backup", self.prompt_campaign_restore),
         ]
         content = [
             ("manage_scenarios", "Manage Scenarios", lambda: self.open_entity("scenarios")),

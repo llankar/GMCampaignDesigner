@@ -85,7 +85,7 @@ wrappers = {
 
 @log_function
 def insert_text(parent, header, content):
-    label = ctk.CTkLabel(parent, text=f"{header}:", font=("Arial", 14, "bold"))
+    label = ctk.CTkLabel(parent, text=f"{header}:", font=("Arial", 16, "bold"))
     label.pack(anchor="w", padx=10)
     box = ctk.CTkTextbox(parent, wrap="word", height=40)
     # Ensure content is a plain string.
@@ -108,7 +108,7 @@ def insert_text(parent, header, content):
 
 @log_function
 def insert_longtext(parent, header, content):
-    ctk.CTkLabel(parent, text=f"{header}:", font=("Arial", 14, "bold")).pack(anchor="w", padx=10)
+    ctk.CTkLabel(parent, text=f"{header}:", font=("Arial", 16, "bold")).pack(anchor="w", padx=10)
 
     # Convert to string and format
     if isinstance(content, dict):
@@ -517,7 +517,7 @@ def insert_places_table(parent, header, place_names, open_entity_callback):
 @log_function
 def insert_list_longtext(parent, header, items, open_entity_callback=None, entity_collector=None):
     """Insert collapsible sections for long text lists such as scenario scenes."""
-    ctk.CTkLabel(parent, text=f"{header}:", font=("Arial", 14, "bold")) \
+    ctk.CTkLabel(parent, text=f"{header}:", font=("Arial", 16, "bold")) \
         .pack(anchor="w", padx=10, pady=(10, 2))
 
     def _coerce_names(value):
@@ -794,7 +794,7 @@ def create_scenario_detail_frame(entity_type, scenario_item, master, open_entity
     CTkLabel(
         frame,
         text=format_longtext(scenario_item.get("Secrets", "")),
-        font=("Arial", 14),
+        font=("Arial", 16),
         wraplength=1620,
         justify="left"
     ).pack(fill="x", pady=(0, 15))
