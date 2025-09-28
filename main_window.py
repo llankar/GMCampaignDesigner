@@ -34,6 +34,7 @@ from modules.helpers.backup_helper import (
     BackupError,
     ManifestError,
     create_backup_archive,
+    read_backup_manifest,
     restore_backup_archive,
 )
 from modules.helpers.swarmui_helper import get_available_models
@@ -1121,6 +1122,12 @@ class MainWindow(ctk.CTk):
             lambda manifest: self._format_backup_summary(manifest, include_target=False),
         )
 
+    @staticmethod
+    def _sanitize_campaign_name(name: str) -> str:
+        safe = "".join(ch for ch in name.strip() if ch.isalnum() or ch in ("_", "-", " "))
+        safe = safe.strip().replace(" ", "_")
+        return safe
+
     def prompt_campaign_restore(self):
         campaign_dir = Path(ConfigHelper.get_campaign_dir()).resolve()
         if campaign_dir.exists():
@@ -1138,18 +1145,77 @@ class MainWindow(ctk.CTk):
         if not archive:
             return
 
+        try:
+            manifest = read_backup_manifest(archive)
+        except ManifestError as exc:
+            messagebox.showerror("Invalid Backup", str(exc))
+            return
+        except BackupError as exc:
+            messagebox.showerror("Backup Error", str(exc))
+            return
+
+        default_name = manifest.get("campaign_name") or ""
+        if not default_name:
+            db_path = manifest.get("database_path")
+            if isinstance(db_path, str) and db_path:
+                default_name = Path(db_path).stem
+            else:
+                default_name = Path(archive).stem
+
+        base_dir = campaign_dir.parent if campaign_dir.parent != campaign_dir else campaign_dir
+
+        while True:
+            new_name = simpledialog.askstring(
+                "Restore Campaign",
+                "Enter a name for the restored campaign:",
+                initialvalue=default_name,
+                parent=self,
+            )
+            if new_name is None:
+                return
+            cleaned_name = self._sanitize_campaign_name(new_name)
+            if not cleaned_name:
+                messagebox.showwarning("Invalid Name", "Please enter a valid campaign name.")
+                continue
+            destination_dir = base_dir / cleaned_name
+            db_filename = f"{cleaned_name}.db"
+            display_name = new_name.strip() or cleaned_name
+            break
+
+        if destination_dir.exists():
+            if not messagebox.askyesno(
+                "Confirm Overwrite",
+                "The selected campaign name already exists:\n"
+                f"{destination_dir}\n\nRestoring will overwrite files in this directory. Continue?",
+            ):
+                return
+
         if not messagebox.askyesno(
             "Confirm Restore",
             "Restoring a backup will overwrite files in:\n"
-            f"{campaign_dir}\n\nArchive:\n{archive}\n\nProceed?",
+            f"{destination_dir}\n\nArchive:\n{archive}\n\nProceed?",
         ):
             return
 
+        destination_dir.mkdir(parents=True, exist_ok=True)
+        new_db_path = destination_dir / db_filename
+
+        def detail_builder(manifest_data: dict | None) -> str:
+            if manifest_data:
+                ConfigHelper.set("Database", "path", str(new_db_path))
+            return self._format_backup_summary(manifest_data, include_target=True)
+
         self._run_progress_task(
             "Restoring Backup",
-            lambda cb: restore_backup_archive(archive, campaign_dir, cb),
+            lambda cb: restore_backup_archive(
+                archive,
+                destination_dir,
+                cb,
+                campaign_name=display_name,
+                database_filename=db_filename,
+            ),
             "Backup restored successfully.",
-            lambda manifest: self._format_backup_summary(manifest, include_target=True),
+            detail_builder,
         )
 
     def open_scenario_importer(self):
@@ -1207,8 +1273,7 @@ class MainWindow(ctk.CTk):
                 if name is None:
                     new_db_path = None
                     break
-                safe = "".join(ch for ch in name.strip() if ch.isalnum() or ch in ("_","-"," ")).strip()
-                safe = safe.replace(" ", "_")
+                safe = self._sanitize_campaign_name(name)
                 if not safe:
                     messagebox.showwarning("Invalid Name", "Please enter a valid campaign name.")
                     continue
