@@ -36,6 +36,7 @@ def add_token(self, path, entity_type, entity_name, entity_record=None):
     yw_center = (ch/2 - self.pan_y) / self.zoom
 
     token = {
+        "type":         "token",
         "entity_type":  entity_type,
         "entity_id":    entity_name,
         "image_path":   img_path,
@@ -143,6 +144,7 @@ def _paste_token(self, event=None):
 
     # Clone all relevant fields into a new token dict
     token = {
+        "type":         "token",
         "entity_type":  c["entity_type"],
         "entity_id":    c["entity_id"],
         "image_path":   c["image_path"],
