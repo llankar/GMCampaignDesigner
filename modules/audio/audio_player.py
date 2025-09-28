@@ -294,6 +294,7 @@ class AudioPlayer:
         self._current_index: int = -1
         self._shuffle: bool = False
         self._loop: bool = False
+        self._continue_playback: bool = True
         self._volume: float = 0.8
         self._is_playing: bool = False
         self._stop_requested: bool = False
@@ -482,6 +483,14 @@ class AudioPlayer:
             self._loop = bool(enabled)
             self._emit("loop_changed", value=self._loop)
 
+    def set_continue(self, enabled: bool) -> None:
+        with self._lock:
+            value = bool(enabled)
+            if self._continue_playback == value:
+                return
+            self._continue_playback = value
+            self._emit("continue_changed", value=self._continue_playback)
+
     def set_volume(self, value: float) -> None:
         with self._lock:
             self._volume = max(0.0, min(value, 1.0))
@@ -542,6 +551,23 @@ class AudioPlayer:
             self._is_playing = False
             self._current_index = -1
             self._emit("playlist_ended")
+            return
+
+        if not self._continue_playback:
+            self._is_playing = False
+            try:
+                self._backend.stop()
+                self._backend.close()
+            except Exception as exc:  # pragma: no cover - backend defensive
+                log_warning(
+                    f"AudioPlayer._advance_after_track - backend stop failed: {exc}",
+                    func_name="AudioPlayer._advance_after_track",
+                )
+            track = self.current_track
+            if track is not None:
+                self._emit("stopped", track=track, index=self._current_index)
+            else:
+                self._emit("playlist_ended")
             return
 
         if self._shuffle and len(self._playlist) > 1:
