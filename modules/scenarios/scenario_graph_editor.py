@@ -903,43 +903,73 @@ class ScenarioGraphEditor(ctk.CTkFrame):
     def _summarize_scene_text(self, text, max_lines=4, min_lines=2):
         if not text:
             return ["No scene notes provided."], False
+
         normalized = str(text).replace("\r", "\n")
-        fragments = [frag.strip() for frag in normalized.splitlines() if frag.strip()]
+
+        def canonical_key(fragment: str) -> str:
+            cleaned = re.sub(r"\s+", " ", fragment or "").strip()
+            if not cleaned:
+                return ""
+            cleaned = re.sub(r"^[\-*\u2022•\s]+", "", cleaned)
+            cleaned = re.sub(r"^[0-9]+[\.)]\s*", "", cleaned)
+            cleaned = cleaned.strip(" :;-•\u2022")
+            return cleaned.lower()
+
+        raw_fragments = [frag.strip() for frag in normalized.splitlines() if frag.strip()]
+        fragments: list[str] = []
+        seen_fragment_keys: set[str] = set()
+        for frag in raw_fragments:
+            key = canonical_key(frag)
+            if not key or key in seen_fragment_keys:
+                continue
+            seen_fragment_keys.add(key)
+            fragments.append(frag)
+
         if len(fragments) < min_lines:
             sentences = re.split(r"(?<=[.!?])\s+", normalized)
             for sentence in sentences:
-                cleaned = sentence.strip()
-                if cleaned and cleaned not in fragments:
-                    fragments.append(cleaned)
-        cleaned_lines = []
-        seen = set()
+                cleaned_sentence = sentence.strip()
+                if not cleaned_sentence:
+                    continue
+                key = canonical_key(cleaned_sentence)
+                if not key or key in seen_fragment_keys:
+                    continue
+                seen_fragment_keys.add(key)
+                fragments.append(cleaned_sentence)
+
+        cleaned_lines: list[str] = []
+        seen_keys: set[str] = set()
+        def strip_leading_markers(value: str) -> str:
+            without_markers = re.sub(r"^[\-*\u2022•\s]+", "", value or "").strip()
+            without_numbers = re.sub(r"^[0-9]+[\.)]\s*", "", without_markers)
+            return without_numbers.strip()
+
         for fragment in fragments:
             cleaned = re.sub(r"\s+", " ", fragment).strip()
-            if not cleaned:
+            key = canonical_key(cleaned)
+            if not key or key in seen_keys:
                 continue
-            key = cleaned.lower()
-            if key in seen:
-                continue
-            seen.add(key)
-            cleaned_lines.append(cleaned)
+            seen_keys.add(key)
+            cleaned_lines.append(strip_leading_markers(cleaned))
             if len(cleaned_lines) >= max_lines:
                 break
+
         truncated = len(cleaned_lines) < len(fragments)
         if not cleaned_lines:
             return ["No scene notes provided."], False
+
         if len(cleaned_lines) < min_lines:
             wrapped = textwrap.wrap(normalized, width=90)
             for chunk in wrapped:
                 chunk_clean = re.sub(r"\s+", " ", chunk).strip()
-                if not chunk_clean:
+                key = canonical_key(chunk_clean)
+                if not key or key in seen_keys:
                     continue
-                key = chunk_clean.lower()
-                if key in seen:
-                    continue
-                cleaned_lines.append(chunk_clean)
-                seen.add(key)
+                cleaned_lines.append(strip_leading_markers(chunk_clean))
+                seen_keys.add(key)
                 if len(cleaned_lines) >= min_lines:
                     break
+
         cleaned_lines = cleaned_lines[:max_lines]
         truncated = truncated or len(cleaned_lines) < len(fragments)
         return cleaned_lines, truncated
