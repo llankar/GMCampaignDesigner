@@ -35,6 +35,7 @@ class WorldMapWindow(ctk.CTkToplevel):
     """Interactive world map viewer with nested map support."""
 
     CANVAS_BG = "#05070D"
+    PORTRAIT_SIZE = (320, 240)
     ZOOM_MIN = 0.25
     ZOOM_MAX = 6.0
     ZOOM_FACTOR = 1.1
@@ -71,6 +72,8 @@ class WorldMapWindow(ctk.CTkToplevel):
         self.base_photo = None
         self.render_params = None
         self.image_cache: dict[str, Image.Image] = {}
+        self._portrait_photo: ImageTk.PhotoImage | None = None
+        self._portrait_placeholder: Image.Image | None = None
 
         self.zoom = 1.0
         self.pan_x = 0.0
@@ -179,6 +182,21 @@ class WorldMapWindow(ctk.CTkToplevel):
 
         self.subtitle_label = ctk.CTkLabel(self.inspector_header, text="Select an entity to view its synthesis.", font=("Segoe UI", 14))
         self.subtitle_label.pack(anchor="w", padx=16, pady=(0, 12))
+
+        self.portrait_frame = ctk.CTkFrame(self.inspector_container, fg_color="#141C30", corner_radius=18)
+        self.portrait_frame.pack(fill="x", padx=16, pady=(0, 12))
+
+        self.portrait_label = ctk.CTkLabel(
+            self.portrait_frame,
+            text="",
+            width=self.PORTRAIT_SIZE[0],
+            height=self.PORTRAIT_SIZE[1],
+            anchor="center",
+        )
+        self.portrait_label.pack(fill="both", expand=True, padx=16, pady=16)
+
+        self._portrait_placeholder = self._create_portrait_placeholder()
+        self._set_portrait_image(None)
 
         self.badge_frame = ctk.CTkFrame(self.inspector_container, fg_color="transparent")
         self.badge_frame.pack(fill="x", padx=16, pady=(0, 12))
@@ -783,6 +801,41 @@ class WorldMapWindow(ctk.CTkToplevel):
             log_warning(f"Failed to load image '{candidate}': {exc}", func_name="WorldMapWindow._load_image")
             return None
 
+    def _create_portrait_placeholder(self) -> Image.Image:
+        width, height = self.PORTRAIT_SIZE
+        placeholder = Image.new("RGBA", (width, height), (20, 27, 48, 255))
+        draw = ImageDraw.Draw(placeholder)
+        margin = 6
+        draw.rounded_rectangle(
+            (margin, margin, width - margin, height - margin),
+            radius=18,
+            outline=(58, 72, 108, 255),
+            width=2,
+        )
+        draw.text(
+            (width / 2, height / 2),
+            "No\nPortrait",
+            fill=(132, 146, 184, 255),
+            anchor="mm",
+            align="center",
+        )
+        return placeholder
+
+    def _set_portrait_image(self, pil_image: Image.Image | None) -> None:
+        base_image = self._portrait_placeholder if pil_image is None else pil_image
+        if base_image is None:
+            return
+        width, height = self.PORTRAIT_SIZE
+        image = base_image.convert("RGBA") if base_image.mode != "RGBA" else base_image.copy()
+        image.thumbnail(self.PORTRAIT_SIZE, Image.LANCZOS)
+        canvas = Image.new("RGBA", self.PORTRAIT_SIZE, (20, 27, 48, 255))
+        offset = ((width - image.width) // 2, (height - image.height) // 2)
+        canvas.paste(image, offset, image)
+        photo = ImageTk.PhotoImage(canvas)
+        self.portrait_label.configure(image=photo)
+        self.portrait_label.image = photo
+        self._portrait_photo = photo
+
     # ------------------------------------------------------------------
     # Token interactions
     # ------------------------------------------------------------------
@@ -870,6 +923,7 @@ class WorldMapWindow(ctk.CTkToplevel):
     def _clear_inspector(self) -> None:
         self.title_label.configure(text="World Map")
         self.subtitle_label.configure(text="Select an entity to view its synthesis.")
+        self._set_portrait_image(None)
         for child in self.badge_frame.winfo_children():
             child.destroy()
         self.summary_box.configure(state="normal")
@@ -887,6 +941,10 @@ class WorldMapWindow(ctk.CTkToplevel):
         name = token.get("entity_id", "Unnamed")
         summary_text, bullet_lines = self._compose_summary(entity_type, record)
         badges = self._collect_badges(entity_type, record)
+
+        portrait_path = token.get("portrait_path") or token.get("image_path")
+        portrait_image = self._load_image(portrait_path) if portrait_path else None
+        self._set_portrait_image(portrait_image)
 
         self.title_label.configure(text=name)
         self.subtitle_label.configure(text=entity_type)
@@ -910,6 +968,10 @@ class WorldMapWindow(ctk.CTkToplevel):
         wrapper_record = self.maps_wrapper_data.get(map_name, {})
         summary_text = entry.get('summary') or self._normalize_text(wrapper_record.get("Summary")) or self._normalize_text(wrapper_record.get("Description"))
         badges = self._summarize_map_contents(entry)
+
+        portrait_path = token.get("portrait_path") or token.get("image_path")
+        portrait_image = self._load_image(portrait_path) if portrait_path else None
+        self._set_portrait_image(portrait_image)
 
         self.title_label.configure(text=map_name)
         self.subtitle_label.configure(text="Nested Map")
