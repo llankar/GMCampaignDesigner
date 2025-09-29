@@ -3,7 +3,12 @@ import os
 import re
 import shutil
 from modules.helpers.config_helper import ConfigHelper
-from modules.helpers.logging_helper import log_debug, log_function, log_info, log_warning
+from modules.helpers.logging_helper import (
+    log_debug,
+    log_function,
+    log_info,
+    log_warning,
+)
 from modules.helpers.logging_helper import log_module_import
 
 log_module_import(__name__)
@@ -248,6 +253,132 @@ def create_custom_entity(entity_slug: str, display_name: str, icon_source: str |
         "slug": slug,
         "label": display_name,
         "icon": icon_path,
+        "is_custom": True,
+    }
+
+
+@log_function
+def update_custom_entity(
+    entity_slug: str,
+    display_name: str | None = None,
+    *,
+    icon_source: str | None = None,
+    clear_icon: bool = False,
+) -> dict:
+    """Update label and/or icon metadata for an existing custom entity."""
+
+    slug = str(entity_slug or "").strip().lower()
+    if not slug:
+        raise ValueError("Entity identifier is required")
+    if slug in _BUILTIN_ENTITY_METADATA:
+        raise ValueError("Built-in entities cannot be edited from this dialog")
+
+    manifest = _load_custom_manifest()
+    if slug not in manifest:
+        raise ValueError(f"Custom entity '{slug}' does not exist")
+
+    entry = manifest[slug]
+
+    if display_name is not None:
+        entry["label"] = display_name
+
+    old_icon = entry.get("icon")
+
+    if clear_icon:
+        if old_icon and os.path.exists(old_icon):
+            try:
+                os.remove(old_icon)
+            except Exception as exc:
+                log_warning(
+                    f"Unable to remove icon '{old_icon}': {exc}",
+                    func_name="modules.helpers.template_loader.update_custom_entity",
+                )
+        entry["icon"] = None
+    elif icon_source:
+        new_icon = _prepare_icon_for_entity(slug, icon_source)
+        if new_icon:
+            if old_icon and old_icon != new_icon and os.path.exists(old_icon):
+                try:
+                    os.remove(old_icon)
+                except Exception as exc:
+                    log_warning(
+                        f"Unable to remove icon '{old_icon}': {exc}",
+                        func_name="modules.helpers.template_loader.update_custom_entity",
+                    )
+            entry["icon"] = new_icon
+
+    manifest[slug] = entry
+    _save_custom_manifest(manifest)
+
+    return {
+        "slug": slug,
+        "label": entry.get("label"),
+        "icon": entry.get("icon"),
+        "is_custom": True,
+    }
+
+
+@log_function
+def delete_custom_entity(entity_slug: str):
+    """Remove an existing custom entity definition and its template."""
+
+    slug = str(entity_slug or "").strip().lower()
+    if not slug:
+        raise ValueError("Entity identifier is required")
+    if slug in _BUILTIN_ENTITY_METADATA:
+        raise ValueError("Built-in entities cannot be removed")
+
+    manifest = _load_custom_manifest()
+    if slug not in manifest:
+        raise ValueError(f"Custom entity '{slug}' does not exist")
+
+    entry = manifest.pop(slug)
+    _save_custom_manifest(manifest)
+
+    icon_path = entry.get("icon")
+    if icon_path and os.path.exists(icon_path):
+        try:
+            os.remove(icon_path)
+        except Exception as exc:
+            log_warning(
+                f"Unable to remove icon '{icon_path}': {exc}",
+                func_name="modules.helpers.template_loader.delete_custom_entity",
+            )
+
+    template_path = _campaign_template_path(slug)
+    if os.path.exists(template_path):
+        try:
+            os.remove(template_path)
+        except Exception as exc:
+            log_warning(
+                f"Unable to remove template '{template_path}': {exc}",
+                func_name="modules.helpers.template_loader.delete_custom_entity",
+            )
+
+    conn = None
+    try:
+        from db.db import get_connection
+
+        conn = get_connection()
+        cursor = conn.cursor()
+        cursor.execute(f"DROP TABLE IF EXISTS {slug}")
+        conn.commit()
+    except Exception as exc:
+        log_warning(
+            f"Unable to drop table '{slug}': {exc}",
+            func_name="modules.helpers.template_loader.delete_custom_entity",
+        )
+    finally:
+        if conn is not None:
+            try:
+                conn.close()
+            except Exception:
+                pass
+
+    return {
+        "slug": slug,
+        "label": entry.get("label"),
+        "icon": None,
         "is_custom": True,
     }
 
