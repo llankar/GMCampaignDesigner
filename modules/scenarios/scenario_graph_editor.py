@@ -8,7 +8,7 @@ import ctypes
 from ctypes import wintypes
 #import logging
 import tkinter as tk
-from tkinter import filedialog, messagebox, simpledialog, ttk, Menu
+from tkinter import filedialog, messagebox, ttk, Menu
 from PIL import Image, ImageTk
 import textwrap
 import html
@@ -41,6 +41,129 @@ MAX_PORTRAIT_SIZE = (128, 128)
 ENTITY_TOOLTIP_PORTRAIT_MAX_SIZE = (180, 180)
 ctk.set_appearance_mode("Dark")
 ctk.set_default_color_theme("blue")
+
+
+class LinkEditDialog(ctk.CTkToplevel):
+    def __init__(self, master, link_record, scene_lookup):
+        super().__init__(master)
+        self.title("Edit Link")
+        self.resizable(False, False)
+        self.transient(master)
+        self.grab_set()
+        self.result = None
+        self.link_record = link_record or {}
+        self.scene_lookup = scene_lookup or {}
+
+        self.columnconfigure(1, weight=1)
+
+        link_text = (self.link_record.get("text") or "").strip()
+        link_data = self.link_record.get("link_data")
+        if not isinstance(link_data, dict):
+            link_data = {}
+
+        ctk.CTkLabel(self, text="Label:").grid(row=0, column=0, padx=12, pady=(12, 6), sticky="w")
+        self.label_var = tk.StringVar(value=link_text)
+        self.label_entry = ctk.CTkEntry(self, textvariable=self.label_var, width=320)
+        self.label_entry.grid(row=0, column=1, padx=12, pady=(12, 6), sticky="ew")
+
+        ctk.CTkLabel(self, text="Target Scene Tag:").grid(row=1, column=0, padx=12, pady=6, sticky="w")
+        tag_options = sorted([tag for tag in self.scene_lookup.keys() if tag])
+        initial_target = self._initial_target_value(link_data)
+        if initial_target and initial_target not in tag_options:
+            tag_options.append(initial_target)
+            tag_options.sort()
+        self.target_var = tk.StringVar(value=initial_target)
+        self.target_combo = ctk.CTkComboBox(
+            self,
+            variable=self.target_var,
+            values=tag_options,
+            state="readonly" if tag_options else "normal",
+            width=320,
+        )
+        self.target_combo.grid(row=1, column=1, padx=12, pady=6, sticky="ew")
+        if initial_target:
+            self.target_combo.set(initial_target)
+
+        ctk.CTkLabel(self, text="Conditional metadata (JSON):").grid(
+            row=2, column=0, padx=12, pady=6, sticky="nw"
+        )
+        self.metadata_textbox = ctk.CTkTextbox(self, width=320, height=140)
+        self.metadata_textbox.grid(row=2, column=1, padx=12, pady=6, sticky="ew")
+        initial_metadata = self._prepare_initial_metadata(link_data)
+        if initial_metadata:
+            self.metadata_textbox.insert("1.0", initial_metadata)
+
+        button_frame = ctk.CTkFrame(self)
+        button_frame.grid(row=3, column=0, columnspan=2, padx=12, pady=(6, 12), sticky="e")
+
+        cancel_btn = ctk.CTkButton(button_frame, text="Cancel", command=self._on_cancel)
+        cancel_btn.pack(side="right", padx=(0, 6))
+        save_btn = ctk.CTkButton(button_frame, text="Save", command=self._on_submit)
+        save_btn.pack(side="right")
+
+        self.protocol("WM_DELETE_WINDOW", self._on_cancel)
+        self.after(100, self._focus_label_entry)
+
+    def _focus_label_entry(self):
+        self.label_entry.focus_set()
+        self.label_entry.icursor("end")
+
+    def _initial_target_value(self, link_data):
+        target_tag = self.link_record.get("target_tag") or self.link_record.get("to")
+        if target_tag:
+            return target_tag
+        if isinstance(link_data, dict):
+            return link_data.get("target_tag") or link_data.get("target") or ""
+        return ""
+
+    def _prepare_initial_metadata(self, link_data):
+        metadata_value = None
+        if isinstance(link_data, dict):
+            if link_data.get("conditions") is not None:
+                metadata_value = link_data.get("conditions")
+            elif link_data.get("metadata") is not None:
+                metadata_value = link_data.get("metadata")
+        if metadata_value is None:
+            return ""
+        try:
+            return json.dumps(metadata_value, indent=2)
+        except TypeError:
+            return str(metadata_value)
+
+    def _on_submit(self):
+        text_value = (self.label_var.get() or "").strip()
+        if not text_value:
+            messagebox.showerror("Validation", "Link label cannot be empty.")
+            return
+
+        target_value = (self.target_var.get() or "").strip()
+        if not target_value:
+            messagebox.showerror("Validation", "A target scene tag must be selected.")
+            return
+        if target_value not in self.scene_lookup:
+            messagebox.showerror("Validation", "Selected target tag is not valid.")
+            return
+
+        metadata_text = self.metadata_textbox.get("1.0", "end").strip()
+        metadata_payload = None
+        if metadata_text:
+            try:
+                metadata_payload = json.loads(metadata_text)
+            except json.JSONDecodeError as exc:
+                messagebox.showerror("Validation", f"Metadata must be valid JSON: {exc}")
+                return
+
+        self.result = {
+            "text": text_value,
+            "target_tag": target_value,
+            "metadata": metadata_payload,
+        }
+        self.destroy()
+
+    def _on_cancel(self):
+        self.result = None
+        self.destroy()
+
 #logging.basicConfig(level=logging.DEBUG)
 
 ENTITY_TOOLTIP_HIDE_DELAY_MS = 600
@@ -3030,20 +3153,50 @@ class ScenarioGraphEditor(ctk.CTkFrame):
         link_record = self.canvas_link_items.get(item_id)
         if not link_record:
             return
-        current_text = link_record.get("text", "")
-        new_text = simpledialog.askstring(
-            "Edit Link",
-            "Link label:",
-            initialvalue=current_text,
-            parent=self,
-        )
-        if new_text is None:
+
+        dialog = LinkEditDialog(self, link_record, self.scene_flow_scene_lookup)
+        self.wait_window(dialog)
+        if not dialog.result:
             return
-        new_text = new_text.strip()
+
+        new_text = dialog.result.get("text", "").strip()
+        target_tag = dialog.result.get("target_tag")
+        metadata_payload = dialog.result.get("metadata")
+
         link_record["text"] = new_text
+        if target_tag:
+            link_record["to"] = target_tag
+            link_record["target_tag"] = target_tag
+
         link_data = link_record.get("link_data")
-        if isinstance(link_data, dict):
-            link_data["text"] = new_text
+        if not isinstance(link_data, dict):
+            link_data = {}
+            link_record["link_data"] = link_data
+
+        link_data["text"] = new_text
+        if target_tag:
+            link_data["target_tag"] = target_tag
+            link_data["target"] = target_tag
+
+        target_scene = None
+        if target_tag:
+            target_scene = (self.scene_flow_scene_lookup or {}).get(target_tag)
+
+        if target_scene:
+            target_index = target_scene.get("index")
+            link_record["target_scene_index"] = target_index
+            link_data["target_scene_index"] = target_index
+            link_data["target_index"] = target_index
+        else:
+            link_record.pop("target_scene_index", None)
+            link_data.pop("target_scene_index", None)
+            link_data.pop("target_index", None)
+
+        if metadata_payload is not None:
+            link_data["conditions"] = metadata_payload
+        else:
+            link_data.pop("conditions", None)
+
         self.canvas.delete("link")
         self.draw_links()
         try:
