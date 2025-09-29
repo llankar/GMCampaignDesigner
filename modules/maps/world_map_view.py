@@ -220,13 +220,75 @@ class WorldMapWindow(ctk.CTkToplevel):
         )
         self.highlight_button.pack(side="right")
 
-        self.summary_container = ctk.CTkFrame(self.inspector_container, fg_color="transparent")
+        tabs_wrapper = ctk.CTkFrame(self.inspector_container, fg_color="transparent")
+        tabs_wrapper.pack(fill="x", padx=16, pady=(0, 12))
+
+        self.tab_selector = ctk.CTkSegmentedButton(
+            tabs_wrapper,
+            values=["Summary", "Notes", "Relationships"],
+            command=self._on_inspector_tab_selected,
+        )
+        self.tab_selector.pack(fill="x")
+        self.tab_selector.set("Summary")
+
+        self.tab_content_container = ctk.CTkFrame(self.inspector_container, fg_color="transparent")
+        self.tab_content_container.pack(fill="both", expand=True, padx=16, pady=(0, 16))
+
+        self._tab_frames: dict[str, ctk.CTkFrame] = {}
+        for name in ("Summary", "Notes", "Relationships"):
+            frame = ctk.CTkFrame(self.tab_content_container, fg_color="transparent")
+            self._tab_frames[name] = frame
+
+        self.summary_container = self._tab_frames["Summary"]
+        self.notes_container = self._tab_frames["Notes"]
+        self.relationships_container = self._tab_frames["Relationships"]
+        self._active_tab: str | None = None
+        self._select_inspector_tab("Summary")
 
         self.bind("<Delete>", self._delete_selected_token)
         self.bind("<Control-s>", self._on_save_shortcut)
-        self.summary_container.pack(fill="both", expand=True, padx=16, pady=(0, 16))
 
         self._clear_inspector()
+
+    def _on_inspector_tab_selected(self, tab_name: str) -> None:
+        if not tab_name:
+            return
+        self._select_inspector_tab(tab_name)
+
+    def _select_inspector_tab(self, tab_name: str) -> None:
+        if tab_name not in getattr(self, "_tab_frames", {}):
+            return
+        if self._active_tab == tab_name:
+            frame = self._tab_frames[tab_name]
+            if not frame.winfo_ismapped():
+                frame.pack(fill="both", expand=True)
+            return
+        for frame in self._tab_frames.values():
+            frame.pack_forget()
+        target = self._tab_frames[tab_name]
+        target.pack(fill="both", expand=True)
+        self._active_tab = tab_name
+
+    def _clear_tab_contents(self, tab_name: str) -> None:
+        frame = getattr(self, "_tab_frames", {}).get(tab_name)
+        if not frame:
+            return
+        for child in frame.winfo_children():
+            child.destroy()
+
+    def _render_tab_message(self, tab_name: str, message: str) -> None:
+        frame = getattr(self, "_tab_frames", {}).get(tab_name)
+        if not frame:
+            return
+        self._clear_tab_contents(tab_name)
+        ctk.CTkLabel(
+            frame,
+            text=message,
+            font=("Segoe UI", 13),
+            wraplength=360,
+            justify="left",
+            anchor="w",
+        ).pack(fill="x", padx=8, pady=(0, 12), anchor="w")
 
     def _load_world_map_store(self) -> dict:
         if not os.path.exists(self.world_map_file):
@@ -944,9 +1006,17 @@ class WorldMapWindow(ctk.CTkToplevel):
         self._set_portrait_image(None)
         for child in self.badge_frame.winfo_children():
             child.destroy()
+        if hasattr(self, "tab_selector"):
+            self.tab_selector.set("Summary")
+        self._select_inspector_tab("Summary")
         self._render_summary_message(
             "Use the controls above to place NPCs, PCs, creatures, places, and nested maps. "
             "Double-click a map token to dive deeper, and drag entities to reposition them."
+        )
+        self._render_tab_message("Notes", "Notes will appear here once added to the world map.")
+        self._render_tab_message(
+            "Relationships",
+            "Relationship insights will populate this tab when available.",
         )
         self._inspector_token = None
         self._set_quick_actions_state(False)
@@ -968,7 +1038,9 @@ class WorldMapWindow(ctk.CTkToplevel):
         self.title_label.configure(text=name)
         self.subtitle_label.configure(text=entity_type)
         self._render_badges(badges)
-        self._render_summary_sections(sections)
+        self._populate_summary_tab(sections)
+        self._populate_notes_tab(record)
+        self._populate_relationships_tab(record)
 
     def _show_map_hint(self, token: dict) -> None:
         map_name = token.get("linked_map") or token.get("entity_id") or "Nested Map"
@@ -1103,21 +1175,10 @@ class WorldMapWindow(ctk.CTkToplevel):
             ).pack(side="left", padx=4)
 
     def _clear_summary_sections(self) -> None:
-        if not hasattr(self, "summary_container"):
-            return
-        for child in self.summary_container.winfo_children():
-            child.destroy()
+        self._clear_tab_contents("Summary")
 
     def _render_summary_message(self, message: str) -> None:
-        self._clear_summary_sections()
-        ctk.CTkLabel(
-            self.summary_container,
-            text=message,
-            font=("Segoe UI", 13),
-            wraplength=360,
-            justify="left",
-            anchor="w",
-        ).pack(fill="x", padx=8, pady=(0, 12), anchor="w")
+        self._render_tab_message("Summary", message)
 
     def _render_summary_sections(self, sections: dict[str, list[str]]) -> None:
         if not sections:
@@ -1143,6 +1204,18 @@ class WorldMapWindow(ctk.CTkToplevel):
                     justify="left",
                     anchor="w",
                 ).pack(fill="x", padx=12, pady=(0, 8))
+
+    def _populate_summary_tab(self, sections: dict[str, list[str]]) -> None:
+        self._render_summary_sections(sections)
+
+    def _populate_notes_tab(self, record: dict | None) -> None:
+        self._render_tab_message("Notes", "Notes will appear here once added to the world map.")
+
+    def _populate_relationships_tab(self, record: dict | None) -> None:
+        self._render_tab_message(
+            "Relationships",
+            "Relationship insights will populate this tab when available.",
+        )
 
     def _compose_summary(self, entity_type: str, record: dict) -> dict[str, list[str]]:
         sections: dict[str, list[str]] = {}
