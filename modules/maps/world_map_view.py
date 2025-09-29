@@ -969,6 +969,8 @@ class WorldMapWindow(ctk.CTkToplevel):
 
         image = self._resolve_token_image(token, size)
         radius = size // 2
+        border_color = self._resolve_token_color(token)
+        border_width = max(3, int(round(size * 0.08)))
 
         canvas_ids: list[int] = []
         image_id = self.canvas.create_image(x, y, image=image, anchor="center")
@@ -980,7 +982,18 @@ class WorldMapWindow(ctk.CTkToplevel):
             font=("Segoe UI", 12, "bold"),
         )
 
-        canvas_ids.extend([image_id, label_id])
+        border_id = self.canvas.create_oval(
+            x - radius,
+            y - radius,
+            x + radius,
+            y + radius,
+            outline=border_color,
+            width=border_width,
+        )
+        self.canvas.tag_raise(border_id, image_id)
+        self.canvas.tag_raise(label_id)
+
+        canvas_ids.extend([image_id, label_id, border_id])
         token["canvas_ids"] = canvas_ids
         token["tk_image"] = image
 
@@ -1018,10 +1031,19 @@ class WorldMapWindow(ctk.CTkToplevel):
                 return ImageTk.PhotoImage(pil.resize((size, size), Image.LANCZOS))
         placeholder = Image.new("RGBA", (size, size), (0, 0, 0, 0))
         draw = ImageDraw.Draw(placeholder)
-        draw.ellipse((0, 0, size, size), fill=(token.get("color") or "#FFFFFF"))
+        color = self._resolve_token_color(token)
+        draw.ellipse((0, 0, size, size), fill=color)
         label = (token.get("entity_id") or "?")[:2].upper()
         draw.text((size / 2, size / 2), label, fill="#0B0B0B", anchor="mm", align="center")
         return ImageTk.PhotoImage(placeholder)
+
+    def _resolve_token_color(self, token: dict) -> str:
+        normalized = self._normalize_hex_color(token.get("color"))
+        if normalized:
+            return normalized
+        fallback = _TOKEN_COLORS.get(token.get("entity_type")) or _DEFAULT_SWATCH_COLOR
+        normalized_fallback = self._normalize_hex_color(fallback)
+        return normalized_fallback or "#FFFFFF"
 
     def _load_image(self, path: str) -> Image.Image | None:
         if path in self.image_cache:
