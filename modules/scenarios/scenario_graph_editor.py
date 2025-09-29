@@ -444,16 +444,23 @@ class ScenarioGraphEditor(ctk.CTkFrame):
         self.detail_textbox = None
         self._rich_renderer_available = False
 
+        self.detail_content_container = ctk.CTkFrame(
+            self.detail_panel,
+            fg_color="transparent",
+        )
+        self.detail_content_container.pack(fill="both", expand=True, padx=pad, pady=(8, pad))
+
         if HTMLLabel is not None:
             try:
                 panel_bg = self._resolve_panel_background_color()
                 self.detail_html_label = HTMLLabel(
-                    self.detail_panel,
+                    self.detail_content_container,
                     html="",
                     background=panel_bg,
                     foreground="#F8FAFC",
                 )
-                self.detail_html_label.pack(fill="both", expand=True, padx=pad, pady=(8, pad))
+                self.detail_html_label.pack(fill="both", expand=True)
+                self.detail_html_label.pack_configure(pady=(0, 8))
                 self._rich_renderer_available = True
             except Exception:
                 self.detail_html_label = None
@@ -461,6 +468,18 @@ class ScenarioGraphEditor(ctk.CTkFrame):
 
         if not self._rich_renderer_available:
             self._create_plain_textbox()
+
+        self.entity_heading_label = ctk.CTkLabel(
+            self.detail_content_container,
+            text="Key Entities",
+            font=ctk.CTkFont(size=14, weight="bold"),
+            anchor="w",
+            justify="left",
+        )
+        self.entity_button_container = ctk.CTkFrame(
+            self.detail_content_container,
+            fg_color="transparent",
+        )
 
         self._clear_detail_panel()
 
@@ -476,14 +495,14 @@ class ScenarioGraphEditor(ctk.CTkFrame):
         return bg
 
     def _create_plain_textbox(self):
-        pad = self.detail_panel_padding
         if self.detail_textbox is None or not int(self.detail_textbox.winfo_exists()):
             self.detail_textbox = ctk.CTkTextbox(
-                self.detail_panel,
+                self.detail_content_container,
                 wrap="word",
             )
         if not self.detail_textbox.winfo_manager():
-            self.detail_textbox.pack(fill="both", expand=True, padx=pad, pady=(8, pad))
+            self.detail_textbox.pack(fill="both", expand=True)
+        self.detail_textbox.pack_configure(pady=(0, 8))
         self.detail_textbox.configure(state="disabled")
 
     def _fallback_to_plain_text(self, text):
@@ -507,6 +526,8 @@ class ScenarioGraphEditor(ctk.CTkFrame):
         if self._rich_renderer_available and self.detail_html_label is not None:
             try:
                 self.detail_html_label.set_html(html_text)
+                if self.detail_textbox is not None and self.detail_textbox.winfo_manager():
+                    self.detail_textbox.pack_forget()
                 return
             except Exception:
                 self._fallback_to_plain_text(plain_text)
@@ -520,6 +541,177 @@ class ScenarioGraphEditor(ctk.CTkFrame):
             self.detail_textbox.delete("1.0", "end")
             self.detail_textbox.insert("1.0", plain_text)
             self.detail_textbox.configure(state="disabled")
+        if self.detail_html_label is not None and self.detail_html_label.winfo_manager():
+            self.detail_html_label.pack_forget()
+
+    def _rebuild_entity_buttons(self, entities):
+        if not hasattr(self, "entity_button_container"):
+            return
+
+        for child in list(self.entity_button_container.winfo_children()):
+            try:
+                child.destroy()
+            except Exception:
+                pass
+
+        if hasattr(self, "entity_heading_label") and self.entity_heading_label.winfo_manager():
+            self.entity_heading_label.pack_forget()
+        if self.entity_button_container.winfo_manager():
+            self.entity_button_container.pack_forget()
+
+        valid_entities = [ent for ent in (entities or []) if isinstance(ent, dict)]
+        if not valid_entities:
+            return
+
+        if hasattr(self, "entity_heading_label") and not self.entity_heading_label.winfo_manager():
+            self.entity_heading_label.pack(fill="x", pady=(0, 4))
+        if not self.entity_button_container.winfo_manager():
+            self.entity_button_container.pack(fill="x", pady=(0, 8))
+
+        for index, entity in enumerate(valid_entities):
+            label_text = self._format_entity_button_label(entity)
+            button = ctk.CTkButton(
+                self.entity_button_container,
+                text=label_text,
+                anchor="w",
+                command=lambda ent=entity: self._open_entity_editor(ent),
+            )
+            button.pack(fill="x", pady=(0 if index == 0 else 4, 0))
+            try:
+                button.configure(takefocus=True)
+            except Exception:
+                pass
+            button.bind("<Return>", lambda _event, btn=button: btn.invoke())
+            button.bind("<space>", lambda _event, btn=button: btn.invoke())
+
+    def _format_entity_button_label(self, entity):
+        if not isinstance(entity, dict):
+            return "Unnamed Entity"
+        name = (entity.get("name") or entity.get("Name") or "Unnamed").strip() or "Unnamed"
+        ent_type = (entity.get("type") or entity.get("Type") or "").strip()
+        if ent_type:
+            return f"{name} ({ent_type.title()})"
+        return name
+
+    def _open_entity_editor(self, entity_entry):
+        context = self._resolve_entity_editor_context(entity_entry)
+        if not context:
+            messagebox.showinfo("Entity", "No editor is available for this entity.")
+            return
+
+        record = context.get("record")
+        wrapper = context.get("wrapper")
+        template_key = context.get("template_key")
+        display_type = context.get("display_type") or "Entity"
+        entity_name = context.get("entity_name") or "Entity"
+
+        if not record or not wrapper:
+            messagebox.showwarning(
+                display_type,
+                f"Unable to locate data for {display_type.rstrip('s')} '{entity_name}'.",
+            )
+            return
+
+        try:
+            template = load_template(template_key)
+        except Exception as exc:
+            messagebox.showerror(display_type, f"Unable to load editor template: {exc}")
+            return
+
+        GenericEditorWindow(None, record, template, wrapper)
+
+    def _resolve_entity_editor_context(self, entity_entry):
+        if not isinstance(entity_entry, dict):
+            return None
+
+        raw_name = entity_entry.get("name") or entity_entry.get("Name") or ""
+        raw_type = entity_entry.get("type") or entity_entry.get("Type") or ""
+        name = str(raw_name).strip()
+        ent_type = str(raw_type).strip().lower()
+
+        if not name:
+            return None
+
+        type_aliases = {
+            "character": "npc",
+            "ally": "npc",
+            "npcs": "npc",
+            "monster": "creature",
+            "enemy": "creature",
+            "foe": "creature",
+            "creatures": "creature",
+            "places": "place",
+            "location": "place",
+            "locations": "place",
+            "site": "place",
+        }
+        base_type = type_aliases.get(ent_type, ent_type or "npc")
+
+        collection = None
+        wrapper = None
+        template_key = None
+        display_type = None
+        record = None
+
+        if base_type == "npc":
+            collection = getattr(self, "npcs", {})
+            wrapper = getattr(self, "npc_wrapper", None)
+            template_key = "npcs"
+            display_type = "NPCs"
+            record = self._lookup_entity_by_name("npc", name)
+        elif base_type == "creature":
+            collection = getattr(self, "creatures", {})
+            wrapper = getattr(self, "creature_wrapper", None)
+            template_key = "creatures"
+            display_type = "Creatures"
+            record = self._lookup_entity_by_name("creature", name)
+        elif base_type == "place":
+            collection = getattr(self, "places", {})
+            wrapper = getattr(self, "place_wrapper", None)
+            template_key = "places"
+            display_type = "Places"
+            record = self._lookup_entity_by_name("place", name)
+        elif base_type == "faction":
+            collection = getattr(self, "factions", {})
+            wrapper = getattr(self, "faction_wrapper", None)
+            template_key = "factions"
+            display_type = "Factions"
+            record = self._lookup_from_collection(collection, name)
+        elif base_type == "scenario":
+            collection = {str((self.scenario or {}).get("Title", "")): self.scenario}
+            wrapper = getattr(self, "scenario_wrapper", None)
+            template_key = "scenarios"
+            display_type = "Scenarios"
+            record = self._lookup_from_collection(collection, name)
+
+        if record is None and collection:
+            record = self._lookup_from_collection(collection, name)
+
+        if not template_key:
+            return None
+
+        return {
+            "record": record,
+            "wrapper": wrapper,
+            "template_key": template_key,
+            "display_type": display_type,
+            "entity_name": name,
+        }
+
+    @staticmethod
+    def _lookup_from_collection(collection, name):
+        if not isinstance(collection, dict):
+            return None
+        if name in collection:
+            return collection[name]
+        lower = name.lower()
+        for key, value in collection.items():
+            try:
+                if str(key).lower() == lower:
+                    return value
+            except Exception:
+                continue
+        return None
 
     @staticmethod
     def _apply_inline_markup(text):
@@ -626,6 +818,7 @@ class ScenarioGraphEditor(ctk.CTkFrame):
             )
         default_text = "Select a scene card to view its full content."
         self._update_detail_text(self._convert_scene_text_to_html(default_text), default_text)
+        self._rebuild_entity_buttons([])
 
     def _show_node_detail(self, node_tag):
         if not self._detail_panel_visible:
@@ -665,38 +858,11 @@ class ScenarioGraphEditor(ctk.CTkFrame):
         full_text = full_text.strip() or "No scene notes provided."
         entities = scene_data.get("entities") or scene_data.get("Entities") or []
 
-        html_sections = [self._convert_scene_text_to_html(full_text)]
-        plain_sections = [full_text]
-
-        if entities:
-            html_sections.append("<h3>Key Entities</h3>")
-            html_sections.append("<ul>")
-            plain_entities = ["Key Entities:"]
-            for ent in entities:
-                if not isinstance(ent, dict):
-                    continue
-                name = (ent.get("name") or "Unnamed").strip() or "Unnamed"
-                ent_type = (ent.get("type") or "").strip()
-                synopsis = (ent.get("synopsis") or "").strip()
-
-                name_html = html.escape(name)
-                type_html = f" <em>({html.escape(ent_type.title())})</em>" if ent_type else ""
-                synopsis_html = f"<br/><span>{self._apply_inline_markup(synopsis)}</span>" if synopsis else ""
-                html_sections.append(f"<li><strong>{name_html}</strong>{type_html}{synopsis_html}</li>")
-
-                bullet = f"- {name}"
-                if ent_type:
-                    bullet += f" ({ent_type.title()})"
-                plain_entities.append(bullet)
-                if synopsis:
-                    plain_entities.append(f"    {synopsis}")
-            html_sections.append("</ul>")
-            plain_sections.append("\n".join(plain_entities))
-
-        html_content = "\n".join(section for section in html_sections if section)
-        plain_content = "\n\n".join(section for section in plain_sections if section)
+        html_content = self._convert_scene_text_to_html(full_text)
+        plain_content = full_text
 
         self._update_detail_text(html_content, plain_content)
+        self._rebuild_entity_buttons(entities)
 
     def _build_scene_payload_from_graph(self, node_tag):
         for node in self.graph.get("nodes", []):
