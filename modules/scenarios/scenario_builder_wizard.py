@@ -69,12 +69,21 @@ class BasicInfoStep(WizardStep):
 class ScenesPlanningStep(WizardStep):
     """Editable scene list tailored for the scenario builder wizard."""
 
-    def __init__(self, master):
+    ENTITY_FIELDS = {
+        "NPCs": ("npcs", "Key NPCs", "NPC"),
+        "Creatures": ("creatures", "Creatures / Foes", "Creature"),
+        "Places": ("places", "Locations / Places", "Place"),
+    }
+
+    def __init__(self, master, entity_wrappers):
         super().__init__(master)
         self.scenes = []
         self.selected_index = None
         self._suppress_list_event = False
         self._updating_fields = False
+        self.entity_wrappers = entity_wrappers
+        self.entity_listboxes = {}
+        self.entity_buttons = []
 
         container = ctk.CTkFrame(self)
         container.pack(fill="both", expand=True, padx=10, pady=10)
@@ -158,21 +167,53 @@ class ScenesPlanningStep(WizardStep):
 
         hint_font = ctk.CTkFont(size=12)
 
-        ctk.CTkLabel(editor, text="Key NPCs (one per line)", anchor="w", font=hint_font).grid(row=7, column=0, sticky="ew", padx=6, pady=(0, 2))
-        self.npcs_text = ctk.CTkTextbox(editor, height=90)
-        self.npcs_text.grid(row=8, column=0, sticky="ew", padx=6, pady=(0, 12))
+        current_row = 7
+        for field, (entity_type, label_text, singular) in self.ENTITY_FIELDS.items():
+            ctk.CTkLabel(editor, text=label_text, anchor="w", font=hint_font).grid(
+                row=current_row, column=0, sticky="ew", padx=6, pady=(0, 2)
+            )
+            current_row += 1
 
-        ctk.CTkLabel(editor, text="Creatures / Foes (one per line)", anchor="w", font=hint_font).grid(row=9, column=0, sticky="ew", padx=6, pady=(0, 2))
-        self.creatures_text = ctk.CTkTextbox(editor, height=90)
-        self.creatures_text.grid(row=10, column=0, sticky="ew", padx=6, pady=(0, 12))
+            list_frame = ctk.CTkFrame(editor)
+            list_frame.grid(row=current_row, column=0, sticky="nsew", padx=6, pady=(0, 6))
+            list_frame.grid_rowconfigure(0, weight=1)
+            list_frame.grid_columnconfigure(0, weight=1)
 
-        ctk.CTkLabel(editor, text="Locations / Places (one per line)", anchor="w", font=hint_font).grid(row=11, column=0, sticky="ew", padx=6, pady=(0, 2))
-        self.places_text = ctk.CTkTextbox(editor, height=90)
-        self.places_text.grid(row=12, column=0, sticky="ew", padx=6, pady=(0, 12))
+            listbox = tk.Listbox(list_frame, activestyle="none", exportselection=False, height=6)
+            listbox.grid(row=0, column=0, sticky="nsew", padx=(6, 0), pady=(6, 6))
+            scrollbar = tk.Scrollbar(list_frame, orient="vertical", command=listbox.yview)
+            scrollbar.grid(row=0, column=1, sticky="ns", pady=(6, 6), padx=(0, 6))
+            listbox.configure(yscrollcommand=scrollbar.set)
+            self.entity_listboxes[field] = listbox
 
-        ctk.CTkLabel(editor, text="Next Scenes (names or numbers)", anchor="w", font=hint_font).grid(row=13, column=0, sticky="ew", padx=6, pady=(0, 2))
+            current_row += 1
+
+            btn_row = ctk.CTkFrame(editor)
+            btn_row.grid(row=current_row, column=0, sticky="ew", padx=6, pady=(0, 12))
+            btn_row.grid_columnconfigure((0, 1), weight=1)
+
+            add_btn = ctk.CTkButton(
+                btn_row,
+                text="Add",
+                command=lambda f=field, et=entity_type, singular=singular: self.open_entity_selector(f, et, singular),
+            )
+            add_btn.grid(row=0, column=0, padx=4, pady=2, sticky="ew")
+            remove_btn = ctk.CTkButton(
+                btn_row,
+                text="Remove",
+                command=lambda f=field: self.remove_selected_entity(f),
+            )
+            remove_btn.grid(row=0, column=1, padx=4, pady=2, sticky="ew")
+            self.entity_buttons.extend([add_btn, remove_btn])
+
+            current_row += 1
+
+        ctk.CTkLabel(editor, text="Next Scenes (names or numbers)", anchor="w", font=hint_font).grid(
+            row=current_row, column=0, sticky="ew", padx=6, pady=(0, 2)
+        )
+        current_row += 1
         self.next_text = ctk.CTkTextbox(editor, height=80)
-        self.next_text.grid(row=14, column=0, sticky="ew", padx=6, pady=(0, 20))
+        self.next_text.grid(row=current_row, column=0, sticky="ew", padx=6, pady=(0, 20))
 
         self._set_editor_enabled(False)
 
@@ -186,16 +227,81 @@ class ScenesPlanningStep(WizardStep):
             self.type_menu.configure(state=state)
         except Exception:  # pragma: no cover - widget state differences
             pass
-        for widget in (self.summary_text, self.npcs_text, self.creatures_text, self.places_text, self.next_text):
+        for widget in (self.summary_text, self.next_text):
             widget.configure(state="normal")
             if not enabled:
                 widget.configure(state="disabled")
+        for listbox in self.entity_listboxes.values():
+            try:
+                listbox.configure(state=tk.NORMAL if enabled else tk.DISABLED)
+            except Exception:  # pragma: no cover - widget differences
+                pass
+        for button in self.entity_buttons:
+            try:
+                button.configure(state="normal" if enabled else "disabled")
+            except Exception:  # pragma: no cover - widget differences
+                pass
 
     def _set_textbox_value(self, widget, value):
         widget.configure(state="normal")
         widget.delete("1.0", "end")
         if value:
             widget.insert("1.0", value)
+
+    def _set_listbox_items(self, field, values):
+        listbox = self.entity_listboxes.get(field)
+        if not listbox:
+            return
+        items = self._dedupe(values)
+        listbox.delete(0, tk.END)
+        for value in items:
+            listbox.insert(tk.END, value)
+
+    def _get_listbox_items(self, field):
+        listbox = self.entity_listboxes.get(field)
+        if not listbox:
+            return []
+        return [listbox.get(idx) for idx in range(listbox.size())]
+
+    def open_entity_selector(self, field, entity_type, singular_label):  # pragma: no cover - UI interaction
+        wrapper = self.entity_wrappers.get(entity_type)
+        if not wrapper:
+            messagebox.showerror("Unavailable", f"No {singular_label} data available for selection.")
+            return
+        template = load_template(entity_type)
+        top = ctk.CTkToplevel(self)
+        top.title(f"Select {singular_label}")
+        top.geometry("900x600")
+        selection = GenericListSelectionView(
+            top,
+            entity_type,
+            wrapper,
+            template,
+            on_select_callback=lambda et, name, f=field, win=top: self._on_entity_selected(f, name, win),
+        )
+        selection.pack(fill="both", expand=True)
+        top.transient(self.winfo_toplevel())
+        top.grab_set()
+
+    def _on_entity_selected(self, field, name, window):  # pragma: no cover - UI callback
+        if not name:
+            return
+        existing = self._get_listbox_items(field)
+        if name not in existing:
+            existing.append(name)
+            self._set_listbox_items(field, existing)
+        try:
+            window.destroy()
+        except Exception:  # pragma: no cover - best effort cleanup
+            pass
+
+    def remove_selected_entity(self, field):  # pragma: no cover - UI interaction
+        listbox = self.entity_listboxes.get(field)
+        if not listbox:
+            return
+        selection = listbox.curselection()
+        for index in reversed(selection):
+            listbox.delete(index)
 
     def _on_scene_selected(self, _event=None):  # pragma: no cover - UI callback
         if self._suppress_list_event:
@@ -216,9 +322,8 @@ class ScenesPlanningStep(WizardStep):
             self._set_editor_enabled(True)
             self.title_var.set("")
             self._set_textbox_value(self.summary_text, "")
-            self._set_textbox_value(self.npcs_text, "")
-            self._set_textbox_value(self.creatures_text, "")
-            self._set_textbox_value(self.places_text, "")
+            for field in self.ENTITY_FIELDS:
+                self._set_listbox_items(field, [])
             self._set_textbox_value(self.next_text, "")
             self.type_var.set(self.type_options[0])
             self._updating_fields = False
@@ -240,9 +345,8 @@ class ScenesPlanningStep(WizardStep):
         self.type_var.set(type_label or self.type_options[0])
         summary = scene.get("Summary") or scene.get("Text") or ""
         self._set_textbox_value(self.summary_text, summary)
-        self._set_textbox_value(self.npcs_text, "\n".join(scene.get("NPCs", [])))
-        self._set_textbox_value(self.creatures_text, "\n".join(scene.get("Creatures", [])))
-        self._set_textbox_value(self.places_text, "\n".join(scene.get("Places", [])))
+        for field in self.ENTITY_FIELDS:
+            self._set_listbox_items(field, scene.get(field, []))
         self._set_textbox_value(self.next_text, "\n".join(scene.get("NextScenes", [])))
         self._updating_fields = False
 
@@ -553,10 +657,6 @@ class ScenesPlanningStep(WizardStep):
                 scenes.append(normalised)
         return scenes
 
-    def _parse_textbox_list(self, widget):
-        content = widget.get("1.0", "end").strip()
-        return self._dedupe(self._split_to_list(content))
-
     def _save_current_scene(self):
         if self.selected_index is None or self.selected_index >= len(self.scenes):
             return
@@ -566,13 +666,10 @@ class ScenesPlanningStep(WizardStep):
         summary = self.summary_text.get("1.0", "end").strip()
         scene["Summary"] = summary
         scene["Text"] = summary
-        npc_list = self._parse_textbox_list(self.npcs_text)
-        creature_list = self._parse_textbox_list(self.creatures_text)
-        place_list = self._parse_textbox_list(self.places_text)
-        next_list = self._parse_textbox_list(self.next_text)
-        scene["NPCs"] = npc_list
-        scene["Creatures"] = creature_list
-        scene["Places"] = place_list
+        next_list = self._dedupe(self._split_to_list(self.next_text.get("1.0", "end")))
+        scene["NPCs"] = self._get_listbox_items("NPCs")
+        scene["Creatures"] = self._get_listbox_items("Creatures")
+        scene["Places"] = self._get_listbox_items("Places")
         scene["NextScenes"] = next_list
         selection = self.type_var.get()
         label = "" if selection == self.type_options[0] else selection
@@ -936,7 +1033,14 @@ class ScenarioBuilderWizard(ctk.CTkToplevel):
 
         self.steps = [
             ("Basic Information", BasicInfoStep(self.step_container)),
-            ("Scenes", ScenesPlanningStep(self.step_container)),
+            (
+                "Scenes",
+                ScenesPlanningStep(self.step_container, {
+                    key: wrapper
+                    for key, wrapper in entity_wrappers.items()
+                    if key in ("npcs", "creatures", "places")
+                }),
+            ),
             ("Entity Linking", EntityLinkingStep(self.step_container, entity_wrappers)),
             ("Review", ReviewStep(self.step_container)),
         ]
