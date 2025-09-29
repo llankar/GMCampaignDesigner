@@ -1,10 +1,13 @@
 """World Map exploration window with nested map navigation and entity synthesis."""
 import os
 import json
+import textwrap
 import tkinter as tk
 from tkinter import messagebox, simpledialog
 import customtkinter as ctk
 from PIL import Image, ImageTk, ImageDraw
+
+from db.db import get_connection, ensure_entity_schema
 
 from modules.generic.entity_detail_factory import open_entity_window
 from modules.generic.generic_model_wrapper import GenericModelWrapper
@@ -76,6 +79,9 @@ class WorldMapWindow(ctk.CTkToplevel):
         self._portrait_photo: ImageTk.PhotoImage | None = None
         self._portrait_placeholder: Image.Image | None = None
         self._inspector_token: dict | None = None
+        self._entity_tab_images: list[ImageTk.PhotoImage] = []
+        self._notes_textbox: ctk.CTkTextbox | None = None
+        self._notes_status_label: ctk.CTkLabel | None = None
 
         self.zoom = 1.0
         self.pan_x = 0.0
@@ -256,7 +262,7 @@ class WorldMapWindow(ctk.CTkToplevel):
 
         self.tab_selector = ctk.CTkSegmentedButton(
             tabs_wrapper,
-            values=["Summary", "Notes", "Relationships"],
+            values=["Summary", "Notes", "Entities"],
             command=self._on_inspector_tab_selected,
         )
         self.tab_selector.pack(fill="x")
@@ -266,13 +272,13 @@ class WorldMapWindow(ctk.CTkToplevel):
         self.tab_content_container.pack(fill="both", expand=True, padx=16, pady=(0, 16))
 
         self._tab_frames: dict[str, ctk.CTkFrame] = {}
-        for name in ("Summary", "Notes", "Relationships"):
+        for name in ("Summary", "Notes", "Entities"):
             frame = ctk.CTkFrame(self.tab_content_container, fg_color="transparent")
             self._tab_frames[name] = frame
 
         self.summary_container = self._tab_frames["Summary"]
         self.notes_container = self._tab_frames["Notes"]
-        self.relationships_container = self._tab_frames["Relationships"]
+        self.entities_container = self._tab_frames["Entities"]
         self._active_tab: str | None = None
         self._select_inspector_tab("Summary")
 
@@ -1132,10 +1138,13 @@ class WorldMapWindow(ctk.CTkToplevel):
             "Use the controls above to place NPCs, PCs, creatures, places, and nested maps. "
             "Double-click a map token to dive deeper, and drag entities to reposition them."
         )
-        self._render_tab_message("Notes", "Notes will appear here once added to the world map.")
+        self._notes_textbox = None
+        self._notes_status_label = None
+        self._entity_tab_images = []
+        self._render_tab_message("Notes", "Select an entity to capture your campaign notes.")
         self._render_tab_message(
-            "Relationships",
-            "Relationship insights will populate this tab when available.",
+            "Entities",
+            "Add NPCs or creatures to this map to see them collected here.",
         )
         self._inspector_token = None
         self._set_quick_actions_state(False)
@@ -1161,7 +1170,7 @@ class WorldMapWindow(ctk.CTkToplevel):
         self._render_badges(badges)
         self._populate_summary_tab(sections)
         self._populate_notes_tab(record)
-        self._populate_relationships_tab(record)
+        self._populate_entities_tab(record)
 
     def _show_map_hint(self, token: dict) -> None:
         map_name = token.get("linked_map") or token.get("entity_id") or "Nested Map"
@@ -1184,6 +1193,8 @@ class WorldMapWindow(ctk.CTkToplevel):
 
         hint = summary_text or "Double-click this map token to open its layer and keep building your world."
         self._render_summary_message(hint)
+        self._populate_notes_tab(None)
+        self._populate_entities_tab(None)
 
     def _set_quick_actions_state(self, enabled: bool) -> None:
         if hasattr(self, "highlight_button"):
@@ -1331,13 +1342,272 @@ class WorldMapWindow(ctk.CTkToplevel):
         self._render_summary_sections(sections)
 
     def _populate_notes_tab(self, record: dict | None) -> None:
-        self._render_tab_message("Notes", "Notes will appear here once added to the world map.")
+        self._clear_tab_contents("Notes")
+        self._notes_textbox = None
+        self._notes_status_label = None
 
-    def _populate_relationships_tab(self, record: dict | None) -> None:
-        self._render_tab_message(
-            "Relationships",
-            "Relationship insights will populate this tab when available.",
+        token = self._inspector_token or self.selected_token
+        if not token or token.get("type") == "map":
+            self._render_tab_message(
+                "Notes",
+                "Notes are available for NPCs, PCs, creatures, and places.",
+            )
+            return
+
+        container = self.notes_container
+        textbox = ctk.CTkTextbox(
+            container,
+            wrap="word",
+            font=("Segoe UI", 12),
+            height=220,
         )
+        textbox.pack(fill="both", expand=True, pady=(0, 12))
+
+        existing_notes = ""
+        if isinstance(record, dict):
+            raw_value = record.get("Notes")
+            if isinstance(raw_value, str):
+                existing_notes = raw_value
+            elif raw_value is not None:
+                existing_notes = self._normalize_text(raw_value)
+        if existing_notes:
+            textbox.insert("1.0", existing_notes)
+
+        controls = ctk.CTkFrame(container, fg_color="transparent")
+        controls.pack(fill="x")
+        status_label = ctk.CTkLabel(controls, text="", font=("Segoe UI", 11))
+        status_label.pack(side="left", padx=(0, 6))
+        save_button = ctk.CTkButton(
+            controls,
+            text="Save Notes",
+            width=120,
+            command=self._on_save_notes,
+        )
+        save_button.pack(side="right")
+
+        self._notes_textbox = textbox
+        self._notes_status_label = status_label
+
+    def _populate_entities_tab(self, _record: dict | None) -> None:
+        self._clear_tab_contents("Entities")
+        self._entity_tab_images = []
+
+        relevant_tokens = [
+            token
+            for token in self.tokens
+            if str(token.get("entity_type")).upper() in {"NPC", "CREATURE"}
+        ]
+        if not relevant_tokens:
+            self._render_tab_message(
+                "Entities",
+                "Add NPCs or creatures to this map to see them collected here.",
+            )
+            return
+
+        relevant_tokens.sort(
+            key=lambda token: (
+                str(token.get("entity_type") or ""),
+                str(token.get("entity_id") or ""),
+            )
+        )
+
+        for token in relevant_tokens:
+            frame = ctk.CTkFrame(self.entities_container, fg_color="#141C30", corner_radius=12)
+            frame.pack(fill="x", pady=(0, 12))
+
+            body = ctk.CTkFrame(frame, fg_color="transparent")
+            body.pack(fill="x", padx=12, pady=12)
+            body.grid_columnconfigure(1, weight=1)
+
+            thumbnail = self._resolve_token_image(token, 72)
+            self._entity_tab_images.append(thumbnail)
+            portrait_label = ctk.CTkLabel(body, text="", image=thumbnail)
+            portrait_label.grid(row=0, column=0, rowspan=2, sticky="nw")
+
+            name = token.get("entity_id", "Unnamed")
+            entity_type = token.get("entity_type", "Entity")
+            title_label = ctk.CTkLabel(
+                body,
+                text=f"{name}",
+                font=("Segoe UI", 14, "bold"),
+                anchor="w",
+            )
+            title_label.grid(row=0, column=1, sticky="w", padx=(12, 0))
+
+            type_label = ctk.CTkLabel(
+                body,
+                text=entity_type,
+                font=("Segoe UI", 11, "bold"),
+                text_color="#93A2D3",
+            )
+            type_label.grid(row=0, column=2, sticky="ne")
+
+            summary = self._get_summary_preview(token.get("record"))
+            summary_label = ctk.CTkLabel(
+                body,
+                text=summary,
+                font=("Segoe UI", 12),
+                wraplength=240,
+                justify="left",
+                anchor="w",
+            )
+            summary_label.grid(row=1, column=1, sticky="w", padx=(12, 0), pady=(6, 0))
+
+            inspect_button = ctk.CTkButton(
+                body,
+                text="Inspect",
+                width=100,
+                command=lambda t=token: self._on_entity_card_selected(t),
+            )
+            inspect_button.grid(row=1, column=2, sticky="se")
+
+    def _on_entity_card_selected(self, token: dict) -> None:
+        if token not in self.tokens:
+            return
+        self.selected_token = token
+        self._show_entity_synthesis(token)
+        if hasattr(self, "tab_selector"):
+            self.tab_selector.set("Summary")
+        self._select_inspector_tab("Summary")
+
+    def _get_summary_preview(self, record: dict | None) -> str:
+        if not isinstance(record, dict):
+            return "No details available yet."
+        for key in ("Summary", "Synopsis", "Description", "Background", "Notes"):
+            value = record.get(key)
+            if not value:
+                continue
+            normalized = self._normalize_text(value).strip()
+            if not normalized:
+                continue
+            single_line = " ".join(normalized.split())
+            if not single_line:
+                continue
+            return textwrap.shorten(single_line, width=220, placeholder="...")
+        return "No details available yet."
+
+    def _on_save_notes(self) -> None:
+        token = self._inspector_token or self.selected_token
+        textbox = self._notes_textbox
+        if not token or not textbox:
+            return
+        if token.get("type") == "map":
+            if self._notes_status_label:
+                self._notes_status_label.configure(
+                    text="Notes are not supported for maps.",
+                    text_color="#F7C948",
+                )
+            return
+
+        notes = textbox.get("1.0", "end").rstrip()
+        success = self._save_entity_notes(token, notes)
+
+        if success:
+            entity_type = token.get("entity_type", "Entity")
+            entity_id = token.get("entity_id")
+            updated_record = self._fetch_record(entity_type, entity_id)
+            if isinstance(updated_record, dict):
+                token["record"] = updated_record
+                self._update_token_records(entity_type, entity_id, updated_record)
+                sections = self._compose_summary(entity_type, updated_record)
+                self._populate_summary_tab(sections)
+                self._populate_entities_tab(updated_record)
+            if self._notes_status_label:
+                self._notes_status_label.configure(
+                    text="Notes saved",
+                    text_color="#7CD992",
+                )
+        else:
+            if self._notes_status_label:
+                self._notes_status_label.configure(
+                    text="Failed to save notes",
+                    text_color="#F17171",
+                )
+
+    def _save_entity_notes(self, token: dict, notes: str) -> bool:
+        entity_type = token.get("entity_type")
+        table = self._get_entity_table_name(entity_type)
+        if not table:
+            return False
+
+        ensure_entity_schema(table)
+        identifier = token.get("entity_id")
+        if not identifier:
+            return False
+
+        conn = get_connection()
+        try:
+            cursor = conn.cursor()
+            cursor.execute(f"PRAGMA table_info({table})")
+            columns = {row[1] for row in cursor.fetchall()}
+            if "Notes" not in columns:
+                cursor.execute(f"ALTER TABLE {table} ADD COLUMN Notes TEXT")
+                columns.add("Notes")
+
+            cursor.execute(
+                f"UPDATE {table} SET Notes = ? WHERE Name = ?",
+                (notes, identifier),
+            )
+            updated = cursor.rowcount
+            if updated == 0 and "Title" in columns:
+                cursor.execute(
+                    f"UPDATE {table} SET Notes = ? WHERE Title = ?",
+                    (notes, identifier),
+                )
+                updated = cursor.rowcount
+
+            conn.commit()
+
+            if updated == 0:
+                cursor.execute(
+                    f"SELECT 1 FROM {table} WHERE Name = ?",
+                    (identifier,),
+                )
+                exists = cursor.fetchone() is not None
+                if not exists and "Title" in columns:
+                    cursor.execute(
+                        f"SELECT 1 FROM {table} WHERE Title = ?",
+                        (identifier,),
+                    )
+                    exists = cursor.fetchone() is not None
+                if not exists:
+                    log_warning(
+                        f"No rows updated when saving notes for {entity_type} '{identifier}'",
+                        func_name="WorldMapWindow._save_entity_notes",
+                    )
+                return exists
+            return True
+        except Exception as exc:
+            log_error(
+                f"Failed to persist notes for {entity_type}: {exc}",
+                func_name="WorldMapWindow._save_entity_notes",
+            )
+            return False
+        finally:
+            conn.close()
+
+    @staticmethod
+    def _get_entity_table_name(entity_type: str | None) -> str | None:
+        if not entity_type:
+            return None
+        mapping = {
+            "NPC": "npcs",
+            "PC": "pcs",
+            "CREATURE": "creatures",
+            "PLACE": "places",
+            "MAP": "maps",
+        }
+        return mapping.get(str(entity_type).upper())
+
+    def _update_token_records(self, entity_type: str | None, entity_id: str | None, record: dict) -> None:
+        if not entity_type or not entity_id:
+            return
+        for entry in self.tokens:
+            if (
+                str(entry.get("entity_type")).upper() == str(entity_type).upper()
+                and entry.get("entity_id") == entity_id
+            ):
+                entry["record"] = record
 
     def _compose_summary(self, entity_type: str, record: dict) -> dict[str, list[str]]:
         sections: dict[str, list[str]] = {}

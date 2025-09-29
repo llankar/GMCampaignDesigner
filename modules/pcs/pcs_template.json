@@ -5,6 +5,7 @@
       {"name": "Background", "type": "longtext"},
       {"name": "Secret", "type": "longtext"},
       {"name": "Traits", "type": "longtext"},
+      {"name": "Notes", "type": "longtext"},
       {"name": "Factions", "type": "list", "linked_type": "Factions"},
       {"name": "Objects", "type": "list", "linked_type": "Objects"},
       {"name": "Portrait", "type": "text"},

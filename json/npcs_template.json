@@ -4,6 +4,7 @@
       {"name": "Role", "type": "text"},
       {"name": "Description", "type": "longtext"},
       {"name": "Factions", "type": "list", "linked_type": "Factions"},
+      {"name": "Notes", "type": "longtext"},
       {"name": "Portrait", "type": "text"}
   ]
 }
