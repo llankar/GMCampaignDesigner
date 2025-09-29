@@ -1156,10 +1156,10 @@ class WorldMapWindow(ctk.CTkToplevel):
         sections["Overview"] = [summary] if summary else []
 
         detail_fields: dict[str, tuple[str, list[str]]] = {
-            "NPC": ("Profile", ["Role", "Faction", "Motivation", "Secrets"]),
-            "PC": ("Adventurer Details", ["Class", "Level", "Player", "Goals"]),
-            "Creature": ("Creature Traits", ["Type", "Challenge", "Abilities", "Weaknesses"]),
-            "Place": ("Location Facts", ["Tags", "Population", "Climate", "Resources"]),
+            "NPC": ("Profile", ["Role", "Factions", "Motivation", "Secret"]),
+            "PC": ("Adventurer Details", ["Role", "Traits", "Background", "Secret"]),
+            "Creature": ("Creature Traits", ["Type", "Powers", "Stats", "Weakness"]),
+            "Place": ("Location Facts", ["Description", "NPCs", "Secrets", "PlayerDisplay"]),
         }
 
         header, fields = detail_fields.get(entity_type, ("Details", []))
