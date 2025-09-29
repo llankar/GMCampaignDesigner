@@ -28,7 +28,11 @@ from docx import Document
 
 # Modular helper imports
 from modules.helpers.window_helper import position_window_at_top
-from modules.helpers.template_loader import load_template
+from modules.helpers.template_loader import (
+    load_template,
+    load_entity_definitions,
+    build_entity_wrappers,
+)
 from modules.helpers.config_helper import ConfigHelper
 from modules.helpers.backup_helper import (
     BackupError,
@@ -62,13 +66,14 @@ from modules.scenarios.scenario_importer import ScenarioImportWindow
 from modules.scenarios.scenario_generator_view import ScenarioGeneratorView
 from modules.generic.export_for_foundry import preview_and_export_foundry
 from modules.helpers import text_helpers
-from db.db import load_schema_from_json, initialize_db
+from db.db import initialize_db, ensure_entity_schema
 from modules.factions.faction_graph_editor import FactionGraphEditor
 from modules.pcs.display_pcs import display_pcs_in_banner
 from modules.generic.generic_list_selection_view import GenericListSelectionView
 from modules.maps.controllers.display_map_controller import DisplayMapController
 from modules.maps.world_map_view import WorldMapWindow
 from modules.generic.custom_fields_editor import CustomFieldsEditor
+from modules.generic.new_entity_type_dialog import NewEntityTypeDialog
 
 
 from modules.dice.dice_roller_window import DiceRollerWindow
@@ -108,6 +113,8 @@ class MainWindow(ctk.CTk):
         position_window_at_top(self)
         self.set_window_icon()
         self.create_layout()
+        self.entity_definitions = load_entity_definitions()
+        self.entity_wrappers = {}
         self.load_icons()
         self.create_sidebar()
         self.create_content_area()
@@ -218,43 +225,46 @@ class MainWindow(ctk.CTk):
 
     def load_icons(self):
         log_debug("Loading sidebar icons", func_name="main_window.MainWindow.load_icons")
-        self.icons = {
-            "change_db": self.load_icon("database_icon.png", size=(60, 60)),
-            "db_export": self.load_icon("database_export_icon.png", size=(60, 60)),
-            "db_import": self.load_icon("database_import_icon.png", size=(60, 60)),
-            "swarm_path": self.load_icon("folder_icon.png", size=(60, 60)),
-            "customize_fields": self.load_icon("customize_fields.png", size=(60, 60)),
-            "manage_scenarios": self.load_icon("scenario_icon.png", size=(60, 60)),
-            "manage_pcs": self.load_icon("pc_icon.png", size=(60, 60)),
-            "manage_npcs": self.load_icon("npc_icon.png", size=(60, 60)),
-            "manage_creatures": self.load_icon("creature_icon.png", size=(60, 60)),
-            "manage_factions": self.load_icon("faction_icon.png", size=(60, 60)),
-            "manage_places": self.load_icon("places_icon.png", size=(60, 60)),
-            "manage_objects": self.load_icon("objects_icon.png", size=(60, 60)),
-            "manage_informations": self.load_icon("informations_icon.png", size=(60, 60)),
-            "manage_clues": self.load_icon("clues_icon.png", size=(60, 60)),
-            "manage_maps": self.load_icon("maps_icon.png", size=(60, 60)),
-            "export_scenarios": self.load_icon("export_icon.png", size=(60, 60)),
-            "gm_screen": self.load_icon("gm_screen_icon.png", size=(60, 60)),
-            "npc_graph": self.load_icon("npc_graph_icon.png", size=(60, 60)),
-            "pc_graph": self.load_icon("pc_graph_icon.png", size=(60, 60)),
-            "faction_graph": self.load_icon("faction_graph_icon.png", size=(60, 60)),
-            "scenario_graph": self.load_icon("scenario_graph_icon.png", size=(60, 60)),
-            "world_map": self.load_icon("maps_icon.png", size=(60, 60)),
-            "generate_portraits": self.load_icon("generate_icon.png", size=(60, 60)),
-            "associate_portraits": self.load_icon("associate_icon.png", size=(60, 60)),
-            "import_portraits": self.load_icon("import_icon.png", size=(60, 60)),
-            "import_scenario": self.load_icon("import_icon.png", size=(60, 60)),
-            "import_creatures_pdf": self.load_icon("import_icon.png", size=(60, 60)),
-            "export_foundry": self.load_icon("export_foundry_icon.png", size=(60, 60)),
-            "map_tool": self.load_icon("map_tool_icon.png", size=(60, 60)),
-            "generate_scenario": self.load_icon("generate_scenario_icon.png", size=(60, 60)),
-            "dice_roller": self.load_icon("dice_roller_icon.png", size=(60, 60)),
-            "dice_bar": self.load_icon("dice_roller_icon.png", size=(60, 60)),
-            "sound_manager": self.load_icon("sound_manager_icon.png", size=(60, 60)),
-            "audio_controls": self.load_icon("sound_manager_icon.png", size=(60, 60)),
-            "scene_flow_viewer": self.load_icon("scenes_flow_icon.png", size=(60, 60)),
+        base_icons = {
+            "change_db": "database_icon.png",
+            "db_export": "database_export_icon.png",
+            "db_import": "database_import_icon.png",
+            "swarm_path": "folder_icon.png",
+            "customize_fields": "customize_fields.png",
+            "new_entity_type": "customize_fields.png",
+            "export_scenarios": "export_icon.png",
+            "gm_screen": "gm_screen_icon.png",
+            "npc_graph": "npc_graph_icon.png",
+            "pc_graph": "pc_graph_icon.png",
+            "faction_graph": "faction_graph_icon.png",
+            "scenario_graph": "scenario_graph_icon.png",
+            "world_map": "maps_icon.png",
+            "generate_portraits": "generate_icon.png",
+            "associate_portraits": "associate_icon.png",
+            "import_portraits": "import_icon.png",
+            "import_scenario": "import_icon.png",
+            "import_creatures_pdf": "import_icon.png",
+            "export_foundry": "export_foundry_icon.png",
+            "map_tool": "map_tool_icon.png",
+            "generate_scenario": "generate_scenario_icon.png",
+            "dice_roller": "dice_roller_icon.png",
+            "dice_bar": "dice_roller_icon.png",
+            "sound_manager": "sound_manager_icon.png",
+            "audio_controls": "sound_manager_icon.png",
+            "scene_flow_viewer": "scenes_flow_icon.png",
         }
+
+        # Entity-specific icons come from metadata; keep base ones separate.
+        self.icons = {}
+        for key, file_name in base_icons.items():
+            self.icons[key] = self.load_icon(file_name, size=(60, 60))
+
+        default_entity_icon = self.icons.get("customize_fields") or self.load_icon("customize_fields.png", size=(60, 60))
+        for slug, meta in self.entity_definitions.items():
+            icon_key = f"entity::{slug}"
+            icon_path = meta.get("icon")
+            icon_image = self.load_icon(icon_path, size=(60, 60)) if icon_path else None
+            self.icons[icon_key] = icon_image or default_entity_icon
 
     def open_custom_fields_editor(self):
         try:
@@ -267,61 +277,131 @@ class MainWindow(ctk.CTk):
                           func_name="main_window.MainWindow.open_custom_fields_editor")
             messagebox.showerror("Error", f"Failed to open Custom Fields Editor:\n{e}")
 
-    def load_icon(self, file_name, size=(60, 60)):
-        path = os.path.join("assets", file_name)
+    def open_new_entity_type_dialog(self):
         try:
-            pil_image = Image.open(path)
-        except Exception as e:
-            log_warning(f"Unable to load icon {file_name}: {e}",
-                        func_name="main_window.MainWindow.load_icon")
+            log_info("Opening New Entity Type dialog", func_name="main_window.MainWindow.open_new_entity_type_dialog")
+            dlg = NewEntityTypeDialog(self, on_created=self.refresh_entities)
+            dlg.transient(self)
+            dlg.lift(); dlg.focus_force()
+        except Exception as exc:
+            log_exception(
+                f"Failed to open New Entity Type dialog: {exc}",
+                func_name="main_window.MainWindow.open_new_entity_type_dialog",
+            )
+            messagebox.showerror("Error", f"Failed to open New Entity Type dialog:\n{exc}")
+
+    def load_icon(self, file_name, size=(60, 60)):
+        if not file_name:
             return None
-        log_debug(f"Loaded icon {file_name}", func_name="main_window.MainWindow.load_icon")
-        return ctk.CTkImage(light_image=pil_image, dark_image=pil_image, size=size)
+
+        candidates = []
+        if os.path.isabs(file_name):
+            candidates.append(file_name)
+        else:
+            if os.path.exists(file_name):
+                candidates.append(file_name)
+            candidates.append(os.path.join("assets", file_name))
+            campaign_dir = ConfigHelper.get_campaign_dir()
+            candidates.append(os.path.join(campaign_dir, file_name))
+            candidates.append(os.path.join(campaign_dir, "assets", file_name))
+            if os.path.sep in file_name:
+                candidates.append(file_name)
+
+        seen = set()
+        for path in candidates:
+            if not path or path in seen:
+                continue
+            seen.add(path)
+            if not os.path.exists(path):
+                continue
+            try:
+                pil_image = Image.open(path)
+            except Exception as exc:
+                log_warning(
+                    f"Unable to load icon {path}: {exc}",
+                    func_name="main_window.MainWindow.load_icon",
+                )
+                continue
+            log_debug(f"Loaded icon {path}", func_name="main_window.MainWindow.load_icon")
+            return ctk.CTkImage(light_image=pil_image, dark_image=pil_image, size=size)
+
+        log_warning(
+            f"Unable to locate icon {file_name}",
+            func_name="main_window.MainWindow.load_icon",
+        )
+        return None
 
     def create_sidebar(self):
-        self.sidebar_frame = ctk.CTkFrame(self.main_frame, width=220)
-        self.sidebar_frame.pack(side="left", fill="y", padx=5, pady=5)
-        self.sidebar_frame.pack_propagate(False)
-        self.sidebar_inner = ctk.CTkFrame(self.sidebar_frame, fg_color="transparent")
-        self.sidebar_inner.pack(fill="both", expand=True, padx=5, pady=5)
+        first_time = not hasattr(self, "sidebar_frame")
 
-        # Logo
-        logo_path = os.path.join("assets", "GMCampaignDesigner logo.png")
-        if os.path.exists(logo_path):
-            logo_image = Image.open(logo_path).resize((60, 60))
-            logo = ctk.CTkImage(light_image=logo_image, dark_image=logo_image, size=(80, 80))
-            self.logo_image = logo
-            logo_label = ctk.CTkLabel(self.sidebar_inner, image=logo, text="")
-            logo_label.pack(pady=(0, 3), anchor="center")
+        if first_time:
+            self.sidebar_frame = ctk.CTkFrame(self.main_frame, width=220)
+            self.sidebar_frame.pack(side="left", fill="y", padx=5, pady=5)
+            self.sidebar_frame.pack_propagate(False)
+            self.sidebar_inner = ctk.CTkFrame(self.sidebar_frame, fg_color="transparent")
+            self.sidebar_inner.pack(fill="both", expand=True, padx=5, pady=5)
 
-        # Header label
-        header_label = ctk.CTkLabel(self.sidebar_inner, text="Campaign Tools", font=("Helvetica", 16, "bold"))
-        header_label.pack(pady=(0, 2), anchor="center")
+            # Logo
+            logo_path = os.path.join("assets", "GMCampaignDesigner logo.png")
+            if os.path.exists(logo_path):
+                logo_image = Image.open(logo_path).resize((60, 60))
+                logo = ctk.CTkImage(light_image=logo_image, dark_image=logo_image, size=(80, 80))
+                self.logo_image = logo
+                logo_label = ctk.CTkLabel(self.sidebar_inner, image=logo, text="")
+                logo_label.pack(pady=(0, 3), anchor="center")
 
-        # Database display container
-        db_container = ctk.CTkFrame(self.sidebar_inner, fg_color="transparent",
-                                    border_color="#005fa3", border_width=2, corner_radius=8)
-        db_container.pack(pady=(0, 5), anchor="center", fill="x", padx=5)
-        db_title_label = ctk.CTkLabel(db_container, text="Database:", font=("Segoe UI", 16, "bold"),
-                                    fg_color="transparent", text_color="white")
-        db_title_label.pack(pady=(3, 0), anchor="center")
-        db_path = ConfigHelper.get("Database", "path", fallback="default_campaign.db")
-        db_name = os.path.splitext(os.path.basename(db_path))[0]
-        self.db_name_label = ctk.CTkLabel(db_container, text=db_name,
-                                        font=("Segoe UI", 14, "italic"), fg_color="transparent", text_color="white")
-        self.db_name_label.pack(pady=(0, 1), anchor="center")
-        try:
-            # Show full absolute path on hover
-            full_path = os.path.abspath(db_path)
-            self.db_tooltip = ToolTip(self.db_name_label, full_path)
-        except Exception:
-            self.db_tooltip = None
+            # Header label
+            header_label = ctk.CTkLabel(self.sidebar_inner, text="Campaign Tools", font=("Helvetica", 16, "bold"))
+            header_label.pack(pady=(0, 2), anchor="center")
+
+            # Database display container
+            db_container = ctk.CTkFrame(
+                self.sidebar_inner,
+                fg_color="transparent",
+                border_color="#005fa3",
+                border_width=2,
+                corner_radius=8,
+            )
+            db_container.pack(pady=(0, 5), anchor="center", fill="x", padx=5)
+            db_title_label = ctk.CTkLabel(
+                db_container,
+                text="Database:",
+                font=("Segoe UI", 16, "bold"),
+                fg_color="transparent",
+                text_color="white",
+            )
+            db_title_label.pack(pady=(3, 0), anchor="center")
+            db_path = ConfigHelper.get("Database", "path", fallback="default_campaign.db")
+            db_name = os.path.splitext(os.path.basename(db_path))[0]
+            self.db_name_label = ctk.CTkLabel(
+                db_container,
+                text=db_name,
+                font=("Segoe UI", 14, "italic"),
+                fg_color="transparent",
+                text_color="white",
+            )
+            self.db_name_label.pack(pady=(0, 1), anchor="center")
+            try:
+                full_path = os.path.abspath(db_path)
+                self.db_tooltip = ToolTip(self.db_name_label, full_path)
+            except Exception:
+                self.db_tooltip = None
+
+            self.sidebar_sections_container = ctk.CTkFrame(self.sidebar_inner, fg_color="transparent")
+            self.sidebar_sections_container.pack(fill="both", expand=True, padx=5, pady=5)
+        else:
+            for child in self.sidebar_sections_container.winfo_children():
+                child.destroy()
 
         self.create_accordion_sidebar()
 
+
     def create_accordion_sidebar(self):
-        container = ctk.CTkFrame(self.sidebar_inner, fg_color="transparent")
-        container.pack(fill="both", expand=True, padx=2, pady=2)
+        container = getattr(self, "sidebar_sections_container", None)
+        if container is None:
+            return
+        for child in container.winfo_children():
+            child.destroy()
         sections = []  # track all sections to enforce single-open behavior
         default_title = "Campaign Workshop"
         default_meta = {"sec": None}
@@ -396,21 +476,18 @@ class MainWindow(ctk.CTk):
             ("change_db", "Change Data Storage", self.change_database_storage),
             ("swarm_path", "Set SwarmUI Path", self.select_swarmui_path),
             ("customize_fields", "Customize Fields", self.open_custom_fields_editor),
+            ("new_entity_type", "New Entity Type", self.open_new_entity_type_dialog),
             ("db_export", "Create Campaign Backup", self.prompt_campaign_backup),
             ("db_import", "Restore Campaign Backup", self.prompt_campaign_restore),
         ]
-        content = [
-            ("manage_scenarios", "Manage Scenarios", lambda: self.open_entity("scenarios")),
-            ("manage_pcs", "Manage PCs", lambda: self.open_entity("pcs")),
-            ("manage_npcs", "Manage NPCs", lambda: self.open_entity("npcs")),
-            ("manage_creatures", "Manage Creatures", lambda: self.open_entity("creatures")),
-            ("manage_factions", "Manage Factions", lambda: self.open_entity("factions")),
-            ("manage_places", "Manage Places", lambda: self.open_entity("places")),
-            ("manage_objects", "Manage Objects", lambda: self.open_entity("objects")),
-            ("manage_informations", "Manage Informations", lambda: self.open_entity("informations")),
-            ("manage_clues", "Manage Clues", lambda: self.open_entity("clues")),
-            ("manage_maps", "Manage Maps", lambda: self.open_entity("maps")),
-        ]
+
+        entity_buttons = []
+        for slug, meta in self.entity_definitions.items():
+            key = f"entity::{slug}"
+            label = meta.get("label") or slug.replace("_", " ").title()
+            tooltip = f"Manage {label}"
+            entity_buttons.append((key, tooltip, lambda s=slug: self.open_entity(s)))
+
         relations = [
             ("npc_graph", "Open NPC Graph Editor", self.open_npc_graph_editor),
             ("pc_graph", "Open PC Graph Editor", self.open_pc_graph_editor),
@@ -437,7 +514,7 @@ class MainWindow(ctk.CTk):
         ]
 
         make_section(container, "Data & System", data_system)
-        make_section(container, "Campaign Workshop", content)
+        make_section(container, "Campaign Workshop", entity_buttons)
         make_section(container, "Relations & Graphs", relations)
         make_section(container, "Utilities", utilities)
 
@@ -563,21 +640,27 @@ class MainWindow(ctk.CTk):
                 self.current_open_view = ctk.CTkFrame(self.content_frame)
                 self.current_open_view.grid(row=0, column=0, sticky="nsew")
 
-                wrapper = GenericModelWrapper(entity)
+                wrapper = self.entity_wrappers.get(entity)
+                if wrapper is None:
+                    wrapper = GenericModelWrapper(entity)
+                    self.entity_wrappers[entity] = wrapper
                 template = load_template(entity)
                 view = GenericListView(self.current_open_view, wrapper, template)
                 view.pack(fill="both", expand=True)
 
+                meta = self.entity_definitions.get(entity, {})
+                display_label = meta.get("label") or entity.replace("_", " ").title()
+
                 load_button = ctk.CTkButton(
                     self.current_open_view,
-                    text=f"Load {entity.capitalize()}",
+                    text=f"Load {display_label}",
                     command=lambda: self.load_items_from_json(view, entity)
                 )
                 load_button.pack(side="right", padx=(5,5))
                 # Assuming `editor_window` is your CTkToplevel or CTkFrame
                 save_btn = ctk.CTkButton(
                     self.current_open_view,
-                    text=f"Save {entity.capitalize()}",
+                    text=f"Save {display_label}",
                     command=lambda: self.save_items_to_json(view, entity)
                 )
                 save_btn.pack(side="right", padx=(5,5))
@@ -611,21 +694,27 @@ class MainWindow(ctk.CTk):
                 self.current_open_view = ctk.CTkFrame(self.inner_content_frame)
                 self.current_open_view.grid(row=0, column=0, sticky="nsew")
 
-                wrapper = GenericModelWrapper(entity)
+                wrapper = self.entity_wrappers.get(entity)
+                if wrapper is None:
+                    wrapper = GenericModelWrapper(entity)
+                    self.entity_wrappers[entity] = wrapper
                 template = load_template(entity)
                 view = GenericListView(self.current_open_view, wrapper, template)
                 view.pack(fill="both", expand=True)
 
+                meta = self.entity_definitions.get(entity, {})
+                display_label = meta.get("label") or entity.replace("_", " ").title()
+
                 load_button = ctk.CTkButton(
                     self.current_open_view,
-                    text=f"Load {entity.capitalize()}",
+                    text=f"Load {display_label}",
                     command=lambda: self.load_items_from_json(view, entity)
                 )
                 load_button.pack(side="right", padx=(5,5))
                 # Assuming `editor_window` is your CTkToplevel or CTkFrame
                 save_btn = ctk.CTkButton(
                     self.current_open_view,
-                    text=f"Save {entity.capitalize()}",
+                    text=f"Save {display_label}",
                     command=lambda: self.save_items_to_json(view, entity)
                 )
                 save_btn.pack(side="right", padx=(5,5))
@@ -662,16 +751,36 @@ class MainWindow(ctk.CTk):
         )
 
     def init_wrappers(self):
-        self.place_wrapper = GenericModelWrapper("places")
-        self.npc_wrapper = GenericModelWrapper("npcs")
-        self.pc_wrapper = GenericModelWrapper("pcs")
-        self.faction_wrapper = GenericModelWrapper("factions")
-        self.object_wrapper = GenericModelWrapper("objects")
-        self.creature_wrapper = GenericModelWrapper("creatures")
-        self.clues_wrapper = GenericModelWrapper("clues")
-        self.informations_wrapper = GenericModelWrapper("informations")
-        self.maps_wrapper = GenericModelWrapper("maps")
+        self.entity_wrappers = build_entity_wrappers()
+
+        attr_map = {
+            "places": ["place_wrapper"],
+            "npcs": ["npc_wrapper"],
+            "pcs": ["pc_wrapper"],
+            "factions": ["faction_wrapper"],
+            "objects": ["object_wrapper"],
+            "creatures": ["creature_wrapper"],
+            "clues": ["clues_wrapper"],
+            "informations": ["informations_wrapper", "information_wrapper"],
+            "maps": ["maps_wrapper"],
+        }
+
+        for slug, attrs in attr_map.items():
+            wrapper = self.entity_wrappers.get(slug)
+            if wrapper is None:
+                wrapper = GenericModelWrapper(slug)
+                self.entity_wrappers[slug] = wrapper
+            for attr in attrs:
+                setattr(self, attr, wrapper)
+
         log_info("Entity wrappers initialized", func_name="main_window.MainWindow.init_wrappers")
+
+    def refresh_entities(self, *_):
+        self.entity_definitions = load_entity_definitions()
+        self.load_icons()
+        self.init_wrappers()
+        self.create_sidebar()
+
 
     def open_faction_graph_editor(self):
         self._graph_type = 'faction'
@@ -731,31 +840,41 @@ class MainWindow(ctk.CTk):
         self.current_open_view = container
         self.current_open_entity = entity  # ✅ Add this clearly!
 
-        wrapper = GenericModelWrapper(entity)
+        wrapper = self.entity_wrappers.get(entity)
+        if wrapper is None:
+            wrapper = GenericModelWrapper(entity)
+            self.entity_wrappers[entity] = wrapper
+
         template = load_template(entity)
         view = GenericListView(container, wrapper, template)
         view.pack(fill="both", expand=True)
 
+        meta = self.entity_definitions.get(entity, {})
+        display_label = meta.get("label") or entity.replace("_", " ").title()
+
         load_button = ctk.CTkButton(
             container,
-            text=f"Load {entity.capitalize()}",
+            text=f"Load {display_label}",
             command=lambda: self.load_items_from_json(view, entity)
         )
         load_button.pack(side="right", padx=(5,5))
         # Assuming `editor_window` is your CTkToplevel or CTkFrame
         save_btn = ctk.CTkButton(
             container,
-            text=f"Save {entity.capitalize()}",
+            text=f"Save {display_label}",
             command=lambda: self.save_items_to_json(view, entity)
         )
         save_btn.pack(side="right", padx=(5,5))
-    
+
     def save_items_to_json(self, view, entity_name):
+        display_label = self.entity_definitions.get(entity_name, {}).get(
+            "label", entity_name.replace("_", " ").title()
+        )
         # 1) Ask the user where to save
         path = filedialog.asksaveasfilename(
             defaultextension=".json",
             filetypes=[("JSON Files", "*.json"), ("All Files", "*.*")],
-            title=f"Export {entity_name.capitalize()} to JSON"
+            title=f"Export {display_label} to JSON",
         )
         if not path:
             return  # user hit “Cancel”
@@ -769,7 +888,8 @@ class MainWindow(ctk.CTk):
                 items = view.items                  # ← or maybe it’s stored in view.items
             except Exception:
                 # 3) …otherwise fall back on the DB
-                wrapper = GenericModelWrapper(entity_name)
+                wrapper = self.entity_wrappers.get(entity_name) or GenericModelWrapper(entity_name)
+                self.entity_wrappers[entity_name] = wrapper
                 items   = wrapper.load_items()
 
         # 4) Serialize to JSON
@@ -778,15 +898,20 @@ class MainWindow(ctk.CTk):
             with open(path, "w", encoding="utf-8") as f:
                 json.dump(data, f, indent=4)
         except Exception as e:
-            messagebox.showerror("Error", f"Failed to save {entity_name}:\n{e}")
+            messagebox.showerror("Error", f"Failed to save {display_label}:\n{e}")
+
             return
 
         # 5) Let the user know it worked
-        messagebox.showinfo("Export Successful", f"Wrote {len(items)} {entity_name} to:\n{path}")
+        messagebox.showinfo("Export Successful", f"Wrote {len(items)} {display_label} to:\n{path}")
+
 
     def load_items_from_json(self, view, entity_name):
+        display_label = self.entity_definitions.get(entity_name, {}).get(
+            "label", entity_name.replace("_", " ").title()
+        )
         file_path = filedialog.askopenfilename(
-            title=f"Load {entity_name.capitalize()} from JSON",
+            title=f"Load {display_label} from JSON",
             filetypes=[("JSON Files", "*.json"), ("All Files", "*.*")]
         )
         if not file_path:
@@ -796,9 +921,9 @@ class MainWindow(ctk.CTk):
                 data = json.load(file)
                 items = data.get(entity_name, [])
                 view.add_items(items)
-                messagebox.showinfo("Success", f"{len(items)} {entity_name} loaded successfully!")
+                messagebox.showinfo("Success", f"{len(items)} {display_label} loaded successfully!")
         except Exception as e:
-            messagebox.showerror("Error", f"Failed to load {entity_name}: {e}")
+            messagebox.showerror("Error", f"Failed to load {display_label}: {e}")
 
     def open_gm_screen(self):
         # 1) Clear any existing content
@@ -1338,37 +1463,8 @@ class MainWindow(ctk.CTk):
         conn = sqlite3.connect(new_db_path)
         cursor = conn.cursor()
 
-        # For each entity, load its template and build a CREATE TABLE
-        for entity in ("pcs","npcs", "scenarios", "factions",
-                    "places", "objects", "creatures", "informations","clues", "maps"):
-
-            tpl = load_template(entity)   # loads modules/<entity>/<entity>_template.json
-            cols = []
-            for i, field in enumerate(tpl["fields"]):
-                name = field["name"]
-                ftype = field["type"]
-                # map JSON -> SQL
-                if ftype in ("text", "longtext"):
-                    sql_type = "TEXT"
-                elif ftype == "boolean":
-                    sql_type = "BOOLEAN"
-                elif ftype == "list":
-                    # we store lists as JSON strings
-                    sql_type = "TEXT"
-                elif ftype == "file":
-                    # we store lists as JSON strings
-                    sql_type = "TEXT"
-                else:
-                    sql_type = "TEXT"
-
-                # first field is primary key
-                if i == 0:
-                    cols.append(f"{name} {sql_type} PRIMARY KEY")
-                else:
-                    cols.append(f"{name} {sql_type}")
-
-            ddl = f"CREATE TABLE IF NOT EXISTS {entity} ({', '.join(cols)})"
-            cursor.execute(ddl)
+        for entity in load_entity_definitions().keys():
+            ensure_entity_schema(entity)
 
         # 4) Re‑create the graph viewer tables
         cursor.execute("""
@@ -1408,14 +1504,7 @@ class MainWindow(ctk.CTk):
 
         # 5) Re‑initialise your in‑memory wrappers & update the label
         #    (and run any schema‐migrations if you still need them)
-        self.place_wrapper    = GenericModelWrapper("places")
-        self.npc_wrapper      = GenericModelWrapper("npcs")
-        self.pc_wrapper      = GenericModelWrapper("pcs")
-        self.faction_wrapper  = GenericModelWrapper("factions")
-        self.object_wrapper   = GenericModelWrapper("objects")
-        self.creature_wrapper = GenericModelWrapper("creatures")
-        self.information_wrapper = GenericModelWrapper("informations")
-        self.clues_wrapper = GenericModelWrapper("clues")
+        self.refresh_entities()
 
         db_name = os.path.splitext(os.path.basename(new_db_path))[0]
         self.db_name_label.configure(text=db_name)

@@ -1,0 +1,13 @@
+{
+  "fields": [
+    {
+      "name": "Name",
+      "type": "text"
+    },
+    {
+      "name": "Description",
+      "type": "longtext"
+    }
+  ],
+  "custom_fields": []
+}
