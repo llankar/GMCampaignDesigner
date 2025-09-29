@@ -11,6 +11,12 @@ import tkinter as tk
 from tkinter import filedialog, messagebox, simpledialog, ttk, Menu
 from PIL import Image, ImageTk
 import textwrap
+import html
+
+try:  # Optional rich-text renderer for detail panel content
+    from tkhtmlview import HTMLLabel  # type: ignore
+except Exception:  # pragma: no cover - fallback when library is absent
+    HTMLLabel = None
 
 from modules.helpers.template_loader import load_template
 from modules.generic.generic_model_wrapper import GenericModelWrapper
@@ -311,13 +317,160 @@ class ScenarioGraphEditor(ctk.CTkFrame):
         )
         self.detail_panel_meta.pack(fill="x", padx=pad)
 
-        self.detail_textbox = ctk.CTkTextbox(
-            self.detail_panel,
-            wrap="word",
-        )
-        self.detail_textbox.pack(fill="both", expand=True, padx=pad, pady=(8, pad))
-        self.detail_textbox.configure(state="disabled")
+        self.detail_html_label = None
+        self.detail_textbox = None
+        self._rich_renderer_available = False
+
+        if HTMLLabel is not None:
+            try:
+                panel_bg = self._resolve_panel_background_color()
+                self.detail_html_label = HTMLLabel(
+                    self.detail_panel,
+                    html="",
+                    background=panel_bg,
+                    foreground="#F8FAFC",
+                )
+                self.detail_html_label.pack(fill="both", expand=True, padx=pad, pady=(8, pad))
+                self._rich_renderer_available = True
+            except Exception:
+                self.detail_html_label = None
+                self._rich_renderer_available = False
+
+        if not self._rich_renderer_available:
+            self._create_plain_textbox()
+
         self._clear_detail_panel()
+
+    def _resolve_panel_background_color(self):
+        try:
+            bg = self.detail_panel.cget("fg_color")
+        except Exception:
+            bg = None
+        if isinstance(bg, (tuple, list)):
+            bg = bg[-1]
+        if not bg or bg in {"", "transparent"}:
+            return "#1F2933"
+        return bg
+
+    def _create_plain_textbox(self):
+        pad = self.detail_panel_padding
+        if self.detail_textbox is None or not int(self.detail_textbox.winfo_exists()):
+            self.detail_textbox = ctk.CTkTextbox(
+                self.detail_panel,
+                wrap="word",
+            )
+        if not self.detail_textbox.winfo_manager():
+            self.detail_textbox.pack(fill="both", expand=True, padx=pad, pady=(8, pad))
+        self.detail_textbox.configure(state="disabled")
+
+    def _fallback_to_plain_text(self, text):
+        if self.detail_html_label is not None:
+            try:
+                self.detail_html_label.pack_forget()
+                self.detail_html_label.destroy()
+            except Exception:
+                pass
+            finally:
+                self.detail_html_label = None
+        self._rich_renderer_available = False
+        self._create_plain_textbox()
+        if self.detail_textbox is not None:
+            self.detail_textbox.configure(state="normal")
+            self.detail_textbox.delete("1.0", "end")
+            self.detail_textbox.insert("1.0", text)
+            self.detail_textbox.configure(state="disabled")
+
+    def _update_detail_text(self, html_text, plain_text):
+        if self._rich_renderer_available and self.detail_html_label is not None:
+            try:
+                self.detail_html_label.set_html(html_text)
+                return
+            except Exception:
+                self._fallback_to_plain_text(plain_text)
+                return
+
+        if self.detail_textbox is None:
+            self._create_plain_textbox()
+
+        if self.detail_textbox is not None:
+            self.detail_textbox.configure(state="normal")
+            self.detail_textbox.delete("1.0", "end")
+            self.detail_textbox.insert("1.0", plain_text)
+            self.detail_textbox.configure(state="disabled")
+
+    @staticmethod
+    def _apply_inline_markup(text):
+        escaped = html.escape(text, quote=False)
+        escaped = re.sub(r"\*\*(.+?)\*\*", lambda m: f"<strong>{m.group(1)}</strong>", escaped)
+        escaped = re.sub(
+            r"(?<!_)__(?!_)(.+?)(?<!_)__(?!_)",
+            lambda m: f"<strong>{m.group(1)}</strong>",
+            escaped,
+        )
+        escaped = re.sub(
+            r"(?<!\*)\*(?!\s)(.+?)(?<!\s)\*(?!\*)",
+            lambda m: f"<em>{m.group(1)}</em>",
+            escaped,
+        )
+        escaped = re.sub(
+            r"(?<!_)_(?!_)(.+?)(?<!_)_(?!_)",
+            lambda m: f"<em>{m.group(1)}</em>",
+            escaped,
+        )
+        escaped = re.sub(r"`(.+?)`", lambda m: f"<code>{m.group(1)}</code>", escaped)
+        return escaped
+
+    def _convert_scene_text_to_html(self, text):
+        trimmed = (text or "").strip()
+        if not trimmed:
+            return "<p>No scene notes provided.</p>"
+
+        html_parts = []
+        paragraph_lines = []
+        in_list = False
+
+        def close_list():
+            nonlocal in_list
+            if in_list:
+                html_parts.append("</ul>")
+                in_list = False
+
+        def flush_paragraph():
+            nonlocal paragraph_lines
+            if not paragraph_lines:
+                return
+            processed = [self._apply_inline_markup(line.strip()) for line in paragraph_lines if line.strip()]
+            if processed:
+                html_parts.append(f"<p>{'<br/>'.join(processed)}</p>")
+            paragraph_lines = []
+
+        for raw_line in trimmed.splitlines():
+            stripped_line = raw_line.strip()
+            if not stripped_line:
+                flush_paragraph()
+                close_list()
+                continue
+
+            bullet_match = re.match(r"^[\-\*]\s+(.*)$", stripped_line)
+            if bullet_match:
+                flush_paragraph()
+                if not in_list:
+                    html_parts.append("<ul>")
+                    in_list = True
+                item_text = bullet_match.group(1).strip()
+                html_parts.append(f"<li>{self._apply_inline_markup(item_text)}</li>")
+                continue
+
+            close_list()
+            paragraph_lines.append(stripped_line)
+
+        flush_paragraph()
+        close_list()
+
+        if not html_parts:
+            return "<p>No scene notes provided.</p>"
+
+        return "\n".join(html_parts)
 
     def _show_detail_panel(self):
         if self._detail_panel_visible:
@@ -348,11 +501,8 @@ class ScenarioGraphEditor(ctk.CTkFrame):
                 text="Select a scene card to view its full content.",
                 text_color="#94A3B8",
             )
-        if hasattr(self, "detail_textbox"):
-            self.detail_textbox.configure(state="normal")
-            self.detail_textbox.delete("1.0", "end")
-            self.detail_textbox.insert("1.0", "Select a scene card to view its full content.")
-            self.detail_textbox.configure(state="disabled")
+        default_text = "Select a scene card to view its full content."
+        self._update_detail_text(self._convert_scene_text_to_html(default_text), default_text)
 
     def _show_node_detail(self, node_tag):
         if not self._detail_panel_visible:
@@ -392,25 +542,38 @@ class ScenarioGraphEditor(ctk.CTkFrame):
         full_text = full_text.strip() or "No scene notes provided."
         entities = scene_data.get("entities") or scene_data.get("Entities") or []
 
-        if hasattr(self, "detail_textbox"):
-            self.detail_textbox.configure(state="normal")
-            self.detail_textbox.delete("1.0", "end")
-            self.detail_textbox.insert("1.0", full_text)
-            if entities:
-                self.detail_textbox.insert("end", "\n\nKey Entities:\n")
-                for ent in entities:
-                    if not isinstance(ent, dict):
-                        continue
-                    name = ent.get("name") or "Unnamed"
-                    ent_type = ent.get("type") or ""
-                    synopsis = ent.get("synopsis") or ""
-                    bullet = f"- {name}"
-                    if ent_type:
-                        bullet += f" ({ent_type.title()})"
-                    self.detail_textbox.insert("end", bullet + "\n")
-                    if synopsis:
-                        self.detail_textbox.insert("end", f"    {synopsis.strip()}\n")
-            self.detail_textbox.configure(state="disabled")
+        html_sections = [self._convert_scene_text_to_html(full_text)]
+        plain_sections = [full_text]
+
+        if entities:
+            html_sections.append("<h3>Key Entities</h3>")
+            html_sections.append("<ul>")
+            plain_entities = ["Key Entities:"]
+            for ent in entities:
+                if not isinstance(ent, dict):
+                    continue
+                name = (ent.get("name") or "Unnamed").strip() or "Unnamed"
+                ent_type = (ent.get("type") or "").strip()
+                synopsis = (ent.get("synopsis") or "").strip()
+
+                name_html = html.escape(name)
+                type_html = f" <em>({html.escape(ent_type.title())})</em>" if ent_type else ""
+                synopsis_html = f"<br/><span>{self._apply_inline_markup(synopsis)}</span>" if synopsis else ""
+                html_sections.append(f"<li><strong>{name_html}</strong>{type_html}{synopsis_html}</li>")
+
+                bullet = f"- {name}"
+                if ent_type:
+                    bullet += f" ({ent_type.title()})"
+                plain_entities.append(bullet)
+                if synopsis:
+                    plain_entities.append(f"    {synopsis}")
+            html_sections.append("</ul>")
+            plain_sections.append("\n".join(plain_entities))
+
+        html_content = "\n".join(section for section in html_sections if section)
+        plain_content = "\n\n".join(section for section in plain_sections if section)
+
+        self._update_detail_text(html_content, plain_content)
 
     def _build_scene_payload_from_graph(self, node_tag):
         for node in self.graph.get("nodes", []):
