@@ -1498,20 +1498,36 @@ class ScenarioGraphEditor(ctk.CTkFrame):
     def _normalize_scene_entry(self, entry, index, scenario_npcs, scenario_creatures, scenario_places):
         raw_text = ""
         if isinstance(entry, dict):
-            text_fragments = []
+            text_fragments: list[str] = []
+            fragment_keys: set[str] = set()
+
+            def register_fragment(value) -> None:
+                if value is None:
+                    return
+                fragment = str(value)
+                normalized = re.sub(r"\s+", " ", fragment).strip()
+                if not normalized:
+                    return
+                key = normalized.lower()
+                if key in fragment_keys:
+                    return
+                fragment_keys.add(key)
+                text_fragments.append(fragment.strip())
+
             for key in ("Text", "text", "Description", "Summary", "Body", "Details", "Notes", "Gist", "Content"):
                 value = entry.get(key)
                 if isinstance(value, str):
-                    text_fragments.append(value)
+                    register_fragment(value)
                 elif isinstance(value, list):
-                    text_fragments.extend(str(v) for v in value if v)
+                    for item in value:
+                        register_fragment(item)
                 elif isinstance(value, dict):
                     if isinstance(value.get("text"), str):
-                        text_fragments.append(value.get("text"))
+                        register_fragment(value.get("text"))
                     else:
-                        text_fragments.extend(
-                            str(v) for v in value.values() if isinstance(v, str)
-                        )
+                        for item in value.values():
+                            if isinstance(item, str):
+                                register_fragment(item)
             raw_text = "\n\n".join(fragment for fragment in text_fragments if str(fragment).strip())
             if not raw_text:
                 alt = entry.get("text")
