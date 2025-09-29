@@ -985,11 +985,31 @@ class WorldMapWindow(ctk.CTkToplevel):
         token["tk_image"] = image
 
         for cid in canvas_ids:
-            self.canvas.tag_bind(cid, "<ButtonPress-1>", lambda e, t=token: self._on_token_press(e, t))
-            self.canvas.tag_bind(cid, "<B1-Motion>", lambda e, t=token: self._on_token_drag(e, t))
-            self.canvas.tag_bind(cid, "<ButtonRelease-1>", lambda e, t=token: self._on_token_release(e, t))
-            self.canvas.tag_bind(cid, "<Double-Button-1>", lambda e, t=token: self._on_token_double_click(e, t))
-            self.canvas.tag_bind(cid, "<Button-3>", lambda e, t=token: self._show_token_menu(e, t))
+            self.canvas.tag_bind(
+                cid,
+                "<ButtonPress-1>",
+                lambda e=None, t=token: self._on_token_press(e, t),
+            )
+            self.canvas.tag_bind(
+                cid,
+                "<B1-Motion>",
+                lambda e=None, t=token: self._on_token_drag(e, t),
+            )
+            self.canvas.tag_bind(
+                cid,
+                "<ButtonRelease-1>",
+                lambda e=None, t=token: self._on_token_release(e, t),
+            )
+            self.canvas.tag_bind(
+                cid,
+                "<Double-Button-1>",
+                lambda e=None, t=token: self._on_token_double_click(e, t),
+            )
+            self.canvas.tag_bind(
+                cid,
+                "<Button-3>",
+                lambda e=None, t=token: self._show_token_menu(e, t),
+            )
     def _resolve_token_image(self, token: dict, size: int) -> ImageTk.PhotoImage:
         portrait = token.get("portrait_path") or token.get("image_path")
         if portrait:
@@ -1058,6 +1078,8 @@ class WorldMapWindow(ctk.CTkToplevel):
     # Token interactions
     # ------------------------------------------------------------------
     def _on_token_press(self, event, token: dict) -> None:
+        if event is None:
+            return
         self.selected_token = token
         token["drag_anchor"] = (event.x, event.y)
         if token.get("type") == "map":
@@ -1066,7 +1088,7 @@ class WorldMapWindow(ctk.CTkToplevel):
             self._show_entity_synthesis(token)
 
     def _on_token_drag(self, event, token: dict) -> None:
-        if "drag_anchor" not in token or not self.render_params:
+        if event is None or "drag_anchor" not in token or not self.render_params:
             return
         scale, offset_x, offset_y, base_w, base_h = self.render_params
         radius = token.get("size", 120) * scale / 2
@@ -1103,6 +1125,8 @@ class WorldMapWindow(ctk.CTkToplevel):
         self._clear_inspector()
 
     def _show_token_menu(self, event, token: dict) -> None:
+        if event is None:
+            return
         menu = tk.Menu(self.canvas, tearoff=0)
         menu.add_command(label="Resize?", command=lambda: self._prompt_resize(token))
         menu.add_command(label="Change Color", command=lambda: self._prompt_token_color(token))
