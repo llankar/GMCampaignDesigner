@@ -57,8 +57,8 @@ class AudioBarWindow(ctk.CTkToplevel):
         self._is_collapsed = False
         self._remembered_track_label: Optional[str] = None
         self._building_ui = False
-        self._search_results_label_max_chars = 60
-        self._now_playing_label_max_chars = 60
+        self._search_results_label_max_chars = 25
+        self._now_playing_label_max_chars = 35
         self._build_ui()
         self._set_collapsed(True)
         self._register_controller_listener()
