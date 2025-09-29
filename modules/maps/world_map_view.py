@@ -262,7 +262,7 @@ class WorldMapWindow(ctk.CTkToplevel):
 
         self.tab_selector = ctk.CTkSegmentedButton(
             tabs_wrapper,
-            values=["Summary", "Notes", "Entities"],
+            values=["Summary", "Notes", "Characters"],
             command=self._on_inspector_tab_selected,
         )
         self.tab_selector.pack(fill="x")
@@ -272,13 +272,13 @@ class WorldMapWindow(ctk.CTkToplevel):
         self.tab_content_container.pack(fill="both", expand=True, padx=16, pady=(0, 16))
 
         self._tab_frames: dict[str, ctk.CTkFrame] = {}
-        for name in ("Summary", "Notes", "Entities"):
+        for name in ("Summary", "Notes", "Characters"):
             frame = ctk.CTkFrame(self.tab_content_container, fg_color="transparent")
             self._tab_frames[name] = frame
 
         self.summary_container = self._tab_frames["Summary"]
         self.notes_container = self._tab_frames["Notes"]
-        self.entities_container = self._tab_frames["Entities"]
+        self.characters_container = self._tab_frames["Characters"]
         self._active_tab: str | None = None
         self._select_inspector_tab("Summary")
 
@@ -1143,8 +1143,8 @@ class WorldMapWindow(ctk.CTkToplevel):
         self._entity_tab_images = []
         self._render_tab_message("Notes", "Select an entity to capture your campaign notes.")
         self._render_tab_message(
-            "Entities",
-            "Add NPCs or creatures to this map to see them collected here.",
+            "Characters",
+            "Add NPCs or creatures to this map to review their stats here.",
         )
         self._inspector_token = None
         self._set_quick_actions_state(False)
@@ -1170,7 +1170,7 @@ class WorldMapWindow(ctk.CTkToplevel):
         self._render_badges(badges)
         self._populate_summary_tab(sections)
         self._populate_notes_tab(record)
-        self._populate_entities_tab(record)
+        self._populate_characters_tab(record)
 
     def _show_map_hint(self, token: dict) -> None:
         map_name = token.get("linked_map") or token.get("entity_id") or "Nested Map"
@@ -1194,7 +1194,7 @@ class WorldMapWindow(ctk.CTkToplevel):
         hint = summary_text or "Double-click this map token to open its layer and keep building your world."
         self._render_summary_message(hint)
         self._populate_notes_tab(None)
-        self._populate_entities_tab(None)
+        self._populate_characters_tab(None)
 
     def _set_quick_actions_state(self, enabled: bool) -> None:
         if hasattr(self, "highlight_button"):
@@ -1388,8 +1388,8 @@ class WorldMapWindow(ctk.CTkToplevel):
         self._notes_textbox = textbox
         self._notes_status_label = status_label
 
-    def _populate_entities_tab(self, _record: dict | None) -> None:
-        self._clear_tab_contents("Entities")
+    def _populate_characters_tab(self, _record: dict | None) -> None:
+        self._clear_tab_contents("Characters")
         self._entity_tab_images = []
 
         relevant_tokens = [
@@ -1399,8 +1399,8 @@ class WorldMapWindow(ctk.CTkToplevel):
         ]
         if not relevant_tokens:
             self._render_tab_message(
-                "Entities",
-                "Add NPCs or creatures to this map to see them collected here.",
+                "Characters",
+                "Add NPCs or creatures to this map to review their stats here.",
             )
             return
 
@@ -1412,12 +1412,13 @@ class WorldMapWindow(ctk.CTkToplevel):
         )
 
         for token in relevant_tokens:
-            frame = ctk.CTkFrame(self.entities_container, fg_color="#141C30", corner_radius=12)
+            frame = ctk.CTkFrame(self.characters_container, fg_color="#141C30", corner_radius=12)
             frame.pack(fill="x", pady=(0, 12))
 
             body = ctk.CTkFrame(frame, fg_color="transparent")
             body.pack(fill="x", padx=12, pady=12)
             body.grid_columnconfigure(1, weight=1)
+            body.grid_columnconfigure(2, weight=0)
 
             thumbnail = self._resolve_token_image(token, 72)
             self._entity_tab_images.append(thumbnail)
@@ -1442,24 +1443,16 @@ class WorldMapWindow(ctk.CTkToplevel):
             )
             type_label.grid(row=0, column=2, sticky="ne")
 
-            summary = self._get_summary_preview(token.get("record"))
-            summary_label = ctk.CTkLabel(
+            stats_preview = self._get_stats_preview(token.get("record"))
+            stats_label = ctk.CTkLabel(
                 body,
-                text=summary,
+                text=stats_preview,
                 font=("Segoe UI", 12),
-                wraplength=240,
+                wraplength=320,
                 justify="left",
                 anchor="w",
             )
-            summary_label.grid(row=1, column=1, sticky="w", padx=(12, 0), pady=(6, 0))
-
-            inspect_button = ctk.CTkButton(
-                body,
-                text="Inspect",
-                width=100,
-                command=lambda t=token: self._on_entity_card_selected(t),
-            )
-            inspect_button.grid(row=1, column=2, sticky="se")
+            stats_label.grid(row=1, column=1, columnspan=2, sticky="we", padx=(12, 0), pady=(6, 0))
 
     def _on_entity_card_selected(self, token: dict) -> None:
         if token not in self.tokens:
@@ -1469,6 +1462,34 @@ class WorldMapWindow(ctk.CTkToplevel):
         if hasattr(self, "tab_selector"):
             self.tab_selector.set("Summary")
         self._select_inspector_tab("Summary")
+
+    def _get_stats_preview(self, record: dict | None) -> str:
+        if not isinstance(record, dict):
+            return "No stats available yet."
+
+        stats_value = record.get("Stats")
+        if not stats_value:
+            return "No stats available yet."
+
+        if isinstance(stats_value, dict):
+            candidate = None
+            for key in ("text", "value", "content"):
+                value = stats_value.get(key)
+                if isinstance(value, str) and value.strip():
+                    candidate = value
+                    break
+            if candidate:
+                stats_value = candidate
+            else:
+                joined = "\n".join(
+                    str(value).strip()
+                    for value in stats_value.values()
+                    if isinstance(value, str) and value.strip()
+                )
+                stats_value = joined or stats_value
+
+        normalized = self._normalize_text(stats_value).strip()
+        return normalized if normalized else "No stats available yet."
 
     def _get_summary_preview(self, record: dict | None) -> str:
         if not isinstance(record, dict):
@@ -1511,7 +1532,7 @@ class WorldMapWindow(ctk.CTkToplevel):
                 self._update_token_records(entity_type, entity_id, updated_record)
                 sections = self._compose_summary(entity_type, updated_record)
                 self._populate_summary_tab(sections)
-                self._populate_entities_tab(updated_record)
+                self._populate_characters_tab(updated_record)
             if self._notes_status_label:
                 self._notes_status_label.configure(
                     text="Notes saved",
