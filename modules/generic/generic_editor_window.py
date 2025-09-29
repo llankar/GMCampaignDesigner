@@ -1,6 +1,6 @@
 import customtkinter as ctk
 import os
-import requests 
+import requests
 import subprocess
 import time
 import shutil
@@ -21,6 +21,7 @@ from modules.helpers.text_helpers import format_longtext
 from modules.helpers.text_helpers import ai_text_to_rtf_json
 from modules.ai.local_ai_client import LocalAIClient
 import json
+import ast
 from io import BytesIO
 from pathlib import Path
 from modules.audio.entity_audio import play_entity_audio, resolve_audio_path, stop_entity_audio
@@ -316,12 +317,23 @@ class GenericEditorWindow(ctk.CTkToplevel):
         # Load data (dict or raw string)
 
         data = initial_text
-        if not isinstance(data, dict):
+        if isinstance(data, str):
+            parsed_data = None
             try:
-                data = json.loads(data)
+                parsed_data = json.loads(data)
             except Exception:
-                data = {"text": str(initial_text or "")}
-                
+                try:
+                    parsed_data = ast.literal_eval(data)
+                except Exception:
+                    parsed_data = None
+
+            if isinstance(parsed_data, dict):
+                data = parsed_data
+            else:
+                data = {"text": data}
+        elif not isinstance(data, dict):
+            data = {"text": str(initial_text or "")}
+
         editor.load_text_data(data)
         # Toolbar toggle
         if hide_toolbar:
