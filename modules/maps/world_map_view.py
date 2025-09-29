@@ -2,8 +2,9 @@
 import os
 import json
 import textwrap
+import importlib
 import tkinter as tk
-from tkinter import messagebox, simpledialog
+from tkinter import messagebox, simpledialog, colorchooser
 import customtkinter as ctk
 from PIL import Image, ImageTk, ImageDraw
 
@@ -34,6 +35,14 @@ _TOKEN_COLORS = {
     "Place": "#B5E48C",
     "Map": "#F9C74F",
 }
+
+_DEFAULT_SWATCH_COLOR = "#2B3357"
+
+_TKCOLORPICKER_ASKCOLOR = None
+_tkcolorpicker_spec = importlib.util.find_spec("tkcolorpicker")
+if _tkcolorpicker_spec is not None:
+    _tkcolorpicker_module = importlib.import_module("tkcolorpicker")
+    _TKCOLORPICKER_ASKCOLOR = getattr(_tkcolorpicker_module, "askcolor", None)
 
 class WorldMapWindow(ctk.CTkToplevel):
     """Interactive world map viewer with nested map support."""
@@ -83,6 +92,7 @@ class WorldMapWindow(ctk.CTkToplevel):
         self._notes_textbox: ctk.CTkTextbox | None = None
         self._notes_status_label: ctk.CTkLabel | None = None
 
+        self.color_swatch_button: ctk.CTkButton | None = None
         self.zoom = 1.0
         self.pan_x = 0.0
         self.pan_y = 0.0
@@ -236,8 +246,26 @@ class WorldMapWindow(ctk.CTkToplevel):
         self._portrait_placeholder = self._create_portrait_placeholder()
         self._set_portrait_image(None)
 
-        self.badge_frame = ctk.CTkFrame(self.inspector_container, fg_color="transparent")
-        self.badge_frame.pack(fill="x", padx=16, pady=(0, 12))
+        badge_row = ctk.CTkFrame(self.inspector_container, fg_color="transparent")
+        badge_row.pack(fill="x", padx=16, pady=(0, 12))
+
+        self.badge_frame = ctk.CTkFrame(badge_row, fg_color="transparent")
+        self.badge_frame.pack(side="left", fill="x", expand=True)
+
+        self.color_swatch_button = ctk.CTkButton(
+            badge_row,
+            text="",
+            width=32,
+            height=32,
+            corner_radius=16,
+            fg_color=_DEFAULT_SWATCH_COLOR,
+            hover_color=_DEFAULT_SWATCH_COLOR,
+            border_color="#4A5578",
+            border_width=2,
+            command=self._on_color_swatch_click,
+        )
+        self.color_swatch_button.pack(side="right")
+        self.color_swatch_button.configure(state=ctk.DISABLED)
 
         self.quick_actions_frame = ctk.CTkFrame(self.inspector_container, fg_color="transparent")
         self.quick_actions_frame.pack(fill="x", padx=16, pady=(0, 12))
@@ -1077,6 +1105,7 @@ class WorldMapWindow(ctk.CTkToplevel):
     def _show_token_menu(self, event, token: dict) -> None:
         menu = tk.Menu(self.canvas, tearoff=0)
         menu.add_command(label="Resize?", command=lambda: self._prompt_resize(token))
+        menu.add_command(label="Change Color", command=lambda: self._prompt_token_color(token))
         menu.add_separator()
         menu.add_command(label="Delete", command=lambda: self._delete_token(token))
         try:
@@ -1147,6 +1176,7 @@ class WorldMapWindow(ctk.CTkToplevel):
             "Add NPCs or creatures to this map to review their stats here.",
         )
         self._inspector_token = None
+        self._update_color_swatch(None)
         self._set_quick_actions_state(False)
         self._configure_inspector_actions(None)
 
@@ -1160,6 +1190,7 @@ class WorldMapWindow(ctk.CTkToplevel):
         self._inspector_token = token
         self._set_quick_actions_state(True)
         self._configure_inspector_actions(token)
+        self._update_color_swatch(token)
 
         portrait_path = token.get("portrait_path") or token.get("image_path")
         portrait_image = self._load_image(portrait_path) if portrait_path else None
@@ -1182,6 +1213,7 @@ class WorldMapWindow(ctk.CTkToplevel):
         self._inspector_token = token
         self._set_quick_actions_state(True)
         self._configure_inspector_actions(token)
+        self._update_color_swatch(token)
 
         portrait_path = token.get("portrait_path") or token.get("image_path")
         portrait_image = self._load_image(portrait_path) if portrait_path else None
@@ -1292,6 +1324,105 @@ class WorldMapWindow(ctk.CTkToplevel):
             animation_info["after_ids"].append(after_id)
 
         animate(0)
+
+    def _on_color_swatch_click(self) -> None:
+        token = self._inspector_token or self.selected_token
+        if not token:
+            return
+        self._prompt_token_color(token)
+
+    def _update_color_swatch(self, token: dict | None) -> None:
+        button = getattr(self, "color_swatch_button", None)
+        if not button:
+            return
+        if not token:
+            button.configure(
+                state=ctk.DISABLED,
+                fg_color=_DEFAULT_SWATCH_COLOR,
+                hover_color=_DEFAULT_SWATCH_COLOR,
+                border_color="#4A5578",
+            )
+            return
+        color = token.get("color") or "#FFFFFF"
+        normalized = self._normalize_hex_color(color) or "#FFFFFF"
+        border = self._calculate_swatch_border(normalized)
+        button.configure(
+            state=ctk.NORMAL,
+            fg_color=normalized,
+            hover_color=normalized,
+            border_color=border,
+        )
+
+    def _prompt_token_color(self, token: dict) -> None:
+        if not token:
+            return
+        current = token.get("color") or "#FFFFFF"
+        new_color = self._ask_token_color(current)
+        if not new_color or new_color == token.get("color"):
+            return
+        token["color"] = new_color
+        if self._inspector_token is token:
+            self._update_color_swatch(token)
+        self._draw_scene()
+        self._persist_tokens()
+
+    def _ask_token_color(self, initial: str | None = None) -> str | None:
+        base_color = self._normalize_hex_color(initial) or "#FFFFFF"
+        selection = None
+        if _TKCOLORPICKER_ASKCOLOR is not None:
+            selection = self._extract_color_hex(
+                _TKCOLORPICKER_ASKCOLOR(color=base_color, parent=self)
+            )
+        if not selection:
+            selection = self._extract_color_hex(
+                colorchooser.askcolor(color=base_color, parent=self)
+            )
+        if not selection:
+            return None
+        return self._normalize_hex_color(selection)
+
+    @staticmethod
+    def _extract_color_hex(selection) -> str | None:
+        if selection is None:
+            return None
+        if isinstance(selection, (list, tuple)):
+            if len(selection) >= 2 and selection[1]:
+                return selection[1]
+            if selection and isinstance(selection[0], str):
+                return selection[0]
+        elif isinstance(selection, str):
+            return selection
+        return None
+
+    @staticmethod
+    def _normalize_hex_color(value: str | None) -> str | None:
+        if not isinstance(value, str):
+            return None
+        candidate = value.strip()
+        if not candidate:
+            return None
+        if candidate.startswith("#"):
+            candidate = candidate[1:]
+        if len(candidate) == 3:
+            candidate = "".join(ch * 2 for ch in candidate)
+        if len(candidate) != 6:
+            return None
+        try:
+            int(candidate, 16)
+        except ValueError:
+            return None
+        return f"#{candidate.upper()}"
+
+    @staticmethod
+    def _calculate_swatch_border(color: str) -> str:
+        normalized = WorldMapWindow._normalize_hex_color(color)
+        if not normalized:
+            return "#4A5578"
+        red = int(normalized[1:3], 16)
+        green = int(normalized[3:5], 16)
+        blue = int(normalized[5:7], 16)
+        luminance = (0.299 * red + 0.587 * green + 0.114 * blue) / 255
+        return "#1B233A" if luminance > 0.65 else "#F3F5FF"
 
     def _render_badges(self, labels: list[str]) -> None:
         for child in self.badge_frame.winfo_children():
