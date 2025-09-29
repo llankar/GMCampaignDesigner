@@ -289,6 +289,16 @@ class GenericListView(ctk.CTkFrame):
 
         self.refresh_list()
 
+    def reload_from_db(self):
+        """Reload items from the model wrapper and refresh the view."""
+        log_info(
+            f"Reloading {self.model_wrapper.entity_type} list from database",
+            func_name="GenericListView.reload_from_db",
+        )
+        self.items = self.model_wrapper.load_items()
+        self.filtered_items = list(self.items)
+        self.refresh_list()
+
     def show_portrait_window(self, iid):
         log_info(f"Showing portrait for {self.model_wrapper.entity_type} item: {iid}", func_name="GenericListView.show_portrait_window")
         item, _ = self._find_item_by_iid(iid)

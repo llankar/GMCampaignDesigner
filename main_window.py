@@ -64,6 +64,7 @@ from modules.pcs.pc_graph_editor import PCGraphEditor
 from modules.scenarios.scenario_graph_editor import ScenarioGraphEditor
 from modules.scenarios.scenario_importer import ScenarioImportWindow
 from modules.scenarios.scenario_generator_view import ScenarioGeneratorView
+from modules.scenarios.scenario_builder_wizard import ScenarioBuilderWizard
 from modules.generic.export_for_foundry import preview_and_export_foundry
 from modules.helpers import text_helpers
 from db.db import initialize_db, ensure_entity_schema
@@ -238,6 +239,7 @@ class MainWindow(ctk.CTk):
             "pc_graph": "pc_graph_icon.png",
             "faction_graph": "faction_graph_icon.png",
             "scenario_graph": "scenario_graph_icon.png",
+            "scenario_builder": "scenario_graph_icon.png",
             "world_map": "maps_icon.png",
             "generate_portraits": "generate_icon.png",
             "associate_portraits": "associate_icon.png",
@@ -498,6 +500,7 @@ class MainWindow(ctk.CTk):
         ]
         utilities = [
             ("generate_scenario", "Generate Scenario", self.open_scenario_generator),
+            ("scenario_builder", "Scenario Builder Wizard", self.open_scenario_builder),
             ("import_scenario", "Import Scenario", self.open_scenario_importer),
             ("import_creatures_pdf", "Import Creatures from PDF", self.open_creature_importer),
             ("gm_screen", "Open GM Screen", self.open_gm_screen),
@@ -1372,6 +1375,19 @@ class MainWindow(ctk.CTk):
         container.grid(row=0, column=0, sticky="nsew")
         ScenarioImportWindow(container)
 
+    def _on_scenario_built(self):
+        try:
+            if self.current_open_entity == "scenarios" and self.current_open_view is not None:
+                for child in self.current_open_view.winfo_children():
+                    if isinstance(child, GenericListView):
+                        child.reload_from_db()
+                        break
+        except Exception as exc:
+            log_exception(
+                f"Failed to refresh scenarios after builder save: {exc}",
+                func_name="main_window.MainWindow._on_scenario_built",
+            )
+
     def open_creature_importer(self):
         from modules.creatures.creature_importer import CreatureImportWindow
 
@@ -1389,6 +1405,18 @@ class MainWindow(ctk.CTk):
         parent.grid_columnconfigure(0, weight=1)
         self.current_open_view = container
         self.current_open_entity = None
+
+    def open_scenario_builder(self):
+        try:
+            wizard = ScenarioBuilderWizard(self, on_saved=self._on_scenario_built)
+            wizard.grab_set()
+            wizard.focus_force()
+        except Exception as exc:
+            log_exception(
+                f"Failed to open Scenario Builder Wizard: {exc}",
+                func_name="main_window.MainWindow.open_scenario_builder",
+            )
+            messagebox.showerror("Error", f"Failed to open Scenario Builder:\n{exc}")
 
     
 
