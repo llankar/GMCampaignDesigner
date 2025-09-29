@@ -50,11 +50,45 @@ def _ensure_campaign_templates():
         pass
 
     for entity in list_known_entities():
+        default_tpl = os.path.join("modules", entity, f"{entity}_template.json")
+        if not os.path.exists(default_tpl):
+            continue
         try:
             sync_campaign_template(entity)
         except Exception:
             # Individual template sync issues should not block DB startup.
             continue
+
+
+def _ensure_schema_for_entity(cursor, entity):
+    schema = load_schema_from_json(entity)
+    if not schema:
+        return
+    pk = schema[0][0]
+    cols = ",\n    ".join(f"{c} {t}" for c, t in schema)
+
+    cursor.execute(
+        "SELECT name FROM sqlite_master WHERE type='table' AND name=?",
+        (entity,),
+    )
+    if not cursor.fetchone():
+        ddl = f"""
+        CREATE TABLE IF NOT EXISTS {entity} (
+            {cols},
+            PRIMARY KEY({pk})
+        )"""
+        cursor.execute(ddl)
+        return
+
+    cursor.execute(f"PRAGMA table_info({entity})")
+    rows = cursor.fetchall()
+    existing = {row[1] for row in rows}
+    for col, typ in schema:
+        if col in existing:
+            continue
+        cursor.execute(
+            f"ALTER TABLE {entity} ADD COLUMN {col} {typ}"
+        )
 
 def get_connection():
     raw_db_path = ConfigHelper.get("Database", "path", fallback="default_campaign.db").strip()
@@ -78,16 +112,11 @@ def initialize_db():
     cursor = conn.cursor()
 
     # Create tables if missing
-    for table in ["pcs","npcs","scenarios","factions","places","objects","informations","clues", "creatures", "maps"]:
-        schema = load_schema_from_json(table)
-        pk = schema[0][0]
-        cols_sql = ",\n    ".join(f"{col} {typ}" for col,typ in schema)
-        ddl = f"""
-        CREATE TABLE IF NOT EXISTS {table} (
-            {cols_sql},
-            PRIMARY KEY({pk})
-        )"""
-        cursor.execute(ddl)
+    for entity in list_known_entities():
+        try:
+            _ensure_schema_for_entity(cursor, entity)
+        except Exception as exc:
+            logging.warning("Failed to ensure schema for %s: %s", entity, exc)
 
     # Add any new columns for existing tables
     update_table_schema(conn, cursor)
@@ -101,51 +130,28 @@ def update_table_schema(conn, cursor):
     - If its table is missing, CREATE it from modules/<entity>/<entity>_template.json
     - Else, ALTER it to add any new columns defined in that same JSON
     """
-    entities = [
-        "npcs",
-        "scenarios",
-        "factions",
-        "places",
-        "objects",
-        "creatures",      # new one
-        "informations",
-        "clues",
-        "pcs",
-        "maps"
-    ]
-
-    for ent in entities:
-        schema = load_schema_from_json(ent)
-        pk     = schema[0][0]
-        cols   = ",\n    ".join(f"{c} {t}" for c, t in schema)
-
-        # 1) does table exist?
-        cursor.execute(
-            "SELECT name FROM sqlite_master WHERE type='table' AND name=?",
-            (ent,)
-        )
-        if not cursor.fetchone():
-            # create the whole table
-            ddl = f"""
-            CREATE TABLE {ent} (
-                {cols},
-                PRIMARY KEY({pk})
-            )"""
-            cursor.execute(ddl)
-        else:
-            # just add any missing columns
-            cursor.execute(f"PRAGMA table_info({ent})")
-            rows = cursor.fetchall()
-            # second column is the column name
-            existing = {row[1] for row in rows}
-            for col, typ in schema:
-                if col not in existing:
-                    cursor.execute(
-                        f"ALTER TABLE {ent} ADD COLUMN {col} {typ}"
-                    )
+    for entity in list_known_entities():
+        try:
+            _ensure_schema_for_entity(cursor, entity)
+        except Exception as exc:
+            logging.warning("Failed to update schema for %s: %s", entity, exc)
 
     conn.commit()
+
+def ensure_entity_schema(entity: str):
+    """Ensure the SQLite schema for ``entity`` exists and matches its template."""
+
+    conn = get_connection()
+    cursor = conn.cursor()
+    try:
+        _ensure_campaign_templates()
+        _ensure_schema_for_entity(cursor, entity)
+        conn.commit()
+    finally:
+        conn.close()
 
 if __name__ == "__main__":
     initialize_db()
     print("Database initialized.")
+
+
