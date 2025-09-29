@@ -74,6 +74,7 @@ class WorldMapWindow(ctk.CTkToplevel):
         self.image_cache: dict[str, Image.Image] = {}
         self._portrait_photo: ImageTk.PhotoImage | None = None
         self._portrait_placeholder: Image.Image | None = None
+        self._inspector_token: dict | None = None
 
         self.zoom = 1.0
         self.pan_x = 0.0
@@ -200,6 +201,24 @@ class WorldMapWindow(ctk.CTkToplevel):
 
         self.badge_frame = ctk.CTkFrame(self.inspector_container, fg_color="transparent")
         self.badge_frame.pack(fill="x", padx=16, pady=(0, 12))
+
+        self.quick_actions_frame = ctk.CTkFrame(self.inspector_container, fg_color="transparent")
+        self.quick_actions_frame.pack(fill="x", padx=16, pady=(0, 12))
+
+        ctk.CTkLabel(
+            self.quick_actions_frame,
+            text="Quick Actions",
+            font=("Segoe UI", 13, "bold"),
+        ).pack(side="left")
+
+        self.highlight_button = ctk.CTkButton(
+            self.quick_actions_frame,
+            text="Highlight",
+            width=120,
+            command=self._on_highlight_token,
+            state=ctk.DISABLED,
+        )
+        self.highlight_button.pack(side="right")
 
         self.summary_box = ctk.CTkTextbox(self.inspector_container, wrap="word", font=("Segoe UI", 13))
 
@@ -934,6 +953,8 @@ class WorldMapWindow(ctk.CTkToplevel):
             "Double-click a map token to dive deeper, and drag entities to reposition them.",
         )
         self.summary_box.configure(state="disabled")
+        self._inspector_token = None
+        self._set_quick_actions_state(False)
 
     def _show_entity_synthesis(self, token: dict) -> None:
         record = token.get("record") or {}
@@ -941,6 +962,9 @@ class WorldMapWindow(ctk.CTkToplevel):
         name = token.get("entity_id", "Unnamed")
         summary_text, bullet_lines = self._compose_summary(entity_type, record)
         badges = self._collect_badges(entity_type, record)
+
+        self._inspector_token = token
+        self._set_quick_actions_state(True)
 
         portrait_path = token.get("portrait_path") or token.get("image_path")
         portrait_image = self._load_image(portrait_path) if portrait_path else None
@@ -969,6 +993,9 @@ class WorldMapWindow(ctk.CTkToplevel):
         summary_text = entry.get('summary') or self._normalize_text(wrapper_record.get("Summary")) or self._normalize_text(wrapper_record.get("Description"))
         badges = self._summarize_map_contents(entry)
 
+        self._inspector_token = token
+        self._set_quick_actions_state(True)
+
         portrait_path = token.get("portrait_path") or token.get("image_path")
         portrait_image = self._load_image(portrait_path) if portrait_path else None
         self._set_portrait_image(portrait_image)
@@ -982,6 +1009,103 @@ class WorldMapWindow(ctk.CTkToplevel):
         self.summary_box.delete("1.0", "end")
         self.summary_box.insert("1.0", hint)
         self.summary_box.configure(state="disabled")
+
+    def _set_quick_actions_state(self, enabled: bool) -> None:
+        if hasattr(self, "highlight_button"):
+            state = ctk.NORMAL if enabled else ctk.DISABLED
+            self.highlight_button.configure(state=state)
+
+    def _on_highlight_token(self) -> None:
+        token = self._inspector_token or self.selected_token
+        if not token:
+            return
+        self._pulse_token(token)
+
+    def _pulse_token(self, token: dict) -> None:
+        canvas = getattr(self, "canvas", None)
+        if not canvas or not canvas.winfo_exists():
+            return
+        if not token:
+            return
+
+        animation = token.pop("_pulse_animation", None)
+        if animation:
+            for after_id in animation.get("after_ids", []):
+                try:
+                    canvas.after_cancel(after_id)
+                except tk.TclError:
+                    pass
+            outline_id = animation.get("outline_id")
+            if outline_id:
+                try:
+                    canvas.delete(outline_id)
+                except tk.TclError:
+                    pass
+
+        canvas_ids = token.get("canvas_ids") or []
+        if not canvas_ids:
+            return
+
+        image_id = canvas_ids[0]
+        try:
+            coords = canvas.coords(image_id)
+        except tk.TclError:
+            return
+        if not coords:
+            return
+        x, y = coords[0], coords[1]
+
+        try:
+            bbox = canvas.bbox(image_id)
+        except tk.TclError:
+            bbox = None
+
+        if bbox:
+            radius = max((bbox[2] - bbox[0]) / 2, (bbox[3] - bbox[1]) / 2)
+        else:
+            logical_size = token.get("size", 120)
+            scale = self.render_params[0] if self.render_params else 1.0
+            radius = (logical_size * scale) / 2
+        radius = max(radius, 24)
+
+        outline_id = canvas.create_oval(
+            x - radius,
+            y - radius,
+            x + radius,
+            y + radius,
+            outline="#F1FA8C",
+            width=3,
+        )
+        canvas.tag_raise(outline_id)
+
+        animation_info = {"outline_id": outline_id, "after_ids": []}
+        token["_pulse_animation"] = animation_info
+
+        scales = [1.0, 1.08, 1.18, 1.08, 1.0]
+        step_delay = 60
+
+        def animate(index: int) -> None:
+            if token.get("_pulse_animation") is not animation_info:
+                return
+            if index >= len(scales):
+                try:
+                    canvas.delete(outline_id)
+                except tk.TclError:
+                    pass
+                token.pop("_pulse_animation", None)
+                return
+            scale_factor = scales[index]
+            canvas.coords(
+                outline_id,
+                x - radius * scale_factor,
+                y - radius * scale_factor,
+                x + radius * scale_factor,
+                y + radius * scale_factor,
+            )
+            after_id = canvas.after(step_delay, lambda: animate(index + 1))
+            animation_info["after_ids"].append(after_id)
+
+        animate(0)
 
     def _render_badges(self, labels: list[str]) -> None:
         for child in self.badge_frame.winfo_children():
