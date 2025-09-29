@@ -220,12 +220,11 @@ class WorldMapWindow(ctk.CTkToplevel):
         )
         self.highlight_button.pack(side="right")
 
-        self.summary_box = ctk.CTkTextbox(self.inspector_container, wrap="word", font=("Segoe UI", 13))
+        self.summary_container = ctk.CTkFrame(self.inspector_container, fg_color="transparent")
 
         self.bind("<Delete>", self._delete_selected_token)
         self.bind("<Control-s>", self._on_save_shortcut)
-        self.summary_box.pack(fill="both", expand=True, padx=16, pady=(0, 16))
-        self.summary_box.configure(state="disabled")
+        self.summary_container.pack(fill="both", expand=True, padx=16, pady=(0, 16))
 
         self._clear_inspector()
 
@@ -945,14 +944,10 @@ class WorldMapWindow(ctk.CTkToplevel):
         self._set_portrait_image(None)
         for child in self.badge_frame.winfo_children():
             child.destroy()
-        self.summary_box.configure(state="normal")
-        self.summary_box.delete("1.0", "end")
-        self.summary_box.insert(
-            "1.0",
+        self._render_summary_message(
             "Use the controls above to place NPCs, PCs, creatures, places, and nested maps. "
-            "Double-click a map token to dive deeper, and drag entities to reposition them.",
+            "Double-click a map token to dive deeper, and drag entities to reposition them."
         )
-        self.summary_box.configure(state="disabled")
         self._inspector_token = None
         self._set_quick_actions_state(False)
 
@@ -960,7 +955,7 @@ class WorldMapWindow(ctk.CTkToplevel):
         record = token.get("record") or {}
         entity_type = token.get("entity_type", "Entity")
         name = token.get("entity_id", "Unnamed")
-        summary_text, bullet_lines = self._compose_summary(entity_type, record)
+        sections = self._compose_summary(entity_type, record)
         badges = self._collect_badges(entity_type, record)
 
         self._inspector_token = token
@@ -973,18 +968,7 @@ class WorldMapWindow(ctk.CTkToplevel):
         self.title_label.configure(text=name)
         self.subtitle_label.configure(text=entity_type)
         self._render_badges(badges)
-
-        body = []
-        if summary_text:
-            body.append(summary_text)
-        body.extend(bullet_lines)
-        if not body:
-            body.append("No synthesis data available yet. Add notes for richer context.")
-
-        self.summary_box.configure(state="normal")
-        self.summary_box.delete("1.0", "end")
-        self.summary_box.insert("1.0", "\n\n".join(body))
-        self.summary_box.configure(state="disabled")
+        self._render_summary_sections(sections)
 
     def _show_map_hint(self, token: dict) -> None:
         map_name = token.get("linked_map") or token.get("entity_id") or "Nested Map"
@@ -1005,10 +989,7 @@ class WorldMapWindow(ctk.CTkToplevel):
         self._render_badges(badges or ["Double-click to enter"])
 
         hint = summary_text or "Double-click this map token to open its layer and keep building your world."
-        self.summary_box.configure(state="normal")
-        self.summary_box.delete("1.0", "end")
-        self.summary_box.insert("1.0", hint)
-        self.summary_box.configure(state="disabled")
+        self._render_summary_message(hint)
 
     def _set_quick_actions_state(self, enabled: bool) -> None:
         if hasattr(self, "highlight_button"):
@@ -1121,7 +1102,50 @@ class WorldMapWindow(ctk.CTkToplevel):
                 pady=4,
             ).pack(side="left", padx=4)
 
-    def _compose_summary(self, entity_type: str, record: dict) -> tuple[str, list[str]]:
+    def _clear_summary_sections(self) -> None:
+        if not hasattr(self, "summary_container"):
+            return
+        for child in self.summary_container.winfo_children():
+            child.destroy()
+
+    def _render_summary_message(self, message: str) -> None:
+        self._clear_summary_sections()
+        ctk.CTkLabel(
+            self.summary_container,
+            text=message,
+            font=("Segoe UI", 13),
+            wraplength=360,
+            justify="left",
+            anchor="w",
+        ).pack(fill="x", padx=8, pady=(0, 12), anchor="w")
+
+    def _render_summary_sections(self, sections: dict[str, list[str]]) -> None:
+        if not sections:
+            self._render_summary_message("No synthesis data available yet. Add notes for richer context.")
+            return
+        self._clear_summary_sections()
+        for title, values in sections.items():
+            frame = ctk.CTkFrame(self.summary_container, fg_color="#141C30", corner_radius=12)
+            frame.pack(fill="x", pady=(0, 12))
+            ctk.CTkLabel(
+                frame,
+                text=title,
+                font=("Segoe UI", 13, "bold"),
+                anchor="w",
+            ).pack(anchor="w", padx=12, pady=(12, 6))
+            content = values if values else ["No details have been recorded yet."]
+            for value in content:
+                ctk.CTkLabel(
+                    frame,
+                    text=value,
+                    font=("Segoe UI", 12),
+                    wraplength=360,
+                    justify="left",
+                    anchor="w",
+                ).pack(fill="x", padx=12, pady=(0, 8))
+
+    def _compose_summary(self, entity_type: str, record: dict) -> dict[str, list[str]]:
+        sections: dict[str, list[str]] = {}
         summary = None
         for key in ("Summary", "Synopsis", "Description", "Background", "Notes"):
             value = record.get(key)
@@ -1129,16 +1153,41 @@ class WorldMapWindow(ctk.CTkToplevel):
                 summary = self._normalize_text(value)
                 if summary:
                     break
-        bullets = []
-        if entity_type == "NPC":
-            bullets.extend(self._harvest_fields(record, ["Role", "Faction", "Motivation", "Secrets"]))
-        elif entity_type == "PC":
-            bullets.extend(self._harvest_fields(record, ["Class", "Level", "Player", "Goals"]))
-        elif entity_type == "Creature":
-            bullets.extend(self._harvest_fields(record, ["Type", "Challenge", "Abilities", "Weaknesses"]))
-        elif entity_type == "Place":
-            bullets.extend(self._harvest_fields(record, ["Tags", "Population", "Climate", "Resources"]))
-        return summary or "", bullets[:6]
+        sections["Overview"] = [summary] if summary else []
+
+        detail_fields: dict[str, tuple[str, list[str]]] = {
+            "NPC": ("Profile", ["Role", "Faction", "Motivation", "Secrets"]),
+            "PC": ("Adventurer Details", ["Class", "Level", "Player", "Goals"]),
+            "Creature": ("Creature Traits", ["Type", "Challenge", "Abilities", "Weaknesses"]),
+            "Place": ("Location Facts", ["Tags", "Population", "Climate", "Resources"]),
+        }
+
+        header, fields = detail_fields.get(entity_type, ("Details", []))
+        harvested = self._harvest_fields(record, fields)[:6] if fields else []
+        sections[header] = harvested
+
+        summary_keys = {"Summary", "Synopsis", "Description", "Background", "Notes"}
+        general_details = []
+        for key, value in record.items():
+            if key in summary_keys or key in fields:
+                continue
+            if isinstance(value, (dict, set)):
+                continue
+            if isinstance(value, (list, tuple)):
+                formatted = ", ".join(str(v) for v in value if v)
+            elif isinstance(value, str):
+                formatted = self._normalize_text(value)
+            else:
+                formatted = str(value).strip()
+            if formatted:
+                general_details.append(f"{key}: {formatted}")
+        if general_details:
+            if fields:
+                sections["Additional Notes"] = general_details[:6]
+            else:
+                sections[header] = general_details[:6]
+
+        return sections
 
     def _harvest_fields(self, record: dict, fields: list[str]) -> list[str]:
         out = []
