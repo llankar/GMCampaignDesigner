@@ -1,3 +1,5 @@
+import copy
+import json
 import tkinter as tk
 from tkinter import messagebox
 
@@ -7,7 +9,6 @@ from modules.generic.generic_list_selection_view import GenericListSelectionView
 from modules.generic.generic_model_wrapper import GenericModelWrapper
 from modules.helpers.logging_helper import log_module_import, log_info
 from modules.helpers.template_loader import load_template
-from modules.scenarios.scenario_graph_editor import ScenarioGraphEditor
 
 
 log_module_import(__name__)
@@ -22,51 +23,6 @@ class WizardStep(ctk.CTkFrame):
     def save_state(self, state):  # pragma: no cover - UI synchronization
         """Persist widget values into the shared wizard ``state``."""
         return True
-
-
-class WizardScenarioGraphEditor(ScenarioGraphEditor):
-    """Scenario graph editor variant that keeps changes in-memory for the wizard."""
-
-    def __init__(
-        self,
-        master,
-        state_ref,
-        on_state_change,
-        scenario_wrapper,
-        npc_wrapper,
-        creature_wrapper,
-        place_wrapper,
-        *args,
-        **kwargs,
-    ):
-        self._state_ref = state_ref
-        self._state_callback = on_state_change
-        super().__init__(
-            master,
-            scenario_wrapper=scenario_wrapper,
-            npc_wrapper=npc_wrapper,
-            creature_wrapper=creature_wrapper,
-            place_wrapper=place_wrapper,
-            *args,
-            **kwargs,
-        )
-
-    def init_toolbar(self):  # pragma: no cover - UI layout
-        toolbar = ctk.CTkFrame(self)
-        toolbar.pack(fill="x", padx=5, pady=5)
-        ctk.CTkLabel(toolbar, text="Scene Planning", font=ctk.CTkFont(size=15, weight="bold")).pack(
-            side="left", padx=5
-        )
-        ctk.CTkButton(toolbar, text="Reset Zoom", command=self.reset_zoom).pack(side="left", padx=5)
-
-    def _save_scenario_changes(self):  # pragma: no cover - simple callback
-        if not self.scenario:
-            return
-        if isinstance(self._state_ref, dict):
-            self._state_ref.clear()
-            self._state_ref.update(self.scenario)
-        if callable(self._state_callback):
-            self._state_callback(self._state_ref)
 
 
 class BasicInfoStep(WizardStep):
@@ -110,51 +66,632 @@ class BasicInfoStep(WizardStep):
         return True
 
 
-class GraphPlanningStep(WizardStep):
-    def __init__(
-        self,
-        master,
-        state,
-        scenario_wrapper,
-        npc_wrapper,
-        creature_wrapper,
-        place_wrapper,
-    ):
+class ScenesPlanningStep(WizardStep):
+    """Editable scene list tailored for the scenario builder wizard."""
+
+    def __init__(self, master):
         super().__init__(master)
-        self._state = state
-        self._scenario_wrapper = scenario_wrapper
-        self.editor = WizardScenarioGraphEditor(
-            self,
-            state,
-            self._handle_state_change,
-            scenario_wrapper,
-            npc_wrapper,
-            creature_wrapper,
-            place_wrapper,
+        self.scenes = []
+        self.selected_index = None
+        self._suppress_list_event = False
+        self._updating_fields = False
+
+        container = ctk.CTkFrame(self)
+        container.pack(fill="both", expand=True, padx=10, pady=10)
+        container.grid_columnconfigure(0, weight=0, minsize=280)
+        container.grid_columnconfigure(1, weight=1)
+        container.grid_rowconfigure(0, weight=1)
+
+        # Scene list ---------------------------------------------------
+        list_frame = ctk.CTkFrame(container)
+        list_frame.grid(row=0, column=0, sticky="nsew", padx=(0, 12))
+        list_frame.grid_rowconfigure(1, weight=1)
+
+        ctk.CTkLabel(
+            list_frame,
+            text="Scenes",
+            font=ctk.CTkFont(size=15, weight="bold"),
+        ).grid(row=0, column=0, columnspan=2, sticky="w", padx=6, pady=(8, 4))
+
+        self.scene_listbox = tk.Listbox(list_frame, activestyle="none", exportselection=False)
+        self.scene_listbox.grid(row=1, column=0, sticky="nsew", padx=(6, 0), pady=(0, 6))
+        self.scene_listbox.bind("<<ListboxSelect>>", self._on_scene_selected)
+
+        list_scroll = tk.Scrollbar(list_frame, orient="vertical", command=self.scene_listbox.yview)
+        list_scroll.grid(row=1, column=1, sticky="ns", pady=(0, 6), padx=(0, 6))
+        self.scene_listbox.configure(yscrollcommand=list_scroll.set)
+
+        actions_top = ctk.CTkFrame(list_frame)
+        actions_top.grid(row=2, column=0, columnspan=2, sticky="ew", padx=6, pady=(0, 6))
+        actions_top.grid_columnconfigure((0, 1), weight=1)
+        ctk.CTkButton(actions_top, text="Add Scene", command=self.add_scene).grid(row=0, column=0, padx=4, pady=2, sticky="ew")
+        ctk.CTkButton(actions_top, text="Duplicate", command=self.duplicate_scene).grid(row=0, column=1, padx=4, pady=2, sticky="ew")
+
+        actions_middle = ctk.CTkFrame(list_frame)
+        actions_middle.grid(row=3, column=0, columnspan=2, sticky="ew", padx=6, pady=(0, 6))
+        actions_middle.grid_columnconfigure((0, 1), weight=1)
+        ctk.CTkButton(actions_middle, text="Remove", command=self.remove_scene).grid(row=0, column=0, padx=4, pady=2, sticky="ew")
+        ctk.CTkButton(actions_middle, text="Move Up", command=lambda: self.move_scene(-1)).grid(row=0, column=1, padx=4, pady=2, sticky="ew")
+
+        actions_bottom = ctk.CTkFrame(list_frame)
+        actions_bottom.grid(row=4, column=0, columnspan=2, sticky="ew", padx=6, pady=(0, 8))
+        actions_bottom.grid_columnconfigure(0, weight=1)
+        ctk.CTkButton(actions_bottom, text="Move Down", command=lambda: self.move_scene(1)).grid(row=0, column=0, padx=4, pady=2, sticky="ew")
+
+        # Scene editor -------------------------------------------------
+        editor = ctk.CTkScrollableFrame(container)
+        editor.grid(row=0, column=1, sticky="nsew")
+        editor.grid_columnconfigure(0, weight=1)
+
+        ctk.CTkLabel(
+            editor,
+            text="Scene Details",
+            font=ctk.CTkFont(size=15, weight="bold"),
+            anchor="w",
+        ).grid(row=0, column=0, sticky="w", padx=6, pady=(8, 4))
+
+        ctk.CTkLabel(editor, text="Title", anchor="w").grid(row=1, column=0, sticky="ew", padx=6, pady=(0, 2))
+        self.title_var = ctk.StringVar()
+        self.title_entry = ctk.CTkEntry(editor, textvariable=self.title_var)
+        self.title_entry.grid(row=2, column=0, sticky="ew", padx=6, pady=(0, 10))
+        self.title_var.trace_add("write", self._on_title_change)
+
+        ctk.CTkLabel(editor, text="Scene Type", anchor="w").grid(row=3, column=0, sticky="ew", padx=6, pady=(0, 2))
+        self.type_options = [
+            "Auto-detect",
+            "Setup",
+            "Choice",
+            "Investigation",
+            "Combat",
+            "Outcome",
+            "Social",
+            "Travel",
+            "Downtime",
+        ]
+        self.type_var = ctk.StringVar(value=self.type_options[0])
+        self.type_menu = ctk.CTkOptionMenu(editor, values=self.type_options, variable=self.type_var, command=self._on_type_change)
+        self.type_menu.grid(row=4, column=0, sticky="w", padx=6, pady=(0, 12))
+
+        ctk.CTkLabel(editor, text="Summary", anchor="w").grid(row=5, column=0, sticky="ew", padx=6, pady=(0, 2))
+        self.summary_text = ctk.CTkTextbox(editor, height=220)
+        self.summary_text.grid(row=6, column=0, sticky="nsew", padx=6, pady=(0, 12))
+
+        hint_font = ctk.CTkFont(size=12)
+
+        ctk.CTkLabel(editor, text="Key NPCs (one per line)", anchor="w", font=hint_font).grid(row=7, column=0, sticky="ew", padx=6, pady=(0, 2))
+        self.npcs_text = ctk.CTkTextbox(editor, height=90)
+        self.npcs_text.grid(row=8, column=0, sticky="ew", padx=6, pady=(0, 12))
+
+        ctk.CTkLabel(editor, text="Creatures / Foes (one per line)", anchor="w", font=hint_font).grid(row=9, column=0, sticky="ew", padx=6, pady=(0, 2))
+        self.creatures_text = ctk.CTkTextbox(editor, height=90)
+        self.creatures_text.grid(row=10, column=0, sticky="ew", padx=6, pady=(0, 12))
+
+        ctk.CTkLabel(editor, text="Locations / Places (one per line)", anchor="w", font=hint_font).grid(row=11, column=0, sticky="ew", padx=6, pady=(0, 2))
+        self.places_text = ctk.CTkTextbox(editor, height=90)
+        self.places_text.grid(row=12, column=0, sticky="ew", padx=6, pady=(0, 12))
+
+        ctk.CTkLabel(editor, text="Next Scenes (names or numbers)", anchor="w", font=hint_font).grid(row=13, column=0, sticky="ew", padx=6, pady=(0, 2))
+        self.next_text = ctk.CTkTextbox(editor, height=80)
+        self.next_text.grid(row=14, column=0, sticky="ew", padx=6, pady=(0, 20))
+
+        self._set_editor_enabled(False)
+
+    # ------------------------------------------------------------------
+    # UI helpers
+    # ------------------------------------------------------------------
+    def _set_editor_enabled(self, enabled):  # pragma: no cover - UI state toggling
+        state = "normal" if enabled else "disabled"
+        self.title_entry.configure(state=state)
+        try:
+            self.type_menu.configure(state=state)
+        except Exception:  # pragma: no cover - widget state differences
+            pass
+        for widget in (self.summary_text, self.npcs_text, self.creatures_text, self.places_text, self.next_text):
+            widget.configure(state="normal")
+            if not enabled:
+                widget.configure(state="disabled")
+
+    def _set_textbox_value(self, widget, value):
+        widget.configure(state="normal")
+        widget.delete("1.0", "end")
+        if value:
+            widget.insert("1.0", value)
+
+    def _on_scene_selected(self, _event=None):  # pragma: no cover - UI callback
+        if self._suppress_list_event:
+            return
+        selection = self.scene_listbox.curselection()
+        if not selection:
+            return
+        index = selection[0]
+        if index == self.selected_index:
+            return
+        self._save_current_scene()
+        self._apply_selection(index)
+
+    def _apply_selection(self, index):
+        if index is None or index < 0 or index >= len(self.scenes):
+            self.selected_index = None
+            self._updating_fields = True
+            self._set_editor_enabled(True)
+            self.title_var.set("")
+            self._set_textbox_value(self.summary_text, "")
+            self._set_textbox_value(self.npcs_text, "")
+            self._set_textbox_value(self.creatures_text, "")
+            self._set_textbox_value(self.places_text, "")
+            self._set_textbox_value(self.next_text, "")
+            self.type_var.set(self.type_options[0])
+            self._updating_fields = False
+            self._set_editor_enabled(False)
+            return
+
+        self.selected_index = index
+        scene = self.scenes[index]
+        self._updating_fields = True
+        self._set_editor_enabled(True)
+        self.title_var.set(scene.get("Title", ""))
+        type_label = self._normalise_type_label(
+            scene.get("SceneType")
+            or scene.get("Type")
+            or scene.get("Category")
+            or scene.get("Mood")
+            or scene.get("Role")
         )
-        self.editor.pack(fill="both", expand=True, padx=10, pady=10)
-        self._loaded_state = None
+        self.type_var.set(type_label or self.type_options[0])
+        summary = scene.get("Summary") or scene.get("Text") or ""
+        self._set_textbox_value(self.summary_text, summary)
+        self._set_textbox_value(self.npcs_text, "\n".join(scene.get("NPCs", [])))
+        self._set_textbox_value(self.creatures_text, "\n".join(scene.get("Creatures", [])))
+        self._set_textbox_value(self.places_text, "\n".join(scene.get("Places", [])))
+        self._set_textbox_value(self.next_text, "\n".join(scene.get("NextScenes", [])))
+        self._updating_fields = False
 
-    def _handle_state_change(self, state):  # pragma: no cover - UI callback
-        if isinstance(state, dict):
-            self._state.clear()
-            self._state.update(state)
+    def _set_listbox_selection(self, index):
+        self._suppress_list_event = True
+        self.scene_listbox.selection_clear(0, tk.END)
+        if index is not None and 0 <= index < len(self.scenes):
+            self.scene_listbox.selection_set(index)
+            self.scene_listbox.activate(index)
+            self.scene_listbox.see(index)
+        self._suppress_list_event = False
 
+    def _format_scene_label(self, scene, index):
+        title = scene.get("Title") or f"Scene {index + 1}"
+        title = title.strip() or f"Scene {index + 1}"
+        if len(title) > 48:
+            title = title[:45].rstrip() + "..."
+        type_label = scene.get("SceneType") or ""
+        if type_label:
+            return f"{index + 1}. {title} [{type_label}]"
+        return f"{index + 1}. {title}"
+
+    def _refresh_scene_list(self):
+        current = self.selected_index
+        self._suppress_list_event = True
+        self.scene_listbox.delete(0, tk.END)
+        for idx, scene in enumerate(self.scenes):
+            self.scene_listbox.insert(tk.END, self._format_scene_label(scene, idx))
+        self._suppress_list_event = False
+        if current is not None and 0 <= current < len(self.scenes):
+            self._set_listbox_selection(current)
+            self._apply_selection(current)
+        elif self.scenes:
+            self._set_listbox_selection(0)
+            self._apply_selection(0)
+        else:
+            self._apply_selection(None)
+
+    def _on_title_change(self, *_):  # pragma: no cover - simple binding
+        if self._updating_fields or self.selected_index is None:
+            return
+        title = self.title_var.get()
+        self.scenes[self.selected_index]["Title"] = title
+        self._update_list_item(self.selected_index)
+
+    def _on_type_change(self, _value):  # pragma: no cover - simple binding
+        if self._updating_fields or self.selected_index is None:
+            return
+        selection = self.type_var.get()
+        label = "" if selection == self.type_options[0] else selection
+        self.scenes[self.selected_index]["SceneType"] = label
+        if label:
+            self.scenes[self.selected_index]["Type"] = label
+        else:
+            self.scenes[self.selected_index].pop("Type", None)
+        self._update_list_item(self.selected_index)
+
+    def _update_list_item(self, index):
+        if index is None or index < 0 or index >= len(self.scenes):
+            return
+        self._suppress_list_event = True
+        self.scene_listbox.delete(index)
+        self.scene_listbox.insert(index, self._format_scene_label(self.scenes[index], index))
+        self._set_listbox_selection(index)
+        self._suppress_list_event = False
+
+    # ------------------------------------------------------------------
+    # Scene data helpers
+    # ------------------------------------------------------------------
+    def _create_scene_record(self, default_title):
+        return {
+            "Title": default_title,
+            "SceneType": "",
+            "Summary": "",
+            "Text": "",
+            "NPCs": [],
+            "Creatures": [],
+            "Places": [],
+            "NextScenes": [],
+        }
+
+    def _split_to_list(self, value):
+        if not value:
+            return []
+        if isinstance(value, str):
+            tokens = []
+            for segment in value.replace(";", "\n").replace(",", "\n").splitlines():
+                cleaned = segment.strip()
+                if cleaned:
+                    tokens.append(cleaned)
+            return tokens
+        if isinstance(value, (list, tuple, set)):
+            results = []
+            for item in value:
+                results.extend(self._split_to_list(item))
+            return results
+        if isinstance(value, dict):
+            results = []
+            for key in ("Name", "Title", "Label", "text", "Text"):
+                if key in value:
+                    results.extend(self._split_to_list(value[key]))
+            if not results:
+                for item in value.values():
+                    results.extend(self._split_to_list(item))
+            return results
+        value_str = str(value).strip()
+        return [value_str] if value_str else []
+
+    def _dedupe(self, items):
+        seen = set()
+        result = []
+        for item in items:
+            cleaned = str(item).strip()
+            if not cleaned:
+                continue
+            key = cleaned.lower()
+            if key in seen:
+                continue
+            seen.add(key)
+            result.append(cleaned)
+        return result
+
+    def _extract_links(self, value):
+        if value is None:
+            return []
+        if isinstance(value, list):
+            results = []
+            for item in value:
+                results.extend(self._extract_links(item))
+            return results
+        if isinstance(value, dict):
+            for key in ("target", "Target", "Scene", "scene", "Next", "next", "To", "to", "Id", "ID", "Name", "name", "Title", "title", "Label", "label"):
+                if key in value:
+                    return self._extract_links(value.get(key))
+            results = []
+            for item in value.values():
+                results.extend(self._extract_links(item))
+            return results
+        if isinstance(value, (int, float)):
+            return [str(int(value))]
+        text = str(value).strip()
+        return [text] if text else []
+
+    def _extract_text(self, entry):
+        if not isinstance(entry, dict):
+            return str(entry) if entry is not None else ""
+        fragments = []
+        for key in ("Text", "text", "Summary", "Description", "Body", "Details", "Notes", "Content"):
+            value = entry.get(key)
+            if isinstance(value, str):
+                fragments.append(value)
+            elif isinstance(value, (list, tuple)):
+                fragments.extend(str(item) for item in value if item)
+            elif isinstance(value, dict):
+                fragments.extend(str(item) for item in value.values() if isinstance(item, str))
+        if not fragments and isinstance(entry.get("text"), dict):
+            inner = entry.get("text")
+            fragments.extend(str(item) for item in inner.values() if isinstance(item, str))
+        return "\n\n".join(fragment.strip() for fragment in fragments if str(fragment).strip())
+
+    def _normalise_type_label(self, value):
+        if not value:
+            return self.type_options[0]
+        lowered = str(value).strip().lower()
+        if not lowered:
+            return self.type_options[0]
+        for option in self.type_options[1:]:
+            if option.lower() == lowered:
+                return option
+        if "combat" in lowered or "fight" in lowered or "battle" in lowered:
+            return "Combat"
+        if "social" in lowered or "parley" in lowered or "diplom" in lowered:
+            return "Social"
+        if "invest" in lowered or "myster" in lowered or "clue" in lowered:
+            return "Investigation"
+        if "travel" in lowered or "journey" in lowered or "chase" in lowered:
+            return "Travel"
+        if "downtime" in lowered or "rest" in lowered or "interlude" in lowered:
+            return "Downtime"
+        if "setup" in lowered or "hook" in lowered or "opening" in lowered:
+            return "Setup"
+        if "choice" in lowered or "branch" in lowered or "decision" in lowered:
+            return "Choice"
+        if "outcome" in lowered or "resolution" in lowered or "result" in lowered:
+            return "Outcome"
+        display = value if isinstance(value, str) else str(value)
+        display = display.strip() or self.type_options[0]
+        title_display = display.title()
+        if title_display not in self.type_options:
+            self.type_options.append(title_display)
+            try:
+                self.type_menu.configure(values=self.type_options)
+            except Exception:  # pragma: no cover - widget differences
+                pass
+        return title_display
+
+    def _normalise_scene_entry(self, entry, index):
+        scene = self._create_scene_record(f"Scene {index + 1}")
+        if isinstance(entry, dict):
+            title = ""
+            for key in ("Title", "Scene", "Name", "Heading", "Label"):
+                value = entry.get(key)
+                if isinstance(value, str) and value.strip():
+                    title = value.strip()
+                    break
+            if title:
+                scene["Title"] = title
+
+            summary = self._extract_text(entry)
+            if summary:
+                scene["Summary"] = summary.strip()
+                scene["Text"] = scene["Summary"]
+
+            type_label = self._normalise_type_label(
+                entry.get("SceneType")
+                or entry.get("Type")
+                or entry.get("Category")
+                or entry.get("Mood")
+                or entry.get("Role")
+            )
+            scene["SceneType"] = "" if type_label == self.type_options[0] else type_label
+            if scene["SceneType"]:
+                scene["Type"] = scene["SceneType"]
+
+            npc_names = []
+            for key in ("NPCs", "InvolvedNPCs", "Participants", "Characters", "Allies"):
+                npc_names.extend(self._split_to_list(entry.get(key)))
+            creature_names = []
+            for key in ("Creatures", "Monsters", "Enemies", "Foes", "Threats"):
+                creature_names.extend(self._split_to_list(entry.get(key)))
+            place_names = []
+            for key in ("Places", "Locations", "Site", "Setting", "Where", "Venue"):
+                place_names.extend(self._split_to_list(entry.get(key)))
+
+            scene["NPCs"] = self._dedupe(npc_names)
+            scene["Creatures"] = self._dedupe(creature_names)
+            scene["Places"] = self._dedupe(place_names)
+
+            next_refs = []
+            for key in (
+                "NextScenes",
+                "Next",
+                "NextScene",
+                "Links",
+                "Transitions",
+                "Choices",
+                "Branches",
+                "Paths",
+                "Outcomes",
+                "LeadsTo",
+                "OnSuccess",
+                "OnFailure",
+                "IfSuccess",
+                "IfFailure",
+            ):
+                next_refs.extend(self._extract_links(entry.get(key)))
+            scene["NextScenes"] = self._dedupe(next_refs)
+
+            return scene
+
+        if isinstance(entry, str):
+            text = entry.strip()
+        else:
+            text = str(entry).strip()
+        if not text:
+            return scene
+        lines = [line.strip() for line in text.splitlines() if line.strip()]
+        if lines:
+            scene["Title"] = lines[0]
+            scene["Summary"] = "\n".join(lines[1:]) if len(lines) > 1 else ""
+            scene["Text"] = scene["Summary"] or text
+        else:
+            scene["Summary"] = text
+            scene["Text"] = text
+        return scene
+
+    def _coerce_scenes(self, raw):
+        if not raw:
+            return []
+        if isinstance(raw, list):
+            entries = raw
+        elif isinstance(raw, dict):
+            if isinstance(raw.get("Scenes"), list):
+                entries = raw["Scenes"]
+            else:
+                entries = [raw]
+        elif isinstance(raw, str):
+            text = raw.strip()
+            if not text:
+                return []
+            try:
+                parsed = json.loads(text)
+            except (json.JSONDecodeError, TypeError):
+                parsed = None
+            if isinstance(parsed, list):
+                entries = parsed
+            elif isinstance(parsed, dict) and isinstance(parsed.get("Scenes"), list):
+                entries = parsed["Scenes"]
+            else:
+                entries = [text]
+        else:
+            entries = [raw]
+
+        scenes = []
+        for idx, entry in enumerate(entries):
+            normalised = self._normalise_scene_entry(entry, idx)
+            if normalised:
+                scenes.append(normalised)
+        return scenes
+
+    def _parse_textbox_list(self, widget):
+        content = widget.get("1.0", "end").strip()
+        return self._dedupe(self._split_to_list(content))
+
+    def _save_current_scene(self):
+        if self.selected_index is None or self.selected_index >= len(self.scenes):
+            return
+        scene = self.scenes[self.selected_index]
+        title = self.title_var.get().strip()
+        scene["Title"] = title or scene.get("Title") or f"Scene {self.selected_index + 1}"
+        summary = self.summary_text.get("1.0", "end").strip()
+        scene["Summary"] = summary
+        scene["Text"] = summary
+        npc_list = self._parse_textbox_list(self.npcs_text)
+        creature_list = self._parse_textbox_list(self.creatures_text)
+        place_list = self._parse_textbox_list(self.places_text)
+        next_list = self._parse_textbox_list(self.next_text)
+        scene["NPCs"] = npc_list
+        scene["Creatures"] = creature_list
+        scene["Places"] = place_list
+        scene["NextScenes"] = next_list
+        selection = self.type_var.get()
+        label = "" if selection == self.type_options[0] else selection
+        scene["SceneType"] = label
+        if label:
+            scene["Type"] = label
+        else:
+            scene.pop("Type", None)
+        self._update_list_item(self.selected_index)
+
+    def add_scene(self):  # pragma: no cover - UI action
+        self._save_current_scene()
+        new_index = len(self.scenes)
+        new_scene = self._create_scene_record(f"Scene {new_index + 1}")
+        self.scenes.append(new_scene)
+        self._refresh_scene_list()
+        self._set_listbox_selection(new_index)
+        self._apply_selection(new_index)
+
+    def duplicate_scene(self):  # pragma: no cover - UI action
+        if self.selected_index is None or self.selected_index >= len(self.scenes):
+            return
+        self._save_current_scene()
+        source = self.scenes[self.selected_index]
+        duplicated = copy.deepcopy(source)
+        base_title = source.get("Title") or f"Scene {self.selected_index + 1}"
+        duplicated["Title"] = self._generate_unique_title(base_title)
+        insert_at = self.selected_index + 1
+        self.scenes.insert(insert_at, duplicated)
+        self._refresh_scene_list()
+        self._set_listbox_selection(insert_at)
+        self._apply_selection(insert_at)
+
+    def _generate_unique_title(self, base_title):
+        if not base_title:
+            base_title = "Scene"
+        candidate = f"{base_title} (Copy)"
+        counter = 2
+        existing = {scene.get("Title", "").lower() for scene in self.scenes}
+        while candidate.lower() in existing:
+            candidate = f"{base_title} (Copy {counter})"
+            counter += 1
+        return candidate
+
+    def remove_scene(self):  # pragma: no cover - UI action
+        if self.selected_index is None or self.selected_index >= len(self.scenes):
+            return
+        del self.scenes[self.selected_index]
+        if not self.scenes:
+            self.selected_index = None
+            self._refresh_scene_list()
+            return
+        new_index = min(self.selected_index, len(self.scenes) - 1)
+        self.selected_index = None
+        self._refresh_scene_list()
+        self._set_listbox_selection(new_index)
+        self._apply_selection(new_index)
+
+    def move_scene(self, direction):  # pragma: no cover - UI action
+        if self.selected_index is None:
+            return
+        new_index = self.selected_index + direction
+        if new_index < 0 or new_index >= len(self.scenes):
+            return
+        self._save_current_scene()
+        scene = self.scenes.pop(self.selected_index)
+        self.scenes.insert(new_index, scene)
+        self.selected_index = new_index
+        self._refresh_scene_list()
+        self._set_listbox_selection(new_index)
+        self._apply_selection(new_index)
+
+    # ------------------------------------------------------------------
+    # WizardStep overrides
+    # ------------------------------------------------------------------
     def load_state(self, state):  # pragma: no cover - UI synchronization
-        state.setdefault("Secret", state.get("Secrets", ""))
-        state.setdefault("Scenes", state.get("Scenes", []) or [])
-        state.setdefault("NPCs", state.get("NPCs", []) or [])
-        state.setdefault("Places", state.get("Places", []) or [])
-        state.setdefault("Creatures", state.get("Creatures", []) or [])
-        if state is not self._loaded_state:
-            self.editor.load_scenario(state)
-            self._loaded_state = state
+        scenes = self._coerce_scenes(state.get("Scenes"))
+        self.scenes = scenes
+        self.selected_index = None
+        self._refresh_scene_list()
 
     def save_state(self, state):  # pragma: no cover - UI synchronization
-        scenario = self.editor.scenario or {}
-        for key in ("Title", "Summary", "Secret", "Secrets", "Scenes", "NPCs", "Places", "Creatures", "Factions", "Objects"):
-            if key in scenario and scenario[key] is not None:
-                state[key] = scenario[key]
+        self._save_current_scene()
+        payload = []
+        for scene in self.scenes:
+            if not scene:
+                continue
+            title = scene.get("Title", "").strip()
+            summary = scene.get("Summary", "").strip()
+            has_content = bool(title or summary or scene.get("NPCs") or scene.get("Places") or scene.get("Creatures"))
+            if not has_content:
+                continue
+            record = {
+                "Title": title or "Scene",
+                "Summary": summary,
+                "Text": summary,
+                "NPCs": list(scene.get("NPCs", [])),
+                "Creatures": list(scene.get("Creatures", [])),
+                "Places": list(scene.get("Places", [])),
+            }
+            next_scenes = list(scene.get("NextScenes", []))
+            if next_scenes:
+                record["NextScenes"] = next_scenes
+                record["Links"] = [{"target": target, "text": target} for target in next_scenes]
+            scene_type = scene.get("SceneType")
+            if scene_type:
+                record["SceneType"] = scene_type
+                record["Type"] = scene_type
+            payload.append(record)
+
+        state["Scenes"] = payload
+
+        for field_name in ("NPCs", "Creatures", "Places"):
+            from_state = self._dedupe(self._split_to_list(state.get(field_name, [])))
+            from_scenes = []
+            for scene in self.scenes:
+                from_scenes.extend(scene.get(field_name, []))
+            merged = self._dedupe(from_state + from_scenes)
+            state[field_name] = merged
         return True
 
 
@@ -399,17 +936,7 @@ class ScenarioBuilderWizard(ctk.CTkToplevel):
 
         self.steps = [
             ("Basic Information", BasicInfoStep(self.step_container)),
-            (
-                "Scene Graph",
-                GraphPlanningStep(
-                    self.step_container,
-                    self.state,
-                    self.scenario_wrapper,
-                    self.npc_wrapper,
-                    self.creature_wrapper,
-                    self.place_wrapper,
-                ),
-            ),
+            ("Scenes", ScenesPlanningStep(self.step_container)),
             ("Entity Linking", EntityLinkingStep(self.step_container, entity_wrappers)),
             ("Review", ReviewStep(self.step_container)),
         ]
