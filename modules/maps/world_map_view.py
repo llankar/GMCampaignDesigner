@@ -1333,7 +1333,7 @@ class WorldMapWindow(ctk.CTkToplevel):
                     frame,
                     text=value,
                     font=("Segoe UI", 12),
-                    wraplength=360,
+                    wraplength=500,
                     justify="left",
                     anchor="w",
                 ).pack(fill="x", padx=12, pady=(0, 8))
@@ -1466,8 +1466,10 @@ class WorldMapWindow(ctk.CTkToplevel):
     def _get_stats_preview(self, record: dict | None) -> str:
         if not isinstance(record, dict):
             return "No stats available yet."
-
-        stats_value = record.get("Stats")
+        stats_value = record.get("Traits")
+        if not stats_value:
+            stats_value = record.get("Stats")
+            
         if not stats_value:
             return "No stats available yet."
 
@@ -1642,7 +1644,7 @@ class WorldMapWindow(ctk.CTkToplevel):
         sections["Overview"] = [summary] if summary else []
 
         detail_fields: dict[str, tuple[str, list[str]]] = {
-            "NPC": ("Profile", ["Role", "Factions", "Motivation", "Secret"]),
+            "NPC": ("Profile", ["Role", "Traits", "Motivation", "Secret"]),
             "PC": ("Adventurer Details", ["Role", "Traits", "Background", "Secret"]),
             "Creature": ("Creature Traits", ["Type", "Powers", "Stats", "Weakness"]),
             "Place": ("Location Facts", ["Description", "NPCs", "Secrets", "PlayerDisplay"]),
