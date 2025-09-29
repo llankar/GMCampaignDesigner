@@ -6,6 +6,7 @@ from tkinter import messagebox, simpledialog
 import customtkinter as ctk
 from PIL import Image, ImageTk, ImageDraw
 
+from modules.generic.entity_detail_factory import open_entity_window
 from modules.generic.generic_model_wrapper import GenericModelWrapper
 from modules.generic.generic_list_selection_view import GenericListSelectionView
 from modules.helpers.config_helper import ConfigHelper
@@ -183,6 +184,36 @@ class WorldMapWindow(ctk.CTkToplevel):
 
         self.subtitle_label = ctk.CTkLabel(self.inspector_header, text="Select an entity to view its synthesis.", font=("Segoe UI", 14))
         self.subtitle_label.pack(anchor="w", padx=16, pady=(0, 12))
+
+        self.inspector_actions = ctk.CTkFrame(self.inspector_header, fg_color="transparent")
+        self.inspector_actions.pack(fill="x", padx=12, pady=(0, 12))
+
+        self.focus_map_button = ctk.CTkButton(
+            self.inspector_actions,
+            text="Focus on Map",
+            width=130,
+            command=self._focus_on_selected_token,
+            state=ctk.DISABLED,
+        )
+        self.focus_map_button.pack(side="left", padx=(4, 6))
+
+        self.open_record_button = ctk.CTkButton(
+            self.inspector_actions,
+            text="Open Record",
+            width=130,
+            command=self._open_selected_record,
+            state=ctk.DISABLED,
+        )
+        self.open_record_button.pack(side="left", padx=6)
+
+        self.open_map_tool_button = ctk.CTkButton(
+            self.inspector_actions,
+            text="Open in Map Tool",
+            width=150,
+            command=self._open_selected_in_map_tool,
+            state=ctk.DISABLED,
+        )
+        self.open_map_tool_button.pack(side="left", padx=6)
 
         self.portrait_frame = ctk.CTkFrame(self.inspector_container, fg_color="#141C30", corner_radius=18)
         self.portrait_frame.pack(fill="x", padx=16, pady=(0, 12))
@@ -471,6 +502,79 @@ class WorldMapWindow(ctk.CTkToplevel):
             f"Opened map '{target_map}' in Map Tool",
             func_name="WorldMapWindow._open_in_map_tool",
         )
+
+    def _focus_on_selected_token(self) -> None:
+        token = self._inspector_token or self.selected_token
+        if not token:
+            return
+        self._focus_on_token(token)
+
+    def _focus_on_token(self, token: dict) -> None:
+        if not self.render_params or not self.base_image:
+            return
+        canvas = getattr(self, "canvas", None)
+        if not canvas or not canvas.winfo_exists():
+            return
+
+        scale, offset_x, offset_y, base_w, base_h = self.render_params
+        canvas_w = canvas.winfo_width()
+        canvas_h = canvas.winfo_height()
+        if canvas_w <= 0 or canvas_h <= 0:
+            return
+
+        base_offset_x = offset_x - self.pan_x
+        base_offset_y = offset_y - self.pan_y
+
+        x_norm = token.get("x_norm")
+        y_norm = token.get("y_norm")
+        if x_norm is None or y_norm is None:
+            return
+
+        token_x = base_offset_x + float(x_norm) * base_w * scale
+        token_y = base_offset_y + float(y_norm) * base_h * scale
+
+        center_x = canvas_w / 2
+        center_y = canvas_h / 2
+
+        self.pan_x += center_x - token_x
+        self.pan_y += center_y - token_y
+        self._draw_scene()
+        self._pulse_token(token)
+
+    def _open_selected_record(self) -> None:
+        token = self._inspector_token or self.selected_token
+        if not token or token.get("type") == "map":
+            return
+
+        entity_type = token.get("entity_type")
+        entity_id = token.get("entity_id")
+        if not entity_type or not entity_id:
+            return
+
+        type_map = {
+            "NPC": "NPCs",
+            "PC": "PCs",
+            "Creature": "Creatures",
+            "Place": "Places",
+        }
+        target_type = type_map.get(entity_type)
+        if not target_type:
+            return
+
+        try:
+            open_entity_window(target_type, entity_id)
+        except Exception as exc:
+            log_error(
+                f"Failed to open record '{entity_id}' ({entity_type}): {exc}",
+                func_name="WorldMapWindow._open_selected_record",
+            )
+            messagebox.showerror("Error", f"Unable to open {entity_type} '{entity_id}'.\n{exc}")
+
+    def _open_selected_in_map_tool(self) -> None:
+        token = self._inspector_token or self.selected_token
+        if token and token is not self.selected_token:
+            self.selected_token = token
+        self._open_in_map_tool()
 
     # ------------------------------------------------------------------
     # Token creation & persistence
@@ -1000,6 +1104,21 @@ class WorldMapWindow(ctk.CTkToplevel):
         self._persist_tokens()
         self._clear_inspector()
 
+    def _configure_inspector_actions(self, token: dict | None) -> None:
+        focus_state = ctk.NORMAL if token else ctk.DISABLED
+        record_state = ctk.NORMAL if token and token.get("type") != "map" else ctk.DISABLED
+        map_state = ctk.DISABLED
+        if token and token.get("type") == "map":
+            target = token.get("linked_map") or token.get("entity_id")
+            map_state = ctk.NORMAL if target else ctk.DISABLED
+
+        if hasattr(self, "focus_map_button"):
+            self.focus_map_button.configure(state=focus_state)
+        if hasattr(self, "open_record_button"):
+            self.open_record_button.configure(state=record_state)
+        if hasattr(self, "open_map_tool_button"):
+            self.open_map_tool_button.configure(state=map_state)
+
     def _clear_inspector(self) -> None:
         self.title_label.configure(text="World Map")
         self.subtitle_label.configure(text="Select an entity to view its synthesis.")
@@ -1020,6 +1139,7 @@ class WorldMapWindow(ctk.CTkToplevel):
         )
         self._inspector_token = None
         self._set_quick_actions_state(False)
+        self._configure_inspector_actions(None)
 
     def _show_entity_synthesis(self, token: dict) -> None:
         record = token.get("record") or {}
@@ -1030,6 +1150,7 @@ class WorldMapWindow(ctk.CTkToplevel):
 
         self._inspector_token = token
         self._set_quick_actions_state(True)
+        self._configure_inspector_actions(token)
 
         portrait_path = token.get("portrait_path") or token.get("image_path")
         portrait_image = self._load_image(portrait_path) if portrait_path else None
@@ -1051,6 +1172,7 @@ class WorldMapWindow(ctk.CTkToplevel):
 
         self._inspector_token = token
         self._set_quick_actions_state(True)
+        self._configure_inspector_actions(token)
 
         portrait_path = token.get("portrait_path") or token.get("image_path")
         portrait_image = self._load_image(portrait_path) if portrait_path else None
