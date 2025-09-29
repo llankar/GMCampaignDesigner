@@ -21,6 +21,10 @@
       "type": "longtext"
     },
     {
+      "name": "Notes",
+      "type": "longtext"
+    },
+    {
       "name": "Factions",
       "type": "list",
       "linked_type": "Factions"

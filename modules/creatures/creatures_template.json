@@ -8,6 +8,7 @@
       {"name": "Stats", "type": "longtext"},
       {"name": "Background", "type": "longtext"},
       {"name": "Genre", "type": "text"},
+      {"name": "Notes", "type": "longtext"},
       {"name": "Portrait", "type": "text"},
       {"name": "Audio", "type": "audio"}
   ]

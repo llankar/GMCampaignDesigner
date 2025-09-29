@@ -33,6 +33,10 @@
       "type": "text"
     },
     {
+      "name": "Notes",
+      "type": "longtext"
+    },
+    {
       "name": "Portrait",
       "type": "text"
     },

@@ -41,6 +41,10 @@
       "type": "longtext"
     },
     {
+      "name": "Notes",
+      "type": "longtext"
+    },
+    {
       "name": "Genre",
       "type": "text"
     },
