@@ -637,6 +637,18 @@ class SceneCanvas(ctk.CTkFrame):
             self._draw()
 
     def _on_click(self, event):
+        # Allow direct link label editing on single click for better accessibility
+        for x1, y1, x2, y2, source_idx, target_idx, target_value in self._link_regions:
+            if x1 <= event.x <= x2 and y1 <= event.y <= y2:
+                if callable(self.on_link_text_edit):
+                    self.on_link_text_edit(
+                        source_idx,
+                        target_idx,
+                        target_value,
+                        (x1, y1, x2, y2),
+                    )
+                return
+
         icon_idx, icon_type = self._hit_icon(event.x, event.y)
         if icon_idx is not None:
             self._select_index(icon_idx)
