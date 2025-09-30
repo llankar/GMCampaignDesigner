@@ -1078,6 +1078,128 @@ class ScenarioBuilderWizard(ctk.CTkToplevel):
     def cancel(self):  # pragma: no cover - UI navigation
         self.destroy()
 
+    def _coerce_to_string_list(self, value):
+        if not value:
+            return []
+        if isinstance(value, str):
+            text = value.strip()
+            return [text] if text else []
+        if isinstance(value, (list, tuple, set)):
+            result = []
+            for item in value:
+                if item is None:
+                    continue
+                if isinstance(item, str):
+                    text = item.strip()
+                else:
+                    text = str(item).strip()
+                if text:
+                    result.append(text)
+            return list(dict.fromkeys(result))
+        text = str(value).strip()
+        return [text] if text else []
+
+    def _prepare_scenes_for_save(self, scenes):
+        entries = scenes if isinstance(scenes, list) else [scenes]
+        prepared = []
+        skipped = []
+
+        for index, entry in enumerate(entries):
+            record, error_label = self._sanitize_scene_entry_for_save(entry, index)
+            if record is not None:
+                prepared.append(record)
+            elif error_label:
+                skipped.append(error_label)
+
+        return prepared, skipped
+
+    def _sanitize_scene_entry_for_save(self, entry, index):
+        label = f"Scene #{index + 1}"
+
+        if isinstance(entry, dict):
+            data = dict(entry)
+        elif isinstance(entry, str):
+            text = entry.strip()
+            if not text:
+                return None, f"{label} (empty)"
+            lines = [line.strip() for line in text.splitlines() if line.strip()]
+            data = {
+                "Title": lines[0] if lines else text,
+                "Summary": "\n".join(lines[1:]) if len(lines) > 1 else "",
+                "Text": text,
+            }
+        elif entry is None:
+            return None, f"{label} (empty)"
+        else:
+            text = str(entry).strip()
+            if not text:
+                return None, f"{label} (empty)"
+            data = {"Title": text}
+
+        title_raw = data.get("Title")
+        title = str(title_raw).strip() if title_raw is not None else ""
+        summary_raw = data.get("Summary")
+        summary = str(summary_raw).strip() if summary_raw is not None else ""
+        text_raw = data.get("Text")
+        text_value = str(text_raw).strip() if text_raw is not None else ""
+
+        if summary and not text_value:
+            text_value = summary
+        if text_value and not summary:
+            summary = text_value
+
+        record = {}
+        if title:
+            record["Title"] = title
+        else:
+            record["Title"] = f"Scene {index + 1}"
+
+        record["Summary"] = summary
+        record["Text"] = text_value or summary or record["Title"]
+
+        for field in ("NPCs", "Creatures", "Places", "NextScenes"):
+            values = self._coerce_to_string_list(data.get(field))
+            if values:
+                record[field] = values
+
+        next_scenes = record.get("NextScenes", [])
+        if next_scenes:
+            record["Links"] = [{"target": target, "text": target} for target in next_scenes]
+
+        scene_type_raw = data.get("SceneType") or data.get("Type")
+        if scene_type_raw:
+            scene_type = str(scene_type_raw).strip()
+            if scene_type:
+                record["SceneType"] = scene_type
+                record["Type"] = scene_type
+
+        has_meaningful_content = any(
+            record.get(field)
+            for field in ("Summary", "Text", "NPCs", "Creatures", "Places", "NextScenes")
+        )
+
+        if not has_meaningful_content and not (record.get("Title") and title):
+            return None, f"{label} (no usable data)"
+
+        allowed_fields = {
+            "Title",
+            "Summary",
+            "Text",
+            "NPCs",
+            "Creatures",
+            "Places",
+            "NextScenes",
+            "Links",
+            "SceneType",
+            "Type",
+        }
+
+        for key in list(record.keys()):
+            if key not in allowed_fields:
+                record.pop(key, None)
+
+        return record, None
+
     def finish(self):  # pragma: no cover - UI navigation
         step = self.steps[self.current_step_index][1]
         if not step.save_state(self.state):
@@ -1089,9 +1211,16 @@ class ScenarioBuilderWizard(ctk.CTkToplevel):
             return
 
         secrets = self.state.get("Secrets") or ""
-        scenes = self.state.get("Scenes") or []
-        if isinstance(scenes, str):
-            scenes = [scenes]
+        scenes_raw = self.state.get("Scenes") or []
+        if isinstance(scenes_raw, str):
+            scenes_raw = [scenes_raw]
+
+        scenes, skipped = self._prepare_scenes_for_save(scenes_raw)
+        if skipped:
+            message = "Some scenes were skipped because they contain unsupported data:\n" + "\n".join(
+                f"- {label}" for label in skipped
+            )
+            messagebox.showwarning("Scenes Skipped", message)
 
         payload = {
             "Title": title,
