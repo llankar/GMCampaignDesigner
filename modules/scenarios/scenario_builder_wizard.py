@@ -1027,8 +1027,8 @@ class ScenesPlanningStep(WizardStep):
         config = self.ENTITY_FIELDS.get(entity_type)
         if not config:
             return
-        _, _, singular_label = config
-        selected = self._choose_entity_from_library(entity_type, singular_label)
+        slug, _, singular_label = config
+        selected = self._choose_entity_from_library(slug, singular_label)
         if not selected:
             return
         scene = self.scenes[scene_index]
@@ -1139,16 +1139,16 @@ class ScenesPlanningStep(WizardStep):
             except Exception:
                 pass
 
-    def _choose_entity_from_library(self, entity_type, singular_label):
-        wrapper = self.entity_wrappers.get(entity_type)
+    def _choose_entity_from_library(self, entity_slug, singular_label):
+        wrapper = self.entity_wrappers.get(entity_slug)
         if not wrapper:
             messagebox.showerror("Unavailable", f"No {singular_label} library available")
             return None
         try:
-            template = load_template(entity_type)
+            template = load_template(entity_slug)
         except Exception as exc:
             log_exception(
-                f"Failed to load template for {entity_type}: {exc}",
+                f"Failed to load template for {entity_slug}: {exc}",
                 func_name="ScenesPlanningStep._choose_entity_from_library",
             )
             messagebox.showerror("Template Error", f"Unable to load {singular_label} list")
@@ -1162,7 +1162,7 @@ class ScenesPlanningStep(WizardStep):
 
         view = GenericListSelectionView(
             top,
-            entity_type,
+            entity_slug,
             wrapper,
             template,
             on_select_callback=lambda _et, name, win=top: (result.__setitem__("name", name), win.destroy()),
@@ -1173,16 +1173,16 @@ class ScenesPlanningStep(WizardStep):
         self.wait_window(top)
         return result["name"]
 
-    def _create_entity_in_library(self, entity_type, singular_label):
-        wrapper = self.entity_wrappers.get(entity_type)
+    def _create_entity_in_library(self, entity_slug, singular_label):
+        wrapper = self.entity_wrappers.get(entity_slug)
         if not wrapper:
             messagebox.showerror("Unavailable", f"No {singular_label} data available for creation.")
             return None
         try:
-            template = load_template(entity_type)
+            template = load_template(entity_slug)
         except Exception as exc:
             log_exception(
-                f"Failed to load template for {entity_type}: {exc}",
+                f"Failed to load template for {entity_slug}: {exc}",
                 func_name="ScenesPlanningStep._create_entity_in_library",
             )
             messagebox.showerror("Template Error", f"Unable to load the {singular_label} template.")
