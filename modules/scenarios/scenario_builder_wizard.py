@@ -1583,7 +1583,8 @@ class InlineSceneEditor(ctk.CTkFrame):
             row=0, column=1, sticky="ew", padx=(6, 0)
         )
 
-        self.title_entry.bind("<Return>", self._on_save)
+        self.title_entry.bind("<Control-Return>", self._on_save)
+        self.title_entry.bind("<Command-Return>", self._on_save)
         self.title_entry.bind("<Escape>", self._on_cancel)
         self.summary_text.bind("<Control-Return>", self._on_save)
         self.summary_text.bind("<Command-Return>", self._on_save)
