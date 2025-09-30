@@ -306,22 +306,44 @@ class SceneFlowPreview(ctk.CTkFrame):
 
 class SceneCanvas(ctk.CTkFrame):
     GRID = 60
-    CARD_W = 240
-    CARD_H = 150
+    CARD_W = 260
+    CARD_H = 210
 
-    def __init__(self, master, on_select=None, on_move=None, on_edit=None, on_context=None):
+    def __init__(
+        self,
+        master,
+        on_select=None,
+        on_move=None,
+        on_edit=None,
+        on_context=None,
+        on_add_entity=None,
+        on_link=None,
+        on_link_text_edit=None,
+    ):
         super().__init__(master, corner_radius=16, fg_color=SCENE_FLOW_BG)
         self.on_select = on_select
         self.on_move = on_move
         self.on_edit = on_edit
         self.on_context = on_context
+        self.on_add_entity = on_add_entity
+        self.on_link = on_link
+        self.on_link_text_edit = on_link_text_edit
         self.scenes = []
         self.selected_index = None
         self._drag_index = None
+        self._drag_mode = None
         self._drag_offset = (0, 0)
+        self._link_source_index = None
+        self._link_preview_line = None
+        self._link_preview_active = False
         self._grid_tile_cache: dict[str, object] = {}
         self._shadow_cache: dict[tuple, tuple] = {}
         self._image_refs: dict[str, object] = {}
+        self._regions: list[tuple] = []
+        self._move_regions: list[tuple] = []
+        self._icon_regions: list[tuple] = []
+        self._link_regions: list[tuple] = []
+        self._positions: dict[int, tuple[float, float]] = {}
 
         self.canvas = tk.Canvas(
             self,
@@ -385,14 +407,17 @@ class SceneCanvas(ctk.CTkFrame):
             return
         positions = {}
         title_lookup = {}
+        self._positions = {}
         for idx, scene in enumerate(self.scenes):
             layout = scene.get("_canvas", {})
             x = layout.get("x", width / 2)
             y = layout.get("y", height / 2)
             positions[idx] = (x, y)
+            self._positions[idx] = (x, y)
             title = (scene.get("Title") or f"Scene {idx + 1}").strip().lower()
             title_lookup[title] = idx
         # links
+        self._link_regions = []
         for idx, scene in enumerate(self.scenes):
             start = positions.get(idx)
             if not start:
@@ -446,15 +471,24 @@ class SceneCanvas(ctk.CTkFrame):
                 )
                 label_text = str(link.get("text") or target_value).strip()
                 if label_text:
-                    c.create_text(
+                    text_id = c.create_text(
                         mx,
                         my - 14,
                         text=label_text,
                         fill="#9DB4D1",
                         font=("Segoe UI", 10, "bold" if idx == self.selected_index else "normal"),
+                        tags=("link-label",),
                     )
+                    bbox = c.bbox(text_id)
+                    if bbox:
+                        x1, y1, x2, y2 = bbox
+                        self._link_regions.append(
+                            (x1, y1, x2, y2, idx, target_idx, link.get("target"))
+                        )
         # cards
         self._regions = []
+        self._move_regions = []
+        self._icon_regions = []
         for idx, scene in enumerate(self.scenes):
             x, y = positions[idx]
             x1 = x - self.CARD_W / 2
@@ -498,6 +532,7 @@ class SceneCanvas(ctk.CTkFrame):
                 font=("Segoe UI", 13, "bold"),
                 tags=(f"scene-node-{idx}", "scene-node"),
             )
+            self._move_regions.append((x1, y1, x2, y1 + 36, idx))
             summary = scene.get("Summary") or scene.get("Text") or ""
             summary = " ".join(summary.split())[:160]
             c.create_text(
@@ -510,6 +545,60 @@ class SceneCanvas(ctk.CTkFrame):
                 width=self.CARD_W - 28,
                 tags=(f"scene-node-{idx}", "scene-node"),
             )
+            info_y = y1 + 116
+            for label_key, items in (
+                ("NPCs", scene.get("NPCs")),
+                ("Creatures", scene.get("Creatures")),
+                ("Places", scene.get("Places")),
+            ):
+                if items:
+                    display = ", ".join(items[:4])
+                    if len(items) > 4:
+                        display += ", …"
+                    c.create_text(
+                        x1 + 14,
+                        info_y,
+                        text=f"{label_key}: {display}",
+                        anchor="nw",
+                        fill="#9bb8df",
+                        font=("Segoe UI", 9, "bold" if idx == self.selected_index else "normal"),
+                        width=self.CARD_W - 28,
+                        tags=(f"scene-node-{idx}", "scene-node"),
+                    )
+                    info_y += 18
+            icon_size = 24
+            icon_spacing = 10
+            icon_types = [
+                ("NPCs", "N"),
+                ("Creatures", "C"),
+                ("Places", "P"),
+            ]
+            total_width = len(icon_types) * icon_size + (len(icon_types) - 1) * icon_spacing
+            icon_start = x2 - total_width - 16
+            for offset, (etype, label_char) in enumerate(icon_types):
+                ix1 = icon_start + offset * (icon_size + icon_spacing)
+                iy1 = y2 - icon_size - 12
+                ix2 = ix1 + icon_size
+                iy2 = iy1 + icon_size
+                icon_id = c.create_oval(
+                    ix1,
+                    iy1,
+                    ix2,
+                    iy2,
+                    fill="#203758",
+                    outline="#6ab2ff" if idx == self.selected_index else "#30435f",
+                    width=2,
+                    tags=("scene-node",),
+                )
+                c.create_text(
+                    (ix1 + ix2) / 2,
+                    (iy1 + iy2) / 2,
+                    text="+" + label_char,
+                    fill="#d8e6ff",
+                    font=("Segoe UI", 9, "bold"),
+                    tags=("scene-node",),
+                )
+                self._icon_regions.append((ix1, iy1, ix2, iy2, idx, etype))
             self._regions.append((x1, y1, x2, y2, idx))
 
     def _hit_test(self, x, y):
@@ -517,6 +606,25 @@ class SceneCanvas(ctk.CTkFrame):
             if x1 <= x <= x2 and y1 <= y <= y2:
                 return idx
         return None
+
+    def _hit_icon(self, x, y):
+        for x1, y1, x2, y2, idx, etype in self._icon_regions:
+            if x1 <= x <= x2 and y1 <= y <= y2:
+                return idx, etype
+        return None, None
+
+    def get_card_bbox(self, index):
+        for x1, y1, x2, y2, idx in self._regions:
+            if idx == index:
+                return x1, y1, x2, y2
+        return None
+
+    def _get_link_anchor(self, idx):
+        position = self._positions.get(idx)
+        if not position:
+            return 0, 0
+        x, y = position
+        return x + self.CARD_W / 2 - 12, y
 
     def _select_index(self, idx, redraw_on_none=True):
         if self.selected_index != idx:
@@ -529,37 +637,96 @@ class SceneCanvas(ctk.CTkFrame):
             self._draw()
 
     def _on_click(self, event):
+        icon_idx, icon_type = self._hit_icon(event.x, event.y)
+        if icon_idx is not None:
+            self._select_index(icon_idx)
+            if callable(self.on_add_entity):
+                self.on_add_entity(icon_idx, icon_type)
+            self._drag_index = None
+            self._drag_mode = None
+            return
+
         idx = self._hit_test(event.x, event.y)
+        self._drag_index = None
+        self._drag_mode = None
+        self._link_source_index = None
+        self._link_preview_active = False
         if idx is not None:
             region = next((r for r in self._regions if r[4] == idx), None)
             if region:
                 x1, y1, x2, y2, _ = region
-                self._drag_index = idx
-                layout = self.scenes[idx].setdefault("_canvas", {})
-                layout.setdefault("x", (x1 + x2) / 2)
-                layout.setdefault("y", (y1 + y2) / 2)
-                self._drag_offset = (event.x - layout["x"], event.y - layout["y"])
-        else:
-            self._drag_index = None
+                move_region = next((r for r in self._move_regions if r[4] == idx), None)
+                if move_region and move_region[1] <= event.y <= move_region[3]:
+                    self._drag_mode = "move"
+                    self._drag_index = idx
+                    layout = self.scenes[idx].setdefault("_canvas", {})
+                    layout.setdefault("x", (x1 + x2) / 2)
+                    layout.setdefault("y", (y1 + y2) / 2)
+                    self._drag_offset = (event.x - layout["x"], event.y - layout["y"])
+                else:
+                    self._drag_mode = "link"
+                    self._link_source_index = idx
         self._select_index(idx)
 
     def _on_drag(self, event):
-        if self._drag_index is None:
+        if self._drag_mode == "move" and self._drag_index is not None:
+            layout = self.scenes[self._drag_index].setdefault("_canvas", {})
+            layout["x"] = event.x - self._drag_offset[0]
+            layout["y"] = event.y - self._drag_offset[1]
+            self._draw()
+        elif self._drag_mode == "link" and self._link_source_index is not None:
+            anchor = self._get_link_anchor(self._link_source_index)
+            if not self._link_preview_active:
+                self._link_preview_active = True
+                self._link_preview_line = self.canvas.create_line(
+                    anchor[0],
+                    anchor[1],
+                    event.x,
+                    event.y,
+                    dash=(6, 4),
+                    width=2,
+                    fill="#6ab2ff",
+                    arrow=tk.LAST,
+                    arrowshape=(12, 14, 6),
+                )
+            else:
+                self.canvas.coords(self._link_preview_line, anchor[0], anchor[1], event.x, event.y)
+        else:
             return
-        layout = self.scenes[self._drag_index].setdefault("_canvas", {})
-        layout["x"] = event.x - self._drag_offset[0]
-        layout["y"] = event.y - self._drag_offset[1]
-        self._draw()
 
-    def _on_release(self, _event):
-        if self._drag_index is None:
-            return
-        layout = self.scenes[self._drag_index].get("_canvas", {})
-        if callable(self.on_move):
-            self.on_move(self._drag_index, layout.get("x"), layout.get("y"))
+    def _on_release(self, event):
+        if self._drag_mode == "move" and self._drag_index is not None:
+            layout = self.scenes[self._drag_index].get("_canvas", {})
+            if callable(self.on_move):
+                self.on_move(self._drag_index, layout.get("x"), layout.get("y"))
+        elif self._drag_mode == "link" and self._link_source_index is not None:
+            if self._link_preview_line is not None:
+                self.canvas.delete(self._link_preview_line)
+            self._link_preview_line = None
+            if self._link_preview_active:
+                target_idx = self._hit_test(event.x, event.y)
+                if (
+                    target_idx is not None
+                    and target_idx != self._link_source_index
+                    and callable(self.on_link)
+                ):
+                    self.on_link(self._link_source_index, target_idx)
+        self._drag_mode = None
         self._drag_index = None
+        self._link_source_index = None
+        self._link_preview_active = False
 
     def _on_double_click(self, event):
+        for x1, y1, x2, y2, source_idx, target_idx, target_value in self._link_regions:
+            if x1 <= event.x <= x2 and y1 <= event.y <= y2:
+                if callable(self.on_link_text_edit):
+                    self.on_link_text_edit(
+                        source_idx,
+                        target_idx,
+                        target_value,
+                        (x1, y1, x2, y2),
+                    )
+                return
         idx = self._hit_test(event.x, event.y)
         if idx is not None:
             self._select_index(idx)
@@ -602,6 +769,8 @@ class ScenesPlanningStep(WizardStep):
         self.selected_index = None
         self._scenario_summary = ""
         self._scenario_secrets = ""
+        self._inline_editor = None
+        self._link_label_editor = None
 
         self.scenario_title_var = ctk.StringVar()
 
@@ -634,7 +803,7 @@ class ScenesPlanningStep(WizardStep):
 
         ctk.CTkLabel(
             toolbar,
-            text="Double-click a scene card to edit its details or right-click for more actions.",
+            text="Double-click a scene to edit it inline, use the +N/+C/+P icons to link entities, drag from the title bar to move, or drag from the body to create scene links.",
             text_color="#9db4d1",
             wraplength=420,
             justify="left",
@@ -652,6 +821,9 @@ class ScenesPlanningStep(WizardStep):
             on_move=self._on_canvas_move,
             on_edit=self._edit_scene_via_canvas,
             on_context=self._show_canvas_menu,
+            on_add_entity=self._add_entity_to_scene,
+            on_link=self._link_scenes_via_drag,
+            on_link_text_edit=self._start_link_label_edit,
         )
         self.canvas.grid(row=0, column=0, sticky="nsew")
 
@@ -659,7 +831,16 @@ class ScenesPlanningStep(WizardStep):
         return normalise_scene_links(scene, self._split_to_list)
 
     def _on_canvas_select(self, index):
-        self.selected_index = index
+        if index is None or index >= len(self.scenes):
+            self.selected_index = None
+        else:
+            if (
+                self._inline_editor is not None
+                and getattr(self._inline_editor, "scene_index", None) != index
+            ):
+                self._close_inline_scene_editor()
+            self.selected_index = index
+        self._close_link_label_editor()
         self.canvas.set_scenes(self.scenes, index)
         self._update_buttons()
 
@@ -685,31 +866,54 @@ class ScenesPlanningStep(WizardStep):
     def _edit_scene_via_canvas(self, index):
         if index is None or index >= len(self.scenes):
             return
-        self._open_scene_editor(index)
+        self._open_inline_scene_editor(index)
 
-    def _open_scene_editor(self, index):
+    def _open_inline_scene_editor(self, index):
+        bbox = self.canvas.get_card_bbox(index)
+        if not bbox:
+            return
+        self._close_inline_scene_editor()
+        self._close_link_label_editor()
         scene = self.scenes[index]
-        dialog = SceneEditorDialog(
-            self.winfo_toplevel(),
+        editor = InlineSceneEditor(
+            self.canvas,
             scene,
             scene_types=self.SCENE_TYPES,
-            entity_fields=self.ENTITY_FIELDS,
-            link_targets=[
-                self.scenes[i].get("Title") or f"Scene {i + 1}"
-                for i in range(len(self.scenes))
-                if i != index
-            ],
-            choose_entity_callback=self._choose_entity_from_library,
-            create_entity_callback=self._create_entity_in_library,
+            on_save=lambda data, idx=index: self._apply_inline_scene_update(idx, data),
+            on_cancel=self._close_inline_scene_editor,
         )
-        self.wait_window(dialog)
-        if not dialog.result:
-            return
+        editor.scene_index = index
+        x1, y1, x2, y2 = bbox
+        editor.place(
+            x=x1 + 8,
+            y=y1 + 8,
+            width=max(120, (x2 - x1) - 16),
+            height=max(120, (y2 - y1) - 16),
+        )
+        self._inline_editor = editor
 
-        updated_scene = dialog.result
-        layout = scene.get("_canvas", {}).copy()
-        updated_scene.setdefault("_canvas", {}).update(layout)
-        self.scenes[index] = updated_scene
+    def _close_inline_scene_editor(self):
+        if self._inline_editor is None:
+            return
+        try:
+            self._inline_editor.destroy()
+        except Exception:
+            pass
+        self._inline_editor = None
+
+    def _apply_inline_scene_update(self, index, data):
+        if index is None or index >= len(self.scenes):
+            return
+        scene = self.scenes[index]
+        scene["Title"] = data.get("Title", scene.get("Title", "")).strip() or scene.get(
+            "Title", f"Scene {index + 1}"
+        )
+        scene["SceneType"] = data.get("SceneType", "")
+        summary = data.get("Summary", "")
+        scene["Summary"] = summary
+        scene["Text"] = summary
+        self._close_inline_scene_editor()
+        self._close_link_label_editor()
         self.canvas.set_scenes(self.scenes, self.selected_index)
         self._update_buttons()
 
@@ -734,7 +938,10 @@ class ScenesPlanningStep(WizardStep):
         self._update_buttons()
 
         menu = tk.Menu(self, tearoff=0)
-        menu.add_command(label="Edit Scene…", command=lambda idx=index: self._open_scene_editor(idx))
+        menu.add_command(
+            label="Edit Scene Inline",
+            command=lambda idx=index: self._open_inline_scene_editor(idx),
+        )
         menu.add_separator()
         menu.add_command(label="Duplicate Scene", command=lambda idx=index: self.duplicate_scene(idx))
         menu.add_command(label="Remove Scene", command=lambda idx=index: self.remove_scene(idx))
@@ -790,6 +997,7 @@ class ScenesPlanningStep(WizardStep):
         links.append({"target": target_title, "text": display_label})
         scene["LinkData"] = links
         scene["NextScenes"] = [link["target"] for link in links]
+        self._close_link_label_editor()
         self.canvas.set_scenes(self.scenes, self.selected_index)
 
     def _remove_link_between(self, source_index, target_title):
@@ -799,6 +1007,7 @@ class ScenesPlanningStep(WizardStep):
         links = [link for link in self._get_scene_links(scene) if link.get("target") != target_title]
         scene["LinkData"] = links
         scene["NextScenes"] = [link["target"] for link in links]
+        self._close_link_label_editor()
         self.canvas.set_scenes(self.scenes, self.selected_index)
 
     def _clear_links(self, source_index):
@@ -807,7 +1016,126 @@ class ScenesPlanningStep(WizardStep):
         scene = self.scenes[source_index]
         scene["LinkData"] = []
         scene["NextScenes"] = []
+        self._close_link_label_editor()
         self.canvas.set_scenes(self.scenes, self.selected_index)
+
+    def _add_entity_to_scene(self, scene_index, entity_type):
+        if scene_index is None or scene_index >= len(self.scenes):
+            return
+        config = self.ENTITY_FIELDS.get(entity_type)
+        if not config:
+            return
+        _, _, singular_label = config
+        selected = self._choose_entity_from_library(entity_type, singular_label)
+        if not selected:
+            return
+        scene = self.scenes[scene_index]
+        bucket = scene.setdefault(entity_type, [])
+        if selected not in bucket:
+            bucket.append(selected)
+            bucket.sort(key=lambda value: value.lower() if isinstance(value, str) else str(value))
+        self.canvas.set_scenes(self.scenes, self.selected_index)
+
+    def _link_scenes_via_drag(self, source_index, target_index):
+        if (
+            source_index is None
+            or target_index is None
+            or source_index >= len(self.scenes)
+            or target_index >= len(self.scenes)
+        ):
+            return
+        target_title = (
+            self.scenes[target_index].get("Title")
+            or self.scenes[target_index].get("Name")
+            or f"Scene {target_index + 1}"
+        )
+        self._add_link_between(source_index, target_title, label=target_title)
+
+    def _start_link_label_edit(self, source_index, target_index, target_value, bbox):
+        if source_index is None or source_index >= len(self.scenes):
+            return
+        scene = self.scenes[source_index]
+        links = self._get_scene_links(scene)
+        target_str = str(target_value)
+        link = next((l for l in links if str(l.get("target")) == target_str), None)
+        if link is None and target_index is not None and target_index < len(self.scenes):
+            fallback = self.scenes[target_index].get("Title") or f"Scene {target_index + 1}"
+            link = next((l for l in links if str(l.get("target")) == fallback), None)
+            target_str = fallback
+        if link is None:
+            return
+        self._close_link_label_editor()
+        x1, y1, x2, y2 = bbox
+        width = max(160, int(x2 - x1 + 24))
+        entry = ctk.CTkEntry(self.canvas, width=width)
+        entry.insert(0, link.get("text") or target_str)
+        entry.place(x=x1 - 12, y=y1 - 10, width=width, height=30)
+        entry.focus_set()
+        entry.select_range(0, "end")
+        state = {
+            "widget": entry,
+            "source": source_index,
+            "target": target_str,
+        }
+        self._link_label_editor = state
+
+        entry.bind("<Return>", lambda _e: self._commit_link_label_editor(save=True))
+        entry.bind("<Escape>", lambda _e: self._commit_link_label_editor(save=False))
+        entry.bind("<FocusOut>", lambda _e: self._commit_link_label_editor(save=True))
+
+    def _commit_link_label_editor(self, save=True):
+        if not self._link_label_editor:
+            return
+        state = self._link_label_editor
+        entry = state.get("widget")
+        if entry is None:
+            self._link_label_editor = None
+            return
+        try:
+            entry.unbind("<FocusOut>")
+        except Exception:
+            pass
+        text_value = ""
+        if save:
+            try:
+                text_value = entry.get().strip()
+            except Exception:
+                text_value = ""
+        try:
+            entry.destroy()
+        except Exception:
+            pass
+        self._link_label_editor = None
+        if not save:
+            self.canvas.set_scenes(self.scenes, self.selected_index)
+            return
+        if not text_value:
+            text_value = state.get("target", "")
+        source_index = state.get("source")
+        if source_index is None or source_index >= len(self.scenes):
+            self.canvas.set_scenes(self.scenes, self.selected_index)
+            return
+        scene = self.scenes[source_index]
+        links = self._get_scene_links(scene)
+        target_str = state.get("target")
+        for link in links:
+            if str(link.get("target")) == target_str:
+                link["text"] = text_value
+                break
+        scene["LinkData"] = links
+        scene["NextScenes"] = [link["target"] for link in links]
+        self.canvas.set_scenes(self.scenes, self.selected_index)
+
+    def _close_link_label_editor(self):
+        if not self._link_label_editor:
+            return
+        entry = self._link_label_editor.get("widget")
+        self._link_label_editor = None
+        if entry is not None:
+            try:
+                entry.destroy()
+            except Exception:
+                pass
 
     def _choose_entity_from_library(self, entity_type, singular_label):
         wrapper = self.entity_wrappers.get(entity_type)
@@ -910,9 +1238,9 @@ class ScenesPlanningStep(WizardStep):
         self._assign_default_position(scene)
         self.scenes.append(scene)
         self.selected_index = len(self.scenes) - 1
+        self._close_link_label_editor()
         self.canvas.set_scenes(self.scenes, self.selected_index)
         self._update_buttons()
-        self._open_scene_editor(self.selected_index)
 
     def duplicate_scene(self, index=None):
         if index is None:
@@ -928,9 +1256,9 @@ class ScenesPlanningStep(WizardStep):
         insert_at = index + 1
         self.scenes.insert(insert_at, dup)
         self.selected_index = insert_at
+        self._close_link_label_editor()
         self.canvas.set_scenes(self.scenes, self.selected_index)
         self._update_buttons()
-        self._open_scene_editor(self.selected_index)
 
     def remove_scene(self, index=None):
         if index is None:
@@ -991,10 +1319,14 @@ class ScenesPlanningStep(WizardStep):
                 if idx < len(layout) and isinstance(layout[idx], dict):
                     scene.setdefault("_canvas", {}).update(layout[idx])
         self.selected_index = None
+        self._close_inline_scene_editor()
+        self._close_link_label_editor()
         self.canvas.set_scenes(self.scenes, None)
         self._update_buttons()
 
     def save_state(self, state):
+        self._close_inline_scene_editor()
+        self._close_link_label_editor()
         state["Title"] = self.scenario_title_var.get().strip()
         summary = (self._scenario_summary or "").strip()
         secrets = (self._scenario_secrets or "").strip()
@@ -1186,375 +1518,84 @@ class ScenarioInfoDialog(ctk.CTkToplevel):
         self.destroy()
 
 
-class SceneEditorDialog(ctk.CTkToplevel):
-    def __init__(
-        self,
-        master,
-        scene,
-        *,
-        scene_types,
-        entity_fields,
-        link_targets,
-        choose_entity_callback,
-        create_entity_callback,
-    ):
-        super().__init__(master)
-        self.title(scene.get("Title") or "Edit Scene")
-        self.geometry("940x780")
-        self.minsize(880, 720)
-        self.transient(master)
-        self.grab_set()
-        self.result = None
+class InlineSceneEditor(ctk.CTkFrame):
+    def __init__(self, master, scene, *, scene_types, on_save, on_cancel):
+        super().__init__(master, fg_color="#0f172a", corner_radius=12)
+        self.on_save = on_save
+        self.on_cancel = on_cancel
+        self._scene_types = [
+            value for value in (scene_types or []) if isinstance(value, str)
+        ]
 
-        self.scene_types = list(scene_types)
-        self.entity_fields = entity_fields
-        self.choose_entity_callback = choose_entity_callback
-        self.create_entity_callback = create_entity_callback
+        self.grid_columnconfigure(0, weight=1)
+        self.grid_rowconfigure(3, weight=1)
 
-        initial_type = scene.get("SceneType") or scene.get("Type") or self.scene_types[0]
-        if initial_type not in self.scene_types:
-            initial_type = self.scene_types[0]
-        if not initial_type:
-            initial_type = self.scene_types[0]
+        ctk.CTkLabel(
+            self,
+            text="Scene Details",
+            font=ctk.CTkFont(size=14, weight="bold"),
+            anchor="w",
+        ).grid(row=0, column=0, sticky="ew", padx=12, pady=(12, 6))
 
         self.title_var = ctk.StringVar(value=scene.get("Title", ""))
-        self.type_var = ctk.StringVar(value=initial_type)
-        self.link_var = ctk.StringVar()
+        self.title_entry = ctk.CTkEntry(self, textvariable=self.title_var)
+        self.title_entry.grid(row=1, column=0, sticky="ew", padx=12)
 
-        self.links = normalise_scene_links(copy.deepcopy(scene), self._split_to_list)
-        self.link_targets = [target for target in link_targets if target]
-        existing_targets = [link.get("target") for link in self.links if link.get("target")]
-        for target in existing_targets:
-            if target not in self.link_targets:
-                self.link_targets.append(target)
-
-        self.entity_data = {
-            field: list(scene.get(field, [])) for field in self.entity_fields
-        }
-        self.entity_listboxes: dict[str, tk.Listbox] = {}
-
-        container = ctk.CTkFrame(self, fg_color="#101827", corner_radius=16)
-        container.pack(fill="both", expand=True, padx=20, pady=20)
-        container.grid_columnconfigure(0, weight=1)
-        container.grid_rowconfigure(4, weight=1)
-        container.grid_rowconfigure(5, weight=1)
-        container.grid_rowconfigure(6, weight=2)
-
-        ctk.CTkLabel(
-            container,
-            text="Scene Title",
-            font=ctk.CTkFont(size=16, weight="bold"),
-            anchor="w",
-        ).grid(row=0, column=0, sticky="w", padx=18, pady=(18, 6))
-
-        title_entry = ctk.CTkEntry(container, textvariable=self.title_var)
-        title_entry.grid(row=1, column=0, sticky="ew", padx=18)
-
-        type_row = ctk.CTkFrame(container, fg_color="transparent")
-        type_row.grid(row=2, column=0, sticky="ew", padx=18, pady=(10, 0))
-        type_row.grid_columnconfigure(1, weight=1)
-        ctk.CTkLabel(type_row, text="Scene Type", anchor="w").grid(
-            row=0, column=0, sticky="w"
+        type_values = [""]
+        for value in self._scene_types:
+            if value not in type_values:
+                type_values.append(value)
+        current_type = scene.get("SceneType") or scene.get("Type") or ""
+        if current_type and current_type not in type_values:
+            type_values.append(current_type)
+        self.type_var = ctk.StringVar(
+            value=current_type if current_type in type_values else type_values[0]
         )
-        self.type_menu = ctk.CTkOptionMenu(
-            type_row, variable=self.type_var, values=self.scene_types
-        )
-        self.type_menu.grid(row=0, column=1, sticky="w", padx=(12, 0))
+        self.type_menu = ctk.CTkOptionMenu(self, values=type_values or [""], variable=self.type_var)
+        self.type_menu.grid(row=2, column=0, sticky="ew", padx=12, pady=(8, 6))
 
-        ctk.CTkLabel(
-            container,
-            text="Summary",
-            font=ctk.CTkFont(size=16, weight="bold"),
-            anchor="w",
-        ).grid(row=3, column=0, sticky="w", padx=18, pady=(18, 6))
-
-        self.summary_text = ctk.CTkTextbox(container, wrap="word")
-        self.summary_text.grid(row=4, column=0, sticky="nsew", padx=18)
+        self.summary_text = ctk.CTkTextbox(self, wrap="word")
+        self.summary_text.grid(row=3, column=0, sticky="nsew", padx=12)
         self.summary_text.insert("1.0", scene.get("Summary") or scene.get("Text") or "")
 
-        links_frame = ctk.CTkFrame(container, fg_color="#0f1624", corner_radius=14)
-        links_frame.grid(row=5, column=0, sticky="nsew", padx=18, pady=(18, 0))
-        links_frame.grid_columnconfigure(0, weight=1)
-        links_frame.grid_rowconfigure(1, weight=1)
-
         ctk.CTkLabel(
-            links_frame,
-            text="Next Scenes",
-            font=ctk.CTkFont(size=15, weight="bold"),
+            self,
+            text="Ctrl+Enter to save, Esc to cancel",
+            text_color="#9db4d1",
             anchor="w",
-        ).grid(row=0, column=0, sticky="w", padx=16, pady=(16, 4))
-
-        link_list_container = ctk.CTkFrame(links_frame, fg_color="transparent")
-        link_list_container.grid(row=1, column=0, sticky="nsew", padx=16)
-        link_list_container.grid_columnconfigure(0, weight=1)
-        link_list_container.grid_rowconfigure(0, weight=1)
-
-        self.link_listbox = tk.Listbox(
-            link_list_container,
-            activestyle="none",
-            exportselection=False,
-            height=6,
-            selectmode="extended",
-            highlightthickness=0,
-            relief="flat",
-            bg="#101827",
-            fg="#FFFFFF",
-            selectbackground="#1f3b67",
-            selectforeground="#FFFFFF",
-        )
-        self.link_listbox.grid(row=0, column=0, sticky="nsew")
-        link_scroll = tk.Scrollbar(link_list_container, orient="vertical", command=self.link_listbox.yview)
-        link_scroll.grid(row=0, column=1, sticky="ns", padx=(4, 0))
-        self.link_listbox.configure(yscrollcommand=link_scroll.set)
-        self.link_listbox.bind("<<ListboxSelect>>", self._on_link_select)
-
-        link_controls = ctk.CTkFrame(links_frame, fg_color="transparent")
-        link_controls.grid(row=2, column=0, sticky="ew", padx=16, pady=(8, 0))
-        link_controls.grid_columnconfigure(0, weight=1)
-        link_controls.grid_columnconfigure(1, weight=1)
-
-        self.link_combo = ctk.CTkComboBox(link_controls, variable=self.link_var, values=self.link_targets)
-        self.link_combo.grid(row=0, column=0, sticky="ew")
-        if self.link_targets:
-            self.link_combo.set(self.link_targets[0])
-        self.link_label_entry = ctk.CTkEntry(link_controls, placeholder_text="Link text")
-        self.link_label_entry.grid(row=0, column=1, sticky="ew", padx=(6, 0))
-
-        control_buttons = ctk.CTkFrame(links_frame, fg_color="transparent")
-        control_buttons.grid(row=3, column=0, sticky="ew", padx=16, pady=(8, 0))
-        control_buttons.grid_columnconfigure((0, 1, 2), weight=1)
-        ctk.CTkButton(control_buttons, text="Add", width=90, command=self._add_link).grid(
-            row=0, column=0, padx=(0, 6)
-        )
-        ctk.CTkButton(control_buttons, text="Update", width=90, command=self._update_link_label).grid(
-            row=0, column=1, padx=(0, 6)
-        )
-        ctk.CTkButton(control_buttons, text="Remove Selected", command=self._remove_link).grid(
-            row=0, column=2
-        )
-
-        entities_frame = ctk.CTkScrollableFrame(
-            container,
-            fg_color="#0f1624",
-            corner_radius=14,
-        )
-        entities_frame.grid(row=6, column=0, sticky="nsew", padx=18, pady=(18, 0))
-        entities_frame.grid_columnconfigure(0, weight=1)
-
-        row_index = 0
-        for field, (entity_key, label, singular) in self.entity_fields.items():
-            ctk.CTkLabel(
-                entities_frame,
-                text=label,
-                anchor="w",
-                font=ctk.CTkFont(size=15, weight="bold"),
-            ).grid(row=row_index, column=0, sticky="w", padx=14, pady=(14, 4))
-            row_index += 1
-
-            list_container = ctk.CTkFrame(entities_frame, fg_color="transparent")
-            list_container.grid(row=row_index, column=0, sticky="nsew", padx=14)
-            list_container.grid_columnconfigure(0, weight=1)
-            list_container.grid_rowconfigure(0, weight=1)
-
-            listbox = tk.Listbox(
-                list_container,
-                activestyle="none",
-                exportselection=False,
-                height=6,
-                highlightthickness=0,
-                relief="flat",
-                selectmode="extended",
-                bg="#101827",
-                fg="#FFFFFF",
-                selectbackground="#1f3b67",
-                selectforeground="#FFFFFF",
-            )
-            listbox.grid(row=0, column=0, sticky="nsew")
-            scrollbar = tk.Scrollbar(list_container, orient="vertical", command=listbox.yview)
-            scrollbar.grid(row=0, column=1, sticky="ns", padx=(4, 0))
-            listbox.configure(yscrollcommand=scrollbar.set)
-            self.entity_listboxes[field] = listbox
-
-            row_index += 1
-            control = ctk.CTkFrame(entities_frame, fg_color="transparent")
-            control.grid(row=row_index, column=0, sticky="ew", padx=14, pady=(6, 0))
-            control.grid_columnconfigure((0, 1, 2), weight=1)
-
-            ctk.CTkButton(
-                control,
-                text=f"Add {singular}",
-                command=lambda f=field, ek=entity_key, s=singular: self._add_entity(f, ek, s),
-            ).grid(row=0, column=0, sticky="ew", padx=(0, 6))
-            ctk.CTkButton(
-                control,
-                text="Create New",
-                command=lambda f=field, ek=entity_key, s=singular: self._create_entity(f, ek, s),
-            ).grid(row=0, column=1, sticky="ew", padx=(0, 6))
-            ctk.CTkButton(
-                control,
-                text="Remove Selected",
-                command=lambda f=field: self._remove_entity(f),
-            ).grid(row=0, column=2, sticky="ew")
-
-            row_index += 1
+        ).grid(row=4, column=0, sticky="ew", padx=12, pady=(6, 0))
 
         button_row = ctk.CTkFrame(self, fg_color="transparent")
-        button_row.pack(fill="x", padx=20, pady=(0, 20))
+        button_row.grid(row=5, column=0, sticky="ew", padx=12, pady=(8, 10))
         button_row.grid_columnconfigure((0, 1), weight=1)
-
         ctk.CTkButton(button_row, text="Cancel", command=self._on_cancel).grid(
-            row=0, column=0, sticky="ew", padx=(0, 8)
+            row=0, column=0, sticky="ew", padx=(0, 6)
         )
-        ctk.CTkButton(button_row, text="Save Scene", command=self._on_save).grid(
-            row=0, column=1, sticky="ew"
+        ctk.CTkButton(button_row, text="Save", command=self._on_save).grid(
+            row=0, column=1, sticky="ew", padx=(6, 0)
         )
 
-        self.protocol("WM_DELETE_WINDOW", self._on_cancel)
-        title_entry.focus_set()
-        self._refresh_link_list()
-        for field in self.entity_fields:
-            self._refresh_entity_list(field)
+        self.title_entry.bind("<Return>", self._on_save)
+        self.title_entry.bind("<Escape>", self._on_cancel)
+        self.summary_text.bind("<Control-Return>", self._on_save)
+        self.summary_text.bind("<Command-Return>", self._on_save)
+        self.summary_text.bind("<Escape>", self._on_cancel)
+        self.type_menu.bind("<Escape>", self._on_cancel)
 
-    def _refresh_link_list(self):
-        self.link_listbox.delete(0, tk.END)
-        if not self.links:
-            self.link_listbox.configure(state="disabled")
-        else:
-            self.link_listbox.configure(state="normal")
-            for link in self.links:
-                target = link.get("target") or ""
-                label = link.get("text") or target
-                display = label if label == target else f"{label} → {target}"
-                self.link_listbox.insert(tk.END, display)
+        self.summary_text.focus_set()
 
-    def _on_link_select(self, _event=None):
-        selection = self.link_listbox.curselection()
-        if not selection:
-            return
-        idx = selection[0]
-        if 0 <= idx < len(self.links):
-            link = self.links[idx]
-            label = link.get("text") or link.get("target") or ""
-            self.link_label_entry.delete(0, tk.END)
-            self.link_label_entry.insert(0, label)
-
-    def _add_link(self):
-        target = (self.link_var.get() or "").strip()
-        if not target:
-            return
-        label = self.link_label_entry.get().strip() or target
-        if any((link.get("target") == target and (link.get("text") or target) == label) for link in self.links):
-            return
-        self.links.append({"target": target, "text": label})
-        self._refresh_link_list()
-        self.link_label_entry.delete(0, tk.END)
-
-    def _update_link_label(self):
-        selection = self.link_listbox.curselection()
-        if not selection:
-            return
-        label = self.link_label_entry.get().strip()
-        if not label:
-            label = None
-        for idx in selection:
-            if 0 <= idx < len(self.links):
-                link = self.links[idx]
-                link["text"] = label or link.get("target")
-        self._refresh_link_list()
-
-    def _remove_link(self):
-        selection = self.link_listbox.curselection()
-        if not selection:
-            return
-        for idx in reversed(selection):
-            if 0 <= idx < len(self.links):
-                self.links.pop(idx)
-        self.link_label_entry.delete(0, tk.END)
-        self._refresh_link_list()
-
-    def _refresh_entity_list(self, field):
-        listbox = self.entity_listboxes.get(field)
-        if not listbox:
-            return
-        listbox.delete(0, tk.END)
-        entries = self.entity_data.get(field, [])
-        for name in entries:
-            listbox.insert(tk.END, name)
-        if entries:
-            listbox.configure(state="normal")
-        else:
-            listbox.configure(state="disabled")
-
-    def _add_entity(self, field, entity_key, singular):
-        if not callable(self.choose_entity_callback):
-            return
-        name = self.choose_entity_callback(entity_key, singular)
-        if not name:
-            return
-        entries = self.entity_data.setdefault(field, [])
-        if name not in entries:
-            entries.append(name)
-            self._refresh_entity_list(field)
-
-    def _create_entity(self, field, entity_key, singular):
-        if not callable(self.create_entity_callback):
-            return
-        name = self.create_entity_callback(entity_key, singular)
-        if not name:
-            return
-        entries = self.entity_data.setdefault(field, [])
-        if name not in entries:
-            entries.append(name)
-            self._refresh_entity_list(field)
-
-    def _remove_entity(self, field):
-        listbox = self.entity_listboxes.get(field)
-        if not listbox:
-            return
-        selection = listbox.curselection()
-        if not selection:
-            return
-        entries = self.entity_data.setdefault(field, [])
-        for idx in reversed(selection):
-            if 0 <= idx < len(entries):
-                entries.pop(idx)
-        self._refresh_entity_list(field)
-
-    def _on_save(self):
-        title = self.title_var.get().strip() or "Scene"
-        selected_type = self.type_var.get()
-        if selected_type not in self.scene_types:
-            selected_type = self.scene_types[0]
-        summary = self.summary_text.get("1.0", "end").strip()
-        links = normalise_scene_links({"LinkData": list(self.links)}, self._split_to_list)
-        result = {
-            "Title": title,
-            "Summary": summary,
-            "Text": summary,
-            "SceneType": "" if selected_type == self.scene_types[0] else selected_type,
-            "NPCs": list(self.entity_data.get("NPCs", [])),
-            "Creatures": list(self.entity_data.get("Creatures", [])),
-            "Places": list(self.entity_data.get("Places", [])),
-            "LinkData": links,
-            "NextScenes": [link["target"] for link in links],
+    def _on_save(self, _event=None):
+        data = {
+            "Title": self.title_var.get().strip(),
+            "SceneType": self.type_var.get().strip(),
+            "Summary": self.summary_text.get("1.0", "end").strip(),
         }
-        self.result = result
-        self.destroy()
+        if callable(self.on_save):
+            self.on_save(data)
 
-    def _on_cancel(self):
-        self.result = None
-        self.destroy()
-
-    @staticmethod
-    def _split_to_list(value):
-        if value is None:
-            return []
-        if isinstance(value, list):
-            return [str(item).strip() for item in value if str(item).strip()]
-        if isinstance(value, str):
-            parts = [part.strip() for part in value.replace(";", ",").split(",")]
-            return [part for part in parts if part]
-        return [str(value).strip()]
+    def _on_cancel(self, _event=None):
+        if callable(self.on_cancel):
+            self.on_cancel()
 
 
 class EntityLinkingStep(WizardStep):
