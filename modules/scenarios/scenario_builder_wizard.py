@@ -319,15 +319,35 @@ class ScenesPlanningStep(WizardStep):
             anchor="w",
         ).grid(row=0, column=0, sticky="ew", padx=10, pady=(10, 4))
 
-        self.preview = SceneFlowPreview(preview_section, on_select=self._on_preview_node_click)
-        self.preview.grid(row=1, column=0, sticky="nsew", padx=10, pady=(0, 10))
+        self.preview = None
+        self.preview_hint_label = None
+        try:
+            self.preview = SceneFlowPreview(preview_section, on_select=self._on_preview_node_click)
+            self.preview.grid(row=1, column=0, sticky="nsew", padx=10, pady=(0, 10))
 
-        ctk.CTkLabel(
-            preview_section,
-            text="Reorder scenes or add Next Scenes to shape the flow.",
-            anchor="w",
-            text_color=("#8a97b0", "#8a97b0"),
-        ).grid(row=2, column=0, sticky="ew", padx=10, pady=(0, 10))
+            self.preview_hint_label = ctk.CTkLabel(
+                preview_section,
+                text="Reorder scenes or add Next Scenes to shape the flow.",
+                anchor="w",
+                text_color=("#8a97b0", "#8a97b0"),
+            )
+            self.preview_hint_label.grid(row=2, column=0, sticky="ew", padx=10, pady=(0, 10))
+        except TypeError as exc:  # pragma: no cover - defensive for older GUI runtimes
+            log_exception(
+                f"Scene flow preview disabled: {exc}",
+                func_name="ScenesPlanningStep.__init__",
+            )
+            ctk.CTkLabel(
+                preview_section,
+                text=(
+                    "Scene flow preview is unavailable on this system."
+                    " The wizard will continue without the visual map."
+                ),
+                wraplength=320,
+                anchor="w",
+                text_color=("#8a97b0", "#8a97b0"),
+                justify="left",
+            ).grid(row=1, column=0, sticky="nsew", padx=10, pady=(0, 10))
 
         # Scene editor -------------------------------------------------
         editor = ctk.CTkScrollableFrame(container)
@@ -647,8 +667,15 @@ class ScenesPlanningStep(WizardStep):
         self._suppress_list_event = False
 
     def _update_preview(self):
-        if hasattr(self, "preview"):
-            self.preview.render(self.scenes, self.selected_index)
+        if getattr(self, "preview", None) is not None:
+            try:
+                self.preview.render(self.scenes, self.selected_index)
+            except Exception as exc:  # pragma: no cover - render errors should not crash the wizard
+                log_exception(
+                    f"Failed to render scene flow preview: {exc}",
+                    func_name="ScenesPlanningStep._update_preview",
+                )
+                self.preview = None
 
     def _on_preview_node_click(self, index):  # pragma: no cover - UI callback
         if index is None or index < 0 or index >= len(self.scenes):
