@@ -2224,10 +2224,14 @@ class ScenarioGraphEditor(ctk.CTkFrame):
         index_lookup = {}
         for scene in scenes:
             tag = scene.get("tag")
-            index = scene.get("index", 0)
-            if tag:
-                index_lookup[index] = tag
-                index_lookup[index + 1] = tag
+            raw_index = scene.get("index", 0)
+            try:
+                index = int(raw_index)
+            except (TypeError, ValueError):
+                index = None
+            if tag and index is not None:
+                index_lookup.setdefault(index, tag)
+                index_lookup.setdefault(index + 1, tag)
             for ident in scene.get("identifiers", []) or []:
                 norm = self._normalize_scene_identifier_key(ident)
                 if norm and norm not in lookup:
