@@ -1446,7 +1446,14 @@ class ScenarioGraphEditor(ctk.CTkFrame):
                     links.append({"target_tag": next_scene["tag"], "text": "Continue"})
 
             for link in links:
+                text_auto_generated = bool(link.get("text_auto_generated"))
                 text = (link.get("text") or "").strip()
+                if (
+                    text_auto_generated
+                    and self._link_text_matches_target(text, link)
+                ):
+                    text = ""
+                    link["text"] = ""
                 if not text:
                     text = "Continue"
 
@@ -1482,6 +1489,7 @@ class ScenarioGraphEditor(ctk.CTkFrame):
                     "source_scene_index": scene.get("index"),
                     "target_scene_index": target_scene.get("index") if target_scene else None,
                     "link_data": link,
+                    "text_auto_generated": text_auto_generated,
                 })
 
         self.original_positions = dict(self.node_positions)
@@ -1709,12 +1717,17 @@ class ScenarioGraphEditor(ctk.CTkFrame):
             if key in seen_links:
                 continue
             seen_links.add(key)
-            normalised_links.append({
-                "target": target_value,
-                "target_key": target_value,
-                "target_index": target_index,
-                "text": text_clean
-            })
+            normalised_links.append(
+                {
+                    "target": target_value,
+                    "target_key": target_value,
+                    "target_index": target_index,
+                    "text": text_clean,
+                    "text_auto_generated": bool(
+                        item.get("text_auto_generated")
+                    ),
+                }
+            )
 
         base_title = title_text.strip()
         if len(base_title) > 80:
@@ -2181,7 +2194,13 @@ class ScenarioGraphEditor(ctk.CTkFrame):
             text_value = value.strip()
             if not text_value:
                 return links
-            links.append({"target": text_value, "text": text_value})
+            links.append(
+                {
+                    "target": text_value,
+                    "text": text_value,
+                    "text_auto_generated": True,
+                }
+            )
             return links
 
     def _normalise_link_text_value(self, value):
@@ -2218,6 +2237,45 @@ class ScenarioGraphEditor(ctk.CTkFrame):
             return ", ".join([part for part in parts if part])
 
         return str(value).strip()
+
+    def _link_text_matches_target(self, text, link_record):
+        """Return True when the provided label simply mirrors the link target."""
+
+        if not text or not isinstance(link_record, dict):
+            return False
+
+        target_value = (
+            link_record.get("target_key")
+            if link_record.get("target_key") is not None
+            else link_record.get("target")
+        )
+        if target_value is None:
+            return False
+
+        text_str = str(text).strip()
+        target_str = str(target_value).strip()
+        if not text_str or not target_str:
+            return False
+
+        if text_str.lower() == target_str.lower():
+            return True
+
+        normalized_text = self._normalize_scene_identifier_key(text_str)
+        normalized_target = self._normalize_scene_identifier_key(target_str)
+        if normalized_text and normalized_target and normalized_text == normalized_target:
+            return True
+
+        slug_text = self._slugify_scene_identifier(text_str)
+        slug_target = self._slugify_scene_identifier(target_str)
+        if slug_text and slug_target and slug_text == slug_target:
+            return True
+
+        digits_text = re.findall(r"\d+", text_str)
+        digits_target = re.findall(r"\d+", target_str)
+        if digits_text and digits_target and digits_text[0] == digits_target[0]:
+            return True
+
+        return False
 
     def _build_scene_lookup(self, scenes):
         lookup = {}
@@ -3419,6 +3477,7 @@ class ScenarioGraphEditor(ctk.CTkFrame):
         metadata_payload = dialog.result.get("metadata")
 
         link_record["text"] = new_text
+        link_record.pop("text_auto_generated", None)
         if target_tag:
             link_record["to"] = target_tag
             link_record["target_tag"] = target_tag
@@ -3429,6 +3488,7 @@ class ScenarioGraphEditor(ctk.CTkFrame):
             link_record["link_data"] = link_data
 
         link_data["text"] = new_text
+        link_data.pop("text_auto_generated", None)
         if target_tag:
             link_data["target_tag"] = target_tag
             link_data["target"] = target_tag
