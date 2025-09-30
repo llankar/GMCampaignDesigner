@@ -9,6 +9,7 @@ import shutil
 import re
 import unicodedata
 import threading
+from contextlib import contextmanager
 from pathlib import Path
 import tkinter as tk
 from tkinter import (
@@ -129,6 +130,7 @@ class MainWindow(ctk.CTk):
         self.sound_manager_window = None
         self.audio_bar_window = None
         self.portrait_importer = PortraitImporter(self)
+        self._busy_modal = None
         root = self.winfo_toplevel()
         root.bind_all("<Control-f>", self._on_ctrl_f)
 
@@ -740,6 +742,90 @@ class MainWindow(ctk.CTk):
                                     width=20, height=20, corner_radius=15)
         exit_button.place(relx=0.9999, rely=0.01, anchor="ne")
 
+    def _apply_cursor_recursive(self, widget, cursor):
+        try:
+            widget.configure(cursor=cursor)
+        except (tk.TclError, AttributeError):
+            pass
+        for child in widget.winfo_children():
+            self._apply_cursor_recursive(child, cursor)
+
+    def _set_wait_cursor(self, enable):
+        cursor = "wait" if sys.platform.startswith("win") else "watch"
+        target = cursor if enable else ""
+        try:
+            self._apply_cursor_recursive(self, target)
+        except tk.TclError:
+            pass
+        if self._busy_modal and self._busy_modal.winfo_exists():
+            try:
+                self._busy_modal.configure(cursor=target)
+            except tk.TclError:
+                pass
+        self.update_idletasks()
+
+    def _show_busy_modal(self, message):
+        if self._busy_modal and self._busy_modal.winfo_exists():
+            try:
+                label = getattr(self._busy_modal, "_message_label", None)
+                if label is not None:
+                    label.configure(text=message)
+                self._busy_modal.lift()
+                return
+            except tk.TclError:
+                self._busy_modal = None
+
+        modal = ctk.CTkToplevel(self)
+        modal.title("Please wait")
+        modal.resizable(False, False)
+        modal.transient(self)
+        modal.protocol("WM_DELETE_WINDOW", lambda: None)
+
+        frame = ctk.CTkFrame(modal)
+        frame.pack(fill="both", expand=True, padx=20, pady=20)
+
+        label = ctk.CTkLabel(frame, text=message, anchor="center")
+        label.pack(fill="both", expand=True)
+        modal._message_label = label  # type: ignore[attr-defined]
+
+        modal.update_idletasks()
+        self.update_idletasks()
+        try:
+            width = modal.winfo_width()
+            height = modal.winfo_height()
+            root_x = self.winfo_rootx()
+            root_y = self.winfo_rooty()
+            root_w = self.winfo_width()
+            root_h = self.winfo_height()
+            x = root_x + max((root_w - width) // 2, 0)
+            y = root_y + max((root_h - height) // 2, 0)
+            modal.geometry(f"{width}x{height}+{x}+{y}")
+        except tk.TclError:
+            pass
+
+        modal.attributes("-topmost", True)
+        modal.after(10, lambda: modal.attributes("-topmost", False))
+        self._busy_modal = modal
+        self._set_wait_cursor(True)
+
+    def _hide_busy_modal(self):
+        try:
+            if self._busy_modal and self._busy_modal.winfo_exists():
+                self._busy_modal.destroy()
+        except tk.TclError:
+            pass
+        finally:
+            self._busy_modal = None
+            self._set_wait_cursor(False)
+
+    @contextmanager
+    def _busy_operation(self, message):
+        self._show_busy_modal(message)
+        try:
+            yield
+        finally:
+            self._hide_busy_modal()
+
     def load_model_config(self):
         self.models_path = ConfigHelper.get("Paths", "models_path",
                                             fallback=r"E:\SwarmUI\SwarmUI\Models\Stable-diffusion")
@@ -882,30 +968,26 @@ class MainWindow(ctk.CTk):
         if not path:
             return  # user hit “Cancel”
 
-        # 2) Grab the items from the view if possible…
+        items = []
         try:
-            # GenericListView *might* have a method or attribute that holds its current items
-            items = view.get_items()                # ← if you’ve added a get_items()
-        except AttributeError:
-            try:
-                items = view.items                  # ← or maybe it’s stored in view.items
-            except Exception:
-                # 3) …otherwise fall back on the DB
-                wrapper = self.entity_wrappers.get(entity_name) or GenericModelWrapper(entity_name)
-                self.entity_wrappers[entity_name] = wrapper
-                items   = wrapper.load_items()
+            with self._busy_operation(f"Saving {display_label}..."):
+                try:
+                    items = view.get_items()
+                except AttributeError:
+                    try:
+                        items = view.items
+                    except Exception:
+                        wrapper = self.entity_wrappers.get(entity_name) or GenericModelWrapper(entity_name)
+                        self.entity_wrappers[entity_name] = wrapper
+                        items = wrapper.load_items()
 
-        # 4) Serialize to JSON
-        data = { entity_name: items }
-        try:
-            with open(path, "w", encoding="utf-8") as f:
-                json.dump(data, f, indent=4)
+                data = {entity_name: items}
+                with open(path, "w", encoding="utf-8") as f:
+                    json.dump(data, f, indent=4)
         except Exception as e:
             messagebox.showerror("Error", f"Failed to save {display_label}:\n{e}")
-
             return
 
-        # 5) Let the user know it worked
         messagebox.showinfo("Export Successful", f"Wrote {len(items)} {display_label} to:\n{path}")
 
 
@@ -919,14 +1001,18 @@ class MainWindow(ctk.CTk):
         )
         if not file_path:
             return
+        items = []
         try:
-            with open(file_path, "r", encoding="utf-8") as file:
-                data = json.load(file)
+            with self._busy_operation(f"Loading {display_label}..."):
+                with open(file_path, "r", encoding="utf-8") as file:
+                    data = json.load(file)
                 items = data.get(entity_name, [])
                 view.add_items(items)
-                messagebox.showinfo("Success", f"{len(items)} {display_label} loaded successfully!")
         except Exception as e:
             messagebox.showerror("Error", f"Failed to load {display_label}: {e}")
+            return
+
+        messagebox.showinfo("Success", f"{len(items)} {display_label} loaded successfully!")
 
     def open_gm_screen(self):
         # 1) Clear any existing content
