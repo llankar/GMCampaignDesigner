@@ -965,7 +965,12 @@ class ScenarioGraphEditor(ctk.CTkFrame):
                 key = canonical_key(chunk_clean)
                 if not key or key in seen_keys:
                     continue
-                cleaned_lines.append(strip_leading_markers(chunk_clean))
+                candidate_line = strip_leading_markers(chunk_clean)
+                candidate_lower = candidate_line.lower()
+                # Avoid manufacturing duplicate bullets when we only have a single long fragment
+                if any(candidate_lower in existing.lower() or existing.lower() in candidate_lower for existing in cleaned_lines):
+                    continue
+                cleaned_lines.append(candidate_line)
                 seen_keys.add(key)
                 if len(cleaned_lines) >= min_lines:
                     break
