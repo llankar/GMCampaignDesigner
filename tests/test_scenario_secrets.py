@@ -64,6 +64,18 @@ class _DummyStep:
         return True
 
 
+class _DummyButton:
+    def __init__(self):
+        self._state = "normal"
+
+    def cget(self, key):
+        return self._state if key == "state" else None
+
+    def configure(self, **kwargs):
+        if "state" in kwargs:
+            self._state = kwargs["state"]
+
+
 def test_finish_persists_secret_aliases(tmp_path, monkeypatch):
     db_path = tmp_path / "campaign.db"
 
@@ -80,7 +92,7 @@ def test_finish_persists_secret_aliases(tmp_path, monkeypatch):
     wizard = sbw.ScenarioBuilderWizard.__new__(sbw.ScenarioBuilderWizard)
     wizard.steps = [("dummy", _DummyStep())]
     wizard.current_step_index = 0
-    wizard.state = {
+    wizard.wizard_state = {
         "Title": "Test Scenario",
         "Summary": "Summary",
         "Secrets": "Hidden truth",
@@ -94,6 +106,10 @@ def test_finish_persists_secret_aliases(tmp_path, monkeypatch):
     wizard.scenario_wrapper = gmw.GenericModelWrapper("scenarios")
     wizard.on_saved = None
     wizard.destroy = lambda: None
+    wizard.back_btn = _DummyButton()
+    wizard.next_btn = _DummyButton()
+    wizard.finish_btn = _DummyButton()
+    wizard.cancel_btn = _DummyButton()
 
     wizard.finish()
 
