@@ -1,22 +1,30 @@
 import copy
 import json
+import os
 import sqlite3
 import textwrap
 import tkinter as tk
 from tkinter import messagebox
 
 import customtkinter as ctk
+from PIL import Image
 
 from modules.generic.generic_editor_window import GenericEditorWindow
 from modules.generic.generic_list_selection_view import GenericListSelectionView
 from modules.generic.generic_model_wrapper import GenericModelWrapper
+from modules.helpers.config_helper import ConfigHelper
 from modules.helpers.logging_helper import log_module_import, log_info, log_exception
-from modules.helpers.template_loader import load_template
+from modules.helpers.template_loader import load_template, load_entity_definitions
 from modules.scenarios.scene_flow_rendering import (
     SCENE_FLOW_BG,
     apply_scene_flow_canvas_styling,
     get_shadow_image,
 )
+
+try:
+    _IMAGE_RESAMPLE = Image.Resampling.LANCZOS
+except AttributeError:  # pragma: no cover - Pillow < 9.1
+    _IMAGE_RESAMPLE = Image.LANCZOS
 
 
 def normalise_scene_links(scene, split_to_list):
@@ -1312,6 +1320,13 @@ class ScenesPlanningStep(WizardStep):
 
 
 class EntityLinkingStep(WizardStep):
+    CARD_IMAGE_SIZE = (64, 64)
+    CARD_BG = ("#162338", "#0f172a")
+    CARD_SELECTED_BG = ("#20324d", "#1e293b")
+    CARD_BORDER = "#2a3d5a"
+    CARD_SELECTED_BORDER = "#60a5fa"
+    CARD_TEXT_COLOR = ("#e2e8f0", "#e2e8f0")
+    CARD_SUBTEXT_COLOR = ("#94a3b8", "#94a3b8")
     ENTITY_FIELDS = {
         "npcs": ("NPCs", "NPC"),
         "places": ("Places", "Place"),
@@ -1324,7 +1339,33 @@ class EntityLinkingStep(WizardStep):
         super().__init__(master)
         self.wrappers = wrappers
         self.selected = {field: [] for field, _ in self.ENTITY_FIELDS.values()}
-        self.listboxes = {}
+        self.card_containers = {}
+        self.card_widgets = {}
+        self.card_image_refs = {}
+        self.card_selection = {field: set() for field, _ in self.ENTITY_FIELDS.values()}
+        self.field_to_entity = {}
+        self.field_labels = {}
+        self._entity_cache = {}
+        self._media_fields = {}
+
+        project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
+        default_icon = os.path.join(project_root, "assets", "icons", "empty.png")
+        self._default_icon_path = default_icon if os.path.exists(default_icon) else None
+
+        entity_defs = load_entity_definitions()
+        self._entity_icons = {}
+        for entity_type in self.ENTITY_FIELDS:
+            icon_path = None
+            meta = entity_defs.get(entity_type)
+            if meta:
+                icon_path = meta.get("icon")
+            if icon_path and os.path.exists(icon_path):
+                self._entity_icons[entity_type] = icon_path
+            elif self._default_icon_path:
+                self._entity_icons[entity_type] = self._default_icon_path
+            else:
+                self._entity_icons[entity_type] = None
+            self._media_fields[entity_type] = self._detect_media_field(entity_type)
 
         container = ctk.CTkFrame(self)
         container.pack(fill="both", expand=True, padx=10, pady=10)
@@ -1341,9 +1382,15 @@ class EntityLinkingStep(WizardStep):
                 row=0, column=0, sticky="w", padx=6, pady=(6, 4)
             )
 
-            listbox = tk.Listbox(frame, activestyle="none")
-            listbox.grid(row=1, column=0, sticky="nsew", padx=6, pady=(0, 6))
-            self.listboxes[field] = listbox
+            cards = ctk.CTkScrollableFrame(frame, fg_color="transparent")
+            cards.grid(row=1, column=0, sticky="nsew", padx=6, pady=(0, 6))
+            cards.grid_columnconfigure(0, weight=1)
+            self.card_containers[field] = cards
+            self.card_widgets[field] = {}
+            self.card_image_refs[field] = []
+            self.field_to_entity[field] = entity_type
+            self.field_labels[field] = label
+            self.refresh_list(field)
 
             btn_row = ctk.CTkFrame(frame)
             btn_row.grid(row=2, column=0, sticky="ew", padx=6, pady=(0, 8))
@@ -1366,6 +1413,192 @@ class EntityLinkingStep(WizardStep):
                 text=f"New {label}",
                 command=lambda et=entity_type, f=field, lbl=label: self.create_new_entity(et, f, lbl),
             ).grid(row=0, column=2, padx=4, pady=2, sticky="ew")
+
+    def _detect_media_field(self, entity_type):
+        try:
+            template = load_template(entity_type)
+        except Exception:
+            return None
+        fields = template.get("fields") if isinstance(template, dict) else None
+        if not isinstance(fields, list):
+            return None
+        normalized = {}
+        for field in fields:
+            if not isinstance(field, dict):
+                continue
+            name = str(field.get("name") or "").strip()
+            if not name:
+                continue
+            normalized[name.lower()] = name
+            field_type = str(field.get("type") or "").strip().lower()
+            if field_type == "image":
+                return name
+        for key in ("portrait", "image"):
+            if key in normalized:
+                return normalized[key]
+        for lower, original in normalized.items():
+            if "portrait" in lower or "image" in lower:
+                return original
+        return None
+
+    def _invalidate_entity_cache(self, entity_type):
+        self._entity_cache.pop(entity_type, None)
+
+    def _get_entity_record(self, entity_type, name):
+        if not name:
+            return None
+        cache = self._entity_cache.get(entity_type)
+        if cache is None:
+            cache = {"exact": {}, "lower": {}}
+            wrapper = self.wrappers.get(entity_type)
+            if not wrapper:
+                self._entity_cache[entity_type] = cache
+                return None
+            try:
+                items = wrapper.load_items()
+            except Exception:
+                self._entity_cache[entity_type] = cache
+                return None
+            for item in items:
+                if not isinstance(item, dict):
+                    continue
+                value = item.get("Name") or item.get("Title")
+                if not value:
+                    continue
+                text = str(value).strip()
+                if not text:
+                    continue
+                cache["exact"][text] = item
+                cache["lower"][text.lower()] = item
+            self._entity_cache[entity_type] = cache
+        record = cache["exact"].get(name)
+        if record:
+            return record
+        return cache["lower"].get(name.lower())
+
+    def _resolve_portrait_path(self, raw_value):
+        if not raw_value:
+            return None
+        text = str(raw_value).strip()
+        if not text:
+            return None
+        normalized = text.replace("\\", os.sep).replace("/", os.sep)
+        if os.path.isabs(normalized) and os.path.exists(normalized):
+            return normalized
+        candidates = []
+        campaign_dir = ConfigHelper.get_campaign_dir()
+        if campaign_dir:
+            candidates.append(os.path.join(campaign_dir, normalized))
+            candidates.append(os.path.join(campaign_dir, "assets", normalized))
+            base_name = os.path.basename(normalized)
+            if base_name:
+                candidates.append(os.path.join(campaign_dir, "assets", "portraits", base_name))
+        for candidate in candidates:
+            if candidate and os.path.exists(candidate):
+                return candidate
+        return None
+
+    def _create_card_image(self, entity_type, portrait_value):
+        resolved = self._resolve_portrait_path(portrait_value)
+        image_obj = None
+        if resolved:
+            try:
+                with Image.open(resolved) as img:
+                    image_obj = img.convert("RGBA")
+            except Exception:
+                image_obj = None
+        if image_obj is None:
+            fallback_path = self._entity_icons.get(entity_type) or self._default_icon_path
+            if fallback_path and os.path.exists(fallback_path):
+                try:
+                    with Image.open(fallback_path) as img:
+                        image_obj = img.convert("RGBA")
+                except Exception:
+                    image_obj = None
+        if image_obj is None:
+            image_obj = Image.new("RGBA", self.CARD_IMAGE_SIZE, color="#1f2937")
+        else:
+            image_obj.thumbnail(self.CARD_IMAGE_SIZE, _IMAGE_RESAMPLE)
+        return ctk.CTkImage(light_image=image_obj, size=self.CARD_IMAGE_SIZE)
+
+    def _apply_card_selection_style(self, card, selected):
+        card.configure(
+            fg_color=self.CARD_SELECTED_BG if selected else self.CARD_BG,
+            border_color=self.CARD_SELECTED_BORDER if selected else self.CARD_BORDER,
+            border_width=2 if selected else 1,
+        )
+
+    def _toggle_card_selection(self, field, name):
+        cards = self.card_widgets.get(field, {})
+        card = cards.get(name)
+        if not card:
+            return
+        selected_names = self.card_selection.setdefault(field, set())
+        if name in selected_names:
+            selected_names.remove(name)
+            self._apply_card_selection_style(card, False)
+        else:
+            selected_names.add(name)
+            self._apply_card_selection_style(card, True)
+
+    def _create_entity_card(self, field, name):
+        entity_type = self.field_to_entity.get(field)
+        record = self._get_entity_record(entity_type, name) if entity_type else None
+        portrait_field = self._media_fields.get(entity_type) if entity_type else None
+        portrait_value = None
+        if record and portrait_field:
+            portrait_value = record.get(portrait_field)
+        elif record:
+            for key in ("Portrait", "portrait", "Image", "image"):
+                if key in record and record.get(key):
+                    portrait_value = record.get(key)
+                    break
+        if record is None:
+            display_path = "Entity not found in database"
+        else:
+            display_path = str(portrait_value).strip() if portrait_value else "No portrait assigned"
+        image = self._create_card_image(entity_type, portrait_value)
+
+        container = self.card_containers[field]
+        card = ctk.CTkFrame(
+            container,
+            corner_radius=12,
+            fg_color=self.CARD_BG,
+            border_color=self.CARD_BORDER,
+            border_width=1,
+        )
+        card.grid_columnconfigure(1, weight=1)
+
+        image_label = ctk.CTkLabel(card, text="", image=image)
+        image_label.grid(row=0, column=0, rowspan=2, padx=10, pady=10)
+
+        name_label = ctk.CTkLabel(
+            card,
+            text=name or "(Unnamed)",
+            font=ctk.CTkFont(size=13, weight="bold"),
+            text_color=self.CARD_TEXT_COLOR,
+            anchor="w",
+        )
+        name_label.grid(row=0, column=1, sticky="ew", padx=(0, 12), pady=(10, 2))
+
+        path_label = ctk.CTkLabel(
+            card,
+            text=display_path or "No portrait assigned",
+            font=ctk.CTkFont(size=11),
+            text_color=self.CARD_SUBTEXT_COLOR,
+            anchor="w",
+            justify="left",
+            wraplength=220,
+        )
+        path_label.grid(row=1, column=1, sticky="ew", padx=(0, 12), pady=(0, 10))
+
+        for widget in (card, image_label, name_label, path_label):
+            widget.bind("<Button-1>", lambda _event, f=field, n=name: self._toggle_card_selection(f, n))
+
+        self.card_widgets[field][name] = card
+        self.card_image_refs[field].append(image)
+        self._apply_card_selection_style(card, name in self.card_selection.get(field, set()))
+        return card
 
     def open_selector(self, entity_type, field):  # pragma: no cover - UI interaction
         wrapper = self.wrappers[entity_type]
@@ -1398,18 +1631,12 @@ class EntityLinkingStep(WizardStep):
             pass
 
     def remove_selected(self, field):  # pragma: no cover - UI interaction
-        listbox = self.listboxes.get(field)
-        if not listbox:
+        selected_cards = set(self.card_selection.get(field) or set())
+        if not selected_cards:
             return
-        selection = listbox.curselection()
-        if not selection:
-            return
-        selected_items = self.selected.get(field, [])
-        for index in reversed(selection):
-            try:
-                del selected_items[index]
-            except IndexError:
-                continue
+        current = self.selected.get(field, [])
+        self.selected[field] = [name for name in current if name not in selected_cards]
+        self.card_selection[field] = set()
         self.refresh_list(field)
 
     def create_new_entity(self, entity_type, field, label):  # pragma: no cover - UI interaction
@@ -1468,6 +1695,7 @@ class EntityLinkingStep(WizardStep):
             log_exception(f"Failed to persist new {entity_type}: {exc}")
             messagebox.showerror("Save Error", f"Unable to save the new {label}.")
             return
+        self._invalidate_entity_cache(entity_type)
 
         if not unique_value:
             messagebox.showwarning(
@@ -1482,12 +1710,42 @@ class EntityLinkingStep(WizardStep):
             self.refresh_list(field)
 
     def refresh_list(self, field):  # pragma: no cover - UI helper
-        listbox = self.listboxes.get(field)
-        if not listbox:
+        container = self.card_containers.get(field)
+        if not container:
             return
-        listbox.delete(0, tk.END)
-        for name in self.selected.get(field, []):
-            listbox.insert(tk.END, name)
+        for child in container.winfo_children():
+            child.destroy()
+        self.card_widgets[field] = {}
+        self.card_image_refs[field] = []
+        values = self.selected.get(field, [])
+        if not isinstance(values, list):
+            values = list(values)
+        deduped = []
+        seen = set()
+        for name in values:
+            if name in seen:
+                continue
+            seen.add(name)
+            deduped.append(name)
+        self.selected[field] = deduped
+        selection = self.card_selection.setdefault(field, set())
+        selection.intersection_update(set(deduped))
+        if not deduped:
+            label = self.field_labels.get(field, field)
+            empty_text = f"No {label.lower()}s linked yet."
+            ctk.CTkLabel(
+                container,
+                text=empty_text,
+                text_color=self.CARD_SUBTEXT_COLOR,
+                anchor="w",
+                justify="left",
+            ).grid(row=0, column=0, sticky="w", padx=6, pady=6)
+            return
+        for idx, name in enumerate(deduped):
+            card = self._create_entity_card(field, name)
+            card.grid(row=idx, column=0, sticky="ew", padx=4, pady=4)
+
+        container.grid_columnconfigure(0, weight=1)
 
     def load_state(self, state):  # pragma: no cover - UI synchronization
         for entity_type, (field, _) in self.ENTITY_FIELDS.items():
@@ -1495,6 +1753,7 @@ class EntityLinkingStep(WizardStep):
             if isinstance(values, str):
                 values = [values]
             self.selected[field] = list(dict.fromkeys(values))
+            self.card_selection[field] = set()
             self.refresh_list(field)
 
     def save_state(self, state):  # pragma: no cover - UI synchronization
