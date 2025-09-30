@@ -1,6 +1,7 @@
 import copy
 import json
 import sqlite3
+import textwrap
 import tkinter as tk
 from tkinter import messagebox
 
@@ -68,6 +69,181 @@ class BasicInfoStep(WizardStep):
         return True
 
 
+class SceneFlowPreview(ctk.CTkFrame):
+    """Lightweight scene flow canvas used inside the wizard."""
+
+    CARD_WIDTH = 220
+    CARD_HEIGHT = 130
+    GRID_SPACING = 48
+
+    def __init__(self, master, *, on_select=None):
+        super().__init__(master, corner_radius=16, fg_color=("#0f1624", "#0f1624"))
+        self.on_select = on_select
+        self.scenes = []
+        self.selected_index = None
+        self.node_regions = []
+
+        self.canvas = tk.Canvas(self, bg="#0c121d", highlightthickness=0, bd=0)
+        self.canvas.pack(fill="both", expand=True, padx=4, pady=4)
+        self.canvas.bind("<Configure>", lambda _event: self._draw())
+        self.canvas.bind("<Button-1>", self._handle_click)
+
+    def render(self, scenes, selected_index):
+        self.scenes = scenes or []
+        self.selected_index = selected_index if isinstance(selected_index, int) else None
+        self._draw()
+
+    def _draw(self):
+        if not hasattr(self, "canvas"):
+            return
+        width = max(self.canvas.winfo_width(), 1)
+        height = max(self.canvas.winfo_height(), 1)
+        self.canvas.delete("all")
+        self.node_regions = []
+
+        for x in range(0, width, self.GRID_SPACING):
+            self.canvas.create_line(x, 0, x, height, fill="#141f31")
+        for y in range(0, height, self.GRID_SPACING):
+            self.canvas.create_line(0, y, width, y, fill="#141f31")
+
+        if not self.scenes:
+            self.canvas.create_text(
+                width / 2,
+                height / 2,
+                text="Add scenes to see the story flow visualised here",
+                fill="#7183a5",
+                font=("Segoe UI", 15, "bold"),
+            )
+            return
+
+        columns = max(1, min(4, (width - 140) // (self.CARD_WIDTH + 60)))
+        positions = []
+        for idx, _ in enumerate(self.scenes):
+            col = idx % columns
+            row = idx // columns
+            x = 90 + col * (self.CARD_WIDTH + 60) + self.CARD_WIDTH / 2
+            y = 90 + row * (self.CARD_HEIGHT + 120)
+            positions.append((x, y))
+
+        title_lookup = {}
+        for idx, scene in enumerate(self.scenes):
+            title = (scene.get("Title") or f"Scene {idx + 1}").strip().lower()
+            if title:
+                title_lookup[title] = idx
+
+        def resolve_target(reference):
+            if reference is None:
+                return None
+            ref = str(reference).strip()
+            if not ref:
+                return None
+            lowered = ref.lower()
+            if lowered in title_lookup:
+                return title_lookup[lowered]
+            if lowered.startswith("scene "):
+                try:
+                    number = int(lowered.split()[1])
+                except (ValueError, IndexError):
+                    number = None
+                if number and 1 <= number <= len(self.scenes):
+                    return number - 1
+            if ref.isdigit():
+                number = int(ref)
+                if 1 <= number <= len(self.scenes):
+                    return number - 1
+            return None
+
+        for idx, scene in enumerate(self.scenes):
+            start = positions[idx]
+            for target in scene.get("NextScenes") or []:
+                resolved = resolve_target(target)
+                if resolved is None or resolved >= len(positions):
+                    continue
+                end = positions[resolved]
+                color = "#58a2ff" if idx == self.selected_index else "#365074"
+                self.canvas.create_line(
+                    start[0],
+                    start[1] + self.CARD_HEIGHT / 2 - 8,
+                    end[0],
+                    end[1] - self.CARD_HEIGHT / 2,
+                    fill=color,
+                    width=2.2,
+                    arrow=tk.LAST,
+                    smooth=True,
+                )
+
+        for idx, scene in enumerate(self.scenes):
+            x, y = positions[idx]
+            x1 = x - self.CARD_WIDTH / 2
+            y1 = y - self.CARD_HEIGHT / 2
+            x2 = x + self.CARD_WIDTH / 2
+            y2 = y + self.CARD_HEIGHT / 2
+            selected = idx == self.selected_index
+            bg = "#1b253b" if selected else "#121a2a"
+            border = "#6ab2ff" if selected else "#23314a"
+            self.canvas.create_rectangle(
+                x1,
+                y1,
+                x2,
+                y2,
+                fill=bg,
+                outline=border,
+                width=2.4,
+                tags=(f"scene-node-{idx}", "scene-node"),
+            )
+            title = (scene.get("Title") or f"Scene {idx + 1}").strip() or f"Scene {idx + 1}"
+            summary = (scene.get("Summary") or scene.get("Text") or "").replace("\n", " ").strip()
+            summary_display = (
+                textwrap.shorten(summary, width=120, placeholder="…")
+                if summary
+                else "Click to outline this beat."
+            )
+            scene_type = scene.get("SceneType") or scene.get("Type") or ""
+            if scene_type:
+                self.canvas.create_rectangle(
+                    x1 + 8,
+                    y1 + 8,
+                    x1 + 108,
+                    y1 + 30,
+                    fill="#28548a",
+                    outline="",
+                    tags=(f"scene-node-{idx}", "scene-node"),
+                )
+                self.canvas.create_text(
+                    x1 + 58,
+                    y1 + 19,
+                    text=scene_type.upper(),
+                    fill="white",
+                    font=("Segoe UI", 9, "bold"),
+                    tags=(f"scene-node-{idx}", "scene-node"),
+                )
+            self.canvas.create_text(
+                x,
+                y - 8,
+                text=title,
+                fill="white",
+                font=("Segoe UI", 13, "bold"),
+                width=self.CARD_WIDTH - 24,
+                tags=(f"scene-node-{idx}", "scene-node"),
+            )
+            self.canvas.create_text(
+                x,
+                y + 26,
+                text=summary_display,
+                fill="#8d9ab7",
+                font=("Segoe UI", 10),
+                width=self.CARD_WIDTH - 24,
+                tags=(f"scene-node-{idx}", "scene-node"),
+            )
+            self.node_regions.append((x1, y1, x2, y2, idx))
+
+    def _handle_click(self, event):
+        for x1, y1, x2, y2, idx in self.node_regions:
+            if x1 <= event.x <= x2 and y1 <= event.y <= y2:
+                if callable(self.on_select):
+                    self.on_select(idx)
+                break
+
 class ScenesPlanningStep(WizardStep):
     """Editable scene list tailored for the scenario builder wizard."""
 
@@ -91,6 +267,7 @@ class ScenesPlanningStep(WizardStep):
         container.pack(fill="both", expand=True, padx=10, pady=10)
         container.grid_columnconfigure(0, weight=0, minsize=280)
         container.grid_columnconfigure(1, weight=1)
+        container.grid_columnconfigure(2, weight=0, minsize=360)
         container.grid_rowconfigure(0, weight=1)
 
         # Scene list ---------------------------------------------------
@@ -129,9 +306,32 @@ class ScenesPlanningStep(WizardStep):
         actions_bottom.grid_columnconfigure(0, weight=1)
         ctk.CTkButton(actions_bottom, text="Move Down", command=lambda: self.move_scene(1)).grid(row=0, column=0, padx=4, pady=2, sticky="ew")
 
+        # Scene flow preview ------------------------------------------
+        preview_section = ctk.CTkFrame(container, corner_radius=12)
+        preview_section.grid(row=0, column=1, sticky="nsew", padx=6, pady=6)
+        preview_section.grid_columnconfigure(0, weight=1)
+        preview_section.grid_rowconfigure(1, weight=1)
+
+        ctk.CTkLabel(
+            preview_section,
+            text="Scene Flow Preview",
+            font=ctk.CTkFont(size=15, weight="bold"),
+            anchor="w",
+        ).grid(row=0, column=0, sticky="ew", padx=10, pady=(10, 4))
+
+        self.preview = SceneFlowPreview(preview_section, on_select=self._on_preview_node_click)
+        self.preview.grid(row=1, column=0, sticky="nsew", padx=10, pady=(0, 10))
+
+        ctk.CTkLabel(
+            preview_section,
+            text="Reorder scenes or add Next Scenes to shape the flow.",
+            anchor="w",
+            text_color=("#8a97b0", "#8a97b0"),
+        ).grid(row=2, column=0, sticky="ew", padx=10, pady=(0, 10))
+
         # Scene editor -------------------------------------------------
         editor = ctk.CTkScrollableFrame(container)
-        editor.grid(row=0, column=1, sticky="nsew")
+        editor.grid(row=0, column=2, sticky="nsew")
         editor.grid_columnconfigure(0, weight=1)
 
         ctk.CTkLabel(
@@ -413,6 +613,7 @@ class ScenesPlanningStep(WizardStep):
             self.type_var.set(self.type_options[0])
             self._updating_fields = False
             self._set_editor_enabled(False)
+            self._update_preview()
             return
 
         self.selected_index = index
@@ -434,6 +635,7 @@ class ScenesPlanningStep(WizardStep):
             self._set_listbox_items(field, scene.get(field, []))
         self._set_textbox_value(self.next_text, "\n".join(scene.get("NextScenes", [])))
         self._updating_fields = False
+        self._update_preview()
 
     def _set_listbox_selection(self, index):
         self._suppress_list_event = True
@@ -443,6 +645,19 @@ class ScenesPlanningStep(WizardStep):
             self.scene_listbox.activate(index)
             self.scene_listbox.see(index)
         self._suppress_list_event = False
+
+    def _update_preview(self):
+        if hasattr(self, "preview"):
+            self.preview.render(self.scenes, self.selected_index)
+
+    def _on_preview_node_click(self, index):  # pragma: no cover - UI callback
+        if index is None or index < 0 or index >= len(self.scenes):
+            return
+        if index == self.selected_index:
+            return
+        self._save_current_scene()
+        self._set_listbox_selection(index)
+        self._apply_selection(index)
 
     def _format_scene_label(self, scene, index):
         title = scene.get("Title") or f"Scene {index + 1}"
@@ -469,6 +684,7 @@ class ScenesPlanningStep(WizardStep):
             self._apply_selection(0)
         else:
             self._apply_selection(None)
+        self._update_preview()
 
     def _on_title_change(self, *_):  # pragma: no cover - simple binding
         if self._updating_fields or self.selected_index is None:
@@ -497,6 +713,7 @@ class ScenesPlanningStep(WizardStep):
         self.scene_listbox.insert(index, self._format_scene_label(self.scenes[index], index))
         self._set_listbox_selection(index)
         self._suppress_list_event = False
+        self._update_preview()
 
     # ------------------------------------------------------------------
     # Scene data helpers
