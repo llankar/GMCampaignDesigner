@@ -273,7 +273,8 @@ class ScenesPlanningStep(WizardStep):
         template = load_template(entity_type)
         top = ctk.CTkToplevel(self)
         top.title(f"Select {singular_label}")
-        top.geometry("900x600")
+        top.geometry("1100x720")
+        top.minsize(1100, 720)
         selection = GenericListSelectionView(
             top,
             entity_type,
@@ -855,7 +856,8 @@ class EntityLinkingStep(WizardStep):
         template = load_template(entity_type)
         top = ctk.CTkToplevel(self)
         top.title(f"Select {field}")
-        top.geometry("900x600")
+        top.geometry("1100x720")
+        top.minsize(1100, 720)
         selection = GenericListSelectionView(
             top,
             entity_type,
