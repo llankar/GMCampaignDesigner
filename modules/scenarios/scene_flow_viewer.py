@@ -1,13 +1,16 @@
-import math
 import tkinter as tk
 from typing import Callable, Dict, Optional, Sequence
 
 import customtkinter as ctk
-from PIL import Image, ImageDraw, ImageFilter, ImageTk
+from PIL import ImageTk
 
 from modules.generic.generic_model_wrapper import GenericModelWrapper
 from modules.helpers.logging_helper import log_info, log_module_import, log_warning
 from modules.scenarios.scenario_graph_editor import ScenarioGraphEditor
+from modules.scenarios.scene_flow_rendering import (
+    apply_scene_flow_canvas_styling,
+    get_shadow_image,
+)
 
 log_module_import(__name__)
 
@@ -84,7 +87,7 @@ class SceneFlowViewerFrame(ScenarioGraphEditor):
         self._initial_title = self._extract_title(self._initial_scenario)
         self._scenario_lookup: Dict[str, dict] = {}
         self._shadow_cache: Dict[tuple, tuple] = {}
-        self._grid_tile: Optional[ImageTk.PhotoImage] = None
+        self._grid_tile_cache: Dict[str, ImageTk.PhotoImage] = {}
 
         super().__init__(
             master,
@@ -246,58 +249,13 @@ class SceneFlowViewerFrame(ScenarioGraphEditor):
             self.background_id = None
             self.background_photo = None
 
-        self._draw_grid_background()
+        apply_scene_flow_canvas_styling(
+            self.canvas,
+            tile_cache=self._grid_tile_cache,
+            extent_width=self.GRID_EXTENT_WIDTH,
+            extent_height=self.GRID_EXTENT_HEIGHT,
+        )
         self.canvas.tag_lower("scene_flow_bg")
-
-    def _draw_grid_background(self) -> None:
-        if self._grid_tile is None:
-            self._grid_tile = self._create_grid_tile()
-        tile = self._grid_tile
-        if tile is None:
-            return
-
-        tile_width = tile.width()
-        tile_height = tile.height()
-        cols = max(1, math.ceil(self.GRID_EXTENT_WIDTH / tile_width))
-        rows = max(1, math.ceil(self.GRID_EXTENT_HEIGHT / tile_height))
-
-        for i in range(cols):
-            for j in range(rows):
-                self.canvas.create_image(
-                    i * tile_width,
-                    j * tile_height,
-                    image=tile,
-                    anchor="nw",
-                    tags=("background", "scene_flow_bg"),
-                )
-
-    def _create_grid_tile(self) -> Optional[ImageTk.PhotoImage]:
-        size = 256
-        spacing = 96
-        line_color = (255, 255, 255, 25)
-        dot_color = (255, 255, 255, 40)
-
-        image = Image.new("RGBA", (size, size), (0, 0, 0, 0))
-        draw = ImageDraw.Draw(image)
-
-        for offset in range(0, size, spacing):
-            draw.line([(offset, 0), (offset, size)], fill=line_color, width=1)
-            draw.line([(0, offset), (size, offset)], fill=line_color, width=1)
-
-        dot_radius = 2
-        for x in range(0, size, spacing):
-            for y in range(0, size, spacing):
-                draw.ellipse(
-                    [
-                        x - dot_radius,
-                        y - dot_radius,
-                        x + dot_radius,
-                        y + dot_radius,
-                    ],
-                    fill=dot_color,
-                )
-
-        return ImageTk.PhotoImage(image, master=self.canvas)
 
     # ------------------------------------------------------------------
     # Scene drawing overrides
@@ -314,7 +272,9 @@ class SceneFlowViewerFrame(ScenarioGraphEditor):
         width = int(right - left)
         height = int(bottom - top)
 
-        shadow_image, offset = self._get_shadow_image(width, height, scale)
+        shadow_image, offset = get_shadow_image(
+            self.canvas, self._shadow_cache, width, height, scale
+        )
         if shadow_image is None:
             return
 
@@ -328,39 +288,6 @@ class SceneFlowViewerFrame(ScenarioGraphEditor):
         self.canvas.tag_lower(shadow_id, node_tag)
         cache_key = (node_tag, "shadow")
         self.node_images[cache_key] = shadow_image
-
-    def _get_shadow_image(self, width: int, height: int, scale: float) -> tuple[Optional[ImageTk.PhotoImage], int]:
-        rounded_width = max(10, int(width))
-        rounded_height = max(10, int(height))
-        blur_radius = max(6, int(10 * scale))
-        padding = max(4, int(6 * scale))
-        corner_radius = max(16, int(20 * scale))
-        offset = blur_radius + padding
-        cache_key = (rounded_width, rounded_height, blur_radius, padding, corner_radius)
-
-        cached = self._shadow_cache.get(cache_key)
-        if cached:
-            return cached
-
-        total_width = rounded_width + 2 * offset
-        total_height = rounded_height + 2 * offset
-
-        shadow = Image.new("RGBA", (total_width, total_height), (0, 0, 0, 0))
-        draw = ImageDraw.Draw(shadow)
-        draw.rounded_rectangle(
-            [
-                offset,
-                offset,
-                offset + rounded_width,
-                offset + rounded_height,
-            ],
-            radius=corner_radius,
-            fill=(0, 0, 0, 120),
-        )
-        shadow = shadow.filter(ImageFilter.GaussianBlur(radius=blur_radius))
-        photo = ImageTk.PhotoImage(shadow, master=self.canvas)
-        self._shadow_cache[cache_key] = (photo, offset)
-        return photo, offset
 
     # Override scenario selection to avoid generic dialog usage.
     def select_scenario(self):  # type: ignore[override]

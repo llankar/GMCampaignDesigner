@@ -12,6 +12,11 @@ from modules.generic.generic_list_selection_view import GenericListSelectionView
 from modules.generic.generic_model_wrapper import GenericModelWrapper
 from modules.helpers.logging_helper import log_module_import, log_info, log_exception
 from modules.helpers.template_loader import load_template
+from modules.scenarios.scene_flow_rendering import (
+    SCENE_FLOW_BG,
+    apply_scene_flow_canvas_styling,
+    get_shadow_image,
+)
 
 
 log_module_import(__name__)
@@ -251,15 +256,23 @@ class SceneCanvas(ctk.CTkFrame):
     CARD_H = 150
 
     def __init__(self, master, on_select=None, on_move=None):
-        super().__init__(master, corner_radius=16, fg_color="#0f1624")
+        super().__init__(master, corner_radius=16, fg_color=SCENE_FLOW_BG)
         self.on_select = on_select
         self.on_move = on_move
         self.scenes = []
         self.selected_index = None
         self._drag_index = None
         self._drag_offset = (0, 0)
+        self._grid_tile_cache: dict[str, object] = {}
+        self._shadow_cache: dict[tuple, tuple] = {}
+        self._image_refs: dict[str, object] = {}
 
-        self.canvas = tk.Canvas(self, bg="#0b1220", highlightthickness=0, bd=0)
+        self.canvas = tk.Canvas(
+            self,
+            bg=SCENE_FLOW_BG,
+            highlightthickness=0,
+            bd=0,
+        )
         self.canvas.pack(fill="both", expand=True)
         self.canvas.bind("<Configure>", lambda _e: self._draw())
         self.canvas.bind("<Button-1>", self._on_click)
@@ -294,12 +307,15 @@ class SceneCanvas(ctk.CTkFrame):
         width = max(c.winfo_width(), 1)
         height = max(c.winfo_height(), 1)
         c.delete("all")
-        for x in range(0, width, self.GRID):
-            color = "#17233a" if (x // self.GRID) % 3 == 0 else "#111a2c"
-            c.create_line(x, 0, x, height, fill=color)
-        for y in range(0, height, self.GRID):
-            color = "#17233a" if (y // self.GRID) % 3 == 0 else "#111a2c"
-            c.create_line(0, y, width, y, fill=color)
+        self._image_refs.clear()
+
+        apply_scene_flow_canvas_styling(
+            c,
+            tile_cache=self._grid_tile_cache,
+            extent_width=max(width, self.CARD_W * 4),
+            extent_height=max(height, self.CARD_H * 4),
+        )
+        c.tag_lower("scene_flow_bg")
         if not self.scenes:
             c.create_text(
                 width / 2,
@@ -347,7 +363,9 @@ class SceneCanvas(ctk.CTkFrame):
                 end = positions.get(target_idx)
                 if not end:
                     continue
-                color = "#66a7ff" if idx == self.selected_index else "#3f7ded"
+                is_selected = idx == self.selected_index
+                color = "#5bb8ff" if is_selected else "#2f4c6f"
+                line_width = 3 if is_selected else 2
                 sx = start[0] + self.CARD_W / 2 - 12
                 sy = start[1]
                 ex = end[0] - self.CARD_W / 2 + 12
@@ -362,10 +380,11 @@ class SceneCanvas(ctk.CTkFrame):
                     ex,
                     ey,
                     smooth=True,
-                    width=3,
+                    width=line_width,
                     arrow=tk.LAST,
-                    arrowshape=(14, 16, 6),
+                    arrowshape=(16, 18, 7),
                     fill=color,
+                    tags=("link", "scene_flow_link"),
                 )
                 label_text = str(link.get("text") or target_value).strip()
                 if label_text:
@@ -384,11 +403,43 @@ class SceneCanvas(ctk.CTkFrame):
             y1 = y - self.CARD_H / 2
             x2 = x + self.CARD_W / 2
             y2 = y + self.CARD_H / 2
-            bg = "#1b273d" if idx == self.selected_index else "#141d2f"
-            border = "#5d8bff" if idx == self.selected_index else "#253352"
-            c.create_rectangle(x1, y1, x2, y2, fill=bg, outline=border, width=3)
+            shadow_image, offset = get_shadow_image(
+                c, self._shadow_cache, self.CARD_W, self.CARD_H, 1.0
+            )
+            if shadow_image:
+                shadow_id = c.create_image(
+                    x1 - offset,
+                    y1 - offset,
+                    image=shadow_image,
+                    anchor="nw",
+                    tags=(f"scene-node-{idx}", "scene-node-shadow"),
+                )
+                c.tag_lower(shadow_id)
+                self._image_refs[f"shadow-{idx}"] = shadow_image
+
+            bg = "#1f2a40" if idx == self.selected_index else "#151e30"
+            border = "#6ab2ff" if idx == self.selected_index else "#273750"
+            card_id = c.create_rectangle(
+                x1,
+                y1,
+                x2,
+                y2,
+                fill=bg,
+                outline=border,
+                width=3,
+                tags=(f"scene-node-{idx}", "scene-node"),
+            )
+            c.tag_raise(card_id)
             title = scene.get("Title") or f"Scene {idx + 1}"
-            c.create_text(x1 + 14, y1 + 18, text=title, anchor="nw", fill="#ffffff", font=("Segoe UI", 13, "bold"))
+            c.create_text(
+                x1 + 14,
+                y1 + 18,
+                text=title,
+                anchor="nw",
+                fill="#f8fafc",
+                font=("Segoe UI", 13, "bold"),
+                tags=(f"scene-node-{idx}", "scene-node"),
+            )
             summary = scene.get("Summary") or scene.get("Text") or ""
             summary = " ".join(summary.split())[:160]
             c.create_text(
@@ -396,9 +447,10 @@ class SceneCanvas(ctk.CTkFrame):
                 y1 + 48,
                 text=summary,
                 anchor="nw",
-                fill="#b7c4e3",
+                fill="#c5d4f5",
                 font=("Segoe UI", 10),
                 width=self.CARD_W - 28,
+                tags=(f"scene-node-{idx}", "scene-node"),
             )
             self._regions.append((x1, y1, x2, y2, idx))
 
@@ -465,6 +517,7 @@ class ScenesPlanningStep(WizardStep):
         self.scenes = []
         self.selected_index = None
         self._updating = False
+        self._detail_panel_visible = True
 
         self.scenario_title_var = ctk.StringVar()
         self.scene_title_var = ctk.StringVar()
@@ -480,6 +533,15 @@ class ScenesPlanningStep(WizardStep):
         toolbar.grid(row=0, column=0, sticky="ew", padx=12, pady=(12, 6))
         toolbar.grid_columnconfigure(0, weight=1)
         ctk.CTkLabel(toolbar, text="Scenario Title", font=ctk.CTkFont(size=15, weight="bold")).grid(row=0, column=0, sticky="w", padx=16, pady=(12, 4))
+        self.detail_toggle = ctk.CTkSwitch(
+            toolbar,
+            text="Show Details",
+            command=self._toggle_detail_panel,
+            onvalue=True,
+            offvalue=False,
+        )
+        self.detail_toggle.grid(row=0, column=1, sticky="e", padx=(0, 16), pady=(12, 0))
+        self.detail_toggle.select()
         self.scenario_title_entry = ctk.CTkEntry(toolbar, textvariable=self.scenario_title_var, font=ctk.CTkFont(size=18, weight="bold"))
         self.scenario_title_entry.grid(row=1, column=0, sticky="ew", padx=16)
         btn_row = ctk.CTkFrame(toolbar, fg_color="transparent")
@@ -496,6 +558,7 @@ class ScenesPlanningStep(WizardStep):
         main.grid_columnconfigure(0, weight=1)
         main.grid_columnconfigure(1, weight=0, minsize=580)
         main.grid_rowconfigure(0, weight=1)
+        self._main_frame = main
 
         self.canvas = SceneCanvas(main, on_select=self._on_canvas_select, on_move=self._on_canvas_move)
         self.canvas.grid(row=0, column=0, sticky="nsew")
@@ -624,6 +687,32 @@ class ScenesPlanningStep(WizardStep):
             row_index += 1
         self.scene_title_var.trace_add("write", self._on_scene_title_change)
         self._refresh_link_list()
+
+    def _toggle_detail_panel(self, *_args) -> None:
+        if getattr(self.detail_toggle, "get", lambda: True)():
+            self._show_detail_panel()
+        else:
+            self._hide_detail_panel()
+
+    def _show_detail_panel(self) -> None:
+        if self._detail_panel_visible:
+            return
+        self.canvas.grid(row=0, column=0, columnspan=1, sticky="nsew")
+        self.detail_panel.grid(row=0, column=1, sticky="nsew", padx=(12, 0))
+        if hasattr(self, "_main_frame"):
+            self._main_frame.grid_columnconfigure(1, weight=0, minsize=580)
+        self._detail_panel_visible = True
+        self.canvas._draw()
+
+    def _hide_detail_panel(self) -> None:
+        if not self._detail_panel_visible:
+            return
+        self.detail_panel.grid_remove()
+        self.canvas.grid(row=0, column=0, columnspan=2, sticky="nsew")
+        if hasattr(self, "_main_frame"):
+            self._main_frame.grid_columnconfigure(1, weight=0, minsize=0)
+        self._detail_panel_visible = False
+        self.canvas._draw()
 
     # ------------------------------------------------------------------
     # Scene interactions
