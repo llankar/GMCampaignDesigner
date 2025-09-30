@@ -1105,28 +1105,21 @@ class ScenarioBuilderWizard(ctk.CTkToplevel):
             "Objects": list(dict.fromkeys(self.state.get("Objects", []))),
         }
 
-        items = self.scenario_wrapper.load_items()
-        replaced = False
-        for idx, existing in enumerate(items):
-            if existing.get("Title") == title:
-                if not messagebox.askyesno(
-                    "Overwrite Scenario",
-                    f"A scenario titled '{title}' already exists. Overwrite it?",
-                ):
-                    return
-                items[idx] = payload
-                replaced = True
-                break
-
-        if not replaced:
-            items.append(payload)
+        existing = self.scenario_wrapper.get_item_by_field("Title", title)
+        replaced = existing is not None
+        if replaced:
+            if not messagebox.askyesno(
+                "Overwrite Scenario",
+                f"A scenario titled '{title}' already exists. Overwrite it?",
+            ):
+                return
 
         log_info(
             f"Saving scenario '{title}' via builder wizard (replaced={replaced})",
             func_name="ScenarioBuilderWizard.finish",
         )
 
-        self.scenario_wrapper.save_items(items)
+        self.scenario_wrapper.upsert_item(payload)
         messagebox.showinfo("Scenario Saved", f"Scenario '{title}' has been saved.")
         if callable(self.on_saved):
             try:

@@ -11,28 +11,46 @@ class GenericModelWrapper:
         # Assume your table name is the same as the entity type (e.g., "npcs")
         self.table = entity_type  
 
+    def _decode_row(self, row):
+        item = {}
+        for key in row.keys():
+            value = row[key]
+            # Decode only likely JSON: starts with {, [, or "
+            if isinstance(value, str) and value.strip().startswith(("{", "[", "\"")):
+                try:
+                    item[key] = json.loads(value)
+                except (TypeError, json.JSONDecodeError):
+                    item[key] = value
+            else:
+                item[key] = value
+        return item
+
     def load_items(self):
         conn = get_connection()
         conn.row_factory = sqlite3.Row  # This makes rows behave like dictionaries.
         cursor = conn.cursor()
         cursor.execute(f"SELECT * FROM {self.table}")
         rows = cursor.fetchall()
-        items = []
-        for row in rows:
-            item = {}
-            for key in row.keys():
-                value = row[key]
-                # Decode only likely JSON: starts with {, [, or "
-                if isinstance(value, str) and value.strip().startswith(("{", "[", "\"")):
-                    try:
-                        item[key] = json.loads(value)
-                    except (TypeError, json.JSONDecodeError):
-                        item[key] = value
-                else:
-                    item[key] = value
-            items.append(item)
+        items = [self._decode_row(row) for row in rows]
         conn.close()
         return items
+
+    def get_item_by_field(self, field, value):
+        if not field.replace("_", "").isalnum():
+            raise ValueError("Field name must be alphanumeric or underscore-only.")
+
+        conn = get_connection()
+        conn.row_factory = sqlite3.Row
+        cursor = conn.cursor()
+        cursor.execute(
+            f"SELECT * FROM {self.table} WHERE {field} = ? LIMIT 1",
+            (value,),
+        )
+        row = cursor.fetchone()
+        conn.close()
+        if row is None:
+            return None
+        return self._decode_row(row)
 
 
     def _ensure_schema(self, cursor, items):
@@ -75,6 +93,17 @@ class GenericModelWrapper:
 
         return existing_columns
 
+    def _determine_unique_field(self, sample_item):
+        if not sample_item:
+            return "Name"
+
+        preferred = ("Name", "Title", "id", "ID", "uuid", "UUID")
+        for candidate in preferred:
+            if candidate in sample_item:
+                return candidate
+
+        return next(iter(sample_item.keys()))
+
     def save_items(self, items):
         conn = get_connection()
         conn.execute("PRAGMA busy_timeout = 5000")
@@ -86,12 +115,7 @@ class GenericModelWrapper:
             # Détermine le champ unique à utiliser
             if items:
                 sample_item = items[0]
-                if "Name" in sample_item:
-                    unique_field = "Name"
-                elif "Title" in sample_item:
-                    unique_field = "Title"
-                else:
-                    unique_field = list(sample_item.keys())[0]
+                unique_field = self._determine_unique_field(sample_item)
             else:
                 unique_field = "Name"  # Valeur par défaut si la liste est vide
 
@@ -123,6 +147,42 @@ class GenericModelWrapper:
                 delete_sql = f"DELETE FROM {self.table}"
                 cursor.execute(delete_sql)
 
+            conn.commit()
+        finally:
+            conn.close()
+
+    def upsert_item(self, item):
+        if not item:
+            raise ValueError("Cannot upsert an empty item.")
+
+        conn = get_connection()
+        conn.execute("PRAGMA busy_timeout = 5000")
+        cursor = conn.cursor()
+
+        try:
+            existing_columns = self._ensure_schema(cursor, [item])
+            unique_field = self._determine_unique_field(item)
+
+            if unique_field not in item:
+                raise KeyError(
+                    f"Unique field '{unique_field}' is required in item for upsert."
+                )
+
+            keys = [key for key in item.keys() if key in existing_columns]
+            values = []
+            for key in keys:
+                val = item[key]
+                if isinstance(val, (list, dict)):
+                    val = json.dumps(val)
+                values.append(val)
+
+            if not keys:
+                raise ValueError("Item does not contain any known columns to upsert.")
+
+            placeholders = ", ".join("?" for _ in keys)
+            cols = ", ".join(keys)
+            sql = f"INSERT OR REPLACE INTO {self.table} ({cols}) VALUES ({placeholders})"
+            cursor.execute(sql, values)
             conn.commit()
         finally:
             conn.close()
