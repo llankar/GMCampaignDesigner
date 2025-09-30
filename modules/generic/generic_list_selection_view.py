@@ -105,13 +105,23 @@ class GenericListSelectionView(ctk.CTkFrame):
         # --- Center the window if master is a Toplevel ---
         if isinstance(self.master, tk.Toplevel):
             self.master.update_idletasks()
+
             width = self.master.winfo_width()
             height = self.master.winfo_height()
+
+            # When the toplevel is freshly created Tk often reports a size of 1x1.
+            # Fall back to the requested size (or a sensible default) so that the
+            # geometry we apply keeps the selection view large enough to read.
+            if width <= 1:
+                width = max(self.master.winfo_reqwidth(), 900)
+            if height <= 1:
+                height = max(self.master.winfo_reqheight(), 600)
+
             screen_width = self.master.winfo_screenwidth()
             screen_height = self.master.winfo_screenheight()
-            x = (screen_width - width) // 2
-            y = (screen_height - height) // 2
-            self.master.geometry(f"{width}x{height}+{x}+{y}")
+            x = max((screen_width - width) // 2, 0)
+            y = max((screen_height - height) // 2, 0)
+            self.master.geometry(f"{int(width)}x{int(height)}+{x}+{y}")
     def refresh_list(self):
         self.tree.delete(*self.tree.get_children())
         for item in self.filtered_items:
