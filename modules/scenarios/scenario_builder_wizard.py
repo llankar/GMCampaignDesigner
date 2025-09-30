@@ -309,10 +309,12 @@ class SceneCanvas(ctk.CTkFrame):
     CARD_W = 240
     CARD_H = 150
 
-    def __init__(self, master, on_select=None, on_move=None):
+    def __init__(self, master, on_select=None, on_move=None, on_edit=None, on_context=None):
         super().__init__(master, corner_radius=16, fg_color=SCENE_FLOW_BG)
         self.on_select = on_select
         self.on_move = on_move
+        self.on_edit = on_edit
+        self.on_context = on_context
         self.scenes = []
         self.selected_index = None
         self._drag_index = None
@@ -332,6 +334,8 @@ class SceneCanvas(ctk.CTkFrame):
         self.canvas.bind("<Button-1>", self._on_click)
         self.canvas.bind("<B1-Motion>", self._on_drag)
         self.canvas.bind("<ButtonRelease-1>", self._on_release)
+        self.canvas.bind("<Double-Button-1>", self._on_double_click)
+        self.canvas.bind("<Button-3>", self._on_right_click)
 
     def set_scenes(self, scenes, selected_index=None):
         self.scenes = scenes or []
@@ -508,26 +512,36 @@ class SceneCanvas(ctk.CTkFrame):
             )
             self._regions.append((x1, y1, x2, y2, idx))
 
-    def _on_click(self, event):
+    def _hit_test(self, x, y):
         for x1, y1, x2, y2, idx in reversed(self._regions):
-            if x1 <= event.x <= x2 and y1 <= event.y <= y2:
+            if x1 <= x <= x2 and y1 <= y <= y2:
+                return idx
+        return None
+
+    def _select_index(self, idx, redraw_on_none=True):
+        if self.selected_index != idx:
+            self.selected_index = idx
+            if callable(self.on_select):
+                self.on_select(idx)
+            elif redraw_on_none:
+                self._draw()
+        elif idx is None and redraw_on_none:
+            self._draw()
+
+    def _on_click(self, event):
+        idx = self._hit_test(event.x, event.y)
+        if idx is not None:
+            region = next((r for r in self._regions if r[4] == idx), None)
+            if region:
+                x1, y1, x2, y2, _ = region
                 self._drag_index = idx
                 layout = self.scenes[idx].setdefault("_canvas", {})
                 layout.setdefault("x", (x1 + x2) / 2)
                 layout.setdefault("y", (y1 + y2) / 2)
                 self._drag_offset = (event.x - layout["x"], event.y - layout["y"])
-                if self.selected_index != idx:
-                    self.selected_index = idx
-                    if callable(self.on_select):
-                        self.on_select(idx)
-                    else:
-                        self._draw()
-                return
-        self.selected_index = None
-        if callable(self.on_select):
-            self.on_select(None)
         else:
-            self._draw()
+            self._drag_index = None
+        self._select_index(idx)
 
     def _on_drag(self, event):
         if self._drag_index is None:
@@ -544,6 +558,22 @@ class SceneCanvas(ctk.CTkFrame):
         if callable(self.on_move):
             self.on_move(self._drag_index, layout.get("x"), layout.get("y"))
         self._drag_index = None
+
+    def _on_double_click(self, event):
+        idx = self._hit_test(event.x, event.y)
+        if idx is not None:
+            self._select_index(idx)
+            if callable(self.on_edit):
+                self.on_edit(idx)
+
+    def _on_right_click(self, event):
+        idx = self._hit_test(event.x, event.y)
+        if idx is not None:
+            self._select_index(idx, redraw_on_none=False)
+        else:
+            self._select_index(None, redraw_on_none=False)
+        if callable(self.on_context):
+            self.on_context(event, idx)
 
 
 class ScenesPlanningStep(WizardStep):
@@ -570,13 +600,10 @@ class ScenesPlanningStep(WizardStep):
         self.entity_wrappers = entity_wrappers or {}
         self.scenes = []
         self.selected_index = None
-        self._updating = False
-        self._detail_panel_visible = True
+        self._scenario_summary = ""
+        self._scenario_secrets = ""
 
         self.scenario_title_var = ctk.StringVar()
-        self.scene_title_var = ctk.StringVar()
-        self.scene_type_var = ctk.StringVar(value=self.SCENE_TYPES[0])
-        self.link_var = ctk.StringVar()
 
         root = ctk.CTkFrame(self, fg_color="transparent")
         root.pack(fill="both", expand=True)
@@ -586,325 +613,54 @@ class ScenesPlanningStep(WizardStep):
         toolbar = ctk.CTkFrame(root, fg_color="#101827", corner_radius=14)
         toolbar.grid(row=0, column=0, sticky="ew", padx=12, pady=(12, 6))
         toolbar.grid_columnconfigure(0, weight=1)
-        ctk.CTkLabel(toolbar, text="Scenario Title", font=ctk.CTkFont(size=15, weight="bold")).grid(row=0, column=0, sticky="w", padx=16, pady=(12, 4))
-        self.detail_toggle = ctk.CTkSwitch(
-            toolbar,
-            text="Show Details",
-            command=self._toggle_detail_panel,
-            onvalue=True,
-            offvalue=False,
+        ctk.CTkLabel(toolbar, text="Scenario Title", font=ctk.CTkFont(size=15, weight="bold")).grid(
+            row=0, column=0, sticky="w", padx=16, pady=(12, 4)
         )
-        self.detail_toggle.grid(row=0, column=1, sticky="e", padx=(0, 16), pady=(12, 0))
-        self.detail_toggle.select()
-        self.scenario_title_entry = ctk.CTkEntry(toolbar, textvariable=self.scenario_title_var, font=ctk.CTkFont(size=18, weight="bold"))
+        self.scenario_title_entry = ctk.CTkEntry(
+            toolbar, textvariable=self.scenario_title_var, font=ctk.CTkFont(size=18, weight="bold")
+        )
         self.scenario_title_entry.grid(row=1, column=0, sticky="ew", padx=16)
+
         btn_row = ctk.CTkFrame(toolbar, fg_color="transparent")
         btn_row.grid(row=1, column=1, padx=16, pady=(0, 12))
+        self.notes_btn = ctk.CTkButton(btn_row, text="Edit Notes", command=self._edit_scenario_info)
+        self.notes_btn.pack(side="left")
         self.add_scene_btn = ctk.CTkButton(btn_row, text="Add Scene", command=self.add_scene)
-        self.add_scene_btn.pack(side="left")
+        self.add_scene_btn.pack(side="left", padx=(6, 0))
         self.dup_scene_btn = ctk.CTkButton(btn_row, text="Duplicate", command=self.duplicate_scene)
         self.dup_scene_btn.pack(side="left", padx=6)
         self.remove_scene_btn = ctk.CTkButton(btn_row, text="Remove", command=self.remove_scene)
         self.remove_scene_btn.pack(side="left")
 
+        ctk.CTkLabel(
+            toolbar,
+            text="Double-click a scene card to edit its details or right-click for more actions.",
+            text_color="#9db4d1",
+            wraplength=420,
+            justify="left",
+        ).grid(row=2, column=0, columnspan=2, sticky="w", padx=16, pady=(0, 10))
+
         main = ctk.CTkFrame(root, fg_color="transparent")
         main.grid(row=1, column=0, sticky="nsew", padx=12, pady=(0, 12))
         main.grid_columnconfigure(0, weight=1)
-        main.grid_columnconfigure(1, weight=0, minsize=580)
         main.grid_rowconfigure(0, weight=1)
         self._main_frame = main
 
-        self.canvas = SceneCanvas(main, on_select=self._on_canvas_select, on_move=self._on_canvas_move)
+        self.canvas = SceneCanvas(
+            main,
+            on_select=self._on_canvas_select,
+            on_move=self._on_canvas_move,
+            on_edit=self._edit_scene_via_canvas,
+            on_context=self._show_canvas_menu,
+        )
         self.canvas.grid(row=0, column=0, sticky="nsew")
-
-        self.detail_panel = ctk.CTkFrame(main, width=580, fg_color="#101827", corner_radius=16)
-        self.detail_panel.grid(row=0, column=1, sticky="nsew", padx=(12, 0))
-        self.detail_panel.grid_rowconfigure(1, weight=0)
-        self.detail_panel.grid_rowconfigure(3, weight=0)
-        self.detail_panel.grid_rowconfigure(4, weight=1)
-        self.detail_panel.grid_columnconfigure(0, weight=1)
-
-        ctk.CTkLabel(self.detail_panel, text="Scenario Overview", font=ctk.CTkFont(size=15, weight="bold")).grid(row=0, column=0, sticky="w", padx=18, pady=(18, 6))
-        self.scenario_summary = ctk.CTkTextbox(self.detail_panel, height=120, wrap="word")
-        self.scenario_summary.grid(row=1, column=0, sticky="nsew", padx=18)
-        ctk.CTkLabel(self.detail_panel, text="Secrets", font=ctk.CTkFont(size=15, weight="bold")).grid(row=2, column=0, sticky="w", padx=18, pady=(12, 4))
-        self.scenario_secrets = ctk.CTkTextbox(self.detail_panel, height=110, wrap="word")
-        self.scenario_secrets.grid(row=3, column=0, sticky="nsew", padx=18)
-
-        self.scene_section = ctk.CTkScrollableFrame(
-            self.detail_panel,
-            fg_color="#0f1624",
-            corner_radius=14,
-        )
-        self.scene_section.grid(row=4, column=0, sticky="nsew", padx=18, pady=(18, 18))
-        self.scene_section.grid_columnconfigure(0, weight=1)
-
-        ctk.CTkLabel(self.scene_section, text="Selected Scene", font=ctk.CTkFont(size=15, weight="bold")).grid(row=0, column=0, sticky="w", padx=14, pady=(14, 4))
-        self.scene_title_entry = ctk.CTkEntry(self.scene_section, textvariable=self.scene_title_var)
-        self.scene_title_entry.grid(row=1, column=0, sticky="ew", padx=14)
-        ctk.CTkLabel(self.scene_section, text="Scene Type", anchor="w").grid(row=2, column=0, sticky="ew", padx=14, pady=(8, 2))
-        self.scene_type_menu = ctk.CTkOptionMenu(self.scene_section, variable=self.scene_type_var, values=self.SCENE_TYPES, command=self._on_scene_type_change)
-        self.scene_type_menu.grid(row=3, column=0, sticky="w", padx=14)
-        ctk.CTkLabel(self.scene_section, text="Summary", anchor="w").grid(row=4, column=0, sticky="ew", padx=14, pady=(10, 2))
-        self.scene_summary = ctk.CTkTextbox(self.scene_section, height=120, wrap="word")
-        self.scene_summary.grid(row=5, column=0, sticky="ew", padx=14)
-
-        ctk.CTkLabel(self.scene_section, text="Next Scenes", anchor="w").grid(row=6, column=0, sticky="ew", padx=14, pady=(12, 2))
-        link_container = ctk.CTkFrame(self.scene_section, fg_color="transparent")
-        link_container.grid(row=7, column=0, sticky="nsew", padx=14)
-        link_container.grid_columnconfigure(0, weight=1)
-        link_container.grid_rowconfigure(0, weight=1)
-        self.link_list = tk.Listbox(
-            link_container,
-            activestyle="none",
-            exportselection=False,
-            height=6,
-            selectmode="extended",
-            highlightthickness=0,
-            relief="flat",
-            bg="#101827",
-            fg="#FFFFFF",
-            selectbackground="#1f3b67",
-            selectforeground="#FFFFFF",
-        )
-        self.link_list.grid(row=0, column=0, sticky="nsew")
-        link_scroll = tk.Scrollbar(link_container, orient="vertical", command=self.link_list.yview)
-        link_scroll.grid(row=0, column=1, sticky="ns", padx=(4, 0))
-        self.link_list.configure(yscrollcommand=link_scroll.set)
-        self.link_list.bind("<<ListboxSelect>>", self._on_link_selected)
-
-        link_row = ctk.CTkFrame(self.scene_section, fg_color="transparent")
-        link_row.grid(row=8, column=0, sticky="ew", padx=14, pady=(6, 0))
-        link_row.grid_columnconfigure(0, weight=1)
-        link_row.grid_columnconfigure(1, weight=1)
-        self.link_combo = ctk.CTkComboBox(link_row, variable=self.link_var, values=[])
-        self.link_combo.grid(row=0, column=0, sticky="ew")
-        self.link_label_entry = ctk.CTkEntry(link_row, placeholder_text="Link text")
-        self.link_label_entry.grid(row=0, column=1, sticky="ew", padx=(6, 0))
-        ctk.CTkButton(link_row, text="Add", width=80, command=self._add_link).grid(row=0, column=2, padx=(6, 0))
-        ctk.CTkButton(link_row, text="Update", width=90, command=self._update_link_label).grid(row=0, column=3, padx=(6, 0))
-
-        ctk.CTkButton(self.scene_section, text="Remove Selected", command=self._remove_link).grid(row=9, column=0, sticky="w", padx=14, pady=(6, 0))
-
-        self.entity_listboxes = {}
-        row_index = 10
-        for field, (entity_key, label, singular) in self.ENTITY_FIELDS.items():
-            ctk.CTkLabel(self.scene_section, text=label, anchor="w").grid(row=row_index, column=0, sticky="ew", padx=14, pady=(12, 2))
-            row_index += 1
-            self.scene_section.grid_rowconfigure(row_index, weight=1)
-
-            list_container = ctk.CTkFrame(self.scene_section, fg_color="transparent")
-            list_container.grid(row=row_index, column=0, sticky="nsew", padx=14)
-            list_container.grid_columnconfigure(0, weight=1)
-            list_container.grid_rowconfigure(0, weight=1)
-
-            listbox = tk.Listbox(
-                list_container,
-                activestyle="none",
-                exportselection=False,
-                height=6,
-                highlightthickness=0,
-                relief="flat",
-                selectmode="extended",
-                bg="#101827",
-                fg="#FFFFFF",
-                selectbackground="#1f3b67",
-                selectforeground="#FFFFFF",
-            )
-            listbox.grid(row=0, column=0, sticky="nsew")
-            scrollbar = tk.Scrollbar(list_container, orient="vertical", command=listbox.yview)
-            scrollbar.grid(row=0, column=1, sticky="ns", padx=(4, 0))
-            listbox.configure(yscrollcommand=scrollbar.set)
-            self.entity_listboxes[field] = listbox
-
-            row_index += 1
-            control = ctk.CTkFrame(self.scene_section, fg_color="transparent")
-            control.grid(row=row_index, column=0, sticky="ew", padx=14, pady=(6, 0))
-            control.grid_columnconfigure((0, 1, 2), weight=1)
-
-            ctk.CTkButton(
-                control,
-                text=f"Add {singular}",
-                command=lambda f=field, lab=singular: self.open_entity_selector(f, lab),
-            ).grid(row=0, column=0, sticky="ew", padx=(0, 6))
-            ctk.CTkButton(
-                control,
-                text="Create New",
-                command=lambda f=field, et=entity_key, lab=singular: self.create_new_entity(et, f, lab),
-            ).grid(row=0, column=1, sticky="ew", padx=(0, 6))
-            ctk.CTkButton(
-                control,
-                text="Remove Selected",
-                command=lambda f=field: self._remove_entity(f),
-            ).grid(row=0, column=2, sticky="ew")
-
-            row_index += 1
-        self.scene_title_var.trace_add("write", self._on_scene_title_change)
-        self._refresh_link_list()
-
-    def _toggle_detail_panel(self, *_args) -> None:
-        if getattr(self.detail_toggle, "get", lambda: True)():
-            self._show_detail_panel()
-        else:
-            self._hide_detail_panel()
-
-    def _show_detail_panel(self) -> None:
-        if self._detail_panel_visible:
-            return
-        self.canvas.grid(row=0, column=0, columnspan=1, sticky="nsew")
-        self.detail_panel.grid(row=0, column=1, sticky="nsew", padx=(12, 0))
-        if hasattr(self, "_main_frame"):
-            self._main_frame.grid_columnconfigure(1, weight=0, minsize=580)
-        self._detail_panel_visible = True
-        self.canvas._draw()
-
-    def _hide_detail_panel(self) -> None:
-        if not self._detail_panel_visible:
-            return
-        self.detail_panel.grid_remove()
-        self.canvas.grid(row=0, column=0, columnspan=2, sticky="nsew")
-        if hasattr(self, "_main_frame"):
-            self._main_frame.grid_columnconfigure(1, weight=0, minsize=0)
-        self._detail_panel_visible = False
-        self.canvas._draw()
-
-    # ------------------------------------------------------------------
-    # Scene interactions
-    # ------------------------------------------------------------------
-    def _save_current_scene(self):
-        if self.selected_index is None or self.selected_index >= len(self.scenes):
-            return
-        scene = self.scenes[self.selected_index]
-        scene["Title"] = self.scene_title_var.get().strip()
-        selected_type = self.scene_type_var.get()
-        scene["SceneType"] = "" if selected_type == self.SCENE_TYPES[0] else selected_type
-        summary = self.scene_summary.get("1.0", "end").strip()
-        scene["Summary"] = summary
-        if summary and not scene.get("Text"):
-            scene["Text"] = summary
-        links = self._get_scene_links(scene)
-        scene["LinkData"] = links
-        scene["NextScenes"] = [link["target"] for link in links]
-
-    def _load_scene(self, index):
-        self._updating = True
-        if index is None or index >= len(self.scenes):
-            self.scene_title_var.set("")
-            self.scene_type_var.set(self.SCENE_TYPES[0])
-            self.scene_summary.delete("1.0", "end")
-            self._refresh_entity_views()
-            self._refresh_link_options()
-            self._updating = False
-            return
-        scene = self.scenes[index]
-        self.scene_title_var.set(scene.get("Title", ""))
-        scene_type = scene.get("SceneType") or self.SCENE_TYPES[0]
-        if scene_type not in self.SCENE_TYPES:
-            scene_type = self.SCENE_TYPES[0]
-        self.scene_type_var.set(scene_type)
-        self.scene_summary.delete("1.0", "end")
-        self.scene_summary.insert("1.0", scene.get("Summary", ""))
-        self._refresh_entity_views()
-        self._refresh_link_options()
-        self._updating = False
-
-
-    def _refresh_entity_views(self):
-        if self.selected_index is None or self.selected_index >= len(self.scenes):
-            for listbox in self.entity_listboxes.values():
-                listbox.configure(state="normal")
-                listbox.delete(0, tk.END)
-                listbox.configure(state="disabled")
-            self._refresh_link_list()
-            return
-
-        scene = self.scenes[self.selected_index]
-        for field, listbox in self.entity_listboxes.items():
-            values = scene.get(field, [])
-            listbox.configure(state="normal")
-            listbox.delete(0, tk.END)
-            for name in values:
-                listbox.insert(tk.END, name)
-            if values:
-                listbox.configure(state="normal")
-            else:
-                listbox.configure(state="disabled")
-        self._refresh_link_list()
-
-    def _refresh_link_list(self):
-        self.link_list.delete(0, tk.END)
-        if self.selected_index is None or self.selected_index >= len(self.scenes):
-            self.link_list.configure(state="disabled")
-            if hasattr(self, 'link_label_entry'):
-                self.link_label_entry.delete(0, tk.END)
-            return
-
-        scene = self.scenes[self.selected_index]
-        links = self._get_scene_links(scene)
-        self.link_list.configure(state="normal")
-        self.link_label_entry.delete(0, tk.END)
-        for link in links:
-            target = link.get("target") or ""
-            label = link.get("text") or target
-            display = label if label == target else f"{label} -> {target}"
-            self.link_list.insert(tk.END, display)
-        self.link_list.selection_clear(0, tk.END)
 
     def _get_scene_links(self, scene):
         return normalise_scene_links(scene, self._split_to_list)
 
-    def _on_link_selected(self, _event=None):
-        if self.selected_index is None or self.selected_index >= len(self.scenes):
-            return
-        selection = self.link_list.curselection()
-        if not selection:
-            return
-        links = self._get_scene_links(self.scenes[self.selected_index])
-        idx = selection[0]
-        if 0 <= idx < len(links):
-            label = links[idx].get("text") or links[idx].get("target")
-            self.link_label_entry.delete(0, tk.END)
-            self.link_label_entry.insert(0, label)
-
-    def _update_link_label(self):
-        if self.selected_index is None or self.selected_index >= len(self.scenes):
-            return
-        selection = self.link_list.curselection()
-        if not selection:
-            return
-        label = self.link_label_entry.get().strip()
-        scene = self.scenes[self.selected_index]
-        links = self._get_scene_links(scene)
-        if not label:
-            label = None
-        for idx in selection:
-            if 0 <= idx < len(links):
-                links[idx]["text"] = label or links[idx]["target"]
-        scene["LinkData"] = links
-        scene["NextScenes"] = [link["target"] for link in links]
-        self._refresh_link_list()
-        self._refresh_canvas()
-
-    def _refresh_link_options(self):
-        options = []
-        for idx, scene in enumerate(self.scenes):
-            title = scene.get("Title") or f"Scene {idx + 1}"
-            if idx != self.selected_index:
-                options.append(title)
-        current = (self.link_var.get() or "").strip()
-        self.link_combo.configure(values=options)
-        if current in options:
-            self.link_combo.set(current)
-        elif options:
-            self.link_combo.set(options[0])
-        else:
-            self.link_combo.set("")
-
     def _on_canvas_select(self, index):
-        self._save_current_scene()
         self.selected_index = index
         self.canvas.set_scenes(self.scenes, index)
-        self._load_scene(index)
         self._update_buttons()
 
     def _on_canvas_move(self, index, x, y):
@@ -914,90 +670,193 @@ class ScenesPlanningStep(WizardStep):
         layout["x"] = x
         layout["y"] = y
 
-    def _on_scene_title_change(self, *_):
-        if self._updating or self.selected_index is None or self.selected_index >= len(self.scenes):
-            return
-        self.scenes[self.selected_index]["Title"] = self.scene_title_var.get().strip()
-        self._refresh_link_options()
-        self.canvas.set_scenes(self.scenes, self.selected_index)
+    def _edit_scenario_info(self):
+        dialog = ScenarioInfoDialog(
+            self.winfo_toplevel(),
+            title=self.scenario_title_var.get().strip() or "Scenario Notes",
+            summary=self._scenario_summary,
+            secrets=self._scenario_secrets,
+        )
+        self.wait_window(dialog)
+        if dialog.result:
+            self._scenario_summary = dialog.result.get("summary", "")
+            self._scenario_secrets = dialog.result.get("secrets", "")
 
-    def _on_scene_type_change(self, value):
-        if self._updating or self.selected_index is None or self.selected_index >= len(self.scenes):
+    def _edit_scene_via_canvas(self, index):
+        if index is None or index >= len(self.scenes):
             return
-        scene = self.scenes[self.selected_index]
-        scene["SceneType"] = "" if value == self.SCENE_TYPES[0] else value
-        self.canvas.set_scenes(self.scenes, self.selected_index)
+        self._open_scene_editor(index)
 
-    def _add_link(self):
-        if self.selected_index is None or self.selected_index >= len(self.scenes):
+    def _open_scene_editor(self, index):
+        scene = self.scenes[index]
+        dialog = SceneEditorDialog(
+            self.winfo_toplevel(),
+            scene,
+            scene_types=self.SCENE_TYPES,
+            entity_fields=self.ENTITY_FIELDS,
+            link_targets=[
+                self.scenes[i].get("Title") or f"Scene {i + 1}"
+                for i in range(len(self.scenes))
+                if i != index
+            ],
+            choose_entity_callback=self._choose_entity_from_library,
+            create_entity_callback=self._create_entity_in_library,
+        )
+        self.wait_window(dialog)
+        if not dialog.result:
             return
-        target = (self.link_var.get() or "").strip()
-        if not target:
+
+        updated_scene = dialog.result
+        layout = scene.get("_canvas", {}).copy()
+        updated_scene.setdefault("_canvas", {}).update(layout)
+        self.scenes[index] = updated_scene
+        self.canvas.set_scenes(self.scenes, self.selected_index)
+        self._update_buttons()
+
+    def _show_canvas_menu(self, event, index):
+        if index is None:
+            self._show_background_menu(event)
+        else:
+            self._show_scene_menu(event, index)
+
+    def _show_background_menu(self, event):
+        menu = tk.Menu(self, tearoff=0)
+        menu.add_command(label="Add Scene", command=self.add_scene)
+        menu.add_command(label="Edit Scenario Notes", command=self._edit_scenario_info)
+        try:
+            menu.tk_popup(event.x_root, event.y_root)
+        finally:
+            menu.grab_release()
+
+    def _show_scene_menu(self, event, index):
+        self.selected_index = index
+        self.canvas.set_scenes(self.scenes, index)
+        self._update_buttons()
+
+        menu = tk.Menu(self, tearoff=0)
+        menu.add_command(label="Edit Scene…", command=lambda idx=index: self._open_scene_editor(idx))
+        menu.add_separator()
+        menu.add_command(label="Duplicate Scene", command=lambda idx=index: self.duplicate_scene(idx))
+        menu.add_command(label="Remove Scene", command=lambda idx=index: self.remove_scene(idx))
+
+        link_targets = [
+            (i, self.scenes[i].get("Title") or f"Scene {i + 1}")
+            for i in range(len(self.scenes))
+            if i != index
+        ]
+        add_menu = tk.Menu(menu, tearoff=0)
+        for target_idx, title in link_targets:
+            add_menu.add_command(
+                label=title,
+                command=lambda t=title, idx=index: self._add_link_between(idx, t, label=t),
+            )
+        if link_targets:
+            menu.add_cascade(label="Add Link To", menu=add_menu)
+        else:
+            menu.add_command(label="Add Link To", state="disabled")
+
+        existing_links = self._get_scene_links(self.scenes[index])
+        if existing_links:
+            remove_menu = tk.Menu(menu, tearoff=0)
+            for link in existing_links:
+                target = link.get("target") or ""
+                label = link.get("text") or target
+                display = label if label == target else f"{label} → {target}"
+                remove_menu.add_command(
+                    label=display,
+                    command=lambda tgt=target, idx=index: self._remove_link_between(idx, tgt),
+                )
+            remove_menu.add_separator()
+            remove_menu.add_command(
+                label="Clear All", command=lambda idx=index: self._clear_links(idx)
+            )
+            menu.add_cascade(label="Remove Link", menu=remove_menu)
+        else:
+            menu.add_command(label="Remove Link", state="disabled")
+
+        try:
+            menu.tk_popup(event.x_root, event.y_root)
+        finally:
+            menu.grab_release()
+
+    def _add_link_between(self, source_index, target_title, label=None):
+        if source_index is None or source_index >= len(self.scenes):
             return
-        label = self.link_label_entry.get().strip() or target
-        scene = self.scenes[self.selected_index]
+        scene = self.scenes[source_index]
         links = self._get_scene_links(scene)
-        if any((link.get("target") == target and (link.get("text") or target) == label) for link in links):
+        if any(link.get("target") == target_title for link in links):
             return
-        links.append({"target": target, "text": label})
+        display_label = (label or target_title).strip() or target_title
+        links.append({"target": target_title, "text": display_label})
         scene["LinkData"] = links
         scene["NextScenes"] = [link["target"] for link in links]
-        self._refresh_link_list()
-        self._refresh_canvas()
-        self.link_label_entry.delete(0, tk.END)
+        self.canvas.set_scenes(self.scenes, self.selected_index)
 
-    def _remove_link(self):
-        if self.selected_index is None or self.selected_index >= len(self.scenes):
+    def _remove_link_between(self, source_index, target_title):
+        if source_index is None or source_index >= len(self.scenes):
             return
-        selection = self.link_list.curselection()
-        if not selection:
-            return
-        scene = self.scenes[self.selected_index]
-        links = self._get_scene_links(scene)
-        for index in reversed(selection):
-            if 0 <= index < len(links):
-                links.pop(index)
+        scene = self.scenes[source_index]
+        links = [link for link in self._get_scene_links(scene) if link.get("target") != target_title]
         scene["LinkData"] = links
         scene["NextScenes"] = [link["target"] for link in links]
-        self._refresh_link_list()
-        self._refresh_canvas()
+        self.canvas.set_scenes(self.scenes, self.selected_index)
 
+    def _clear_links(self, source_index):
+        if source_index is None or source_index >= len(self.scenes):
+            return
+        scene = self.scenes[source_index]
+        scene["LinkData"] = []
+        scene["NextScenes"] = []
+        self.canvas.set_scenes(self.scenes, self.selected_index)
 
-    def _remove_entity(self, field):
-        if self.selected_index is None or self.selected_index >= len(self.scenes):
-            return
-        listbox = self.entity_listboxes.get(field)
-        if not listbox:
-            return
-        selection = listbox.curselection()
-        if not selection:
-            return
-        entries = self.scenes[self.selected_index].get(field, [])
-        for index in reversed(selection):
-            if 0 <= index < len(entries):
-                entries.pop(index)
-        self._refresh_entity_views()
-        self._refresh_canvas()
-
-    def create_new_entity(self, entity_type, field, label):
-        if self.selected_index is None or self.selected_index >= len(self.scenes):
-            messagebox.showinfo("Select Scene", "Choose a scene card first.")
-            return
-
+    def _choose_entity_from_library(self, entity_type, singular_label):
         wrapper = self.entity_wrappers.get(entity_type)
         if not wrapper:
-            messagebox.showerror("Unavailable", f"No {label} data available for creation.")
-            return
-
+            messagebox.showerror("Unavailable", f"No {singular_label} library available")
+            return None
         try:
             template = load_template(entity_type)
         except Exception as exc:
             log_exception(
                 f"Failed to load template for {entity_type}: {exc}",
-                func_name="ScenesPlanningStep.create_new_entity",
+                func_name="ScenesPlanningStep._choose_entity_from_library",
             )
-            messagebox.showerror("Template Error", f"Unable to load the {label} template.")
-            return
+            messagebox.showerror("Template Error", f"Unable to load {singular_label} list")
+            return None
+
+        top = ctk.CTkToplevel(self)
+        top.title(f"Select {singular_label}")
+        top.geometry("1100x720")
+        top.minsize(1100, 720)
+        result = {"name": None}
+
+        view = GenericListSelectionView(
+            top,
+            entity_type,
+            wrapper,
+            template,
+            on_select_callback=lambda _et, name, win=top: (result.__setitem__("name", name), win.destroy()),
+        )
+        view.pack(fill="both", expand=True)
+        top.transient(self.winfo_toplevel())
+        top.grab_set()
+        self.wait_window(top)
+        return result["name"]
+
+    def _create_entity_in_library(self, entity_type, singular_label):
+        wrapper = self.entity_wrappers.get(entity_type)
+        if not wrapper:
+            messagebox.showerror("Unavailable", f"No {singular_label} data available for creation.")
+            return None
+        try:
+            template = load_template(entity_type)
+        except Exception as exc:
+            log_exception(
+                f"Failed to load template for {entity_type}: {exc}",
+                func_name="ScenesPlanningStep._create_entity_in_library",
+            )
+            messagebox.showerror("Template Error", f"Unable to load the {singular_label} template.")
+            return None
 
         new_item = {}
         editor = GenericEditorWindow(
@@ -1008,15 +867,13 @@ class ScenesPlanningStep(WizardStep):
             creation_mode=True,
         )
         self.wait_window(editor)
-
         if not getattr(editor, "saved", False):
-            return
+            return None
 
         try:
             items = wrapper.load_items()
         except Exception:
             items = []
-
         name = editor.item.get("Name") or editor.item.get("Title")
         replaced = False
         if name:
@@ -1028,26 +885,18 @@ class ScenesPlanningStep(WizardStep):
                     break
         if not replaced:
             items.append(editor.item)
-
         try:
             wrapper.save_items(items)
         except Exception as exc:
             log_exception(
                 f"Failed to save {entity_type}: {exc}",
-                func_name="ScenesPlanningStep.create_new_entity",
+                func_name="ScenesPlanningStep._create_entity_in_library",
             )
-            messagebox.showerror("Save Error", f"Unable to save the new {label}.")
-            return
-
-        if name:
-            entries = self.scenes[self.selected_index].setdefault(field, [])
-            if name not in entries:
-                entries.append(name)
-                self._refresh_entity_views()
-                self._refresh_canvas()
+            messagebox.showerror("Save Error", f"Unable to save the new {singular_label}.")
+            return None
+        return name
 
     def add_scene(self):
-        self._save_current_scene()
         scene = {
             "Title": f"Scene {len(self.scenes) + 1}",
             "Summary": "",
@@ -1062,29 +911,33 @@ class ScenesPlanningStep(WizardStep):
         self.scenes.append(scene)
         self.selected_index = len(self.scenes) - 1
         self.canvas.set_scenes(self.scenes, self.selected_index)
-        self._load_scene(self.selected_index)
         self._update_buttons()
+        self._open_scene_editor(self.selected_index)
 
-    def duplicate_scene(self):
-        if self.selected_index is None or self.selected_index >= len(self.scenes):
+    def duplicate_scene(self, index=None):
+        if index is None:
+            index = self.selected_index
+        if index is None or index >= len(self.scenes):
             return
-        self._save_current_scene()
-        source = copy.deepcopy(self.scenes[self.selected_index])
+        source = copy.deepcopy(self.scenes[index])
         source.pop("_canvas", None)
         dup = copy.deepcopy(source)
         dup["Title"] = self._unique_title(source.get("Title") or "Scene")
+        dup["_canvas"] = {}
         self._assign_default_position(dup)
-        insert_at = self.selected_index + 1
+        insert_at = index + 1
         self.scenes.insert(insert_at, dup)
         self.selected_index = insert_at
         self.canvas.set_scenes(self.scenes, self.selected_index)
-        self._load_scene(self.selected_index)
         self._update_buttons()
+        self._open_scene_editor(self.selected_index)
 
-    def remove_scene(self):
-        if self.selected_index is None or self.selected_index >= len(self.scenes):
+    def remove_scene(self, index=None):
+        if index is None:
+            index = self.selected_index
+        if index is None or index >= len(self.scenes):
             return
-        removed_scene = self.scenes.pop(self.selected_index)
+        removed_scene = self.scenes.pop(index)
         removed_title = (removed_scene.get("Title") or "").strip()
 
         for scene in self.scenes:
@@ -1096,20 +949,18 @@ class ScenesPlanningStep(WizardStep):
 
         if not self.scenes:
             self.selected_index = None
-        elif self.selected_index >= len(self.scenes):
+        elif index >= len(self.scenes):
             self.selected_index = len(self.scenes) - 1
+        else:
+            self.selected_index = index
 
         self.canvas.set_scenes(self.scenes, self.selected_index)
-        self._load_scene(self.selected_index)
         self._update_buttons()
 
     def _update_buttons(self):
         state = "normal" if self.selected_index is not None else "disabled"
         self.dup_scene_btn.configure(state=state)
         self.remove_scene_btn.configure(state=state)
-
-    def _refresh_canvas(self):
-        self.canvas.set_scenes(self.scenes, self.selected_index)
 
     def _assign_default_position(self, scene):
         layout = scene.setdefault("_canvas", {})
@@ -1127,57 +978,12 @@ class ScenesPlanningStep(WizardStep):
         return f"{base} ({counter})"
 
     # ------------------------------------------------------------------
-    # Entity selection
-    # ------------------------------------------------------------------
-    def open_entity_selector(self, field, singular_label):
-        if self.selected_index is None or self.selected_index >= len(self.scenes):
-            messagebox.showinfo("Select Scene", "Choose a scene card first.")
-            return
-        wrapper_key = self.ENTITY_FIELDS[field][0]
-        wrapper = self.entity_wrappers.get(wrapper_key)
-        if not wrapper:
-            messagebox.showerror("Unavailable", f"No {singular_label} library available")
-            return
-        template = load_template(wrapper_key)
-        top = ctk.CTkToplevel(self)
-        top.title(f"Select {singular_label}")
-        top.geometry("1100x720")
-        top.minsize(1100, 720)
-        view = GenericListSelectionView(
-            top,
-            wrapper_key,
-            wrapper,
-            template,
-            on_select_callback=lambda _et, name, win=top, fld=field: self._on_entity_selected(fld, name, win),
-        )
-        view.pack(fill="both", expand=True)
-        top.transient(self.winfo_toplevel())
-        top.grab_set()
-
-    def _on_entity_selected(self, field, name, window):
-        try:
-            window.destroy()
-        except Exception:
-            pass
-        if self.selected_index is None or self.selected_index >= len(self.scenes):
-            return
-        entries = self.scenes[self.selected_index].setdefault(field, [])
-        if name not in entries:
-            entries.append(name)
-        self._refresh_entity_views()
-        self.canvas.set_scenes(self.scenes, self.selected_index)
-
-    # ------------------------------------------------------------------
     # WizardStep overrides
     # ------------------------------------------------------------------
     def load_state(self, state):
-        self._updating = True
         self.scenario_title_var.set(state.get("Title", ""))
-        self.scenario_summary.delete("1.0", "end")
-        self.scenario_summary.insert("1.0", state.get("Summary", ""))
-        secrets = state.get("Secrets") or state.get("Secret") or ""
-        self.scenario_secrets.delete("1.0", "end")
-        self.scenario_secrets.insert("1.0", secrets)
+        self._scenario_summary = state.get("Summary", "")
+        self._scenario_secrets = state.get("Secrets") or state.get("Secret") or ""
         self.scenes = self._coerce_scenes(state.get("Scenes"))
         layout = state.get("_SceneLayout")
         if isinstance(layout, list):
@@ -1186,16 +992,12 @@ class ScenesPlanningStep(WizardStep):
                     scene.setdefault("_canvas", {}).update(layout[idx])
         self.selected_index = None
         self.canvas.set_scenes(self.scenes, None)
-        self._refresh_entity_views()
-        self._refresh_link_options()
         self._update_buttons()
-        self._updating = False
 
     def save_state(self, state):
-        self._save_current_scene()
         state["Title"] = self.scenario_title_var.get().strip()
-        summary = self.scenario_summary.get("1.0", "end").strip()
-        secrets = self.scenario_secrets.get("1.0", "end").strip()
+        summary = (self._scenario_summary or "").strip()
+        secrets = (self._scenario_secrets or "").strip()
         state["Summary"] = summary
         state["Secrets"] = secrets
         state["Secret"] = secrets
@@ -1317,6 +1119,442 @@ class ScenesPlanningStep(WizardStep):
             "LinkData": deduped,
         }
         return scene
+
+
+class ScenarioInfoDialog(ctk.CTkToplevel):
+    def __init__(self, master, *, title, summary, secrets):
+        super().__init__(master)
+        window_title = title or "Scenario Notes"
+        self.title(window_title)
+        self.geometry("720x540")
+        self.minsize(640, 480)
+        self.transient(master)
+        self.grab_set()
+        self.result = None
+
+        container = ctk.CTkFrame(self, fg_color="#101827", corner_radius=16)
+        container.pack(fill="both", expand=True, padx=20, pady=20)
+        container.grid_columnconfigure(0, weight=1)
+        container.grid_rowconfigure(1, weight=1)
+        container.grid_rowconfigure(3, weight=1)
+
+        ctk.CTkLabel(
+            container,
+            text="Scenario Overview",
+            font=ctk.CTkFont(size=16, weight="bold"),
+            anchor="w",
+        ).grid(row=0, column=0, sticky="w", padx=18, pady=(18, 8))
+
+        self.summary_text = ctk.CTkTextbox(container, height=140, wrap="word")
+        self.summary_text.grid(row=1, column=0, sticky="nsew", padx=18)
+        self.summary_text.insert("1.0", summary or "")
+
+        ctk.CTkLabel(
+            container,
+            text="Secrets",
+            font=ctk.CTkFont(size=16, weight="bold"),
+            anchor="w",
+        ).grid(row=2, column=0, sticky="w", padx=18, pady=(18, 8))
+
+        self.secrets_text = ctk.CTkTextbox(container, height=140, wrap="word")
+        self.secrets_text.grid(row=3, column=0, sticky="nsew", padx=18)
+        self.secrets_text.insert("1.0", secrets or "")
+
+        button_row = ctk.CTkFrame(container, fg_color="transparent")
+        button_row.grid(row=4, column=0, sticky="ew", padx=18, pady=(18, 12))
+        button_row.grid_columnconfigure((0, 1), weight=1)
+
+        ctk.CTkButton(button_row, text="Cancel", command=self._on_cancel).grid(
+            row=0, column=0, sticky="ew", padx=(0, 8)
+        )
+        ctk.CTkButton(button_row, text="Save Notes", command=self._on_save).grid(
+            row=0, column=1, sticky="ew"
+        )
+
+        self.protocol("WM_DELETE_WINDOW", self._on_cancel)
+        self.summary_text.focus_set()
+
+    def _on_save(self):
+        self.result = {
+            "summary": self.summary_text.get("1.0", "end").strip(),
+            "secrets": self.secrets_text.get("1.0", "end").strip(),
+        }
+        self.destroy()
+
+    def _on_cancel(self):
+        self.result = None
+        self.destroy()
+
+
+class SceneEditorDialog(ctk.CTkToplevel):
+    def __init__(
+        self,
+        master,
+        scene,
+        *,
+        scene_types,
+        entity_fields,
+        link_targets,
+        choose_entity_callback,
+        create_entity_callback,
+    ):
+        super().__init__(master)
+        self.title(scene.get("Title") or "Edit Scene")
+        self.geometry("940x780")
+        self.minsize(880, 720)
+        self.transient(master)
+        self.grab_set()
+        self.result = None
+
+        self.scene_types = list(scene_types)
+        self.entity_fields = entity_fields
+        self.choose_entity_callback = choose_entity_callback
+        self.create_entity_callback = create_entity_callback
+
+        initial_type = scene.get("SceneType") or scene.get("Type") or self.scene_types[0]
+        if initial_type not in self.scene_types:
+            initial_type = self.scene_types[0]
+        if not initial_type:
+            initial_type = self.scene_types[0]
+
+        self.title_var = ctk.StringVar(value=scene.get("Title", ""))
+        self.type_var = ctk.StringVar(value=initial_type)
+        self.link_var = ctk.StringVar()
+
+        self.links = normalise_scene_links(copy.deepcopy(scene), self._split_to_list)
+        self.link_targets = [target for target in link_targets if target]
+        existing_targets = [link.get("target") for link in self.links if link.get("target")]
+        for target in existing_targets:
+            if target not in self.link_targets:
+                self.link_targets.append(target)
+
+        self.entity_data = {
+            field: list(scene.get(field, [])) for field in self.entity_fields
+        }
+        self.entity_listboxes: dict[str, tk.Listbox] = {}
+
+        container = ctk.CTkFrame(self, fg_color="#101827", corner_radius=16)
+        container.pack(fill="both", expand=True, padx=20, pady=20)
+        container.grid_columnconfigure(0, weight=1)
+        container.grid_rowconfigure(4, weight=1)
+        container.grid_rowconfigure(5, weight=1)
+        container.grid_rowconfigure(6, weight=2)
+
+        ctk.CTkLabel(
+            container,
+            text="Scene Title",
+            font=ctk.CTkFont(size=16, weight="bold"),
+            anchor="w",
+        ).grid(row=0, column=0, sticky="w", padx=18, pady=(18, 6))
+
+        title_entry = ctk.CTkEntry(container, textvariable=self.title_var)
+        title_entry.grid(row=1, column=0, sticky="ew", padx=18)
+
+        type_row = ctk.CTkFrame(container, fg_color="transparent")
+        type_row.grid(row=2, column=0, sticky="ew", padx=18, pady=(10, 0))
+        type_row.grid_columnconfigure(1, weight=1)
+        ctk.CTkLabel(type_row, text="Scene Type", anchor="w").grid(
+            row=0, column=0, sticky="w"
+        )
+        self.type_menu = ctk.CTkOptionMenu(
+            type_row, variable=self.type_var, values=self.scene_types
+        )
+        self.type_menu.grid(row=0, column=1, sticky="w", padx=(12, 0))
+
+        ctk.CTkLabel(
+            container,
+            text="Summary",
+            font=ctk.CTkFont(size=16, weight="bold"),
+            anchor="w",
+        ).grid(row=3, column=0, sticky="w", padx=18, pady=(18, 6))
+
+        self.summary_text = ctk.CTkTextbox(container, wrap="word")
+        self.summary_text.grid(row=4, column=0, sticky="nsew", padx=18)
+        self.summary_text.insert("1.0", scene.get("Summary") or scene.get("Text") or "")
+
+        links_frame = ctk.CTkFrame(container, fg_color="#0f1624", corner_radius=14)
+        links_frame.grid(row=5, column=0, sticky="nsew", padx=18, pady=(18, 0))
+        links_frame.grid_columnconfigure(0, weight=1)
+        links_frame.grid_rowconfigure(1, weight=1)
+
+        ctk.CTkLabel(
+            links_frame,
+            text="Next Scenes",
+            font=ctk.CTkFont(size=15, weight="bold"),
+            anchor="w",
+        ).grid(row=0, column=0, sticky="w", padx=16, pady=(16, 4))
+
+        link_list_container = ctk.CTkFrame(links_frame, fg_color="transparent")
+        link_list_container.grid(row=1, column=0, sticky="nsew", padx=16)
+        link_list_container.grid_columnconfigure(0, weight=1)
+        link_list_container.grid_rowconfigure(0, weight=1)
+
+        self.link_listbox = tk.Listbox(
+            link_list_container,
+            activestyle="none",
+            exportselection=False,
+            height=6,
+            selectmode="extended",
+            highlightthickness=0,
+            relief="flat",
+            bg="#101827",
+            fg="#FFFFFF",
+            selectbackground="#1f3b67",
+            selectforeground="#FFFFFF",
+        )
+        self.link_listbox.grid(row=0, column=0, sticky="nsew")
+        link_scroll = tk.Scrollbar(link_list_container, orient="vertical", command=self.link_listbox.yview)
+        link_scroll.grid(row=0, column=1, sticky="ns", padx=(4, 0))
+        self.link_listbox.configure(yscrollcommand=link_scroll.set)
+        self.link_listbox.bind("<<ListboxSelect>>", self._on_link_select)
+
+        link_controls = ctk.CTkFrame(links_frame, fg_color="transparent")
+        link_controls.grid(row=2, column=0, sticky="ew", padx=16, pady=(8, 0))
+        link_controls.grid_columnconfigure(0, weight=1)
+        link_controls.grid_columnconfigure(1, weight=1)
+
+        self.link_combo = ctk.CTkComboBox(link_controls, variable=self.link_var, values=self.link_targets)
+        self.link_combo.grid(row=0, column=0, sticky="ew")
+        if self.link_targets:
+            self.link_combo.set(self.link_targets[0])
+        self.link_label_entry = ctk.CTkEntry(link_controls, placeholder_text="Link text")
+        self.link_label_entry.grid(row=0, column=1, sticky="ew", padx=(6, 0))
+
+        control_buttons = ctk.CTkFrame(links_frame, fg_color="transparent")
+        control_buttons.grid(row=3, column=0, sticky="ew", padx=16, pady=(8, 0))
+        control_buttons.grid_columnconfigure((0, 1, 2), weight=1)
+        ctk.CTkButton(control_buttons, text="Add", width=90, command=self._add_link).grid(
+            row=0, column=0, padx=(0, 6)
+        )
+        ctk.CTkButton(control_buttons, text="Update", width=90, command=self._update_link_label).grid(
+            row=0, column=1, padx=(0, 6)
+        )
+        ctk.CTkButton(control_buttons, text="Remove Selected", command=self._remove_link).grid(
+            row=0, column=2
+        )
+
+        entities_frame = ctk.CTkScrollableFrame(
+            container,
+            fg_color="#0f1624",
+            corner_radius=14,
+        )
+        entities_frame.grid(row=6, column=0, sticky="nsew", padx=18, pady=(18, 0))
+        entities_frame.grid_columnconfigure(0, weight=1)
+
+        row_index = 0
+        for field, (entity_key, label, singular) in self.entity_fields.items():
+            ctk.CTkLabel(
+                entities_frame,
+                text=label,
+                anchor="w",
+                font=ctk.CTkFont(size=15, weight="bold"),
+            ).grid(row=row_index, column=0, sticky="w", padx=14, pady=(14, 4))
+            row_index += 1
+
+            list_container = ctk.CTkFrame(entities_frame, fg_color="transparent")
+            list_container.grid(row=row_index, column=0, sticky="nsew", padx=14)
+            list_container.grid_columnconfigure(0, weight=1)
+            list_container.grid_rowconfigure(0, weight=1)
+
+            listbox = tk.Listbox(
+                list_container,
+                activestyle="none",
+                exportselection=False,
+                height=6,
+                highlightthickness=0,
+                relief="flat",
+                selectmode="extended",
+                bg="#101827",
+                fg="#FFFFFF",
+                selectbackground="#1f3b67",
+                selectforeground="#FFFFFF",
+            )
+            listbox.grid(row=0, column=0, sticky="nsew")
+            scrollbar = tk.Scrollbar(list_container, orient="vertical", command=listbox.yview)
+            scrollbar.grid(row=0, column=1, sticky="ns", padx=(4, 0))
+            listbox.configure(yscrollcommand=scrollbar.set)
+            self.entity_listboxes[field] = listbox
+
+            row_index += 1
+            control = ctk.CTkFrame(entities_frame, fg_color="transparent")
+            control.grid(row=row_index, column=0, sticky="ew", padx=14, pady=(6, 0))
+            control.grid_columnconfigure((0, 1, 2), weight=1)
+
+            ctk.CTkButton(
+                control,
+                text=f"Add {singular}",
+                command=lambda f=field, ek=entity_key, s=singular: self._add_entity(f, ek, s),
+            ).grid(row=0, column=0, sticky="ew", padx=(0, 6))
+            ctk.CTkButton(
+                control,
+                text="Create New",
+                command=lambda f=field, ek=entity_key, s=singular: self._create_entity(f, ek, s),
+            ).grid(row=0, column=1, sticky="ew", padx=(0, 6))
+            ctk.CTkButton(
+                control,
+                text="Remove Selected",
+                command=lambda f=field: self._remove_entity(f),
+            ).grid(row=0, column=2, sticky="ew")
+
+            row_index += 1
+
+        button_row = ctk.CTkFrame(self, fg_color="transparent")
+        button_row.pack(fill="x", padx=20, pady=(0, 20))
+        button_row.grid_columnconfigure((0, 1), weight=1)
+
+        ctk.CTkButton(button_row, text="Cancel", command=self._on_cancel).grid(
+            row=0, column=0, sticky="ew", padx=(0, 8)
+        )
+        ctk.CTkButton(button_row, text="Save Scene", command=self._on_save).grid(
+            row=0, column=1, sticky="ew"
+        )
+
+        self.protocol("WM_DELETE_WINDOW", self._on_cancel)
+        title_entry.focus_set()
+        self._refresh_link_list()
+        for field in self.entity_fields:
+            self._refresh_entity_list(field)
+
+    def _refresh_link_list(self):
+        self.link_listbox.delete(0, tk.END)
+        if not self.links:
+            self.link_listbox.configure(state="disabled")
+        else:
+            self.link_listbox.configure(state="normal")
+            for link in self.links:
+                target = link.get("target") or ""
+                label = link.get("text") or target
+                display = label if label == target else f"{label} → {target}"
+                self.link_listbox.insert(tk.END, display)
+
+    def _on_link_select(self, _event=None):
+        selection = self.link_listbox.curselection()
+        if not selection:
+            return
+        idx = selection[0]
+        if 0 <= idx < len(self.links):
+            link = self.links[idx]
+            label = link.get("text") or link.get("target") or ""
+            self.link_label_entry.delete(0, tk.END)
+            self.link_label_entry.insert(0, label)
+
+    def _add_link(self):
+        target = (self.link_var.get() or "").strip()
+        if not target:
+            return
+        label = self.link_label_entry.get().strip() or target
+        if any((link.get("target") == target and (link.get("text") or target) == label) for link in self.links):
+            return
+        self.links.append({"target": target, "text": label})
+        self._refresh_link_list()
+        self.link_label_entry.delete(0, tk.END)
+
+    def _update_link_label(self):
+        selection = self.link_listbox.curselection()
+        if not selection:
+            return
+        label = self.link_label_entry.get().strip()
+        if not label:
+            label = None
+        for idx in selection:
+            if 0 <= idx < len(self.links):
+                link = self.links[idx]
+                link["text"] = label or link.get("target")
+        self._refresh_link_list()
+
+    def _remove_link(self):
+        selection = self.link_listbox.curselection()
+        if not selection:
+            return
+        for idx in reversed(selection):
+            if 0 <= idx < len(self.links):
+                self.links.pop(idx)
+        self.link_label_entry.delete(0, tk.END)
+        self._refresh_link_list()
+
+    def _refresh_entity_list(self, field):
+        listbox = self.entity_listboxes.get(field)
+        if not listbox:
+            return
+        listbox.delete(0, tk.END)
+        entries = self.entity_data.get(field, [])
+        for name in entries:
+            listbox.insert(tk.END, name)
+        if entries:
+            listbox.configure(state="normal")
+        else:
+            listbox.configure(state="disabled")
+
+    def _add_entity(self, field, entity_key, singular):
+        if not callable(self.choose_entity_callback):
+            return
+        name = self.choose_entity_callback(entity_key, singular)
+        if not name:
+            return
+        entries = self.entity_data.setdefault(field, [])
+        if name not in entries:
+            entries.append(name)
+            self._refresh_entity_list(field)
+
+    def _create_entity(self, field, entity_key, singular):
+        if not callable(self.create_entity_callback):
+            return
+        name = self.create_entity_callback(entity_key, singular)
+        if not name:
+            return
+        entries = self.entity_data.setdefault(field, [])
+        if name not in entries:
+            entries.append(name)
+            self._refresh_entity_list(field)
+
+    def _remove_entity(self, field):
+        listbox = self.entity_listboxes.get(field)
+        if not listbox:
+            return
+        selection = listbox.curselection()
+        if not selection:
+            return
+        entries = self.entity_data.setdefault(field, [])
+        for idx in reversed(selection):
+            if 0 <= idx < len(entries):
+                entries.pop(idx)
+        self._refresh_entity_list(field)
+
+    def _on_save(self):
+        title = self.title_var.get().strip() or "Scene"
+        selected_type = self.type_var.get()
+        if selected_type not in self.scene_types:
+            selected_type = self.scene_types[0]
+        summary = self.summary_text.get("1.0", "end").strip()
+        links = normalise_scene_links({"LinkData": list(self.links)}, self._split_to_list)
+        result = {
+            "Title": title,
+            "Summary": summary,
+            "Text": summary,
+            "SceneType": "" if selected_type == self.scene_types[0] else selected_type,
+            "NPCs": list(self.entity_data.get("NPCs", [])),
+            "Creatures": list(self.entity_data.get("Creatures", [])),
+            "Places": list(self.entity_data.get("Places", [])),
+            "LinkData": links,
+            "NextScenes": [link["target"] for link in links],
+        }
+        self.result = result
+        self.destroy()
+
+    def _on_cancel(self):
+        self.result = None
+        self.destroy()
+
+    @staticmethod
+    def _split_to_list(value):
+        if value is None:
+            return []
+        if isinstance(value, list):
+            return [str(item).strip() for item in value if str(item).strip()]
+        if isinstance(value, str):
+            parts = [part.strip() for part in value.replace(";", ",").split(",")]
+            return [part for part in parts if part]
+        return [str(value).strip()]
 
 
 class EntityLinkingStep(WizardStep):
