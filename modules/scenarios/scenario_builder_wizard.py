@@ -7,6 +7,10 @@ import customtkinter as ctk
 
 from modules.generic.generic_list_selection_view import GenericListSelectionView
 from modules.generic.generic_model_wrapper import GenericModelWrapper
+from modules.helpers.list_utils import (
+    dedupe_preserve_case,
+    format_multi_field_duplicate_summary,
+)
 from modules.helpers.logging_helper import log_module_import, log_info
 from modules.helpers.template_loader import load_template
 
@@ -895,16 +899,42 @@ class EntityLinkingStep(WizardStep):
             listbox.insert(tk.END, name)
 
     def load_state(self, state):  # pragma: no cover - UI synchronization
+        duplicates_report = {}
+
         for entity_type, (field, _) in self.ENTITY_FIELDS.items():
             values = state.get(field) or []
             if isinstance(values, str):
                 values = [values]
-            self.selected[field] = list(dict.fromkeys(values))
+            deduped, duplicates = dedupe_preserve_case(values)
+            self.selected[field] = deduped
+            if duplicates:
+                duplicates_report[entity_type] = duplicates
             self.refresh_list(field)
 
+        if duplicates_report:
+            message = format_multi_field_duplicate_summary(
+                duplicates_report,
+                intro="While loading saved data, duplicate entries were merged.",
+            )
+            if message:
+                messagebox.showinfo("Duplicates Collapsed", message)
+
     def save_state(self, state):  # pragma: no cover - UI synchronization
-        for _, (field, _) in self.ENTITY_FIELDS.items():
-            state[field] = list(dict.fromkeys(self.selected.get(field, [])))
+        duplicates_report = {}
+
+        for entity_type, (field, _) in self.ENTITY_FIELDS.items():
+            deduped, duplicates = dedupe_preserve_case(self.selected.get(field, []))
+            state[field] = deduped
+            if duplicates:
+                duplicates_report[entity_type] = duplicates
+
+        if duplicates_report:
+            message = format_multi_field_duplicate_summary(
+                duplicates_report,
+                intro="Duplicate entries were merged to keep lists consistent.",
+            )
+            if message:
+                messagebox.showinfo("Duplicates Collapsed", message)
         return True
 
 
@@ -1098,12 +1128,14 @@ class ScenarioBuilderWizard(ctk.CTkToplevel):
             "Summary": self.state.get("Summary", ""),
             "Secrets": secrets,
             "Scenes": scenes,
-            "Places": list(dict.fromkeys(self.state.get("Places", []))),
-            "NPCs": list(dict.fromkeys(self.state.get("NPCs", []))),
-            "Creatures": list(dict.fromkeys(self.state.get("Creatures", []))),
-            "Factions": list(dict.fromkeys(self.state.get("Factions", []))),
-            "Objects": list(dict.fromkeys(self.state.get("Objects", []))),
         }
+
+        duplicate_payload_report = {}
+        for field in ("Places", "NPCs", "Creatures", "Factions", "Objects"):
+            deduped, duplicates = dedupe_preserve_case(self.state.get(field, []))
+            payload[field] = deduped
+            if duplicates:
+                duplicate_payload_report[field] = duplicates
 
         items = self.scenario_wrapper.load_items()
         replaced = False
@@ -1127,7 +1159,16 @@ class ScenarioBuilderWizard(ctk.CTkToplevel):
         )
 
         self.scenario_wrapper.save_items(items)
-        messagebox.showinfo("Scenario Saved", f"Scenario '{title}' has been saved.")
+        success_message = f"Scenario '{title}' has been saved."
+        if duplicate_payload_report:
+            note = format_multi_field_duplicate_summary(
+                duplicate_payload_report,
+                intro="Note: Duplicate entries were merged because they only differed by letter case.",
+            )
+            if note:
+                success_message = f"{success_message}\n\n{note}"
+
+        messagebox.showinfo("Scenario Saved", success_message)
         if callable(self.on_saved):
             try:
                 self.on_saved()

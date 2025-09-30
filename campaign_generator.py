@@ -24,6 +24,11 @@ import zipfile
 from typing import Dict, List
 import json
 
+from modules.helpers.list_utils import (
+    dedupe_preserve_case,
+    format_multi_field_duplicate_summary,
+)
+
 
 # ---------------------------------------------------------------------------
 # Campaign data tables for each setting
@@ -1678,8 +1683,9 @@ class CampaignGeneratorApp(tk.Tk):
                     if p and p not in region_parts:
                         region_parts.append(p)
         places.extend(region_parts)
-        # Remove duplicates
-        places = list(dict.fromkeys([p for p in places if p]))
+        # Remove duplicates while preserving original casing
+        places_clean = [p for p in places if p]
+        places, place_duplicates = dedupe_preserve_case(places_clean)
         # Extract NPCs: take primary NPC and quest giver names before dash
         npcs = []
         for field in ["Key NPC", "Quest Giver"]:
@@ -1688,7 +1694,7 @@ class CampaignGeneratorApp(tk.Tk):
                 name = val.split("–")[0].strip()
                 if name:
                     npcs.append(name)
-        npcs = list(dict.fromkeys(npcs))
+        npcs, npc_duplicates = dedupe_preserve_case(npcs)
         # Prepare nested formatting structure
         formatting_empty = {"bold": [], "italic": [], "underline": [], "left": [], "center": [], "right": []}
         scenario = {
@@ -1716,7 +1722,21 @@ class CampaignGeneratorApp(tk.Tk):
         except Exception as e:
             messagebox.showerror("Error", f"Failed to save JSON: {e}")
             return
-        messagebox.showinfo("Export Successful", f"Campaign saved to {filename}")
+        success_message = f"Campaign saved to {filename}"
+        duplicate_report = {}
+        if place_duplicates:
+            duplicate_report["Places"] = place_duplicates
+        if npc_duplicates:
+            duplicate_report["NPCs"] = npc_duplicates
+        if duplicate_report:
+            note = format_multi_field_duplicate_summary(
+                duplicate_report,
+                intro="Note: Duplicate entries were merged because they only differed by letter case.",
+            )
+            if note:
+                success_message = f"{success_message}\n\n{note}"
+
+        messagebox.showinfo("Export Successful", success_message)
 
 
 def main() -> None:
