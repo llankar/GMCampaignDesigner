@@ -966,7 +966,9 @@ class ScenarioBuilderWizard(ctk.CTkToplevel):
         self.transient(master)
         self.on_saved = on_saved
 
-        self.state = {
+        # NOTE: Avoid shadowing the inherited ``state()`` method from Tk by
+        # storing wizard data on a dedicated attribute.
+        self.wizard_state = {
             "Title": "",
             "Summary": "",
             "Secrets": "",
@@ -1053,7 +1055,7 @@ class ScenarioBuilderWizard(ctk.CTkToplevel):
         title, frame = self.steps[index]
         self.header_label.configure(text=f"Step {index + 1} of {len(self.steps)}: {title}")
         frame.tkraise()
-        frame.load_state(self.state)
+        frame.load_state(self.wizard_state)
         self._update_navigation_buttons()
 
     def _update_navigation_buttons(self):  # pragma: no cover - UI navigation
@@ -1064,14 +1066,14 @@ class ScenarioBuilderWizard(ctk.CTkToplevel):
 
     def go_next(self):  # pragma: no cover - UI navigation
         step = self.steps[self.current_step_index][1]
-        if not step.save_state(self.state):
+        if not step.save_state(self.wizard_state):
             return
         self.current_step_index += 1
         self._show_step(self.current_step_index)
 
     def go_back(self):  # pragma: no cover - UI navigation
         step = self.steps[self.current_step_index][1]
-        if not step.save_state(self.state):
+        if not step.save_state(self.wizard_state):
             return
         self.current_step_index -= 1
         self._show_step(self.current_step_index)
@@ -1081,30 +1083,30 @@ class ScenarioBuilderWizard(ctk.CTkToplevel):
 
     def finish(self):  # pragma: no cover - UI navigation
         step = self.steps[self.current_step_index][1]
-        if not step.save_state(self.state):
+        if not step.save_state(self.wizard_state):
             return
 
-        title = (self.state.get("Title") or "").strip()
+        title = (self.wizard_state.get("Title") or "").strip()
         if not title:
             messagebox.showwarning("Missing Title", "Please provide a title before saving the scenario.")
             return
 
-        secrets = self.state.get("Secrets") or ""
-        scenes = self.state.get("Scenes") or []
+        secrets = self.wizard_state.get("Secrets") or ""
+        scenes = self.wizard_state.get("Scenes") or []
         if isinstance(scenes, str):
             scenes = [scenes]
 
         payload = {
             "Title": title,
-            "Summary": self.state.get("Summary", ""),
+            "Summary": self.wizard_state.get("Summary", ""),
             "Secrets": secrets,
             "Secret": secrets,
             "Scenes": scenes,
-            "Places": list(dict.fromkeys(self.state.get("Places", []))),
-            "NPCs": list(dict.fromkeys(self.state.get("NPCs", []))),
-            "Creatures": list(dict.fromkeys(self.state.get("Creatures", []))),
-            "Factions": list(dict.fromkeys(self.state.get("Factions", []))),
-            "Objects": list(dict.fromkeys(self.state.get("Objects", []))),
+            "Places": list(dict.fromkeys(self.wizard_state.get("Places", []))),
+            "NPCs": list(dict.fromkeys(self.wizard_state.get("NPCs", []))),
+            "Creatures": list(dict.fromkeys(self.wizard_state.get("Creatures", []))),
+            "Factions": list(dict.fromkeys(self.wizard_state.get("Factions", []))),
+            "Objects": list(dict.fromkeys(self.wizard_state.get("Objects", []))),
         }
 
         buttons = {

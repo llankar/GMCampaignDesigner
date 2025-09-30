@@ -101,13 +101,25 @@ class _DummyStep:
         return True
 
 
+class _DummyButton:
+    def __init__(self):
+        self._state = "normal"
+
+    def cget(self, key):
+        return self._state if key == "state" else None
+
+    def configure(self, **kwargs):
+        if "state" in kwargs:
+            self._state = kwargs["state"]
+
+
 def test_finish_shows_retry_dialog_on_load_failure(monkeypatch):
     wizard = scenario_builder_wizard.ScenarioBuilderWizard.__new__(
         scenario_builder_wizard.ScenarioBuilderWizard
     )
     wizard.current_step_index = 0
     wizard.steps = [("Review", _DummyStep())]
-    wizard.state = {
+    wizard.wizard_state = {
         "Title": "Broken Scenario",
         "Summary": "",
         "Secrets": "",
@@ -120,6 +132,10 @@ def test_finish_shows_retry_dialog_on_load_failure(monkeypatch):
     }
     wizard.on_saved = None
     wizard.destroy = lambda: None
+    wizard.back_btn = _DummyButton()
+    wizard.next_btn = _DummyButton()
+    wizard.finish_btn = _DummyButton()
+    wizard.cancel_btn = _DummyButton()
 
     load_calls = []
 
