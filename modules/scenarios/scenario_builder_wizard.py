@@ -1097,6 +1097,7 @@ class ScenarioBuilderWizard(ctk.CTkToplevel):
             "Title": title,
             "Summary": self.state.get("Summary", ""),
             "Secrets": secrets,
+            "Secret": secrets,
             "Scenes": scenes,
             "Places": list(dict.fromkeys(self.state.get("Places", []))),
             "NPCs": list(dict.fromkeys(self.state.get("NPCs", []))),
