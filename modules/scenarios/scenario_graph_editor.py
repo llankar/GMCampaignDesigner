@@ -1693,7 +1693,7 @@ class ScenarioGraphEditor(ctk.CTkFrame):
             text_value = item.get("text")
             if isinstance(target_value, dict):
                 target_value = target_value.get("target") or target_value.get("Scene") or target_value.get("Next")
-            text_clean = clean_longtext(str(text_value), max_length=160).strip() if text_value else ""
+            text_clean = self._normalise_link_text_value(text_value)
             target_index = None
             if isinstance(target_value, (int, float)):
                 target_index = int(target_value)
@@ -2183,7 +2183,41 @@ class ScenarioGraphEditor(ctk.CTkFrame):
                 return links
             links.append({"target": text_value, "text": text_value})
             return links
-        return links
+
+    def _normalise_link_text_value(self, value):
+        """Convert raw link text payloads into display strings without truncation."""
+
+        if value is None:
+            return ""
+
+        if isinstance(value, str):
+            return value.strip()
+
+        if isinstance(value, (int, float)):
+            return str(value)
+
+        if isinstance(value, dict):
+            for key in (
+                "text",
+                "Text",
+                "label",
+                "Label",
+                "description",
+                "Description",
+                "summary",
+                "Summary",
+                "value",
+                "Value",
+            ):
+                if key in value:
+                    return self._normalise_link_text_value(value.get(key))
+            return format_longtext(value, max_length=5000).strip()
+
+        if isinstance(value, (list, tuple, set)):
+            parts = [self._normalise_link_text_value(item) for item in value]
+            return ", ".join([part for part in parts if part])
+
+        return str(value).strip()
 
     def _build_scene_lookup(self, scenes):
         lookup = {}
