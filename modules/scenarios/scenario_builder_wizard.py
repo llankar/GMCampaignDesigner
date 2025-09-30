@@ -1,5 +1,6 @@
 import copy
 import json
+import sqlite3
 import tkinter as tk
 from tkinter import messagebox
 
@@ -7,7 +8,7 @@ import customtkinter as ctk
 
 from modules.generic.generic_list_selection_view import GenericListSelectionView
 from modules.generic.generic_model_wrapper import GenericModelWrapper
-from modules.helpers.logging_helper import log_module_import, log_info
+from modules.helpers.logging_helper import log_module_import, log_info, log_exception
 from modules.helpers.template_loader import load_template
 
 
@@ -1105,7 +1106,20 @@ class ScenarioBuilderWizard(ctk.CTkToplevel):
             "Objects": list(dict.fromkeys(self.state.get("Objects", []))),
         }
 
-        items = self.scenario_wrapper.load_items()
+        while True:
+            try:
+                items = self.scenario_wrapper.load_items()
+                break
+            except (sqlite3.Error, json.JSONDecodeError):
+                log_exception(
+                    "Failed to load scenarios for ScenarioBuilderWizard.",
+                    func_name="ScenarioBuilderWizard.finish",
+                )
+                if not messagebox.askretrycancel(
+                    "Load Error",
+                    "An error occurred while loading scenarios. Retry?",
+                ):
+                    return
         replaced = False
         for idx, existing in enumerate(items):
             if existing.get("Title") == title:
