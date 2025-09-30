@@ -192,7 +192,7 @@ class ScenesPlanningStep(WizardStep):
 
             btn_row = ctk.CTkFrame(editor)
             btn_row.grid(row=current_row, column=0, sticky="ew", padx=6, pady=(0, 12))
-            btn_row.grid_columnconfigure((0, 1), weight=1)
+            btn_row.grid_columnconfigure((0, 1, 2), weight=1)
 
             add_btn = ctk.CTkButton(
                 btn_row,
@@ -206,7 +206,13 @@ class ScenesPlanningStep(WizardStep):
                 command=lambda f=field: self.remove_selected_entity(f),
             )
             remove_btn.grid(row=0, column=1, padx=4, pady=2, sticky="ew")
-            self.entity_buttons.extend([add_btn, remove_btn])
+            new_btn = ctk.CTkButton(
+                btn_row,
+                text=f"New {singular}",
+                command=lambda et=entity_type, f=field, lbl=singular: self.create_new_entity(et, f, lbl),
+            )
+            new_btn.grid(row=0, column=2, padx=4, pady=2, sticky="ew")
+            self.entity_buttons.extend([add_btn, remove_btn, new_btn])
 
             current_row += 1
 
@@ -293,6 +299,7 @@ class ScenesPlanningStep(WizardStep):
         if name not in existing:
             existing.append(name)
             self._set_listbox_items(field, existing)
+            self._update_scene_field_from_listbox(field)
         try:
             window.destroy()
         except Exception:  # pragma: no cover - best effort cleanup
@@ -305,6 +312,81 @@ class ScenesPlanningStep(WizardStep):
         selection = listbox.curselection()
         for index in reversed(selection):
             listbox.delete(index)
+        self._update_scene_field_from_listbox(field)
+
+    def create_new_entity(self, entity_type, field, label):  # pragma: no cover - UI interaction
+        wrapper = self.entity_wrappers.get(entity_type)
+        if not wrapper:
+            messagebox.showerror("Unavailable", f"No {label} data source is available.")
+            return
+
+        try:
+            template = load_template(entity_type)
+        except Exception as exc:  # pragma: no cover - defensive path
+            log_exception(f"Failed to load template for {entity_type}: {exc}")
+            messagebox.showerror("Template Error", f"Unable to load the {label} template.")
+            return
+
+        try:
+            items = wrapper.load_items()
+        except Exception as exc:  # pragma: no cover - defensive path
+            log_exception(f"Failed to load existing {entity_type}: {exc}")
+            messagebox.showerror("Database Error", f"Unable to load existing {label}s.")
+            return
+
+        new_item = {}
+        editor = GenericEditorWindow(
+            self.winfo_toplevel(),
+            new_item,
+            template,
+            wrapper,
+            creation_mode=True,
+        )
+        self.wait_window(editor)
+
+        if not getattr(editor, "saved", False):
+            return
+
+        preferred_keys = ("Name", "Title")
+        unique_key = next((key for key in preferred_keys if new_item.get(key)), None)
+        unique_value = new_item.get(unique_key, "") if unique_key else ""
+        if unique_key:
+            replaced = False
+            for idx, existing in enumerate(items):
+                if existing.get(unique_key) == new_item.get(unique_key):
+                    items[idx] = new_item
+                    replaced = True
+                    break
+            if not replaced:
+                items.append(new_item)
+        else:
+            items.append(new_item)
+
+        try:
+            wrapper.save_items(items)
+            wrapper.load_items()
+        except Exception as exc:  # pragma: no cover - defensive path
+            log_exception(f"Failed to persist new {entity_type}: {exc}")
+            messagebox.showerror("Save Error", f"Unable to save the new {label}.")
+            return
+
+        if not unique_value:
+            messagebox.showwarning(
+                "Missing Name",
+                f"The new {label.lower()} was saved without a name and cannot be linked automatically.",
+            )
+            return
+
+        existing = self._get_listbox_items(field)
+        if unique_value not in existing:
+            existing.append(unique_value)
+            self._set_listbox_items(field, existing)
+            self._update_scene_field_from_listbox(field)
+
+    def _update_scene_field_from_listbox(self, field):  # pragma: no cover - UI helper
+        if self.selected_index is None or self.selected_index >= len(self.scenes):
+            return
+        self.scenes[self.selected_index][field] = self._get_listbox_items(field)
 
     def _on_scene_selected(self, _event=None):  # pragma: no cover - UI callback
         if self._suppress_list_event:
