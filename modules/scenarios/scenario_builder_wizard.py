@@ -7,7 +7,7 @@ import customtkinter as ctk
 
 from modules.generic.generic_list_selection_view import GenericListSelectionView
 from modules.generic.generic_model_wrapper import GenericModelWrapper
-from modules.helpers.logging_helper import log_module_import, log_info
+from modules.helpers.logging_helper import log_module_import, log_info, log_exception
 from modules.helpers.template_loader import load_template
 
 
@@ -1126,7 +1126,19 @@ class ScenarioBuilderWizard(ctk.CTkToplevel):
             func_name="ScenarioBuilderWizard.finish",
         )
 
-        self.scenario_wrapper.save_items(items)
+        try:
+            self.scenario_wrapper.save_items(items)
+        except Exception as exc:  # pragma: no cover - error path validated via unit test
+            log_exception(
+                f"Failed to save scenario '{title}' via builder wizard: {exc}",
+                func_name="ScenarioBuilderWizard.finish",
+            )
+            messagebox.showerror(
+                "Scenario Save Failed",
+                f"Scenario '{title}' could not be saved.\n\nDetails: {exc}",
+            )
+            return
+
         messagebox.showinfo("Scenario Saved", f"Scenario '{title}' has been saved.")
         if callable(self.on_saved):
             try:
