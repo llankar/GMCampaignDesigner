@@ -948,6 +948,31 @@ class ScenesPlanningStep(WizardStep):
         menu.add_command(label="Duplicate Scene", command=lambda idx=index: self.duplicate_scene(idx))
         menu.add_command(label="Remove Scene", command=lambda idx=index: self.remove_scene(idx))
 
+        for field, (_, _, singular_label) in self.ENTITY_FIELDS.items():
+            entries = []
+            if 0 <= index < len(self.scenes):
+                bucket = self.scenes[index].get(field)
+                if isinstance(bucket, list):
+                    entries = [item for item in bucket if str(item).strip()]
+            if entries:
+                remove_menu = tk.Menu(menu, tearoff=0)
+                for name in entries:
+                    display = str(name).strip()
+                    if not display:
+                        display = f"(Unnamed {singular_label})"
+                    remove_menu.add_command(
+                        label=display,
+                        command=lambda value=name, idx=index, f=field: self._remove_entity_from_scene(idx, f, value),
+                    )
+                remove_menu.add_separator()
+                remove_menu.add_command(
+                    label="Clear All",
+                    command=lambda idx=index, f=field: self._clear_entities_from_scene(idx, f),
+                )
+                menu.add_cascade(label=f"Remove {singular_label}s", menu=remove_menu)
+            else:
+                menu.add_command(label=f"Remove {singular_label}s", state="disabled")
+
         link_targets = [
             (i, self.scenes[i].get("Title") or f"Scene {i + 1}")
             for i in range(len(self.scenes))
@@ -1020,6 +1045,32 @@ class ScenesPlanningStep(WizardStep):
         scene["NextScenes"] = []
         self._close_link_label_editor()
         self.canvas.set_scenes(self.scenes, self.selected_index)
+
+    def _remove_entity_from_scene(self, scene_index, field, name):
+        if scene_index is None or scene_index >= len(self.scenes):
+            return
+        if field not in self.ENTITY_FIELDS:
+            return
+        scene = self.scenes[scene_index]
+        bucket = scene.get(field)
+        if not isinstance(bucket, list) or not bucket:
+            return
+        target = str(name).strip().lower()
+        filtered = [item for item in bucket if str(item).strip().lower() != target]
+        if len(filtered) == len(bucket):
+            return
+        scene[field] = filtered
+        self.canvas.set_scenes(self.scenes, self.selected_index)
+
+    def _clear_entities_from_scene(self, scene_index, field):
+        if scene_index is None or scene_index >= len(self.scenes):
+            return
+        if field not in self.ENTITY_FIELDS:
+            return
+        scene = self.scenes[scene_index]
+        if isinstance(scene.get(field), list) and scene.get(field):
+            scene[field] = []
+            self.canvas.set_scenes(self.scenes, self.selected_index)
 
     def _add_entity_to_scene(self, scene_index, entity_type):
         if scene_index is None or scene_index >= len(self.scenes):
