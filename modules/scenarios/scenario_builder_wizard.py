@@ -875,20 +875,22 @@ class ScenesPlanningStep(WizardStep):
         self._close_inline_scene_editor()
         self._close_link_label_editor()
         scene = self.scenes[index]
+        x1, y1, x2, y2 = bbox
+        width = max(120, (x2 - x1) - 16)
+        height = max(120, (y2 - y1) - 16)
         editor = InlineSceneEditor(
             self.canvas,
             scene,
             scene_types=self.SCENE_TYPES,
             on_save=lambda data, idx=index: self._apply_inline_scene_update(idx, data),
             on_cancel=self._close_inline_scene_editor,
+            width=width,
+            height=height,
         )
         editor.scene_index = index
-        x1, y1, x2, y2 = bbox
         editor.place(
             x=x1 + 8,
             y=y1 + 8,
-            width=max(120, (x2 - x1) - 16),
-            height=max(120, (y2 - y1) - 16),
         )
         self._inline_editor = editor
 
@@ -1519,8 +1521,14 @@ class ScenarioInfoDialog(ctk.CTkToplevel):
 
 
 class InlineSceneEditor(ctk.CTkFrame):
-    def __init__(self, master, scene, *, scene_types, on_save, on_cancel):
-        super().__init__(master, fg_color="#0f172a", corner_radius=12)
+    def __init__(self, master, scene, *, scene_types, on_save, on_cancel, width=None, height=None):
+        super().__init__(
+            master,
+            fg_color="#0f172a",
+            corner_radius=12,
+            width=width,
+            height=height,
+        )
         self.on_save = on_save
         self.on_cancel = on_cancel
         self._scene_types = [
