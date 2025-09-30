@@ -1105,29 +1105,42 @@ class ScenarioBuilderWizard(ctk.CTkToplevel):
             "Objects": list(dict.fromkeys(self.state.get("Objects", []))),
         }
 
-        items = self.scenario_wrapper.load_items()
-        replaced = False
-        for idx, existing in enumerate(items):
-            if existing.get("Title") == title:
-                if not messagebox.askyesno(
-                    "Overwrite Scenario",
-                    f"A scenario titled '{title}' already exists. Overwrite it?",
-                ):
-                    return
-                items[idx] = payload
-                replaced = True
-                break
-
-        if not replaced:
-            items.append(payload)
-
-        log_info(
-            f"Saving scenario '{title}' via builder wizard (replaced={replaced})",
-            func_name="ScenarioBuilderWizard.finish",
+        controls_to_disable = (
+            self.back_btn,
+            self.next_btn,
+            self.finish_btn,
+            self.cancel_btn,
         )
+        for control in controls_to_disable:
+            control.configure(state="disabled")
 
-        self.scenario_wrapper.save_items(items)
-        messagebox.showinfo("Scenario Saved", f"Scenario '{title}' has been saved.")
+        try:
+            items = self.scenario_wrapper.load_items()
+            replaced = False
+            for idx, existing in enumerate(items):
+                if existing.get("Title") == title:
+                    if not messagebox.askyesno(
+                        "Overwrite Scenario",
+                        f"A scenario titled '{title}' already exists. Overwrite it?",
+                    ):
+                        return
+                    items[idx] = payload
+                    replaced = True
+                    break
+
+            if not replaced:
+                items.append(payload)
+
+            log_info(
+                f"Saving scenario '{title}' via builder wizard (replaced={replaced})",
+                func_name="ScenarioBuilderWizard.finish",
+            )
+
+            self.scenario_wrapper.save_items(items)
+            messagebox.showinfo("Scenario Saved", f"Scenario '{title}' has been saved.")
+        finally:
+            self._update_navigation_buttons()
+            self.cancel_btn.configure(state="normal")
         if callable(self.on_saved):
             try:
                 self.on_saved()
