@@ -19,6 +19,52 @@ from modules.scenarios.scene_flow_rendering import (
 )
 
 
+def normalise_scene_links(scene, split_to_list):
+    """Return the cleaned link payload for ``scene``.
+
+    The helper mirrors :meth:`ScenesPlanningStep._get_scene_links` so that the
+    same normalisation logic can be shared with lightweight previews such as
+    the wizard review step without duplicating behaviour.
+    """
+
+    raw_links = scene.get("LinkData")
+    cleaned = []
+    if isinstance(raw_links, list):
+        for item in raw_links:
+            if isinstance(item, dict):
+                target = str(
+                    item.get("target")
+                    or item.get("Scene")
+                    or item.get("Next")
+                    or ""
+                ).strip()
+                if not target:
+                    continue
+                text = str(item.get("text") or target).strip()
+                cleaned.append({"target": target, "text": text})
+            elif isinstance(item, str):
+                target = item.strip()
+                if target:
+                    cleaned.append({"target": target, "text": target})
+    if not cleaned:
+        for target in split_to_list(scene.get("NextScenes", [])):
+            if target:
+                cleaned.append({"target": target, "text": target})
+    deduped = []
+    seen = set()
+    for link in cleaned:
+        target = link["target"]
+        text = link.get("text") or target
+        key = (target.lower(), text.lower())
+        if key in seen:
+            continue
+        seen.add(key)
+        deduped.append({"target": target, "text": text})
+    scene["LinkData"] = deduped
+    scene["NextScenes"] = [link["target"] for link in deduped]
+    return deduped
+
+
 log_module_import(__name__)
 
 
@@ -797,37 +843,7 @@ class ScenesPlanningStep(WizardStep):
         self.link_list.selection_clear(0, tk.END)
 
     def _get_scene_links(self, scene):
-        raw_links = scene.get("LinkData")
-        cleaned = []
-        if isinstance(raw_links, list):
-            for item in raw_links:
-                if isinstance(item, dict):
-                    target = str(item.get("target") or item.get("Scene") or item.get("Next") or "").strip()
-                    if not target:
-                        continue
-                    text = str(item.get("text") or target).strip()
-                    cleaned.append({"target": target, "text": text})
-                elif isinstance(item, str):
-                    target = item.strip()
-                    if target:
-                        cleaned.append({"target": target, "text": target})
-        if not cleaned:
-            for target in self._split_to_list(scene.get("NextScenes", [])):
-                if target:
-                    cleaned.append({"target": target, "text": target})
-        deduped = []
-        seen = set()
-        for link in cleaned:
-            target = link["target"]
-            text = link.get("text") or target
-            key = (target.lower(), text.lower())
-            if key in seen:
-                continue
-            seen.add(key)
-            deduped.append({"target": target, "text": text})
-        scene["LinkData"] = deduped
-        scene["NextScenes"] = [link["target"] for link in deduped]
-        return deduped
+        return normalise_scene_links(scene, self._split_to_list)
 
     def _on_link_selected(self, _event=None):
         if self.selected_index is None or self.selected_index >= len(self.scenes):
@@ -1214,7 +1230,8 @@ class ScenesPlanningStep(WizardStep):
     # ------------------------------------------------------------------
     # Data helpers
     # ------------------------------------------------------------------
-    def _split_to_list(self, value):
+    @staticmethod
+    def _split_to_list(value):
         if value is None:
             return []
         if isinstance(value, list):
@@ -1224,7 +1241,8 @@ class ScenesPlanningStep(WizardStep):
             return [part for part in parts if part]
         return [str(value).strip()]
 
-    def _dedupe(self, items):
+    @staticmethod
+    def _dedupe(items):
         seen = set()
         result = []
         for item in items:
@@ -1488,30 +1506,142 @@ class EntityLinkingStep(WizardStep):
 class ReviewStep(WizardStep):
     def __init__(self, master):
         super().__init__(master)
-        self.text = ctk.CTkTextbox(self, state="disabled")
-        self.text.pack(fill="both", expand=True, padx=20, pady=20)
+        self.grid_rowconfigure(0, weight=1)
+        self.grid_columnconfigure(0, weight=3)
+        self.grid_columnconfigure(1, weight=2)
+
+        preview_section = ctk.CTkFrame(self)
+        preview_section.grid(row=0, column=0, sticky="nsew", padx=(20, 10), pady=20)
+        preview_section.grid_rowconfigure(0, weight=0)
+        preview_section.grid_rowconfigure(1, weight=1)
+        preview_section.grid_columnconfigure(0, weight=1)
+
+        ctk.CTkLabel(
+            preview_section,
+            text="Scene Flow",
+            font=ctk.CTkFont(size=16, weight="bold"),
+            anchor="w",
+        ).grid(row=0, column=0, sticky="ew", padx=16, pady=(16, 4))
+
+        self.flow_preview = SceneFlowPreview(preview_section)
+        self.flow_preview.grid(row=1, column=0, sticky="nsew", padx=12, pady=(0, 12))
+
+        facts_panel = ctk.CTkFrame(self)
+        facts_panel.grid(row=0, column=1, sticky="nsew", padx=(10, 20), pady=20)
+        facts_panel.grid_columnconfigure(0, weight=1)
+        facts_panel.grid_rowconfigure(5, weight=1)
+
+        self.title_label = ctk.CTkLabel(
+            facts_panel,
+            text="",
+            font=ctk.CTkFont(size=18, weight="bold"),
+            anchor="w",
+            wraplength=360,
+        )
+        self.title_label.grid(row=0, column=0, sticky="ew", padx=16, pady=(16, 6))
+
+        self.summary_label = ctk.CTkLabel(
+            facts_panel,
+            text="",
+            anchor="w",
+            justify="left",
+            wraplength=360,
+        )
+        self.summary_label.grid(row=1, column=0, sticky="ew", padx=16)
+
+        self.secrets_label = ctk.CTkLabel(
+            facts_panel,
+            text="",
+            anchor="w",
+            justify="left",
+            wraplength=360,
+            text_color=("#b9c6dd", "#b9c6dd"),
+        )
+        self.secrets_label.grid(row=2, column=0, sticky="ew", padx=16, pady=(8, 0))
+
+        self.stats_label = ctk.CTkLabel(
+            facts_panel,
+            text="",
+            anchor="w",
+            justify="left",
+            wraplength=360,
+            text_color=("#7f90ac", "#7f90ac"),
+        )
+        self.stats_label.grid(row=3, column=0, sticky="ew", padx=16, pady=(10, 8))
+
+        self.details_header = ctk.CTkLabel(
+            facts_panel,
+            text="Details",
+            font=ctk.CTkFont(size=15, weight="bold"),
+            anchor="w",
+        )
+        self.details_header.grid(row=4, column=0, sticky="ew", padx=16, pady=(4, 2))
+
+        self.details_text = ctk.CTkTextbox(
+            facts_panel,
+            height=260,
+            state="disabled",
+            wrap="word",
+        )
+        self.details_text.grid(row=5, column=0, sticky="nsew", padx=16, pady=(0, 16))
 
     def load_state(self, state):  # pragma: no cover - UI synchronization
+        title = state.get("Title", "Untitled Scenario")
+        summary = state.get("Summary") or "(No summary provided.)"
+        secrets = state.get("Secrets") or "(No secrets provided.)"
+
+        summary_preview = textwrap.shorten(summary, width=160, placeholder="…")
+        secrets_preview = textwrap.shorten(secrets, width=160, placeholder="…")
+
+        self.title_label.configure(text=title)
+        self.summary_label.configure(text=f"Summary: {summary_preview}")
+        self.secrets_label.configure(text=f"Secrets: {secrets_preview}")
+
+        scenes = copy.deepcopy(state.get("Scenes") or [])
+        for scene in scenes:
+            if isinstance(scene, dict):
+                normalise_scene_links(scene, ScenesPlanningStep._split_to_list)
+        self.flow_preview.render(scenes, selected_index=None)
+
+        scene_count = len(scenes)
+        entity_counts = []
+        for field, label in (
+            ("NPCs", "NPCs"),
+            ("Creatures", "Creatures"),
+            ("Places", "Places"),
+            ("Factions", "Factions"),
+            ("Objects", "Objects"),
+        ):
+            entries = state.get(field) or []
+            if entries:
+                entity_counts.append(f"{len(entries)} {label}")
+        stats_text = " • ".join(entity_counts)
+        stats_prefix = f"{scene_count} scene{'s' if scene_count != 1 else ''}"
+        self.stats_label.configure(
+            text=f"{stats_prefix}{f' • {stats_text}' if stats_text else ''}"
+        )
+
         summary_lines = [
-            f"Title: {state.get('Title', 'Untitled Scenario')}",
+            f"Title: {title}",
             "",
             "Summary:",
-            state.get("Summary", "(No summary provided.)"),
+            summary,
             "",
             "Secrets:",
-            state.get("Secrets", "(No secrets provided.)"),
+            secrets,
             "",
             "Scenes:",
         ]
 
-        scenes = state.get("Scenes") or []
-        if isinstance(scenes, (list, tuple)) and scenes:
+        if scenes:
             for idx, scene in enumerate(scenes, start=1):
+                title_value = ""
                 if isinstance(scene, dict):
-                    title = scene.get("Title") or scene.get("title") or f"Scene {idx}"
-                    summary_lines.append(f"  - {title}")
+                    title_value = scene.get("Title") or scene.get("title") or ""
+                if title_value:
+                    summary_lines.append(f"  {idx}. {title_value}")
                 else:
-                    summary_lines.append(f"  - {scene}")
+                    summary_lines.append(f"  {idx}. Scene {idx}")
         else:
             summary_lines.append("  (No scenes planned.)")
 
@@ -1525,10 +1655,10 @@ class ReviewStep(WizardStep):
             else:
                 summary_lines.append("  (None)")
 
-        self.text.configure(state="normal")
-        self.text.delete("1.0", "end")
-        self.text.insert("1.0", "\n".join(summary_lines))
-        self.text.configure(state="disabled")
+        self.details_text.configure(state="normal")
+        self.details_text.delete("1.0", "end")
+        self.details_text.insert("1.0", "\n".join(summary_lines))
+        self.details_text.configure(state="disabled")
 
 
 class ScenarioBuilderWizard(ctk.CTkToplevel):
