@@ -1107,46 +1107,59 @@ class ScenarioBuilderWizard(ctk.CTkToplevel):
             "Objects": list(dict.fromkeys(self.state.get("Objects", []))),
         }
 
-        while True:
-            try:
-                items = self.scenario_wrapper.load_items()
-                break
-            except (sqlite3.Error, json.JSONDecodeError):
-                log_exception(
-                    "Failed to load scenarios for ScenarioBuilderWizard.",
-                    func_name="ScenarioBuilderWizard.finish",
-                )
-                if not messagebox.askretrycancel(
-                    "Load Error",
-                    "An error occurred while loading scenarios. Retry?",
-                ):
-                    return
-        replaced = False
-        for idx, existing in enumerate(items):
-            if existing.get("Title") == title:
-                if not messagebox.askyesno(
-                    "Overwrite Scenario",
-                    f"A scenario titled '{title}' already exists. Overwrite it?",
-                ):
-                    return
-                items[idx] = payload
-                replaced = True
-                break
+        buttons = {
+            self.back_btn: self.back_btn.cget("state"),
+            self.next_btn: self.next_btn.cget("state"),
+            self.finish_btn: self.finish_btn.cget("state"),
+            self.cancel_btn: self.cancel_btn.cget("state"),
+        }
+        for btn in buttons:
+            btn.configure(state="disabled")
 
-        if not replaced:
-            items.append(payload)
+        try:
+            while True:
+                try:
+                    items = self.scenario_wrapper.load_items()
+                    break
+                except (sqlite3.Error, json.JSONDecodeError):
+                    log_exception(
+                        "Failed to load scenarios for ScenarioBuilderWizard.",
+                        func_name="ScenarioBuilderWizard.finish",
+                    )
+                    if not messagebox.askretrycancel(
+                        "Load Error",
+                        "An error occurred while loading scenarios. Retry?",
+                    ):
+                        return
+            replaced = False
+            for idx, existing in enumerate(items):
+                if existing.get("Title") == title:
+                    if not messagebox.askyesno(
+                        "Overwrite Scenario",
+                        f"A scenario titled '{title}' already exists. Overwrite it?",
+                    ):
+                        return
+                    items[idx] = payload
+                    replaced = True
+                    break
 
-        log_info(
-            f"Saving scenario '{title}' via builder wizard (replaced={replaced})",
-            func_name="ScenarioBuilderWizard.finish",
-        )
+            if not replaced:
+                items.append(payload)
 
-        self.scenario_wrapper.save_items(items)
-        messagebox.showinfo("Scenario Saved", f"Scenario '{title}' has been saved.")
-        if callable(self.on_saved):
-            try:
-                self.on_saved()
-            except Exception:
-                pass
+            log_info(
+                f"Saving scenario '{title}' via builder wizard (replaced={replaced})",
+                func_name="ScenarioBuilderWizard.finish",
+            )
+
+            self.scenario_wrapper.save_items(items)
+            messagebox.showinfo("Scenario Saved", f"Scenario '{title}' has been saved.")
+            if callable(self.on_saved):
+                try:
+                    self.on_saved()
+                except Exception:
+                    pass
+        finally:
+            for btn, previous_state in buttons.items():
+                btn.configure(state=previous_state)
         self.destroy()
 
