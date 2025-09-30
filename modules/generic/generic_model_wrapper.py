@@ -59,6 +59,10 @@ class GenericModelWrapper:
                         column_type = "INTEGER"
                     elif isinstance(value, float):
                         column_type = "REAL"
+                    elif isinstance(value, (list, dict)):
+                        column_type = "TEXT"
+                    elif isinstance(value, str) or value is None:
+                        column_type = "TEXT"
                     else:
                         column_type = "TEXT"
 
