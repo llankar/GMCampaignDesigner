@@ -1132,9 +1132,9 @@ class ScenesPlanningStep(WizardStep):
         self._close_link_label_editor()
         x1, y1, x2, y2 = bbox
         width = max(160, int(x2 - x1 + 24))
-        entry = ctk.CTkEntry(self.canvas, width=width)
+        entry = ctk.CTkEntry(self.canvas, width=width, height=30)
         entry.insert(0, link.get("text") or target_str)
-        entry.place(x=x1 - 12, y=y1 - 10, width=width, height=30)
+        entry.place(x=x1 - 12, y=y1 - 10)
         entry.focus_set()
         entry.select_range(0, "end")
         state = {
