@@ -1444,6 +1444,7 @@ class ScenarioGraphEditor(ctk.CTkFrame):
                 next_scene = normalized_scenes[scene["index"] + 1]
                 if next_scene.get("tag"):
                     links.append({"target_tag": next_scene["tag"], "text": "Continue"})
+            prepared_links = []
 
             for link in links:
                 text_auto_generated = bool(link.get("text_auto_generated"))
@@ -1470,10 +1471,6 @@ class ScenarioGraphEditor(ctk.CTkFrame):
                 if not target_tag or target_tag == from_tag:
                     continue
 
-                key = (from_tag, target_tag, text)
-                if key in existing_links:
-                    continue
-                existing_links.add(key)
                 target_scene = tag_lookup.get(target_tag)
                 if target_scene and not isinstance(link.get("target_index"), int):
                     link["target_index"] = target_scene.get("index")
@@ -1482,14 +1479,41 @@ class ScenarioGraphEditor(ctk.CTkFrame):
                 link["source_scene_index"] = scene.get("index")
                 if target_scene:
                     link["target_scene_index"] = target_scene.get("index")
+
+                prepared_links.append(
+                    {
+                        "text": text,
+                        "text_auto_generated": text_auto_generated,
+                        "target_tag": target_tag,
+                        "target_scene": target_scene,
+                        "link": link,
+                    }
+                )
+
+            pairs_with_explicit = {
+                (from_tag, item["target_tag"])
+                for item in prepared_links
+                if not item["text_auto_generated"]
+            }
+
+            for item in prepared_links:
+                pair = (from_tag, item["target_tag"])
+                if item["text_auto_generated"] and pair in pairs_with_explicit:
+                    continue
+
+                key = (from_tag, item["target_tag"], item["text"])
+                if key in existing_links:
+                    continue
+                existing_links.add(key)
+
                 self.graph["links"].append({
                     "from": from_tag,
-                    "to": target_tag,
-                    "text": text,
+                    "to": item["target_tag"],
+                    "text": item["text"],
                     "source_scene_index": scene.get("index"),
-                    "target_scene_index": target_scene.get("index") if target_scene else None,
-                    "link_data": link,
-                    "text_auto_generated": text_auto_generated,
+                    "target_scene_index": item["target_scene"].get("index") if item["target_scene"] else None,
+                    "link_data": item["link"],
+                    "text_auto_generated": item["text_auto_generated"],
                 })
 
         self.original_positions = dict(self.node_positions)
