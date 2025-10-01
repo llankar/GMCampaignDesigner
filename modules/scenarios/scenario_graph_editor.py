@@ -216,7 +216,7 @@ class ScenarioGraphEditor(ctk.CTkFrame):
         self.npc_wrapper = npc_wrapper
         self.creature_wrapper = creature_wrapper
         self.place_wrapper = place_wrapper
-        self.node_holder_images = {}    # <- keep PhotoImage refs here
+        self.node_holder_images = {}    # ← keep PhotoImage refs here
         self.node_bboxes = {}
         self.node_images = {}  # Prevent garbage collection of PhotoImage objects
         self.overlay_images={}
@@ -1444,16 +1444,19 @@ class ScenarioGraphEditor(ctk.CTkFrame):
                 next_scene = normalized_scenes[scene["index"] + 1]
                 if next_scene.get("tag"):
                     links.append({"target_tag": next_scene["tag"], "text": "Continue"})
+            prepared_links = []
 
             for link in links:
                 text_auto_generated = bool(link.get("text_auto_generated"))
-                raw_text = (link.get("text") or "").strip()
+                text = (link.get("text") or "").strip()
                 if (
                     text_auto_generated
-                    and self._link_text_matches_target(raw_text, link)
+                    and self._link_text_matches_target(text, link)
                 ):
-                    raw_text = ""
+                    text = ""
                     link["text"] = ""
+                if not text:
+                    text = "Continue"
 
                 target_tag = link.get("target_tag")
                 if not target_tag:
@@ -1469,12 +1472,6 @@ class ScenarioGraphEditor(ctk.CTkFrame):
                     continue
 
                 target_scene = tag_lookup.get(target_tag)
-                display_text = self._resolve_link_display_text(link, raw_text, target_scene)
-
-                key = (from_tag, target_tag, display_text)
-                if key in existing_links:
-                    continue
-                existing_links.add(key)
                 if target_scene and not isinstance(link.get("target_index"), int):
                     link["target_index"] = target_scene.get("index")
                 link["target_tag"] = target_tag
@@ -1482,16 +1479,41 @@ class ScenarioGraphEditor(ctk.CTkFrame):
                 link["source_scene_index"] = scene.get("index")
                 if target_scene:
                     link["target_scene_index"] = target_scene.get("index")
-                if display_text and display_text != link.get("text"):
-                    link["text"] = display_text
+
+                prepared_links.append(
+                    {
+                        "text": text,
+                        "text_auto_generated": text_auto_generated,
+                        "target_tag": target_tag,
+                        "target_scene": target_scene,
+                        "link": link,
+                    }
+                )
+
+            pairs_with_explicit = {
+                (from_tag, item["target_tag"])
+                for item in prepared_links
+                if not item["text_auto_generated"]
+            }
+
+            for item in prepared_links:
+                pair = (from_tag, item["target_tag"])
+                if item["text_auto_generated"] and pair in pairs_with_explicit:
+                    continue
+
+                key = (from_tag, item["target_tag"], item["text"])
+                if key in existing_links:
+                    continue
+                existing_links.add(key)
+
                 self.graph["links"].append({
                     "from": from_tag,
-                    "to": target_tag,
-                    "text": display_text,
+                    "to": item["target_tag"],
+                    "text": item["text"],
                     "source_scene_index": scene.get("index"),
-                    "target_scene_index": target_scene.get("index") if target_scene else None,
-                    "link_data": link,
-                    "text_auto_generated": text_auto_generated,
+                    "target_scene_index": item["target_scene"].get("index") if item["target_scene"] else None,
+                    "link_data": item["link"],
+                    "text_auto_generated": item["text_auto_generated"],
                 })
 
         self.original_positions = dict(self.node_positions)
@@ -2240,34 +2262,6 @@ class ScenarioGraphEditor(ctk.CTkFrame):
 
         return str(value).strip()
 
-    def _resolve_link_display_text(self, link_record, text_value, target_scene=None, default="Continue"):
-        """Return a human-friendly label for a scene transition."""
-
-        label = (text_value or "").strip()
-        if label:
-            return label
-
-        if isinstance(target_scene, dict):
-            for key in ("title", "display_name"):
-                candidate = target_scene.get(key)
-                if isinstance(candidate, str):
-                    candidate = candidate.strip()
-                    if candidate:
-                        return candidate
-            index_value = target_scene.get("index")
-            if isinstance(index_value, int):
-                return f"Scene {index_value + 1}"
-
-        candidate = self._normalise_link_text_value(link_record.get("target_key"))
-        if candidate:
-            return candidate
-
-        candidate = self._normalise_link_text_value(link_record.get("target"))
-        if candidate:
-            return candidate
-
-        return default
-
     def _link_text_matches_target(self, text, link_record):
         """Return True when the provided label simply mirrors the link target."""
 
@@ -2724,7 +2718,7 @@ class ScenarioGraphEditor(ctk.CTkFrame):
                     tags=("node", node_tag)
                 )
 
-                # -- NEW: draw the semitransparent watermark icon --
+                # ── NEW: draw the semitransparent watermark icon ──
                 icon = self.type_icons.get(node_type)
                 if icon:
                     # compute top-left corner of the post-it
@@ -2883,20 +2877,8 @@ class ScenarioGraphEditor(ctk.CTkFrame):
 
     def draw_links(self):
         self.canvas_link_items = {}
-        link_groups = {}
-        for link in self.graph.get("links", []):
-            key = (link.get("from"), link.get("to"))
-            link_groups.setdefault(key, []).append(link)
-
-        slot_lookup = {}
-        for group in link_groups.values():
-            total = len(group)
-            for idx, grouped_link in enumerate(group):
-                slot_lookup[id(grouped_link)] = (idx, total)
-
-        for link in self.graph.get("links", []):
-            slot_index, slot_count = slot_lookup.get(id(link), (0, 1))
-            self.draw_one_link(link, slot_index, slot_count)
+        for link in self.graph["links"]:
+            self.draw_one_link(link)
         self.canvas.tag_lower("link_line")
         self.canvas.tag_raise("link_label")
 
@@ -3185,7 +3167,7 @@ class ScenarioGraphEditor(ctk.CTkFrame):
 
         self.node_bboxes[node_tag] = (left, top, right, bottom)
 
-    def draw_one_link(self, link, slot_index=0, slot_count=1):
+    def draw_one_link(self, link):
         tag_from = link["from"]
         tag_to = link["to"]
         x1, y1 = self.node_positions.get(tag_from, (0, 0))
@@ -3216,19 +3198,12 @@ class ScenarioGraphEditor(ctk.CTkFrame):
             mid_y = (y1 + y2) / 2
             dx = x2 - x1
             dy = y2 - y1
-            length = math.hypot(dx, dy) or 1.0
-            perp_unit_x = -dy / length
-            perp_unit_y = dx / length
-            tangent_unit_x = dx / length
-            tangent_unit_y = dy / length
-            base_offset = 18
-            label_x = mid_x + perp_unit_x * base_offset
-            label_y = mid_y + perp_unit_y * base_offset
-            if slot_count > 1:
-                slot_position = slot_index - (slot_count - 1) / 2.0
-                spacing = max(36, 24 * self.canvas_scale)
-                label_x += tangent_unit_x * spacing * slot_position
-                label_y += tangent_unit_y * spacing * slot_position
+            length = math.hypot(dx, dy) or 1
+            offset = 18
+            offset_x = -dy / length * offset
+            offset_y = dx / length * offset
+            label_x = mid_x + offset_x
+            label_y = mid_y + offset_y
             default_font_size = max(8, int(10 * self.canvas_scale))
 
             font_spec = link.get("label_font") or link.get("font")
