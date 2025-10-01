@@ -719,7 +719,7 @@ def insert_list_longtext(parent, header, items, open_entity_callback=None, entit
             ctk.CTkLabel(link_section, text="Links:", font=("Arial", 13, "bold"))\
                 .pack(anchor="w")
             for link in links:
-                text_val = str(link.get("text") or "Continue").strip()
+                text_val = str(link.get("text") or "").strip()
                 target_val = link.get("target")
                 if isinstance(target_val, (int, float)):
                     target_display = f"Scene {int(target_val)}"
@@ -727,6 +727,8 @@ def insert_list_longtext(parent, header, items, open_entity_callback=None, entit
                     target_display = str(target_val)
                 else:
                     target_display = "(unspecified)"
+                if not text_val:
+                    text_val = "(no link text)"
                 CTkLabel(
                     link_section,
                     text=f"• {text_val} → {target_display}",
