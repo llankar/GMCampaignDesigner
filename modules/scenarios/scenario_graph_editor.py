@@ -1443,7 +1443,13 @@ class ScenarioGraphEditor(ctk.CTkFrame):
             if not links and scene.get("index", 0) < count - 1:
                 next_scene = normalized_scenes[scene["index"] + 1]
                 if next_scene.get("tag"):
-                    links.append({"target_tag": next_scene["tag"], "text": "Continue"})
+                    links.append(
+                        {
+                            "target_tag": next_scene["tag"],
+                            "text": "Continue",
+                            "text_auto_generated": True,
+                        }
+                    )
             prepared_links = []
 
             for link in links:
@@ -1457,6 +1463,9 @@ class ScenarioGraphEditor(ctk.CTkFrame):
                     link["text"] = ""
                 if not text:
                     text = "Continue"
+                    if not text_auto_generated:
+                        text_auto_generated = True
+                        link["text_auto_generated"] = True
 
                 target_tag = link.get("target_tag")
                 if not target_tag:
