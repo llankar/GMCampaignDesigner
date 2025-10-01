@@ -288,6 +288,17 @@ class ScenesPlanningStep(WizardStep):
         menu.add_command(label="Duplicate Scene", command=lambda idx=index: self.duplicate_scene(idx))
         menu.add_command(label="Remove Scene", command=lambda idx=index: self.remove_scene(idx))
 
+        menu.add_separator()
+        for field, (slug, _, singular_label) in self.ENTITY_FIELDS.items():
+            if slug in self.entity_wrappers:
+                menu.add_command(
+                    label=f"Create {singular_label}",
+                    command=lambda f=field, idx=index: self._create_entity_for_scene(idx, f),
+                )
+            else:
+                menu.add_command(label=f"Create {singular_label}", state="disabled")
+
+        menu.add_separator()
         for field, (_, _, singular_label) in self.ENTITY_FIELDS.items():
             entries = []
             if 0 <= index < len(self.scenes):
@@ -312,22 +323,6 @@ class ScenesPlanningStep(WizardStep):
                 menu.add_cascade(label=f"Remove {singular_label}s", menu=remove_menu)
             else:
                 menu.add_command(label=f"Remove {singular_label}s", state="disabled")
-
-        link_targets = [
-            (i, self.scenes[i].get("Title") or f"Scene {i + 1}")
-            for i in range(len(self.scenes))
-            if i != index
-        ]
-        add_menu = tk.Menu(menu, tearoff=0)
-        for target_idx, title in link_targets:
-            add_menu.add_command(
-                label=title,
-                command=lambda t=title, idx=index: self._add_link_between(idx, t, label=t),
-            )
-        if link_targets:
-            menu.add_cascade(label="Add Link To", menu=add_menu)
-        else:
-            menu.add_command(label="Add Link To", state="disabled")
 
         existing_links = self._get_scene_links(self.scenes[index])
         if existing_links:
@@ -426,6 +421,23 @@ class ScenesPlanningStep(WizardStep):
         bucket = scene.setdefault(entity_type, [])
         if selected not in bucket:
             bucket.append(selected)
+            bucket.sort(key=lambda value: value.lower() if isinstance(value, str) else str(value))
+        self.canvas.set_scenes(self.scenes, self.selected_index)
+
+    def _create_entity_for_scene(self, scene_index, entity_type):
+        if scene_index is None or scene_index >= len(self.scenes):
+            return
+        config = self.ENTITY_FIELDS.get(entity_type)
+        if not config:
+            return
+        slug, _, singular_label = config
+        name = self._create_entity_in_library(slug, singular_label)
+        if not name:
+            return
+        scene = self.scenes[scene_index]
+        bucket = scene.setdefault(entity_type, [])
+        if name not in bucket:
+            bucket.append(name)
             bucket.sort(key=lambda value: value.lower() if isinstance(value, str) else str(value))
         self.canvas.set_scenes(self.scenes, self.selected_index)
 
@@ -610,7 +622,7 @@ class ScenesPlanningStep(WizardStep):
             wrapper.save_items(items)
         except Exception as exc:
             log_exception(
-                f"Failed to save {entity_type}: {exc}",
+                f"Failed to save {entity_slug}: {exc}",
                 func_name="ScenesPlanningStep._create_entity_in_library",
             )
             messagebox.showerror("Save Error", f"Unable to save the new {singular_label}.")
