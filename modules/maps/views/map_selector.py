@@ -2,6 +2,7 @@ from tkinter import messagebox
 import ast
 import json
 import os
+from functools import lru_cache
 import tkinter as tk
 import customtkinter as ctk
 from PIL import Image, ImageTk, ImageDraw
@@ -38,6 +39,73 @@ def _campaign_relative_path(path: str) -> str:
     if relative.startswith(".."):  # outside the campaign directory
         return path
     return relative.replace(os.sep, "/")
+
+
+@lru_cache(maxsize=256)
+def _find_existing_token_image(original_path: str) -> str:
+    """Attempt to locate a token image inside the current campaign.
+
+    Some persisted databases contain absolute paths from other machines. When
+    those paths are reloaded we try to discover a matching asset inside the
+    active campaign directory by progressively stripping leading folders and
+    finally falling back to a filename search beneath the campaign's assets
+    directory. Returns an absolute path if a match is found, otherwise an empty
+    string.
+    """
+
+    if not original_path:
+        return ""
+
+    campaign_dir = ConfigHelper.get_campaign_dir()
+    normalized = os.path.normpath(str(original_path))
+
+    if os.path.isabs(normalized) and os.path.exists(normalized):
+        return normalized
+
+    parts = [
+        part for part in normalized.replace("\\", "/").split("/")
+        if part and part != "." and not (len(part) == 2 and part[1] == ":") and not part.endswith(":")
+    ]
+
+    if not parts:
+        return ""
+
+    candidates = []
+    seen = set()
+    lowered_parts = [part.lower() for part in parts]
+
+    if "assets" in lowered_parts:
+        idx = lowered_parts.index("assets")
+        candidate_rel = os.path.join(*parts[idx:])
+        candidate_abs = os.path.normpath(os.path.join(campaign_dir, candidate_rel))
+        if candidate_abs not in seen:
+            candidates.append(candidate_abs)
+            seen.add(candidate_abs)
+
+    for start in range(len(parts)):
+        candidate_rel = os.path.join(*parts[start:])
+        candidate_abs = os.path.normpath(os.path.join(campaign_dir, candidate_rel))
+        if candidate_abs not in seen:
+            candidates.append(candidate_abs)
+            seen.add(candidate_abs)
+
+    for candidate in candidates:
+        if os.path.exists(candidate):
+            return candidate
+
+    filename = os.path.basename(normalized)
+    if not filename:
+        return ""
+
+    assets_root = os.path.join(campaign_dir, "assets")
+    if not os.path.isdir(assets_root):
+        return ""
+
+    for root, _, files in os.walk(assets_root):
+        if filename in files:
+            return os.path.join(root, filename)
+
+    return ""
 
 def select_map(self):
     """Show the full‐frame map selector, replacing any existing UI."""
@@ -193,8 +261,20 @@ def _on_display_map(self, entity_type, map_name): # entity_type here is the map'
 
             portrait_path = (rec.get("image_path") or "").strip()
             path = _resolve_campaign_path(portrait_path) if portrait_path else ""
+
+            if path and not os.path.exists(path):
+                fallback_path = _find_existing_token_image(portrait_path)
+                if not fallback_path and portrait_path != path:
+                    fallback_path = _find_existing_token_image(path)
+                if fallback_path and os.path.exists(fallback_path):
+                    path = fallback_path
+                    portrait_path = _campaign_relative_path(path)
+                    print(
+                        f"[_on_display_map] Updated missing token image path to '{portrait_path}'."
+                    )
+
             storage_path = _campaign_relative_path(path) if path else portrait_path
-            
+
             sz   = rec.get("size", self.token_size) # Use self.token_size as default
             pil_image = None
             source_image = None
@@ -203,9 +283,9 @@ def _on_display_map(self, entity_type, map_name): # entity_type here is the map'
                     source_image = Image.open(path).convert("RGBA")
                     pil_image = source_image.resize((sz, sz), resample=Image.LANCZOS)
                 elif path: # Path provided but does not exist
-                     print(f"[_on_display_map] Token image path not found: '{path}'. Creating placeholder.")
-                     pil_image = Image.new("RGBA", (sz, sz), (255, 0, 0, 128)) # Red placeholder
-                     source_image = pil_image
+                    print(f"[_on_display_map] Token image path not found: '{path}'. Creating placeholder.")
+                    pil_image = Image.new("RGBA", (sz, sz), (255, 0, 0, 128)) # Red placeholder
+                    source_image = pil_image
                 else: # No path provided for a token
                     print(f"[_on_display_map] Token missing image_path. Creating placeholder for ID: {rec.get('entity_id')}.")
                     pil_image = Image.new("RGBA", (sz, sz), (255, 0, 0, 128)) # Red placeholder
