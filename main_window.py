@@ -123,6 +123,7 @@ class MainWindow(ctk.CTk):
         self.create_exit_button()
         self.load_model_config()
         self.init_wrappers()
+        self._normalize_entity_media_paths()
         self.current_gm_view = None
         self.dice_roller_window = None
         self.dice_bar_window = None
@@ -863,6 +864,142 @@ class MainWindow(ctk.CTk):
                 setattr(self, attr, wrapper)
 
         log_info("Entity wrappers initialized", func_name="main_window.MainWindow.init_wrappers")
+
+    def _normalize_entity_media_paths(self):
+        """Ensure stored portrait/image paths are relative within the campaign."""
+
+        raw_db_path = ConfigHelper.get("Database", "path", fallback="default_campaign.db") or "default_campaign.db"
+        campaign_dir_candidates = []
+
+        try:
+            campaign_dir_candidates.append(Path(raw_db_path).parent)
+        except Exception:
+            pass
+
+        try:
+            campaign_dir_candidates.append(Path(ConfigHelper.get_campaign_dir()))
+        except Exception:
+            pass
+
+        # Deduplicate while preserving order
+        unique_candidates = []
+        seen = set()
+        for candidate in campaign_dir_candidates:
+            candidate_str = str(candidate)
+            if candidate_str and candidate_str not in seen:
+                unique_candidates.append(candidate)
+                seen.add(candidate_str)
+
+        path_fields = ("Portrait", "portrait", "Image", "image", "TokenImage", "tokenImage", "Token", "token")
+
+        for slug, wrapper in self.entity_wrappers.items():
+            try:
+                items = wrapper.load_items()
+            except Exception as exc:
+                log_exception(
+                    f"Unable to load items for '{slug}' while normalizing media paths: {exc}",
+                    func_name="main_window.MainWindow._normalize_entity_media_paths",
+                )
+                continue
+
+            updated = False
+            for item in items:
+                if not isinstance(item, dict):
+                    continue
+
+                for field in path_fields:
+                    if field not in item:
+                        continue
+
+                    new_value, changed = self._normalize_single_media_path(item.get(field, ""), unique_candidates)
+                    if changed:
+                        item[field] = new_value
+                        updated = True
+
+            if updated:
+                try:
+                    wrapper.save_items(items)
+                    log_info(
+                        f"Normalized media paths for entity '{slug}'",
+                        func_name="main_window.MainWindow._normalize_entity_media_paths",
+                    )
+                except Exception as exc:
+                    log_exception(
+                        f"Unable to save normalized media paths for '{slug}': {exc}",
+                        func_name="main_window.MainWindow._normalize_entity_media_paths",
+                    )
+
+    def _normalize_single_media_path(self, value, base_candidates):
+        """Return normalized (relative) path for portraits/images."""
+
+        if not isinstance(value, str):
+            return value, False
+
+        raw = value
+        stripped = raw.strip()
+        if not stripped:
+            return "", raw != ""
+
+        normalized = stripped.replace("\\", "/")
+        changed = normalized != raw
+
+        if not self._is_absolute_path(normalized):
+            if normalized.startswith("./"):
+                normalized = normalized[2:]
+                changed = True
+            return normalized, changed
+
+        path_obj = Path(normalized)
+
+        for base in base_candidates:
+            base_str = str(base).replace("\\", "/").rstrip("/")
+            if not base_str:
+                continue
+
+            lower_value = normalized.lower()
+            lower_base = base_str.lower()
+
+            if lower_value == lower_base:
+                return ".", True
+
+            if lower_value.startswith(lower_base + "/"):
+                relative_part = normalized[len(base_str) + 1 :]
+                return relative_part, True
+
+            try:
+                rel_path = path_obj.relative_to(base)
+                return rel_path.as_posix(), True
+            except Exception:
+                continue
+
+        lowered = normalized.lower()
+        for marker in ("/assets/", "/static/", "/images/"):
+            idx = lowered.find(marker)
+            if idx != -1:
+                rel_path = normalized[idx + 1 :]
+                return rel_path, True
+
+        log_warning(
+            f"Unable to derive relative path from '{value}', leaving as-is.",
+            func_name="main_window.MainWindow._normalize_single_media_path",
+        )
+        return normalized, changed
+
+    @staticmethod
+    def _is_absolute_path(path_value: str) -> bool:
+        if not path_value:
+            return False
+
+        if path_value.startswith(("/", "\\")):
+            return True
+
+        if re.match(r"^[a-zA-Z]:[\\/].*", path_value):
+            return True
+
+        if path_value.startswith("~"):
+            return True
+
+        return False
 
     def refresh_entities(self, *_):
         self.entity_definitions = load_entity_definitions()
