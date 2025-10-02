@@ -20,7 +20,13 @@ from modules.maps.views.canvas_view import _build_canvas, _on_delete_key
 from modules.maps.services.fog_manager import _set_fog, clear_fog, reset_fog, on_paint
 # Removed direct imports from token_manager, as methods are now part of this controller or generic
 # from modules.maps.services.token_manager import add_token, _on_token_press, _on_token_move, _on_token_release, _copy_token, _paste_token, _show_token_menu, _resize_token_dialog, _change_token_border_color, _delete_token, _persist_tokens
-from modules.maps.services.token_manager import add_token, _persist_tokens, _change_token_border_color # Keep this if it's used by other token_manager functions not moved
+from modules.maps.services.token_manager import (
+    add_token,
+    _persist_tokens,
+    _change_token_border_color,
+    _resolve_campaign_path,
+    normalize_existing_token_paths,
+)  # Keep this if it's used by other token_manager functions not moved
 from modules.maps.views.fullscreen_view import open_fullscreen, _update_fullscreen_map
 from modules.maps.views.web_display_view import open_web_display, _update_web_display_map, close_web_display
 from modules.maps.services.entity_picker_service import open_entity_picker, on_entity_selected
@@ -55,7 +61,9 @@ class DisplayMapController:
         self.parent = parent
         self.maps = maps_wrapper
         self.map_template = map_template
-    
+
+        normalize_existing_token_paths(maps_wrapper)
+
         self._model_wrappers = {
             "NPC":      GenericModelWrapper("npcs"),
             "Creature": GenericModelWrapper("creatures"),
@@ -1994,13 +2002,15 @@ class DisplayMapController:
         source_img = token.get("source_image")
 
         if "image_path" in token and token["image_path"]:
+            resolved_path = _resolve_campaign_path(token["image_path"])
             try:
-                if source_img is None:
-                    source_img = Image.open(token["image_path"]).convert("RGBA")
-                token["source_image"] = source_img
-                token["pil_image"] = source_img.resize((new_size, new_size), Image.LANCZOS)
+                if source_img is None and resolved_path:
+                    source_img = Image.open(resolved_path).convert("RGBA")
+                if source_img is not None:
+                    token["source_image"] = source_img
+                    token["pil_image"] = source_img.resize((new_size, new_size), Image.LANCZOS)
             except FileNotFoundError:
-                print(f"Error: Image file not found for token: {token['image_path']}")
+                print(f"Error: Image file not found for token: {resolved_path}")
             except Exception as exc:
                 print(f"Error reloading image for resized token: {exc}")
         elif source_img is not None:

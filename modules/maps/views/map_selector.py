@@ -24,6 +24,21 @@ def _resolve_campaign_path(path: str) -> str:
         return os.path.normpath(normalized)
     return os.path.normpath(os.path.join(ConfigHelper.get_campaign_dir(), normalized))
 
+
+def _campaign_relative_path(path: str) -> str:
+    if not path:
+        return ""
+    if not os.path.isabs(path):
+        return str(path).replace("\\", "/")
+    campaign_dir = ConfigHelper.get_campaign_dir()
+    try:
+        relative = os.path.relpath(path, campaign_dir)
+    except ValueError:
+        return path
+    if relative.startswith(".."):  # outside the campaign directory
+        return path
+    return relative.replace(os.sep, "/")
+
 def select_map(self):
     """Show the full‐frame map selector, replacing any existing UI."""
     for w in self.parent.winfo_children():
@@ -178,6 +193,7 @@ def _on_display_map(self, entity_type, map_name): # entity_type here is the map'
 
             portrait_path = (rec.get("image_path") or "").strip()
             path = _resolve_campaign_path(portrait_path) if portrait_path else ""
+            storage_path = _campaign_relative_path(path) if path else portrait_path
             
             sz   = rec.get("size", self.token_size) # Use self.token_size as default
             pil_image = None
@@ -202,7 +218,7 @@ def _on_display_map(self, entity_type, map_name): # entity_type here is the map'
             item_data.update({
                 "entity_type":  rec.get("entity_type"), # Must come from record for tokens
                 "entity_id":    rec.get("entity_id"),
-                "image_path":   path,
+                "image_path":   storage_path,
                 "source_image": source_image,
                 "pil_image":    pil_image,
                 "border_color": rec.get("border_color", "#0000ff"), # Default blue for tokens
