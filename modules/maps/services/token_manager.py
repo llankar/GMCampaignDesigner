@@ -1,3 +1,4 @@
+import ast
 import json
 from PIL import Image
 from tkinter import messagebox, colorchooser
@@ -7,6 +8,7 @@ from modules.ui.image_viewer import show_portrait
 import tkinter.simpledialog as sd
 import tkinter as tk
 import threading
+from typing import Any, Tuple
 from modules.helpers.logging_helper import log_module_import
 
 log_module_import(__name__)
@@ -37,6 +39,82 @@ def _campaign_relative_path(path: str) -> str:
         return path
     return relative.replace(os.sep, "/")
 
+
+def _deserialize_tokens_field(raw_tokens: Any) -> Tuple[list, type]:
+    """Return a list of token dicts and remember the original container type."""
+    if isinstance(raw_tokens, list):
+        return raw_tokens, list
+    if isinstance(raw_tokens, str):
+        trimmed = raw_tokens.strip()
+        if not trimmed:
+            return [], str
+        try:
+            parsed = json.loads(trimmed)
+            if isinstance(parsed, list):
+                return parsed, str
+        except json.JSONDecodeError:
+            try:
+                parsed = ast.literal_eval(trimmed)
+                if isinstance(parsed, list):
+                    return parsed, str
+            except (ValueError, SyntaxError):
+                pass
+        return [], str
+    return [], type(raw_tokens)
+
+
+def normalize_existing_token_paths(maps_wrapper) -> bool:
+    """Convert stored token image paths to campaign-relative references."""
+    if not maps_wrapper:
+        return False
+
+    try:
+        items = maps_wrapper.load_items()
+    except Exception:
+        return False
+
+    updated_items = []
+    any_updated = False
+
+    for item in items:
+        raw_tokens = item.get("Tokens")
+        tokens_list, original_type = _deserialize_tokens_field(raw_tokens)
+        if not tokens_list:
+            updated_items.append(item)
+            continue
+
+        item_updated = False
+        for token in tokens_list:
+            if not isinstance(token, dict):
+                continue
+            existing_path = token.get("image_path")
+            if not existing_path:
+                continue
+            resolved = _resolve_campaign_path(existing_path)
+            relative = _campaign_relative_path(resolved)
+            if relative and relative != existing_path:
+                token["image_path"] = relative
+                item_updated = True
+
+        if item_updated:
+            new_item = dict(item)
+            if original_type is str:
+                new_item["Tokens"] = json.dumps(tokens_list)
+            else:
+                new_item["Tokens"] = tokens_list
+            updated_items.append(new_item)
+            any_updated = True
+        else:
+            updated_items.append(item)
+
+    if any_updated:
+        try:
+            maps_wrapper.save_items(updated_items)
+        except Exception:
+            return False
+
+    return any_updated
+
 def add_token(self, path, entity_type, entity_name, entity_record=None):
     img_path = _resolve_campaign_path(path)
     if not img_path or not os.path.exists(img_path):
@@ -50,6 +128,8 @@ def add_token(self, path, entity_type, entity_name, entity_record=None):
     logical_size = int(self.token_size)
     pil_img = source_img.resize((logical_size, logical_size), resample=Image.LANCZOS)
 
+    storage_path = _campaign_relative_path(img_path)
+
     # Get canvas center in world coords
     self.canvas.update_idletasks()
     cw = self.canvas.winfo_width()
@@ -61,7 +141,7 @@ def add_token(self, path, entity_type, entity_name, entity_record=None):
         "type":         "token",
         "entity_type":  entity_type,
         "entity_id":    entity_name,
-        "image_path":   img_path,
+        "image_path":   storage_path,
         "size":         logical_size,
         "source_image": source_img,
         "pil_image":    pil_img,
@@ -162,6 +242,7 @@ def _paste_token(self, event=None):
     # Re-create the PIL image at the original token size
     resolved_path = _resolve_campaign_path(c.get("image_path"))
     source_img = Image.open(resolved_path).convert("RGBA")
+    storage_path = _campaign_relative_path(resolved_path)
     size = int(c["size"])
     pil_img = source_img.resize((size, size), Image.LANCZOS)
 
@@ -170,7 +251,7 @@ def _paste_token(self, event=None):
         "type":         "token",
         "entity_type":  c["entity_type"],
         "entity_id":    c["entity_id"],
-        "image_path":   resolved_path,
+        "image_path":   storage_path,
         "size":         size,
         "source_image": source_img,
         "border_color": c["border_color"],
