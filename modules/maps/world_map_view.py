@@ -3,6 +3,7 @@ import os
 import json
 import textwrap
 import importlib
+from functools import lru_cache
 import tkinter as tk
 from tkinter import messagebox, simpledialog, colorchooser
 import customtkinter as ctk
@@ -43,6 +44,24 @@ _tkcolorpicker_spec = importlib.util.find_spec("tkcolorpicker")
 if _tkcolorpicker_spec is not None:
     _tkcolorpicker_module = importlib.import_module("tkcolorpicker")
     _TKCOLORPICKER_ASKCOLOR = getattr(_tkcolorpicker_module, "askcolor", None)
+
+
+@lru_cache(maxsize=1)
+def _default_pin_image_path() -> str:
+    """Return the absolute path to the bundled pin placeholder image."""
+
+    campaign_dir = ConfigHelper.get_campaign_dir()
+    if campaign_dir:
+        campaign_pin = os.path.join(campaign_dir, "assets", "pin.png")
+        if os.path.exists(campaign_pin):
+            return os.path.normpath(campaign_pin)
+
+    project_root = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
+    bundled_pin = os.path.join(project_root, "assets", "pin.png")
+    if os.path.exists(bundled_pin):
+        return os.path.normpath(bundled_pin)
+
+    return ""
 
 class WorldMapWindow(ctk.CTkToplevel):
     """Interactive world map viewer with nested map support."""
@@ -1029,6 +1048,23 @@ class WorldMapWindow(ctk.CTkToplevel):
             pil = self._load_image(portrait)
             if pil is not None:
                 return pil.resize((size, size), Image.LANCZOS)
+        pin_path = _default_pin_image_path()
+        if pin_path:
+            pin_image = self._load_image(pin_path)
+            if pin_image is not None:
+                resized_pin = pin_image.resize((size, size), Image.LANCZOS)
+                canvas = resized_pin.copy()
+                label = (token.get("entity_id") or "?")[:2].upper()
+                if label.strip():
+                    draw = ImageDraw.Draw(canvas)
+                    draw.text(
+                        (size / 2, size * 0.4),
+                        label,
+                        fill="#0B0B0B",
+                        anchor="mm",
+                        align="center",
+                    )
+                return canvas
         placeholder = Image.new("RGBA", (size, size), (0, 0, 0, 0))
         draw = ImageDraw.Draw(placeholder)
         color = self._resolve_token_color(token)
