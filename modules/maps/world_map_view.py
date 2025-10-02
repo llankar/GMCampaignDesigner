@@ -1003,14 +1003,26 @@ class WorldMapWindow(ctk.CTkToplevel):
         if not token.get("_uses_pin_image"):
             border_color = self._resolve_token_color(token)
             border_width = max(3, int(round(size * 0.08)))
-            border_id = self.canvas.create_oval(
-                x - radius,
-                y - radius,
-                x + radius,
-                y + radius,
-                outline=border_color,
-                width=border_width,
-            )
+            if token.get("_has_portrait_image"):
+                half_size = size / 2
+                margin = border_width / 2
+                border_id = self.canvas.create_rectangle(
+                    int(round(x - half_size - margin)),
+                    int(round(y - half_size - margin)),
+                    int(round(x + half_size + margin)),
+                    int(round(y + half_size + margin)),
+                    outline=border_color,
+                    width=border_width,
+                )
+            else:
+                border_id = self.canvas.create_oval(
+                    x - radius,
+                    y - radius,
+                    x + radius,
+                    y + radius,
+                    outline=border_color,
+                    width=border_width,
+                )
             self.canvas.tag_raise(border_id, image_id)
             canvas_ids.append(border_id)
 
@@ -1046,11 +1058,13 @@ class WorldMapWindow(ctk.CTkToplevel):
             )
     def _create_token_pil_image(self, token: dict, size: int) -> Image.Image:
         token["_uses_pin_image"] = False
+        token["_has_portrait_image"] = False
 
         portrait = token.get("portrait_path") or token.get("image_path")
         if portrait:
             pil = self._load_image(portrait)
             if pil is not None:
+                token["_has_portrait_image"] = True
                 return pil.resize((size, size), Image.LANCZOS)
         pin_path = _default_pin_image_path()
         if pin_path:
