@@ -241,6 +241,8 @@ def _on_display_map(self, entity_type, map_name): # entity_type here is the map'
     pcs       = {r.get("Name"): r for r in self._model_wrappers["PC"].load_items()}
 
     # 7) Build self.tokens (now includes shapes)
+    token_paths_updated = False
+
     for rec in token_list:
         item_type_from_rec = rec.get("type", "token") # Default to token if not specified
         
@@ -272,6 +274,8 @@ def _on_display_map(self, entity_type, map_name): # entity_type here is the map'
                     print(
                         f"[_on_display_map] Updated missing token image path to '{portrait_path}'."
                     )
+                    rec["image_path"] = portrait_path
+                    token_paths_updated = True
 
             storage_path = _campaign_relative_path(path) if path else portrait_path
 
@@ -338,6 +342,12 @@ def _on_display_map(self, entity_type, map_name): # entity_type here is the map'
             continue
 
         self.tokens.append(item_data)
+
+    if token_paths_updated:
+        try:
+            self._persist_tokens()
+        except Exception as exc:
+            print(f"[_on_display_map] Failed to persist updated token image paths: {exc}")
 
     # 8) Hydrate token metadata for info card display (ONLY FOR TOKENS)
     for current_item in self.tokens:
