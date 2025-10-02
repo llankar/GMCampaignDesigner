@@ -41,6 +41,24 @@ def _campaign_relative_path(path: str) -> str:
     return relative.replace(os.sep, "/")
 
 
+@lru_cache(maxsize=1)
+def _default_token_image_path() -> str:
+    """Locate the default pin image shipped with the application."""
+
+    campaign_pin = _resolve_campaign_path(os.path.join("assets", "pin.png"))
+    if campaign_pin and os.path.exists(campaign_pin):
+        return campaign_pin
+
+    project_root = os.path.dirname(
+        os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
+    )
+    bundled_pin = os.path.normpath(os.path.join(project_root, "assets", "pin.png"))
+    if os.path.exists(bundled_pin):
+        return bundled_pin
+
+    return ""
+
+
 @lru_cache(maxsize=256)
 def _find_existing_token_image(original_path: str) -> str:
     """Attempt to locate a token image inside the current campaign.
@@ -277,27 +295,49 @@ def _on_display_map(self, entity_type, map_name): # entity_type here is the map'
                     rec["image_path"] = portrait_path
                     token_paths_updated = True
 
-            storage_path = _campaign_relative_path(path) if path else portrait_path
-
             sz   = rec.get("size", self.token_size) # Use self.token_size as default
             pil_image = None
             source_image = None
-            try:
-                if path and os.path.exists(path): # Check if path exists
-                    source_image = Image.open(path).convert("RGBA")
-                    pil_image = source_image.resize((sz, sz), resample=Image.LANCZOS)
-                elif path: # Path provided but does not exist
-                    print(f"[_on_display_map] Token image path not found: '{path}'. Creating placeholder.")
-                    pil_image = Image.new("RGBA", (sz, sz), (255, 0, 0, 128)) # Red placeholder
-                    source_image = pil_image
-                else: # No path provided for a token
-                    print(f"[_on_display_map] Token missing image_path. Creating placeholder for ID: {rec.get('entity_id')}.")
-                    pil_image = Image.new("RGBA", (sz, sz), (255, 0, 0, 128)) # Red placeholder
-                    source_image = pil_image
-            except Exception as e:
-                print(f"[_on_display_map] Failed to load token image '{path}': {e}. Creating placeholder.")
-                pil_image = Image.new("RGBA", (sz, sz), (255, 0, 0, 128)) # Red placeholder on any error
+            resolved_path = ""
+
+            if path:
+                if os.path.exists(path):
+                    try:
+                        source_image = Image.open(path).convert("RGBA")
+                        pil_image = source_image.resize((sz, sz), resample=Image.LANCZOS)
+                        resolved_path = path
+                    except Exception as e:
+                        print(f"[_on_display_map] Failed to load token image '{path}': {e}. Trying default pin image.")
+                        source_image = None
+                        pil_image = None
+                else:
+                    print(f"[_on_display_map] Token image path not found: '{path}'. Trying default pin image.")
+            else:
+                print(f"[_on_display_map] Token missing image_path. Trying default pin image for ID: {rec.get('entity_id')}.")
+
+            if pil_image is None:
+                default_pin_path = _default_token_image_path()
+                if default_pin_path and os.path.exists(default_pin_path):
+                    try:
+                        source_image = Image.open(default_pin_path).convert("RGBA")
+                        pil_image = source_image.resize((sz, sz), resample=Image.LANCZOS)
+                        resolved_path = default_pin_path
+                        print(f"[_on_display_map] Using default pin image for token '{rec.get('entity_id')}'.")
+                    except Exception as fallback_error:
+                        print(
+                            "[_on_display_map] Failed to load default pin image: "
+                            f"{fallback_error}. Creating placeholder."
+                        )
+                        source_image = None
+                        pil_image = None
+                else:
+                    print("[_on_display_map] Default pin image not found. Creating placeholder.")
+
+            if pil_image is None:
+                pil_image = Image.new("RGBA", (sz, sz), (255, 0, 0, 128))
                 source_image = pil_image
+
+            storage_path = _campaign_relative_path(resolved_path) if resolved_path else portrait_path
 
             item_data.update({
                 "entity_type":  rec.get("entity_type"), # Must come from record for tokens
