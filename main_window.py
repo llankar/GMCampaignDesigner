@@ -1892,7 +1892,13 @@ class MainWindow(ctk.CTk):
             img = img.convert("RGB")
             img.thumbnail(MAX_PORTRAIT_SIZE)
             img.save(dest_path)
-        return dest_path
+        try:
+            relative_path = os.path.relpath(dest_path, campaign_dir)
+        except ValueError:
+            return dest_path
+        if relative_path.startswith(".."):
+            return dest_path
+        return relative_path.replace(os.sep, "/")
 
     def import_portraits_from_directory(self):
         """Match and import portraits from a directory for all portrait-capable entities."""

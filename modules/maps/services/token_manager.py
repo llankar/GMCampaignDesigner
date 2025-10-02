@@ -11,12 +11,34 @@ from modules.helpers.logging_helper import log_module_import
 
 log_module_import(__name__)
 
+
+def _resolve_campaign_path(path: str) -> str:
+    if not path:
+        return ""
+    normalized = str(path).strip()
+    if not normalized:
+        return ""
+    if os.path.isabs(normalized):
+        return os.path.normpath(normalized)
+    return os.path.normpath(os.path.join(ConfigHelper.get_campaign_dir(), normalized))
+
+
+def _campaign_relative_path(path: str) -> str:
+    if not path:
+        return ""
+    if not os.path.isabs(path):
+        return str(path).replace("\\", "/")
+    campaign_dir = ConfigHelper.get_campaign_dir()
+    try:
+        relative = os.path.relpath(path, campaign_dir)
+    except ValueError:
+        return path
+    if relative.startswith(".."):  # outside the campaign directory
+        return path
+    return relative.replace(os.sep, "/")
+
 def add_token(self, path, entity_type, entity_name, entity_record=None):
-    img_path = path
-    if img_path and not os.path.isabs(img_path):
-        candidate = os.path.join(ConfigHelper.get_campaign_dir(), img_path)
-        if os.path.exists(candidate):
-            img_path = candidate
+    img_path = _resolve_campaign_path(path)
     if not img_path or not os.path.exists(img_path):
         messagebox.showerror(
             "Error",
@@ -138,7 +160,8 @@ def _paste_token(self, event=None):
     vcy = (self.canvas.winfo_height() // 2 - self.pan_y) / self.zoom
 
     # Re-create the PIL image at the original token size
-    source_img = Image.open(c["image_path"]).convert("RGBA")
+    resolved_path = _resolve_campaign_path(c.get("image_path"))
+    source_img = Image.open(resolved_path).convert("RGBA")
     size = int(c["size"])
     pil_img = source_img.resize((size, size), Image.LANCZOS)
 
@@ -147,7 +170,7 @@ def _paste_token(self, event=None):
         "type":         "token",
         "entity_type":  c["entity_type"],
         "entity_id":    c["entity_id"],
-        "image_path":   c["image_path"],
+        "image_path":   resolved_path,
         "size":         size,
         "source_image": source_img,
         "border_color": c["border_color"],
@@ -179,7 +202,8 @@ def _resize_token_dialog(self, token):
     try:
         source_img = token.get("source_image")
         if source_img is None:
-            source_img = Image.open(token["image_path"]).convert("RGBA")
+            resolved = _resolve_campaign_path(token.get("image_path"))
+            source_img = Image.open(resolved).convert("RGBA")
         pil = source_img.resize((new_size, new_size), Image.LANCZOS)
     except Exception as e:
         messagebox.showerror("Error", f"Could not resize token image:\n{e}")
@@ -299,10 +323,11 @@ def _persist_tokens(self):
             }
 
             if item_type == "token":
+                storage_path = _campaign_relative_path(t.get("image_path", ""))
                 item_data.update({
                     "entity_type":    t.get("entity_type", ""),
                     "entity_id":      t.get("entity_id", ""),
-                    "image_path":     t.get("image_path", ""),
+                    "image_path":     storage_path,
                     "size":           t.get("size", self.token_size),
                     "hp":             t.get("hp", 10),
                     "max_hp":         t.get("max_hp", 10),

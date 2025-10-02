@@ -1,4 +1,4 @@
-from tkinter import messagebox 
+from tkinter import messagebox
 import ast
 import json
 import os
@@ -11,6 +11,18 @@ from modules.generic.generic_list_selection_view import GenericListSelectionView
 from modules.helpers.logging_helper import log_module_import
 
 log_module_import(__name__)
+
+
+def _resolve_campaign_path(path: str) -> str:
+    """Return an absolute path for campaign-relative assets."""
+    if not path:
+        return ""
+    normalized = str(path).strip()
+    if not normalized:
+        return ""
+    if os.path.isabs(normalized):
+        return os.path.normpath(normalized)
+    return os.path.normpath(os.path.join(ConfigHelper.get_campaign_dir(), normalized))
 
 def select_map(self):
     """Show the full‐frame map selector, replacing any existing UI."""
@@ -59,14 +71,23 @@ def _on_display_map(self, entity_type, map_name): # entity_type here is the map'
     self._build_canvas()
 
     # 3) Load base image + fog mask
-    campaign_dir = ConfigHelper.get_campaign_dir()
-    image_path = item.get("Image", "")
-    full_image_path= os.path.join(campaign_dir, image_path)
-    self.base_img = Image.open(full_image_path).convert("RGBA")
+    image_path = (item.get("Image", "") or "").strip()
+    full_image_path = _resolve_campaign_path(image_path)
+    try:
+        self.base_img = Image.open(full_image_path).convert("RGBA")
+    except (FileNotFoundError, OSError):
+        messagebox.showerror(
+            "Map Image Missing",
+            f"The map image for '{map_name}' could not be found."
+        )
+        self.base_img = Image.new("RGBA", (1280, 720), (0, 0, 0, 255))
     mask_path = (item.get("FogMaskPath") or "").strip()
-    full_mask_path = os.path.join(campaign_dir, mask_path) if mask_path else ""
+    full_mask_path = _resolve_campaign_path(mask_path) if mask_path else ""
     if mask_path and os.path.isfile(full_mask_path):
-        self.mask_img = Image.open(full_mask_path).convert("RGBA")
+        try:
+            self.mask_img = Image.open(full_mask_path).convert("RGBA")
+        except (FileNotFoundError, OSError):
+            self.mask_img = Image.new("RGBA", self.base_img.size, (0, 0, 0, 128))
     else:
         self.mask_img = Image.new("RGBA", self.base_img.size, (0, 0, 0, 128))
 
@@ -155,9 +176,8 @@ def _on_display_map(self, entity_type, map_name): # entity_type here is the map'
 
         if item_type_from_rec == "token":
 
-            campaign_dir = ConfigHelper.get_campaign_dir()
-            portrait_path = rec.get("image_path")
-            path = os.path.join(campaign_dir, portrait_path)
+            portrait_path = (rec.get("image_path") or "").strip()
+            path = _resolve_campaign_path(portrait_path) if portrait_path else ""
             
             sz   = rec.get("size", self.token_size) # Use self.token_size as default
             pil_image = None
