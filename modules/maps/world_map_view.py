@@ -7,7 +7,7 @@ from functools import lru_cache
 import tkinter as tk
 from tkinter import messagebox, simpledialog, colorchooser
 import customtkinter as ctk
-from PIL import Image, ImageTk, ImageDraw
+from PIL import Image, ImageTk, ImageDraw, ImageOps
 
 from db.db import get_connection, ensure_entity_schema
 
@@ -988,9 +988,6 @@ class WorldMapWindow(ctk.CTkToplevel):
 
         image = self._resolve_token_image(token, size)
         radius = size // 2
-        border_color = self._resolve_token_color(token)
-        border_width = max(3, int(round(size * 0.08)))
-
         canvas_ids: list[int] = []
         image_id = self.canvas.create_image(x, y, image=image, anchor="center")
         label_id = self.canvas.create_text(
@@ -1001,18 +998,23 @@ class WorldMapWindow(ctk.CTkToplevel):
             font=("Segoe UI", 12, "bold"),
         )
 
-        border_id = self.canvas.create_oval(
-            x - radius,
-            y - radius,
-            x + radius,
-            y + radius,
-            outline=border_color,
-            width=border_width,
-        )
-        self.canvas.tag_raise(border_id, image_id)
-        self.canvas.tag_raise(label_id)
+        canvas_ids.extend([image_id, label_id])
 
-        canvas_ids.extend([image_id, label_id, border_id])
+        if not token.get("_uses_pin_image"):
+            border_color = self._resolve_token_color(token)
+            border_width = max(3, int(round(size * 0.08)))
+            border_id = self.canvas.create_oval(
+                x - radius,
+                y - radius,
+                x + radius,
+                y + radius,
+                outline=border_color,
+                width=border_width,
+            )
+            self.canvas.tag_raise(border_id, image_id)
+            canvas_ids.append(border_id)
+
+        self.canvas.tag_raise(label_id)
         token["canvas_ids"] = canvas_ids
         token["tk_image"] = image
 
@@ -1043,6 +1045,8 @@ class WorldMapWindow(ctk.CTkToplevel):
                 lambda e=None, t=token: self._show_token_menu(e, t),
             )
     def _create_token_pil_image(self, token: dict, size: int) -> Image.Image:
+        token["_uses_pin_image"] = False
+
         portrait = token.get("portrait_path") or token.get("image_path")
         if portrait:
             pil = self._load_image(portrait)
@@ -1053,7 +1057,13 @@ class WorldMapWindow(ctk.CTkToplevel):
             pin_image = self._load_image(pin_path)
             if pin_image is not None:
                 resized_pin = pin_image.resize((size, size), Image.LANCZOS)
-                canvas = resized_pin.copy()
+                color = self._resolve_token_color(token)
+                grayscale_pin = ImageOps.grayscale(resized_pin)
+                colored_pin = ImageOps.colorize(grayscale_pin, black="#000000", white=color)
+                alpha = resized_pin.split()[-1]
+                colored_pin.putalpha(alpha)
+                canvas = colored_pin.convert("RGBA")
+                token["_uses_pin_image"] = True
                 label = (token.get("entity_id") or "?")[:2].upper()
                 if label.strip():
                     draw = ImageDraw.Draw(canvas)
