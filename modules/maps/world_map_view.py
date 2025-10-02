@@ -88,7 +88,7 @@ class WorldMapWindow(ctk.CTkToplevel):
         self._portrait_photo: ImageTk.PhotoImage | None = None
         self._portrait_placeholder: Image.Image | None = None
         self._inspector_token: dict | None = None
-        self._entity_tab_images: list[ImageTk.PhotoImage] = []
+        self._entity_tab_images: list[ctk.CTkImage] = []
         self._notes_textbox: ctk.CTkTextbox | None = None
         self._notes_status_label: ctk.CTkLabel | None = None
 
@@ -1023,19 +1023,27 @@ class WorldMapWindow(ctk.CTkToplevel):
                 "<Button-3>",
                 lambda e=None, t=token: self._show_token_menu(e, t),
             )
-    def _resolve_token_image(self, token: dict, size: int) -> ImageTk.PhotoImage:
+    def _create_token_pil_image(self, token: dict, size: int) -> Image.Image:
         portrait = token.get("portrait_path") or token.get("image_path")
         if portrait:
             pil = self._load_image(portrait)
             if pil is not None:
-                return ImageTk.PhotoImage(pil.resize((size, size), Image.LANCZOS))
+                return pil.resize((size, size), Image.LANCZOS)
         placeholder = Image.new("RGBA", (size, size), (0, 0, 0, 0))
         draw = ImageDraw.Draw(placeholder)
         color = self._resolve_token_color(token)
         draw.ellipse((0, 0, size, size), fill=color)
         label = (token.get("entity_id") or "?")[:2].upper()
         draw.text((size / 2, size / 2), label, fill="#0B0B0B", anchor="mm", align="center")
-        return ImageTk.PhotoImage(placeholder)
+        return placeholder
+
+    def _resolve_token_image(self, token: dict, size: int) -> ImageTk.PhotoImage:
+        pil_image = self._create_token_pil_image(token, size)
+        return ImageTk.PhotoImage(pil_image)
+
+    def _resolve_token_ctk_image(self, token: dict, size: int) -> ctk.CTkImage:
+        pil_image = self._create_token_pil_image(token, size)
+        return ctk.CTkImage(light_image=pil_image, dark_image=pil_image, size=(size, size))
 
     def _resolve_token_color(self, token: dict) -> str:
         normalized = self._normalize_hex_color(token.get("color"))
@@ -1597,7 +1605,7 @@ class WorldMapWindow(ctk.CTkToplevel):
             body.grid_columnconfigure(1, weight=1)
             body.grid_columnconfigure(2, weight=0)
 
-            thumbnail = self._resolve_token_image(token, 72)
+            thumbnail = self._resolve_token_ctk_image(token, 72)
             self._entity_tab_images.append(thumbnail)
             portrait_label = ctk.CTkLabel(body, text="", image=thumbnail)
             portrait_label.grid(row=0, column=0, rowspan=2, sticky="nw")
