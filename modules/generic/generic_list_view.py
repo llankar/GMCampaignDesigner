@@ -672,8 +672,9 @@ class GenericListView(ctk.CTkFrame):
         campaign_dir = ConfigHelper.get_campaign_dir()
         portrait_path = item.get("Portrait", "") if item else ""
         if portrait_path:
-            portrait_path = os.path.join(campaign_dir, portrait_path)
-            has_portrait = bool(portrait_path and os.path.isabs(portrait_path))
+            if not os.path.isabs(portrait_path):
+                portrait_path = os.path.join(campaign_dir, portrait_path)
+            has_portrait = os.path.exists(portrait_path)
         else:
             has_portrait = False
 
