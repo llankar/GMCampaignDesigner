@@ -279,6 +279,7 @@ class SceneCanvas(ctk.CTkFrame):
         self._icon_regions: list[tuple] = []
         self._link_regions: list[tuple] = []
         self._positions: dict[int, tuple[float, float]] = {}
+        self._is_panning = False
 
         self.canvas = tk.Canvas(
             self,
@@ -293,6 +294,9 @@ class SceneCanvas(ctk.CTkFrame):
         self.canvas.bind("<ButtonRelease-1>", self._on_release)
         self.canvas.bind("<Double-Button-1>", self._on_double_click)
         self.canvas.bind("<Button-3>", self._on_right_click)
+        self.canvas.bind("<Button-2>", self._on_middle_press)
+        self.canvas.bind("<B2-Motion>", self._on_middle_drag)
+        self.canvas.bind("<ButtonRelease-2>", self._on_middle_release)
 
     def set_scenes(self, scenes, selected_index=None):
         self.scenes = scenes or []
@@ -536,6 +540,14 @@ class SceneCanvas(ctk.CTkFrame):
                 self._icon_regions.append((ix1, iy1, ix2, iy2, idx, etype))
             self._regions.append((x1, y1, x2, y2, idx))
 
+        bbox = c.bbox("all")
+        if bbox:
+            x1, y1, x2, y2 = bbox
+            margin = 200
+            c.configure(scrollregion=(x1 - margin, y1 - margin, x2 + margin, y2 + margin))
+        else:
+            c.configure(scrollregion=(0, 0, width, height))
+
     def _hit_test(self, x, y):
         for x1, y1, x2, y2, idx in reversed(self._regions):
             if x1 <= x <= x2 and y1 <= y <= y2:
@@ -570,6 +582,32 @@ class SceneCanvas(ctk.CTkFrame):
                 self._draw()
         elif idx is None and redraw_on_none:
             self._draw()
+
+    def _on_middle_press(self, event):
+        if self._link_preview_line is not None:
+            self.canvas.delete(self._link_preview_line)
+            self._link_preview_line = None
+        self._drag_mode = None
+        self._drag_index = None
+        self._link_source_index = None
+        self._link_preview_active = False
+        self._is_panning = True
+        self.canvas.scan_mark(event.x, event.y)
+        self.canvas.configure(cursor="fleur")
+        return "break"
+
+    def _on_middle_drag(self, event):
+        if not self._is_panning:
+            return
+        self.canvas.scan_dragto(event.x, event.y, gain=1)
+        return "break"
+
+    def _on_middle_release(self, _event):
+        if not self._is_panning:
+            return
+        self._is_panning = False
+        self.canvas.configure(cursor="")
+        return "break"
 
     def _on_click(self, event):
         # Allow direct link label editing on single click for better accessibility
