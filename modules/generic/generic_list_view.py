@@ -592,7 +592,9 @@ class GenericListView(ctk.CTkFrame):
             base_id = sanitize_id(raw or f"item_{int(time.time()*1000)}").lower()
             iid = unique_iid(self.tree, base_id)
             name_text = self._format_cell("#0", item.get(self.unique_field, ""))
-            vals = tuple(self._format_cell(col, item.get(c, "")) for c in self.columns)
+            vals = tuple(
+                self._format_cell(c, item.get(c, "")) for c in self.columns
+            )
             try:
                 self.tree.insert("", "end", iid=iid, text=name_text, values=vals)
                 color = self.row_colors.get(base_id)
