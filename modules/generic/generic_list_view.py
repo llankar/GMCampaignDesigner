@@ -3,6 +3,7 @@ import time
 import os
 import customtkinter as ctk
 import tkinter as tk
+import tkinter.font as tkfont
 from tkinter import ttk, messagebox, filedialog
 import copy
 from PIL import Image
@@ -220,6 +221,8 @@ class GenericListView(ctk.CTkFrame):
             selectmode="browse",
             style="Custom.Treeview"
         )
+        self._tree_font = tkfont.Font(family="Segoe UI", size=10, weight="bold")
+        self._ellipsis = "..."
         # Unique field column
         self.tree.heading("#0", text=self.unique_field,
                         command=lambda: self.sort_column(self.unique_field))
@@ -588,8 +591,8 @@ class GenericListView(ctk.CTkFrame):
                 raw = raw.get("text", "")
             base_id = sanitize_id(raw or f"item_{int(time.time()*1000)}").lower()
             iid = unique_iid(self.tree, base_id)
-            name_text = self.clean_value(item.get(self.unique_field, ""))
-            vals = tuple(self.clean_value(item.get(c, "")) for c in self.columns)
+            name_text = self._format_cell("#0", item.get(self.unique_field, ""))
+            vals = tuple(self._format_cell(col, item.get(c, "")) for c in self.columns)
             try:
                 self.tree.insert("", "end", iid=iid, text=name_text, values=vals)
                 color = self.row_colors.get(base_id)
@@ -617,8 +620,8 @@ class GenericListView(ctk.CTkFrame):
                     raw = raw.get("text", "")
                 base_iid = sanitize_id(raw or f"item_{int(time.time()*1000)}").lower()
                 iid = unique_iid(self.tree, base_iid)
-                name_text = self.clean_value(item.get(self.unique_field, ""))
-                vals = tuple(self.clean_value(item.get(c, "")) for c in self.columns)
+                name_text = self._format_cell("#0", item.get(self.unique_field, ""))
+                vals = tuple(self._format_cell(col, item.get(c, "")) for c in self.columns)
                 try:
                     self.tree.insert(group_id, "end", iid=iid, text=name_text, values=vals)
                     color = self.row_colors.get(base_iid)
@@ -635,6 +638,39 @@ class GenericListView(ctk.CTkFrame):
         if isinstance(val, list):
             return ", ".join(self.clean_value(v) for v in val if v is not None)
         return str(val).replace("{", "").replace("}", "").strip()
+
+    def _format_cell(self, column_id, value):
+        """Prepare a value for display in the tree, truncating if needed."""
+        text = self.clean_value(value)
+        return self._truncate_text(text, column_id)
+
+    def _truncate_text(self, text, column_id):
+        if not text:
+            return ""
+        try:
+            width = self.tree.column(column_id, "width")
+        except Exception:
+            width = 0
+        if width <= 0:
+            return text
+
+        available = max(width - 12, 0)
+        if self._tree_font.measure(text) <= available:
+            return text
+
+        ellipsis_width = self._tree_font.measure(self._ellipsis)
+        if ellipsis_width >= available:
+            return self._ellipsis if ellipsis_width <= width else ""
+
+        truncated = []
+        current_width = 0
+        for char in text:
+            char_width = self._tree_font.measure(char)
+            if current_width + char_width > available - ellipsis_width:
+                break
+            truncated.append(char)
+            current_width += char_width
+        return "".join(truncated) + self._ellipsis
 
     def sort_column(self, column_name):
         if not hasattr(self, "sort_directions"):
