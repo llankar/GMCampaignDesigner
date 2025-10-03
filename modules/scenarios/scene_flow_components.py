@@ -8,6 +8,7 @@ from typing import Any, Callable, Optional
 
 import customtkinter as ctk
 
+from modules.helpers.text_helpers import coerce_text
 from modules.scenarios.scene_flow_rendering import (
     SCENE_FLOW_BG,
     apply_scene_flow_canvas_styling,
@@ -184,7 +185,8 @@ class SceneFlowPreview(ctk.CTkFrame):
                 tags=(f"scene-node-{idx}", "scene-node"),
             )
             title = (scene.get("Title") or f"Scene {idx + 1}").strip() or f"Scene {idx + 1}"
-            summary = (scene.get("Summary") or scene.get("Text") or "").replace("\n", " ").strip()
+            summary_raw = scene.get("Summary") or scene.get("Text") or ""
+            summary = coerce_text(summary_raw).replace("\n", " ").strip()
             summary_display = (
                 textwrap.shorten(summary, width=120, placeholder="...")
                 if summary
@@ -466,8 +468,8 @@ class SceneCanvas(ctk.CTkFrame):
                 tags=(f"scene-node-{idx}", "scene-node"),
             )
             self._move_regions.append((x1, y1, x2, y1 + 36, idx))
-            summary = scene.get("Summary") or scene.get("Text") or ""
-            summary = " ".join(summary.split())[:160]
+            summary_raw = scene.get("Summary") or scene.get("Text") or ""
+            summary = " ".join(coerce_text(summary_raw).split())[:160]
             c.create_text(
                 x1 + 14,
                 y1 + 48,

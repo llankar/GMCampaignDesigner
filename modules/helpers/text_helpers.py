@@ -370,6 +370,18 @@ def _coerce_text(val):
         return str(v)
     return str(val)
 
+
+def coerce_text(val):
+    """Return a plain-text representation for longtext-style values.
+
+    Many parts of the UI accept data that may either be a raw string or the
+    richer ``{"text": ..., "formatting": ...}`` structure produced by
+    importers.  ``coerce_text`` normalises the value so widgets can safely
+    display it without worrying about the underlying shape.
+    """
+
+    return _coerce_text(val)
+
 def format_longtext(data, max_length=30000):
     text = _coerce_text(data)
     text = text.replace("\n", " ").strip()
