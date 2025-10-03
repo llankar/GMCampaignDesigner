@@ -986,7 +986,54 @@ class ScenesPlanningStep(WizardStep):
                 continue
             seen.add(key)
             deduped.append({"target": target, "text": text})
-        summary = entry.get("Summary") or entry.get("Text") or ""
+        summary_fragments = []
+        seen_fragments = set()
+
+        def _register_fragment(value):
+            if value is None:
+                return
+            if isinstance(value, (list, tuple, set)):
+                for item in value:
+                    _register_fragment(item)
+                return
+            if isinstance(value, dict):
+                text_value = value.get("text")
+                if text_value is not None:
+                    _register_fragment(text_value)
+                else:
+                    for item in value.values():
+                        _register_fragment(item)
+                return
+            fragment = coerce_text(value).strip()
+            normalised = " ".join(fragment.split())
+            if not normalised:
+                return
+            key = normalised.lower()
+            if key in seen_fragments:
+                return
+            seen_fragments.add(key)
+            summary_fragments.append(fragment)
+
+        if isinstance(entry, dict):
+            for key in (
+                "Summary",
+                "SceneSummary",
+                "Text",
+                "SceneText",
+                "Description",
+                "Body",
+                "Details",
+                "SceneDetails",
+                "Notes",
+                "Content",
+                "Synopsis",
+                "Overview",
+            ):
+                _register_fragment(entry.get(key))
+        else:
+            _register_fragment(entry)
+
+        summary = "\n\n".join(fragment for fragment in summary_fragments if fragment)
         scene = {
             "Title": entry.get("Title") or entry.get("Name") or f"Scene {index + 1}",
             "Summary": coerce_text(summary),
