@@ -243,6 +243,13 @@ class SceneCanvas(ctk.CTkFrame):
     GRID = 60
     CARD_W = 260
     CARD_H = 210
+    ICON_LABELS = {
+        "NPCs": "N",
+        "Creatures": "C",
+        "Places": "P",
+        "Maps": "M",
+    }
+    ENTITY_DISPLAY_ORDER = ("NPCs", "Creatures", "Places", "Maps")
 
     def __init__(
         self,
@@ -254,6 +261,7 @@ class SceneCanvas(ctk.CTkFrame):
         on_add_entity: Optional[Callable[[int, str], None]] = None,
         on_link: Optional[Callable[[int, int], None]] = None,
         on_link_text_edit: Optional[Callable[[int, int, Any, tuple[float, float, float, float]], None]] = None,
+        available_entity_types: Optional[tuple[str, ...] | list[str]] = None,
     ):
         super().__init__(master, corner_radius=16, fg_color=SCENE_FLOW_BG)
         self.on_select = on_select
@@ -280,6 +288,15 @@ class SceneCanvas(ctk.CTkFrame):
         self._link_regions: list[tuple] = []
         self._positions: dict[int, tuple[float, float]] = {}
         self._is_panning = False
+        if available_entity_types is None:
+            available_entity_types = ("NPCs", "Creatures", "Places")
+        self.available_entity_types = [
+            entity
+            for entity in available_entity_types
+            if entity in self.ICON_LABELS
+        ]
+        if not self.available_entity_types:
+            self.available_entity_types = ["NPCs", "Creatures", "Places"]
 
         self.canvas = tk.Canvas(
             self,
@@ -490,59 +507,67 @@ class SceneCanvas(ctk.CTkFrame):
                 tags=(f"scene-node-{idx}", "scene-node"),
             )
             info_y = y1 + 116
-            for label_key, items in (
-                ("NPCs", scene.get("NPCs")),
-                ("Creatures", scene.get("Creatures")),
-                ("Places", scene.get("Places")),
-            ):
-                if items:
-                    display = ", ".join(items[:4])
-                    if len(items) > 4:
-                        display += ", …"
-                    c.create_text(
-                        x1 + 14,
-                        info_y,
-                        text=f"{label_key}: {display}",
-                        anchor="nw",
-                        fill="#9bb8df",
-                        font=("Segoe UI", 9, "bold" if idx == self.selected_index else "normal"),
-                        width=self.CARD_W - 28,
-                        tags=(f"scene-node-{idx}", "scene-node"),
-                    )
-                    info_y += 18
+            for label_key in self.ENTITY_DISPLAY_ORDER:
+                items = scene.get(label_key)
+                if not items:
+                    continue
+                if isinstance(items, str):
+                    items = [items]
+                display_items = [
+                    str(item).strip()
+                    for item in items
+                    if str(item).strip()
+                ]
+                if not display_items:
+                    continue
+                display = ", ".join(display_items[:4])
+                if len(display_items) > 4:
+                    display += ", …"
+                c.create_text(
+                    x1 + 14,
+                    info_y,
+                    text=f"{label_key}: {display}",
+                    anchor="nw",
+                    fill="#9bb8df",
+                    font=("Segoe UI", 9, "bold" if idx == self.selected_index else "normal"),
+                    width=self.CARD_W - 28,
+                    tags=(f"scene-node-{idx}", "scene-node"),
+                )
+                info_y += 18
             icon_size = 24
             icon_spacing = 10
             icon_types = [
-                ("NPCs", "N"),
-                ("Creatures", "C"),
-                ("Places", "P"),
+                (etype, self.ICON_LABELS[etype])
+                for etype in self.available_entity_types
+                if etype in self.ICON_LABELS
             ]
-            total_width = len(icon_types) * icon_size + (len(icon_types) - 1) * icon_spacing
-            icon_start = x2 - total_width - 16
-            for offset, (etype, label_char) in enumerate(icon_types):
-                ix1 = icon_start + offset * (icon_size + icon_spacing)
-                iy1 = y2 - icon_size - 12
-                ix2 = ix1 + icon_size
-                iy2 = iy1 + icon_size
-                icon_id = c.create_oval(
-                    ix1,
-                    iy1,
-                    ix2,
-                    iy2,
-                    fill="#203758",
-                    outline="#6ab2ff" if idx == self.selected_index else "#30435f",
-                    width=2,
-                    tags=("scene-node",),
-                )
-                c.create_text(
-                    (ix1 + ix2) / 2,
-                    (iy1 + iy2) / 2,
-                    text="+" + label_char,
-                    fill="#d8e6ff",
-                    font=("Segoe UI", 9, "bold"),
-                    tags=("scene-node",),
-                )
-                self._icon_regions.append((ix1, iy1, ix2, iy2, idx, etype))
+            if icon_types:
+                total_width = len(icon_types) * icon_size + (len(icon_types) - 1) * icon_spacing
+                icon_start = x2 - total_width - 16
+                for offset, (etype, label_char) in enumerate(icon_types):
+                    ix1 = icon_start + offset * (icon_size + icon_spacing)
+                    iy1 = y2 - icon_size - 12
+                    ix2 = ix1 + icon_size
+                    iy2 = iy1 + icon_size
+                    icon_id = c.create_oval(
+                        ix1,
+                        iy1,
+                        ix2,
+                        iy2,
+                        fill="#203758",
+                        outline="#6ab2ff" if idx == self.selected_index else "#30435f",
+                        width=2,
+                        tags=("scene-node",),
+                    )
+                    c.create_text(
+                        (ix1 + ix2) / 2,
+                        (iy1 + iy2) / 2,
+                        text="+" + label_char,
+                        fill="#d8e6ff",
+                        font=("Segoe UI", 9, "bold"),
+                        tags=("scene-node",),
+                    )
+                    self._icon_regions.append((ix1, iy1, ix2, iy2, idx, etype))
             self._regions.append((x1, y1, x2, y2, idx))
 
         bbox = c.bbox("all")
