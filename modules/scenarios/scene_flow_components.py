@@ -65,18 +65,29 @@ def normalise_scene_links(scene: dict, split_to_list: Callable[[Any], list[str]]
 class SceneFlowPreview(ctk.CTkFrame):
     """Lightweight scene flow canvas used inside the wizard."""
 
-    CARD_WIDTH = 220
-    CARD_HEIGHT = 130
+    CARD_WIDTH = 260
+    CARD_MIN_HEIGHT = 190
     GRID_SPACING = 48
+    TITLE_TOP_PADDING = 18
+    HORIZONTAL_PADDING = 18
+    TITLE_SUMMARY_GAP = 12
+    SUMMARY_ENTITY_GAP = 12
+    ENTITY_LINE_GAP = 6
+    ICON_SECTION_GAP = 16
+    ICON_SIZE = 26
+    CARD_BOTTOM_PADDING = 18
 
     def __init__(self, master, *, on_select: Optional[Callable[[int], None]] = None):
-        super().__init__(master, corner_radius=16, fg_color=("#0f1624", "#0f1624"))
+        super().__init__(master, corner_radius=16, fg_color=(SCENE_FLOW_BG, SCENE_FLOW_BG))
         self.on_select = on_select
         self.scenes: list[dict[str, Any]] = []
         self.selected_index: Optional[int] = None
         self.node_regions: list[tuple[float, float, float, float, int]] = []
+        self._grid_tile_cache: dict[str, object] = {}
+        self._shadow_cache: dict[tuple, tuple] = {}
+        self._image_refs: dict[str, object] = {}
 
-        self.canvas = tk.Canvas(self, bg="#0c121d", highlightthickness=0, bd=0)
+        self.canvas = tk.Canvas(self, bg=SCENE_FLOW_BG, highlightthickness=0, bd=0)
         self.canvas.pack(fill="both", expand=True, padx=4, pady=4)
         self.canvas.bind("<Configure>", lambda _event: self._draw())
         self.canvas.bind("<Button-1>", self._handle_click)
@@ -93,29 +104,32 @@ class SceneFlowPreview(ctk.CTkFrame):
         height = max(self.canvas.winfo_height(), 1)
         self.canvas.delete("all")
         self.node_regions = []
-
-        for x in range(0, width, self.GRID_SPACING):
-            self.canvas.create_line(x, 0, x, height, fill="#141f31")
-        for y in range(0, height, self.GRID_SPACING):
-            self.canvas.create_line(0, y, width, y, fill="#141f31")
+        tile = apply_scene_flow_canvas_styling(
+            self.canvas,
+            tile_cache=self._grid_tile_cache,
+            extent_width=width,
+            extent_height=height,
+        )
+        if tile is not None:
+            self._image_refs["grid"] = tile
 
         if not self.scenes:
             self.canvas.create_text(
                 width / 2,
                 height / 2,
                 text="Add scenes to see the story flow visualised here",
-                fill="#7183a5",
-                font=("Segoe UI", 15, "bold"),
+                fill="#8ba6d0",
+                font=("Segoe UI", 16, "bold"),
             )
             return
 
-        columns = max(1, min(4, (width - 140) // (self.CARD_WIDTH + 60)))
+        columns = max(1, min(4, (width - 180) // (self.CARD_WIDTH + 70)))
         positions: list[tuple[float, float]] = []
         for idx, _ in enumerate(self.scenes):
             col = idx % columns
             row = idx // columns
-            x = 90 + col * (self.CARD_WIDTH + 60) + self.CARD_WIDTH / 2
-            y = 90 + row * (self.CARD_HEIGHT + 120)
+            x = 120 + col * (self.CARD_WIDTH + 70) + self.CARD_WIDTH / 2
+            y = 130 + row * (self.CARD_MIN_HEIGHT + 150)
             positions.append((x, y))
 
         title_lookup = {}
@@ -146,6 +160,11 @@ class SceneFlowPreview(ctk.CTkFrame):
                     return number - 1
             return None
 
+        card_models = [
+            self._build_card_model(scene, idx, idx == self.selected_index)
+            for idx, scene in enumerate(self.scenes)
+        ]
+
         for idx, scene in enumerate(self.scenes):
             start = positions[idx]
             for target in scene.get("NextScenes") or []:
@@ -153,82 +172,188 @@ class SceneFlowPreview(ctk.CTkFrame):
                 if resolved is None or resolved >= len(positions):
                     continue
                 end = positions[resolved]
-                color = "#58a2ff" if idx == self.selected_index else "#365074"
+                color = "#68b3ff" if idx == self.selected_index else "#3b587a"
+                control_x = (start[0] + end[0]) / 2
+                control_y = min(start[1], end[1]) - 60
                 self.canvas.create_line(
                     start[0],
-                    start[1] + self.CARD_HEIGHT / 2 - 8,
+                    start[1] + card_models[idx]["half_height"],
+                    control_x,
+                    control_y,
                     end[0],
-                    end[1] - self.CARD_HEIGHT / 2,
+                    end[1] - card_models[resolved]["half_height"],
                     fill=color,
-                    width=2.2,
-                    arrow=tk.LAST,
+                    width=2.4 if idx == self.selected_index else 2.0,
                     smooth=True,
+                    arrow=tk.LAST,
+                    arrowshape=(16, 18, 7),
                 )
 
         for idx, scene in enumerate(self.scenes):
             x, y = positions[idx]
-            x1 = x - self.CARD_WIDTH / 2
-            y1 = y - self.CARD_HEIGHT / 2
-            x2 = x + self.CARD_WIDTH / 2
-            y2 = y + self.CARD_HEIGHT / 2
             selected = idx == self.selected_index
-            bg = "#1b253b" if selected else "#121a2a"
-            border = "#6ab2ff" if selected else "#23314a"
-            self.canvas.create_rectangle(
+            model = card_models[idx]
+            half_height = model["half_height"]
+            x1 = x - self.CARD_WIDTH / 2
+            y1 = y - half_height
+            x2 = x + self.CARD_WIDTH / 2
+            y2 = y + half_height
+
+            shadow_image, offset = get_shadow_image(
+                self.canvas,
+                self._shadow_cache,
+                self.CARD_WIDTH,
+                half_height * 2,
+                1.0,
+            )
+            if shadow_image is not None:
+                shadow_id = self.canvas.create_image(
+                    x1 - offset,
+                    y1 - offset,
+                    image=shadow_image,
+                    anchor="nw",
+                )
+                self.canvas.tag_lower(shadow_id)
+                self._image_refs[f"shadow-{idx}"] = shadow_image
+
+            bg = "#1e2a40" if selected else "#151d2f"
+            border = "#75beff" if selected else "#273750"
+            card_id = self.canvas.create_rectangle(
                 x1,
                 y1,
                 x2,
                 y2,
                 fill=bg,
                 outline=border,
-                width=2.4,
+                width=3 if selected else 2,
                 tags=(f"scene-node-{idx}", "scene-node"),
             )
-            title = (scene.get("Title") or f"Scene {idx + 1}").strip() or f"Scene {idx + 1}"
-            summary_raw = scene.get("Summary") or scene.get("Text") or ""
-            summary = coerce_text(summary_raw).replace("\n", " ").strip()
-            summary_display = (
-                textwrap.shorten(summary, width=120, placeholder="...")
-                if summary
-                else "Click to outline this beat."
-            )
-            scene_type = scene.get("SceneType") or scene.get("Type") or ""
+            self.canvas.tag_raise(card_id)
+
+            current_x = x1 + self.HORIZONTAL_PADDING
+            current_y = y1 + self.TITLE_TOP_PADDING
+
+            scene_type = model["scene_type"]
             if scene_type:
+                max_chip_width = self.CARD_WIDTH - 2 * self.HORIZONTAL_PADDING
+                type_width = min(
+                    max_chip_width,
+                    max(96, len(scene_type) * 7 + 30),
+                )
                 self.canvas.create_rectangle(
-                    x1 + 8,
-                    y1 + 8,
-                    x1 + 108,
-                    y1 + 30,
-                    fill="#28548a",
+                    current_x,
+                    current_y - 6,
+                    current_x + type_width,
+                    current_y + 18,
+                    fill="#25507f",
                     outline="",
                     tags=(f"scene-node-{idx}", "scene-node"),
                 )
                 self.canvas.create_text(
-                    x1 + 58,
-                    y1 + 19,
-                    text=scene_type.upper(),
-                    fill="white",
+                    current_x + type_width / 2,
+                    current_y + 6,
+                    text=scene_type,
+                    fill="#f4f8ff",
                     font=("Segoe UI", 9, "bold"),
                     tags=(f"scene-node-{idx}", "scene-node"),
                 )
-            self.canvas.create_text(
-                x,
-                y - 8,
+                current_y += 22
+
+            title = model["title"]
+            title_id = self.canvas.create_text(
+                current_x,
+                current_y,
                 text=title,
-                fill="white",
+                fill="#f7f9ff",
                 font=("Segoe UI", 13, "bold"),
-                width=self.CARD_WIDTH - 24,
+                anchor="nw",
+                width=self.CARD_WIDTH - 2 * self.HORIZONTAL_PADDING,
                 tags=(f"scene-node-{idx}", "scene-node"),
             )
-            self.canvas.create_text(
-                x,
-                y + 26,
-                text=summary_display,
-                fill="#8d9ab7",
-                font=("Segoe UI", 10),
-                width=self.CARD_WIDTH - 24,
-                tags=(f"scene-node-{idx}", "scene-node"),
-            )
+            bbox = self.canvas.bbox(title_id)
+            if bbox:
+                current_y = bbox[3]
+            else:
+                current_y += 24
+
+            summary = model["summary"]
+            if summary:
+                current_y += self.TITLE_SUMMARY_GAP
+                summary_id = self.canvas.create_text(
+                    current_x,
+                    current_y,
+                    text=summary,
+                    fill="#9fb3d7",
+                    font=("Segoe UI", 10),
+                    anchor="nw",
+                    width=self.CARD_WIDTH - 2 * self.HORIZONTAL_PADDING,
+                    tags=(f"scene-node-{idx}", "scene-node"),
+                )
+                summary_bbox = self.canvas.bbox(summary_id)
+                if summary_bbox:
+                    current_y = summary_bbox[3]
+
+            entity_lines = model["entity_lines"]
+            if entity_lines:
+                current_y += self.SUMMARY_ENTITY_GAP
+                entity_font = ("Segoe UI", 9, "bold" if selected else "normal")
+                for line_index, line in enumerate(entity_lines):
+                    entity_id = self.canvas.create_text(
+                        current_x,
+                        current_y,
+                        text=line,
+                        fill="#8fa6cc",
+                        font=entity_font,
+                        anchor="nw",
+                        width=self.CARD_WIDTH - 2 * self.HORIZONTAL_PADDING,
+                        tags=(f"scene-node-{idx}", "scene-node"),
+                    )
+                    line_bbox = self.canvas.bbox(entity_id)
+                    if line_bbox:
+                        current_y = line_bbox[3]
+                    if line_index != len(entity_lines) - 1:
+                        current_y += self.ENTITY_LINE_GAP
+
+            badges = model["badges"]
+            if badges:
+                current_y += self.ICON_SECTION_GAP
+                spacing = 12
+                total_width = len(badges) * self.ICON_SIZE + (len(badges) - 1) * spacing
+                start_x = x2 - total_width - self.HORIZONTAL_PADDING
+                for offset, (label_char, active) in enumerate(badges):
+                    ix1 = start_x + offset * (self.ICON_SIZE + spacing)
+                    iy1 = current_y
+                    ix2 = ix1 + self.ICON_SIZE
+                    iy2 = iy1 + self.ICON_SIZE
+                    fill = "#27466d" if active else "#1c2940"
+                    outline = "#75beff" if selected and active else "#2f3f5b"
+                    oval = self.canvas.create_oval(
+                        ix1,
+                        iy1,
+                        ix2,
+                        iy2,
+                        fill=fill,
+                        outline=outline,
+                        width=2,
+                        tags=(f"scene-node-{idx}", "scene-node"),
+                    )
+                    self.canvas.tag_raise(oval)
+                    self.canvas.create_text(
+                        (ix1 + ix2) / 2,
+                        (iy1 + iy2) / 2,
+                        text=label_char,
+                        fill="#d5e4ff" if active else "#64769a",
+                        font=("Segoe UI", 10, "bold"),
+                        tags=(f"scene-node-{idx}", "scene-node"),
+                    )
+                current_y += self.ICON_SIZE
+
+            current_y += self.CARD_BOTTOM_PADDING
+            final_bottom = max(y2, current_y)
+            if final_bottom != y2:
+                y2 = final_bottom
+                self.canvas.coords(card_id, x1, y1, x2, y2)
+
             self.node_regions.append((x1, y1, x2, y2, idx))
 
     def _handle_click(self, event):
@@ -237,6 +362,159 @@ class SceneFlowPreview(ctk.CTkFrame):
                 if callable(self.on_select):
                     self.on_select(idx)
                 break
+
+    def _build_card_model(
+        self, scene: dict[str, Any], index: int, selected: bool
+    ) -> dict[str, Any]:
+        title_raw = scene.get("Title") or scene.get("title") or ""
+        title_default = f"Scene {index + 1}" if index >= 0 else "Scene"
+        title = str(title_raw).strip() or title_default
+        scene_type = (
+            scene.get("SceneType")
+            or scene.get("Type")
+            or scene.get("Scene Tag")
+            or ""
+        )
+        scene_type_display = str(scene_type).strip().upper()
+        summary = self._prepare_summary(scene)
+        entity_lines = self._prepare_entity_lines(scene)
+        badges = self._prepare_icon_badges(scene)
+        half_height = self._compute_card_half_height(
+            title,
+            summary,
+            entity_lines,
+            bool(scene_type_display),
+            len(badges),
+            selected,
+        )
+        return {
+            "title": title,
+            "scene_type": scene_type_display,
+            "summary": summary,
+            "entity_lines": entity_lines,
+            "badges": badges,
+            "half_height": half_height,
+        }
+
+    def _compute_card_half_height(
+        self,
+        title: str,
+        summary: str,
+        entity_lines: list[str],
+        has_type: bool,
+        badge_count: int,
+        selected: bool,
+    ) -> float:
+        width = self.CARD_WIDTH - 2 * self.HORIZONTAL_PADDING
+        total_height = self.TITLE_TOP_PADDING
+        if has_type:
+            total_height += 22
+        total_height += self._measure_text_height(
+            self.canvas, title, ("Segoe UI", 13, "bold"), width
+        )
+        if summary:
+            total_height += self.TITLE_SUMMARY_GAP
+            total_height += self._measure_text_height(
+                self.canvas, summary, ("Segoe UI", 10), width
+            )
+        if entity_lines:
+            total_height += self.SUMMARY_ENTITY_GAP
+            entity_font = ("Segoe UI", 9, "bold" if selected else "normal")
+            for index, line in enumerate(entity_lines):
+                total_height += self._measure_text_height(
+                    self.canvas, line, entity_font, width
+                )
+                if index < len(entity_lines) - 1:
+                    total_height += self.ENTITY_LINE_GAP
+        if badge_count:
+            total_height += self.ICON_SECTION_GAP + self.ICON_SIZE
+        total_height += self.CARD_BOTTOM_PADDING
+        total_height = max(float(self.CARD_MIN_HEIGHT), total_height)
+        return total_height / 2.0
+
+    def _prepare_summary(self, scene: dict[str, Any]) -> str:
+        summary_sources = (
+            scene.get("Summary"),
+            scene.get("SceneSummary"),
+            scene.get("Synopsis"),
+            scene.get("Text"),
+            scene.get("SceneText"),
+            scene.get("Description"),
+            scene.get("Details"),
+            scene.get("SceneDetails"),
+            scene.get("Body"),
+            scene.get("Notes"),
+        )
+        for candidate in summary_sources:
+            text = coerce_text(candidate).strip()
+            if text:
+                try:
+                    return textwrap.shorten(text, width=170, placeholder="…")
+                except ValueError:
+                    return text[:167] + "…" if len(text) > 170 else text
+        return "Click to outline this beat."
+
+    def _prepare_entity_lines(self, scene: dict[str, Any]) -> list[str]:
+        lines: list[str] = []
+        display_order = getattr(SceneCanvas, "ENTITY_DISPLAY_ORDER", ())
+        for label_key in display_order:
+            items = scene.get(label_key)
+            if not items:
+                continue
+            if isinstance(items, str):
+                values = [items]
+            elif isinstance(items, (list, tuple, set)):
+                values = items
+            else:
+                values = [items]
+            display_items = [
+                str(item).strip()
+                for item in values
+                if str(item).strip()
+            ]
+            if not display_items:
+                continue
+            display = ", ".join(display_items[:3])
+            if len(display_items) > 3:
+                display += ", …"
+            lines.append(f"{label_key}: {display}")
+        return lines
+
+    def _prepare_icon_badges(self, scene: dict[str, Any]) -> list[tuple[str, bool]]:
+        badges: list[tuple[str, bool]] = []
+        icon_labels = getattr(SceneCanvas, "ICON_LABELS", {})
+        for key, label_char in icon_labels.items():
+            items = scene.get(key)
+            if isinstance(items, str):
+                active = bool(items.strip())
+            elif isinstance(items, (list, tuple, set)):
+                active = any(str(item).strip() for item in items)
+            else:
+                active = bool(items)
+            if not active:
+                continue
+            badges.append((label_char, True))
+        return badges
+
+    def _measure_text_height(
+        self, canvas: tk.Canvas, text: str, font: tuple, width: int
+    ) -> float:
+        if not text:
+            return 0.0
+        text_id = canvas.create_text(
+            0,
+            0,
+            text=text,
+            font=font,
+            width=width,
+            anchor="nw",
+            state="hidden",
+        )
+        bbox = canvas.bbox(text_id)
+        canvas.delete(text_id)
+        if not bbox:
+            return 0.0
+        return float(bbox[3] - bbox[1])
 
 
 class SceneCanvas(ctk.CTkFrame):
