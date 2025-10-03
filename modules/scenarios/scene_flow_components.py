@@ -86,11 +86,15 @@ class SceneFlowPreview(ctk.CTkFrame):
         self._grid_tile_cache: dict[str, object] = {}
         self._shadow_cache: dict[tuple, tuple] = {}
         self._image_refs: dict[str, object] = {}
+        self._is_panning = False
 
         self.canvas = tk.Canvas(self, bg=SCENE_FLOW_BG, highlightthickness=0, bd=0)
         self.canvas.pack(fill="both", expand=True, padx=4, pady=4)
         self.canvas.bind("<Configure>", lambda _event: self._draw())
         self.canvas.bind("<Button-1>", self._handle_click)
+        self.canvas.bind("<Button-2>", self._on_middle_press)
+        self.canvas.bind("<B2-Motion>", self._on_middle_drag)
+        self.canvas.bind("<ButtonRelease-2>", self._on_middle_release)
 
     def render(self, scenes, selected_index):
         self.scenes = scenes or []
@@ -121,6 +125,7 @@ class SceneFlowPreview(ctk.CTkFrame):
                 fill="#8ba6d0",
                 font=("Segoe UI", 16, "bold"),
             )
+            self.canvas.configure(scrollregion=(0, 0, width, height))
             return
 
         columns = max(1, min(4, (width - 180) // (self.CARD_WIDTH + 70)))
@@ -356,12 +361,39 @@ class SceneFlowPreview(ctk.CTkFrame):
 
             self.node_regions.append((x1, y1, x2, y2, idx))
 
+        bbox = self.canvas.bbox("all")
+        if bbox:
+            x1, y1, x2, y2 = bbox
+            margin = 160
+            self.canvas.configure(scrollregion=(x1 - margin, y1 - margin, x2 + margin, y2 + margin))
+        else:
+            self.canvas.configure(scrollregion=(0, 0, width, height))
+
     def _handle_click(self, event):
         for x1, y1, x2, y2, idx in self.node_regions:
             if x1 <= event.x <= x2 and y1 <= event.y <= y2:
                 if callable(self.on_select):
                     self.on_select(idx)
                 break
+
+    def _on_middle_press(self, event):
+        self._is_panning = True
+        self.canvas.scan_mark(event.x, event.y)
+        self.canvas.configure(cursor="fleur")
+        return "break"
+
+    def _on_middle_drag(self, event):
+        if not self._is_panning:
+            return
+        self.canvas.scan_dragto(event.x, event.y, gain=1)
+        return "break"
+
+    def _on_middle_release(self, _event):
+        if not self._is_panning:
+            return
+        self._is_panning = False
+        self.canvas.configure(cursor="")
+        return "break"
 
     def _build_card_model(
         self, scene: dict[str, Any], index: int, selected: bool
