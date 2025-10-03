@@ -304,6 +304,11 @@ class SceneCanvas(ctk.CTkFrame):
         self._ensure_positions()
         self._draw()
 
+    def _event_coords(self, event: tk.Event) -> tuple[float, float]:
+        """Return the canvas-space coordinates for ``event``."""
+
+        return self.canvas.canvasx(event.x), self.canvas.canvasy(event.y)
+
     def _ensure_positions(self):
         if not self.scenes:
             return
@@ -611,8 +616,10 @@ class SceneCanvas(ctk.CTkFrame):
 
     def _on_click(self, event):
         # Allow direct link label editing on single click for better accessibility
+        event_x, event_y = self._event_coords(event)
+
         for x1, y1, x2, y2, source_idx, target_idx, target_value in self._link_regions:
-            if x1 <= event.x <= x2 and y1 <= event.y <= y2:
+            if x1 <= event_x <= x2 and y1 <= event_y <= y2:
                 if callable(self.on_link_text_edit):
                     self.on_link_text_edit(
                         source_idx,
@@ -622,7 +629,7 @@ class SceneCanvas(ctk.CTkFrame):
                     )
                 return
 
-        icon_idx, icon_type = self._hit_icon(event.x, event.y)
+        icon_idx, icon_type = self._hit_icon(event_x, event_y)
         if icon_idx is not None:
             self._select_index(icon_idx)
             if callable(self.on_add_entity):
@@ -631,7 +638,7 @@ class SceneCanvas(ctk.CTkFrame):
             self._drag_mode = None
             return
 
-        idx = self._hit_test(event.x, event.y)
+        idx = self._hit_test(event_x, event_y)
         self._drag_index = None
         self._drag_mode = None
         self._link_source_index = None
@@ -641,23 +648,27 @@ class SceneCanvas(ctk.CTkFrame):
             if region:
                 x1, y1, x2, y2, _ = region
                 move_region = next((r for r in self._move_regions if r[4] == idx), None)
-                if move_region and move_region[1] <= event.y <= move_region[3]:
+                if move_region and move_region[1] <= event_y <= move_region[3]:
                     self._drag_mode = "move"
                     self._drag_index = idx
                     layout = self.scenes[idx].setdefault("_canvas", {})
                     layout.setdefault("x", (x1 + x2) / 2)
                     layout.setdefault("y", (y1 + y2) / 2)
-                    self._drag_offset = (event.x - layout["x"], event.y - layout["y"])
+                    self._drag_offset = (
+                        event_x - layout.get("x", 0),
+                        event_y - layout.get("y", 0),
+                    )
                 else:
                     self._drag_mode = "link"
                     self._link_source_index = idx
         self._select_index(idx)
 
     def _on_drag(self, event):
+        event_x, event_y = self._event_coords(event)
         if self._drag_mode == "move" and self._drag_index is not None:
             layout = self.scenes[self._drag_index].setdefault("_canvas", {})
-            layout["x"] = event.x - self._drag_offset[0]
-            layout["y"] = event.y - self._drag_offset[1]
+            layout["x"] = event_x - self._drag_offset[0]
+            layout["y"] = event_y - self._drag_offset[1]
             self._draw()
         elif self._drag_mode == "link" and self._link_source_index is not None:
             anchor = self._get_link_anchor(self._link_source_index)
@@ -666,8 +677,8 @@ class SceneCanvas(ctk.CTkFrame):
                 self._link_preview_line = self.canvas.create_line(
                     anchor[0],
                     anchor[1],
-                    event.x,
-                    event.y,
+                    event_x,
+                    event_y,
                     dash=(6, 4),
                     width=2,
                     fill="#6ab2ff",
@@ -675,11 +686,18 @@ class SceneCanvas(ctk.CTkFrame):
                     arrowshape=(12, 14, 6),
                 )
             else:
-                self.canvas.coords(self._link_preview_line, anchor[0], anchor[1], event.x, event.y)
+                self.canvas.coords(
+                    self._link_preview_line,
+                    anchor[0],
+                    anchor[1],
+                    event_x,
+                    event_y,
+                )
         else:
             return
 
     def _on_release(self, event):
+        event_x, event_y = self._event_coords(event)
         if self._drag_mode == "move" and self._drag_index is not None:
             layout = self.scenes[self._drag_index].get("_canvas", {})
             if callable(self.on_move):
@@ -689,7 +707,7 @@ class SceneCanvas(ctk.CTkFrame):
                 self.canvas.delete(self._link_preview_line)
             self._link_preview_line = None
             if self._link_preview_active:
-                target_idx = self._hit_test(event.x, event.y)
+                target_idx = self._hit_test(event_x, event_y)
                 if (
                     target_idx is not None
                     and target_idx != self._link_source_index
@@ -702,8 +720,9 @@ class SceneCanvas(ctk.CTkFrame):
         self._link_preview_active = False
 
     def _on_double_click(self, event):
+        event_x, event_y = self._event_coords(event)
         for x1, y1, x2, y2, source_idx, target_idx, target_value in self._link_regions:
-            if x1 <= event.x <= x2 and y1 <= event.y <= y2:
+            if x1 <= event_x <= x2 and y1 <= event_y <= y2:
                 if callable(self.on_link_text_edit):
                     self.on_link_text_edit(
                         source_idx,
@@ -712,14 +731,15 @@ class SceneCanvas(ctk.CTkFrame):
                         (x1, y1, x2, y2),
                     )
                 return
-        idx = self._hit_test(event.x, event.y)
+        idx = self._hit_test(event_x, event_y)
         if idx is not None:
             self._select_index(idx)
             if callable(self.on_edit):
                 self.on_edit(idx)
 
     def _on_right_click(self, event):
-        idx = self._hit_test(event.x, event.y)
+        event_x, event_y = self._event_coords(event)
+        idx = self._hit_test(event_x, event_y)
         if idx is not None:
             self._select_index(idx, redraw_on_none=False)
         else:
