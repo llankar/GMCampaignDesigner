@@ -56,10 +56,11 @@ def unique_iid(tree, base_id):
 @log_methods
 class _ToolTip:
     """Simple tooltip for a Treeview showing full cell text on hover."""
-    def __init__(self, widget):
+    def __init__(self, widget, text_resolver=None):
         self.widget = widget
         self.tipwindow = None
         self.text = ""
+        self.text_resolver = text_resolver
         widget.bind("<Motion>", self._on_motion)
         widget.bind("<Leave>", self._on_leave)
 
@@ -67,7 +68,9 @@ class _ToolTip:
         rowid = self.widget.identify_row(event.y)
         colid = self.widget.identify_column(event.x)
         if rowid and colid:
-            if colid == "#0":
+            if callable(self.text_resolver):
+                txt = self.text_resolver(rowid, colid)
+            elif colid == "#0":
                 txt = self.widget.item(rowid, "text")
             else:
                 txt = self.widget.set(rowid, colid)
@@ -275,7 +278,8 @@ class GenericListView(ctk.CTkFrame):
         if cfg.has_section(self.row_color_section):
             self.row_colors = dict(cfg.items(self.row_color_section))
 
-        self._tooltip = _ToolTip(self.tree)
+        self._cell_texts = {}
+        self._tooltip = _ToolTip(self.tree, self._get_cell_text)
 
         self.footer_frame = ctk.CTkFrame(self)
         self.footer_frame.pack(fill="x", padx=5, pady=(0, 5))
@@ -315,6 +319,7 @@ class GenericListView(ctk.CTkFrame):
     def refresh_list(self):
         log_info(f"Refreshing list for {self.model_wrapper.entity_type}", func_name="GenericListView.refresh_list")
         self.tree.delete(*self.tree.get_children())
+        self._cell_texts.clear()
         self.batch_index = 0
         self.batch_size = 50
         if self.group_column:
@@ -591,9 +596,9 @@ class GenericListView(ctk.CTkFrame):
                 raw = raw.get("text", "")
             base_id = sanitize_id(raw or f"item_{int(time.time()*1000)}").lower()
             iid = unique_iid(self.tree, base_id)
-            name_text = self._format_cell("#0", item.get(self.unique_field, ""))
+            name_text = self._format_cell("#0", item.get(self.unique_field, ""), iid)
             vals = tuple(
-                self._format_cell(c, item.get(c, "")) for c in self.columns
+                self._format_cell(c, item.get(c, ""), iid) for c in self.columns
             )
             try:
                 self.tree.insert("", "end", iid=iid, text=name_text, values=vals)
@@ -622,8 +627,8 @@ class GenericListView(ctk.CTkFrame):
                     raw = raw.get("text", "")
                 base_iid = sanitize_id(raw or f"item_{int(time.time()*1000)}").lower()
                 iid = unique_iid(self.tree, base_iid)
-                name_text = self._format_cell("#0", item.get(self.unique_field, ""))
-                vals = tuple(self._format_cell(col, item.get(c, "")) for c in self.columns)
+                name_text = self._format_cell("#0", item.get(self.unique_field, ""), iid)
+                vals = tuple(self._format_cell(col, item.get(c, ""), iid) for c in self.columns)
                 try:
                     self.tree.insert(group_id, "end", iid=iid, text=name_text, values=vals)
                     color = self.row_colors.get(base_iid)
@@ -641,9 +646,18 @@ class GenericListView(ctk.CTkFrame):
             return ", ".join(self.clean_value(v) for v in val if v is not None)
         return str(val).replace("{", "").replace("}", "").strip()
 
-    def _format_cell(self, column_id, value):
+    def _get_cell_text(self, iid, column_id):
+        if (iid, column_id) in self._cell_texts:
+            return self._cell_texts[(iid, column_id)]
+        if column_id == "#0":
+            return self.tree.item(iid, "text")
+        return self.tree.set(iid, column_id)
+
+    def _format_cell(self, column_id, value, iid=None):
         """Prepare a value for display in the tree, truncating if needed."""
         text = self.clean_value(value)
+        if iid is not None:
+            self._cell_texts[(iid, column_id)] = text
         return self._truncate_text(text, column_id)
 
     def _truncate_text(self, text, column_id):
