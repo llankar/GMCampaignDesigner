@@ -242,7 +242,16 @@ class SceneFlowPreview(ctk.CTkFrame):
 class SceneCanvas(ctk.CTkFrame):
     GRID = 60
     CARD_W = 260
-    CARD_H = 210
+    CARD_MIN_H = 210
+    SUMMARY_MAX_CHARS = 320
+    TITLE_TOP_PADDING = 18
+    HORIZONTAL_PADDING = 14
+    TITLE_SUMMARY_GAP = 12
+    SUMMARY_ENTITY_GAP = 12
+    ENTITY_LINE_GAP = 6
+    ICON_SECTION_GAP = 14
+    ICON_SIZE = 24
+    BOTTOM_PADDING = 16
     ICON_LABELS = {
         "NPCs": "N",
         "Creatures": "C",
@@ -330,7 +339,7 @@ class SceneCanvas(ctk.CTkFrame):
         if not self.scenes:
             return
         spacing_x = self.CARD_W + 160
-        spacing_y = self.CARD_H + 140
+        spacing_y = self.CARD_MIN_H + 140
         cols = max(1, int(len(self.scenes) ** 0.5))
         for idx, scene in enumerate(self.scenes):
             layout = scene.setdefault("_canvas", {})
@@ -354,7 +363,7 @@ class SceneCanvas(ctk.CTkFrame):
             c,
             tile_cache=self._grid_tile_cache,
             extent_width=max(width, self.CARD_W * 4),
-            extent_height=max(height, self.CARD_H * 4),
+            extent_height=max(height, self.CARD_MIN_H * 4),
         )
         c.tag_lower("scene_flow_bg")
         if not self.scenes:
@@ -451,13 +460,32 @@ class SceneCanvas(ctk.CTkFrame):
         self._move_regions = []
         self._icon_regions = []
         for idx, scene in enumerate(self.scenes):
+            selected = idx == self.selected_index
             x, y = positions[idx]
+            title = scene.get("Title") or f"Scene {idx + 1}"
+            summary_raw = scene.get("Summary") or scene.get("Text") or ""
+            summary_full = " ".join(coerce_text(summary_raw).split())
+            summary_display = self._truncate_inline_summary(summary_full)
+            entity_lines = self._prepare_entity_lines(scene)
+            icon_types = [
+                (etype, self.ICON_LABELS[etype])
+                for etype in self.available_entity_types
+                if etype in self.ICON_LABELS
+            ]
+            card_height = self._compute_card_height(
+                c,
+                title,
+                summary_display,
+                entity_lines,
+                icon_types,
+                selected=selected,
+            )
             x1 = x - self.CARD_W / 2
-            y1 = y - self.CARD_H / 2
             x2 = x + self.CARD_W / 2
-            y2 = y + self.CARD_H / 2
+            y1 = y - card_height / 2
+            y2 = y + card_height / 2
             shadow_image, offset = get_shadow_image(
-                c, self._shadow_cache, self.CARD_W, self.CARD_H, 1.0
+                c, self._shadow_cache, self.CARD_W, card_height, 1.0
             )
             if shadow_image:
                 shadow_id = c.create_image(
@@ -470,8 +498,8 @@ class SceneCanvas(ctk.CTkFrame):
                 c.tag_lower(shadow_id)
                 self._image_refs[f"shadow-{idx}"] = shadow_image
 
-            bg = "#1f2a40" if idx == self.selected_index else "#151e30"
-            border = "#6ab2ff" if idx == self.selected_index else "#273750"
+            bg = "#1f2a40" if selected else "#151e30"
+            border = "#6ab2ff" if selected else "#273750"
             card_id = c.create_rectangle(
                 x1,
                 y1,
@@ -483,79 +511,85 @@ class SceneCanvas(ctk.CTkFrame):
                 tags=(f"scene-node-{idx}", "scene-node"),
             )
             c.tag_raise(card_id)
-            title = scene.get("Title") or f"Scene {idx + 1}"
-            c.create_text(
-                x1 + 14,
-                y1 + 18,
+            content_x = x1 + self.HORIZONTAL_PADDING
+            current_y = y1 + self.TITLE_TOP_PADDING
+            title_id = c.create_text(
+                content_x,
+                current_y,
                 text=title,
                 anchor="nw",
                 fill="#f8fafc",
                 font=("Segoe UI", 13, "bold"),
+                width=self.CARD_W - 2 * self.HORIZONTAL_PADDING,
                 tags=(f"scene-node-{idx}", "scene-node"),
             )
-            self._move_regions.append((x1, y1, x2, y1 + 36, idx))
-            summary_raw = scene.get("Summary") or scene.get("Text") or ""
-            summary = " ".join(coerce_text(summary_raw).split())[:160]
-            c.create_text(
-                x1 + 14,
-                y1 + 48,
-                text=summary,
-                anchor="nw",
-                fill="#c5d4f5",
-                font=("Segoe UI", 10),
-                width=self.CARD_W - 28,
-                tags=(f"scene-node-{idx}", "scene-node"),
-            )
-            info_y = y1 + 116
-            for label_key in self.ENTITY_DISPLAY_ORDER:
-                items = scene.get(label_key)
-                if not items:
-                    continue
-                if isinstance(items, str):
-                    items = [items]
-                display_items = [
-                    str(item).strip()
-                    for item in items
-                    if str(item).strip()
-                ]
-                if not display_items:
-                    continue
-                display = ", ".join(display_items[:4])
-                if len(display_items) > 4:
-                    display += ", …"
-                c.create_text(
-                    x1 + 14,
-                    info_y,
-                    text=f"{label_key}: {display}",
+            title_bbox = c.bbox(title_id)
+            if title_bbox:
+                title_bottom = title_bbox[3]
+            else:
+                title_bottom = y1 + self.TITLE_TOP_PADDING + self._measure_text_height(
+                    c,
+                    title,
+                    ("Segoe UI", 13, "bold"),
+                    self.CARD_W - 2 * self.HORIZONTAL_PADDING,
+                )
+            title_bottom = max(title_bottom, y1 + 36)
+            self._move_regions.append((x1, y1, x2, title_bottom, idx))
+            current_y = title_bottom
+            if summary_display:
+                current_y += self.TITLE_SUMMARY_GAP
+                summary_id = c.create_text(
+                    content_x,
+                    current_y,
+                    text=summary_display,
                     anchor="nw",
-                    fill="#9bb8df",
-                    font=("Segoe UI", 9, "bold" if idx == self.selected_index else "normal"),
-                    width=self.CARD_W - 28,
+                    fill="#c5d4f5",
+                    font=("Segoe UI", 10),
+                    width=self.CARD_W - 2 * self.HORIZONTAL_PADDING,
                     tags=(f"scene-node-{idx}", "scene-node"),
                 )
-                info_y += 18
-            icon_size = 24
+                summary_bbox = c.bbox(summary_id)
+                if summary_bbox:
+                    current_y = summary_bbox[3]
+            if entity_lines:
+                current_y += self.SUMMARY_ENTITY_GAP
+                entity_font = ("Segoe UI", 9, "bold" if selected else "normal")
+                for line_index, line in enumerate(entity_lines):
+                    entity_id = c.create_text(
+                        content_x,
+                        current_y,
+                        text=line,
+                        anchor="nw",
+                        fill="#9bb8df",
+                        font=entity_font,
+                        width=self.CARD_W - 2 * self.HORIZONTAL_PADDING,
+                        tags=(f"scene-node-{idx}", "scene-node"),
+                    )
+                    entity_bbox = c.bbox(entity_id)
+                    if entity_bbox:
+                        current_y = entity_bbox[3]
+                    if line_index != len(entity_lines) - 1:
+                        current_y += self.ENTITY_LINE_GAP
             icon_spacing = 10
-            icon_types = [
-                (etype, self.ICON_LABELS[etype])
-                for etype in self.available_entity_types
-                if etype in self.ICON_LABELS
-            ]
             if icon_types:
-                total_width = len(icon_types) * icon_size + (len(icon_types) - 1) * icon_spacing
-                icon_start = x2 - total_width - 16
+                current_y += self.ICON_SECTION_GAP
+                total_width = (
+                    len(icon_types) * self.ICON_SIZE
+                    + (len(icon_types) - 1) * icon_spacing
+                )
+                icon_start = x2 - total_width - self.HORIZONTAL_PADDING
                 for offset, (etype, label_char) in enumerate(icon_types):
-                    ix1 = icon_start + offset * (icon_size + icon_spacing)
-                    iy1 = y2 - icon_size - 12
-                    ix2 = ix1 + icon_size
-                    iy2 = iy1 + icon_size
+                    ix1 = icon_start + offset * (self.ICON_SIZE + icon_spacing)
+                    iy1 = current_y
+                    ix2 = ix1 + self.ICON_SIZE
+                    iy2 = iy1 + self.ICON_SIZE
                     icon_id = c.create_oval(
                         ix1,
                         iy1,
                         ix2,
                         iy2,
                         fill="#203758",
-                        outline="#6ab2ff" if idx == self.selected_index else "#30435f",
+                        outline="#6ab2ff" if selected else "#30435f",
                         width=2,
                         tags=("scene-node",),
                     )
@@ -568,6 +602,12 @@ class SceneCanvas(ctk.CTkFrame):
                         tags=("scene-node",),
                     )
                     self._icon_regions.append((ix1, iy1, ix2, iy2, idx, etype))
+                current_y += self.ICON_SIZE
+            current_y += self.BOTTOM_PADDING
+            final_bottom = max(y2, current_y)
+            if final_bottom != y2:
+                y2 = final_bottom
+                c.coords(card_id, x1, y1, x2, y2)
             self._regions.append((x1, y1, x2, y2, idx))
 
         bbox = c.bbox("all")
@@ -602,6 +642,84 @@ class SceneCanvas(ctk.CTkFrame):
             return 0, 0
         x, y = position
         return x + self.CARD_W / 2 - 12, y
+
+    def _truncate_inline_summary(self, text: str) -> str:
+        collapsed = text.strip()
+        if not collapsed:
+            return ""
+        if len(collapsed) <= self.SUMMARY_MAX_CHARS:
+            return collapsed
+        try:
+            return textwrap.shorten(collapsed, width=self.SUMMARY_MAX_CHARS, placeholder="...")
+        except ValueError:
+            return collapsed[: self.SUMMARY_MAX_CHARS - 3] + "..."
+
+    def _prepare_entity_lines(self, scene: dict[str, Any]) -> list[str]:
+        lines: list[str] = []
+        for label_key in self.ENTITY_DISPLAY_ORDER:
+            items = scene.get(label_key)
+            if not items:
+                continue
+            if isinstance(items, str):
+                items = [items]
+            display_items = [
+                str(item).strip()
+                for item in items
+                if str(item).strip()
+            ]
+            if not display_items:
+                continue
+            display = ", ".join(display_items[:4])
+            if len(display_items) > 4:
+                display += ", …"
+            lines.append(f"{label_key}: {display}")
+        return lines
+
+    def _measure_text_height(self, canvas: tk.Canvas, text: str, font: tuple, width: int) -> float:
+        if not text:
+            return 0.0
+        text_id = canvas.create_text(
+            0,
+            0,
+            text=text,
+            font=font,
+            width=width,
+            anchor="nw",
+            state="hidden",
+        )
+        bbox = canvas.bbox(text_id)
+        canvas.delete(text_id)
+        if not bbox:
+            return 0.0
+        return float(bbox[3] - bbox[1])
+
+    def _compute_card_height(
+        self,
+        canvas: tk.Canvas,
+        title: str,
+        summary_text: str,
+        entity_lines: list[str],
+        icon_types: list[tuple[str, str]],
+        *,
+        selected: bool,
+    ) -> float:
+        width = self.CARD_W - 2 * self.HORIZONTAL_PADDING
+        height = self.TITLE_TOP_PADDING
+        height += self._measure_text_height(canvas, title, ("Segoe UI", 13, "bold"), width)
+        if summary_text:
+            height += self.TITLE_SUMMARY_GAP
+            height += self._measure_text_height(canvas, summary_text, ("Segoe UI", 10), width)
+        if entity_lines:
+            height += self.SUMMARY_ENTITY_GAP
+            entity_font = ("Segoe UI", 9, "bold" if selected else "normal")
+            for index, line in enumerate(entity_lines):
+                height += self._measure_text_height(canvas, line, entity_font, width)
+                if index < len(entity_lines) - 1:
+                    height += self.ENTITY_LINE_GAP
+        if icon_types:
+            height += self.ICON_SECTION_GAP + self.ICON_SIZE
+        height += self.BOTTOM_PADDING
+        return max(self.CARD_MIN_H, height)
 
     def _select_index(self, idx, redraw_on_none=True):
         if self.selected_index != idx:
