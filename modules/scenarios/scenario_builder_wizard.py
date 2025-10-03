@@ -15,6 +15,7 @@ from modules.generic.generic_model_wrapper import GenericModelWrapper
 from modules.helpers.config_helper import ConfigHelper
 from modules.helpers.logging_helper import log_module_import, log_info, log_exception
 from modules.helpers.template_loader import load_template, load_entity_definitions
+from modules.helpers.text_helpers import coerce_text
 from modules.scenarios.scene_flow_components import (
     SceneCanvas,
     SceneFlowPreview,
@@ -286,14 +287,12 @@ class ScenesPlanningStep(WizardStep):
 
     def _apply_loaded_scenario(self, scenario):
         title = scenario.get("Title") or scenario.get("Name") or ""
-        summary = scenario.get("Summary")
-        if not isinstance(summary, str):
-            summary = scenario.get("Text") if isinstance(scenario.get("Text"), str) else summary
-        summary = summary or ""
-        secrets = scenario.get("Secrets")
-        if not isinstance(secrets, str):
-            secrets = scenario.get("Secret") if isinstance(scenario.get("Secret"), str) else secrets
-        secrets = secrets or ""
+        summary = coerce_text(scenario.get("Summary"))
+        if not summary:
+            summary = coerce_text(scenario.get("Text"))
+        secrets = coerce_text(scenario.get("Secrets"))
+        if not secrets:
+            secrets = coerce_text(scenario.get("Secret"))
 
         self.scenario_title_var.set(str(title))
         self._scenario_summary = str(summary)
@@ -317,9 +316,9 @@ class ScenesPlanningStep(WizardStep):
             return
 
         self._state_ref["Title"] = str(title)
-        self._state_ref["Summary"] = str(summary)
-        self._state_ref["Secrets"] = str(secrets)
-        self._state_ref["Secret"] = str(secrets)
+        self._state_ref["Summary"] = summary
+        self._state_ref["Secrets"] = secrets
+        self._state_ref["Secret"] = secrets
 
         if isinstance(layout, list):
             self._state_ref["_SceneLayout"] = copy.deepcopy(layout)
@@ -987,9 +986,10 @@ class ScenesPlanningStep(WizardStep):
                 continue
             seen.add(key)
             deduped.append({"target": target, "text": text})
+        summary = entry.get("Summary") or entry.get("Text") or ""
         scene = {
             "Title": entry.get("Title") or entry.get("Name") or f"Scene {index + 1}",
-            "Summary": entry.get("Summary") or entry.get("Text") or "",
+            "Summary": coerce_text(summary),
             "SceneType": entry.get("SceneType") or entry.get("Type") or "",
             "NPCs": self._split_to_list(entry.get("NPCs")),
             "Creatures": self._split_to_list(entry.get("Creatures")),
