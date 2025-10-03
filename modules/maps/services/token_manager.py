@@ -88,13 +88,21 @@ def normalize_existing_token_paths(maps_wrapper) -> bool:
             if not isinstance(token, dict):
                 continue
             existing_path = token.get("image_path")
-            if not existing_path:
-                continue
-            resolved = _resolve_campaign_path(existing_path)
-            relative = _campaign_relative_path(resolved)
-            if relative and relative != existing_path:
-                token["image_path"] = relative
-                item_updated = True
+            if existing_path:
+                resolved = _resolve_campaign_path(existing_path)
+                relative = _campaign_relative_path(resolved)
+                if relative and relative != existing_path:
+                    token["image_path"] = relative
+                    item_updated = True
+
+            if token.get("type") == "marker":
+                existing_video = token.get("video_path")
+                if existing_video:
+                    resolved_video = _resolve_campaign_path(existing_video)
+                    relative_video = _campaign_relative_path(resolved_video)
+                    if relative_video and relative_video != existing_video:
+                        token["video_path"] = relative_video
+                        item_updated = True
 
         if item_updated:
             new_item = dict(item)
@@ -427,11 +435,15 @@ def _persist_tokens(self):
                 entry_widget = t.get("entry_widget")
                 if entry_widget and entry_widget.winfo_exists():
                     t["text"] = entry_widget.get()
+                video_path = t.get("video_path", "")
+                resolved_video = _resolve_campaign_path(video_path)
+                storage_video = _campaign_relative_path(resolved_video) if resolved_video else ""
                 item_data.update({
                     "text": t.get("text", ""),
                     "description": t.get("description", ""),
                     "entry_width": t.get("entry_width", 180),
                     "border_color": t.get("border_color", "#00ff00"),
+                    "video_path": storage_video,
                 })
             else:
                 # Silently skip unknown types for now

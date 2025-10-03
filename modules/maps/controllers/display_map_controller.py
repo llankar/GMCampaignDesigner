@@ -2,7 +2,7 @@ import os
 import json
 import copy
 from pathlib import Path
-from tkinter import colorchooser, messagebox
+from tkinter import colorchooser, filedialog, messagebox
 import tkinter as tk
 from tkinter import font as tkfont
 from types import SimpleNamespace
@@ -25,6 +25,7 @@ from modules.maps.services.token_manager import (
     _persist_tokens,
     _change_token_border_color,
     _resolve_campaign_path,
+    _campaign_relative_path,
     normalize_existing_token_paths,
 )  # Keep this if it's used by other token_manager functions not moved
 from modules.maps.views.fullscreen_view import open_fullscreen, _update_fullscreen_map
@@ -37,6 +38,7 @@ from modules.helpers.template_loader import load_template
 from modules.helpers.text_helpers import format_longtext
 from modules.helpers.config_helper import ConfigHelper
 from modules.ui.image_viewer import show_portrait
+from modules.ui.video_player import play_video_on_second_screen
 from modules.helpers.logging_helper import log_module_import
 from modules.audio.entity_audio import (
     get_entity_audio_value,
@@ -577,6 +579,7 @@ class DisplayMapController:
             "text": "New Marker",
             "description": "Marker description",
             "border_color": "#00ff00",
+            "video_path": "",
             "entry_widget": None,
             "description_popup": None,
             "description_label": None,
@@ -761,11 +764,12 @@ class DisplayMapController:
             self._hovered_marker = None
 
         menu = tk.Menu(self.canvas, tearoff=0)
+        single_marker = valid_markers[0] if len(valid_markers) == 1 else None
 
-        if len(valid_markers) == 1:
+        if single_marker:
             menu.add_command(
                 label="Edit Description",
-                command=lambda: self._open_marker_description_editor(valid_markers[0]),
+                command=lambda: self._open_marker_description_editor(single_marker),
             )
 
         plural = "s" if len(valid_markers) != 1 else ""
@@ -773,6 +777,28 @@ class DisplayMapController:
             label=f"Change Border Color{plural}",
             command=lambda: self._change_markers_border_color(valid_markers),
         )
+
+        menu.add_separator()
+        menu.add_command(
+            label="Attach Video...",
+            command=lambda: self._attach_video_to_markers(valid_markers),
+        )
+
+        if single_marker:
+            has_video = bool(single_marker.get("video_path"))
+            menu.add_command(
+                label="Play Video on Second Screen",
+                command=lambda: self._play_marker_video(single_marker),
+                state=tk.NORMAL if has_video else tk.DISABLED,
+            )
+
+        has_any_video = any((marker.get("video_path") for marker in valid_markers))
+        menu.add_command(
+            label=f"Clear Attached Video{plural}",
+            command=lambda: self._clear_marker_videos(valid_markers),
+            state=tk.NORMAL if has_any_video else tk.DISABLED,
+        )
+
         menu.add_separator()
         menu.add_command(
             label=f"Delete Marker{plural}",
@@ -805,6 +831,73 @@ class DisplayMapController:
         if not marker:
             return
         self._change_markers_border_color([marker])
+
+    def _attach_video_to_markers(self, markers):
+        valid_markers = [m for m in markers if isinstance(m, dict) and m.get("type") == "marker"]
+        if not valid_markers:
+            return
+
+        try:
+            campaign_dir = ConfigHelper.get_campaign_dir()
+        except Exception:
+            campaign_dir = None
+
+        initial_dir = campaign_dir if campaign_dir and os.path.isdir(campaign_dir) else os.path.expanduser("~")
+
+        filetypes = [
+            ("Video Files", "*.mp4 *.mov *.mkv *.avi *.webm *.m4v"),
+            ("All Files", "*.*"),
+        ]
+
+        selected = filedialog.askopenfilename(
+            parent=getattr(self, "canvas", None),
+            title="Select Video File",
+            filetypes=filetypes,
+            initialdir=initial_dir,
+        )
+
+        if not selected:
+            return
+
+        resolved_path = _resolve_campaign_path(selected)
+        if not resolved_path or not os.path.exists(resolved_path):
+            messagebox.showerror("Marker Video", f"Unable to locate the selected video file:\n{selected}")
+            return
+
+        storage_path = _campaign_relative_path(resolved_path)
+        for marker in valid_markers:
+            marker["video_path"] = storage_path
+
+        self._persist_tokens()
+
+    def _clear_marker_videos(self, markers):
+        changed = False
+        for marker in markers:
+            if isinstance(marker, dict) and marker.get("type") == "marker" and marker.get("video_path"):
+                marker["video_path"] = ""
+                changed = True
+        if changed:
+            self._persist_tokens()
+
+    def _play_marker_video(self, marker):
+        if not marker or marker.get("type") != "marker":
+            return
+
+        video_value = marker.get("video_path") or ""
+        if not video_value:
+            messagebox.showinfo("Marker Video", "No video is attached to this marker.")
+            return
+
+        resolved_path = _resolve_campaign_path(video_value)
+        if not resolved_path or not os.path.exists(resolved_path):
+            messagebox.showerror("Marker Video", f"The attached video could not be found:\n{resolved_path or video_value}")
+            return
+
+        title = marker.get("text") or "Marker Video"
+        try:
+            play_video_on_second_screen(resolved_path, title=title)
+        except Exception as exc:
+            messagebox.showerror("Marker Video", f"Unable to play the video:\n{exc}")
 
     def _edit_marker_description(self, marker):
         self._open_marker_description_editor(marker)
