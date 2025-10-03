@@ -104,6 +104,49 @@ class ScenesPlanningStep(WizardStep):
         "Downtime",
     ]
 
+    ROOT_KNOWN_FIELDS = {
+        "Title",
+        "Summary",
+        "Text",
+        "Secrets",
+        "Secret",
+        "Scenes",
+        "_SceneLayout",
+        "NPCs",
+        "Creatures",
+        "Places",
+        "Maps",
+        "Factions",
+        "Objects",
+    }
+
+    SCENE_KNOWN_FIELDS = {
+        "Title",
+        "Summary",
+        "SceneSummary",
+        "Text",
+        "SceneText",
+        "Description",
+        "Body",
+        "Details",
+        "SceneDetails",
+        "Notes",
+        "Content",
+        "Synopsis",
+        "Overview",
+        "SceneType",
+        "Type",
+        "NPCs",
+        "Creatures",
+        "Places",
+        "Maps",
+        "NextScenes",
+        "Links",
+        "LinkData",
+        "_canvas",
+        "_extra_fields",
+    }
+
     def __init__(self, master, entity_wrappers, *, scenario_wrapper=None):
         super().__init__(master)
         self.entity_wrappers = entity_wrappers or {}
@@ -116,6 +159,7 @@ class ScenesPlanningStep(WizardStep):
         self._link_label_editor = None
         self._state_ref = None
         self._on_state_change = None
+        self._root_extra_fields = {}
 
         self.scenario_title_var = ctk.StringVar()
 
@@ -358,6 +402,12 @@ class ScenesPlanningStep(WizardStep):
             else:
                 values = []
             self._state_ref[field] = list(dict.fromkeys(values))
+
+        self._root_extra_fields = {
+            key: copy.deepcopy(value)
+            for key, value in scenario.items()
+            if key not in self.ROOT_KNOWN_FIELDS
+        }
 
         self.save_state(self._state_ref)
         if callable(self._on_state_change):
@@ -893,6 +943,12 @@ class ScenesPlanningStep(WizardStep):
         self.canvas.set_scenes(self.scenes, None)
         self._update_buttons()
 
+        self._root_extra_fields = {
+            key: copy.deepcopy(value)
+            for key, value in (state or {}).items()
+            if key not in self.ROOT_KNOWN_FIELDS
+        }
+
     def save_state(self, state):
         self._close_inline_scene_editor()
         self._close_link_label_editor()
@@ -927,6 +983,11 @@ class ScenesPlanningStep(WizardStep):
                     {"target": link["target"], "text": link.get("text") or link["target"]}
                     for link in links
                 ]
+            extras = scene.get("_extra_fields")
+            if isinstance(extras, dict):
+                for key, value in extras.items():
+                    if key not in record:
+                        record[key] = copy.deepcopy(value)
             payload.append(record)
             layout.append(scene.get("_canvas", {}))
         state["Scenes"] = payload
@@ -937,6 +998,10 @@ class ScenesPlanningStep(WizardStep):
             for scene in self.scenes:
                 merged.extend(scene.get(field, []))
             state[field] = self._dedupe(merged)
+
+        if isinstance(self._root_extra_fields, dict):
+            for key, value in self._root_extra_fields.items():
+                state.setdefault(key, copy.deepcopy(value))
         return True
 
     # ------------------------------------------------------------------
@@ -1069,6 +1134,13 @@ class ScenesPlanningStep(WizardStep):
             "NextScenes": [link["target"] for link in deduped],
             "LinkData": deduped,
         }
+        extras = {
+            key: copy.deepcopy(value)
+            for key, value in entry.items()
+            if key not in self.SCENE_KNOWN_FIELDS
+        }
+        if extras:
+            scene["_extra_fields"] = extras
         return scene
 
 
