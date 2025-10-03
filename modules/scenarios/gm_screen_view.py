@@ -384,11 +384,26 @@ class GMScreenView(ctk.CTkFrame):
 
 
     def open_global_search(self, event=None):
-        # Create popup
-        popup = ctk.CTkToplevel(self)
+        # Ensure the view is still alive before creating child windows
+        try:
+            if not int(self.winfo_exists()):
+                return
+        except tk.TclError:
+            return
+
+        try:
+            host = self.winfo_toplevel()
+        except tk.TclError:
+            return
+
+        if host is None:
+            return
+
+        # Create popup anchored to the hosting toplevel
+        popup = ctk.CTkToplevel(host)
         popup.title("Search Entities")
         popup.geometry("400x300")
-        popup.transient(self.winfo_toplevel())
+        popup.transient(host)
         popup.grab_set()
 
         # 1) Search entry
@@ -464,7 +479,10 @@ class GMScreenView(ctk.CTkFrame):
         def on_select(evt=None):
             if not search_map:
                 return
-            idx = listbox.curselection()[0]
+            selection = listbox.curselection()
+            if not selection:
+                return
+            idx = selection[0]
             entity_type, name = search_map[idx]
             self.open_entity_tab(entity_type, name)
             popup.destroy()
