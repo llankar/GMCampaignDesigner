@@ -89,6 +89,7 @@ class ScenesPlanningStep(WizardStep):
         "NPCs": ("npcs", "Key NPCs", "NPC"),
         "Creatures": ("creatures", "Creatures / Foes", "Creature"),
         "Places": ("places", "Locations / Places", "Place"),
+        "Maps": ("maps", "Maps & Handouts", "Map"),
     }
 
     SCENE_TYPES = [
@@ -123,6 +124,15 @@ class ScenesPlanningStep(WizardStep):
         root.grid_rowconfigure(1, weight=1)
         root.grid_columnconfigure(0, weight=1)
 
+        available_types = [
+            field
+            for field, (slug, _, _) in self.ENTITY_FIELDS.items()
+            if slug in self.entity_wrappers
+        ]
+        if not available_types:
+            available_types = list(self.ENTITY_FIELDS.keys())
+        self._available_entity_types = available_types
+
         toolbar = ctk.CTkFrame(root, fg_color="#101827", corner_radius=14)
         toolbar.grid(row=0, column=0, sticky="ew", padx=12, pady=(12, 6))
         toolbar.grid_columnconfigure(0, weight=1)
@@ -149,9 +159,20 @@ class ScenesPlanningStep(WizardStep):
         self.remove_scene_btn = ctk.CTkButton(btn_row, text="Remove", command=self.remove_scene)
         self.remove_scene_btn.pack(side="left")
 
+        icon_hint = "/".join(
+            f"+{SceneCanvas.ICON_LABELS.get(field, field[:1].upper())}"
+            for field in self._available_entity_types
+            if SceneCanvas.ICON_LABELS.get(field)
+        )
+        if not icon_hint:
+            icon_hint = "+N/+C/+P"
         ctk.CTkLabel(
             toolbar,
-            text="Double-click a scene to edit it inline, use the +N/+C/+P icons to link entities, drag from the title bar to move, or drag from the body to create scene links.",
+            text=(
+                "Double-click a scene to edit it inline, use the "
+                f"{icon_hint} icons to link entities, drag from the title bar to move, "
+                "or drag from the body to create scene links."
+            ),
             text_color="#9db4d1",
             wraplength=420,
             justify="left",
@@ -172,6 +193,7 @@ class ScenesPlanningStep(WizardStep):
             on_add_entity=self._add_entity_to_scene,
             on_link=self._link_scenes_via_drag,
             on_link_text_edit=self._start_link_label_edit,
+            available_entity_types=self._available_entity_types,
         )
         self.canvas.grid(row=0, column=0, sticky="nsew")
 
@@ -325,7 +347,7 @@ class ScenesPlanningStep(WizardStep):
         else:
             self._state_ref["_SceneLayout"] = []
 
-        for field in ("NPCs", "Creatures", "Places", "Factions", "Objects"):
+        for field in ("NPCs", "Creatures", "Places", "Maps", "Factions", "Objects"):
             values = scenario.get(field) or []
             if isinstance(values, str):
                 values = self._split_to_list(values)
@@ -778,6 +800,7 @@ class ScenesPlanningStep(WizardStep):
             "NPCs": [],
             "Creatures": [],
             "Places": [],
+            "Maps": [],
             "NextScenes": [],
             "LinkData": [],
         }
@@ -892,6 +915,7 @@ class ScenesPlanningStep(WizardStep):
                 "NPCs": list(scene.get("NPCs", [])),
                 "Creatures": list(scene.get("Creatures", [])),
                 "Places": list(scene.get("Places", [])),
+                "Maps": list(scene.get("Maps", [])),
             }
             if scene.get("SceneType"):
                 record["SceneType"] = scene["SceneType"]
@@ -908,7 +932,7 @@ class ScenesPlanningStep(WizardStep):
         state["Scenes"] = payload
         state["_SceneLayout"] = layout
 
-        for field in ("NPCs", "Creatures", "Places"):
+        for field in ("NPCs", "Creatures", "Places", "Maps"):
             merged = self._dedupe(self._split_to_list(state.get(field, [])))
             for scene in self.scenes:
                 merged.extend(scene.get(field, []))
@@ -1041,6 +1065,7 @@ class ScenesPlanningStep(WizardStep):
             "NPCs": self._split_to_list(entry.get("NPCs")),
             "Creatures": self._split_to_list(entry.get("Creatures")),
             "Places": self._split_to_list(entry.get("Places")),
+            "Maps": self._split_to_list(entry.get("Maps")),
             "NextScenes": [link["target"] for link in deduped],
             "LinkData": deduped,
         }
@@ -1211,6 +1236,7 @@ class EntityLinkingStep(WizardStep):
         "factions": ("Factions", "Faction"),
         "creatures": ("Creatures", "Creature"),
         "objects": ("Objects", "Item"),
+        "maps": ("Maps", "Map"),
     }
 
     def __init__(self, master, wrappers):
@@ -1746,6 +1772,7 @@ class ReviewStep(WizardStep):
             ("NPCs", "NPCs"),
             ("Creatures", "Creatures"),
             ("Places", "Places"),
+            ("Maps", "Maps"),
             ("Factions", "Factions"),
             ("Objects", "Objects"),
         ):
@@ -1782,7 +1809,7 @@ class ReviewStep(WizardStep):
         else:
             summary_lines.append("  (No scenes planned.)")
 
-        for field in ("NPCs", "Creatures", "Places", "Factions", "Objects"):
+        for field in ("NPCs", "Creatures", "Places", "Maps", "Factions", "Objects"):
             entries = state.get(field) or []
             summary_lines.append("")
             summary_lines.append(f"{field}:")
@@ -1820,6 +1847,7 @@ class ScenarioBuilderWizard(ctk.CTkToplevel):
             "NPCs": [],
             "Creatures": [],
             "Places": [],
+            "Maps": [],
             "Factions": [],
             "Objects": [],
         }
@@ -1828,6 +1856,7 @@ class ScenarioBuilderWizard(ctk.CTkToplevel):
         self.npc_wrapper = GenericModelWrapper("npcs")
         self.creature_wrapper = GenericModelWrapper("creatures")
         self.place_wrapper = GenericModelWrapper("places")
+        self.map_wrapper = GenericModelWrapper("maps")
         self.faction_wrapper = GenericModelWrapper("factions")
         self.object_wrapper = GenericModelWrapper("objects")
 
@@ -1883,6 +1912,7 @@ class ScenarioBuilderWizard(ctk.CTkToplevel):
             "factions": self.faction_wrapper,
             "creatures": self.creature_wrapper,
             "objects": self.object_wrapper,
+            "maps": self.map_wrapper,
         }
 
         planning_step = ScenesPlanningStep(
@@ -1890,7 +1920,7 @@ class ScenarioBuilderWizard(ctk.CTkToplevel):
             {
                 key: wrapper
                 for key, wrapper in entity_wrappers.items()
-                if key in ("npcs", "creatures", "places")
+                if key in ("npcs", "creatures", "places", "maps")
             },
             scenario_wrapper=self.scenario_wrapper,
         )
@@ -2007,6 +2037,7 @@ class ScenarioBuilderWizard(ctk.CTkToplevel):
             "Places": list(dict.fromkeys(self.wizard_state.get("Places", []))),
             "NPCs": list(dict.fromkeys(self.wizard_state.get("NPCs", []))),
             "Creatures": list(dict.fromkeys(self.wizard_state.get("Creatures", []))),
+            "Maps": list(dict.fromkeys(self.wizard_state.get("Maps", []))),
             "Factions": list(dict.fromkeys(self.wizard_state.get("Factions", []))),
             "Objects": list(dict.fromkeys(self.wizard_state.get("Objects", []))),
         }
