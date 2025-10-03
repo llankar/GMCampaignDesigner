@@ -102,15 +102,18 @@ class ScenesPlanningStep(WizardStep):
         "Downtime",
     ]
 
-    def __init__(self, master, entity_wrappers):
+    def __init__(self, master, entity_wrappers, *, scenario_wrapper=None):
         super().__init__(master)
         self.entity_wrappers = entity_wrappers or {}
+        self.scenario_wrapper = scenario_wrapper
         self.scenes = []
         self.selected_index = None
         self._scenario_summary = ""
         self._scenario_secrets = ""
         self._inline_editor = None
         self._link_label_editor = None
+        self._state_ref = None
+        self._on_state_change = None
 
         self.scenario_title_var = ctk.StringVar()
 
@@ -132,8 +135,12 @@ class ScenesPlanningStep(WizardStep):
 
         btn_row = ctk.CTkFrame(toolbar, fg_color="transparent")
         btn_row.grid(row=1, column=1, padx=16, pady=(0, 12))
+        self.load_scenario_btn = ctk.CTkButton(
+            btn_row, text="Load Scenario", command=self._load_existing_scenario
+        )
+        self.load_scenario_btn.pack(side="left")
         self.notes_btn = ctk.CTkButton(btn_row, text="Edit Notes", command=self._edit_scenario_info)
-        self.notes_btn.pack(side="left")
+        self.notes_btn.pack(side="left", padx=(6, 0))
         self.add_scene_btn = ctk.CTkButton(btn_row, text="Add Scene", command=self.add_scene)
         self.add_scene_btn.pack(side="left", padx=(6, 0))
         self.dup_scene_btn = ctk.CTkButton(btn_row, text="Duplicate", command=self.duplicate_scene)
@@ -166,6 +173,10 @@ class ScenesPlanningStep(WizardStep):
             on_link_text_edit=self._start_link_label_edit,
         )
         self.canvas.grid(row=0, column=0, sticky="nsew")
+
+    def set_state_binding(self, state, on_state_change=None):
+        self._state_ref = state
+        self._on_state_change = on_state_change
 
     def _get_scene_links(self, scene):
         return normalise_scene_links(scene, self._split_to_list)
@@ -202,6 +213,137 @@ class ScenesPlanningStep(WizardStep):
         if dialog.result:
             self._scenario_summary = dialog.result.get("summary", "")
             self._scenario_secrets = dialog.result.get("secrets", "")
+
+    def _load_existing_scenario(self):  # pragma: no cover - UI interaction
+        if not self.scenario_wrapper:
+            messagebox.showerror("Unavailable", "No scenario library is available to load from.")
+            return
+
+        scenario_name = self._choose_existing_scenario()
+        if not scenario_name:
+            return
+
+        try:
+            scenarios = self.scenario_wrapper.load_items()
+        except Exception as exc:  # pragma: no cover - defensive path
+            log_exception(
+                f"Failed to load scenarios: {exc}",
+                func_name="ScenesPlanningStep._load_existing_scenario",
+            )
+            messagebox.showerror("Load Error", "Unable to load scenarios from the database.")
+            return
+
+        match = None
+        for entry in scenarios or []:
+            title = entry.get("Title") or entry.get("Name")
+            if title == scenario_name:
+                match = entry
+                break
+
+        if not match:
+            messagebox.showerror("Not Found", f"Scenario '{scenario_name}' was not found.")
+            return
+
+        self.load_from_payload(copy.deepcopy(match))
+
+    def _choose_existing_scenario(self):  # pragma: no cover - UI interaction
+        try:
+            template = load_template("scenarios")
+        except Exception as exc:
+            log_exception(
+                f"Failed to load scenario template: {exc}",
+                func_name="ScenesPlanningStep._choose_existing_scenario",
+            )
+            messagebox.showerror("Template Error", "Unable to load the scenario list.")
+            return None
+
+        dialog = ctk.CTkToplevel(self)
+        dialog.title("Select Scenario")
+        dialog.geometry("1100x720")
+        dialog.minsize(1100, 720)
+        result = {"name": None}
+
+        view = GenericListSelectionView(
+            dialog,
+            "scenarios",
+            self.scenario_wrapper,
+            template,
+            on_select_callback=lambda _et, name, win=dialog: (
+                result.__setitem__("name", name),
+                win.destroy(),
+            ),
+        )
+        view.pack(fill="both", expand=True)
+        dialog.transient(self.winfo_toplevel())
+        dialog.grab_set()
+        self.wait_window(dialog)
+        return result["name"]
+
+    def load_from_payload(self, scenario):  # pragma: no cover - UI synchronization
+        if not isinstance(scenario, dict):
+            return
+        self._apply_loaded_scenario(copy.deepcopy(scenario))
+
+    def _apply_loaded_scenario(self, scenario):
+        title = scenario.get("Title") or scenario.get("Name") or ""
+        summary = scenario.get("Summary")
+        if not isinstance(summary, str):
+            summary = scenario.get("Text") if isinstance(scenario.get("Text"), str) else summary
+        summary = summary or ""
+        secrets = scenario.get("Secrets")
+        if not isinstance(secrets, str):
+            secrets = scenario.get("Secret") if isinstance(scenario.get("Secret"), str) else secrets
+        secrets = secrets or ""
+
+        self.scenario_title_var.set(str(title))
+        self._scenario_summary = str(summary)
+        self._scenario_secrets = str(secrets)
+
+        scenes_payload = scenario.get("Scenes")
+        self.scenes = self._coerce_scenes(copy.deepcopy(scenes_payload))
+        layout = scenario.get("_SceneLayout")
+        if isinstance(layout, list):
+            for idx, scene in enumerate(self.scenes):
+                if idx < len(layout) and isinstance(layout[idx], dict):
+                    scene.setdefault("_canvas", {}).update(layout[idx])
+
+        self.selected_index = 0 if self.scenes else None
+        self._close_inline_scene_editor()
+        self._close_link_label_editor()
+        self.canvas.set_scenes(self.scenes, self.selected_index)
+        self._update_buttons()
+
+        if self._state_ref is None:
+            return
+
+        self._state_ref["Title"] = str(title)
+        self._state_ref["Summary"] = str(summary)
+        self._state_ref["Secrets"] = str(secrets)
+        self._state_ref["Secret"] = str(secrets)
+
+        if isinstance(layout, list):
+            self._state_ref["_SceneLayout"] = copy.deepcopy(layout)
+        else:
+            self._state_ref["_SceneLayout"] = []
+
+        for field in ("NPCs", "Creatures", "Places", "Factions", "Objects"):
+            values = scenario.get(field) or []
+            if isinstance(values, str):
+                values = self._split_to_list(values)
+            elif isinstance(values, list):
+                values = [str(item).strip() for item in values if str(item).strip()]
+            elif values:
+                values = [str(values).strip()]
+            else:
+                values = []
+            self._state_ref[field] = list(dict.fromkeys(values))
+
+        self.save_state(self._state_ref)
+        if callable(self._on_state_change):
+            try:
+                self._on_state_change(source=self)
+            except TypeError:
+                self._on_state_change()
 
     def _edit_scene_via_canvas(self, index):
         if index is None or index >= len(self.scenes):
@@ -1612,7 +1754,7 @@ class ReviewStep(WizardStep):
 class ScenarioBuilderWizard(ctk.CTkToplevel):
     """Interactive wizard guiding users through building a scenario."""
 
-    def __init__(self, master, on_saved=None):
+    def __init__(self, master, on_saved=None, *, initial_scenario=None):
         super().__init__(master)
         self.title("Scenario Builder Wizard")
         self.geometry("1280x860")
@@ -1644,6 +1786,14 @@ class ScenarioBuilderWizard(ctk.CTkToplevel):
 
         self._build_layout()
         self._create_steps()
+        if initial_scenario:
+            try:
+                self.load_existing_scenario(initial_scenario)
+            except Exception:
+                log_exception(
+                    "Failed to load initial scenario into wizard.",
+                    func_name="ScenarioBuilderWizard.__init__",
+                )
         self.current_step_index = 0
         self._show_step(0)
 
@@ -1688,15 +1838,18 @@ class ScenarioBuilderWizard(ctk.CTkToplevel):
             "objects": self.object_wrapper,
         }
 
+        planning_step = ScenesPlanningStep(
+            self.step_container,
+            {
+                key: wrapper
+                for key, wrapper in entity_wrappers.items()
+                if key in ("npcs", "creatures", "places")
+            },
+            scenario_wrapper=self.scenario_wrapper,
+        )
+
         self.steps = [
-            (
-                "Visual Builder",
-                ScenesPlanningStep(self.step_container, {
-                    key: wrapper
-                    for key, wrapper in entity_wrappers.items()
-                    if key in ("npcs", "creatures", "places")
-                }),
-            ),
+            ("Visual Builder", planning_step),
             ("Entity Linking", EntityLinkingStep(self.step_container, entity_wrappers)),
             ("Review", ReviewStep(self.step_container)),
         ]
@@ -1704,12 +1857,61 @@ class ScenarioBuilderWizard(ctk.CTkToplevel):
         for _, frame in self.steps:
             frame.grid(row=0, column=0, sticky="nsew")
 
+        for _, frame in self.steps:
+            if hasattr(frame, "set_state_binding"):
+                frame.set_state_binding(self.wizard_state, self._on_wizard_state_changed)
+
     def _show_step(self, index):  # pragma: no cover - UI navigation
         title, frame = self.steps[index]
         self.header_label.configure(text=f"Step {index + 1} of {len(self.steps)}: {title}")
         frame.tkraise()
         frame.load_state(self.wizard_state)
         self._update_navigation_buttons()
+
+    def _on_wizard_state_changed(self, source=None):  # pragma: no cover - UI synchronization
+        for _, frame in self.steps:
+            if frame is source:
+                continue
+            try:
+                frame.load_state(self.wizard_state)
+            except Exception:
+                pass
+
+    def load_existing_scenario(self, scenario):  # pragma: no cover - UI interaction
+        planning_step = next(
+            (frame for _, frame in self.steps if isinstance(frame, ScenesPlanningStep)),
+            None,
+        )
+        if planning_step is None:
+            return
+
+        scenario_payload = None
+        if isinstance(scenario, str):
+            try:
+                items = self.scenario_wrapper.load_items()
+            except Exception as exc:
+                log_exception(
+                    f"Failed to load scenarios for editing: {exc}",
+                    func_name="ScenarioBuilderWizard.load_existing_scenario",
+                )
+                messagebox.showerror("Load Error", "Unable to load scenarios from the database.")
+                return
+            for entry in items or []:
+                title = entry.get("Title") or entry.get("Name")
+                if title == scenario:
+                    scenario_payload = entry
+                    break
+            if scenario_payload is None:
+                messagebox.showerror("Not Found", f"Scenario '{scenario}' was not found.")
+                return
+        elif isinstance(scenario, dict):
+            scenario_payload = scenario
+        else:
+            return
+
+        planning_step.load_from_payload(copy.deepcopy(scenario_payload))
+        self.current_step_index = 0
+        self._show_step(self.current_step_index)
 
     def _update_navigation_buttons(self):  # pragma: no cover - UI navigation
         self.back_btn.configure(state="normal" if self.current_step_index > 0 else "disabled")
