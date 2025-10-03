@@ -646,12 +646,27 @@ class GenericListView(ctk.CTkFrame):
             return ", ".join(self.clean_value(v) for v in val if v is not None)
         return str(val).replace("{", "").replace("}", "").strip()
 
-    def _get_cell_text(self, iid, column_id):
-        if (iid, column_id) in self._cell_texts:
-            return self._cell_texts[(iid, column_id)]
+    def _normalize_column_id(self, column_id):
+        """Translate Treeview #n identifiers into configured column names."""
         if column_id == "#0":
+            return column_id
+        if column_id and column_id.startswith("#"):
+            try:
+                index = int(column_id[1:]) - 1
+            except ValueError:
+                return column_id
+            columns = self.tree["columns"]
+            if 0 <= index < len(columns):
+                return columns[index]
+        return column_id
+
+    def _get_cell_text(self, iid, column_id):
+        column_key = self._normalize_column_id(column_id)
+        if (iid, column_key) in self._cell_texts:
+            return self._cell_texts[(iid, column_key)]
+        if column_key == "#0":
             return self.tree.item(iid, "text")
-        return self.tree.set(iid, column_id)
+        return self.tree.set(iid, column_key)
 
     def _format_cell(self, column_id, value, iid=None):
         """Prepare a value for display in the tree, truncating if needed."""
