@@ -1903,7 +1903,7 @@ class ScenarioBuilderWizard(ctk.CTkToplevel):
     def __init__(self, master, on_saved=None, *, initial_scenario=None):
         super().__init__(master)
         self.title("Scenario Builder Wizard")
-        self.geometry("1920x1080")
+        self.geometry("1920x1080+0+0")
         self.minsize(1100, 700)
         self.transient(master)
         self.on_saved = on_saved
