@@ -166,6 +166,22 @@ def _on_display_map(self, entity_type, map_name): # entity_type here is the map'
             self.hover_font = ctk.CTkFont(size=self.hover_font_size)
 
     # 2) Tear down any existing UI & build toolbar + canvas
+    # Reset any canvas/image bookkeeping so the new canvas does not try to
+    # reuse stale ids from a previously opened map (which can happen when
+    # jumping between linked maps). Otherwise Tk may interpret later
+    # itemconfig calls as targeting non-image primitives and raise
+    # "unknown option -image" while leaving the map background blank.
+    self.base_tk = None
+    self.mask_tk = None
+    self.base_id = None
+    self.mask_id = None
+    if hasattr(self, "canvas") and self.canvas is not None:
+        try:
+            self.canvas.destroy()
+        except Exception:
+            pass
+        self.canvas = None
+
     for w in self.parent.winfo_children():
         w.destroy()
     self._build_toolbar()
