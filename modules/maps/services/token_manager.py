@@ -444,6 +444,7 @@ def _persist_tokens(self):
                     "entry_width": t.get("entry_width", 180),
                     "border_color": t.get("border_color", "#00ff00"),
                     "video_path": storage_video,
+                    "linked_map": t.get("linked_map", ""),
                 })
             else:
                 # Silently skip unknown types for now

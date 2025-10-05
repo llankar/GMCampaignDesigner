@@ -580,6 +580,7 @@ class DisplayMapController:
             "description": "Marker description",
             "border_color": "#00ff00",
             "video_path": "",
+            "linked_map": "",
             "entry_widget": None,
             "description_popup": None,
             "description_label": None,
@@ -767,6 +768,23 @@ class DisplayMapController:
         single_marker = valid_markers[0] if len(valid_markers) == 1 else None
 
         if single_marker:
+            linked_name = (single_marker.get("linked_map") or "").strip()
+            menu.add_command(
+                label="Open Linked Map",
+                command=lambda: self._open_marker_linked_map(single_marker),
+                state=tk.NORMAL if linked_name else tk.DISABLED,
+            )
+            menu.add_command(
+                label="Set Linked Map...",
+                command=lambda: self._choose_marker_linked_map(single_marker),
+            )
+            menu.add_command(
+                label="Clear Linked Map",
+                command=lambda: self._clear_marker_link(single_marker),
+                state=tk.NORMAL if linked_name else tk.DISABLED,
+            )
+            menu.add_separator()
+
             menu.add_command(
                 label="Edit Description",
                 command=lambda: self._open_marker_description_editor(single_marker),
@@ -810,6 +828,120 @@ class DisplayMapController:
             menu.grab_release()
         except tk.TclError:
             pass
+
+    def _open_marker_linked_map(self, marker, silent=False):
+        if not marker or marker.get("type") != "marker":
+            return False
+        target = (marker.get("linked_map") or "").strip()
+        if not target:
+            if not silent:
+                messagebox.showinfo("Linked Map", "No linked map is assigned to this marker.")
+            return False
+        return self.open_map_by_name(target)
+
+    def _choose_marker_linked_map(self, marker):
+        if not marker or marker.get("type") != "marker":
+            return
+        map_names = sorted(self._maps.keys(), key=lambda name: name.lower())
+        if not map_names:
+            messagebox.showinfo("Linked Map", "There are no maps available to link.")
+            return
+
+        dialog = ctk.CTkToplevel(self.parent)
+        dialog.title("Select Linked Map")
+        dialog.geometry("320x400")
+        dialog.transient(self.parent)
+        dialog.grab_set()
+
+        container = ctk.CTkFrame(dialog)
+        container.pack(fill="both", expand=True, padx=12, pady=12)
+
+        ctk.CTkLabel(container, text="Choose a map to link to this marker:").pack(anchor="w")
+
+        search_var = tk.StringVar()
+        search_entry = ctk.CTkEntry(container, textvariable=search_var, placeholder_text="Search maps...")
+        search_entry.pack(fill="x", pady=(6, 8))
+
+        listbox = tk.Listbox(container, activestyle="none")
+        listbox.pack(fill="both", expand=True)
+
+        button_row = ctk.CTkFrame(container)
+        button_row.pack(fill="x", pady=(10, 0))
+
+        result = {"value": None}
+        filtered_names = []
+
+        def refresh_list():
+            query = (search_var.get() or "").strip().lower()
+            filtered_names.clear()
+            for name in map_names:
+                if not query or query in name.lower():
+                    filtered_names.append(name)
+            listbox.delete(0, tk.END)
+            for idx, name in enumerate(filtered_names):
+                listbox.insert(tk.END, name)
+            current = (marker.get("linked_map") or "").strip()
+            if current and current in filtered_names:
+                pos = filtered_names.index(current)
+                listbox.selection_clear(0, tk.END)
+                listbox.selection_set(pos)
+                listbox.activate(pos)
+
+        def on_confirm(event=None):
+            if not filtered_names:
+                return
+            try:
+                selection = listbox.curselection()
+                if not selection:
+                    return
+                idx = selection[0]
+            except tk.TclError:
+                return
+            result["value"] = filtered_names[idx]
+            dialog.destroy()
+
+        def on_clear():
+            result["value"] = "__CLEAR__"
+            dialog.destroy()
+
+        def on_cancel():
+            result["value"] = None
+            dialog.destroy()
+
+        link_button = ctk.CTkButton(button_row, text="Link Map", command=on_confirm)
+        link_button.pack(side="left")
+        has_link = bool((marker.get("linked_map") or "").strip())
+        clear_button = ctk.CTkButton(
+            button_row,
+            text="Clear Link",
+            command=on_clear,
+            state=tk.NORMAL if has_link else tk.DISABLED,
+        )
+        clear_button.pack(side="left", padx=6)
+        cancel_button = ctk.CTkButton(button_row, text="Cancel", command=on_cancel)
+        cancel_button.pack(side="right")
+
+        listbox.bind("<Double-Button-1>", on_confirm)
+        search_var.trace_add("write", lambda *args: refresh_list())
+
+        dialog.protocol("WM_DELETE_WINDOW", on_cancel)
+        dialog.after(10, search_entry.focus_set)
+        refresh_list()
+        dialog.wait_window()
+
+        choice = result.get("value")
+        if choice == "__CLEAR__":
+            self._clear_marker_link(marker)
+        elif isinstance(choice, str) and choice:
+            marker["linked_map"] = choice
+            self._persist_tokens()
+
+    def _clear_marker_link(self, marker):
+        if not marker or marker.get("type") != "marker":
+            return
+        if marker.get("linked_map"):
+            marker["linked_map"] = ""
+            self._persist_tokens()
 
     def _change_markers_border_color(self, markers):
         valid_markers = [m for m in markers if isinstance(m, dict) and m.get("type") == "marker"]
@@ -1666,6 +1798,7 @@ class DisplayMapController:
                     entry.bind("<Return>", lambda e, i=item: self._on_marker_entry_return(e, i))
                     entry.bind("<ButtonPress-1>", lambda e, i=item: self._on_marker_entry_press(e, i))
                     entry.bind("<ButtonRelease-1>", lambda e, i=item: self._on_marker_entry_click(e, i))
+                    entry.bind("<Double-Button-1>", lambda e, i=item: self._on_marker_double_click(e, i))
                     entry.bind("<Button-3>", lambda e, i=item: self._on_item_right_click(e, i))
                     item["entry_widget"] = entry
                 else:
@@ -1694,6 +1827,7 @@ class DisplayMapController:
                     handle_widget.bind("<ButtonPress-1>", lambda e, i=item: self._on_marker_handle_press(e, i))
                     handle_widget.bind("<B1-Motion>", lambda e, i=item: self._on_marker_handle_drag(e, i))
                     handle_widget.bind("<ButtonRelease-1>", lambda e, i=item: self._on_marker_handle_release(e, i))
+                    handle_widget.bind("<Double-Button-1>", lambda e, i=item: self._on_marker_double_click(e, i))
                     handle_widget.bind("<Button-3>", lambda e, i=item: self._on_item_right_click(e, i))
                     item["handle_widget"] = handle_widget
                 handle_widget.configure(height=entry_height)
@@ -1814,6 +1948,8 @@ class DisplayMapController:
             item_type = item.get("type", "token")
             if item_type == "token":
                  self.canvas.tag_bind(cid, "<Double-Button-1>", lambda e, i=item: self._on_token_double_click(e, i))
+            elif item_type == "marker":
+                 self.canvas.tag_bind(cid, "<Double-Button-1>", lambda e, i=item: self._on_marker_double_click(e, i))
             # elif item_type in ["rectangle", "oval"]:
             # No double-click for handles; triggered by menu now.
             pass
@@ -1907,6 +2043,11 @@ class DisplayMapController:
                 self._hide_all_token_hovers()
                 self._hide_all_marker_descriptions()
                 self._show_marker_description(item)
+
+    def _on_marker_double_click(self, event, marker):
+        if self._open_marker_linked_map(marker, silent=True):
+            return "break"
+        return None
 
     def _on_item_right_click(self, event, item):
         if not self._ensure_selection_for_context_menu(item):
@@ -2402,6 +2543,7 @@ class DisplayMapController:
                 new_item_data.setdefault("text", "New Marker")
                 new_item_data.setdefault("description", "Marker description")
                 new_item_data.setdefault("border_color", "#00ff00")
+                new_item_data.setdefault("linked_map", "")
                 new_item_data["entry_widget"] = None
                 new_item_data["description_popup"] = None
                 new_item_data["description_label"] = None
