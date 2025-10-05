@@ -370,6 +370,7 @@ def _on_display_map(self, entity_type, map_name): # entity_type here is the map'
                 "entry_width": rec.get("entry_width", 180),
                 "border_color": rec.get("border_color", "#00ff00"),
                 "video_path": rec.get("video_path", ""),
+                "linked_map": rec.get("linked_map", ""),
                 "border_canvas_id": None,
                 "entry_widget": None,
                 "description_popup": None,
