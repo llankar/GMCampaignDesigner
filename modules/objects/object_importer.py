@@ -281,6 +281,7 @@ class ObjectImportWindow(ctk.CTkToplevel):
                     return
                 combined_objects = []
                 total_imported = 0
+                failed_chunks = []
                 basename = os.path.basename(path)
                 for index in range(0, len(pages), 2):
                     chunk_text = "\n".join(pages[index : index + 2]).strip()
@@ -290,25 +291,48 @@ class ObjectImportWindow(ctk.CTkToplevel):
                     end_page = min(index + 2, len(pages))
                     label = f"{basename} p{start_page}-{end_page}"
                     self._set_status(f"Processing {label}...")
-                    objects, count = self._ai_extract_and_import(
-                        chunk_text,
-                        source_label=label,
-                        update_text=False,
-                    )
+                    try:
+                        objects, count = self._ai_extract_and_import(
+                            chunk_text,
+                            source_label=label,
+                            update_text=False,
+                        )
+                    except Exception as exc:
+                        log_warning(
+                            f"AI extraction failed for {label}: {exc}",
+                            func_name="ObjectImportWindow.import_pdf_via_ai",
+                        )
+                        failed_chunks.append((label, str(exc)))
+                        continue
                     if objects:
                         combined_objects.extend(objects)
                     total_imported += count
 
                 if not combined_objects:
-                    self._warn("No Objects Imported", "AI did not return any objects for the PDF.")
+                    if failed_chunks:
+                        joined = "\n".join(
+                            f"- {name}: {error}" for name, error in failed_chunks[:5]
+                        )
+                        if len(failed_chunks) > 5:
+                            joined += "\n- (additional failures omitted)"
+                        message = (
+                            "AI did not return usable JSON for any PDF section.\n"
+                            f"Errors:\n{joined}"
+                        )
+                        self._warn("No Objects Imported", message)
+                    else:
+                        self._warn("No Objects Imported", "AI did not return any objects for the PDF.")
                     return
 
                 pretty = json.dumps({"objects": combined_objects}, ensure_ascii=False, indent=2)
                 self._set_text(pretty)
-                self._info(
-                    "Import Complete",
-                    f"Imported {total_imported} object(s) from {basename}.",
-                )
+                message = f"Imported {total_imported} object(s) from {basename}."
+                if failed_chunks:
+                    joined = "\n".join(f"- {name}: {error}" for name, error in failed_chunks[:5])
+                    if len(failed_chunks) > 5:
+                        joined += "\n- (additional failures omitted)"
+                    message += "\n\nSome sections could not be imported:\n" + joined
+                self._info("Import Complete", message)
             except Exception as exc:
                 self._error("AI Import Error", str(exc))
             finally:
