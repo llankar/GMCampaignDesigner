@@ -112,6 +112,38 @@ def test_parse_inline_actions_interprets_damage_plus_modifier_as_d20():
     assert action["notes"] == "radiant"
 
 
+def test_parse_inline_actions_supports_dm_separator():
+    text = "[Strike +5 DM 1d8+3 slashing]"
+    display, actions, errors = parse_inline_actions(text)
+
+    assert display == "Strike (slashing)"
+    assert errors == []
+    assert len(actions) == 1
+
+    action = actions[0]
+    assert action["label"] == "Strike"
+    assert action["attack_bonus"] == "+5"
+    assert action["attack_roll_formula"] == "1d20+5"
+    assert action["damage_formula"] == "1d8+3"
+    assert action["notes"] == "slashing"
+
+
+def test_parse_inline_actions_supports_dm_with_modifier_damage():
+    text = "[Bash +4 DM +6 bludgeoning]"
+    display, actions, errors = parse_inline_actions(text)
+
+    assert display == "Bash (bludgeoning)"
+    assert errors == []
+    assert len(actions) == 1
+
+    action = actions[0]
+    assert action["label"] == "Bash"
+    assert action["attack_bonus"] == "+4"
+    assert action["attack_roll_formula"] == "1d20+4"
+    assert action["damage_formula"] == "1d20+6"
+    assert action["notes"] == "bludgeoning"
+
+
 def test_build_token_macros_uses_parsed_actions():
     actions = [
         {

@@ -136,12 +136,17 @@ def _parse_segment(segment: str, span: Tuple[int, int]) -> tuple[ParsedAction | 
     else:
         left, right = trimmed, ""
 
-    label_text, attack_bonus_text, attack_roll = _extract_label_and_attack(left.strip())
+    left_without_dm, dm_damage_text = _split_dm_damage(left)
+    label_text, attack_bonus_text, attack_roll = _extract_label_and_attack(left_without_dm.strip())
 
     damage_formula_text: str | None = None
     notes: str | None = None
     if right.strip():
         damage_formula_text, notes, damage_error = _extract_damage(right.strip(), span, segment)
+        if damage_error is not None:
+            return None, damage_error
+    elif dm_damage_text:
+        damage_formula_text, notes, damage_error = _extract_damage(dm_damage_text, span, segment)
         if damage_error is not None:
             return None, damage_error
 
@@ -218,6 +223,22 @@ def _extract_damage(right: str, span: Tuple[int, int], segment: str) -> tuple[st
         )
 
     return normalized, notes_part, None
+
+
+def _split_dm_damage(text: str) -> tuple[str, str | None]:
+    tokens = text.split()
+    if not tokens:
+        return text, None
+
+    for idx, token in enumerate(tokens):
+        if token.upper() == "DM":
+            attack_tokens = tokens[:idx]
+            damage_tokens = tokens[idx + 1 :]
+            attack_part = " ".join(attack_tokens).strip()
+            damage_part = " ".join(damage_tokens).strip() or None
+            return attack_part, damage_part
+
+    return text, None
 
 
 def _try_parse_formula(formula: str, *, force_sign: bool) -> str | None:
