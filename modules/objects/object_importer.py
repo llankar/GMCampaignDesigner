@@ -63,7 +63,14 @@ def _normalize_object_payload(payload):
             value = payload.get(key)
             if isinstance(value, list):
                 return value
-    raise ValueError("Payload must be a list of objects or contain an 'objects' array")
+    log_warning(
+        f"Unrecognized payload structure for AI import: type={type(payload).__name__}",
+        func_name="_normalize_object_payload",
+    )
+    raise ValueError(
+        "Payload must be a list of objects or contain an 'objects' array. Enable application "
+        "logging in config/config.ini to inspect the AI response."
+    )
 
 
 def _to_longtext(value):
@@ -85,7 +92,26 @@ def import_object_records(payload) -> int:
 
     objects = _normalize_object_payload(payload)
     if not objects:
-        raise ValueError("No objects found in payload")
+        preview = ""
+        try:
+            preview = json.dumps(payload, ensure_ascii=False)
+        except Exception:
+            try:
+                preview = str(payload)
+            except Exception:
+                preview = "<unavailable>"
+
+        if len(preview) > 500:
+            preview = preview[:500] + "…"
+
+        log_warning(
+            f"AI payload did not contain any object entries. Preview: {preview}",
+            func_name="import_object_records",
+        )
+        raise ValueError(
+            "No objects found in payload. Enable application logging in config/config.ini "
+            "([Logging] section) to capture the AI response for troubleshooting."
+        )
 
     wrapper = GenericModelWrapper("objects")
     existing = wrapper.load_items()

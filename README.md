@@ -101,3 +101,14 @@ GMCampaignDesigner2 is licensed under the GPL-3.0 License. See the LICENSE file 
 
 Acknowledgements
 Special thanks to the contributors and open-source community who help improve and maintain GMCampaignDesigner2. Your support makes continuous innovation possible!
+
+Enabling Application Logs
+-------------------------
+Detailed logs can help troubleshoot AI imports and other automated workflows. To enable them:
+
+1. Open `config/config.ini` in a text editor while the application is closed.
+2. Locate the `[Logging]` section and set `enabled = true`.
+3. (Optional) Adjust `directory`, `filename`, or `level` if you want to change where the log is written or how verbose it is. The directory is relative to the application root unless you provide an absolute path.
+4. Save the file and restart GMCampaignDesigner.
+
+When logging is enabled, runtime messages are written to the configured log file (for example, `logs/gmcampaigndesigner.log`), which you can inspect to see the AI payloads processed during imports.
