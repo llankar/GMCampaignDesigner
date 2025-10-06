@@ -743,8 +743,72 @@ class DisplayMapController:
                 self._hide_token_hover(token)
 
     def _on_canvas_focus_out(self, event=None):
+        """Hide hover windows when the canvas loses focus, unless the focus
+        moved inside one of the hover popups."""
+
+        def _collect_focus_candidates():
+            candidates = []
+
+            if event is not None:
+                related = getattr(event, "related_widget", None)
+                if related is not None:
+                    candidates.append(related)
+
+                widget = getattr(event, "widget", None)
+                if widget is not None:
+                    try:
+                        focus_widget = widget.focus_get()
+                    except Exception:
+                        focus_widget = None
+                    else:
+                        if focus_widget is not None:
+                            candidates.append(focus_widget)
+
+            canvas = getattr(self, "canvas", None)
+            if canvas is not None:
+                try:
+                    focus_widget = canvas.focus_get()
+                except Exception:
+                    focus_widget = None
+                else:
+                    if focus_widget is not None:
+                        candidates.append(focus_widget)
+
+                try:
+                    pointer_x, pointer_y = canvas.winfo_pointerxy()
+                    pointer_widget = canvas.winfo_containing(pointer_x, pointer_y)
+                except tk.TclError:
+                    pointer_widget = None
+                if pointer_widget is not None:
+                    candidates.append(pointer_widget)
+
+            return candidates
+
+        candidates = _collect_focus_candidates()
+
+        if any(self._widget_is_within_hover_popup(widget) for widget in candidates if widget is not None):
+            return
+
         self._hide_all_marker_descriptions()
         self._hide_all_token_hovers()
+
+    def _widget_is_within_hover_popup(self, widget) -> bool:
+        """Return True if *widget* is a descendant of any registered hover popup."""
+
+        if widget is None:
+            return False
+
+        popups = getattr(self, "_active_hover_popups", set())
+        visited = set()
+        current = widget
+
+        while current is not None and current not in visited:
+            visited.add(current)
+            if current in popups:
+                return True
+            current = getattr(current, "master", None)
+
+        return False
 
     def clear_hover_windows(self):
         """Hide all token and marker info popups."""
