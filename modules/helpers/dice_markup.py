@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import re
 from typing import Any, List, Tuple
 
 from modules.dice import dice_engine
@@ -53,6 +54,13 @@ class ParsedError:
             "range": self.span,
             "segment": self.segment,
         }
+
+
+FALLBACK_ACTION_PATTERN = re.compile(
+    r"(?P<label>[A-Za-zÀ-ÖØ-öø-ÿ'’()\-\/ ]{2,}?)\s+"
+    r"(?P<attack>[+-]\d{1,3})\s+DM\s+"
+    r"(?P<damage>[^\s,;:.]+(?:\s+[a-zà-öø-ÿ'’()\-\/]+)*)",
+)
 
 
 def parse_inline_actions(raw_text: Any) -> tuple[str, list[dict[str, Any]], list[dict[str, Any]]]:
@@ -161,6 +169,11 @@ def parse_inline_actions(raw_text: Any) -> tuple[str, list[dict[str, Any]], list
         cursor = end + 1
 
     cleaned_text = "".join(cleaned_segments)
+
+    if not actions:
+        inferred = _infer_actions_from_plain_text(cleaned_text)
+        if inferred:
+            actions.extend(inferred)
     log_debug(
         f"parse_inline_actions - completed: actions={len(actions)} errors={len(errors)} cleaned_length={len(cleaned_text)}",
         func_name="dice_markup.parse_inline_actions",
@@ -414,3 +427,49 @@ def _coerce_text(raw: Any) -> str:
         text = raw.get("text", "")
         return str(text or "")
     return str(raw)
+
+
+def _infer_actions_from_plain_text(text: str) -> list[ParsedAction]:
+    inferred_actions: List[ParsedAction] = []
+    for match in FALLBACK_ACTION_PATTERN.finditer(text):
+        label = (match.group("label") or "").strip()
+        label = label.strip(" .:;•-")
+        if not label:
+            continue
+
+        attack_bonus_raw = match.group("attack") or ""
+        attack_bonus = _try_parse_formula(attack_bonus_raw, force_sign=True)
+        if attack_bonus is None:
+            continue
+
+        damage_source = match.group("damage") or ""
+        span = (match.start(), match.end())
+        segment_source = text[span[0] : span[1]]
+
+        damage_formula, notes, damage_error = _extract_damage(damage_source.strip(), span, segment_source)
+        if damage_error is not None:
+            continue
+
+        display_text, attack_span, damage_span = _format_action_display(
+            label=label,
+            attack_bonus=attack_bonus,
+            damage_formula=damage_formula,
+            notes=notes,
+            base_offset=match.start(),
+        )
+
+        action = ParsedAction(
+            label=label,
+            attack_bonus=attack_bonus,
+            attack_roll_formula=_make_attack_roll_formula(attack_bonus),
+            damage_formula=damage_formula,
+            notes=notes,
+            span=span,
+            source=segment_source,
+            display_text=display_text,
+            attack_span=attack_span,
+            damage_span=damage_span,
+        )
+        inferred_actions.append(action)
+
+    return inferred_actions
