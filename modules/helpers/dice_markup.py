@@ -146,11 +146,11 @@ def _parse_segment(segment: str, span: Tuple[int, int]) -> tuple[ParsedAction | 
             return None, damage_error
 
     if attack_bonus_text is None and damage_formula_text is None:
-        return None, ParsedError(
-            message="Dice markup must include an attack bonus or damage formula.",
-            span=span,
-            segment=f"[{segment}]",
-        )
+        # Treat segments that don't contain an attack bonus or damage formula as
+        # plain text. This allows large blocks of narrative text with only a
+        # handful of embedded combat actions to validate successfully – parsing
+        # should only fail when no actions are detected at all.
+        return None, None
 
     label = label_text or "Action"
     return (
