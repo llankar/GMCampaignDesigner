@@ -1,4 +1,5 @@
 import os
+import json
 import tkinter as tk
 import customtkinter as ctk
 from PIL import Image, ImageTk
@@ -81,11 +82,29 @@ def show_entity_on_second_screen(item, title, fields):
     body = tk.Frame(root, bg=bg)
     body.pack(fill="both", expand=True, padx=40, pady=10)
 
+    def _decode_longtext_payload(raw_value):
+        """Return a structured value for longtext JSON blobs stored as strings."""
+        if not isinstance(raw_value, str):
+            return raw_value
+        stripped = raw_value.strip()
+        if not stripped.startswith("{"):
+            return raw_value
+        if '"text"' not in stripped and '"formatting"' not in stripped:
+            return raw_value
+        try:
+            decoded = json.loads(stripped)
+        except json.JSONDecodeError:
+            return raw_value
+        if isinstance(decoded, dict) and ("text" in decoded or "formatting" in decoded):
+            return decoded
+        return raw_value
+
     # Render each requested field (skip Portrait which we handled above)
     for field in fields:
         if field.lower() == "portrait":
             continue
         val = item.get(field, "")
+        val = _decode_longtext_payload(val)
         if isinstance(val, dict):
             # Show rich text as multiline text content
             val = format_multiline_text(val)
