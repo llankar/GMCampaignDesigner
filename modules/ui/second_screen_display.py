@@ -99,12 +99,141 @@ def show_entity_on_second_screen(item, title, fields):
             return decoded
         return raw_value
 
+    def _normalise_scene_entries(raw_scenes):
+        """Return a list of scene dictionaries from stored payloads."""
+        if raw_scenes is None:
+            return []
+        # Stored as {"Scenes": [...]} or JSON string? handle both
+        if isinstance(raw_scenes, str):
+            stripped = raw_scenes.strip()
+            if stripped.startswith("{") or stripped.startswith("["):
+                try:
+                    decoded = json.loads(stripped)
+                except json.JSONDecodeError:
+                    decoded = None
+                if isinstance(decoded, dict) and isinstance(decoded.get("Scenes"), list):
+                    return decoded.get("Scenes")
+                if isinstance(decoded, list):
+                    return decoded
+            # fall back to treating as single text scene
+            return [raw_scenes]
+        if isinstance(raw_scenes, dict):
+            if isinstance(raw_scenes.get("Scenes"), list):
+                return raw_scenes.get("Scenes")
+            # Sometimes scenes payload is a mapping representing one scene
+            return [raw_scenes]
+        if isinstance(raw_scenes, (list, tuple, set)):
+            return list(raw_scenes)
+        return [raw_scenes]
+
+    def _coerce_name_list(value):
+        if value is None:
+            return []
+        if isinstance(value, (list, tuple, set)):
+            return [str(v).strip() for v in value if str(v).strip()]
+        text = str(value or "")
+        if not text.strip():
+            return []
+        parts = [part.strip() for part in text.replace(";", ",").split(",") if part.strip()]
+        return parts or [text.strip()]
+
+    def _coerce_scene_text(value):
+        value = _decode_longtext_payload(value)
+        if isinstance(value, list):
+            rendered_parts = []
+            for part in value:
+                part = _decode_longtext_payload(part)
+                if isinstance(part, dict):
+                    rendered_parts.append(format_multiline_text(part))
+                elif part:
+                    rendered_parts.append(str(part))
+            return "\n".join(rendered_parts)
+        if isinstance(value, dict):
+            return format_multiline_text(value)
+        return format_multiline_text(value) if value else ""
+
+    def _render_scenes_section(parent, payload):
+        scenes = _normalise_scene_entries(payload)
+        if not scenes:
+            return False
+
+        section = tk.Frame(parent, bg=bg)
+        section.pack(fill="x", anchor="w", pady=(10, 5))
+        tk.Label(
+            section,
+            text="Scenes",
+            font=("Segoe UI", 32, "bold"),
+            fg=fg,
+            bg=bg
+        ).pack(anchor="w", pady=(0, 6))
+
+        for idx, raw_scene in enumerate(scenes, start=1):
+            scene = raw_scene if isinstance(raw_scene, dict) else {"Text": raw_scene}
+
+            # Heading
+            title = ""
+            for key in ("Title", "Scene", "Name", "Heading"):
+                if scene.get(key):
+                    title = str(scene.get(key)).strip()
+                    if title:
+                        break
+            header_parts = [f"Scene {idx}"]
+            if title:
+                header_parts.append(title)
+            tk.Label(
+                section,
+                text=": ".join(header_parts),
+                font=("Segoe UI", 26, "bold"),
+                fg=fg,
+                bg=bg
+            ).pack(anchor="w", pady=(2, 2))
+
+            # Body text (Text/Summary/etc.)
+            body_text = ""
+            for key in ("Text", "Summary", "Description", "Body", "Notes", "Gist"):
+                if scene.get(key):
+                    body_text = _coerce_scene_text(scene.get(key))
+                    if body_text:
+                        break
+            if body_text:
+                tk.Label(
+                    section,
+                    text=body_text,
+                    font=("Segoe UI", 20),
+                    fg=fg,
+                    bg=bg,
+                    justify="left",
+                    wraplength=sw - 160
+                ).pack(anchor="w", pady=(0, 4))
+
+            # Related entities (NPCs, Places, etc.)
+            related_fields = []
+            for label, key in (("NPCs", "NPCs"), ("Creatures", "Creatures"), ("Places", "Places"), ("Maps", "Maps")):
+                names = _coerce_name_list(scene.get(key))
+                if names:
+                    related_fields.append((label, names))
+            for label, names in related_fields:
+                tk.Label(
+                    section,
+                    text=f"{label}: {', '.join(names)}",
+                    font=("Segoe UI", 18, "italic"),
+                    fg=fg,
+                    bg=bg,
+                    justify="left",
+                    wraplength=sw - 160
+                ).pack(anchor="w", pady=(0, 2))
+
+        return True
+
     # Render each requested field (skip Portrait which we handled above)
     for field in fields:
         if field.lower() == "portrait":
             continue
         val = item.get(field, "")
         val = _decode_longtext_payload(val)
+        if field.lower() == "scenes":
+            if _render_scenes_section(body, val):
+                continue
         if isinstance(val, dict):
             # Show rich text as multiline text content
             val = format_multiline_text(val)
