@@ -149,6 +149,7 @@ class DisplayMapController:
         # descriptions) so the toolbar button can reliably dismiss every one of
         # them even if internal bookkeeping for a token becomes desynchronised.
         self._active_hover_popups = set()
+        self._hover_auto_hide_suppressed = 0
 
         # For interactive shape resizing (re-adding)
         self._resize_handles = []
@@ -746,6 +747,9 @@ class DisplayMapController:
         """Hide hover windows when the canvas loses focus, unless the focus
         moved inside one of the hover popups."""
 
+        if getattr(self, "_hover_auto_hide_suppressed", 0):
+            return
+
         canvas = getattr(self, "canvas", None)
         if canvas is None or not canvas.winfo_exists():
             return
@@ -875,6 +879,8 @@ class DisplayMapController:
                 popup.withdraw()
 
     def _on_application_focus_out(self, event=None):
+        if getattr(self, "_hover_auto_hide_suppressed", 0):
+            return
         self._hide_all_marker_descriptions()
         self._hide_all_token_hovers()
 
@@ -1413,6 +1419,29 @@ class DisplayMapController:
             return f"Damage ({formula} {notes})"
         return f"Damage ({formula})"
 
+    def _execute_token_hover_action(self, token: dict, action: dict, roll_type: str) -> None:
+        """Run a token hover action while temporarily suppressing auto-hide logic."""
+        self._hover_auto_hide_suppressed = getattr(self, "_hover_auto_hide_suppressed", 0) + 1
+
+        def _release_suppression():
+            current = getattr(self, "_hover_auto_hide_suppressed", 0)
+            if current > 0:
+                self._hover_auto_hide_suppressed = current - 1
+
+        try:
+            self._roll_token_action(token, action, roll_type)
+        finally:
+            canvas = getattr(self, "canvas", None)
+            if canvas and canvas.winfo_exists():
+                try:
+                    canvas.after_idle(_release_suppression)
+                    return
+                except tk.TclError:
+                    pass
+                except Exception:
+                    pass
+            _release_suppression()
+
     def _roll_token_action(self, token: dict, action: dict, roll_type: str) -> None:
         if not isinstance(action, dict):
             return
@@ -1648,7 +1677,7 @@ class DisplayMapController:
                             ctk.CTkButton(
                                 buttons_row,
                                 text=attack_text,
-                                command=lambda a=action: self._roll_token_action(token, a, "attack"),
+                                command=lambda a=action: self._execute_token_hover_action(token, a, "attack"),
                                 width=0,
                             ).pack(side="left", padx=(0, 6))
                             buttons_added = True
@@ -1658,7 +1687,7 @@ class DisplayMapController:
                             ctk.CTkButton(
                                 buttons_row,
                                 text=damage_text,
-                                command=lambda a=action: self._roll_token_action(token, a, "damage"),
+                                command=lambda a=action: self._execute_token_hover_action(token, a, "damage"),
                                 width=0,
                             ).pack(side="left", padx=(0, 6))
                             buttons_added = True
