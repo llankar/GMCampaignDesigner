@@ -782,6 +782,20 @@ class DisplayMapController:
                 if pointer_widget is not None:
                     candidates.append(pointer_widget)
 
+            # Ensure widgets that currently have focus within any active hover
+            # popup windows are considered.  Some CustomTkinter widgets don't
+            # consistently show up via ``focus_get`` on the canvas or via
+            # ``winfo_containing`` queries, which previously caused the token
+            # info window to be dismissed when clicking inline dice buttons.
+            popups = getattr(self, "_active_hover_popups", set())
+            for popup in list(popups):
+                try:
+                    focus_widget = popup.focus_get()
+                except Exception:
+                    focus_widget = None
+                if focus_widget is not None:
+                    candidates.append(focus_widget)
+
             return candidates
 
         candidates = _collect_focus_candidates()
