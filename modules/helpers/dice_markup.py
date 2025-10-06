@@ -199,7 +199,17 @@ def _extract_damage(right: str, span: Tuple[int, int], segment: str) -> tuple[st
             formula_part = first
             notes_part = remainder.strip()
 
-    normalized = _try_parse_formula(formula_part, force_sign=False)
+    trimmed_formula = formula_part.strip()
+    normalized: str | None = None
+
+    if trimmed_formula and trimmed_formula.startswith("+") and "d" not in trimmed_formula.lower():
+        bonus_text = _try_parse_formula(trimmed_formula, force_sign=True)
+        if bonus_text is not None:
+            normalized = _make_attack_roll_formula(bonus_text)
+
+    if normalized is None:
+        normalized = _try_parse_formula(formula_part, force_sign=False)
+
     if normalized is None:
         return None, None, ParsedError(
             message=f"Invalid damage formula '{formula_part}'.",
