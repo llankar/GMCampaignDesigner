@@ -776,9 +776,10 @@ class DisplayMapController:
                 if focus_widget is not None:
                     candidates.append(focus_widget)
 
+            pointer_coords = None
             try:
-                pointer_x, pointer_y = canvas.winfo_pointerxy()
-                pointer_widget = canvas.winfo_containing(pointer_x, pointer_y)
+                pointer_coords = canvas.winfo_pointerxy()
+                pointer_widget = canvas.winfo_containing(*pointer_coords)
             except tk.TclError:
                 pointer_widget = None
             if pointer_widget is not None:
@@ -797,6 +798,15 @@ class DisplayMapController:
                     focus_widget = None
                 if focus_widget is not None:
                     candidates.append(focus_widget)
+
+                if pointer_coords is not None:
+                    try:
+                        popup_pointer_widget = popup.winfo_containing(*pointer_coords)
+                    except tk.TclError:
+                        popup_pointer_widget = None
+                    else:
+                        if popup_pointer_widget is not None:
+                            candidates.append(popup_pointer_widget)
 
             return candidates
 
