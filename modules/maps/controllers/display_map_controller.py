@@ -6,7 +6,7 @@ from tkinter import colorchooser, filedialog, messagebox
 import tkinter as tk
 from tkinter import font as tkfont
 from types import SimpleNamespace
-from typing import TYPE_CHECKING, List
+from typing import TYPE_CHECKING
 import customtkinter as ctk
 from modules.maps.views.map_selector import select_map, _on_display_map
 from modules.maps.views.toolbar_view import (
@@ -36,6 +36,7 @@ from modules.maps.utils.icon_loader import load_icon
 from PIL import Image, ImageTk, ImageDraw
 from modules.generic.generic_model_wrapper import GenericModelWrapper
 from modules.helpers.template_loader import load_template
+from modules.helpers.text_helpers import format_longtext
 from modules.helpers.config_helper import ConfigHelper
 from modules.ui.image_viewer import show_portrait
 from modules.ui.video_player import play_video_on_second_screen
@@ -1158,10 +1159,10 @@ class DisplayMapController:
         for item in getattr(self, "tokens", []):
             if not isinstance(item, dict):
                 continue
-            text_widget = item.get("hover_textbox")
-            if text_widget and text_widget.winfo_exists():
+            label = item.get("hover_label")
+            if label and label.winfo_exists():
                 try:
-                    text_widget.configure(font=hover_font)
+                    label.configure(font=hover_font)
                     self._refresh_token_hover_popup(item)
                 except tk.TclError:
                     pass
@@ -1254,13 +1255,42 @@ class DisplayMapController:
         token["maptools_macros"] = build_token_macros(actions, token_name=token.get("entity_id"))
 
         display_source = token.get("_inline_markup_display", plain_text)
-        if isinstance(display_source, (list, tuple)):
-            display_source = "\n".join(map(str, display_source))
+        display_stats_text = format_longtext(display_source)
+        if isinstance(display_stats_text, (list, tuple)):
+            display_stats_text = "\n".join(map(str, display_stats_text))
         else:
-            display_source = str(display_source or "")
-        if not display_source.strip():
-            display_source = "(No details available)"
-        return display_source
+            display_stats_text = str(display_stats_text or "")
+        if not display_stats_text.strip():
+            display_stats_text = "(No details available)"
+        return display_stats_text
+
+    @staticmethod
+    def _format_action_header(action: dict) -> str:
+        if not isinstance(action, dict):
+            return "Action"
+        label = str(action.get("label") or "Action")
+        notes = str(action.get("notes") or "").strip()
+        if notes:
+            return f"{label} [{notes}]"
+        return label
+
+    @staticmethod
+    def _format_attack_button_text(action: dict) -> str:
+        formula = str(action.get("attack_roll_formula") or "").strip()
+        if not formula:
+            bonus = str(action.get("attack_bonus") or "").strip()
+            return f"Attack {bonus}" if bonus else "Attack"
+        return f"Attack ({formula})"
+
+    @staticmethod
+    def _format_damage_button_text(action: dict) -> str:
+        formula = str(action.get("damage_formula") or "").strip()
+        if not formula:
+            return "Damage"
+        notes = str(action.get("notes") or "").strip()
+        if notes:
+            return f"Damage ({formula} {notes})"
+        return f"Damage ({formula})"
 
     def _roll_token_action(self, token: dict, action: dict, roll_type: str) -> None:
         if not isinstance(action, dict):
@@ -1356,9 +1386,9 @@ class DisplayMapController:
 
     def _ensure_token_hover_popup(self, token):
         popup = token.get("hover_popup")
-        text_widget = token.get("hover_textbox")
+        label = token.get("hover_label")
         canvas = getattr(self, "canvas", None)
-        if popup and popup.winfo_exists() and text_widget and text_widget.winfo_exists():
+        if popup and popup.winfo_exists() and label and label.winfo_exists():
             return popup
         if popup and popup.winfo_exists():
             popup.destroy()
@@ -1377,18 +1407,18 @@ class DisplayMapController:
             pass
         frame = ctk.CTkFrame(popup, corner_radius=8, fg_color="#1f1f1f")
         frame.pack(fill="both", expand=True)
-        text_widget = ctk.CTkTextbox(
+        label = ctk.CTkLabel(
             frame,
-            wrap="word",
-            font=getattr(self, "hover_font", None),
-            activate_scrollbars=False,
+            text="",
+            justify="left",
+            anchor="w",
+            font=getattr(self, "hover_font", None)
         )
-        text_widget.pack(fill="both", expand=True, padx=12, pady=10)
-        text_widget.configure(cursor="arrow", takefocus=False)
+        label.pack(fill="both", expand=True, padx=12, pady=10)
         actions_frame = ctk.CTkFrame(frame, fg_color="transparent")
         self._register_hover_popup(popup)
         token["hover_popup"] = popup
-        token["hover_textbox"] = text_widget
+        token["hover_label"] = label
         token["hover_actions_frame"] = actions_frame
         return popup
 
@@ -1406,18 +1436,18 @@ class DisplayMapController:
 
     def _refresh_token_hover_popup(self, token):
         popup = token.get("hover_popup")
-        text_widget = token.get("hover_textbox")
+        label = token.get("hover_label")
         canvas = getattr(self, "canvas", None)
-        if (
-            not canvas
-            or not popup
-            or not popup.winfo_exists()
-            or not text_widget
-            or not text_widget.winfo_exists()
-        ):
+        if not canvas or not popup or not popup.winfo_exists() or not label or not label.winfo_exists():
             return
         display_text = self._get_token_hover_text(token)
-        self._update_hover_textbox(text_widget, token, display_text)
+        label.configure(
+            text=display_text,
+            justify="left",
+            anchor="w",
+            wraplength=400,
+            font=getattr(self, "hover_font", None)
+        )
 
         actions = token.get("parsed_actions") or []
         errors = token.get("action_errors") or []
@@ -1429,121 +1459,75 @@ class DisplayMapController:
                 except tk.TclError:
                     pass
 
-            if errors:
+            if actions or errors:
                 if not actions_frame.winfo_ismapped():
                     actions_frame.pack(fill="x", padx=12, pady=(0, 10))
 
-                error_color = "#f87171"
-                ctk.CTkLabel(
-                    actions_frame,
-                    text="Markup issues detected:",
-                    anchor="w",
-                    text_color=error_color,
-                ).pack(anchor="w", pady=(8, 2))
-                for issue in errors:
-                    message = str(issue.get("message", ""))
+                if actions:
+                    header_font = ctk.CTkFont(size=max(12, self.hover_font_size - 1), weight="bold")
+                    ctk.CTkLabel(actions_frame, text="Actions", anchor="w", font=header_font).pack(anchor="w", pady=(0, 6))
+                    for action in actions:
+                        action_container = ctk.CTkFrame(actions_frame, fg_color="transparent")
+                        action_container.pack(fill="x", pady=(0, 6))
+
+                        title = self._format_action_header(action)
+                        ctk.CTkLabel(
+                            action_container,
+                            text=title,
+                            anchor="w",
+                            justify="left",
+                        ).pack(anchor="w")
+
+                        buttons_row = ctk.CTkFrame(action_container, fg_color="transparent")
+                        buttons_row.pack(fill="x", pady=(4, 0))
+
+                        attack_formula = str(action.get("attack_roll_formula") or "").strip()
+                        damage_formula = str(action.get("damage_formula") or "").strip()
+
+                        buttons_added = False
+                        if attack_formula:
+                            attack_text = self._format_attack_button_text(action)
+                            ctk.CTkButton(
+                                buttons_row,
+                                text=attack_text,
+                                command=lambda a=action: self._roll_token_action(token, a, "attack"),
+                                width=0,
+                            ).pack(side="left", padx=(0, 6))
+                            buttons_added = True
+
+                        if damage_formula:
+                            damage_text = self._format_damage_button_text(action)
+                            ctk.CTkButton(
+                                buttons_row,
+                                text=damage_text,
+                                command=lambda a=action: self._roll_token_action(token, a, "damage"),
+                                width=0,
+                            ).pack(side="left", padx=(0, 6))
+                            buttons_added = True
+
+                        if not buttons_added:
+                            buttons_row.pack_forget()
+
+                if errors:
+                    error_color = "#f87171"
                     ctk.CTkLabel(
                         actions_frame,
-                        text=f"• {message}",
+                        text="Markup issues detected:",
                         anchor="w",
-                        justify="left",
                         text_color=error_color,
-                        wraplength=360,
-                    ).pack(anchor="w")
+                    ).pack(anchor="w", pady=(8, 2))
+                    for issue in errors:
+                        message = str(issue.get("message", ""))
+                        ctk.CTkLabel(
+                            actions_frame,
+                            text=f"• {message}",
+                            anchor="w",
+                            justify="left",
+                            text_color=error_color,
+                            wraplength=360,
+                        ).pack(anchor="w")
             elif actions_frame.winfo_ismapped():
                 actions_frame.pack_forget()
-
-    def _update_hover_textbox(self, text_widget, token, display_text: str) -> None:
-        if not text_widget or not text_widget.winfo_exists():
-            return
-
-        text = str(display_text or "").strip()
-        if not text:
-            text = "(No details available)"
-
-        try:
-            text_widget.configure(state="normal")
-            text_widget.delete("1.0", "end")
-            text_widget.insert("1.0", text)
-            text_widget.configure(font=getattr(self, "hover_font", None), cursor="arrow")
-        except tk.TclError:
-            return
-
-        self._apply_action_links(text_widget, token)
-
-        try:
-            text_widget.bind("<Key>", lambda _e: "break")
-        except tk.TclError:
-            pass
-
-    def _get_text_tag_target(self, text_widget):
-        if not text_widget:
-            return None
-
-        if hasattr(text_widget, "tag_configure"):
-            return text_widget
-
-        for attr_name in ("_textbox", "textbox", "text_widget"):
-            internal = getattr(text_widget, attr_name, None)
-            if internal and hasattr(internal, "tag_configure"):
-                return internal
-
-        return None
-
-    def _apply_action_links(self, text_widget, token) -> None:
-        tk_text = self._get_text_tag_target(text_widget)
-        if tk_text is None:
-            return
-
-        actions = token.get("parsed_actions") or []
-        existing_tags = getattr(text_widget, "_action_tags", [])
-        for tag_name in existing_tags:
-            try:
-                tk_text.tag_delete(tag_name)
-            except tk.TclError:
-                pass
-        text_widget._action_tags = []
-
-        try:
-            tk_text.tag_configure("body", justify="left")
-            tk_text.tag_add("body", "1.0", "end")
-        except tk.TclError:
-            pass
-
-        new_tags: List[str] = []
-        for index, action in enumerate(actions):
-            for kind, key in (("attack", "attack_span"), ("damage", "damage_span")):
-                span = action.get(key)
-                if not span:
-                    continue
-                try:
-                    start, end = int(span[0]), int(span[1])
-                except Exception:
-                    continue
-                if end <= start:
-                    continue
-                tag_name = f"action_link_{index}_{kind}"
-                start_index = f"1.0+{start}c"
-                end_index = f"1.0+{end}c"
-                try:
-                    tk_text.tag_add(tag_name, start_index, end_index)
-                    tk_text.tag_configure(tag_name, foreground="#60a5fa", underline=True)
-                    tk_text.tag_bind(tag_name, "<Enter>", lambda _e, tw=text_widget: tw.configure(cursor="hand2"))
-                    tk_text.tag_bind(tag_name, "<Leave>", lambda _e, tw=text_widget: tw.configure(cursor="arrow"))
-                    tk_text.tag_bind(
-                        tag_name,
-                        "<Button-1>",
-                        lambda event, t=token, a=action, k=kind: self._handle_action_link(event, t, a, k),
-                    )
-                    new_tags.append(tag_name)
-                except tk.TclError:
-                    continue
-
-        text_widget._action_tags = new_tags
-
-    def _handle_action_link(self, event, token, action, roll_type: str):
-        self._roll_token_action(token, action, roll_type)
-        return "break"
 
         try:
             popup.update_idletasks()
@@ -2732,7 +2716,7 @@ class DisplayMapController:
             "border_canvas_id",
             "description_editor",
             "hover_popup",
-            "hover_textbox",
+            "hover_label",
             "hover_bbox",
             "hover_visible",
             "fs_canvas_ids",
@@ -2821,7 +2805,7 @@ class DisplayMapController:
                     new_item_data["pil_image"] = None
                 new_item_data["hover_visible"] = False
                 new_item_data.pop("hover_popup", None)
-                new_item_data.pop("hover_textbox", None)
+                new_item_data.pop("hover_label", None)
                 new_item_data.pop("hover_bbox", None)
             elif item_type == "marker":
                 new_item_data.setdefault("text", "New Marker")
@@ -2871,7 +2855,7 @@ class DisplayMapController:
             if popup and popup.winfo_exists():
                 popup.destroy()
             item_to_delete["hover_popup"] = None
-            item_to_delete["hover_textbox"] = None
+            item_to_delete["hover_label"] = None
             item_to_delete["hover_visible"] = False
             item_to_delete.pop("hover_bbox", None)
         elif item_to_delete.get("type") == "marker":
