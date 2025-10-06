@@ -852,7 +852,11 @@ class GenericListView(ctk.CTkFrame):
         iid = self.tree.identify_row(event.y)
         if not iid:
             return
-        self.tree.selection_set(iid)
+        current = set(self.tree.selection())
+        if iid not in current:
+            self.tree.selection_set(iid)
+        else:
+            self.tree.focus(iid)
         self._show_item_menu(iid, event)
 
     def _show_item_menu(self, iid, event):
@@ -942,20 +946,32 @@ class GenericListView(ctk.CTkFrame):
             messagebox.showwarning("Audio", f"Unable to play audio for {name}.")
 
     def delete_item(self, iid):
-        log_info(f"Deleting {self.model_wrapper.entity_type} item: {iid}", func_name="GenericListView.delete_item")
-        _, base = self._find_item_by_iid(iid)
-        base_id = base or iid.lower()
-        if base_id in self.row_colors:
-            self._save_row_color(base_id, None)
-        self.items = [
+        targets = self._resolve_action_target_bases(iid)
+        if not targets:
+            return
+        log_info(
+            f"Deleting {self.model_wrapper.entity_type} items: {targets}",
+            func_name="GenericListView.delete_item",
+        )
+        for base_id in targets:
+            if base_id in self.row_colors:
+                self._save_row_color(base_id, None)
+        remaining = [
             it for it in self.items
-            if sanitize_id(str(it.get(self.unique_field, ""))).lower() != base_id
+            if self._get_base_id(it) not in targets
         ]
-        self.selected_iids.discard(base_id)
-        self.model_wrapper.save_items(self.items)
-        self._save_list_order()
-        self.filter_items(self.search_var.get())
-        self._update_bulk_controls()
+        removed_any = len(remaining) != len(self.items)
+        if removed_any:
+            self.items = remaining
+        self.selected_iids.difference_update(targets)
+        if removed_any:
+            self.model_wrapper.save_items(self.items)
+            self._save_list_order()
+            self.filter_items(self.search_var.get())
+        else:
+            self._apply_selection_to_tree()
+            self._refresh_grid_selection()
+            self._update_bulk_controls()
 
     def open_in_gm_screen(self, iid):
         log_info(f"Opening {self.model_wrapper.entity_type} in GM screen: {iid}", func_name="GenericListView.open_in_gm_screen")
@@ -1150,6 +1166,19 @@ class GenericListView(ctk.CTkFrame):
         if isinstance(raw, dict):
             raw = raw.get("text", "")
         return sanitize_id(raw).lower()
+
+    def _resolve_action_target_bases(self, iid):
+        """Return base ids targeted by a row-level action."""
+        _, base_id = self._find_item_by_iid(iid)
+        if not base_id:
+            base_id = (iid or "").lower()
+        if not base_id:
+            return []
+        if base_id in self.selected_iids:
+            if len(self.selected_iids) > 1:
+                return sorted(self.selected_iids)
+            return [base_id]
+        return [base_id]
 
     def _register_tree_iid(self, base_id, iid):
         if not base_id:
@@ -1643,20 +1672,27 @@ class GenericListView(ctk.CTkFrame):
             pass
 
     def set_row_color(self, iid, color_name):
-        item, base_id = self._find_item_by_iid(iid)
-        if not base_id:
+        targets = self._resolve_action_target_bases(iid)
+        if not targets:
             return
-        if color_name:
-            self.tree.item(iid, tags=(f"color_{color_name}",))
-        else:
-            self.tree.item(iid, tags=())
-        # Deselect the row so the new color is visible immediately
-        self.tree.selection_remove(iid)
+        affected_tree_iids = set()
+        for base_id in targets:
+            tree_iids = self._base_to_iids.get(base_id, [])
+            if color_name:
+                for tree_iid in tree_iids:
+                    self.tree.item(tree_iid, tags=(f"color_{color_name}",))
+            else:
+                for tree_iid in tree_iids:
+                    self.tree.item(tree_iid, tags=())
+            affected_tree_iids.update(tree_iids)
+            self._save_row_color(base_id, color_name)
+        self.selected_iids.difference_update(targets)
+        if affected_tree_iids:
+            self.tree.selection_remove(*affected_tree_iids)
         self.tree.focus("")
-        self.selected_iids.discard(base_id)
-        self._update_bulk_controls()
+        self._apply_selection_to_tree()
         self._refresh_grid_selection()
-        self._save_row_color(base_id, color_name)
+        self._update_bulk_controls()
 
     def _save_row_color(self, base_id, color_name):
         cfg = ConfigHelper.load_campaign_config()
