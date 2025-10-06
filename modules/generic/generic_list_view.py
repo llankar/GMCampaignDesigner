@@ -159,6 +159,7 @@ class GenericListView(ctk.CTkFrame):
         self._base_to_iids = {}
         self._suppress_tree_select_event = False
         self.grid_cards = []
+        self.copied_items = []
 
         # Load grouping from campaign-local settings
         cfg_grp = ConfigHelper.load_campaign_config()
@@ -295,7 +296,6 @@ class GenericListView(ctk.CTkFrame):
         self.tree.bind("<Control-c>", lambda e: self.copy_item(self.tree.focus()))
         self.tree.bind("<Control-v>", lambda e: self.paste_item(self.tree.focus() or None))
         self.tree.bind("<<TreeviewSelect>>", self._on_tree_selection_changed)
-        self.copied_item = None
         self.dragging_iid = None
         self.dragging_column = None
         # --- Row color setup ---
@@ -633,32 +633,34 @@ class GenericListView(ctk.CTkFrame):
         self.dragging_iid = None
 
     def copy_item(self, iid):
-        item = next(
-            (
-                it
-                for it in self.items
-                if sanitize_id(str(it.get(self.unique_field, ""))).lower() == iid
-            ),
-            None,
-        )
-        if item:
-            self.copied_item = copy.deepcopy(item)
+        """Copy the currently selected items or the provided iid."""
+        selection = list(self.tree.selection())
+        if selection:
+            try:
+                selection.sort(key=self.tree.index)
+            except tk.TclError:
+                pass
+        elif iid:
+            selection = [iid]
+        else:
+            selection = []
+
+        copied = []
+        for selected_iid in selection:
+            item, _ = self._find_item_by_iid(selected_iid)
+            if item:
+                copied.append(copy.deepcopy(item))
+
+        self.copied_items = copied
 
     def paste_item(self, iid=None):
-        if not self.copied_item:
+        if not self.copied_items:
             return
-        new_item = copy.deepcopy(self.copied_item)
-        base_name = f"{new_item.get(self.unique_field, '')} Copy"
         existing = {
             sanitize_id(str(it.get(self.unique_field, ""))).lower()
             for it in self.items
         }
-        new_name = base_name
-        counter = 1
-        while sanitize_id(new_name).lower() in existing:
-            counter += 1
-            new_name = f"{base_name} {counter}"
-        new_item[self.unique_field] = new_name
+
         if iid:
             index = (
                 next(
@@ -674,7 +676,26 @@ class GenericListView(ctk.CTkFrame):
             )
         else:
             index = len(self.items)
-        self.items.insert(index, new_item)
+
+        insert_index = index
+        for original in self.copied_items:
+            new_item = copy.deepcopy(original)
+            base_value = new_item.get(self.unique_field, "")
+            if isinstance(base_value, dict):
+                base_value = base_value.get("text", "")
+            base_name = f"{base_value} Copy".strip()
+            if not base_name.strip():
+                base_name = "Copy"
+            new_name = base_name
+            counter = 1
+            while sanitize_id(new_name).lower() in existing:
+                counter += 1
+                new_name = f"{base_name} {counter}"
+            new_item[self.unique_field] = new_name
+            existing.add(sanitize_id(new_name).lower())
+            self.items.insert(insert_index, new_item)
+            insert_index += 1
+
         self.model_wrapper.save_items(self.items)
         self._save_list_order()
         self.filter_items(self.search_var.get())
@@ -867,7 +888,7 @@ class GenericListView(ctk.CTkFrame):
         )
         menu.add_command(
             label="Paste",
-            state=(tk.NORMAL if self.copied_item else tk.DISABLED),
+            state=(tk.NORMAL if self.copied_items else tk.DISABLED),
             command=lambda: self.paste_item(iid)
         )
         menu.add_command(
