@@ -19,6 +19,7 @@ import tkinter as tk
 import random
 from modules.helpers.text_helpers import format_longtext
 from modules.helpers.text_helpers import ai_text_to_rtf_json
+from modules.helpers.dice_markup import parse_inline_actions
 from modules.ai.local_ai_client import LocalAIClient
 import json
 import ast
@@ -394,6 +395,80 @@ class GenericEditorWindow(ctk.CTkToplevel):
             btn_row, text=f"AI Improve {field['name']}",
             command=lambda fn=field["name"]: self.ai_improve_field(fn)
         ).pack(side="left", padx=5, pady=5)
+
+        markup_supported_fields = {"Traits", "Stats"}
+
+        if field.get("name") in markup_supported_fields:
+            def _validate_markup():
+                try:
+                    data = editor.get_text_data()
+                except Exception:
+                    data = {"text": editor.get_text()}
+                raw_text = str(data.get("text", "") or "")
+                _cleaned_text, actions, errors = parse_inline_actions(raw_text)
+
+                text_widget = getattr(editor, "text_widget", None)
+                if text_widget:
+                    text_widget.tag_configure("dice_markup_error", background="#512331")
+                    text_widget.tag_configure("dice_markup_action", background="#1f3b5b")
+                    text_widget.tag_remove("dice_markup_error", "1.0", "end")
+                    text_widget.tag_remove("dice_markup_action", "1.0", "end")
+
+                    for action_data in actions:
+                        rng = action_data.get("range")
+                        if not isinstance(rng, (list, tuple)) or len(rng) != 2:
+                            continue
+                        start, end = rng
+                        try:
+                            start_idx = f"1.0 + {int(start)} chars"
+                            end_idx = f"1.0 + {int(end)} chars"
+                            text_widget.tag_add("dice_markup_action", start_idx, end_idx)
+                        except Exception:
+                            continue
+
+                    for issue in errors:
+                        rng = issue.get("range")
+                        if not isinstance(rng, (list, tuple)) or len(rng) != 2:
+                            continue
+                        start, end = rng
+                        try:
+                            start_idx = f"1.0 + {int(start)} chars"
+                            end_idx = f"1.0 + {int(end)} chars"
+                            text_widget.tag_add("dice_markup_error", start_idx, end_idx)
+                        except Exception:
+                            continue
+
+                summary_lines: list[str] = []
+                if actions:
+                    summary_lines.append("Detected actions:")
+                    for action_data in actions:
+                        attack = action_data.get("attack_roll_formula") or "—"
+                        damage = action_data.get("damage_formula") or "—"
+                        notes = action_data.get("notes")
+                        note_suffix = f" [{notes}]" if notes else ""
+                        summary_lines.append(
+                            f"- {action_data.get('label', 'Action')}: attack {attack}, damage {damage}{note_suffix}"
+                        )
+                if errors:
+                    if summary_lines:
+                        summary_lines.append("")
+                    summary_lines.append("Issues:")
+                    for issue in errors:
+                        summary_lines.append(f"- {issue.get('message', 'Unknown error')}")
+                if not summary_lines:
+                    summary_lines.append("No dice markup detected.")
+
+                message = "\n".join(summary_lines)
+                if errors:
+                    messagebox.showwarning("Dice Markup Validation", message)
+                else:
+                    messagebox.showinfo("Dice Markup Validation", message)
+
+            ctk.CTkButton(
+                btn_row,
+                text="Validate Dice Markup",
+                command=_validate_markup,
+            ).pack(side="left", padx=5, pady=5)
 
     def create_dynamic_longtext_list(self, field):
         container = ctk.CTkFrame(self.scroll_frame)
