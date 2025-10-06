@@ -154,6 +154,35 @@ def test_parse_inline_actions_supports_dm_with_modifier_damage():
     assert action["notes"] == "bludgeoning"
 
 
+def test_parse_inline_actions_infers_unmarked_dm_segments():
+    text = (
+        "[Archétype standard] NC¥, créature humanoïde FOR +1 DEX +1 CON +1 INT +0 SAG +0 CHA -2 "
+        "DEF 14 PV 9 Init 12 Serres et bec +8 DM 2d6+6 Epée +2 DM 1d8+1"
+    )
+
+    display, actions, errors = parse_inline_actions(text)
+
+    assert display == text
+    assert errors == []
+    assert len(actions) == 2
+
+    claws, sword = actions
+
+    assert claws["label"] == "Serres et bec"
+    assert claws["attack_bonus"] == "+8"
+    assert claws["attack_roll_formula"] == "1d20+8"
+    assert claws["damage_formula"] == "2d6+6"
+    assert claws["notes"] is None
+    assert claws["display_text"] == "Serres et bec • Attack +8 • Damage 2d6+6"
+
+    assert sword["label"] == "Epée"
+    assert sword["attack_bonus"] == "+2"
+    assert sword["attack_roll_formula"] == "1d20+2"
+    assert sword["damage_formula"] == "1d8+1"
+    assert sword["notes"] is None
+    assert sword["display_text"] == "Epée • Attack +2 • Damage 1d8+1"
+
+
 def test_build_token_macros_uses_parsed_actions():
     actions = [
         {
