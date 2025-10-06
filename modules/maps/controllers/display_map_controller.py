@@ -746,6 +746,10 @@ class DisplayMapController:
         """Hide hover windows when the canvas loses focus, unless the focus
         moved inside one of the hover popups."""
 
+        canvas = getattr(self, "canvas", None)
+        if canvas is None or not canvas.winfo_exists():
+            return
+
         def _collect_focus_candidates():
             candidates = []
 
@@ -764,23 +768,21 @@ class DisplayMapController:
                         if focus_widget is not None:
                             candidates.append(focus_widget)
 
-            canvas = getattr(self, "canvas", None)
-            if canvas is not None:
-                try:
-                    focus_widget = canvas.focus_get()
-                except Exception:
-                    focus_widget = None
-                else:
-                    if focus_widget is not None:
-                        candidates.append(focus_widget)
+            try:
+                focus_widget = canvas.focus_get()
+            except Exception:
+                focus_widget = None
+            else:
+                if focus_widget is not None:
+                    candidates.append(focus_widget)
 
-                try:
-                    pointer_x, pointer_y = canvas.winfo_pointerxy()
-                    pointer_widget = canvas.winfo_containing(pointer_x, pointer_y)
-                except tk.TclError:
-                    pointer_widget = None
-                if pointer_widget is not None:
-                    candidates.append(pointer_widget)
+            try:
+                pointer_x, pointer_y = canvas.winfo_pointerxy()
+                pointer_widget = canvas.winfo_containing(pointer_x, pointer_y)
+            except tk.TclError:
+                pointer_widget = None
+            if pointer_widget is not None:
+                candidates.append(pointer_widget)
 
             # Ensure widgets that currently have focus within any active hover
             # popup windows are considered.  Some CustomTkinter widgets don't
@@ -798,13 +800,18 @@ class DisplayMapController:
 
             return candidates
 
-        candidates = _collect_focus_candidates()
+        def _evaluate_focus_change():
+            candidates = _collect_focus_candidates()
+            if any(self._widget_is_within_hover_popup(widget) for widget in candidates if widget is not None):
+                return
 
-        if any(self._widget_is_within_hover_popup(widget) for widget in candidates if widget is not None):
-            return
+            self._hide_all_marker_descriptions()
+            self._hide_all_token_hovers()
 
-        self._hide_all_marker_descriptions()
-        self._hide_all_token_hovers()
+        try:
+            canvas.after_idle(_evaluate_focus_change)
+        except tk.TclError:
+            _evaluate_focus_change()
 
     def _widget_is_within_hover_popup(self, widget) -> bool:
         """Return True if *widget* is a descendant of any registered hover popup."""
