@@ -1591,7 +1591,13 @@ class DisplayMapController:
             except tk.TclError:
                 pass
 
-        links = self._extract_links_from_text(display_text)
+        link_sources = [display_text, token.get("_inline_markup_source")]
+
+        record = token.get("entity_record")
+        if record:
+            link_sources.append(record)
+
+        links = self._extract_links_from_sources(link_sources)
         if not links:
             if links_frame.winfo_ismapped():
                 links_frame.pack_forget()
@@ -1621,6 +1627,53 @@ class DisplayMapController:
                 lambda _event, target=url: self._open_external_link(target),
                 add="+",
             )
+
+    @staticmethod
+    def _iter_text_fragments(value):
+        if value is None:
+            return
+
+        if isinstance(value, str):
+            yield value
+            return
+
+        if isinstance(value, dict):
+            for item in value.values():
+                yield from DisplayMapController._iter_text_fragments(item)
+            return
+
+        if isinstance(value, (list, tuple, set)):
+            for item in value:
+                yield from DisplayMapController._iter_text_fragments(item)
+            return
+
+        try:
+            text = str(value)
+        except Exception:
+            return
+        else:
+            if text:
+                yield text
+
+    @classmethod
+    def _extract_links_from_sources(cls, sources) -> list[str]:
+        if not sources:
+            return []
+
+        seen: set[str] = set()
+        results: list[str] = []
+        for source in sources:
+            for fragment in cls._iter_text_fragments(source):
+                if not fragment:
+                    continue
+                fragment = fragment.strip()
+                if not fragment:
+                    continue
+                for url in cls._extract_links_from_text(fragment):
+                    if url not in seen:
+                        seen.add(url)
+                        results.append(url)
+        return results
 
     @staticmethod
     def _extract_links_from_text(text: str) -> list[str]:
