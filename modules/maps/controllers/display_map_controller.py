@@ -1476,19 +1476,37 @@ class DisplayMapController:
         except tk.TclError:
             pass
 
+    def _get_text_tag_target(self, text_widget):
+        if not text_widget:
+            return None
+
+        if hasattr(text_widget, "tag_configure"):
+            return text_widget
+
+        for attr_name in ("_textbox", "textbox", "text_widget"):
+            internal = getattr(text_widget, attr_name, None)
+            if internal and hasattr(internal, "tag_configure"):
+                return internal
+
+        return None
+
     def _apply_action_links(self, text_widget, token) -> None:
+        tk_text = self._get_text_tag_target(text_widget)
+        if tk_text is None:
+            return
+
         actions = token.get("parsed_actions") or []
         existing_tags = getattr(text_widget, "_action_tags", [])
         for tag_name in existing_tags:
             try:
-                text_widget.tag_delete(tag_name)
+                tk_text.tag_delete(tag_name)
             except tk.TclError:
                 pass
         text_widget._action_tags = []
 
         try:
-            text_widget.tag_configure("body", justify="left")
-            text_widget.tag_add("body", "1.0", "end")
+            tk_text.tag_configure("body", justify="left")
+            tk_text.tag_add("body", "1.0", "end")
         except tk.TclError:
             pass
 
@@ -1508,11 +1526,11 @@ class DisplayMapController:
                 start_index = f"1.0+{start}c"
                 end_index = f"1.0+{end}c"
                 try:
-                    text_widget.tag_add(tag_name, start_index, end_index)
-                    text_widget.tag_configure(tag_name, foreground="#60a5fa", underline=True)
-                    text_widget.tag_bind(tag_name, "<Enter>", lambda _e, tw=text_widget: tw.configure(cursor="hand2"))
-                    text_widget.tag_bind(tag_name, "<Leave>", lambda _e, tw=text_widget: tw.configure(cursor="arrow"))
-                    text_widget.tag_bind(
+                    tk_text.tag_add(tag_name, start_index, end_index)
+                    tk_text.tag_configure(tag_name, foreground="#60a5fa", underline=True)
+                    tk_text.tag_bind(tag_name, "<Enter>", lambda _e, tw=text_widget: tw.configure(cursor="hand2"))
+                    tk_text.tag_bind(tag_name, "<Leave>", lambda _e, tw=text_widget: tw.configure(cursor="arrow"))
+                    tk_text.tag_bind(
                         tag_name,
                         "<Button-1>",
                         lambda event, t=token, a=action, k=kind: self._handle_action_link(event, t, a, k),
