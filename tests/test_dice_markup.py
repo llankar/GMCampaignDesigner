@@ -99,6 +99,19 @@ def test_parse_inline_actions_defaults_label_when_missing():
     assert actions[0]["damage_formula"] == "1d6"
 
 
+def test_parse_inline_actions_interprets_damage_plus_modifier_as_d20():
+    text = "[Smite +8|+6 radiant]"
+    display, actions, errors = parse_inline_actions(text)
+
+    assert display == "Smite (radiant)"
+    assert errors == []
+    assert len(actions) == 1
+
+    action = actions[0]
+    assert action["damage_formula"] == "1d20+6"
+    assert action["notes"] == "radiant"
+
+
 def test_build_token_macros_uses_parsed_actions():
     actions = [
         {
