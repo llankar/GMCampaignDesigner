@@ -9,7 +9,7 @@ from modules.helpers.logging_helper import log_module_import, log_warning
 log_module_import(__name__)
 
 
-@dataclass(frozen=True)
+@dataclass
 class ParsedAction:
     """Lightweight container describing a parsed inline combat action."""
 
@@ -20,6 +20,9 @@ class ParsedAction:
     notes: str | None
     span: Tuple[int, int]
     source: str
+    display_text: str
+    attack_span: Tuple[int, int] | None
+    damage_span: Tuple[int, int] | None
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -30,6 +33,9 @@ class ParsedAction:
             "notes": self.notes,
             "range": self.span,
             "source": self.source,
+            "display_text": self.display_text,
+            "attack_span": self.attack_span,
+            "damage_span": self.damage_span,
         }
 
 
@@ -67,14 +73,19 @@ def parse_inline_actions(raw_text: Any) -> tuple[str, list[dict[str, Any]], list
 
     cursor = 0
     length = len(text)
+    current_offset = 0
 
     while cursor < length:
         start = text.find("[", cursor)
         if start == -1:
-            cleaned_segments.append(text[cursor:])
+            trailing = text[cursor:]
+            cleaned_segments.append(trailing)
+            current_offset += len(trailing)
             break
 
-        cleaned_segments.append(text[cursor:start])
+        prefix = text[cursor:start]
+        cleaned_segments.append(prefix)
+        current_offset += len(prefix)
         end = text.find("]", start + 1)
         if end == -1:
             segment = text[start:]
@@ -86,6 +97,7 @@ def parse_inline_actions(raw_text: Any) -> tuple[str, list[dict[str, Any]], list
             errors.append(error)
             log_warning(error.message, func_name="dice_markup.parse_inline_actions")
             cleaned_segments.append(segment)
+            current_offset += len(segment)
             break
 
         inner = text[start + 1 : end]
@@ -100,36 +112,45 @@ def parse_inline_actions(raw_text: Any) -> tuple[str, list[dict[str, Any]], list
             errors.append(error)
             log_warning(error.message, func_name="dice_markup.parse_inline_actions")
             cleaned_segments.append(segment)
+            current_offset += len(segment)
             cursor = end + 1
             continue
 
-        action, error = _parse_segment(inner, segment_span)
+        action, error, replacement = _parse_segment(inner, segment_span, base_offset=current_offset)
         if error is not None:
             errors.append(error)
             log_warning(error.message, func_name="dice_markup.parse_inline_actions")
-            cleaned_segments.append(text[start : end + 1])
+            fallback = text[start : end + 1]
+            cleaned_segments.append(fallback)
+            current_offset += len(fallback)
         elif action is not None:
             actions.append(action)
-            replacement = action.label
-            if action.notes:
-                replacement = f"{replacement} ({action.notes})"
+            replacement = replacement or ""
             cleaned_segments.append(replacement)
+            current_offset += len(replacement)
         else:
-            cleaned_segments.append(text[start : end + 1])
+            fallback = text[start : end + 1]
+            cleaned_segments.append(fallback)
+            current_offset += len(fallback)
         cursor = end + 1
 
     cleaned_text = "".join(cleaned_segments)
     return cleaned_text, [action.to_dict() for action in actions], [err.to_dict() for err in errors]
 
 
-def _parse_segment(segment: str, span: Tuple[int, int]) -> tuple[ParsedAction | None, ParsedError | None]:
+def _parse_segment(
+    segment: str,
+    span: Tuple[int, int],
+    *,
+    base_offset: int,
+) -> tuple[ParsedAction | None, ParsedError | None, str | None]:
     trimmed = segment.strip()
     if not trimmed:
         return None, ParsedError(
             message="Dice markup is empty.",
             span=span,
             segment=f"[{segment}]",
-        )
+        ), None
 
     if "|" in trimmed:
         left, right = trimmed.split("|", 1)
@@ -144,32 +165,94 @@ def _parse_segment(segment: str, span: Tuple[int, int]) -> tuple[ParsedAction | 
     if right.strip():
         damage_formula_text, notes, damage_error = _extract_damage(right.strip(), span, segment)
         if damage_error is not None:
-            return None, damage_error
+            return None, damage_error, None
     elif dm_damage_text:
         damage_formula_text, notes, damage_error = _extract_damage(dm_damage_text, span, segment)
         if damage_error is not None:
-            return None, damage_error
+            return None, damage_error, None
 
     if attack_bonus_text is None and damage_formula_text is None:
         # Treat segments that don't contain an attack bonus or damage formula as
         # plain text. This allows large blocks of narrative text with only a
         # handful of embedded combat actions to validate successfully – parsing
         # should only fail when no actions are detected at all.
-        return None, None
+        return None, None, None
 
     label = label_text or "Action"
-    return (
-        ParsedAction(
-            label=label,
-            attack_bonus=attack_bonus_text,
-            attack_roll_formula=attack_roll,
-            damage_formula=damage_formula_text,
-            notes=notes,
-            span=span,
-            source=f"[{segment}]",
-        ),
-        None,
+    display_text, attack_span, damage_span = _format_action_display(
+        label=label,
+        attack_bonus=attack_bonus_text,
+        damage_formula=damage_formula_text,
+        notes=notes,
+        base_offset=base_offset,
     )
+
+    action = ParsedAction(
+        label=label,
+        attack_bonus=attack_bonus_text,
+        attack_roll_formula=attack_roll,
+        damage_formula=damage_formula_text,
+        notes=notes,
+        span=span,
+        source=f"[{segment}]",
+        display_text=display_text,
+        attack_span=attack_span,
+        damage_span=damage_span,
+    )
+    return action, None, display_text
+
+
+def _format_action_display(
+    *,
+    label: str,
+    attack_bonus: str | None,
+    damage_formula: str | None,
+    notes: str | None,
+    base_offset: int,
+) -> tuple[str, Tuple[int, int] | None, Tuple[int, int] | None]:
+    parts: List[str] = []
+    attack_span: Tuple[int, int] | None = None
+    damage_span: Tuple[int, int] | None = None
+
+    current_length = 0
+
+    def append(text: str) -> None:
+        nonlocal current_length
+        parts.append(text)
+        current_length += len(text)
+
+    def add_separator() -> None:
+        if current_length > 0:
+            append(" • ")
+
+    label_text = str(label or "").strip()
+    if label_text:
+        append(label_text)
+
+    if attack_bonus:
+        add_separator()
+        attack_text = f"Attack {attack_bonus.strip()}"
+        start = current_length
+        append(attack_text)
+        attack_span = (base_offset + start, base_offset + current_length)
+
+    if damage_formula:
+        add_separator()
+        damage_text = f"Damage {damage_formula.strip()}"
+        if notes:
+            damage_text = f"{damage_text} {notes.strip()}"
+        start = current_length
+        append(damage_text)
+        damage_span = (base_offset + start, base_offset + current_length)
+    elif notes:
+        add_separator()
+        append(notes.strip())
+
+    display = "".join(parts)
+    if not display:
+        display = label_text
+
+    return display, attack_span, damage_span
 
 
 def _extract_label_and_attack(left: str) -> tuple[str, str | None, str | None]:

@@ -431,7 +431,7 @@ def _on_display_map(self, entity_type, map_name): # entity_type here is the map'
             current_item["entity_record"] = {}
 
         current_item["hover_popup"] = None
-        current_item["hover_label"] = None
+        current_item["hover_textbox"] = None
         current_item["hover_visible"] = False
         current_item["hover_bbox"] = None
 

@@ -161,7 +161,7 @@ def add_token(self, path, entity_type, entity_name, entity_record=None):
         "hp_entry": None,
         "hp_entry_id": None,
         "hover_popup": None,
-        "hover_label": None,
+        "hover_textbox": None,
         "hover_visible": False,
         "hover_bbox": None,
     }
@@ -368,7 +368,7 @@ def _delete_token(self, token):
     if popup and popup.winfo_exists():
         popup.destroy()
     token["hover_popup"] = None
-    token["hover_label"] = None
+    token["hover_textbox"] = None
     token["hover_visible"] = False
     token.pop("hover_bbox", None)
 

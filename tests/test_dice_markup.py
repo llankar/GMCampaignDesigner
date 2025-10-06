@@ -6,7 +6,8 @@ def test_parse_inline_actions_basic_attack_and_damage():
     text = "Attacks: [Strike +7|1d8+4 piercing]"
     display, actions, errors = parse_inline_actions(text)
 
-    assert display == "Attacks: Strike (piercing)"
+    expected_display = "Attacks: Strike • Attack +7 • Damage 1d8+4 piercing"
+    assert display == expected_display
     assert errors == []
     assert len(actions) == 1
 
@@ -17,13 +18,16 @@ def test_parse_inline_actions_basic_attack_and_damage():
     assert action["damage_formula"] == "1d8+4"
     assert action["notes"] == "piercing"
     assert action["range"] == (9, 35)
+    assert action["display_text"] == "Strike • Attack +7 • Damage 1d8+4 piercing"
+    assert action["attack_span"] == (18, 27)
+    assert action["damage_span"] == (30, 51)
 
 
 def test_parse_inline_actions_multiple_segments():
     text = "[Strike +7|1d8+4 slashing] and [Fireball|8d6 fire]"
     display, actions, errors = parse_inline_actions(text)
 
-    assert display == "Strike (slashing) and Fireball (fire)"
+    assert display == "Strike • Attack +7 • Damage 1d8+4 slashing and Fireball • Damage 8d6 fire"
     assert errors == []
     assert len(actions) == 2
 
@@ -32,11 +36,17 @@ def test_parse_inline_actions_multiple_segments():
     assert strike["attack_bonus"] == "+7"
     assert strike["damage_formula"] == "1d8+4"
     assert strike["notes"] == "slashing"
+    assert strike["display_text"] == "Strike • Attack +7 • Damage 1d8+4 slashing"
+    assert strike["attack_span"] == (9, 18)
+    assert strike["damage_span"] == (21, 42)
 
     assert fireball["label"] == "Fireball"
     assert fireball["attack_bonus"] is None
     assert fireball["damage_formula"] == "8d6"
     assert fireball["notes"] == "fire"
+    assert fireball["display_text"] == "Fireball • Damage 8d6 fire"
+    assert fireball["attack_span"] is None
+    assert fireball["damage_span"] == (58, 73)
 
 
 def test_parse_inline_actions_ignores_non_combat_segments():
@@ -91,7 +101,7 @@ def test_parse_inline_actions_defaults_label_when_missing():
     text = "[+7|1d6]"
     display, actions, errors = parse_inline_actions(text)
 
-    assert display == "Action"
+    assert display == "Action • Attack +7 • Damage 1d6"
     assert errors == []
     assert len(actions) == 1
     assert actions[0]["label"] == "Action"
@@ -103,7 +113,7 @@ def test_parse_inline_actions_interprets_damage_plus_modifier_as_d20():
     text = "[Smite +8|+6 radiant]"
     display, actions, errors = parse_inline_actions(text)
 
-    assert display == "Smite (radiant)"
+    assert display == "Smite • Attack +8 • Damage 1d20+6 radiant"
     assert errors == []
     assert len(actions) == 1
 
@@ -116,7 +126,7 @@ def test_parse_inline_actions_supports_dm_separator():
     text = "[Strike +5 DM 1d8+3 slashing]"
     display, actions, errors = parse_inline_actions(text)
 
-    assert display == "Strike (slashing)"
+    assert display == "Strike • Attack +5 • Damage 1d8+3 slashing"
     assert errors == []
     assert len(actions) == 1
 
@@ -132,7 +142,7 @@ def test_parse_inline_actions_supports_dm_with_modifier_damage():
     text = "[Bash +4 DM +6 bludgeoning]"
     display, actions, errors = parse_inline_actions(text)
 
-    assert display == "Bash (bludgeoning)"
+    assert display == "Bash • Attack +4 • Damage 1d20+6 bludgeoning"
     assert errors == []
     assert len(actions) == 1
 
