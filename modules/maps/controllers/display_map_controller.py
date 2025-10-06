@@ -1,6 +1,8 @@
 import os
 import json
 import copy
+import re
+import webbrowser
 from pathlib import Path
 from tkinter import colorchooser, filedialog, messagebox
 import tkinter as tk
@@ -64,6 +66,8 @@ MAX_ZOOM = 3.0
 MIN_ZOOM = 0.1
 ZOOM_STEP = 0.1  # 10% per wheel notch
 ctk.set_appearance_mode("dark")
+
+LINK_PATTERN = re.compile(r"(https?://|www\.)[^\s<>"]+", re.IGNORECASE)
 
 class DisplayMapController:
     def __init__(self, parent, maps_wrapper, map_template, *, root_app=None):
@@ -1387,8 +1391,22 @@ class DisplayMapController:
     def _ensure_token_hover_popup(self, token):
         popup = token.get("hover_popup")
         label = token.get("hover_label")
+        frame = token.get("hover_frame")
+        links_frame = token.get("hover_links_frame")
+        actions_frame = token.get("hover_actions_frame")
         canvas = getattr(self, "canvas", None)
         if popup and popup.winfo_exists() and label and label.winfo_exists():
+            if not frame or not frame.winfo_exists():
+                frame = label.master
+                if frame and frame.winfo_exists():
+                    token["hover_frame"] = frame
+            if frame and frame.winfo_exists():
+                if not links_frame or not links_frame.winfo_exists():
+                    links_frame = ctk.CTkFrame(frame, fg_color="transparent")
+                    token["hover_links_frame"] = links_frame
+                if not actions_frame or not actions_frame.winfo_exists():
+                    actions_frame = ctk.CTkFrame(frame, fg_color="transparent")
+                    token["hover_actions_frame"] = actions_frame
             return popup
         if popup and popup.winfo_exists():
             popup.destroy()
@@ -1415,10 +1433,13 @@ class DisplayMapController:
             font=getattr(self, "hover_font", None)
         )
         label.pack(fill="both", expand=True, padx=12, pady=10)
+        links_frame = ctk.CTkFrame(frame, fg_color="transparent")
         actions_frame = ctk.CTkFrame(frame, fg_color="transparent")
         self._register_hover_popup(popup)
         token["hover_popup"] = popup
         token["hover_label"] = label
+        token["hover_frame"] = frame
+        token["hover_links_frame"] = links_frame
         token["hover_actions_frame"] = actions_frame
         return popup
 
@@ -1448,6 +1469,8 @@ class DisplayMapController:
             wraplength=400,
             font=getattr(self, "hover_font", None)
         )
+
+        self._populate_token_links(token, display_text)
 
         actions = token.get("parsed_actions") or []
         errors = token.get("action_errors") or []
@@ -1556,6 +1579,77 @@ class DisplayMapController:
         screen_x = canvas.winfo_rootx() + int(sx)
         screen_y = canvas.winfo_rooty() + int(sy) + 6
         popup.geometry(f"{int(width)}x{int(height)}+{screen_x}+{screen_y}")
+
+    def _populate_token_links(self, token: dict, display_text: str) -> None:
+        links_frame = token.get("hover_links_frame")
+        if not links_frame or not links_frame.winfo_exists():
+            return
+
+        for child in list(links_frame.winfo_children()):
+            try:
+                child.destroy()
+            except tk.TclError:
+                pass
+
+        links = self._extract_links_from_text(display_text)
+        if not links:
+            if links_frame.winfo_ismapped():
+                links_frame.pack_forget()
+            return
+
+        if not links_frame.winfo_ismapped():
+            links_frame.pack(fill="x", padx=12, pady=(0, 6))
+
+        header_font = ctk.CTkFont(size=max(12, self.hover_font_size - 1), weight="bold")
+        ctk.CTkLabel(links_frame, text="Links", anchor="w", font=header_font).pack(anchor="w", pady=(0, 4))
+
+        for url in links:
+            link_label = ctk.CTkLabel(
+                links_frame,
+                text=url,
+                anchor="w",
+                justify="left",
+                text_color="#93c5fd",
+            )
+            try:
+                link_label.configure(cursor="hand2")
+            except tk.TclError:
+                pass
+            link_label.pack(fill="x", pady=(0, 4))
+            link_label.bind(
+                "<Button-1>",
+                lambda _event, target=url: self._open_external_link(target),
+                add="+",
+            )
+
+    @staticmethod
+    def _extract_links_from_text(text: str) -> list[str]:
+        if not text:
+            return []
+
+        text = str(text)
+
+        results: list[str] = []
+        seen: set[str] = set()
+        for match in LINK_PATTERN.finditer(text):
+            raw_url = match.group(0)
+            trimmed = raw_url.rstrip('.,!?:;)"]')
+            if trimmed.lower().startswith("www."):
+                trimmed = f"https://{trimmed}"
+            if trimmed and trimmed not in seen:
+                seen.add(trimmed)
+                results.append(trimmed)
+        return results
+
+    @staticmethod
+    def _open_external_link(url: str) -> None:
+        try:
+            webbrowser.open(url, new=2)
+        except Exception as exc:
+            log_warning(
+                f"Failed to open external link '{url}': {exc}",
+                func_name="DisplayMapController._open_external_link",
+            )
 
     def _show_token_hover(self, token):
         canvas = getattr(self, "canvas", None)
