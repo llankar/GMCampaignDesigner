@@ -1251,6 +1251,11 @@ class DisplayMapController:
 
         plain_text = self._extract_longtext_text(raw_stats_value)
         cleaned_text, actions, errors = parse_inline_actions(plain_text)
+        print(
+            "[DEBUG] _get_token_hover_text: parse_inline_actions returned"
+            f" {len(actions)} actions and {len(errors)} errors for token"
+            f" '{token.get('entity_id', 'Unknown')}'"
+        )
 
         token["_inline_markup_source"] = plain_text
         token["_inline_markup_display"] = cleaned_text or plain_text
