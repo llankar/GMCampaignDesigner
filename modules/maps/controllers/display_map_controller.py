@@ -40,6 +40,9 @@ from modules.helpers.config_helper import ConfigHelper
 from modules.ui.image_viewer import show_portrait
 from modules.ui.video_player import play_video_on_second_screen
 from modules.helpers.logging_helper import log_module_import
+from modules.helpers.dice_markup import parse_inline_actions
+from modules.maps.exporters.maptools import build_token_macros
+from modules.dice import dice_engine
 from modules.audio.entity_audio import (
     get_entity_audio_value,
     play_entity_audio,
@@ -1182,17 +1185,36 @@ class DisplayMapController:
         except Exception as exc:
             print(f"[hover_font_size] Failed to persist hover font size: {exc}")
 
+    @staticmethod
+    def _extract_longtext_text(value):
+        if isinstance(value, dict):
+            return str(value.get("text", "") or "")
+        if value is None:
+            return ""
+        return str(value)
+
     def _get_token_hover_text(self, token):
         record = token.get("entity_record") or {}
         entity_type = token.get("entity_type")
-        raw_stats_text = ""
-        if entity_type == "Creature":
-            raw_stats_text = record.get("Stats", "")
-        elif entity_type == "PC":
-            raw_stats_text = record.get("Stats", "")
+
+        raw_stats_value = ""
+        if entity_type in ("Creature", "PC"):
+            raw_stats_value = record.get("Stats", "")
         elif entity_type == "NPC":
-            raw_stats_text = record.get("Traits", "")
-        display_stats_text = format_longtext(raw_stats_text)
+            raw_stats_value = record.get("Traits", "")
+
+        plain_text = self._extract_longtext_text(raw_stats_value)
+        cached_source = token.get("_inline_markup_source")
+        if plain_text != cached_source:
+            cleaned_text, actions, errors = parse_inline_actions(plain_text)
+            token["_inline_markup_source"] = plain_text
+            token["_inline_markup_display"] = cleaned_text or plain_text
+            token["parsed_actions"] = actions
+            token["action_errors"] = errors
+            token["maptools_macros"] = build_token_macros(actions, token_name=token.get("entity_id"))
+
+        display_source = token.get("_inline_markup_display", plain_text)
+        display_stats_text = format_longtext(display_source)
         if isinstance(display_stats_text, (list, tuple)):
             display_stats_text = "\n".join(map(str, display_stats_text))
         else:
@@ -1200,6 +1222,71 @@ class DisplayMapController:
         if not display_stats_text.strip():
             display_stats_text = "(No details available)"
         return display_stats_text
+
+    @staticmethod
+    def _format_action_button_label(action: dict) -> str:
+        if not isinstance(action, dict):
+            return "Action"
+        label = str(action.get("label") or "Action")
+        details: list[str] = []
+        attack_bonus = str(action.get("attack_bonus") or "").strip()
+        damage_formula = str(action.get("damage_formula") or "").strip()
+        if attack_bonus:
+            details.append(attack_bonus)
+        if damage_formula:
+            details.append(damage_formula)
+        if details:
+            return f"{label} ({', '.join(details)})"
+        return label
+
+    def _roll_token_action(self, token: dict, action: dict) -> None:
+        if not isinstance(action, dict):
+            return
+
+        label = str(action.get("label") or "Action")
+        attack_formula = str(action.get("attack_roll_formula") or "").strip()
+        damage_formula = str(action.get("damage_formula") or "").strip()
+
+        summaries: list[str] = []
+
+        try:
+            if attack_formula:
+                attack_result = dice_engine.roll_formula(attack_formula)
+                summaries.append(self._format_roll_summary("Attack", attack_formula, attack_result))
+            if damage_formula:
+                damage_result = dice_engine.roll_formula(damage_formula)
+                summaries.append(self._format_roll_summary("Damage", damage_formula, damage_result))
+        except dice_engine.DiceEngineError as exc:
+            messagebox.showerror("Dice Roll Failed", f"{label}: {exc}")
+            return
+
+        if not summaries:
+            messagebox.showinfo("Dice Roll", f"No roll formula configured for {label}.")
+            return
+
+        notes = str(action.get("notes") or "").strip()
+        if notes:
+            summaries.append(f"Notes: {notes}")
+
+        messagebox.showinfo("Dice Roll", f"{label}\n" + "\n".join(summaries))
+
+    @staticmethod
+    def _format_roll_summary(kind: str, formula: str, result) -> str:
+        parts: list[str] = []
+        for summary in getattr(result, "face_summaries", () ):
+            values = getattr(summary, "display_values", ())
+            base_count = getattr(summary, "base_count", 0)
+            faces = getattr(summary, "faces", None)
+            if not values or faces is None:
+                continue
+            parts.append(f"{base_count}d{faces}[{', '.join(values)}]")
+        modifier = getattr(result, "modifier", 0)
+        if modifier:
+            parts.append(f"{modifier:+d}")
+        breakdown = " + ".join(parts)
+        if breakdown:
+            return f"{kind}: {formula} = {result.total} ({breakdown})"
+        return f"{kind}: {formula} = {result.total}"
 
     def _ensure_token_hover_popup(self, token):
         popup = token.get("hover_popup")
@@ -1232,9 +1319,11 @@ class DisplayMapController:
             font=getattr(self, "hover_font", None)
         )
         label.pack(fill="both", expand=True, padx=12, pady=10)
+        actions_frame = ctk.CTkFrame(frame, fg_color="transparent")
         self._register_hover_popup(popup)
         token["hover_popup"] = popup
         token["hover_label"] = label
+        token["hover_actions_frame"] = actions_frame
         return popup
 
     def _register_hover_popup(self, popup):
@@ -1255,19 +1344,70 @@ class DisplayMapController:
         canvas = getattr(self, "canvas", None)
         if not canvas or not popup or not popup.winfo_exists() or not label or not label.winfo_exists():
             return
+        display_text = self._get_token_hover_text(token)
         label.configure(
-            text=self._get_token_hover_text(token),
+            text=display_text,
             justify="left",
             anchor="w",
             wraplength=400,
             font=getattr(self, "hover_font", None)
         )
+
+        actions = token.get("parsed_actions") or []
+        errors = token.get("action_errors") or []
+        actions_frame = token.get("hover_actions_frame")
+        if actions_frame and actions_frame.winfo_exists():
+            for child in list(actions_frame.winfo_children()):
+                try:
+                    child.destroy()
+                except tk.TclError:
+                    pass
+
+            if actions or errors:
+                if not actions_frame.winfo_ismapped():
+                    actions_frame.pack(fill="x", padx=12, pady=(0, 10))
+
+                if actions:
+                    header_font = ctk.CTkFont(size=max(12, self.hover_font_size - 1), weight="bold")
+                    ctk.CTkLabel(actions_frame, text="Actions", anchor="w", font=header_font).pack(anchor="w", pady=(0, 6))
+                    for action in actions:
+                        button_label = self._format_action_button_label(action)
+                        btn = ctk.CTkButton(
+                            actions_frame,
+                            text=button_label,
+                            command=lambda a=action: self._roll_token_action(token, a),
+                            width=0,
+                        )
+                        btn.pack(fill="x", pady=2)
+
+                if errors:
+                    error_color = "#f87171"
+                    ctk.CTkLabel(
+                        actions_frame,
+                        text="Markup issues detected:",
+                        anchor="w",
+                        text_color=error_color,
+                    ).pack(anchor="w", pady=(8, 2))
+                    for issue in errors:
+                        message = str(issue.get("message", ""))
+                        ctk.CTkLabel(
+                            actions_frame,
+                            text=f"• {message}",
+                            anchor="w",
+                            justify="left",
+                            text_color=error_color,
+                            wraplength=360,
+                        ).pack(anchor="w")
+            elif actions_frame.winfo_ismapped():
+                actions_frame.pack_forget()
+
         try:
             popup.update_idletasks()
         except tk.TclError:
             return
-        width = max(label.winfo_reqwidth() + 20, 160)
-        height = max(label.winfo_reqheight() + 16, 80)
+        container = label.master or label
+        width = max(container.winfo_reqwidth() + 20, 160)
+        height = max(container.winfo_reqheight() + 16, 80)
         bbox = token.get("hover_bbox")
         sx = sy = None
         if bbox:
