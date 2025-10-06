@@ -101,6 +101,31 @@ def show_entity_on_second_screen(item, title, fields):
     body.bind("<Configure>", _update_scroll_region)
     canvas.bind("<Configure>", _resize_body)
 
+    def _on_mousewheel(event):
+        """Scroll the canvas when the mouse wheel is used."""
+        if event.delta:
+            # Windows and macOS provide an event delta
+            direction = -1 if event.delta > 0 else 1
+        else:
+            # Linux uses button numbers for wheel events
+            if event.num == 4:
+                direction = -1
+            elif event.num == 5:
+                direction = 1
+            else:
+                return "break"
+        canvas.yview_scroll(direction, "units")
+        return "break"
+
+    def _focus_canvas(_event):
+        canvas.focus_set()
+
+    for widget in (canvas, body):
+        widget.bind("<Enter>", _focus_canvas)
+        widget.bind("<MouseWheel>", _on_mousewheel)
+        widget.bind("<Button-4>", _on_mousewheel)
+        widget.bind("<Button-5>", _on_mousewheel)
+
     def _decode_longtext_payload(raw_value):
         """Return a structured value for longtext JSON blobs stored as strings."""
         if not isinstance(raw_value, str):
