@@ -211,6 +211,9 @@ class GenericListView(ctk.CTkFrame):
         ctk.CTkButton(search_frame, text="Add",
             command=self.add_item)\
         .pack(side="left", padx=5)
+        ctk.CTkButton(search_frame, text="Merge Duplicates",
+            command=self.merge_duplicate_entities)\
+        .pack(side="left", padx=5)
         if self.model_wrapper.entity_type == "maps":
             ctk.CTkButton(search_frame, text="Import Directory",
                           command=self.import_map_directory)\
@@ -767,6 +770,88 @@ class GenericListView(ctk.CTkFrame):
             return ", ".join(self.clean_value(v) for v in val if v is not None)
         return str(val).replace("{", "").replace("}", "").strip()
 
+    def _normalize_unique_value(self, value):
+        if value is None:
+            return ""
+        if isinstance(value, dict):
+            value = value.get("text", "")
+        elif isinstance(value, (list, tuple, set)):
+            value = " ".join(str(v) for v in value)
+        return str(value).strip().lower()
+
+    def _merge_duplicate_group(self, group):
+        base = copy.deepcopy(group[0])
+        for item in group[1:]:
+            for field, value in item.items():
+                existing = base.get(field)
+                base[field] = self._merge_field_value(existing, value)
+        return base
+
+    def _merge_field_value(self, existing, new):
+        if self._is_empty_value(existing):
+            return copy.deepcopy(new)
+        if self._is_empty_value(new):
+            return existing
+
+        if isinstance(existing, dict) and isinstance(new, dict):
+            merged = copy.deepcopy(existing)
+            for key, value in new.items():
+                if key in merged:
+                    merged[key] = self._merge_field_value(merged[key], value)
+                else:
+                    merged[key] = copy.deepcopy(value)
+            return merged
+
+        if isinstance(existing, list) and isinstance(new, list):
+            merged_list = list(existing)
+            for item in new:
+                if item not in merged_list:
+                    merged_list.append(item)
+            return merged_list
+
+        if isinstance(existing, set) and isinstance(new, set):
+            return existing | new
+
+        if isinstance(existing, tuple) and isinstance(new, tuple):
+            merged_items = list(existing)
+            for item in new:
+                if item not in merged_items:
+                    merged_items.append(item)
+            return tuple(merged_items)
+
+        if isinstance(existing, (int, float)) and isinstance(new, (int, float)):
+            if existing == 0 and new != 0:
+                return new
+            return existing
+
+        if isinstance(existing, str) and isinstance(new, str):
+            existing_clean = existing.strip()
+            new_clean = new.strip()
+            if not existing_clean:
+                return new
+            if not new_clean:
+                return existing
+            existing_parts = [part.strip() for part in existing.splitlines() if part.strip()]
+            if any(part.lower() == new_clean.lower() for part in existing_parts):
+                return existing
+            if existing.endswith("\n") or not existing:
+                return existing + new
+            return f"{existing}\n{new}"
+
+        if existing == new:
+            return existing
+
+        return existing
+
+    def _is_empty_value(self, value):
+        if value is None:
+            return True
+        if isinstance(value, str):
+            return value.strip() == ""
+        if isinstance(value, (list, tuple, set, dict)):
+            return len(value) == 0
+        return False
+
     def _normalize_column_id(self, column_id):
         """Translate Treeview #n identifiers into configured column names."""
         if column_id == "#0":
@@ -1040,6 +1125,68 @@ class GenericListView(ctk.CTkFrame):
             self.model_wrapper.save_items(self.items)
             self._save_list_order()
             self.filter_items(self.search_var.get())
+
+    def merge_duplicate_entities(self):
+        func_name = "GenericListView.merge_duplicate_entities"
+        if not self.unique_field:
+            messagebox.showwarning(
+                "Merge Duplicates",
+                "Unable to merge entities because no unique field is defined.",
+            )
+            return
+
+        name_groups = {}
+        order = []
+        for item in self.items:
+            key = self._normalize_unique_value(item.get(self.unique_field))
+            if not key:
+                continue
+            if key not in name_groups:
+                name_groups[key] = []
+                order.append(key)
+            name_groups[key].append(item)
+
+        duplicates = {k: name_groups[k] for k in order if len(name_groups[k]) > 1}
+        if not duplicates:
+            messagebox.showinfo("Merge Duplicates", "No duplicate entities were found.")
+            return
+
+        total_items = sum(len(group) for group in duplicates.values())
+        if not messagebox.askyesno(
+            "Merge Duplicates",
+            f"Found {total_items} duplicate entries across {len(duplicates)} names. "
+            "Merge them into single entities?",
+        ):
+            return
+
+        log_info(
+            f"Merging {total_items} duplicate entries across {len(duplicates)} groups",
+            func_name=func_name,
+        )
+
+        merged_groups = {key: self._merge_duplicate_group(group) for key, group in duplicates.items()}
+
+        new_items = []
+        processed = set()
+        for item in self.items:
+            key = self._normalize_unique_value(item.get(self.unique_field))
+            if key in merged_groups:
+                if key in processed:
+                    continue
+                new_items.append(merged_groups[key])
+                processed.add(key)
+            else:
+                new_items.append(item)
+
+        removed_count = total_items - len(duplicates)
+        self.items = new_items
+        self.model_wrapper.save_items(self.items)
+        self._save_list_order()
+        self.filter_items(self.search_var.get())
+        messagebox.showinfo(
+            "Merge Complete",
+            f"Merged {len(duplicates)} groups and removed {removed_count} duplicate entries.",
+        )
 
     def import_map_directory(self):
         log_info("Importing maps from directory", func_name="GenericListView.import_map_directory")
