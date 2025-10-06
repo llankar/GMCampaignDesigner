@@ -830,6 +830,23 @@ class DisplayMapController:
             return False
 
         popups = getattr(self, "_active_hover_popups", set())
+
+        # ``winfo_toplevel`` is a more robust way to identify the parent window
+        # for CustomTkinter widgets.  Some of the custom widgets used in the
+        # token info window do not expose a traditional ``master`` chain (or it
+        # temporarily becomes ``None`` during click handling), which caused the
+        # hover popup to be treated as "outside" the active popup when its
+        # buttons were pressed.  Checking the toplevel first ensures we still
+        # recognise those widgets as part of the popup even if traversing the
+        # ``master`` chain fails.
+        try:
+            toplevel = widget.winfo_toplevel()
+        except Exception:
+            toplevel = None
+        else:
+            if toplevel in popups:
+                return True
+
         visited = set()
         current = widget
 
