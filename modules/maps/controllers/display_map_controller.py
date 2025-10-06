@@ -1469,13 +1469,6 @@ class DisplayMapController:
         except tk.TclError:
             return
 
-        tk_text = self._get_text_tag_target(text_widget)
-        if tk_text is not None and tk_text is not text_widget:
-            try:
-                tk_text.configure(cursor="arrow")
-            except tk.TclError:
-                pass
-
         self._apply_action_links(text_widget, token)
 
         try:
@@ -1487,13 +1480,13 @@ class DisplayMapController:
         if not text_widget:
             return None
 
+        if hasattr(text_widget, "tag_configure"):
+            return text_widget
+
         for attr_name in ("_textbox", "textbox", "text_widget"):
             internal = getattr(text_widget, attr_name, None)
             if internal and hasattr(internal, "tag_configure"):
                 return internal
-
-        if hasattr(text_widget, "tag_configure"):
-            return text_widget
 
         return None
 
@@ -1535,8 +1528,8 @@ class DisplayMapController:
                 try:
                     tk_text.tag_add(tag_name, start_index, end_index)
                     tk_text.tag_configure(tag_name, foreground="#60a5fa", underline=True)
-                    tk_text.tag_bind(tag_name, "<Enter>", lambda _e, tw=tk_text: tw.configure(cursor="hand2"))
-                    tk_text.tag_bind(tag_name, "<Leave>", lambda _e, tw=tk_text: tw.configure(cursor="arrow"))
+                    tk_text.tag_bind(tag_name, "<Enter>", lambda _e, tw=text_widget: tw.configure(cursor="hand2"))
+                    tk_text.tag_bind(tag_name, "<Leave>", lambda _e, tw=text_widget: tw.configure(cursor="arrow"))
                     tk_text.tag_bind(
                         tag_name,
                         "<Button-1>",
