@@ -1383,6 +1383,15 @@ class DisplayMapController:
         if not isinstance(action, dict):
             return
 
+        was_visible = bool(token.get("hover_visible"))
+
+        def _restore_hover():
+            if was_visible:
+                try:
+                    self._show_token_hover(token)
+                except Exception:
+                    pass
+
         label = str(action.get("label") or "Action")
         notes = str(action.get("notes") or "").strip()
 
@@ -1395,10 +1404,13 @@ class DisplayMapController:
             descriptor_with_notes = f"{descriptor} ({notes})"
 
         if not formula:
-            messagebox.showinfo(
-                "Dice Roll",
-                f"No {descriptor.lower()} formula configured for {label}.",
-            )
+            try:
+                messagebox.showinfo(
+                    "Dice Roll",
+                    f"No {descriptor.lower()} formula configured for {label}.",
+                )
+            finally:
+                _restore_hover()
             return
 
         dice_window = self._resolve_dice_bar_window()
@@ -1432,26 +1444,32 @@ class DisplayMapController:
                 supported_faces=supported_faces,
             )
         except dice_engine.DiceEngineError as exc:
-            messagebox.showerror("Dice Roll Failed", f"{label}: {exc}")
+            try:
+                messagebox.showerror("Dice Roll Failed", f"{label}: {exc}")
+            finally:
+                _restore_hover()
             return
 
-        if dice_window is not None and TextSegmentCls is not None:
-            try:
-                segments, total_text = dice_window._format_roll_output(result, separate)
-                prefix = TextSegmentCls(f"{label} – {descriptor_with_notes}: ")
-                dice_window.formula_var.set(result.canonical())
-                dice_window._display_segments([prefix, *segments])
-                dice_window._set_total_text(total_text)
-                dice_window.show()
-                return
-            except Exception as exc:
-                log_warning(
-                    f"Failed to display roll in dice bar: {exc}",
-                    func_name="DisplayMapController._roll_token_action",
-                )
+        try:
+            if dice_window is not None and TextSegmentCls is not None:
+                try:
+                    segments, total_text = dice_window._format_roll_output(result, separate)
+                    prefix = TextSegmentCls(f"{label} – {descriptor_with_notes}: ")
+                    dice_window.formula_var.set(result.canonical())
+                    dice_window._display_segments([prefix, *segments])
+                    dice_window._set_total_text(total_text)
+                    dice_window.show()
+                    return
+                except Exception as exc:
+                    log_warning(
+                        f"Failed to display roll in dice bar: {exc}",
+                        func_name="DisplayMapController._roll_token_action",
+                    )
 
-        summary = self._format_roll_summary(descriptor_with_notes, formula, result)
-        messagebox.showinfo("Dice Roll", f"{label}\n{summary}")
+            summary = self._format_roll_summary(descriptor_with_notes, formula, result)
+            messagebox.showinfo("Dice Roll", f"{label}\n{summary}")
+        finally:
+            _restore_hover()
 
     @staticmethod
     def _format_roll_summary(kind: str, formula: str, result) -> str:
