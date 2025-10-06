@@ -39,6 +39,22 @@ def test_parse_inline_actions_multiple_segments():
     assert fireball["notes"] == "fire"
 
 
+def test_parse_inline_actions_ignores_non_combat_segments():
+    text = """Lore [Some note]\n[Strike +6|1d8+3 slashing]\nFlavor [Another note]\n"""
+
+    display, actions, errors = parse_inline_actions(text)
+
+    assert "[Some note]" in display
+    assert "[Another note]" in display
+    assert errors == []
+    assert len(actions) == 1
+
+    action = actions[0]
+    assert action["label"] == "Strike"
+    assert action["attack_bonus"] == "+6"
+    assert action["damage_formula"] == "1d8+3"
+
+
 def test_parse_inline_actions_reports_errors_and_retains_markup():
     text = "Broken [Strike +7|bad] text"
     display, actions, errors = parse_inline_actions(text)
