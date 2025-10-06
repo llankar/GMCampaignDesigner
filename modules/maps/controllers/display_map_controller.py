@@ -67,7 +67,7 @@ MIN_ZOOM = 0.1
 ZOOM_STEP = 0.1  # 10% per wheel notch
 ctk.set_appearance_mode("dark")
 
-LINK_PATTERN = re.compile(r"(https?://|www\.)[^\s<>"]+", re.IGNORECASE)
+LINK_PATTERN = re.compile(r"(https?://|www\.)[^\s<>]+", re.IGNORECASE)
 
 class DisplayMapController:
     def __init__(self, parent, maps_wrapper, map_template, *, root_app=None):
