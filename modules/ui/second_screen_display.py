@@ -73,14 +73,33 @@ def show_entity_on_second_screen(item, title, fields):
     tk.Label(
         root,
         text=str(title or ""),
-        font=("Segoe UI", 44, "bold"),
+        font=("Segoe UI", 32, "bold"),
         fg=fg,
         bg=bg
     ).pack(pady=(10, 5))
 
-    # Fields container
-    body = tk.Frame(root, bg=bg)
-    body.pack(fill="both", expand=True, padx=40, pady=10)
+    # Fields container with vertical scrolling
+    body_container = tk.Frame(root, bg=bg)
+    body_container.pack(fill="both", expand=True, padx=40, pady=10)
+
+    canvas = tk.Canvas(body_container, bg=bg, highlightthickness=0)
+    canvas.pack(side="left", fill="both", expand=True)
+
+    scrollbar = tk.Scrollbar(body_container, orient="vertical", command=canvas.yview)
+    scrollbar.pack(side="right", fill="y")
+    canvas.configure(yscrollcommand=scrollbar.set)
+
+    body = tk.Frame(canvas, bg=bg)
+    body_window = canvas.create_window((0, 0), window=body, anchor="nw")
+
+    def _update_scroll_region(event):
+        canvas.configure(scrollregion=canvas.bbox("all"))
+
+    def _resize_body(event):
+        canvas.itemconfig(body_window, width=event.width)
+
+    body.bind("<Configure>", _update_scroll_region)
+    canvas.bind("<Configure>", _resize_body)
 
     def _decode_longtext_payload(raw_value):
         """Return a structured value for longtext JSON blobs stored as strings."""
@@ -162,7 +181,7 @@ def show_entity_on_second_screen(item, title, fields):
         tk.Label(
             section,
             text="Scenes",
-            font=("Segoe UI", 32, "bold"),
+            font=("Segoe UI", 26, "bold"),
             fg=fg,
             bg=bg
         ).pack(anchor="w", pady=(0, 6))
@@ -183,7 +202,7 @@ def show_entity_on_second_screen(item, title, fields):
             tk.Label(
                 section,
                 text=": ".join(header_parts),
-                font=("Segoe UI", 26, "bold"),
+                font=("Segoe UI", 20, "bold"),
                 fg=fg,
                 bg=bg
             ).pack(anchor="w", pady=(2, 2))
@@ -199,7 +218,7 @@ def show_entity_on_second_screen(item, title, fields):
                 tk.Label(
                     section,
                     text=body_text,
-                    font=("Segoe UI", 20),
+                    font=("Segoe UI", 16),
                     fg=fg,
                     bg=bg,
                     justify="left",
@@ -216,7 +235,7 @@ def show_entity_on_second_screen(item, title, fields):
                 tk.Label(
                     section,
                     text=f"{label}: {', '.join(names)}",
-                    font=("Segoe UI", 18, "italic"),
+                    font=("Segoe UI", 14, "italic"),
                     fg=fg,
                     bg=bg,
                     justify="left",
@@ -247,8 +266,8 @@ def show_entity_on_second_screen(item, title, fields):
 
         row = tk.Frame(body, bg=bg)
         row.pack(fill="x", anchor="w", pady=6)
-        tk.Label(row, text=f"{field}:", font=("Segoe UI", 22, "bold"), fg=fg, bg=bg).pack(side="top", anchor="w")
-        tk.Label(row, text=val, font=("Segoe UI", 20), fg=fg, bg=bg, justify="left", wraplength=sw-120).pack(side="top", anchor="w")
+        tk.Label(row, text=f"{field}:", font=("Segoe UI", 18, "bold"), fg=fg, bg=bg).pack(side="top", anchor="w")
+        tk.Label(row, text=val, font=("Segoe UI", 16), fg=fg, bg=bg, justify="left", wraplength=sw-120).pack(side="top", anchor="w")
 
     # Close on click or Escape
     win.bind("<Button-1>", lambda e: win.destroy())
