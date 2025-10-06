@@ -64,6 +64,7 @@ from modules.npcs.npc_graph_editor import NPCGraphEditor
 from modules.pcs.pc_graph_editor import PCGraphEditor
 from modules.scenarios.scenario_graph_editor import ScenarioGraphEditor
 from modules.scenarios.scenario_importer import ScenarioImportWindow
+from modules.objects.object_importer import ObjectImportWindow
 from modules.scenarios.scenario_generator_view import ScenarioGeneratorView
 from modules.scenarios.scenario_builder_wizard import ScenarioBuilderWizard
 from modules.generic.export_for_foundry import preview_and_export_foundry
@@ -506,6 +507,7 @@ class MainWindow(ctk.CTk):
             ("scenario_builder", "Scenario Builder Wizard", self.open_scenario_builder),
             ("import_scenario", "Import Scenario", self.open_scenario_importer),
             ("import_creatures_pdf", "Import Creatures from PDF", self.open_creature_importer),
+            ("import_objects_pdf", "Import Equipment from PDF", self.open_object_importer),
             ("gm_screen", "Open GM Screen", self.open_gm_screen),
             ("export_scenarios", "Export Scenarios", self.preview_and_export_scenarios),
             ("export_foundry", "Export Scenarios for Foundry", self.export_foundry),
@@ -1618,6 +1620,12 @@ class MainWindow(ctk.CTk):
         container = ctk.CTkFrame(self.content_frame)
         container.grid(row=0, column=0, sticky="nsew")
         CreatureImportWindow(container)
+
+    def open_object_importer(self):
+        self.clear_current_content()
+        container = ctk.CTkFrame(self.content_frame)
+        container.grid(row=0, column=0, sticky="nsew")
+        ObjectImportWindow(container)
 
     def open_scenario_generator(self):
         self.clear_current_content()
