@@ -56,20 +56,83 @@ def parse_json_relaxed(payload: str):
 def _normalize_object_payload(payload):
     """Return the equipment list from various payload shapes."""
 
+    def _as_list(value):
+        if isinstance(value, list):
+            return value
+        if isinstance(value, dict):
+            return [value]
+        return None
+
+    if isinstance(payload, str):
+        try:
+            parsed = parse_json_relaxed(payload)
+        except Exception as exc:  # pragma: no cover - defensive logging aid
+            log_warning(
+                f"Failed to parse string payload: {exc}",
+                func_name="_normalize_object_payload",
+            )
+            raise ValueError(
+                "String payload could not be parsed as JSON. Enable application logging in "
+                "config/config.ini to inspect the AI response."
+            )
+        return _normalize_object_payload(parsed)
+
     if isinstance(payload, list):
         return payload
+
     if isinstance(payload, dict):
-        for key in ("objects", "equipment", "items", "Equipment", "Items"):
-            value = payload.get(key)
-            if isinstance(value, list):
-                return value
+        for key in (
+            "objects",
+            "object",
+            "equipment",
+            "items",
+            "entries",
+            "records",
+            "data",
+            "Equipment",
+            "Items",
+        ):
+            if key in payload:
+                value = payload.get(key)
+                normalized = _as_list(value)
+                if normalized is not None:
+                    return normalized
+
+        if "choices" in payload and isinstance(payload["choices"], list):
+            for choice in payload["choices"]:
+                if not isinstance(choice, dict):
+                    continue
+                message = choice.get("message") if isinstance(choice.get("message"), dict) else None
+                content = None
+                if message:
+                    content = message.get("content")
+                if not isinstance(content, str):
+                    content = choice.get("text")
+                if isinstance(content, str) and content.strip():
+                    try:
+                        return _normalize_object_payload(parse_json_relaxed(content))
+                    except Exception:
+                        continue
+
+        if "response" in payload and isinstance(payload["response"], str):
+            try:
+                return _normalize_object_payload(parse_json_relaxed(payload["response"]))
+            except Exception:
+                pass
+
+        # If the dict itself looks like a single object entry, wrap it.
+        if any(key in payload for key in ("Name", "Description", "Stats", "Secrets", "Portrait")):
+            normalized = _as_list(payload)
+            if normalized is not None:
+                return normalized
+
     log_warning(
         f"Unrecognized payload structure for AI import: type={type(payload).__name__}",
         func_name="_normalize_object_payload",
     )
     raise ValueError(
-        "Payload must be a list of objects or contain an 'objects' array. Enable application "
-        "logging in config/config.ini to inspect the AI response."
+        "Payload must describe one or more objects. Enable application logging in config/config.ini "
+        "to inspect the AI response."
     )
 
 
