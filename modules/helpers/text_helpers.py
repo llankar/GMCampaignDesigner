@@ -362,7 +362,12 @@ def _coerce_text(val):
     if val is None:
         return ""
     if isinstance(val, list):
-        return " ".join(str(x) for x in val if x is not None)
+        # Recursively coerce nested longtext fragments so we never display
+        # Python reprs (e.g. dictionaries) in the UI when rich-text blocks
+        # are provided as arrays of segments.
+        return " ".join(
+            _coerce_text(x) for x in val if x is not None
+        )
     if isinstance(val, dict):
         v = val.get("text", "")
         if isinstance(v, (list, dict)):
