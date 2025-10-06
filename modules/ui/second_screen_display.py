@@ -120,11 +120,15 @@ def show_entity_on_second_screen(item, title, fields):
     def _focus_canvas(_event):
         canvas.focus_set()
 
-    for widget in (canvas, body):
-        widget.bind("<Enter>", _focus_canvas)
-        widget.bind("<MouseWheel>", _on_mousewheel)
-        widget.bind("<Button-4>", _on_mousewheel)
-        widget.bind("<Button-5>", _on_mousewheel)
+    def _bind_mousewheel(widget):
+        """Ensure the mouse wheel scrolls the canvas from anywhere in the window."""
+        widget.bind("<Enter>", _focus_canvas, add="+")
+        widget.bind("<MouseWheel>", _on_mousewheel, add="+")
+        widget.bind("<Button-4>", _on_mousewheel, add="+")
+        widget.bind("<Button-5>", _on_mousewheel, add="+")
+
+    for widget in (win, root, body_container, canvas, body):
+        _bind_mousewheel(widget)
 
     def _decode_longtext_payload(raw_value):
         """Return a structured value for longtext JSON blobs stored as strings."""
