@@ -2377,7 +2377,8 @@ class MainWindow(ctk.CTk):
         self.map_controller = DisplayMapController(
             map_frame,
             maps_wrapper,
-            load_template("maps")
+            load_template("maps"),
+            root_app=self,
         )
         if map_name and hasattr(self.map_controller, "open_map_by_name"):
             self.map_controller.open_map_by_name(map_name)
