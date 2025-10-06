@@ -8,6 +8,8 @@ from tkinter import ttk, messagebox, filedialog
 import copy
 from PIL import Image
 from modules.generic.generic_editor_window import GenericEditorWindow
+from modules.generic.generic_model_wrapper import GenericModelWrapper
+from modules.generic.generic_list_selection_view import GenericListSelectionView
 from modules.ui.image_viewer import show_portrait
 from modules.ui.second_screen_display import show_entity_on_second_screen
 from modules.helpers.config_helper import ConfigHelper
@@ -17,8 +19,10 @@ from modules.audio.entity_audio import (
     stop_entity_audio,
 )
 from modules.scenarios.gm_screen_view import GMScreenView
+from modules.scenarios.gm_layout_manager import GMScreenLayoutManager
 from modules.ai.authoring_wizard import AuthoringWizardView
 import shutil
+from modules.helpers.template_loader import load_template
 from modules.helpers.logging_helper import (
     log_function,
     log_info,
@@ -32,6 +36,39 @@ log_module_import(__name__)
 PORTRAIT_FOLDER = os.path.join(ConfigHelper.get_campaign_dir(), "assets", "portraits")
 ctk.set_appearance_mode("Dark")
 ctk.set_default_color_theme("blue")
+
+SCENARIO_LINK_FIELDS = {
+    "npcs": "NPCs",
+    "creatures": "Creatures",
+    "factions": "Factions",
+    "places": "Places",
+    "objects": "Objects",
+}
+
+GM_SCREEN_ENTITY_TYPES = {
+    "scenarios": "Scenarios",
+    "pcs": "PCs",
+    "npcs": "NPCs",
+    "creatures": "Creatures",
+    "factions": "Factions",
+    "places": "Places",
+    "objects": "Objects",
+    "clues": "Clues",
+    "informations": "Informations",
+}
+
+ENTITY_DISPLAY_LABELS = {
+    "scenarios": "Scenarios",
+    "pcs": "PCs",
+    "npcs": "NPCs",
+    "creatures": "Creatures",
+    "factions": "Factions",
+    "places": "Places",
+    "objects": "Objects",
+    "clues": "Clues",
+    "informations": "Informations",
+    "maps": "Maps",
+}
 
 try:
     RESAMPLE_MODE = Image.Resampling.LANCZOS
@@ -118,6 +155,10 @@ class GenericListView(ctk.CTkFrame):
 
         self.items = self.model_wrapper.load_items()
         self.filtered_items = list(self.items)
+        self.selected_iids = set()
+        self._base_to_iids = {}
+        self._suppress_tree_select_event = False
+        self.grid_cards = []
 
         # Load grouping from campaign-local settings
         cfg_grp = ConfigHelper.load_campaign_config()
@@ -221,7 +262,7 @@ class GenericListView(ctk.CTkFrame):
             self.tree_frame,
             columns=self.columns,
             show="tree headings",
-            selectmode="browse",
+            selectmode="extended",
             style="Custom.Treeview"
         )
         self._tree_font = tkfont.Font(family="Segoe UI", size=10, weight="bold")
@@ -253,6 +294,7 @@ class GenericListView(ctk.CTkFrame):
         self.tree.bind("<ButtonRelease-1>", self.on_button_release)
         self.tree.bind("<Control-c>", lambda e: self.copy_item(self.tree.focus()))
         self.tree.bind("<Control-v>", lambda e: self.paste_item(self.tree.focus() or None))
+        self.tree.bind("<<TreeviewSelect>>", self._on_tree_selection_changed)
         self.copied_item = None
         self.dragging_iid = None
         self.dragging_column = None
@@ -285,6 +327,15 @@ class GenericListView(ctk.CTkFrame):
         self.footer_frame.pack(fill="x", padx=5, pady=(0, 5))
         self.count_label = ctk.CTkLabel(self.footer_frame, text="")
         self.count_label.pack(side="left", padx=5)
+        self.selection_label = ctk.CTkLabel(self.footer_frame, text="")
+        self.selection_label.pack(side="left", padx=5)
+        self.bulk_action_button = ctk.CTkButton(
+            self.footer_frame,
+            text="Bulk Actions",
+            command=self._open_bulk_menu,
+            state=tk.DISABLED,
+        )
+        self.bulk_action_button.pack(side="right", padx=5, pady=5)
         self.grid_toggle_button = ctk.CTkButton(
             self.footer_frame,
             text="Grid View",
@@ -304,7 +355,9 @@ class GenericListView(ctk.CTkFrame):
         )
         self.items = self.model_wrapper.load_items()
         self.filtered_items = list(self.items)
+        self.selected_iids.clear()
         self.refresh_list()
+        self._update_bulk_controls()
 
     def show_portrait_window(self, iid):
         log_info(f"Showing portrait for {self.model_wrapper.entity_type} item: {iid}", func_name="GenericListView.show_portrait_window")
@@ -320,6 +373,7 @@ class GenericListView(ctk.CTkFrame):
         log_info(f"Refreshing list for {self.model_wrapper.entity_type}", func_name="GenericListView.refresh_list")
         self.tree.delete(*self.tree.get_children())
         self._cell_texts.clear()
+        self._base_to_iids = {}
         self.batch_index = 0
         self.batch_size = 50
         if self.group_column:
@@ -329,6 +383,9 @@ class GenericListView(ctk.CTkFrame):
         if self.view_mode == "grid":
             self.populate_grid()
         self.update_entity_count()
+        self._apply_selection_to_tree()
+        self._refresh_grid_selection()
+        self._update_bulk_controls()
 
     def update_entity_count(self):
         total = len(self.filtered_items)
@@ -367,6 +424,7 @@ class GenericListView(ctk.CTkFrame):
         for child in self.grid_container.winfo_children():
             child.destroy()
         self.grid_images.clear()
+        self.grid_cards = []
         columns = 4
         for col in range(columns):
             self.grid_container.grid_columnconfigure(col, weight=1)
@@ -377,7 +435,13 @@ class GenericListView(ctk.CTkFrame):
             return
         for idx, item in enumerate(self.filtered_items):
             row, col = divmod(idx, columns)
-            card = ctk.CTkFrame(self.grid_container, corner_radius=8, fg_color="#1E1E1E")
+            card = ctk.CTkFrame(
+                self.grid_container,
+                corner_radius=8,
+                fg_color="#1E1E1E",
+                border_width=1,
+                border_color="#1E1E1E",
+            )
             card.grid(row=row, column=col, padx=10, pady=10, sticky="nsew")
             image = self._load_grid_image(item)
             image_label = ctk.CTkLabel(card, text="", image=image)
@@ -394,6 +458,34 @@ class GenericListView(ctk.CTkFrame):
             bind_open(image_label)
             bind_open(card)
             bind_open(name_label)
+
+            def bind_select(widget):
+                widget.bind("<Button-1>", lambda e, it=item: self.on_grid_click(e, it))
+
+            bind_select(image_label)
+            bind_select(card)
+            bind_select(name_label)
+
+            base_id = self._get_base_id(item)
+            if base_id:
+                self.grid_cards.append({"base_id": base_id, "card": card})
+
+        self._refresh_grid_selection()
+
+    def on_grid_click(self, _event, item):
+        self.toggle_item_selection(item)
+
+    def toggle_item_selection(self, item):
+        base_id = self._get_base_id(item)
+        if not base_id:
+            return
+        if base_id in self.selected_iids:
+            self.selected_iids.remove(base_id)
+        else:
+            self.selected_iids.add(base_id)
+        self._apply_selection_to_tree()
+        self._update_bulk_controls()
+        self._refresh_grid_selection()
 
     def _detect_media_field(self):
         fields = self.template.get("fields", []) if isinstance(self.template, dict) else []
@@ -605,6 +697,9 @@ class GenericListView(ctk.CTkFrame):
                 color = self.row_colors.get(base_id)
                 if color:
                     self.tree.item(iid, tags=(f"color_{color}",))
+                self._register_tree_iid(base_id, iid)
+                if base_id in self.selected_iids:
+                    self.tree.selection_add(iid)
             except Exception as e:
                 print("[ERROR] inserting item:", e, iid, vals)
         self.batch_index = end
@@ -636,6 +731,9 @@ class GenericListView(ctk.CTkFrame):
                     color = self.row_colors.get(base_iid)
                     if color:
                         self.tree.item(iid, tags=(f"color_{color}",))
+                    self._register_tree_iid(base_iid, iid)
+                    if base_iid in self.selected_iids:
+                        self.tree.selection_add(iid)
                 except Exception as e:
                     print("[ERROR] inserting item:", e, iid, vals)
 
@@ -824,16 +922,19 @@ class GenericListView(ctk.CTkFrame):
 
     def delete_item(self, iid):
         log_info(f"Deleting {self.model_wrapper.entity_type} item: {iid}", func_name="GenericListView.delete_item")
-        base_id = iid.lower()
+        _, base = self._find_item_by_iid(iid)
+        base_id = base or iid.lower()
         if base_id in self.row_colors:
             self._save_row_color(base_id, None)
         self.items = [
             it for it in self.items
             if sanitize_id(str(it.get(self.unique_field, ""))).lower() != base_id
         ]
+        self.selected_iids.discard(base_id)
         self.model_wrapper.save_items(self.items)
         self._save_list_order()
         self.filter_items(self.search_var.get())
+        self._update_bulk_controls()
 
     def open_in_gm_screen(self, iid):
         log_info(f"Opening {self.model_wrapper.entity_type} in GM screen: {iid}", func_name="GenericListView.open_in_gm_screen")
@@ -1029,6 +1130,326 @@ class GenericListView(ctk.CTkFrame):
             raw = raw.get("text", "")
         return sanitize_id(raw).lower()
 
+    def _register_tree_iid(self, base_id, iid):
+        if not base_id:
+            return
+        entries = self._base_to_iids.setdefault(base_id, [])
+        if iid not in entries:
+            entries.append(iid)
+
+    def _apply_selection_to_tree(self):
+        if not hasattr(self, "tree"):
+            return
+        visible = set(self._base_to_iids.keys())
+        if visible:
+            self.selected_iids = {base_id for base_id in self.selected_iids if base_id in visible}
+        else:
+            self.selected_iids = set()
+        self._suppress_tree_select_event = True
+        try:
+            desired = []
+            for base_id in self.selected_iids:
+                desired.extend(self._base_to_iids.get(base_id, []))
+            if desired:
+                self.tree.selection_set(desired)
+            else:
+                self.tree.selection_remove(self.tree.selection())
+        finally:
+            self._suppress_tree_select_event = False
+
+    def _on_tree_selection_changed(self, _event=None):
+        if self._suppress_tree_select_event:
+            return
+        selected = set()
+        for iid in self.tree.selection():
+            _, base_id = self._find_item_by_iid(iid)
+            if base_id:
+                selected.add(base_id)
+        self.selected_iids = selected
+        self._update_bulk_controls()
+        self._refresh_grid_selection()
+
+    def _refresh_grid_selection(self):
+        if not getattr(self, "grid_cards", None):
+            return
+        for info in self.grid_cards:
+            card = info.get("card")
+            base_id = info.get("base_id")
+            self._set_grid_card_selected(card, base_id in self.selected_iids)
+
+    def _set_grid_card_selected(self, card, selected):
+        if not card or not card.winfo_exists():
+            return
+        if selected:
+            card.configure(border_color="#1F6AA5", border_width=3)
+        else:
+            card.configure(border_color="#1E1E1E", border_width=1)
+
+    def _update_bulk_controls(self):
+        count = len(self.selected_iids)
+        if count:
+            self.selection_label.configure(text=f"{count} selected")
+            self.bulk_action_button.configure(state=tk.NORMAL)
+        else:
+            self.selection_label.configure(text="")
+            self.bulk_action_button.configure(state=tk.DISABLED)
+
+    def _get_display_label(self):
+        return ENTITY_DISPLAY_LABELS.get(
+            self.model_wrapper.entity_type,
+            self.model_wrapper.entity_type.replace("_", " ").title(),
+        )
+
+    def _format_entity_noun(self, count):
+        label = self._get_display_label()
+        if count == 1 and label.endswith("s"):
+            return label[:-1]
+        return label
+
+    def _find_item_by_base_id(self, base_id):
+        for item in self.items:
+            if self._get_base_id(item) == base_id:
+                return item
+        return None
+
+    def _open_bulk_menu(self):
+        if not self.selected_iids:
+            messagebox.showinfo("Bulk Actions", "Select at least one item to continue.")
+            return
+        menu = tk.Menu(self, tearoff=0)
+        link_supported = self.model_wrapper.entity_type in SCENARIO_LINK_FIELDS
+        menu.add_command(
+            label="Link to Scenario...",
+            command=self._bulk_link_to_scenario,
+            state=tk.NORMAL if link_supported else tk.DISABLED,
+        )
+        gm_supported = self.model_wrapper.entity_type in GM_SCREEN_ENTITY_TYPES
+        menu.add_command(
+            label="Add to GM Screen...",
+            command=self._bulk_add_to_gm_screen,
+            state=tk.NORMAL if gm_supported else tk.DISABLED,
+        )
+        try:
+            menu.tk_popup(
+                self.bulk_action_button.winfo_rootx(),
+                self.bulk_action_button.winfo_rooty() + self.bulk_action_button.winfo_height(),
+            )
+        finally:
+            menu.grab_release()
+
+    def _bulk_link_to_scenario(self):
+        field_name = SCENARIO_LINK_FIELDS.get(self.model_wrapper.entity_type)
+        if not field_name:
+            messagebox.showinfo(
+                "Bulk Actions",
+                "Linking to scenarios is not supported for this entity type.",
+            )
+            return
+
+        dialog = ctk.CTkToplevel(self)
+        dialog.title("Select Scenario")
+        dialog.geometry("1200x800")
+        dialog.transient(self.winfo_toplevel())
+        dialog.grab_set()
+
+        wrapper = GenericModelWrapper("scenarios")
+        template = load_template("scenarios")
+
+        def _close_dialog():
+            if dialog.winfo_exists():
+                try:
+                    dialog.grab_release()
+                except Exception:
+                    pass
+                dialog.destroy()
+
+        def _on_select(_entity_type, name):
+            _close_dialog()
+            if name:
+                self._apply_bulk_link_to_scenario(name, field_name)
+
+        view = GenericListSelectionView(
+            dialog,
+            "Scenarios",
+            wrapper,
+            template,
+            on_select_callback=_on_select,
+        )
+        view.pack(fill="both", expand=True)
+        dialog.focus_force()
+        dialog.protocol("WM_DELETE_WINDOW", _close_dialog)
+        dialog.wait_window(dialog)
+
+    def _apply_bulk_link_to_scenario(self, scenario_name, field_name):
+        wrapper = GenericModelWrapper("scenarios")
+        scenarios = wrapper.load_items()
+        scenario = next(
+            (
+                it
+                for it in scenarios
+                if str(it.get("Title") or it.get("Name") or "").strip() == scenario_name
+            ),
+            None,
+        )
+        if not scenario:
+            messagebox.showerror("Scenario Not Found", f"Scenario '{scenario_name}' was not found.")
+            return
+
+        current = list(scenario.get(field_name) or [])
+        added = 0
+        for base_id in sorted(self.selected_iids):
+            item = self._find_item_by_base_id(base_id)
+            if not item:
+                continue
+            value = self.clean_value(item.get(self.unique_field, "")) or ""
+            if not value or value in current:
+                continue
+            current.append(value)
+            added += 1
+
+        if added:
+            scenario[field_name] = current
+            wrapper.save_items(scenarios)
+            noun = self._format_entity_noun(added)
+            messagebox.showinfo(
+                "Scenarios",
+                f"Added {added} {noun} to scenario '{scenario_name}'.",
+            )
+        else:
+            messagebox.showinfo(
+                "Scenarios",
+                "All selected items are already linked to the scenario.",
+            )
+
+    def _bulk_add_to_gm_screen(self):
+        gm_type = GM_SCREEN_ENTITY_TYPES.get(self.model_wrapper.entity_type)
+        if not gm_type:
+            messagebox.showinfo(
+                "Bulk Actions",
+                "Adding to the GM Screen is not supported for this entity type.",
+            )
+            return
+
+        dialog = ctk.CTkToplevel(self)
+        dialog.title("Select Scenario")
+        dialog.geometry("1200x800")
+        dialog.transient(self.winfo_toplevel())
+        dialog.grab_set()
+
+        wrapper = GenericModelWrapper("scenarios")
+        template = load_template("scenarios")
+
+        def _close_dialog():
+            if dialog.winfo_exists():
+                try:
+                    dialog.grab_release()
+                except Exception:
+                    pass
+                dialog.destroy()
+
+        def _on_select(_entity_type, name):
+            _close_dialog()
+            if name:
+                self._apply_bulk_add_to_gm_screen(name, gm_type)
+
+        view = GenericListSelectionView(
+            dialog,
+            "Scenarios",
+            wrapper,
+            template,
+            on_select_callback=_on_select,
+        )
+        view.pack(fill="both", expand=True)
+        dialog.focus_force()
+        dialog.protocol("WM_DELETE_WINDOW", _close_dialog)
+        dialog.wait_window(dialog)
+
+    def _apply_bulk_add_to_gm_screen(self, scenario_name, gm_type):
+        manager = GMScreenLayoutManager()
+        existing_default = manager.get_scenario_default(scenario_name)
+        layout_name = existing_default
+        layout = manager.get_layout(layout_name) if layout_name else None
+        created_layout = False
+        if layout is None:
+            layout_name = layout_name or f"Auto: {scenario_name}"
+            layout = manager.get_layout(layout_name)
+            if layout is None:
+                layout = {"scenario": scenario_name, "tabs": [], "active": None}
+                created_layout = True
+
+        tabs = layout.setdefault("tabs", [])
+        scenario_tab_added = False
+        if not any(
+            tab.get("kind") == "entity"
+            and tab.get("entity_type") == "Scenarios"
+            and str(tab.get("entity_name")) == scenario_name
+            for tab in tabs
+        ):
+            tabs.insert(
+                0,
+                {
+                    "kind": "entity",
+                    "entity_type": "Scenarios",
+                    "entity_name": scenario_name,
+                    "title": scenario_name,
+                },
+            )
+            scenario_tab_added = True
+
+        added = 0
+        for base_id in sorted(self.selected_iids):
+            item = self._find_item_by_base_id(base_id)
+            if not item:
+                continue
+            entity_name = self.clean_value(item.get(self.unique_field, "")) or ""
+            if not entity_name:
+                continue
+            exists = any(
+                tab.get("kind") == "entity"
+                and tab.get("entity_type") == gm_type
+                and str(tab.get("entity_name")) == entity_name
+                for tab in tabs
+            )
+            if exists:
+                continue
+            tabs.append(
+                {
+                    "kind": "entity",
+                    "entity_type": gm_type,
+                    "entity_name": entity_name,
+                    "title": entity_name,
+                }
+            )
+            added += 1
+
+        changed = added > 0 or scenario_tab_added or created_layout
+        if changed:
+            layout["scenario"] = scenario_name
+            manager.save_layout(layout_name, layout)
+            if existing_default is None:
+                manager.set_scenario_default(scenario_name, layout_name)
+            if added:
+                noun = self._format_entity_noun(added)
+                messagebox.showinfo(
+                    "GM Screen",
+                    f"Added {added} {noun} to GM Screen layout '{layout_name}' for '{scenario_name}'.",
+                )
+            elif scenario_tab_added:
+                messagebox.showinfo(
+                    "GM Screen",
+                    f"Scenario '{scenario_name}' is now pinned in GM Screen layout '{layout_name}'.",
+                )
+            else:
+                messagebox.showinfo(
+                    "GM Screen",
+                    f"Initialized GM Screen layout '{layout_name}' for '{scenario_name}'.",
+                )
+        else:
+            messagebox.showinfo(
+                "GM Screen",
+                "All selected items are already present in the GM Screen layout.",
+            )
+
     def _column_from_ident(self, ident):
         if ident == "#0":
             return None
@@ -1211,6 +1632,9 @@ class GenericListView(ctk.CTkFrame):
         # Deselect the row so the new color is visible immediately
         self.tree.selection_remove(iid)
         self.tree.focus("")
+        self.selected_iids.discard(base_id)
+        self._update_bulk_controls()
+        self._refresh_grid_selection()
         self._save_row_color(base_id, color_name)
 
     def _save_row_color(self, base_id, color_name):
