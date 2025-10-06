@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from typing import Any, List, Tuple
 
 from modules.dice import dice_engine
-from modules.helpers.logging_helper import log_module_import, log_warning
+from modules.helpers.logging_helper import log_debug, log_module_import, log_warning
 
 log_module_import(__name__)
 
@@ -75,12 +75,21 @@ def parse_inline_actions(raw_text: Any) -> tuple[str, list[dict[str, Any]], list
     length = len(text)
     current_offset = 0
 
+    log_debug(
+        f"parse_inline_actions - starting parse: length={length}",
+        func_name="dice_markup.parse_inline_actions",
+    )
+
     while cursor < length:
         start = text.find("[", cursor)
         if start == -1:
             trailing = text[cursor:]
             cleaned_segments.append(trailing)
             current_offset += len(trailing)
+            log_debug(
+                "parse_inline_actions - no more segments found; appended trailing text",
+                func_name="dice_markup.parse_inline_actions",
+            )
             break
 
         prefix = text[cursor:start]
@@ -101,6 +110,10 @@ def parse_inline_actions(raw_text: Any) -> tuple[str, list[dict[str, Any]], list
             break
 
         inner = text[start + 1 : end]
+        log_debug(
+            f"parse_inline_actions - found segment: span=({start}, {end + 1}) raw='{inner}'",
+            func_name="dice_markup.parse_inline_actions",
+        )
         segment_span = (start, end + 1)
         if "[" in inner:
             segment = text[start : end + 1]
@@ -118,6 +131,10 @@ def parse_inline_actions(raw_text: Any) -> tuple[str, list[dict[str, Any]], list
 
         action, error, replacement = _parse_segment(inner, segment_span, base_offset=current_offset)
         if error is not None:
+            log_debug(
+                f"parse_inline_actions - segment error: {error.message}",
+                func_name="dice_markup.parse_inline_actions",
+            )
             errors.append(error)
             log_warning(error.message, func_name="dice_markup.parse_inline_actions")
             fallback = text[start : end + 1]
@@ -128,13 +145,26 @@ def parse_inline_actions(raw_text: Any) -> tuple[str, list[dict[str, Any]], list
             replacement = replacement or ""
             cleaned_segments.append(replacement)
             current_offset += len(replacement)
+            log_debug(
+                "parse_inline_actions - segment parsed successfully; replacement length="
+                f"{len(replacement)} span={action.span} display='{action.display_text}'",
+                func_name="dice_markup.parse_inline_actions",
+            )
         else:
             fallback = text[start : end + 1]
             cleaned_segments.append(fallback)
             current_offset += len(fallback)
+            log_debug(
+                "parse_inline_actions - segment ignored (no actionable content)",
+                func_name="dice_markup.parse_inline_actions",
+            )
         cursor = end + 1
 
     cleaned_text = "".join(cleaned_segments)
+    log_debug(
+        f"parse_inline_actions - completed: actions={len(actions)} errors={len(errors)} cleaned_length={len(cleaned_text)}",
+        func_name="dice_markup.parse_inline_actions",
+    )
     return cleaned_text, [action.to_dict() for action in actions], [err.to_dict() for err in errors]
 
 
@@ -249,6 +279,11 @@ def _format_action_display(
         append(notes.strip())
 
     display = "".join(parts)
+    log_debug(
+        "_format_action_display - constructed display="
+        f"'{display}' attack_span={attack_span} damage_span={damage_span} base_offset={base_offset}",
+        func_name="dice_markup._format_action_display",
+    )
     if not display:
         display = label_text
 
