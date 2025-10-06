@@ -186,11 +186,40 @@ class ObjectImportWindow(ctk.CTkToplevel):
         def worker():
             try:
                 self._set_status("Extracting PDF text...")
-                text = self._extract_pdf_text(path)
-                if not text or len(text.strip()) < 50:
+                pages = self._extract_pdf_text(path)
+                if not pages or not any(page.strip() for page in pages):
                     self._warn("Empty PDF", "Could not extract meaningful text from the PDF.")
                     return
-                self._ai_extract_and_import(text, source_label=os.path.basename(path))
+                combined_objects = []
+                total_imported = 0
+                basename = os.path.basename(path)
+                for index in range(0, len(pages), 2):
+                    chunk_text = "\n".join(pages[index : index + 2]).strip()
+                    if not chunk_text:
+                        continue
+                    start_page = index + 1
+                    end_page = min(index + 2, len(pages))
+                    label = f"{basename} p{start_page}-{end_page}"
+                    self._set_status(f"Processing {label}...")
+                    objects, count = self._ai_extract_and_import(
+                        chunk_text,
+                        source_label=label,
+                        update_text=False,
+                    )
+                    if objects:
+                        combined_objects.extend(objects)
+                    total_imported += count
+
+                if not combined_objects:
+                    self._warn("No Objects Imported", "AI did not return any objects for the PDF.")
+                    return
+
+                pretty = json.dumps({"objects": combined_objects}, ensure_ascii=False, indent=2)
+                self._set_text(pretty)
+                self._info(
+                    "Import Complete",
+                    f"Imported {total_imported} object(s) from {basename}.",
+                )
             except Exception as exc:
                 self._error("AI Import Error", str(exc))
             finally:
@@ -220,7 +249,7 @@ class ObjectImportWindow(ctk.CTkToplevel):
         threading.Thread(target=worker, daemon=True).start()
 
     # --- Internal helpers -------------------------------------------------
-    def _extract_pdf_text(self, path: str) -> str:
+    def _extract_pdf_text(self, path: str) -> list[str]:
         try:
             try:
                 import PyPDF2 as pypdf  # type: ignore
@@ -234,12 +263,12 @@ class ObjectImportWindow(ctk.CTkToplevel):
                         chunks.append(page.extract_text() or "")
                     except Exception:
                         continue
-            return "\n".join(chunks)
+            return chunks
         except Exception as exc:
             log_warning(f"PDF extraction failed: {exc}", func_name="ObjectImportWindow._extract_pdf_text")
             raise
 
-    def _ai_extract_and_import(self, raw_text: str, source_label: str = ""):
+    def _ai_extract_and_import(self, raw_text: str, source_label: str = "", *, update_text: bool = True):
         log_info(
             f"Running object AI import for {source_label or 'input'}",
             func_name="ObjectImportWindow._ai_extract_and_import",
@@ -302,9 +331,15 @@ class ObjectImportWindow(ctk.CTkToplevel):
         objects = _normalize_object_payload(parsed)
         count = import_object_records(objects)
 
-        pretty = json.dumps({"objects": objects}, ensure_ascii=False, indent=2)
-        self._set_text(pretty)
-        self._info("Import Complete", f"Imported {count} object(s) from {source_label or 'AI input'}.")
+        if update_text:
+            pretty = json.dumps({"objects": objects}, ensure_ascii=False, indent=2)
+            self._set_text(pretty)
+            self._info(
+                "Import Complete",
+                f"Imported {count} object(s) from {source_label or 'AI input'}.",
+            )
+
+        return objects, count
 
     def _set_text(self, value: str):
         def _do():
