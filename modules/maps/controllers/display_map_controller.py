@@ -6,6 +6,7 @@ from tkinter import colorchooser, filedialog, messagebox
 import tkinter as tk
 from tkinter import font as tkfont
 from types import SimpleNamespace
+from typing import TYPE_CHECKING
 import customtkinter as ctk
 from modules.maps.views.map_selector import select_map, _on_display_map
 from modules.maps.views.toolbar_view import (
@@ -39,7 +40,7 @@ from modules.helpers.text_helpers import format_longtext
 from modules.helpers.config_helper import ConfigHelper
 from modules.ui.image_viewer import show_portrait
 from modules.ui.video_player import play_video_on_second_screen
-from modules.helpers.logging_helper import log_module_import
+from modules.helpers.logging_helper import log_module_import, log_warning
 from modules.helpers.dice_markup import parse_inline_actions
 from modules.maps.exporters.maptools import build_token_macros
 from modules.dice import dice_engine
@@ -50,6 +51,9 @@ from modules.audio.entity_audio import (
 )
 
 log_module_import(__name__)
+
+if TYPE_CHECKING:
+    from modules.dice.dice_bar_window import DiceBarWindow
 
 DEFAULT_BRUSH_SIZE = 32  # px
 DEFAULT_SHAPE_WIDTH = 50
@@ -62,10 +66,11 @@ ZOOM_STEP = 0.1  # 10% per wheel notch
 ctk.set_appearance_mode("dark")
 
 class DisplayMapController:
-    def __init__(self, parent, maps_wrapper, map_template):
+    def __init__(self, parent, maps_wrapper, map_template, *, root_app=None):
         self.parent = parent
         self.maps = maps_wrapper
         self.map_template = map_template
+        self._root_app = root_app
 
         normalize_existing_token_paths(maps_wrapper)
 
@@ -1193,6 +1198,43 @@ class DisplayMapController:
             return ""
         return str(value)
 
+    def _resolve_dice_bar_window(self) -> "DiceBarWindow | None":
+        candidates: list[object] = []
+
+        root_app = getattr(self, "_root_app", None)
+        if root_app is not None:
+            candidates.append(root_app)
+
+        parent = getattr(self, "parent", None)
+        toplevel = None
+        if parent is not None:
+            try:
+                toplevel = parent.winfo_toplevel()
+            except Exception:
+                toplevel = None
+
+        main_app = getattr(toplevel, "master", None) if toplevel is not None else None
+        for candidate in (main_app, toplevel):
+            if candidate is not None and candidate not in candidates:
+                candidates.append(candidate)
+
+        for candidate in candidates:
+            open_method = getattr(candidate, "open_dice_bar", None)
+            if callable(open_method):
+                try:
+                    open_method()
+                except Exception as exc:
+                    log_warning(
+                        f"Unable to open dice bar window: {exc}",
+                        func_name="DisplayMapController._resolve_dice_bar_window",
+                    )
+
+            window = getattr(candidate, "dice_bar_window", None)
+            if window is not None and window.winfo_exists():
+                return window
+
+        return None
+
     def _get_token_hover_text(self, token):
         record = token.get("entity_record") or {}
         entity_type = token.get("entity_type")
@@ -1204,14 +1246,13 @@ class DisplayMapController:
             raw_stats_value = record.get("Traits", "")
 
         plain_text = self._extract_longtext_text(raw_stats_value)
-        cached_source = token.get("_inline_markup_source")
-        if plain_text != cached_source:
-            cleaned_text, actions, errors = parse_inline_actions(plain_text)
-            token["_inline_markup_source"] = plain_text
-            token["_inline_markup_display"] = cleaned_text or plain_text
-            token["parsed_actions"] = actions
-            token["action_errors"] = errors
-            token["maptools_macros"] = build_token_macros(actions, token_name=token.get("entity_id"))
+        cleaned_text, actions, errors = parse_inline_actions(plain_text)
+
+        token["_inline_markup_source"] = plain_text
+        token["_inline_markup_display"] = cleaned_text or plain_text
+        token["parsed_actions"] = actions
+        token["action_errors"] = errors
+        token["maptools_macros"] = build_token_macros(actions, token_name=token.get("entity_id"))
 
         display_source = token.get("_inline_markup_display", plain_text)
         display_stats_text = format_longtext(display_source)
@@ -1224,51 +1265,106 @@ class DisplayMapController:
         return display_stats_text
 
     @staticmethod
-    def _format_action_button_label(action: dict) -> str:
+    def _format_action_header(action: dict) -> str:
         if not isinstance(action, dict):
             return "Action"
         label = str(action.get("label") or "Action")
-        details: list[str] = []
-        attack_bonus = str(action.get("attack_bonus") or "").strip()
-        damage_formula = str(action.get("damage_formula") or "").strip()
-        if attack_bonus:
-            details.append(attack_bonus)
-        if damage_formula:
-            details.append(damage_formula)
-        if details:
-            return f"{label} ({', '.join(details)})"
+        notes = str(action.get("notes") or "").strip()
+        if notes:
+            return f"{label} [{notes}]"
         return label
 
-    def _roll_token_action(self, token: dict, action: dict) -> None:
+    @staticmethod
+    def _format_attack_button_text(action: dict) -> str:
+        formula = str(action.get("attack_roll_formula") or "").strip()
+        if not formula:
+            bonus = str(action.get("attack_bonus") or "").strip()
+            return f"Attack {bonus}" if bonus else "Attack"
+        return f"Attack ({formula})"
+
+    @staticmethod
+    def _format_damage_button_text(action: dict) -> str:
+        formula = str(action.get("damage_formula") or "").strip()
+        if not formula:
+            return "Damage"
+        notes = str(action.get("notes") or "").strip()
+        if notes:
+            return f"Damage ({formula} {notes})"
+        return f"Damage ({formula})"
+
+    def _roll_token_action(self, token: dict, action: dict, roll_type: str) -> None:
         if not isinstance(action, dict):
             return
 
         label = str(action.get("label") or "Action")
-        attack_formula = str(action.get("attack_roll_formula") or "").strip()
-        damage_formula = str(action.get("damage_formula") or "").strip()
+        notes = str(action.get("notes") or "").strip()
 
-        summaries: list[str] = []
+        roll_key = "attack_roll_formula" if roll_type == "attack" else "damage_formula"
+        formula = str(action.get(roll_key) or "").strip()
+
+        descriptor = "Attack" if roll_type == "attack" else "Damage"
+        descriptor_with_notes = descriptor
+        if roll_type == "damage" and notes:
+            descriptor_with_notes = f"{descriptor} ({notes})"
+
+        if not formula:
+            messagebox.showinfo(
+                "Dice Roll",
+                f"No {descriptor.lower()} formula configured for {label}.",
+            )
+            return
+
+        dice_window = self._resolve_dice_bar_window()
+        explode = False
+        separate = False
+        if dice_window is not None:
+            try:
+                explode = bool(dice_window.exploding_var.get())
+            except Exception:
+                explode = False
+            try:
+                separate = bool(dice_window.separate_var.get())
+            except Exception:
+                separate = False
+
+        supported_faces = dice_engine.DEFAULT_DICE_SIZES
+        TextSegmentCls = None
+        if dice_window is not None:
+            try:
+                from modules.dice.dice_bar_window import SUPPORTED_DICE_SIZES, TextSegment
+            except Exception:
+                TextSegmentCls = None
+            else:
+                supported_faces = SUPPORTED_DICE_SIZES
+                TextSegmentCls = TextSegment
 
         try:
-            if attack_formula:
-                attack_result = dice_engine.roll_formula(attack_formula)
-                summaries.append(self._format_roll_summary("Attack", attack_formula, attack_result))
-            if damage_formula:
-                damage_result = dice_engine.roll_formula(damage_formula)
-                summaries.append(self._format_roll_summary("Damage", damage_formula, damage_result))
+            result = dice_engine.roll_formula(
+                formula,
+                explode=explode,
+                supported_faces=supported_faces,
+            )
         except dice_engine.DiceEngineError as exc:
             messagebox.showerror("Dice Roll Failed", f"{label}: {exc}")
             return
 
-        if not summaries:
-            messagebox.showinfo("Dice Roll", f"No roll formula configured for {label}.")
-            return
+        if dice_window is not None and TextSegmentCls is not None:
+            try:
+                segments, total_text = dice_window._format_roll_output(result, separate)
+                prefix = TextSegmentCls(f"{label} – {descriptor_with_notes}: ")
+                dice_window.formula_var.set(result.canonical())
+                dice_window._display_segments([prefix, *segments])
+                dice_window._set_total_text(total_text)
+                dice_window.show()
+                return
+            except Exception as exc:
+                log_warning(
+                    f"Failed to display roll in dice bar: {exc}",
+                    func_name="DisplayMapController._roll_token_action",
+                )
 
-        notes = str(action.get("notes") or "").strip()
-        if notes:
-            summaries.append(f"Notes: {notes}")
-
-        messagebox.showinfo("Dice Roll", f"{label}\n" + "\n".join(summaries))
+        summary = self._format_roll_summary(descriptor_with_notes, formula, result)
+        messagebox.showinfo("Dice Roll", f"{label}\n{summary}")
 
     @staticmethod
     def _format_roll_summary(kind: str, formula: str, result) -> str:
@@ -1371,14 +1467,46 @@ class DisplayMapController:
                     header_font = ctk.CTkFont(size=max(12, self.hover_font_size - 1), weight="bold")
                     ctk.CTkLabel(actions_frame, text="Actions", anchor="w", font=header_font).pack(anchor="w", pady=(0, 6))
                     for action in actions:
-                        button_label = self._format_action_button_label(action)
-                        btn = ctk.CTkButton(
-                            actions_frame,
-                            text=button_label,
-                            command=lambda a=action: self._roll_token_action(token, a),
-                            width=0,
-                        )
-                        btn.pack(fill="x", pady=2)
+                        action_container = ctk.CTkFrame(actions_frame, fg_color="transparent")
+                        action_container.pack(fill="x", pady=(0, 6))
+
+                        title = self._format_action_header(action)
+                        ctk.CTkLabel(
+                            action_container,
+                            text=title,
+                            anchor="w",
+                            justify="left",
+                        ).pack(anchor="w")
+
+                        buttons_row = ctk.CTkFrame(action_container, fg_color="transparent")
+                        buttons_row.pack(fill="x", pady=(4, 0))
+
+                        attack_formula = str(action.get("attack_roll_formula") or "").strip()
+                        damage_formula = str(action.get("damage_formula") or "").strip()
+
+                        buttons_added = False
+                        if attack_formula:
+                            attack_text = self._format_attack_button_text(action)
+                            ctk.CTkButton(
+                                buttons_row,
+                                text=attack_text,
+                                command=lambda a=action: self._roll_token_action(token, a, "attack"),
+                                width=0,
+                            ).pack(side="left", padx=(0, 6))
+                            buttons_added = True
+
+                        if damage_formula:
+                            damage_text = self._format_damage_button_text(action)
+                            ctk.CTkButton(
+                                buttons_row,
+                                text=damage_text,
+                                command=lambda a=action: self._roll_token_action(token, a, "damage"),
+                                width=0,
+                            ).pack(side="left", padx=(0, 6))
+                            buttons_added = True
+
+                        if not buttons_added:
+                            buttons_row.pack_forget()
 
                 if errors:
                     error_color = "#f87171"
