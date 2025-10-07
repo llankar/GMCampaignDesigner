@@ -1442,6 +1442,27 @@ class GenericListView(ctk.CTkFrame):
         assignments_raw = None
         allowed_from_ai = None
 
+        def _salvage_assignment_list_from_text(text):
+            if not isinstance(text, str):
+                return None
+            pattern = re.compile(
+                r"\"(?:Name|name|Item|item)\"\s*:\s*\"([^\"]+)\"[^{}]*?\"(?:Category|category|Type|type)\"\s*:\s*\"([^\"]+)\"",
+                re.DOTALL,
+            )
+            salvaged = []
+            for match in pattern.finditer(text):
+                name = match.group(1).strip()
+                category = match.group(2).strip()
+                if not name:
+                    continue
+                salvaged.append({"Name": name, "Category": category})
+            if salvaged:
+                log_warning(
+                    f"Salvaged {len(salvaged)} assignment(s) from raw text fallback.",
+                    func_name="GenericListView._request_ai_category_assignments",
+                )
+            return salvaged or None
+
         def _coerce_assignment_list(value):
             if isinstance(value, list):
                 return value
@@ -1529,11 +1550,16 @@ class GenericListView(ctk.CTkFrame):
         if not isinstance(assignments_raw, list):
             assignments_raw = _coerce_assignment_list(assignments_raw)
         if not isinstance(assignments_raw, list):
-            log_warning(
-                f"Unexpected assignments payload type: {type(assignments_raw).__name__}",
-                func_name="GenericListView._request_ai_category_assignments",
-            )
-            raise RuntimeError("AI response missing 'assignments' list.")
+            salvage_source = raw if isinstance(raw, str) else json.dumps(data, ensure_ascii=False)
+            salvaged = _salvage_assignment_list_from_text(salvage_source)
+            if isinstance(salvaged, list):
+                assignments_raw = salvaged
+            else:
+                log_warning(
+                    f"Unexpected assignments payload type: {type(assignments_raw).__name__}",
+                    func_name="GenericListView._request_ai_category_assignments",
+                )
+                assignments_raw = []
         allowed_lookup = {c.casefold(): c for c in OBJECT_CATEGORY_ALLOWED}
         allowed_lookup.setdefault("miscellaneous", "Miscellaneous")
         used_categories = []
@@ -1592,7 +1618,10 @@ class GenericListView(ctk.CTkFrame):
                 resolved_category = allowed_lookup.get("miscellaneous")
             assignments[name_key.casefold()] = resolved_category
         if not assignments:
-            raise RuntimeError("AI did not return any assignments.")
+            log_warning(
+                "AI did not return any usable assignments; continuing without updates.",
+                func_name="GenericListView._request_ai_category_assignments",
+            )
         for cat in assignments.values():
             if cat and cat not in used_categories:
                 used_categories.append(cat)
