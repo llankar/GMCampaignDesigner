@@ -103,6 +103,9 @@ OBJECT_CATEGORY_ALLOWED = [
     "Miscellaneous",
 ]
 
+
+AI_CATEGORIZE_BATCH_SIZE = 20
+
 try:
     RESAMPLE_MODE = Image.Resampling.LANCZOS
 except AttributeError:  # Pillow < 9.1 fallback
@@ -1518,8 +1521,34 @@ class GenericListView(ctk.CTkFrame):
         self._set_ai_categorize_running(True)
 
         def worker():
+            assignments = {}
+            used_categories = []
+            used_seen = set()
             try:
-                assignments, used_categories = self._request_ai_category_assignments(payload, existing_categories)
+                batch_size = max(1, AI_CATEGORIZE_BATCH_SIZE)
+                total = len(payload)
+                total_batches = (total + batch_size - 1) // batch_size
+                for index, start in enumerate(range(0, total, batch_size), start=1):
+                    end = start + batch_size
+                    batch_payload = payload[start:end]
+                    batch_existing = sorted(set(existing_categories + used_categories))
+                    log_info(
+                        f"AI categorization batch {index}/{total_batches} for {len(batch_payload)} object(s)",
+                        func_name="GenericListView.ai_categorize_objects",
+                    )
+                    batch_assignments, batch_used = self._request_ai_category_assignments(
+                        batch_payload,
+                        batch_existing,
+                    )
+                    assignments.update(batch_assignments)
+                    for cat in batch_used:
+                        if not isinstance(cat, str):
+                            continue
+                        key = cat.casefold()
+                        if key in used_seen:
+                            continue
+                        used_seen.add(key)
+                        used_categories.append(cat)
             except Exception as exc:
                 log_warning(
                     f"AI categorization failed: {exc}",
