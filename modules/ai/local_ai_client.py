@@ -104,6 +104,9 @@ class LocalAIClient:
         while index < length and s[index] not in "{[":
             index += 1
         if index >= length:
+            table_data = LocalAIClient._parse_markdown_table(s)
+            if table_data is not None:
+                return table_data
             raise RuntimeError("No JSON object found in response")
         try:
             obj, _ = decoder.raw_decode(s, idx=index)
@@ -117,7 +120,74 @@ class LocalAIClient:
                     return json.loads(line)
                 except Exception:
                     continue
-            raise
+
+            table_data = LocalAIClient._parse_markdown_table(s)
+            if table_data is not None:
+                return table_data
+
+            raise RuntimeError("No JSON object found in response")
+
+    @staticmethod
+    def _parse_markdown_table(text: str):
+        """Parse the first markdown table found in text into a list of dicts."""
+
+        if not isinstance(text, str):
+            return None
+
+        lines = text.splitlines()
+        block = []
+
+        def flush_block():
+            nonlocal block
+            if not block:
+                return None
+            header_line = block[0]
+            header_line = header_line.strip()
+            if not header_line:
+                block = []
+                return None
+            stripped = header_line.lstrip()
+            if stripped.startswith("#"):
+                stripped = stripped.lstrip("#").strip()
+            if not stripped.startswith("|"):
+                block = []
+                return None
+            header_parts = [part.strip() for part in stripped.strip("|").split("|")]
+            header_parts = [part for part in header_parts if part]
+            if len(header_parts) < 2:
+                block = []
+                return None
+            rows = []
+            for row_line in block[1:]:
+                stripped = row_line.strip()
+                if not stripped:
+                    continue
+                content = stripped.strip("|")
+                if not content:
+                    continue
+                parts = [part.strip() for part in content.split("|")]
+                if len(parts) != len(header_parts):
+                    continue
+                # Skip separator rows like |---|---|
+                joined = "".join(parts).replace("-", "").replace(":", "").strip()
+                if not joined:
+                    continue
+                row = {header_parts[i]: parts[i] for i in range(len(header_parts))}
+                rows.append(row)
+            block = []
+            return rows or None
+
+        for line in lines:
+            if "|" in line:
+                block.append(line)
+            else:
+                result = flush_block()
+                if result:
+                    return result
+        result = flush_block()
+        if result:
+            return result
+        return None
 
     def _powershell_generate(self, url, payload, headers):
         """POST to url using PowerShell Invoke-WebRequest.
