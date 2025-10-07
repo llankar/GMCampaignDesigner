@@ -35,7 +35,7 @@ from modules.helpers.logging_helper import (
     log_module_import,
 )
 from modules.objects.object_catalog_views import (
-    ObjectAccordionCatalog,
+    ObjectExplorerCatalog,
     load_object_catalog_mode,
     save_object_catalog_mode,
 )
@@ -448,7 +448,7 @@ class GenericListView(ctk.CTkFrame):
         self._apply_selection_to_tree()
         self._refresh_grid_selection()
         self._update_bulk_controls()
-        if self._object_support_enabled and self.object_view_preference == "accordion":
+        if self._object_support_enabled and self.object_view_preference == "explorer":
             self._apply_object_catalog_mode(refresh_content=True)
 
     def update_entity_count(self):
@@ -458,7 +458,7 @@ class GenericListView(ctk.CTkFrame):
         self.count_label.configure(text=text)
 
     def show_grid_view(self):
-        if getattr(self, "object_view_preference", "classic") == "accordion":
+        if getattr(self, "object_view_preference", "classic") == "explorer":
             return
         if self.view_mode == "grid" and self.grid_frame.winfo_manager():
             return
@@ -473,7 +473,7 @@ class GenericListView(ctk.CTkFrame):
         self.update_entity_count()
 
     def show_list_view(self):
-        if getattr(self, "object_view_preference", "classic") == "accordion":
+        if getattr(self, "object_view_preference", "classic") == "explorer":
             return
         if self.view_mode == "list" and self.tree_frame.winfo_manager():
             return
@@ -542,15 +542,15 @@ class GenericListView(ctk.CTkFrame):
 
     def _init_object_catalog_support(self):
         self.object_view_preference = load_object_catalog_mode()
-        self.object_catalog_frame = ObjectAccordionCatalog(
+        self.object_catalog_frame = ObjectExplorerCatalog(
             self,
             resolve_media_path=self._resolve_media_path,
             on_edit_item=self._edit_item,
         )
         toggle_text = (
             "Classic List/Grid"
-            if self.object_view_preference == "accordion"
-            else "Merchant Catalog"
+            if self.object_view_preference == "explorer"
+            else "Explorer Catalog"
         )
         self.object_catalog_toggle_button = ctk.CTkButton(
             self.footer_frame,
@@ -562,13 +562,13 @@ class GenericListView(ctk.CTkFrame):
     def toggle_object_catalog_mode(self):
         if not self._object_support_enabled:
             return
-        if self.object_view_preference == "accordion":
+        if self.object_view_preference == "explorer":
             self.object_view_preference = "classic"
             if self._previous_classic_view_mode not in ("list", "grid"):
                 self._previous_classic_view_mode = "list"
         else:
             self._previous_classic_view_mode = self.view_mode
-            self.object_view_preference = "accordion"
+            self.object_view_preference = "explorer"
             self.view_mode = "list"
         save_object_catalog_mode(self.object_view_preference)
         self._apply_object_catalog_mode(refresh_content=True)
@@ -576,7 +576,7 @@ class GenericListView(ctk.CTkFrame):
     def _apply_object_catalog_mode(self, refresh_content: bool = False):
         if not self._object_support_enabled or not self.object_catalog_frame:
             return
-        if self.object_view_preference == "accordion":
+        if self.object_view_preference == "explorer":
             if refresh_content:
                 self.object_catalog_frame.populate(
                     self.filtered_items,
@@ -603,7 +603,7 @@ class GenericListView(ctk.CTkFrame):
             if self.object_catalog_frame.winfo_manager():
                 self.object_catalog_frame.pack_forget()
             if self.object_catalog_toggle_button:
-                self.object_catalog_toggle_button.configure(text="Merchant Catalog")
+                self.object_catalog_toggle_button.configure(text="Explorer Catalog")
             if not self.grid_toggle_button.winfo_manager():
                 self.grid_toggle_button.pack(side="right", padx=5, pady=5)
             if self._previous_classic_view_mode == "grid":
