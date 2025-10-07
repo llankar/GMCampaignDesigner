@@ -34,7 +34,7 @@ from modules.helpers.logging_helper import (
     log_warning,
     log_module_import,
 )
-from modules.generic.object_shelf_view import ObjectShelfView
+from modules.objects.object_shelf_view import ObjectShelfView
 
 log_module_import(__name__)
 
