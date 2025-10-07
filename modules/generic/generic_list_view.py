@@ -1404,7 +1404,7 @@ class GenericListView(ctk.CTkFrame):
         user_content = (
             "Classify each tabletop RPG object into concise categories chosen from the allowed list.\n"
             "Select a concise set (ideally 5-12) of categories that best match these objects.\n"
-            "Every object must receive exactly one category. If nothing fits, use 'Miscellaneous'.\n"
+            "Every object must receive exactly one category. If it contains a creature name, it's Food, If nothing fits, use 'Miscellaneous'.\n"
             "Do not invent categories outside the allowed list.\n"
             f"Allowed categories: {allowed_text}.\n"
             f"Existing campaign categories: {existing_text}.\n\n"
