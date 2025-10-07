@@ -968,7 +968,13 @@ class GenericListView(ctk.CTkFrame):
 
     def on_double_click(self, event):
         # Use the row under the mouse to avoid stale focus
-        iid = self.tree.identify_row(event.y) or self.tree.focus()
+        iid = self.tree.identify_row(event.y)
+        if not iid:
+            selection = self.tree.selection()
+            if selection:
+                iid = selection[0]
+        if not iid:
+            iid = self.tree.focus()
         if not iid:
             return
         item, _ = self._find_item_by_iid(iid)
