@@ -307,7 +307,8 @@ class GenericListView(ctk.CTkFrame):
                         font=("Segoe UI", 10, "bold"))
         style.map(
             "Custom.Treeview",
-            background=[("selected", "#2B2B2B")],
+            background=[("selected", "#FFFFFF")],
+            foreground=[("selected", "#000000")],
             focuscolor=[("selected", "white"), ("!selected", "")],
             focusthickness=[("selected", 1), ("!selected", 0)],
         )
@@ -319,6 +320,7 @@ class GenericListView(ctk.CTkFrame):
             selectmode="extended",
             style="Custom.Treeview"
         )
+        self._last_tree_selection = set()
         self._tree_font = tkfont.Font(family="Segoe UI", size=10, weight="bold")
         self._ellipsis = "..."
         # Unique field column
@@ -366,6 +368,7 @@ class GenericListView(ctk.CTkFrame):
         }
         for name, hex_color in self.color_options.items():
             self.tree.tag_configure(f"color_{name}", background=hex_color)
+        self.tree.tag_configure("selected_row", background="#FFFFFF", foreground="#000000")
 
         self.row_color_section = f"RowColors_{self.model_wrapper.entity_type}"
         self.row_colors = {}
@@ -425,6 +428,7 @@ class GenericListView(ctk.CTkFrame):
     def refresh_list(self):
         log_info(f"Refreshing list for {self.model_wrapper.entity_type}", func_name="GenericListView.refresh_list")
         self.tree.delete(*self.tree.get_children())
+        self._last_tree_selection = set()
         self._cell_texts.clear()
         self._base_to_iids = {}
         self.batch_index = 0
@@ -779,6 +783,7 @@ class GenericListView(ctk.CTkFrame):
         self.batch_index = end
         if end < len(self.filtered_items):
             self.after(50, self.insert_next_batch)
+        self._update_tree_selection_tags()
 
     def insert_grouped_items(self):
         grouped = {}
@@ -810,6 +815,7 @@ class GenericListView(ctk.CTkFrame):
                         self.tree.selection_add(iid)
                 except Exception as e:
                     print("[ERROR] inserting item:", e, iid, vals)
+        self._update_tree_selection_tags()
 
     def clean_value(self, val):
         if val is None:
@@ -1817,8 +1823,8 @@ class GenericListView(ctk.CTkFrame):
         else:
             self.selected_iids = set()
         self._suppress_tree_select_event = True
+        desired = []
         try:
-            desired = []
             for base_id in self.selected_iids:
                 desired.extend(self._base_to_iids.get(base_id, []))
             if desired:
@@ -1827,6 +1833,7 @@ class GenericListView(ctk.CTkFrame):
                 self.tree.selection_remove(self.tree.selection())
         finally:
             self._suppress_tree_select_event = False
+        self._update_tree_selection_tags(desired)
 
     def _on_tree_selection_changed(self, _event=None):
         if self._suppress_tree_select_event:
@@ -1842,8 +1849,37 @@ class GenericListView(ctk.CTkFrame):
             focus_iid = self.tree.focus()
             if focus_iid not in current_selection:
                 self.tree.focus(current_selection[0])
+        self._update_tree_selection_tags(current_selection)
         self._update_bulk_controls()
         self._refresh_grid_selection()
+
+    def _update_tree_selection_tags(self, selection=None):
+        if not hasattr(self, "tree"):
+            return
+        if selection is None:
+            selection = self.tree.selection()
+        selection_set = {iid for iid in selection if self.tree.exists(iid)}
+        removed = self._last_tree_selection - selection_set
+        added = selection_set - self._last_tree_selection
+        for iid in removed:
+            self._remove_selection_tag(iid)
+        for iid in added:
+            self._apply_selection_tag(iid)
+        self._last_tree_selection = selection_set
+
+    def _apply_selection_tag(self, iid):
+        if not self.tree.exists(iid):
+            return
+        current_tags = list(self.tree.item(iid, "tags") or ())
+        if "selected_row" not in current_tags:
+            current_tags.append("selected_row")
+            self.tree.item(iid, tags=tuple(current_tags))
+
+    def _remove_selection_tag(self, iid):
+        if not self.tree.exists(iid):
+            return
+        current_tags = [t for t in (self.tree.item(iid, "tags") or ()) if t != "selected_row"]
+        self.tree.item(iid, tags=tuple(current_tags))
 
     def _refresh_grid_selection(self):
         if not getattr(self, "grid_cards", None):
