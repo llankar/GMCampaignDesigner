@@ -806,7 +806,55 @@ class ObjectShelfView:
             for state in self.sections:
                 if state.grid_frame and state.grid_frame.winfo_exists():
                     state.grid_frame.update_idletasks()
-                    self._on_grid_resize(state, state.grid_frame.winfo_width())
+                    padding = self._calculate_section_padding(state)
+                    viewport_width = max(0, available - padding)
+                    self._on_grid_resize(state, viewport_width)
+
+    def _calculate_section_padding(self, state: ShelfSectionState) -> int:
+        """Determine how much horizontal padding surrounds a section grid."""
+
+        body_padding = self._horizontal_padding_for_widget(state.body_holder, 6)
+        grid_padding = self._horizontal_padding_for_widget(state.grid_frame, 12)
+        return body_padding + grid_padding
+
+    @staticmethod
+    def _horizontal_padding_for_widget(widget, default_per_side: int) -> int:
+        """Return the total horizontal padding applied to a packed widget."""
+
+        if not widget or not widget.winfo_exists():
+            return default_per_side * 2
+        try:
+            info = widget.pack_info()
+        except Exception:
+            return default_per_side * 2
+        raw = info.get("padx", default_per_side)
+        padding = ObjectShelfView._coerce_padding_value(raw)
+        if padding <= 0:
+            padding = default_per_side * 2
+        return padding
+
+    @staticmethod
+    def _coerce_padding_value(raw) -> int:
+        """Normalize various tkinter padx representations into total pixels."""
+
+        values: List[float] = []
+        if isinstance(raw, (list, tuple)):
+            items = raw
+        elif isinstance(raw, str):
+            cleaned = raw.replace("{", "").replace("}", "").split()
+            items = cleaned if cleaned else [0]
+        else:
+            items = [raw]
+        for item in items[:2]:
+            try:
+                values.append(float(item))
+            except (TypeError, ValueError):
+                continue
+        if not values:
+            return 0
+        if len(values) == 1:
+            return int(round(values[0] * 2))
+        return int(round(values[0] + values[1]))
 
     def _on_mousewheel(self, event):
         if self.host.view_mode != "shelf":
