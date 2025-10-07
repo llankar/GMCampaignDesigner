@@ -1,6 +1,8 @@
+import json
 import re
 import time
 import os
+import threading
 import customtkinter as ctk
 import tkinter as tk
 import tkinter.font as tkfont
@@ -21,6 +23,7 @@ from modules.audio.entity_audio import (
 from modules.scenarios.gm_screen_view import GMScreenView
 from modules.scenarios.gm_layout_manager import GMScreenLayoutManager
 from modules.ai.authoring_wizard import AuthoringWizardView
+from modules.ai.local_ai_client import LocalAIClient
 import shutil
 from modules.helpers.template_loader import load_template
 from modules.helpers.logging_helper import (
@@ -69,6 +72,36 @@ ENTITY_DISPLAY_LABELS = {
     "informations": "Informations",
     "maps": "Maps",
 }
+
+OBJECT_CATEGORY_ALLOWED = [
+    "Weapon",
+    "Armor",
+    "Shield",
+    "Ammunition",
+    "Tool",
+    "Kit",
+    "Resource",
+    "Food",
+    "Drink",
+    "Healing",
+    "Potion",
+    "Drug",
+    "Magic Item",
+    "Accessory",
+    "Jewelry",
+    "Clothing",
+    "Scroll",
+    "Wand",
+    "Staff",
+    "Ring",
+    "Wondrous Item",
+    "Explosive",
+    "Poison",
+    "Consumable",
+    "Container",
+    "Trinket",
+    "Miscellaneous",
+]
 
 try:
     RESAMPLE_MODE = Image.Resampling.LANCZOS
@@ -160,6 +193,8 @@ class GenericListView(ctk.CTkFrame):
         self._suppress_tree_select_event = False
         self.grid_cards = []
         self.copied_items = []
+        self.ai_categorize_button = None
+        self._ai_categorize_running = False
 
         # Load grouping from campaign-local settings
         cfg_grp = ConfigHelper.load_campaign_config()
@@ -214,6 +249,13 @@ class GenericListView(ctk.CTkFrame):
         ctk.CTkButton(search_frame, text="Merge Duplicates",
             command=self.merge_duplicate_entities)\
         .pack(side="left", padx=5)
+        if self.model_wrapper.entity_type == "objects":
+            self.ai_categorize_button = ctk.CTkButton(
+                search_frame,
+                text="AI Categorize",
+                command=self.ai_categorize_objects,
+            )
+            self.ai_categorize_button.pack(side="left", padx=5)
         if self.model_wrapper.entity_type == "maps":
             ctk.CTkButton(search_frame, text="Import Directory",
                           command=self.import_map_directory)\
@@ -1290,6 +1332,255 @@ class GenericListView(ctk.CTkFrame):
                 pass
             top.destroy()
         top.protocol("WM_DELETE_WINDOW", on_close)
+
+    def _set_ai_categorize_running(self, running: bool):
+        self._ai_categorize_running = running
+        if self.ai_categorize_button:
+            if running:
+                self.ai_categorize_button.configure(state="disabled", text="AI Categorizing...")
+            else:
+                self.ai_categorize_button.configure(state="normal", text="AI Categorize")
+
+    def _normalize_ai_excerpt(self, value, limit: int = 320) -> str:
+        if value is None:
+            return ""
+        if isinstance(value, dict):
+            for key in ("text", "value", "content", "description"):
+                inner = value.get(key)
+                if isinstance(inner, str) and inner.strip():
+                    value = inner
+                    break
+            else:
+                try:
+                    value = json.dumps(value, ensure_ascii=False)
+                except Exception:
+                    value = str(value)
+        elif isinstance(value, list):
+            joined = ", ".join(str(v) for v in value if v)
+            value = joined
+        text = str(value)
+        text = re.sub(r"\s+", " ", text).strip()
+        if limit and len(text) > limit:
+            text = text[:limit].rstrip() + "..."
+        return text
+
+    def _build_ai_categorization_payload(self, items):
+        payload = []
+        name_map = {}
+        existing_categories = set()
+        for item in items:
+            name = str(item.get("Name") or item.get(self.unique_field) or "").strip()
+            if not name:
+                continue
+            entry = {"Name": name}
+            desc = self._normalize_ai_excerpt(item.get("Description"))
+            if desc:
+                entry["Description"] = desc
+            stats = self._normalize_ai_excerpt(item.get("Stats"))
+            if stats:
+                entry["Stats"] = stats
+            existing = str(item.get("Category") or "").strip()
+            if existing:
+                entry["ExistingCategory"] = existing
+                existing_categories.add(existing)
+            payload.append(entry)
+            key = name.casefold()
+            name_map.setdefault(key, []).append(item)
+        return payload, name_map, sorted(existing_categories)
+
+    def _request_ai_category_assignments(self, payload, existing_categories):
+        log_info(
+            f"Requesting AI categorization for {len(payload)} objects",
+            func_name="GenericListView._request_ai_category_assignments",
+        )
+        client = LocalAIClient()
+        allowed_text = ", ".join(OBJECT_CATEGORY_ALLOWED)
+        existing_text = ", ".join(existing_categories) if existing_categories else "None"
+        objects_json = json.dumps(payload, ensure_ascii=False, indent=2)
+        user_content = (
+            "Classify each tabletop RPG object into concise categories chosen from the allowed list.\n"
+            "Select a concise set (ideally 5-12) of categories that best match these objects.\n"
+            "Every object must receive exactly one category. If nothing fits, use 'Miscellaneous'.\n"
+            "Do not invent categories outside the allowed list.\n"
+            f"Allowed categories: {allowed_text}.\n"
+            f"Existing campaign categories: {existing_text}.\n\n"
+            "Return STRICT JSON with keys 'allowed_categories' and 'assignments'.\n"
+            "'allowed_categories' must list every category you actually used.\n"
+            "'assignments' must be an array containing one entry per object with keys 'Name' and 'Category'.\n\n"
+            f"Objects to classify:\n{objects_json}"
+        )
+        messages = [
+            {
+                "role": "system",
+                "content": (
+                    "You are a meticulous tabletop RPG quartermaster who maintains an organized equipment catalogue."
+                ),
+            },
+            {"role": "user", "content": user_content},
+        ]
+        raw = client.chat(messages, timeout=240)
+        try:
+            data = LocalAIClient._parse_json_safe(raw)
+        except Exception as exc:
+            raise RuntimeError(f"AI returned invalid JSON: {exc}. Raw: {raw[:500]}")
+        if not isinstance(data, dict):
+            raise RuntimeError("AI response was not a JSON object.")
+        assignments_raw = (
+            data.get("assignments")
+            or data.get("Assignments")
+            or data.get("items")
+            or data.get("Items")
+        )
+        if not isinstance(assignments_raw, list):
+            raise RuntimeError("AI response missing 'assignments' list.")
+        allowed_from_ai = data.get("allowed_categories") or data.get("AllowedCategories")
+        allowed_lookup = {c.casefold(): c for c in OBJECT_CATEGORY_ALLOWED}
+        allowed_lookup.setdefault("miscellaneous", "Miscellaneous")
+        used_categories = []
+        if isinstance(allowed_from_ai, list):
+            seen_used = set()
+            for cat in allowed_from_ai:
+                if not isinstance(cat, str):
+                    continue
+                key = cat.strip()
+                if not key:
+                    continue
+                resolved = allowed_lookup.get(key.casefold())
+                if not resolved:
+                    for ak, av in allowed_lookup.items():
+                        if ak in key.casefold():
+                            resolved = av
+                            break
+                if not resolved:
+                    resolved = allowed_lookup.get("miscellaneous")
+                if resolved and resolved.casefold() not in seen_used:
+                    used_categories.append(resolved)
+                    seen_used.add(resolved.casefold())
+        assignments = {}
+        for entry in assignments_raw:
+            if not isinstance(entry, dict):
+                continue
+            name = entry.get("Name") or entry.get("name") or entry.get("Item") or entry.get("item")
+            category = entry.get("Category") or entry.get("category") or entry.get("Type") or entry.get("type")
+            if not isinstance(name, str):
+                continue
+            name_key = name.strip()
+            if not name_key:
+                continue
+            resolved_category = None
+            if isinstance(category, str):
+                cat_key = category.strip()
+                if cat_key:
+                    resolved_category = allowed_lookup.get(cat_key.casefold())
+                    if not resolved_category:
+                        for ak, av in allowed_lookup.items():
+                            if ak in cat_key.casefold():
+                                resolved_category = av
+                                break
+            if not resolved_category:
+                resolved_category = allowed_lookup.get("miscellaneous")
+            assignments[name_key.casefold()] = resolved_category
+        if not assignments:
+            raise RuntimeError("AI did not return any assignments.")
+        for cat in assignments.values():
+            if cat and cat not in used_categories:
+                used_categories.append(cat)
+        return assignments, used_categories
+
+    def ai_categorize_objects(self):
+        if self.model_wrapper.entity_type != "objects":
+            return
+        if self._ai_categorize_running:
+            return
+        items = self.model_wrapper.load_items()
+        if not items:
+            messagebox.showinfo("AI Categorize", "No objects available to categorize.")
+            return
+        payload, name_map, existing_categories = self._build_ai_categorization_payload(items)
+        if not payload:
+            messagebox.showinfo("AI Categorize", "Objects require a name before they can be categorized.")
+            return
+        if not messagebox.askyesno(
+            "AI Categorize",
+            "Contact the local AI to classify every object and update the Category field?",
+        ):
+            return
+
+        current_query = self.search_var.get()
+        self._set_ai_categorize_running(True)
+
+        def worker():
+            try:
+                assignments, used_categories = self._request_ai_category_assignments(payload, existing_categories)
+            except Exception as exc:
+                log_warning(
+                    f"AI categorization failed: {exc}",
+                    func_name="GenericListView.ai_categorize_objects",
+                )
+                self.after(0, lambda: messagebox.showerror("AI Categorize", f"Failed to categorize objects: {exc}"))
+                return
+
+            def apply_results():
+                updated = 0
+                missing = []
+                seen_missing = set()
+                for entry in payload:
+                    name = entry["Name"]
+                    key = name.casefold()
+                    targets = name_map.get(key, [])
+                    if not targets:
+                        continue
+                    category = assignments.get(key)
+                    if not category:
+                        if key not in seen_missing:
+                            missing.append(name)
+                            seen_missing.add(key)
+                        continue
+                    for item in targets:
+                        if item.get("Category") != category:
+                            item["Category"] = category
+                            updated += 1
+                if updated:
+                    try:
+                        self.model_wrapper.save_items(items)
+                    except Exception as save_exc:
+                        messagebox.showerror("AI Categorize", f"Failed to save categories: {save_exc}")
+                        return
+                    self.items = self.model_wrapper.load_items()
+                    self.filter_items(current_query)
+                summary = []
+                if updated:
+                    summary.append(f"Updated categories for {updated} object(s).")
+                else:
+                    summary.append("No object categories were changed.")
+                if used_categories:
+                    unique_cats = []
+                    seen = set()
+                    for cat in used_categories:
+                        if not isinstance(cat, str):
+                            continue
+                        if cat.casefold() in seen:
+                            continue
+                        unique_cats.append(cat)
+                        seen.add(cat.casefold())
+                    if unique_cats:
+                        summary.append("Categories used: " + ", ".join(unique_cats))
+                if missing:
+                    preview = ", ".join(missing[:5])
+                    if len(missing) > 5:
+                        preview += ", ..."
+                    summary.append(f"No category returned for: {preview}")
+                messagebox.showinfo("AI Categorize", "\n".join(summary))
+
+            self.after(0, apply_results)
+
+        def run():
+            try:
+                worker()
+            finally:
+                self.after(0, lambda: self._set_ai_categorize_running(False))
+
+        threading.Thread(target=run, daemon=True).start()
 
     def _find_item_by_iid(self, iid):
         # Prefer exact match on sanitized ID
