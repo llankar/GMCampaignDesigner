@@ -27,6 +27,7 @@ from modules.ai.local_ai_client import LocalAIClient
 import shutil
 from modules.helpers.template_loader import load_template
 from modules.helpers.logging_helper import (
+    log_debug,
     log_function,
     log_info,
     log_methods,
@@ -1422,6 +1423,17 @@ class GenericListView(ctk.CTkFrame):
             {"role": "user", "content": user_content},
         ]
         raw = client.chat(messages, timeout=240)
+        log_debug(
+            f"AI categorization raw response type: {type(raw).__name__}",
+            func_name="GenericListView._request_ai_category_assignments",
+        )
+        preview = raw.strip().replace("\r", " ").replace("\n", " ") if isinstance(raw, str) else str(raw)
+        if len(preview) > 500:
+            preview = preview[:497] + "..."
+        log_info(
+            f"AI categorization response preview: {preview}",
+            func_name="GenericListView._request_ai_category_assignments",
+        )
         try:
             data = LocalAIClient._parse_json_safe(raw)
         except Exception as exc:
@@ -1429,6 +1441,41 @@ class GenericListView(ctk.CTkFrame):
 
         assignments_raw = None
         allowed_from_ai = None
+
+        def _coerce_assignment_list(value):
+            if isinstance(value, list):
+                return value
+            if isinstance(value, dict):
+                converted = []
+                for key, entry in value.items():
+                    if isinstance(entry, dict):
+                        converted.append(entry)
+                        continue
+                    if not isinstance(key, str):
+                        continue
+                    converted.append({"Name": key, "Category": entry})
+                log_debug(
+                    f"Coerced dict assignments into {len(converted)} entries",
+                    func_name="GenericListView._request_ai_category_assignments",
+                )
+                return converted
+            if isinstance(value, str):
+                try:
+                    parsed = LocalAIClient._parse_json_safe(value)
+                except Exception as parse_exc:
+                    log_warning(
+                        f"Failed to parse string assignments: {parse_exc}",
+                        func_name="GenericListView._request_ai_category_assignments",
+                    )
+                    return None
+                coerced = _coerce_assignment_list(parsed)
+                if isinstance(coerced, list):
+                    log_debug(
+                        f"Parsed string assignments into {len(coerced)} entries",
+                        func_name="GenericListView._request_ai_category_assignments",
+                    )
+                return coerced
+            return None
 
         if isinstance(data, dict):
             assignments_raw = (
@@ -1444,10 +1491,27 @@ class GenericListView(ctk.CTkFrame):
         else:
             raise RuntimeError("AI response was not a JSON object.")
         if not isinstance(assignments_raw, list):
+            assignments_raw = _coerce_assignment_list(assignments_raw)
+        if not isinstance(assignments_raw, list):
+            log_warning(
+                f"Unexpected assignments payload type: {type(assignments_raw).__name__}",
+                func_name="GenericListView._request_ai_category_assignments",
+            )
             raise RuntimeError("AI response missing 'assignments' list.")
         allowed_lookup = {c.casefold(): c for c in OBJECT_CATEGORY_ALLOWED}
         allowed_lookup.setdefault("miscellaneous", "Miscellaneous")
         used_categories = []
+        if isinstance(allowed_from_ai, dict):
+            allowed_from_ai = [str(val) for val in allowed_from_ai.values() if isinstance(val, str)]
+        if isinstance(allowed_from_ai, str):
+            try:
+                parsed = LocalAIClient._parse_json_safe(allowed_from_ai)
+                allowed_from_ai = parsed if isinstance(parsed, list) else None
+            except Exception as exc:
+                log_warning(
+                    f"Failed to parse allowed_categories string: {exc}",
+                    func_name="GenericListView._request_ai_category_assignments",
+                )
         if isinstance(allowed_from_ai, list):
             seen_used = set()
             for cat in allowed_from_ai:
