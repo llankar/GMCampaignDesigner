@@ -309,8 +309,8 @@ class ObjectShelfView:
         grid_frame = ctk.CTkFrame(body_holder, fg_color="#141414")
         grid_frame.pack(fill="both", expand=True, padx=12, pady=12)
         state.grid_frame = grid_frame
-        state.compact = len(state.items) > 40
-        state.column_count = 5 if state.compact else 4
+        #state.compact = len(state.items) > 40
+        state.column_count = 10 if state.compact else 10
         state.uniform_id = f"shelf_{id(state)}"
         self._apply_column_configuration(state)
         grid_frame.bind(
@@ -372,7 +372,7 @@ class ObjectShelfView:
         if not available:
             return state.column_count or 1
         min_width = 200 if state.compact else 240
-        max_columns = 6 if state.compact else 5
+        max_columns = 7 if state.compact else 7
         columns = max(1, available // max(1, min_width))
         return max(1, min(max_columns, columns))
 
@@ -522,15 +522,15 @@ class ObjectShelfView:
             anchor="w",
         )
         name_label.pack(fill="x", padx=10, pady=(10, 4))
-        weight = self.host.clean_value(item.get("Weight", "--")) or "--"
-        cost = self.host.clean_value(item.get("Cost", "--")) or "--"
+        Stats = self.host.clean_value(item.get("Stats", "--")) or "--"
+        Description = self.host.clean_value(item.get("Description", "--")) or "--"
         interactive_children = [name_label]
         if compact:
-            meta_text = f"Wt: {weight}  |  Cost: {cost}"
+            meta_text = f"Desc: {Description} | Stats: {Stats}"
             meta_label = ctk.CTkLabel(
                 crate,
                 text=meta_text,
-                font=("Segoe UI", 10, "bold"),
+                font=("Segoe UI", 14, "bold"),
                 anchor="w",
             )
             meta_label.pack(fill="x", padx=10, pady=(0, 6))
@@ -546,14 +546,14 @@ class ObjectShelfView:
             stats_frame.pack(fill="x", padx=10, pady=4)
             ctk.CTkLabel(
                 stats_frame,
-                text=f"Weight: {weight}",
-                font=("Segoe UI", 11, "bold"),
+                text=f"Desc: {Description}",
+                font=("Segoe UI", 14, "bold"),
                 anchor="w",
             ).pack(fill="x", padx=8, pady=(6, 2))
             ctk.CTkLabel(
                 stats_frame,
-                text=f"Cost: {cost}",
-                font=("Segoe UI", 11, "bold"),
+                text=f"Stats: {Stats}",
+                font=("Segoe UI", 14, "bold"),
                 anchor="w",
             ).pack(fill="x", padx=8, pady=(0, 6))
             interactive_children.append(stats_frame)
@@ -723,7 +723,7 @@ class ObjectShelfView:
         title = ctk.CTkLabel(
             wrapper,
             text=str(label).upper(),
-            font=("Segoe UI", 11, "bold"),
+            font=("Segoe UI", 14, "bold"),
             anchor="w",
         )
         title.pack(fill="x", padx=10, pady=(6, 2))
@@ -731,7 +731,7 @@ class ObjectShelfView:
         body = ctk.CTkLabel(
             wrapper,
             text=text,
-            font=("Segoe UI", 10),
+            font=("Segoe UI", 13),
             justify="left",
             wraplength=720,
             anchor="w",
