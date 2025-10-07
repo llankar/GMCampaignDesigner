@@ -36,6 +36,9 @@ from modules.helpers.logging_helper import (
 )
 from modules.objects.object_catalog_views import (
     ObjectExplorerCatalog,
+    OBJECT_VIEW_CLASSIC,
+    OBJECT_VIEW_EXPLORER,
+    OBJECT_VIEW_GALLERY,
     load_object_catalog_mode,
     save_object_catalog_mode,
 )
@@ -205,7 +208,7 @@ class GenericListView(ctk.CTkFrame):
         self.ai_categorize_button = None
         self._ai_categorize_running = False
         self._object_support_enabled = self.model_wrapper.entity_type == "objects"
-        self.object_view_preference = "classic"
+        self.object_view_preference = OBJECT_VIEW_CLASSIC
         self._previous_classic_view_mode = "list"
         self.object_catalog_frame = None
         self.object_catalog_toggle_button = None
@@ -448,7 +451,10 @@ class GenericListView(ctk.CTkFrame):
         self._apply_selection_to_tree()
         self._refresh_grid_selection()
         self._update_bulk_controls()
-        if self._object_support_enabled and self.object_view_preference == "explorer":
+        if self._object_support_enabled and self.object_view_preference in (
+            OBJECT_VIEW_EXPLORER,
+            OBJECT_VIEW_GALLERY,
+        ):
             self._apply_object_catalog_mode(refresh_content=True)
 
     def update_entity_count(self):
@@ -458,7 +464,10 @@ class GenericListView(ctk.CTkFrame):
         self.count_label.configure(text=text)
 
     def show_grid_view(self):
-        if getattr(self, "object_view_preference", "classic") == "explorer":
+        if getattr(self, "object_view_preference", OBJECT_VIEW_CLASSIC) in (
+            OBJECT_VIEW_EXPLORER,
+            OBJECT_VIEW_GALLERY,
+        ):
             return
         if self.view_mode == "grid" and self.grid_frame.winfo_manager():
             return
@@ -473,7 +482,10 @@ class GenericListView(ctk.CTkFrame):
         self.update_entity_count()
 
     def show_list_view(self):
-        if getattr(self, "object_view_preference", "classic") == "explorer":
+        if getattr(self, "object_view_preference", OBJECT_VIEW_CLASSIC) in (
+            OBJECT_VIEW_EXPLORER,
+            OBJECT_VIEW_GALLERY,
+        ):
             return
         if self.view_mode == "list" and self.tree_frame.winfo_manager():
             return
@@ -542,16 +554,31 @@ class GenericListView(ctk.CTkFrame):
 
     def _init_object_catalog_support(self):
         self.object_view_preference = load_object_catalog_mode()
+        if self.object_view_preference not in (
+            OBJECT_VIEW_CLASSIC,
+            OBJECT_VIEW_EXPLORER,
+            OBJECT_VIEW_GALLERY,
+        ):
+            self.object_view_preference = OBJECT_VIEW_CLASSIC
         self.object_catalog_frame = ObjectExplorerCatalog(
             self,
             resolve_media_path=self._resolve_media_path,
             on_edit_item=self._edit_item,
         )
-        toggle_text = (
-            "Classic List/Grid"
-            if self.object_view_preference == "explorer"
-            else "Explorer Catalog"
+        initial_mode = (
+            self.object_view_preference
+            if self.object_view_preference in (OBJECT_VIEW_EXPLORER, OBJECT_VIEW_GALLERY)
+            else OBJECT_VIEW_EXPLORER
         )
+        self.object_catalog_frame.set_view_mode(initial_mode)
+
+        if self.object_view_preference == OBJECT_VIEW_CLASSIC:
+            toggle_text = "Explorer Catalog"
+        elif self.object_view_preference == OBJECT_VIEW_EXPLORER:
+            toggle_text = "Gallery Catalog"
+        else:
+            toggle_text = "Classic List/Grid"
+
         self.object_catalog_toggle_button = ctk.CTkButton(
             self.footer_frame,
             text=toggle_text,
@@ -562,21 +589,28 @@ class GenericListView(ctk.CTkFrame):
     def toggle_object_catalog_mode(self):
         if not self._object_support_enabled:
             return
-        if self.object_view_preference == "explorer":
-            self.object_view_preference = "classic"
+        if self.object_view_preference == OBJECT_VIEW_CLASSIC:
+            self._previous_classic_view_mode = self.view_mode
+            self.object_view_preference = OBJECT_VIEW_EXPLORER
+            self.view_mode = "list"
+        elif self.object_view_preference == OBJECT_VIEW_EXPLORER:
+            self.object_view_preference = OBJECT_VIEW_GALLERY
+            self.view_mode = "list"
+        else:
+            self.object_view_preference = OBJECT_VIEW_CLASSIC
             if self._previous_classic_view_mode not in ("list", "grid"):
                 self._previous_classic_view_mode = "list"
-        else:
-            self._previous_classic_view_mode = self.view_mode
-            self.object_view_preference = "explorer"
-            self.view_mode = "list"
+            self.view_mode = self._previous_classic_view_mode
         save_object_catalog_mode(self.object_view_preference)
         self._apply_object_catalog_mode(refresh_content=True)
 
     def _apply_object_catalog_mode(self, refresh_content: bool = False):
         if not self._object_support_enabled or not self.object_catalog_frame:
             return
-        if self.object_view_preference == "explorer":
+
+        preference = self.object_view_preference
+        if preference in (OBJECT_VIEW_EXPLORER, OBJECT_VIEW_GALLERY):
+            self.object_catalog_frame.set_view_mode(preference)
             if refresh_content:
                 self.object_catalog_frame.populate(
                     self.filtered_items,
@@ -598,7 +632,12 @@ class GenericListView(ctk.CTkFrame):
                     fill="both", expand=True, padx=5, pady=5, before=self.footer_frame
                 )
             if self.object_catalog_toggle_button:
-                self.object_catalog_toggle_button.configure(text="Classic List/Grid")
+                next_text = (
+                    "Gallery Catalog"
+                    if preference == OBJECT_VIEW_EXPLORER
+                    else "Classic List/Grid"
+                )
+                self.object_catalog_toggle_button.configure(text=next_text)
         else:
             if self.object_catalog_frame.winfo_manager():
                 self.object_catalog_frame.pack_forget()
