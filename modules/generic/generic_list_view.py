@@ -34,6 +34,7 @@ from modules.helpers.logging_helper import (
     log_warning,
     log_module_import,
 )
+from modules.generic.object_shelf_view import ObjectShelfView
 
 log_module_import(__name__)
 
@@ -106,6 +107,7 @@ OBJECT_CATEGORY_ALLOWED = [
 
 
 AI_CATEGORIZE_BATCH_SIZE = 20
+
 
 try:
     RESAMPLE_MODE = Image.Resampling.LANCZOS
@@ -293,6 +295,10 @@ class GenericListView(ctk.CTkFrame):
         self.grid_container.pack(fill="both", expand=True, padx=5, pady=5)
         self.grid_images = []
 
+        self.shelf_view = None
+        if self.model_wrapper.entity_type == "objects":
+            self.shelf_view = ObjectShelfView(self, OBJECT_CATEGORY_ALLOWED)
+
         style = ttk.Style(self)
         style.theme_use("clam")
         style.configure("Custom.Treeview",
@@ -392,16 +398,20 @@ class GenericListView(ctk.CTkFrame):
             state=tk.DISABLED,
         )
         self.bulk_action_button.pack(side="right", padx=5, pady=5)
-        self.grid_toggle_button = ctk.CTkButton(
-            self.footer_frame,
-            text="Grid View",
-            command=self.show_grid_view,
+        self.view_toggle_frame = ctk.CTkFrame(
+            self.footer_frame, fg_color="transparent"
         )
-        self.grid_toggle_button.pack(side="right", padx=5, pady=5)
+        self.view_toggle_frame.pack(side="right", padx=5, pady=5)
+        self.view_toggle_buttons = {}
+        self._create_view_toggle_button("list", "List")
+        self._create_view_toggle_button("grid", "Grid")
+        if self.model_wrapper.entity_type == "objects":
+            self._create_view_toggle_button("shelf", "Shelf")
 
         self.view_mode = "list"
 
         self.refresh_list()
+        self._update_view_toggle_state()
 
     def reload_from_db(self):
         """Reload items from the model wrapper and refresh the view."""
@@ -439,9 +449,13 @@ class GenericListView(ctk.CTkFrame):
             self.insert_next_batch()
         if self.view_mode == "grid":
             self.populate_grid()
+        elif self.view_mode == "shelf" and self.shelf_view:
+            self.shelf_view.populate()
         self.update_entity_count()
         self._apply_selection_to_tree()
         self._refresh_grid_selection()
+        if self.shelf_view:
+            self.shelf_view.refresh_selection()
         self._update_bulk_controls()
 
     def update_entity_count(self):
@@ -449,6 +463,44 @@ class GenericListView(ctk.CTkFrame):
         overall = len(self.items)
         text = f"Displaying {total} of {overall} entities"
         self.count_label.configure(text=text)
+        if self.shelf_view:
+            self.shelf_view.update_summary()
+
+    def _create_view_toggle_button(self, mode, label):
+        if getattr(self, "view_toggle_frame", None) is None:
+            return
+        button = ctk.CTkButton(
+            self.view_toggle_frame,
+            text=label,
+            command=lambda m=mode: self._set_view_mode(m),
+            corner_radius=16,
+            width=90,
+            fg_color="#2F2F2F",
+            hover_color="#1F6AA5",
+            border_width=1,
+            border_color="#1F6AA5",
+        )
+        button.pack(side="left", padx=4)
+        self.view_toggle_buttons[mode] = button
+
+    def _set_view_mode(self, mode):
+        if mode == self.view_mode:
+            return
+        if mode == "grid":
+            self.show_grid_view()
+        elif mode == "shelf":
+            self.show_shelf_view()
+        else:
+            self.show_list_view()
+
+    def _update_view_toggle_state(self):
+        for mode, button in self.view_toggle_buttons.items():
+            if not button or not button.winfo_exists():
+                continue
+            if mode == self.view_mode:
+                button.configure(state=tk.DISABLED, fg_color="#1F6AA5")
+            else:
+                button.configure(state=tk.NORMAL, fg_color="#2F2F2F")
 
     def show_grid_view(self):
         if self.view_mode == "grid" and self.grid_frame.winfo_manager():
@@ -458,10 +510,12 @@ class GenericListView(ctk.CTkFrame):
         self.grid_frame.pack(
             fill="both", expand=True, padx=5, pady=5, before=self.footer_frame
         )
-        if self.grid_toggle_button.winfo_manager():
-            self.grid_toggle_button.pack_forget()
+        if self.shelf_view:
+            self.shelf_view.hide()
         self.populate_grid()
+        self._refresh_grid_selection()
         self.update_entity_count()
+        self._update_view_toggle_state()
 
     def show_list_view(self):
         if self.view_mode == "list" and self.tree_frame.winfo_manager():
@@ -471,9 +525,25 @@ class GenericListView(ctk.CTkFrame):
         self.tree_frame.pack(
             fill="both", expand=True, padx=5, pady=5, before=self.footer_frame
         )
-        if not self.grid_toggle_button.winfo_manager():
-            self.grid_toggle_button.pack(side="right", padx=5, pady=5)
+        if self.shelf_view:
+            self.shelf_view.hide()
         self.update_entity_count()
+        self._update_view_toggle_state()
+
+    def show_shelf_view(self):
+        if not self.shelf_view or not self.shelf_view.is_available():
+            return
+        if self.view_mode == "shelf" and self.shelf_view.is_visible():
+            return
+        self.view_mode = "shelf"
+        self.tree_frame.pack_forget()
+        self.grid_frame.pack_forget()
+        self.shelf_view.show(before_widget=self.footer_frame)
+        self.shelf_view.populate()
+        self.shelf_view.refresh_selection()
+        self.shelf_view.start_visibility_monitor()
+        self.update_entity_count()
+        self._update_view_toggle_state()
 
     def populate_grid(self):
         if not hasattr(self, "grid_container"):
@@ -522,12 +592,9 @@ class GenericListView(ctk.CTkFrame):
             bind_select(image_label)
             bind_select(card)
             bind_select(name_label)
-
             base_id = self._get_base_id(item)
             if base_id:
                 self.grid_cards.append({"base_id": base_id, "card": card})
-
-        self._refresh_grid_selection()
 
     def on_grid_click(self, _event, item):
         self.toggle_item_selection(item)
@@ -543,6 +610,8 @@ class GenericListView(ctk.CTkFrame):
         self._apply_selection_to_tree()
         self._update_bulk_controls()
         self._refresh_grid_selection()
+        if self.shelf_view:
+            self.shelf_view.refresh_selection()
 
     def _detect_media_field(self):
         fields = self.template.get("fields", []) if isinstance(self.template, dict) else []
@@ -1119,6 +1188,8 @@ class GenericListView(ctk.CTkFrame):
         else:
             self._apply_selection_to_tree()
             self._refresh_grid_selection()
+            if self.shelf_view:
+                self.shelf_view.refresh_selection()
             self._update_bulk_controls()
 
     def open_in_gm_screen(self, iid):
@@ -1852,6 +1923,8 @@ class GenericListView(ctk.CTkFrame):
         self._update_tree_selection_tags(current_selection)
         self._update_bulk_controls()
         self._refresh_grid_selection()
+        if self.shelf_view:
+            self.shelf_view.refresh_selection()
 
     def _update_tree_selection_tags(self, selection=None):
         if not hasattr(self, "tree"):
