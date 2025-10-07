@@ -1477,20 +1477,55 @@ class GenericListView(ctk.CTkFrame):
                 return coerced
             return None
 
+        def _extract_field(value, candidate_keys):
+            """Recursively locate a field in arbitrarily nested AI responses."""
+
+            seen = set()
+
+            def _inner(current):
+                obj_id = id(current)
+                if obj_id in seen:
+                    return None
+                seen.add(obj_id)
+
+                if isinstance(current, dict):
+                    for key in candidate_keys:
+                        if key in current and current[key] is not None:
+                            return current[key]
+                    for nested in current.values():
+                        found = _inner(nested)
+                        if found is not None:
+                            return found
+                    return None
+                if isinstance(current, list):
+                    for item in current:
+                        found = _inner(item)
+                        if found is not None:
+                            return found
+                    return None
+                if isinstance(current, str):
+                    try:
+                        parsed = LocalAIClient._parse_json_safe(current)
+                    except Exception:
+                        return None
+                    return _inner(parsed)
+                return None
+
+            return _inner(value)
+
         if isinstance(data, dict):
-            for key in ("assignments", "Assignments", "items", "Items"):
-                if key in data:
-                    assignments_raw = data[key]
-                    break
-            for key in ("allowed_categories", "AllowedCategories"):
-                if key in data:
-                    allowed_from_ai = data[key]
-                    break
+            assignments_raw = _extract_field(data, ("assignments", "Assignments", "items", "Items"))
+            allowed_from_ai = _extract_field(data, ("allowed_categories", "AllowedCategories"))
         elif isinstance(data, list):
             # Some local models skip the envelope and return the assignments list directly.
             assignments_raw = data
         else:
             raise RuntimeError("AI response was not a JSON object.")
+
+        if assignments_raw is None and isinstance(raw, str):
+            assignments_raw = _extract_field(raw, ("assignments", "Assignments", "items", "Items"))
+        if allowed_from_ai is None and isinstance(raw, str):
+            allowed_from_ai = _extract_field(raw, ("allowed_categories", "AllowedCategories"))
         if not isinstance(assignments_raw, list):
             assignments_raw = _coerce_assignment_list(assignments_raw)
         if not isinstance(assignments_raw, list):
