@@ -1,4 +1,5 @@
 import os
+from functools import lru_cache
 from typing import Callable, Iterable, Optional, Sequence
 
 
@@ -152,7 +153,12 @@ class _CollapsibleSection(ctk.CTkFrame):
         if self._body_frame is None:
             return
         if not self._body_visible:
-            self._body_frame.pack(fill="x", padx=4, pady=(0, MERCHANT_SECTION_GAP))
+            self._body_frame.pack(
+                fill="x",
+                padx=4,
+                pady=(0, MERCHANT_SECTION_GAP),
+                after=self.container,
+            )
             if self._indicator_label:
                 self._indicator_label.configure(text="▲")
             self._body_visible = True
@@ -193,10 +199,10 @@ class MerchantCatalogEntry(_CollapsibleSection):
         name: str,
         stats_preview: str,
         category: str,
-        description: str,
-        stats_full: str,
-        secrets: str,
-        portrait_path: Optional[str],
+        stats_provider: Optional[Callable[[], str]] = None,
+        description_provider: Optional[Callable[[], str]] = None,
+        secrets_provider: Optional[Callable[[], str]] = None,
+        portrait_provider: Optional[Callable[[], Optional[str]]] = None,
         resolve_media_path: Optional[Callable[[str], Optional[str]]],
         on_edit: Optional[Callable[[], None]] = None,
     ) -> None:
@@ -208,19 +214,19 @@ class MerchantCatalogEntry(_CollapsibleSection):
             on_open=None,
         )
         self._resolve_media_path = resolve_media_path
-        self._portrait_path = portrait_path
         self._portrait_image: Optional[ctk.CTkImage] = None
         self._on_edit = on_edit
-        self._description = description
-        self._stats_full = stats_full
-        self._secrets = secrets
+        self._stats_provider = stats_provider
+        self._description_provider = description_provider
+        self._secrets_provider = secrets_provider
+        self._portrait_provider = portrait_provider
 
         self.set_body_factory(self._build_body)
 
-    def _assign_portrait(self, label: ctk.CTkLabel) -> None:
-        if not self._resolve_media_path or not self._portrait_path:
+    def _assign_portrait(self, label: ctk.CTkLabel, portrait_path: str) -> None:
+        if not self._resolve_media_path or not portrait_path:
             return
-        resolved = self._resolve_media_path(self._portrait_path)
+        resolved = self._resolve_media_path(portrait_path)
         if not resolved:
             return
         try:
@@ -234,6 +240,34 @@ class MerchantCatalogEntry(_CollapsibleSection):
             preview.thumbnail((180, 180), Image.LANCZOS)
         self._portrait_image = ctk.CTkImage(light_image=preview, dark_image=preview, size=preview.size)
         label.configure(image=self._portrait_image)
+
+    def _resolve_text(self, provider: Optional[Callable[[], str]]) -> str:
+        if provider is None:
+            return ""
+        try:
+            value = provider()
+        except Exception:
+            return ""
+        if value is None:
+            return ""
+        if isinstance(value, str):
+            return value
+        return str(value)
+
+    def _resolve_portrait(self) -> Optional[str]:
+        if self._portrait_provider is None:
+            return None
+        try:
+            value = self._portrait_provider()
+        except Exception:
+            return None
+        if not value:
+            return None
+        if isinstance(value, str):
+            portrait = value.strip()
+        else:
+            portrait = str(value).strip()
+        return portrait or None
 
     def _build_body(self) -> Optional[ctk.CTkFrame]:
         body = ctk.CTkFrame(
@@ -250,7 +284,8 @@ class MerchantCatalogEntry(_CollapsibleSection):
         body_font = ("Segoe UI", 12)
 
         row = 0
-        if self._stats_full:
+        stats_full = self._resolve_text(self._stats_provider)
+        if stats_full:
             stats_section = ctk.CTkFrame(body, fg_color="transparent")
             stats_section.grid(row=row, column=0, sticky="we", padx=18, pady=(16, 8))
             ctk.CTkLabel(
@@ -262,7 +297,7 @@ class MerchantCatalogEntry(_CollapsibleSection):
             ).pack(anchor="w")
             ctk.CTkLabel(
                 stats_section,
-                text=self._stats_full,
+                text=stats_full,
                 font=body_font,
                 text_color=text_color,
                 wraplength=620,
@@ -271,7 +306,8 @@ class MerchantCatalogEntry(_CollapsibleSection):
             ).pack(anchor="w", pady=(4, 0))
             row += 1
 
-        if self._description:
+        description = self._resolve_text(self._description_provider)
+        if description:
             desc_section = ctk.CTkFrame(body, fg_color="transparent")
             desc_section.grid(row=row, column=0, sticky="we", padx=18, pady=(8, 8))
             ctk.CTkLabel(
@@ -283,7 +319,7 @@ class MerchantCatalogEntry(_CollapsibleSection):
             ).pack(anchor="w")
             ctk.CTkLabel(
                 desc_section,
-                text=self._description,
+                text=description,
                 font=body_font,
                 text_color=text_color,
                 wraplength=620,
@@ -292,7 +328,8 @@ class MerchantCatalogEntry(_CollapsibleSection):
             ).pack(anchor="w", pady=(4, 0))
             row += 1
 
-        if self._secrets:
+        secrets = self._resolve_text(self._secrets_provider)
+        if secrets:
             secret_section = ctk.CTkFrame(body, fg_color="transparent")
             secret_section.grid(row=row, column=0, sticky="we", padx=18, pady=(8, 12))
             ctk.CTkLabel(
@@ -304,7 +341,7 @@ class MerchantCatalogEntry(_CollapsibleSection):
             ).pack(anchor="w")
             ctk.CTkLabel(
                 secret_section,
-                text=self._secrets,
+                text=secrets,
                 font=body_font,
                 text_color=text_color,
                 wraplength=620,
@@ -325,10 +362,11 @@ class MerchantCatalogEntry(_CollapsibleSection):
             edit_button.grid(row=0, column=0, sticky="e")
         row += 1
 
-        if self._portrait_path:
+        portrait_path = self._resolve_portrait()
+        if portrait_path:
             image_label = ctk.CTkLabel(body, text="", anchor="center")
             image_label.grid(row=0, column=1, rowspan=max(row, 1), sticky="ne", padx=(0, 18), pady=18)
-            self._assign_portrait(image_label)
+            self.after(25, lambda p=portrait_path, lbl=image_label: self._assign_portrait(lbl, p))
 
         return body
 
@@ -451,7 +489,7 @@ class ObjectAccordionCatalog(ctk.CTkFrame):
         )
         self._loading_label.pack(padx=24, pady=24)
 
-        batch_size = 40
+        batch_size = 32 if len(item_list) > 400 else 40
         total = len(item_list)
 
         def build_batch(start_index: int) -> None:
@@ -462,13 +500,43 @@ class ObjectAccordionCatalog(ctk.CTkFrame):
             for idx in range(start_index, end_index):
                 item = item_list[idx]
                 name = self._inline_text(item.get(unique_field) or item.get("Name")) or "Unnamed Object"
-                stats_full = self._normalize_text(item.get(stats_field))
-                description = self._normalize_text(item.get(description_field))
-                secrets = self._normalize_text(item.get(secrets_field))
                 category = self._inline_text(item.get(category_field))
-                portrait_path = item.get(portrait_field) if portrait_field else None
 
-                preview = self._stats_preview(stats_full)
+                @lru_cache(maxsize=1)
+                def stats_value(_item=item):
+                    return self._normalize_text(_item.get(stats_field))
+
+                preview = self._stats_preview(stats_value())
+
+                description_provider: Optional[Callable[[], str]] = None
+                if description_field:
+                    @lru_cache(maxsize=1)
+                    def description_value(_item=item):
+                        return self._normalize_text(_item.get(description_field))
+
+                    description_provider = description_value
+
+                secrets_provider: Optional[Callable[[], str]] = None
+                if secrets_field:
+                    @lru_cache(maxsize=1)
+                    def secrets_value(_item=item):
+                        return self._normalize_text(_item.get(secrets_field))
+
+                    secrets_provider = secrets_value
+
+                portrait_provider: Optional[Callable[[], Optional[str]]] = None
+                if portrait_field:
+
+                    @lru_cache(maxsize=1)
+                    def portrait_value(_item=item):
+                        value = _item.get(portrait_field)
+                        if isinstance(value, str):
+                            return value.strip()
+                        if value is None:
+                            return None
+                        return str(value).strip() or None
+
+                    portrait_provider = portrait_value
 
                 def _make_edit_callback(entry=item):
                     if not callable(self._on_edit_item):
@@ -487,10 +555,10 @@ class ObjectAccordionCatalog(ctk.CTkFrame):
                     name=name,
                     stats_preview=preview,
                     category=category,
-                    description=description,
-                    stats_full=stats_full,
-                    secrets=secrets,
-                    portrait_path=portrait_path,
+                    stats_provider=stats_value,
+                    description_provider=description_provider,
+                    secrets_provider=secrets_provider,
+                    portrait_provider=portrait_provider,
                     resolve_media_path=self._resolve_media_path,
                     on_edit=_make_edit_callback(),
                 )
@@ -502,7 +570,7 @@ class ObjectAccordionCatalog(ctk.CTkFrame):
             else:
                 self._populate_job = None
 
-        build_batch(0)
+        self._populate_job = self.after(15, lambda: build_batch(0))
 
 
 log_module_import(__name__)
