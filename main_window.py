@@ -250,6 +250,7 @@ class MainWindow(ctk.CTk):
             "import_portraits": "import_icon.png",
             "import_scenario": "import_icon.png",
             "import_creatures_pdf": "import_icon.png",
+            "import_objects_pdf": "import_icon.png",
             "export_foundry": "export_foundry_icon.png",
             "map_tool": "map_tool_icon.png",
             "generate_scenario": "generate_scenario_icon.png",

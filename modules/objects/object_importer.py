@@ -283,8 +283,8 @@ class ObjectImportWindow(ctk.CTkToplevel):
                 total_imported = 0
                 failed_chunks = []
                 basename = os.path.basename(path)
-                for index in range(0, len(pages), 2):
-                    chunk_text = "\n".join(pages[index : index + 2]).strip()
+                for index in range(0, len(pages), 4):
+                    chunk_text = "\n".join(pages[index : index + 4]).strip()
                     if not chunk_text:
                         continue
                     start_page = index + 1
@@ -423,7 +423,7 @@ class ObjectImportWindow(ctk.CTkToplevel):
         prompt = (
             "You are an assistant that extracts tabletop RPG equipment entries from PDFs.\n"
             "Return STRICT JSON only using the schema below.\n"
-            "For every object, capture both its descriptive text AND any numeric/stat blocks from tables.\n"
+            "For every object, capture both its descriptive text AND any numeric/stat blocks. The stats can be found in the tables (match them by the object name).\n"
             "If description and stats appear separately, merge them into 'Description' and 'Stats' respectively without losing detail.\n"
             "Do not invent values—leave fields blank if the PDF omits them. Preserve line breaks inside the 'Stats' text so tables stay readable.\n\n"
             "Schema:\n" + json.dumps(schema, ensure_ascii=False, indent=2) + "\n\n"
