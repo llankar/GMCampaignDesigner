@@ -791,6 +791,22 @@ class ObjectShelfView:
 
     def _on_canvas_change(self):
         self._update_return_button()
+        canvas = getattr(self.container, "_parent_canvas", None)
+        inner = getattr(self.container, "_scrollable_frame", None)
+        if not canvas or not inner:
+            return
+        available = canvas.winfo_width()
+        if available <= 0:
+            return
+        needs_update = inner.winfo_width() != available
+        if needs_update:
+            inner.configure(width=available)
+        if needs_update:
+            inner.update_idletasks()
+            for state in self.sections:
+                if state.grid_frame and state.grid_frame.winfo_exists():
+                    state.grid_frame.update_idletasks()
+                    self._on_grid_resize(state, state.grid_frame.winfo_width())
 
     def _on_mousewheel(self, event):
         if self.host.view_mode != "shelf":
