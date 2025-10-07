@@ -28,6 +28,10 @@ class ShelfSectionState:
     crate_widgets: Dict[str, ctk.CTkFrame] = field(default_factory=dict)
     crate_order: List[str] = field(default_factory=list)
     open_specs: Dict[str, ctk.CTkFrame] = field(default_factory=dict)
+    compact: bool = False
+    column_count: int = 0
+    configured_columns: int = 0
+    uniform_id: str = ""
 
 
 class ObjectShelfView:
@@ -304,8 +308,15 @@ class ObjectShelfView:
         body_holder.pack(fill="both", expand=True, padx=6, pady=(0, 6))
         grid_frame = ctk.CTkFrame(body_holder, fg_color="#141414")
         grid_frame.pack(fill="both", expand=True, padx=12, pady=12)
-        for col in range(4):
-            grid_frame.grid_columnconfigure(col, weight=1, uniform="shelf")
+        state.grid_frame = grid_frame
+        state.compact = len(state.items) > 40
+        state.column_count = 5 if state.compact else 4
+        state.uniform_id = f"shelf_{id(state)}"
+        self._apply_column_configuration(state)
+        grid_frame.bind(
+            "<Configure>",
+            lambda event, st=state: self._on_grid_resize(st, event.width),
+        )
 
         state.container = container
         state.header_frame = header
@@ -329,6 +340,64 @@ class ObjectShelfView:
             state.count_label.configure(text=str(len(state.items)))
         self._update_pin_button(state)
         self._update_collapse_button(state)
+
+    def _apply_column_configuration(self, state: ShelfSectionState):
+        grid = state.grid_frame
+        if not grid:
+            return
+        uniform = state.uniform_id or f"shelf_{id(state)}"
+        state.uniform_id = uniform
+        if state.configured_columns > state.column_count:
+            for col in range(state.column_count, state.configured_columns):
+                grid.grid_columnconfigure(col, weight=0)
+        for col in range(state.column_count):
+            grid.grid_columnconfigure(col, weight=1, uniform=uniform)
+        state.configured_columns = state.column_count
+
+    def _on_grid_resize(self, state: ShelfSectionState, width: int):
+        desired = self._determine_column_count(state, width)
+        if desired <= 0 or desired == state.column_count:
+            return
+        state.column_count = desired
+        self._apply_column_configuration(state)
+        if state.initialized:
+            self._reposition_section_widgets(state)
+
+    def _determine_column_count(self, state: ShelfSectionState, width: Optional[int] = None) -> int:
+        if not state.grid_frame:
+            return state.column_count or 1
+        available = width if width and width > 0 else state.grid_frame.winfo_width()
+        if not available:
+            available = self.container.winfo_width() or self.frame.winfo_width()
+        if not available:
+            return state.column_count or 1
+        min_width = 200 if state.compact else 240
+        max_columns = 6 if state.compact else 5
+        columns = max(1, available // max(1, min_width))
+        return max(1, min(max_columns, columns))
+
+    def _reposition_section_widgets(self, state: ShelfSectionState):
+        columns = max(1, state.column_count or 1)
+        for index, base_id in enumerate(state.crate_order):
+            crate = state.crate_widgets.get(base_id)
+            if crate and crate.winfo_exists():
+                row_group = index // columns
+                row = row_group * 2
+                col = index % columns
+                crate.grid_configure(row=row, column=col, padx=8, pady=8, sticky="nsew")
+        for base_id, spec in list(state.open_specs.items()):
+            if spec and spec.winfo_exists() and base_id in state.crate_order:
+                index = state.crate_order.index(base_id)
+                row_group = index // columns
+                spec_row = row_group * 2 + 1
+                spec.grid_configure(
+                    row=spec_row,
+                    column=0,
+                    columnspan=columns,
+                    padx=8,
+                    pady=(0, 12),
+                    sticky="nsew",
+                )
 
     def _update_pin_button(self, state: ShelfSectionState):
         if not state.pin_button:
@@ -402,7 +471,7 @@ class ObjectShelfView:
             return
         start = state.loaded_count
         end = min(start + batch_size, len(state.items))
-        columns = 4
+        columns = max(1, state.column_count or 4)
         for index in range(start, end):
             item = state.items[index]
             base_id = self.host._get_base_id(item)
@@ -444,56 +513,78 @@ class ObjectShelfView:
         )
         crate.configure(cursor="hand2")
         name = self.host.clean_value(item.get(self.host.unique_field, "Unnamed")) or "Unnamed"
+        compact = state.compact
+        name_font = ("Segoe UI", 11, "bold") if compact else ("Segoe UI", 12, "bold")
         name_label = ctk.CTkLabel(
             crate,
             text=name.upper(),
-            font=("Segoe UI", 12, "bold"),
+            font=name_font,
             anchor="w",
         )
         name_label.pack(fill="x", padx=10, pady=(10, 4))
         weight = self.host.clean_value(item.get("Weight", "--")) or "--"
         cost = self.host.clean_value(item.get("Cost", "--")) or "--"
-        stats_frame = ctk.CTkFrame(
-            crate,
-            fg_color="#151515",
-            corner_radius=8,
-            border_width=1,
-            border_color="#303030",
-        )
-        stats_frame.pack(fill="x", padx=10, pady=4)
-        ctk.CTkLabel(
-            stats_frame,
-            text=f"Weight: {weight}",
-            font=("Segoe UI", 11, "bold"),
-            anchor="w",
-        ).pack(fill="x", padx=8, pady=(6, 2))
-        ctk.CTkLabel(
-            stats_frame,
-            text=f"Cost: {cost}",
-            font=("Segoe UI", 11, "bold"),
-            anchor="w",
-        ).pack(fill="x", padx=8, pady=(0, 6))
+        interactive_children = [name_label]
+        if compact:
+            meta_text = f"Wt: {weight}  |  Cost: {cost}"
+            meta_label = ctk.CTkLabel(
+                crate,
+                text=meta_text,
+                font=("Segoe UI", 10, "bold"),
+                anchor="w",
+            )
+            meta_label.pack(fill="x", padx=10, pady=(0, 6))
+            interactive_children.append(meta_label)
+        else:
+            stats_frame = ctk.CTkFrame(
+                crate,
+                fg_color="#151515",
+                corner_radius=8,
+                border_width=1,
+                border_color="#303030",
+            )
+            stats_frame.pack(fill="x", padx=10, pady=4)
+            ctk.CTkLabel(
+                stats_frame,
+                text=f"Weight: {weight}",
+                font=("Segoe UI", 11, "bold"),
+                anchor="w",
+            ).pack(fill="x", padx=8, pady=(6, 2))
+            ctk.CTkLabel(
+                stats_frame,
+                text=f"Cost: {cost}",
+                font=("Segoe UI", 11, "bold"),
+                anchor="w",
+            ).pack(fill="x", padx=8, pady=(0, 6))
+            interactive_children.append(stats_frame)
+            interactive_children.extend(stats_frame.winfo_children())
 
         actions = ctk.CTkFrame(crate, fg_color="#1d1d1d")
-        actions.pack(fill="x", padx=10, pady=(4, 10))
+        actions_pad = (2, 8) if compact else (4, 10)
+        actions.pack(fill="x", padx=10, pady=actions_pad)
         open_btn = ctk.CTkButton(
             actions,
             text="Open",
-            width=70,
+            width=60 if compact else 70,
             command=lambda it=item: self.host._edit_item(it),
             fg_color="#1F6AA5",
             hover_color="#125280",
         )
-        open_btn.pack(side="left", padx=(0, 6))
+        open_pack = dict(side="left", padx=(0, 4 if compact else 6))
+        delete_pack = dict(side="left", padx=(4 if compact else 6, 0))
+        if compact:
+            open_pack.update(expand=True, fill="x")
+            delete_pack.update(expand=True, fill="x")
+        open_btn.pack(**open_pack)
         delete_btn = ctk.CTkButton(
             actions,
             text="Delete",
-            width=70,
+            width=60 if compact else 70,
             command=lambda bid=base_id: self.host.delete_item(bid),
             fg_color="#8B1A1A",
             hover_color="#a83232",
         )
-        delete_btn.pack(side="left", padx=(6, 0))
+        delete_btn.pack(**delete_pack)
 
         crate.bind(
             "<Button-1>",
@@ -513,16 +604,20 @@ class ObjectShelfView:
         )
         crate.bind(
             "<Key-Up>",
-            lambda _e, st=state, bid=base_id: self._move_crate_focus(st, bid, -4),
+            lambda _e, st=state, bid=base_id: self._move_crate_focus(
+                st, bid, -1 * max(1, st.column_count or 4)
+            ),
         )
         crate.bind(
             "<Key-Down>",
-            lambda _e, st=state, bid=base_id: self._move_crate_focus(st, bid, 4),
+            lambda _e, st=state, bid=base_id: self._move_crate_focus(
+                st, bid, max(1, st.column_count or 4)
+            ),
         )
         crate.bind("<Enter>", lambda _e: crate.focus_set())
         crate.pack_propagate(False)
 
-        for child in (name_label, stats_frame):
+        for child in interactive_children:
             child.bind(
                 "<Button-1>",
                 lambda e, st=state, bid=base_id: self._handle_crate_primary(e, st, bid),
@@ -593,7 +688,7 @@ class ObjectShelfView:
         if base_id not in state.crate_order:
             state.crate_order.append(base_id)
         index = state.crate_order.index(base_id)
-        columns = 4
+        columns = max(1, state.column_count or 4)
         row_group = index // columns
         spec_row = row_group * 2 + 1
         frame.grid(row=spec_row, column=0, columnspan=columns, sticky="nsew", padx=8, pady=(0, 12))
