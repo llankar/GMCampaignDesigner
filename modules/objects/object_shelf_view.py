@@ -693,6 +693,10 @@ class ObjectShelfView:
         spec_row = row_group * 2 + 1
         frame.grid(row=spec_row, column=0, columnspan=columns, sticky="nsew", padx=8, pady=(0, 12))
         state.open_specs[base_id] = frame
+        try:
+            self.host.after_idle(lambda fr=frame: self._scroll_widget_into_view(fr))
+        except Exception:
+            self._scroll_widget_into_view(frame)
 
     def _build_spec_sheet_content(self, frame, item):
         frame.pack_propagate(False)
@@ -743,6 +747,42 @@ class ObjectShelfView:
             if frame and frame.winfo_exists():
                 frame.destroy()
         state.open_specs.clear()
+
+    def _scroll_widget_into_view(self, widget, padding: int = 20):
+        if not widget or not widget.winfo_exists():
+            return
+        canvas = getattr(self.container, "_parent_canvas", None)
+        inner = getattr(self.container, "_scrollable_frame", None)
+        if canvas is None or inner is None:
+            return
+        try:
+            widget.update_idletasks()
+            inner.update_idletasks()
+            canvas.update_idletasks()
+        except Exception:
+            return
+        try:
+            widget_top = widget.winfo_rooty() - inner.winfo_rooty()
+        except Exception:
+            return
+        view_top = canvas.canvasy(0)
+        view_height = canvas.winfo_height()
+        if view_height <= 0:
+            return
+        view_bottom = view_top + view_height
+        target_top = widget_top - padding
+        target_bottom = widget_top + widget.winfo_height() + padding
+        new_top = None
+        if target_top < view_top:
+            new_top = target_top
+        elif target_bottom > view_bottom:
+            new_top = target_bottom - view_height
+        if new_top is None:
+            return
+        inner_height = max(1, inner.winfo_height())
+        max_top = max(0, inner_height - view_height)
+        new_top = min(max_top, max(0, new_top))
+        canvas.yview_moveto(new_top / inner_height)
 
     def _set_crate_selected(self, base_id, selected=False, crate=None, highlight=False):
         target = crate
