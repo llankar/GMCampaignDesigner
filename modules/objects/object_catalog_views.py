@@ -1,5 +1,6 @@
 import os
-from typing import Callable, Iterable, Optional
+from typing import Callable, Iterable, Optional, Sequence
+
 
 import customtkinter as ctk
 from PIL import Image
@@ -8,11 +9,11 @@ from modules.helpers.config_helper import ConfigHelper
 from modules.helpers.logging_helper import log_module_import
 
 
-MERCHANT_HEADER_COLOR = "#3C2F2F"
-MERCHANT_HEADER_BORDER = "#9C6B3D"
-MERCHANT_BODY_COLOR = "#241B14"
-MERCHANT_TEXT_COLOR = "#F5E6C8"
-MERCHANT_SUBTEXT_COLOR = "#C9AA7D"
+MERCHANT_HEADER_COLOR = "#2B2B2B"
+MERCHANT_HEADER_BORDER = "#3C3C3C"
+MERCHANT_BODY_COLOR = "#1E1E1E"
+MERCHANT_TEXT_COLOR = "#FFFFFF"
+MERCHANT_SUBTEXT_COLOR = "#B4B4B4"
 MERCHANT_SECTION_GAP = 8
 
 OBJECT_VIEW_SECTION = "ObjectCatalogView"
@@ -72,6 +73,7 @@ class _CollapsibleSection(ctk.CTkFrame):
         self._body_frame: Optional[ctk.CTkFrame] = None
         self._indicator_label: Optional[ctk.CTkLabel] = None
         self._merchant_palette = merchant_palette
+        self._body_factory: Optional[Callable[[], Optional[ctk.CTkFrame]]] = None
 
         self.container = ctk.CTkFrame(
             self,
@@ -146,6 +148,8 @@ class _CollapsibleSection(ctk.CTkFrame):
 
     def show(self):
         if self._body_frame is None:
+            self._ensure_body()
+        if self._body_frame is None:
             return
         if not self._body_visible:
             self._body_frame.pack(fill="x", padx=4, pady=(0, MERCHANT_SECTION_GAP))
@@ -163,6 +167,20 @@ class _CollapsibleSection(ctk.CTkFrame):
     def assign_body(self, frame: ctk.CTkFrame):
         self._body_frame = frame
         frame.configure(corner_radius=0)
+        self._body_factory = None
+
+    def set_body_factory(self, factory: Callable[[], Optional[ctk.CTkFrame]]) -> None:
+        self._body_factory = factory
+
+    def _ensure_body(self) -> None:
+        if self._body_frame is not None or not callable(self._body_factory):
+            return
+        try:
+            frame = self._body_factory()
+        except Exception:
+            frame = None
+        if isinstance(frame, ctk.CTkFrame):
+            self.assign_body(frame)
 
 
 class MerchantCatalogEntry(_CollapsibleSection):
@@ -197,6 +215,27 @@ class MerchantCatalogEntry(_CollapsibleSection):
         self._stats_full = stats_full
         self._secrets = secrets
 
+        self.set_body_factory(self._build_body)
+
+    def _assign_portrait(self, label: ctk.CTkLabel) -> None:
+        if not self._resolve_media_path or not self._portrait_path:
+            return
+        resolved = self._resolve_media_path(self._portrait_path)
+        if not resolved:
+            return
+        try:
+            with Image.open(resolved) as img:
+                preview = img.copy()
+        except Exception:
+            return
+        if hasattr(Image, "Resampling"):
+            preview.thumbnail((180, 180), Image.Resampling.LANCZOS)
+        else:
+            preview.thumbnail((180, 180), Image.LANCZOS)
+        self._portrait_image = ctk.CTkImage(light_image=preview, dark_image=preview, size=preview.size)
+        label.configure(image=self._portrait_image)
+
+    def _build_body(self) -> Optional[ctk.CTkFrame]:
         body = ctk.CTkFrame(
             self,
             fg_color=MERCHANT_BODY_COLOR,
@@ -282,36 +321,16 @@ class MerchantCatalogEntry(_CollapsibleSection):
                 edit_container,
                 text="Open in Editor",
                 command=self._on_edit,
-                fg_color="#A47148",
-                hover_color="#C18E5A",
             )
             edit_button.grid(row=0, column=0, sticky="e")
         row += 1
 
-        if portrait_path:
+        if self._portrait_path:
             image_label = ctk.CTkLabel(body, text="", anchor="center")
-            image_label.grid(row=0, column=1, rowspan=row, sticky="ne", padx=(0, 18), pady=18)
+            image_label.grid(row=0, column=1, rowspan=max(row, 1), sticky="ne", padx=(0, 18), pady=18)
             self._assign_portrait(image_label)
 
-        self.assign_body(body)
-
-    def _assign_portrait(self, label: ctk.CTkLabel) -> None:
-        if not self._resolve_media_path:
-            return
-        resolved = self._resolve_media_path(self._portrait_path)
-        if not resolved:
-            return
-        try:
-            with Image.open(resolved) as img:
-                preview = img.copy()
-        except Exception:
-            return
-        if hasattr(Image, "Resampling"):
-            preview.thumbnail((180, 180), Image.Resampling.LANCZOS)
-        else:
-            preview.thumbnail((180, 180), Image.LANCZOS)
-        self._portrait_image = ctk.CTkImage(light_image=preview, dark_image=preview, size=preview.size)
-        label.configure(image=self._portrait_image)
+        return body
 
 
 class ObjectAccordionCatalog(ctk.CTkFrame):
@@ -329,6 +348,8 @@ class ObjectAccordionCatalog(ctk.CTkFrame):
         self._on_edit_item = on_edit_item
         self._items: Iterable[dict] = []
         self._sections: list[MerchantCatalogEntry] = []
+        self._populate_job: Optional[str] = None
+        self._loading_label: Optional[ctk.CTkLabel] = None
 
         self._scroll = ctk.CTkScrollableFrame(
             self,
@@ -346,10 +367,33 @@ class ObjectAccordionCatalog(ctk.CTkFrame):
         self._empty_label.pack_forget()
 
     @staticmethod
-    def _clean_text(value: Optional[str]) -> str:
+    def _normalize_text(value: Optional[object]) -> str:
         if value is None:
             return ""
+        if isinstance(value, str):
+            return value.strip()
+        if isinstance(value, dict):
+            lines: list[str] = []
+            for key, sub_value in value.items():
+                key_text = str(key).strip()
+                sub_text = ObjectAccordionCatalog._normalize_text(sub_value)
+                if sub_text:
+                    lines.append(f"{key_text}: {sub_text}")
+                else:
+                    lines.append(key_text)
+            return "\n".join(line for line in lines if line)
+        if isinstance(value, Sequence) and not isinstance(value, (bytes, bytearray, str)):
+            items = [ObjectAccordionCatalog._normalize_text(v) for v in value]
+            items = [item for item in items if item]
+            return "\n".join(
+                f"• {item}" if not item.startswith("• ") else item for item in items
+            )
         return str(value).strip()
+
+    @staticmethod
+    def _inline_text(value: Optional[object]) -> str:
+        text = ObjectAccordionCatalog._normalize_text(value)
+        return ", ".join(part for part in (segment.strip() for segment in text.splitlines()) if part)
 
     @staticmethod
     def _stats_preview(stats: str, limit: int = 160) -> str:
@@ -373,11 +417,19 @@ class ObjectAccordionCatalog(ctk.CTkFrame):
     ) -> None:
         """Populate the accordion with the provided object entries."""
 
+        if self._populate_job:
+            try:
+                self.after_cancel(self._populate_job)
+            except Exception:
+                pass
+            self._populate_job = None
+
         for widget in self._scroll.winfo_children():
             widget.destroy()
         self._sections.clear()
 
         item_list = list(items)
+        self._items = item_list
         if not item_list:
             empty = ctk.CTkLabel(
                 self._scroll,
@@ -387,47 +439,70 @@ class ObjectAccordionCatalog(ctk.CTkFrame):
             )
             empty.pack(padx=24, pady=24)
             self._empty_label = empty
+            self._loading_label = None
             return
 
         self._empty_label = None
+        self._loading_label = ctk.CTkLabel(
+            self._scroll,
+            text="Loading catalog...",
+            font=("Segoe UI", 14, "italic"),
+            text_color=MERCHANT_SUBTEXT_COLOR,
+        )
+        self._loading_label.pack(padx=24, pady=24)
 
-        for item in item_list:
-            name = self._clean_text(item.get(unique_field) or item.get("Name") or "") or "Unnamed Object"
-            stats_full = self._clean_text(item.get(stats_field))
-            description = self._clean_text(item.get(description_field))
-            secrets = self._clean_text(item.get(secrets_field))
-            category = self._clean_text(item.get(category_field))
-            portrait_path = item.get(portrait_field) if portrait_field else None
+        batch_size = 40
+        total = len(item_list)
 
-            preview = self._stats_preview(stats_full)
+        def build_batch(start_index: int) -> None:
+            if self._loading_label:
+                self._loading_label.destroy()
+                self._loading_label = None
+            end_index = min(start_index + batch_size, total)
+            for idx in range(start_index, end_index):
+                item = item_list[idx]
+                name = self._inline_text(item.get(unique_field) or item.get("Name")) or "Unnamed Object"
+                stats_full = self._normalize_text(item.get(stats_field))
+                description = self._normalize_text(item.get(description_field))
+                secrets = self._normalize_text(item.get(secrets_field))
+                category = self._inline_text(item.get(category_field))
+                portrait_path = item.get(portrait_field) if portrait_field else None
 
-            def _make_edit_callback(entry=item):
-                if not callable(self._on_edit_item):
-                    return None
+                preview = self._stats_preview(stats_full)
 
-                def _callback():
-                    try:
-                        self._on_edit_item(entry)
-                    except Exception:
-                        pass
+                def _make_edit_callback(entry=item):
+                    if not callable(self._on_edit_item):
+                        return None
 
-                return _callback
+                    def _callback():
+                        try:
+                            self._on_edit_item(entry)
+                        except Exception:
+                            pass
 
-            section = MerchantCatalogEntry(
-                self._scroll,
-                name=name,
-                stats_preview=preview,
-                category=category,
-                description=description,
-                stats_full=stats_full,
-                secrets=secrets,
-                portrait_path=portrait_path,
-                resolve_media_path=self._resolve_media_path,
-                on_edit=_make_edit_callback(),
-            )
-            section.pack(fill="x", padx=4, pady=0)
-            self._sections.append(section)
+                    return _callback
+
+                section = MerchantCatalogEntry(
+                    self._scroll,
+                    name=name,
+                    stats_preview=preview,
+                    category=category,
+                    description=description,
+                    stats_full=stats_full,
+                    secrets=secrets,
+                    portrait_path=portrait_path,
+                    resolve_media_path=self._resolve_media_path,
+                    on_edit=_make_edit_callback(),
+                )
+                section.pack(fill="x", padx=4, pady=0)
+                self._sections.append(section)
+
+            if end_index < total:
+                self._populate_job = self.after(1, lambda: build_batch(end_index))
+            else:
+                self._populate_job = None
+
+        build_batch(0)
 
 
 log_module_import(__name__)
-
