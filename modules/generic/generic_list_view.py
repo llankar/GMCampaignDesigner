@@ -239,38 +239,39 @@ class GenericListView(ctk.CTkFrame):
         self._load_list_order()
 
         # --- Search bar ---
-        search_frame = ctk.CTkFrame(self)
-        search_frame.pack(fill="x", padx=(5,45), pady=5)
-        ctk.CTkLabel(search_frame, text="Search:").pack(side="left", padx=5)
+        self._search_frame_pack_kwargs = {"fill": "x", "padx": (5, 45), "pady": 5}
+        self.search_frame = ctk.CTkFrame(self)
+        self.search_frame.pack(**self._search_frame_pack_kwargs)
+        ctk.CTkLabel(self.search_frame, text="Search:").pack(side="left", padx=5)
         self.search_var = tk.StringVar()
-        search_entry = ctk.CTkEntry(search_frame, textvariable=self.search_var)
+        search_entry = ctk.CTkEntry(self.search_frame, textvariable=self.search_var)
         search_entry.pack(side="left", fill="x", expand=True, padx=5)
         search_entry.bind("<Return>", lambda e: self.filter_items(self.search_var.get()))
-        ctk.CTkButton(search_frame, text="Filter",
+        ctk.CTkButton(self.search_frame, text="Filter",
             command=lambda: self.filter_items(self.search_var.get()))\
         .pack(side="left", padx=5)
-        ctk.CTkButton(search_frame, text="Add",
+        ctk.CTkButton(self.search_frame, text="Add",
             command=self.add_item)\
         .pack(side="left", padx=5)
-        ctk.CTkButton(search_frame, text="Merge Duplicates",
+        ctk.CTkButton(self.search_frame, text="Merge Duplicates",
             command=self.merge_duplicate_entities)\
         .pack(side="left", padx=5)
         if self.model_wrapper.entity_type == "objects":
             self.ai_categorize_button = ctk.CTkButton(
-                search_frame,
+                self.search_frame,
                 text="AI Categorize",
                 command=self.ai_categorize_objects,
             )
             self.ai_categorize_button.pack(side="left", padx=5)
         if self.model_wrapper.entity_type == "maps":
-            ctk.CTkButton(search_frame, text="Import Directory",
+            ctk.CTkButton(self.search_frame, text="Import Directory",
                           command=self.import_map_directory)\
                 .pack(side="left", padx=5)
         if self.model_wrapper.entity_type in ("npcs", "scenarios"):
-            ctk.CTkButton(search_frame, text="AI Wizard",
+            ctk.CTkButton(self.search_frame, text="AI Wizard",
                           command=self.open_ai_wizard)\
                 .pack(side="left", padx=5)
-        ctk.CTkButton(search_frame, text="Group By",
+        ctk.CTkButton(self.search_frame, text="Group By",
             command=self.choose_group_column)\
         .pack(side="left", padx=5)
 
@@ -413,6 +414,17 @@ class GenericListView(ctk.CTkFrame):
         self.refresh_list()
         self._update_view_toggle_state()
 
+    def _hide_search_frame(self):
+        if getattr(self, "search_frame", None) and self.search_frame.winfo_manager():
+            self.search_frame.pack_forget()
+
+    def _show_search_frame(self):
+        if getattr(self, "search_frame", None) and not self.search_frame.winfo_manager():
+            kwargs = dict(self._search_frame_pack_kwargs)
+            if hasattr(self, "tree_frame"):
+                kwargs["before"] = self.tree_frame
+            self.search_frame.pack(**kwargs)
+
     def reload_from_db(self):
         """Reload items from the model wrapper and refresh the view."""
         log_info(
@@ -506,6 +518,7 @@ class GenericListView(ctk.CTkFrame):
         if self.view_mode == "grid" and self.grid_frame.winfo_manager():
             return
         self.view_mode = "grid"
+        self._show_search_frame()
         self.tree_frame.pack_forget()
         self.grid_frame.pack(
             fill="both", expand=True, padx=5, pady=5, before=self.footer_frame
@@ -521,6 +534,7 @@ class GenericListView(ctk.CTkFrame):
         if self.view_mode == "list" and self.tree_frame.winfo_manager():
             return
         self.view_mode = "list"
+        self._show_search_frame()
         self.grid_frame.pack_forget()
         self.tree_frame.pack(
             fill="both", expand=True, padx=5, pady=5, before=self.footer_frame
@@ -536,6 +550,7 @@ class GenericListView(ctk.CTkFrame):
         if self.view_mode == "shelf" and self.shelf_view.is_visible():
             return
         self.view_mode = "shelf"
+        self._hide_search_frame()
         self.tree_frame.pack_forget()
         self.grid_frame.pack_forget()
         self.shelf_view.show(before_widget=self.footer_frame)
