@@ -1478,13 +1478,14 @@ class GenericListView(ctk.CTkFrame):
             return None
 
         if isinstance(data, dict):
-            assignments_raw = (
-                data.get("assignments")
-                or data.get("Assignments")
-                or data.get("items")
-                or data.get("Items")
-            )
-            allowed_from_ai = data.get("allowed_categories") or data.get("AllowedCategories")
+            for key in ("assignments", "Assignments", "items", "Items"):
+                if key in data:
+                    assignments_raw = data[key]
+                    break
+            for key in ("allowed_categories", "AllowedCategories"):
+                if key in data:
+                    allowed_from_ai = data[key]
+                    break
         elif isinstance(data, list):
             # Some local models skip the envelope and return the assignments list directly.
             assignments_raw = data
