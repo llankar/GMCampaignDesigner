@@ -422,7 +422,12 @@ class GenericListView(ctk.CTkFrame):
         if getattr(self, "search_frame", None) and not self.search_frame.winfo_manager():
             kwargs = dict(self._search_frame_pack_kwargs)
             if hasattr(self, "tree_frame"):
-                kwargs["before"] = self.tree_frame
+                try:
+                    manager = self.tree_frame.winfo_manager()
+                except Exception:
+                    manager = ""
+                if manager:
+                    kwargs["before"] = self.tree_frame
             self.search_frame.pack(**kwargs)
 
     def reload_from_db(self):

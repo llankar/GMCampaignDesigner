@@ -706,7 +706,7 @@ class ObjectShelfView:
             font=("Segoe UI", 12, "bold"),
             anchor="w",
         )
-        header.pack(fill="x", padx=12, pady=(12, 4))
+        header.pack(fill="x", padx=8, pady=(8, 4))
         fields = ["Description", "Stats", "Secrets"]
         seen = set()
         for key in fields:
@@ -722,25 +722,30 @@ class ObjectShelfView:
             self._add_spec_field(frame, key, value)
 
     def _add_spec_field(self, parent, label, value):
-        wrapper = ctk.CTkFrame(parent, fg_color="#141414", corner_radius=8)
-        wrapper.pack(fill="x", padx=10, pady=(4, 10))
+        wrapper = ctk.CTkFrame(parent, fg_color="#141414", corner_radius=6)
+        wrapper.pack(fill="x", padx=6, pady=(2, 6))
         title = ctk.CTkLabel(
             wrapper,
             text=str(label).upper(),
             font=("Segoe UI", 14, "bold"),
             anchor="w",
         )
-        title.pack(fill="x", padx=10, pady=(6, 2))
+        title.pack(fill="x", padx=8, pady=(4, 2))
         text = self.host.clean_value(value)
         body = ctk.CTkLabel(
             wrapper,
             text=text,
             font=("Segoe UI", 13),
             justify="left",
-            wraplength=720,
             anchor="w",
         )
-        body.pack(fill="x", padx=10, pady=(0, 8))
+        body.pack(fill="x", padx=8, pady=(0, 6))
+
+        def _update_wrap(event, lbl=body):
+            available = max(10, event.width - 16)
+            lbl.configure(wraplength=available)
+
+        wrapper.bind("<Configure>", _update_wrap)
 
     def _dispose_specs(self, state: ShelfSectionState):
         for base_id, frame in list(state.open_specs.items()):
@@ -813,19 +818,42 @@ class ObjectShelfView:
         canvas = getattr(self.container, "_parent_canvas", None)
         if canvas is None:
             return
+        inner = getattr(self.container, "_scrollable_frame", None)
+        inner_root_top = None
+        if inner and inner.winfo_exists():
+            inner_root_top = inner.winfo_rooty()
         visible_top = canvas.canvasy(0)
         visible_bottom = visible_top + canvas.winfo_height()
         threshold = 200
         for state in self.sections:
-            if not state.header_frame or not state.header_frame.winfo_ismapped():
+            container = state.container
+            if (
+                not container
+                or not container.winfo_exists()
+                or not container.winfo_ismapped()
+            ):
                 continue
-            top = state.header_frame.winfo_y()
-            bottom = top + state.header_frame.winfo_height()
+            if inner_root_top is not None:
+                container_root_top = container.winfo_rooty()
+                top = container_root_top - inner_root_top
+            else:
+                top = container.winfo_y()
+            bottom = top + container.winfo_height()
+            body = state.body_holder
+            if body and body.winfo_exists() and body.winfo_ismapped():
+                body_offset = body.winfo_y()
+                if inner_root_top is not None:
+                    body_top = container_root_top + body_offset - inner_root_top
+                else:
+                    body_top = top + body_offset
+                body_bottom = body_top + body.winfo_height()
+                top = min(top, body_top)
+                bottom = max(bottom, body_bottom)
             if bottom >= visible_top - threshold and top <= visible_bottom + threshold:
                 self._ensure_section_loaded(state)
                 self._maybe_load_more_crates(state)
             else:
-                if not state.pinned:
+                if state.open_specs and not state.pinned:
                     self._dispose_specs(state)
         self._update_return_button()
 
