@@ -1517,7 +1517,13 @@ class GenericListView(ctk.CTkFrame):
                     f"AI categorization failed: {exc}",
                     func_name="GenericListView.ai_categorize_objects",
                 )
-                self.after(0, lambda: messagebox.showerror("AI Categorize", f"Failed to categorize objects: {exc}"))
+                error_message = str(exc)
+                self.after(
+                    0,
+                    lambda msg=error_message: messagebox.showerror(
+                        "AI Categorize", f"Failed to categorize objects: {msg}"
+                    ),
+                )
                 return
 
             def apply_results():
