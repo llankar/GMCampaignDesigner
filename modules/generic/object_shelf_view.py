@@ -111,7 +111,10 @@ class ObjectShelfView:
         self.refresh_selection()
         self.update_summary()
         self._on_canvas_change()
-        self._check_visible_shelves()
+        try:
+            self.host.after_idle(self._check_visible_shelves)
+        except Exception:
+            self._check_visible_shelves()
 
     def refresh_selection(self):
         if not self.is_available():
@@ -194,6 +197,7 @@ class ObjectShelfView:
             state = self.sections_by_norm.get(norm)
             if state:
                 state.pinned = True
+                state.collapsed = False
                 self._update_section_controls(state)
                 self._ensure_section_loaded(state)
 
@@ -311,11 +315,13 @@ class ObjectShelfView:
         state.body_holder = body_holder
         state.grid_frame = grid_frame
         state.initialized = False
-        state.collapsed = False
+        state.collapsed = True
         state.loaded_count = 0
         state.crate_widgets = {}
         state.crate_order = []
         state.open_specs = {}
+        if state.body_holder:
+            state.body_holder.pack_forget()
         self._update_section_controls(state)
 
     def _update_section_controls(self, state: ShelfSectionState):
@@ -335,7 +341,7 @@ class ObjectShelfView:
     def _update_collapse_button(self, state: ShelfSectionState):
         if not state.collapse_button:
             return
-        label = "Expand" if state.collapsed else "Collapse"
+        label = "Show Items" if state.collapsed else "Hide Items"
         state.collapse_button.configure(text=label)
         if state.body_holder:
             if state.collapsed:
