@@ -1423,17 +1423,25 @@ class GenericListView(ctk.CTkFrame):
             data = LocalAIClient._parse_json_safe(raw)
         except Exception as exc:
             raise RuntimeError(f"AI returned invalid JSON: {exc}. Raw: {raw[:500]}")
-        if not isinstance(data, dict):
+
+        assignments_raw = None
+        allowed_from_ai = None
+
+        if isinstance(data, dict):
+            assignments_raw = (
+                data.get("assignments")
+                or data.get("Assignments")
+                or data.get("items")
+                or data.get("Items")
+            )
+            allowed_from_ai = data.get("allowed_categories") or data.get("AllowedCategories")
+        elif isinstance(data, list):
+            # Some local models skip the envelope and return the assignments list directly.
+            assignments_raw = data
+        else:
             raise RuntimeError("AI response was not a JSON object.")
-        assignments_raw = (
-            data.get("assignments")
-            or data.get("Assignments")
-            or data.get("items")
-            or data.get("Items")
-        )
         if not isinstance(assignments_raw, list):
             raise RuntimeError("AI response missing 'assignments' list.")
-        allowed_from_ai = data.get("allowed_categories") or data.get("AllowedCategories")
         allowed_lookup = {c.casefold(): c for c in OBJECT_CATEGORY_ALLOWED}
         allowed_lookup.setdefault("miscellaneous", "Miscellaneous")
         used_categories = []
