@@ -305,8 +305,12 @@ class GenericListView(ctk.CTkFrame):
                         background="#2B2B2B",
                         foreground="white",
                         font=("Segoe UI", 10, "bold"))
-        style.map("Custom.Treeview",
-                background=[("selected", "#2B2B2B")])
+        style.map(
+            "Custom.Treeview",
+            background=[("selected", "#2B2B2B")],
+            focuscolor=[("selected", "white"), ("!selected", "")],
+            focusthickness=[("selected", 1), ("!selected", 0)],
+        )
 
         self.tree = ttk.Treeview(
             self.tree_frame,
@@ -968,9 +972,16 @@ class GenericListView(ctk.CTkFrame):
 
     def on_double_click(self, event):
         # Use the row under the mouse to avoid stale focus
-        iid = self.tree.identify_row(event.y) or self.tree.focus()
+        iid = self.tree.identify_row(event.y)
+        if not iid:
+            # Fallback to the active selection or current focus
+            selection = self.tree.selection()
+            iid = selection[0] if selection else self.tree.focus()
         if not iid:
             return
+        # Ensure the identified row becomes the active selection for consistent focus behaviour
+        self.tree.selection_set(iid)
+        self.tree.focus(iid)
         item, _ = self._find_item_by_iid(iid)
         if item:
             self._edit_item(item)
@@ -1821,11 +1832,16 @@ class GenericListView(ctk.CTkFrame):
         if self._suppress_tree_select_event:
             return
         selected = set()
-        for iid in self.tree.selection():
+        current_selection = self.tree.selection()
+        for iid in current_selection:
             _, base_id = self._find_item_by_iid(iid)
             if base_id:
                 selected.add(base_id)
         self.selected_iids = selected
+        if current_selection:
+            focus_iid = self.tree.focus()
+            if focus_iid not in current_selection:
+                self.tree.focus(current_selection[0])
         self._update_bulk_controls()
         self._refresh_grid_selection()
 
