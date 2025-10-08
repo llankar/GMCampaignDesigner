@@ -514,7 +514,7 @@ class ObjectShelfView:
         crate.configure(cursor="hand2")
         name = self.host.clean_value(item.get(self.host.unique_field, "Unnamed")) or "Unnamed"
         compact = state.compact
-        name_font = ("Segoe UI", 11, "bold") if compact else ("Segoe UI", 12, "bold")
+        name_font = ("Segoe UI", 14, "bold") if compact else ("Segoe UI", 14, "bold")
         name_label = ctk.CTkLabel(
             crate,
             text=name.upper(),
@@ -558,33 +558,6 @@ class ObjectShelfView:
             ).pack(fill="x", padx=8, pady=(0, 6))
             interactive_children.append(stats_frame)
             interactive_children.extend(stats_frame.winfo_children())
-
-        actions = ctk.CTkFrame(crate, fg_color="#1d1d1d")
-        actions_pad = (2, 8) if compact else (4, 10)
-        actions.pack(fill="x", padx=10, pady=actions_pad)
-        open_btn = ctk.CTkButton(
-            actions,
-            text="Open",
-            width=60 if compact else 70,
-            command=lambda it=item: self.host._edit_item(it),
-            fg_color="#1F6AA5",
-            hover_color="#125280",
-        )
-        open_pack = dict(side="left", padx=(0, 4 if compact else 6))
-        delete_pack = dict(side="left", padx=(4 if compact else 6, 0))
-        if compact:
-            open_pack.update(expand=True, fill="x")
-            delete_pack.update(expand=True, fill="x")
-        open_btn.pack(**open_pack)
-        delete_btn = ctk.CTkButton(
-            actions,
-            text="Delete",
-            width=60 if compact else 70,
-            command=lambda bid=base_id: self.host.delete_item(bid),
-            fg_color="#8B1A1A",
-            hover_color="#a83232",
-        )
-        delete_btn.pack(**delete_pack)
 
         crate.bind(
             "<Button-1>",
@@ -706,7 +679,7 @@ class ObjectShelfView:
             font=("Segoe UI", 12, "bold"),
             anchor="w",
         )
-        header.pack(fill="x", padx=8, pady=(8, 4))
+        header.pack(fill="x", padx=12, pady=(12, 4))
         fields = ["Description", "Stats", "Secrets"]
         seen = set()
         for key in fields:
@@ -722,30 +695,25 @@ class ObjectShelfView:
             self._add_spec_field(frame, key, value)
 
     def _add_spec_field(self, parent, label, value):
-        wrapper = ctk.CTkFrame(parent, fg_color="#141414", corner_radius=6)
-        wrapper.pack(fill="x", padx=6, pady=(2, 6))
+        wrapper = ctk.CTkFrame(parent, fg_color="#141414", corner_radius=8)
+        wrapper.pack(fill="x", padx=10, pady=(4, 10))
         title = ctk.CTkLabel(
             wrapper,
             text=str(label).upper(),
             font=("Segoe UI", 14, "bold"),
             anchor="w",
         )
-        title.pack(fill="x", padx=8, pady=(4, 2))
+        title.pack(fill="x", padx=10, pady=(6, 2))
         text = self.host.clean_value(value)
         body = ctk.CTkLabel(
             wrapper,
             text=text,
             font=("Segoe UI", 13),
             justify="left",
+            wraplength=720,
             anchor="w",
         )
-        body.pack(fill="x", padx=8, pady=(0, 6))
-
-        def _update_wrap(event, lbl=body):
-            available = max(10, event.width - 16)
-            lbl.configure(wraplength=available)
-
-        wrapper.bind("<Configure>", _update_wrap)
+        body.pack(fill="x", padx=10, pady=(0, 8))
 
     def _dispose_specs(self, state: ShelfSectionState):
         for base_id, frame in list(state.open_specs.items()):
