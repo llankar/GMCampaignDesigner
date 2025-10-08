@@ -514,7 +514,7 @@ class ObjectShelfView:
         crate.configure(cursor="hand2")
         name = self.host.clean_value(item.get(self.host.unique_field, "Unnamed")) or "Unnamed"
         compact = state.compact
-        name_font = ("Segoe UI", 14, "bold") if compact else ("Segoe UI", 14, "bold")
+        name_font = ("Segoe UI", 12, "bold") if compact else ("Segoe UI", 14, "bold")
         name_label = ctk.CTkLabel(
             crate,
             text=name.upper(),
@@ -539,7 +539,7 @@ class ObjectShelfView:
             desc_label = ctk.CTkLabel(
                 crate,
                 text=f"Desc: {Description}",
-                font=("Segoe UI", 14, "bold"),
+                font=("Segoe UI", 12, "bold"),
                 anchor="w",
                 justify="left",
             )
@@ -547,7 +547,7 @@ class ObjectShelfView:
             size_label = ctk.CTkLabel(
                 crate,
                 text=f"{size_label_name}: {Size}",
-                font=("Segoe UI", 14, "bold"),
+                font=("Segoe UI", 12, "bold"),
                 anchor="w",
                 justify="left",
             )
@@ -566,7 +566,7 @@ class ObjectShelfView:
             desc_label = ctk.CTkLabel(
                 stats_frame,
                 text=f"Desc: {Description}",
-                font=("Segoe UI", 14, "bold"),
+                font=("Segoe UI", 12, "bold"),
                 anchor="w",
                 justify="left",
             )
@@ -574,7 +574,7 @@ class ObjectShelfView:
             size_label = ctk.CTkLabel(
                 stats_frame,
                 text=f"{size_label_name}: {Size}",
-                font=("Segoe UI", 14, "bold"),
+                font=("Segoe UI", 12, "bold"),
                 anchor="w",
                 justify="left",
             )
@@ -729,16 +729,28 @@ class ObjectShelfView:
             self._add_spec_field(frame, key, value)
 
     def _add_spec_field(self, parent, label, value):
+        label_text = str(label)
+        is_stats = label_text.lower() == "stats"
         wrapper = ctk.CTkFrame(parent, fg_color="#141414", corner_radius=8)
-        wrapper.pack(fill="x", padx=10, pady=(4, 10))
+        if is_stats:
+            wrapper.pack(fill="x", padx=8, pady=(2, 6))
+        else:
+            wrapper.pack(fill="x", padx=10, pady=(4, 10))
         title = ctk.CTkLabel(
             wrapper,
-            text=str(label).upper(),
-            font=("Segoe UI", 14, "bold"),
+            text=label_text.upper(),
+            font=("Segoe UI", 12, "bold"),
             anchor="w",
         )
-        title.pack(fill="x", padx=10, pady=(6, 2))
+        if is_stats:
+            title.pack(fill="x", padx=8, pady=(4, 1))
+        else:
+            title.pack(fill="x", padx=10, pady=(6, 2))
         text = self.host.clean_value(value)
+        if is_stats and isinstance(text, str):
+            normalized = text.replace("\r", "\n").split("\n")
+            lines = [segment.strip() for segment in normalized if segment.strip()]
+            text = " ".join(lines) if lines else text
         body = ctk.CTkLabel(
             wrapper,
             text=text,
@@ -747,7 +759,10 @@ class ObjectShelfView:
             wraplength=1400,
             anchor="w",
         )
-        body.pack(fill="x", padx=10, pady=(0, 8))
+        if is_stats:
+            body.pack(fill="x", padx=8, pady=(0, 6))
+        else:
+            body.pack(fill="x", padx=10, pady=(0, 8))
 
     def _dispose_specs(self, state: ShelfSectionState):
         for base_id, frame in list(state.open_specs.items()):
