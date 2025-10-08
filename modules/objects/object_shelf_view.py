@@ -28,6 +28,9 @@ class ShelfSectionState:
     crate_widgets: Dict[str, ctk.CTkFrame] = field(default_factory=dict)
     crate_order: List[str] = field(default_factory=list)
     open_specs: Dict[str, ctk.CTkFrame] = field(default_factory=dict)
+    collapsed_strip: Optional[ctk.CTkFrame] = None
+    collapsed_title: Optional[ctk.CTkLabel] = None
+    collapsed_detail: Optional[ctk.CTkLabel] = None
     shelf_rows: Dict[int, ctk.CTkFrame] = field(default_factory=dict)
     compact: bool = False
     column_count: int = 0
@@ -253,52 +256,6 @@ class ObjectShelfView:
             border_color="#2d2d2d",
         )
         container.pack(fill="x", expand=True, pady=(0, 16))
-        header = ctk.CTkFrame(
-            container,
-            fg_color=self._header_colors,
-            corner_radius=14,
-            border_width=0,
-        )
-        header.pack(fill="x")
-        header.configure(cursor="hand2")
-        header.bind("<Button-1>", lambda _e, st=state: self._toggle_section_collapse(st))
-
-        title_frame = ctk.CTkFrame(header, fg_color="transparent")
-        title_frame.pack(side="left", padx=12, pady=6)
-        title = ctk.CTkLabel(
-            title_frame,
-            text=state.category.upper(),
-            font=("Segoe UI", 14, "bold"),
-            anchor="w",
-        )
-        title.pack(side="left")
-        count_label = ctk.CTkLabel(
-            title_frame,
-            text="0",
-            font=("Segoe UI", 12, "bold"),
-        )
-        count_label.pack(side="left", padx=8)
-        pin_button = ctk.CTkButton(
-            header,
-            text="Pin",
-            corner_radius=18,
-            width=80,
-            command=lambda st=state: self._toggle_section_pin(st),
-            fg_color="#2d2d2d",
-            hover_color="#1F6AA5",
-        )
-        pin_button.pack(side="left", padx=6, pady=4)
-        collapse_button = ctk.CTkButton(
-            header,
-            text="Collapse",
-            corner_radius=18,
-            width=100,
-            command=lambda st=state: self._toggle_section_collapse(st),
-            fg_color="#2d2d2d",
-            hover_color="#1F6AA5",
-        )
-        collapse_button.pack(side="left", padx=(0, 10), pady=4)
-
         body_holder = ctk.CTkFrame(
             container,
             fg_color="#141414",
@@ -307,6 +264,7 @@ class ObjectShelfView:
             border_color="#262626",
         )
         body_holder.pack(fill="both", expand=True, padx=6, pady=(0, 6))
+        collapsed_strip = self._build_collapsed_strip(state, container, before_widget=body_holder)
         grid_frame = ctk.CTkFrame(body_holder, fg_color="#141414")
         grid_frame.pack(fill="both", expand=True, padx=12, pady=12)
         state.grid_frame = grid_frame
@@ -320,11 +278,9 @@ class ObjectShelfView:
         )
 
         state.container = container
-        state.header_frame = header
-        state.count_label = count_label
-        state.pin_button = pin_button
-        state.collapse_button = collapse_button
         state.body_holder = body_holder
+        state.collapsed_strip = collapsed_strip
+        state.header_frame = collapsed_strip
         state.grid_frame = grid_frame
         state.initialized = False
         state.collapsed = True
@@ -338,8 +294,6 @@ class ObjectShelfView:
         self._update_section_controls(state)
 
     def _update_section_controls(self, state: ShelfSectionState):
-        if state.count_label:
-            state.count_label.configure(text=str(len(state.items)))
         self._update_pin_button(state)
         self._update_collapse_button(state)
 
@@ -414,22 +368,35 @@ class ObjectShelfView:
         if not state.pin_button:
             return
         if state.pinned:
-            state.pin_button.configure(text="Pinned", fg_color="#1F6AA5")
+            state.pin_button.configure(
+                text="★",
+                fg_color="#b68e54",
+                hover_color="#d6a863",
+                text_color="#1a1109",
+            )
         else:
-            state.pin_button.configure(text="Pin", fg_color="#2d2d2d")
+            state.pin_button.configure(
+                text="☆",
+                fg_color="#3b2515",
+                hover_color="#6a4a2d",
+                text_color="#f7f0e4",
+            )
 
     def _update_collapse_button(self, state: ShelfSectionState):
         if not state.collapse_button:
             return
-        label = "Show Items" if state.collapsed else "Hide Items"
-        state.collapse_button.configure(text=label)
-        if state.body_holder:
-            if state.collapsed:
-                state.body_holder.pack_forget()
-            else:
-                state.body_holder.pack(fill="both", expand=True, padx=6, pady=(0, 6))
+        symbol = ">" if state.collapsed else "v"
+        state.collapse_button.configure(text=symbol)
+        body = state.body_holder
+        if state.collapsed:
+            if body and body.winfo_exists():
+                body.pack_forget()
+        else:
+            if body and body.winfo_exists():
+                body.pack(fill="both", expand=True, padx=6, pady=(0, 6))
                 if state.initialized:
                     self._ensure_section_loaded(state)
+        self._update_collapsed_strip_text(state)
 
     def _toggle_section_collapse(self, state: ShelfSectionState):
         if state.pinned and not state.collapsed:
@@ -569,6 +536,150 @@ class ObjectShelfView:
             rivet.place(relx=relx, rely=0.12, anchor="n")
         state.shelf_rows[row_group] = strip
         return strip
+
+    def _build_collapsed_strip(
+        self,
+        state: ShelfSectionState,
+        container: ctk.CTkFrame,
+        before_widget: Optional[ctk.CTkFrame] = None,
+    ):
+        strip = ctk.CTkFrame(
+            container,
+            fg_color="#1a1a1a",
+            corner_radius=0,
+            border_width=0,
+        )
+        strip.configure(height=54, cursor="hand2")
+        strip.pack_propagate(False)
+        strip.bind("<Button-1>", lambda _e, st=state: self._toggle_section_collapse(st))
+        strip.bind("<Return>", lambda _e, st=state: self._toggle_section_collapse(st))
+        strip.bind("<space>", lambda _e, st=state: self._toggle_section_collapse(st))
+
+        def _focus_strip(_event, frame=strip):
+            try:
+                frame.focus_set()
+            except Exception:
+                pass
+
+        strip.bind("<Enter>", _focus_strip)
+        strip.bind("<FocusIn>", _focus_strip)
+
+        plank = ctk.CTkFrame(
+            strip,
+            fg_color="#3c291a",
+            corner_radius=12,
+            border_width=1,
+            border_color="#25170e",
+        )
+        plank.pack(fill="both", expand=True, padx=6, pady=6)
+        plank.pack_propagate(False)
+
+        surface = ctk.CTkFrame(
+            plank,
+            fg_color="#52341e",
+            corner_radius=10,
+            border_width=0,
+        )
+        surface.pack(fill="both", expand=True, padx=3, pady=3)
+        surface.pack_propagate(False)
+        surface.grid_columnconfigure(1, weight=1)
+        surface.grid_columnconfigure(2, weight=1)
+
+        bottom_band = ctk.CTkFrame(surface, fg_color="#1a120c", height=6, corner_radius=3)
+        bottom_band.place(relx=0.5, rely=0.92, anchor="s", relwidth=0.88)
+
+        left_post = ctk.CTkFrame(surface, fg_color="#3b2515", corner_radius=5, width=18)
+        left_post.grid(row=0, column=0, rowspan=2, sticky="ns", padx=(14, 8), pady=8)
+
+        title = ctk.CTkLabel(
+            surface,
+            text="",
+            font=("Segoe UI", 13, "bold"),
+            anchor="w",
+            justify="left",
+            text_color="#f7f0e4",
+        )
+        title.grid(row=0, column=1, sticky="w", pady=(6, 0))
+
+        detail = ctk.CTkLabel(
+            surface,
+            text="",
+            font=("Segoe UI", 11),
+            anchor="w",
+            justify="left",
+            text_color="#e5d4bb",
+        )
+        detail.grid(row=1, column=1, sticky="w", pady=(0, 6))
+
+        pin_button = ctk.CTkButton(
+            surface,
+            text="☆",
+            width=28,
+            height=28,
+            corner_radius=14,
+            fg_color="#3b2515",
+            hover_color="#6a4a2d",
+            text_color="#f7f0e4",
+            font=("Segoe UI", 16),
+            command=lambda st=state: self._toggle_section_pin(st),
+        )
+        pin_button.grid(row=0, column=3, rowspan=2, padx=(10, 6), pady=8)
+
+        collapse_button = ctk.CTkButton(
+            surface,
+            text=">",
+            width=34,
+            height=28,
+            corner_radius=14,
+            fg_color="#2d2d2d",
+            hover_color="#1F6AA5",
+            command=lambda st=state: self._toggle_section_collapse(st),
+        )
+        collapse_button.grid(row=0, column=4, rowspan=2, padx=(0, 10), pady=8)
+
+        right_post = ctk.CTkFrame(surface, fg_color="#3b2515", corner_radius=5, width=18)
+        right_post.grid(row=0, column=5, rowspan=2, sticky="ns", padx=(0, 12), pady=8)
+
+        interactive = [strip, plank, surface, left_post, title, detail, right_post, bottom_band]
+        for widget in interactive:
+            widget.bind(
+                "<Button-1>",
+                lambda _e, st=state: self._toggle_section_collapse(st),
+                add="+",
+            )
+
+        pack_kwargs = {"fill": "x", "padx": 6, "pady": (6, 0)}
+        if before_widget and before_widget.winfo_exists() and before_widget.winfo_manager():
+            strip.pack(before=before_widget, **pack_kwargs)
+        else:
+            strip.pack(**pack_kwargs)
+
+        state.collapsed_strip = strip
+        state.collapsed_title = title
+        state.collapsed_detail = detail
+        state.pin_button = pin_button
+        state.collapse_button = collapse_button
+        state.count_label = detail
+        state.header_frame = strip
+        self._update_collapsed_strip_text(state)
+        return strip
+
+    def _update_collapsed_strip_text(self, state: ShelfSectionState):
+        if not state.collapsed_title or not state.collapsed_detail:
+            return
+        count = len(state.items)
+        noun = "item" if count == 1 else "items"
+        status_bits: List[str] = []
+        if state.pinned:
+            status_bits.append("Pinned")
+        status_bits.append("Closed" if state.collapsed else "Open")
+        status_text = " | ".join(status_bits)
+        state.collapsed_title.configure(text=f"{state.category.upper()} SHELF  ({status_text})")
+        if state.collapsed:
+            detail_text = f"{count} {noun} stored - click to reopen"
+        else:
+            detail_text = f"{count} {noun} displayed - click to collapse"
+        state.collapsed_detail.configure(text=detail_text)
 
     def _maybe_load_more_crates(self, state: ShelfSectionState, force=False):
         if state.collapsed or state.loaded_count >= len(state.items):
