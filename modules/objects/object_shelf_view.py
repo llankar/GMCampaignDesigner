@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Dict, List, Optional, Sequence
+from typing import Dict, List, Optional, Sequence, Set
 
 import customtkinter as ctk
 
@@ -28,6 +28,7 @@ class ShelfSectionState:
     crate_widgets: Dict[str, ctk.CTkFrame] = field(default_factory=dict)
     crate_order: List[str] = field(default_factory=list)
     open_specs: Dict[str, ctk.CTkFrame] = field(default_factory=dict)
+    shelf_rows: Dict[int, ctk.CTkFrame] = field(default_factory=dict)
     compact: bool = False
     column_count: int = 0
     configured_columns: int = 0
@@ -331,6 +332,7 @@ class ObjectShelfView:
         state.crate_widgets = {}
         state.crate_order = []
         state.open_specs = {}
+        state.shelf_rows = {}
         if state.body_holder:
             state.body_holder.pack_forget()
         self._update_section_controls(state)
@@ -378,13 +380,16 @@ class ObjectShelfView:
 
     def _reposition_section_widgets(self, state: ShelfSectionState):
         columns = max(1, state.column_count or 1)
+        active_rows: Set[int] = set()
         for index, base_id in enumerate(state.crate_order):
             crate = state.crate_widgets.get(base_id)
             if crate and crate.winfo_exists():
                 row_group = index // columns
                 row = row_group * 2
+                self._ensure_shelf_row(state, row_group, columns, row)
                 col = index % columns
-                crate.grid_configure(row=row, column=col, padx=8, pady=8, sticky="nsew")
+                crate.grid_configure(row=row, column=col, padx=8, pady=(10, 6), sticky="nsew")
+                active_rows.add(row_group)
         for base_id, spec in list(state.open_specs.items()):
             if spec and spec.winfo_exists() and base_id in state.crate_order:
                 index = state.crate_order.index(base_id)
@@ -398,6 +403,12 @@ class ObjectShelfView:
                     pady=(0, 12),
                     sticky="nsew",
                 )
+                active_rows.add(row_group)
+        for row_group, strip in list(state.shelf_rows.items()):
+            if row_group not in active_rows:
+                if strip and strip.winfo_exists():
+                    strip.destroy()
+                state.shelf_rows.pop(row_group, None)
 
     def _update_pin_button(self, state: ShelfSectionState):
         if not state.pin_button:
@@ -441,6 +452,10 @@ class ObjectShelfView:
         for crate in state.crate_widgets.values():
             if crate and crate.winfo_exists():
                 crate.grid_remove()
+        for strip in state.shelf_rows.values():
+            if strip and strip.winfo_exists():
+                strip.destroy()
+        state.shelf_rows.clear()
         state.loaded_count = 0
 
     def _toggle_section_pin(self, state: ShelfSectionState):
@@ -483,10 +498,77 @@ class ObjectShelfView:
             row_group = index // columns
             row = row_group * 2
             col = index % columns
-            crate.grid(row=row, column=col, padx=8, pady=8, sticky="nsew")
+            self._ensure_shelf_row(state, row_group, columns, row)
+            crate.grid(row=row, column=col, padx=8, pady=(10, 6), sticky="nsew")
         state.loaded_count = end
         if state.loaded_count < len(state.items):
             state.grid_frame.after(150, lambda st=state: self._maybe_load_more_crates(st))
+
+    def _ensure_shelf_row(
+        self,
+        state: ShelfSectionState,
+        row_group: int,
+        columns: int,
+        row: int,
+    ) -> ctk.CTkFrame:
+        grid = state.grid_frame
+        if not grid:
+            return None
+        strip = state.shelf_rows.get(row_group)
+        strip_pad = (8, 10) if row_group == 0 else (6, 10)
+        if strip and strip.winfo_exists():
+            strip.grid_configure(
+                row=row,
+                column=0,
+                columnspan=columns,
+                padx=6,
+                pady=strip_pad,
+                sticky="nsew",
+            )
+            strip.lower()
+            return strip
+        grid.grid_rowconfigure(row, weight=1, minsize=140)
+        strip = ctk.CTkFrame(
+            grid,
+            fg_color="#120d08",
+            corner_radius=16,
+            border_width=0,
+        )
+        strip.grid(
+            row=row,
+            column=0,
+            columnspan=columns,
+            padx=6,
+            pady=strip_pad,
+            sticky="nsew",
+        )
+        strip.grid_propagate(False)
+        strip.lower()
+        plank = ctk.CTkFrame(
+            strip,
+            fg_color="#1d140d",
+            corner_radius=14,
+            border_width=1,
+            border_color="#2c1f14",
+        )
+        plank.pack(fill="both", expand=True, padx=6, pady=(6, 8))
+        plank.pack_propagate(False)
+        top_edge = ctk.CTkFrame(plank, fg_color="#5f4330", height=6, corner_radius=4)
+        top_edge.pack(fill="x", padx=12, pady=(8, 4))
+        top_edge.pack_propagate(False)
+        slat = ctk.CTkFrame(plank, fg_color="#281b12", height=12, corner_radius=6)
+        slat.pack(fill="x", padx=10, pady=(0, 8))
+        slat.pack_propagate(False)
+        shadow = ctk.CTkFrame(plank, fg_color="#080707", height=8, corner_radius=4)
+        shadow.pack(fill="x", padx=18, pady=(0, 6))
+        shadow.pack_propagate(False)
+        for relx in (0.04, 0.96):
+            post = ctk.CTkFrame(plank, fg_color="#3b2a1d", corner_radius=6, width=12)
+            post.place(relx=relx, rely=0.18, anchor="n", relheight=0.64)
+            rivet = ctk.CTkFrame(plank, fg_color="#715236", width=10, height=10, corner_radius=5)
+            rivet.place(relx=relx, rely=0.12, anchor="n")
+        state.shelf_rows[row_group] = strip
+        return strip
 
     def _maybe_load_more_crates(self, state: ShelfSectionState, force=False):
         if state.collapsed or state.loaded_count >= len(state.items):
