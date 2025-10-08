@@ -522,19 +522,38 @@ class ObjectShelfView:
             anchor="w",
         )
         name_label.pack(fill="x", padx=10, pady=(10, 4))
-        Stats = self.host.clean_value(item.get("Stats", "--")) or "--"
         Description = self.host.clean_value(item.get("Description", "--")) or "--"
+        size_source = item.get("Size")
+        size_label_name = "Size"
+        if size_source in (None, ""):
+            stats_value = item.get("Stats")
+            if stats_value not in (None, ""):
+                size_source = stats_value
+                size_label_name = "Stats"
+        if size_source in (None, ""):
+            size_source = "--"
+        Size = self.host.clean_value(size_source) or "--"
         interactive_children = [name_label]
+        wrap_targets: List[ctk.CTkLabel] = []
         if compact:
-            meta_text = f"Desc: {Description} | Stats: {Stats}"
-            meta_label = ctk.CTkLabel(
+            desc_label = ctk.CTkLabel(
                 crate,
-                text=meta_text,
+                text=f"Desc: {Description}",
                 font=("Segoe UI", 14, "bold"),
                 anchor="w",
+                justify="left",
             )
-            meta_label.pack(fill="x", padx=10, pady=(0, 6))
-            interactive_children.append(meta_label)
+            desc_label.pack(fill="x", padx=10, pady=(0, 2))
+            size_label = ctk.CTkLabel(
+                crate,
+                text=f"{size_label_name}: {Size}",
+                font=("Segoe UI", 14, "bold"),
+                anchor="w",
+                justify="left",
+            )
+            size_label.pack(fill="x", padx=10, pady=(0, 6))
+            interactive_children.extend([desc_label, size_label])
+            wrap_targets.extend([desc_label, size_label])
         else:
             stats_frame = ctk.CTkFrame(
                 crate,
@@ -544,20 +563,35 @@ class ObjectShelfView:
                 border_color="#303030",
             )
             stats_frame.pack(fill="x", padx=10, pady=4)
-            ctk.CTkLabel(
+            desc_label = ctk.CTkLabel(
                 stats_frame,
                 text=f"Desc: {Description}",
                 font=("Segoe UI", 14, "bold"),
                 anchor="w",
-            ).pack(fill="x", padx=8, pady=(6, 2))
-            ctk.CTkLabel(
+                justify="left",
+            )
+            desc_label.pack(fill="x", padx=8, pady=(6, 2))
+            size_label = ctk.CTkLabel(
                 stats_frame,
-                text=f"Stats: {Stats}",
+                text=f"{size_label_name}: {Size}",
                 font=("Segoe UI", 14, "bold"),
                 anchor="w",
-            ).pack(fill="x", padx=8, pady=(0, 6))
+                justify="left",
+            )
+            size_label.pack(fill="x", padx=8, pady=(0, 6))
             interactive_children.append(stats_frame)
             interactive_children.extend(stats_frame.winfo_children())
+            wrap_targets.extend([desc_label, size_label])
+
+        if wrap_targets:
+            def _update_wrap(_event=None, labels=tuple(wrap_targets)):
+                available = max(50, crate.winfo_width() - 20)
+                for label in labels:
+                    if label and label.winfo_exists():
+                        label.configure(wraplength=available)
+
+            crate.bind("<Configure>", _update_wrap, add="+")
+            crate.after(0, _update_wrap)
 
         crate.bind(
             "<Button-1>",
@@ -708,9 +742,9 @@ class ObjectShelfView:
         body = ctk.CTkLabel(
             wrapper,
             text=text,
-            font=("Segoe UI", 13),
+            font=("Segoe UI", 12),
             justify="left",
-            wraplength=720,
+            wraplength=1400,
             anchor="w",
         )
         body.pack(fill="x", padx=10, pady=(0, 8))
