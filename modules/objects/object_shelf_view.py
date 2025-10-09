@@ -533,19 +533,19 @@ class ObjectShelfView:
         )
         plank.pack(fill="both", expand=True, padx=6, pady=(4, 6))
         plank.pack_propagate(False)
-        top_edge = ctk.CTkFrame(plank, fg_color="#5f4330", height=4, corner_radius=4)
+        top_edge = ctk.CTkFrame(plank, fg_color="#5f4330", height=2, corner_radius=4)
         top_edge.pack(fill="x", padx=12, pady=(4, 3))
         top_edge.pack_propagate(False)
-        slat = ctk.CTkFrame(plank, fg_color="#281b12", height=8, corner_radius=6)
+        slat = ctk.CTkFrame(plank, fg_color="#281b12", height=2, corner_radius=6)
         slat.pack(fill="x", padx=10, pady=(0, 4))
         slat.pack_propagate(False)
-        shadow = ctk.CTkFrame(plank, fg_color="#080707", height=6, corner_radius=4)
+        shadow = ctk.CTkFrame(plank, fg_color="#080707", height=2, corner_radius=4)
         shadow.pack(fill="x", padx=18, pady=(0, 4))
         shadow.pack_propagate(False)
         for relx in (0.04, 0.96):
             post = ctk.CTkFrame(plank, fg_color="#3b2a1d", corner_radius=6, width=12)
             post.place(relx=relx, rely=0.2, anchor="n", relheight=0.5)
-            rivet = ctk.CTkFrame(plank, fg_color="#715236", width=10, height=10, corner_radius=5)
+            rivet = ctk.CTkFrame(plank, fg_color="#715236", width=10, height=2, corner_radius=5)
             rivet.place(relx=relx, rely=0.12, anchor="n")
         state.shelf_rows[row_group] = strip
         return strip
@@ -593,6 +593,7 @@ class ObjectShelfView:
             fg_color="#52341e",
             corner_radius=10,
             border_width=0,
+            height=2
         )
         surface.pack(fill="both", expand=True, padx=3, pady=3)
         surface.pack_propagate(False)
@@ -612,6 +613,7 @@ class ObjectShelfView:
             corner_radius=10,
             border_width=1,
             border_color="#262626",
+            height=2
         )
         info_frame.grid(row=0, column=1, sticky="nsew", padx=12, pady=6)
         info_frame.grid_columnconfigure(0, weight=0)
@@ -641,7 +643,7 @@ class ObjectShelfView:
             info_frame,
             text="☆",
             width=28,
-            height=28,
+            height=2,
             corner_radius=14,
             fg_color="#3b2515",
             hover_color="#6a4a2d",
@@ -655,7 +657,7 @@ class ObjectShelfView:
             info_frame,
             text=">",
             width=34,
-            height=28,
+            height=2,
             corner_radius=14,
             fg_color="#2d2d2d",
             hover_color="#1F6AA5",
