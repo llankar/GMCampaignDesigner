@@ -18,7 +18,6 @@ class ShelfSectionState:
     header_frame: Optional[ctk.CTkFrame] = None
     body_holder: Optional[ctk.CTkFrame] = None
     grid_frame: Optional[ctk.CTkFrame] = None
-    count_label: Optional[ctk.CTkLabel] = None
     pin_button: Optional[ctk.CTkButton] = None
     collapse_button: Optional[ctk.CTkButton] = None
     initialized: bool = False
@@ -36,6 +35,9 @@ class ShelfSectionState:
     column_count: int = 0
     configured_columns: int = 0
     uniform_id: str = ""
+    section_overlay: Optional[ctk.CTkFrame] = None
+    section_overlay_title: Optional[ctk.CTkLabel] = None
+    section_overlay_count: Optional[ctk.CTkLabel] = None
 
 
 class ObjectShelfView:
@@ -265,8 +267,9 @@ class ObjectShelfView:
         )
         body_holder.pack(fill="both", expand=True, padx=6, pady=(0, 6))
         collapsed_strip = self._build_collapsed_strip(state, container, before_widget=body_holder)
+        self._build_section_overlay(state, body_holder)
         grid_frame = ctk.CTkFrame(body_holder, fg_color="#141414")
-        grid_frame.pack(fill="both", expand=True, padx=12, pady=12)
+        grid_frame.pack(fill="both", expand=True, padx=12, pady=(44, 12))
         state.grid_frame = grid_frame
         #state.compact = len(state.items) > 40
         state.column_count = 10 if state.compact else 10
@@ -468,6 +471,7 @@ class ObjectShelfView:
             self._ensure_shelf_row(state, row_group, columns, row)
             crate.grid(row=row, column=col, padx=8, pady=(10, 6), sticky="nsew")
         state.loaded_count = end
+        self._update_section_overlay_text(state)
         if state.loaded_count < len(state.items):
             state.grid_frame.after(150, lambda st=state: self._maybe_load_more_crates(st))
 
@@ -659,10 +663,46 @@ class ObjectShelfView:
         state.collapsed_detail = detail
         state.pin_button = pin_button
         state.collapse_button = collapse_button
-        state.count_label = detail
         state.header_frame = strip
         self._update_collapsed_strip_text(state)
         return strip
+
+    def _build_section_overlay(self, state: ShelfSectionState, parent: ctk.CTkFrame):
+        overlay = ctk.CTkFrame(
+            parent,
+            fg_color="#2b1b11",
+            corner_radius=12,
+            border_width=1,
+            border_color="#432d1d",
+        )
+        overlay.place(relx=0.5, y=12, anchor="n", relwidth=0.9)
+        overlay.grid_columnconfigure(1, weight=1)
+        overlay.lift()
+
+        title = ctk.CTkLabel(
+            overlay,
+            text="",
+            font=("Segoe UI", 15, "bold"),
+            anchor="w",
+            justify="left",
+            text_color="#f7f0e4",
+        )
+        title.grid(row=0, column=0, sticky="w", padx=(16, 8), pady=10)
+
+        count = ctk.CTkLabel(
+            overlay,
+            text="",
+            font=("Segoe UI", 13),
+            anchor="e",
+            text_color="#eadbc2",
+        )
+        count.grid(row=0, column=1, sticky="e", padx=(8, 16), pady=10)
+
+        state.section_overlay_title = title
+        state.section_overlay_count = count
+        state.section_overlay = overlay
+        self._update_section_overlay_text(state)
+        return overlay
 
     def _update_collapsed_strip_text(self, state: ShelfSectionState):
         if not state.collapsed_title or not state.collapsed_detail:
@@ -680,6 +720,23 @@ class ObjectShelfView:
         else:
             detail_text = f"{count} {noun} displayed - click to collapse"
         state.collapsed_detail.configure(text=detail_text)
+        self._update_section_overlay_text(state)
+
+    def _update_section_overlay_text(self, state: ShelfSectionState):
+        total = len(state.items)
+        noun = "item" if total == 1 else "items"
+        displayed = state.loaded_count if state.initialized and not state.collapsed else state.loaded_count
+        displayed = min(displayed, total)
+        if state.section_overlay_title:
+            state.section_overlay_title.configure(text=state.category.upper())
+        if state.section_overlay_count:
+            if state.collapsed and not state.initialized:
+                shown_text = f"{total} {noun}"
+            elif displayed and displayed < total:
+                shown_text = f"{displayed} / {total} {noun}"
+            else:
+                shown_text = f"{total} {noun}"
+            state.section_overlay_count.configure(text=shown_text)
 
     def _maybe_load_more_crates(self, state: ShelfSectionState, force=False):
         if state.collapsed or state.loaded_count >= len(state.items):
