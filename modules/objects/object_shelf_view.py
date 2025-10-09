@@ -576,6 +576,8 @@ class ObjectShelfView:
         strip.bind("<Enter>", _focus_strip)
         strip.bind("<FocusIn>", _focus_strip)
 
+        strip.grid_columnconfigure(1, weight=1)
+
         plank = ctk.CTkFrame(
             strip,
             fg_color="#3c291a",
@@ -583,8 +585,8 @@ class ObjectShelfView:
             border_width=1,
             border_color="#25170e",
         )
-        plank.pack(fill="both", expand=True, padx=6, pady=6)
-        plank.pack_propagate(False)
+        plank.grid(row=0, column=0, padx=(6, 0), pady=6, sticky="ns")
+        plank.grid_propagate(False)
 
         surface = ctk.CTkFrame(
             plank,
@@ -611,8 +613,9 @@ class ObjectShelfView:
             border_width=1,
             border_color="#262626",
         )
-        info_frame.pack(fill="x", padx=12, pady=(0, 6))
-        info_frame.grid_columnconfigure(0, weight=1)
+        info_frame.grid(row=0, column=1, sticky="nsew", padx=12, pady=6)
+        info_frame.grid_columnconfigure(0, weight=0)
+        info_frame.grid_columnconfigure(1, weight=1)
 
         title = ctk.CTkLabel(
             info_frame,
@@ -622,7 +625,7 @@ class ObjectShelfView:
             justify="left",
             text_color="#f7f0e4",
         )
-        title.grid(row=0, column=0, sticky="w", padx=10, pady=(6, 0))
+        title.grid(row=0, column=0, sticky="w", padx=(12, 6), pady=8)
 
         detail = ctk.CTkLabel(
             info_frame,
@@ -632,7 +635,7 @@ class ObjectShelfView:
             justify="left",
             text_color="#e5d4bb",
         )
-        detail.grid(row=1, column=0, sticky="w", padx=10, pady=(0, 8))
+        detail.grid(row=0, column=1, sticky="w", padx=(0, 12), pady=8)
 
         pin_button = ctk.CTkButton(
             info_frame,
@@ -646,7 +649,7 @@ class ObjectShelfView:
             font=("Segoe UI", 16),
             command=lambda st=state: self._toggle_section_pin(st),
         )
-        pin_button.grid(row=0, column=1, rowspan=2, padx=(12, 6), pady=8)
+        pin_button.grid(row=0, column=2, padx=(6, 6), pady=8)
 
         collapse_button = ctk.CTkButton(
             info_frame,
@@ -658,7 +661,7 @@ class ObjectShelfView:
             hover_color="#1F6AA5",
             command=lambda st=state: self._toggle_section_collapse(st),
         )
-        collapse_button.grid(row=0, column=2, rowspan=2, padx=(0, 10), pady=8)
+        collapse_button.grid(row=0, column=3, padx=(0, 10), pady=8)
 
         interactive = [strip, plank, surface, left_post, right_post, bottom_band, info_frame, title, detail]
         for widget in interactive:
