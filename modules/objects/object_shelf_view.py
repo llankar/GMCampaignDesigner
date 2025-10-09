@@ -59,6 +59,10 @@ class ObjectShelfView:
         self.host = host
         self.allowed_categories = [c for c in allowed_categories]
         self.frame = ctk.CTkFrame(host, fg_color="#181818")
+        self.search_frame: Optional[ctk.CTkFrame] = None
+        self.search_entry: Optional[ctk.CTkEntry] = None
+        self.search_button: Optional[ctk.CTkButton] = None
+        self._build_search_bar()
         self.summary_bar = ctk.CTkFrame(
             self.frame,
             fg_color="#242424",
@@ -66,7 +70,8 @@ class ObjectShelfView:
             border_width=1,
             border_color="#404040",
         )
-        self.summary_bar.pack(fill="x", padx=10, pady=(10, 0))
+        summary_pady = (6, 0) if self.search_frame else (10, 0)
+        self.summary_bar.pack(fill="x", padx=10, pady=summary_pady)
         self.summary_label = ctk.CTkLabel(
             self.summary_bar,
             text="",
@@ -115,6 +120,57 @@ class ObjectShelfView:
             "spec_body": ctk.CTkFont(family="Segoe UI", size=12),
         }
         self._last_known_selection: Set[str] = set()
+
+    def _build_search_bar(self):
+        """Create a shelf-level search input that leverages the host filter."""
+
+        var = getattr(self.host, "search_var", None)
+        if var is None:
+            return
+        self.search_frame = ctk.CTkFrame(
+            self.frame,
+            fg_color="#242424",
+            corner_radius=12,
+            border_width=1,
+            border_color="#404040",
+        )
+        self.search_frame.pack(fill="x", padx=10, pady=(10, 0))
+        self.search_entry = ctk.CTkEntry(
+            self.search_frame,
+            textvariable=var,
+            placeholder_text="Search objects...",
+        )
+        self.search_entry.pack(side="left", fill="x", expand=True, padx=(12, 6), pady=6)
+        self.search_entry.bind("<Return>", self._trigger_search)
+        self.search_button = ctk.CTkButton(
+            self.search_frame,
+            text="Search",
+            command=self._trigger_search,
+            corner_radius=18,
+            width=90,
+        )
+        self.search_button.pack(side="left", padx=(0, 12), pady=6)
+
+    def _trigger_search(self, event=None):
+        """Invoke the host filter when the search entry is submitted."""
+
+        var = getattr(self.host, "search_var", None)
+        if var is None or not hasattr(self.host, "filter_items"):
+            return "break" if event is not None else None
+        self.host.filter_items(var.get())
+        return "break" if event is not None else None
+
+    def _current_search_query(self) -> str:
+        """Return the trimmed search query if one is active."""
+
+        var = getattr(self.host, "search_var", None)
+        if var is None:
+            return ""
+        try:
+            value = var.get()
+        except Exception:
+            return ""
+        return (value or "").strip()
 
     # ------------------------------------------------------------------
     # Public API
@@ -178,9 +234,7 @@ class ObjectShelfView:
         pinned = len(self._pinned_categories)
         total = len(self.host.filtered_items)
         filters: List[str] = []
-        query = ""
-        if hasattr(self.host, "search_var") and self.host.search_var is not None:
-            query = self.host.search_var.get().strip()
+        query = self._current_search_query()
         if query:
             filters.append(f"Search: \"{query}\"")
         if self.host.filtered_items != self.host.items and not query:
@@ -252,6 +306,20 @@ class ObjectShelfView:
                 state.collapsed = False
                 self._update_section_controls(state)
                 self._ensure_section_loaded(state)
+        self._expand_sections_for_search()
+
+    def _expand_sections_for_search(self):
+        """Ensure all sections are open and populated when a search is active."""
+
+        if not self.sections:
+            return
+        if not self._current_search_query():
+            return
+        for state in self.sections:
+            if state.collapsed:
+                state.collapsed = False
+            self._update_section_controls(state)
+            self._ensure_section_loaded(state)
 
     def _group_items_by_category(self):
         groups: Dict[str, Dict[str, object]] = {}
