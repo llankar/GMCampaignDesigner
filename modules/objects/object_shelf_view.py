@@ -26,11 +26,15 @@ class ShelfSectionState:
     loaded_count: int = 0
     crate_widgets: Dict[str, ctk.CTkFrame] = field(default_factory=dict)
     crate_order: List[str] = field(default_factory=list)
+    crate_index: Dict[str, int] = field(default_factory=dict)
     open_specs: Dict[str, ctk.CTkFrame] = field(default_factory=dict)
     collapsed_strip: Optional[ctk.CTkFrame] = None
     collapsed_title: Optional[ctk.CTkLabel] = None
     collapsed_detail: Optional[ctk.CTkLabel] = None
     shelf_rows: Dict[int, ctk.CTkFrame] = field(default_factory=dict)
+    display_cache: Dict[str, dict] = field(default_factory=dict)
+    wrap_targets: Dict[str, List[ctk.CTkLabel]] = field(default_factory=dict)
+    current_wrap: int = 0
     compact: bool = False
     column_count: int = 0
     configured_columns: int = 0
@@ -95,6 +99,11 @@ class ObjectShelfView:
         self._focused_base_id: Optional[str] = None
         self._visibility_job: Optional[str] = None
         self._header_colors = ("#3c2f23", "#23282f")
+        self._fonts = {
+            "name": ctk.CTkFont(family="Segoe UI", size=14, weight="bold"),
+            "name_compact": ctk.CTkFont(family="Segoe UI", size=12, weight="bold"),
+            "body": ctk.CTkFont(family="Segoe UI", size=12, weight="bold"),
+        }
 
     # ------------------------------------------------------------------
     # Public API
@@ -263,7 +272,7 @@ class ObjectShelfView:
             container,
             fg_color="#141414",
             corner_radius=12,
-            border_width=1,
+            border_width=1, 
             border_color="#262626",
         )
         body_holder.pack(fill="both", expand=True, padx=6, pady=(0, 6))
@@ -271,8 +280,8 @@ class ObjectShelfView:
         grid_frame = ctk.CTkFrame(body_holder, fg_color="#141414")
         grid_frame.pack(fill="both", expand=True, padx=12, pady=(12, 12))
         state.grid_frame = grid_frame
-        #state.compact = len(state.items) > 40
-        state.column_count = 10 if state.compact else 10
+        state.compact = len(state.items) > 40
+        state.column_count = max(1, self._determine_column_count(state))
         state.uniform_id = f"shelf_{id(state)}"
         self._apply_column_configuration(state)
         grid_frame.bind(
@@ -290,8 +299,12 @@ class ObjectShelfView:
         state.loaded_count = 0
         state.crate_widgets = {}
         state.crate_order = []
+        state.crate_index = {}
         state.open_specs = {}
         state.shelf_rows = {}
+        state.display_cache = {}
+        state.wrap_targets = {}
+        state.current_wrap = 0
         state.section_overlay_summary = None
         if state.body_holder:
             state.body_holder.pack_forget()
@@ -323,30 +336,26 @@ class ObjectShelfView:
 
     def _on_grid_resize(self, state: ShelfSectionState, width: int):
         desired = self._determine_column_count(state, width)
-        if desired <= 0 or desired == state.column_count:
+        if desired <= 0:
+            return
+        if desired == state.column_count:
+            self._update_wrap_lengths(state)
             return
         state.column_count = desired
         self._apply_column_configuration(state)
         if state.initialized:
             self._reposition_section_widgets(state)
+        else:
+            self._update_wrap_lengths(state)
 
     def _determine_column_count(self, state: ShelfSectionState, width: Optional[int] = None) -> int:
-        if not state.grid_frame:
-            return state.column_count or 1
-        available = width if width and width > 0 else state.grid_frame.winfo_width()
-        if not available:
-            available = self.container.winfo_width() or self.frame.winfo_width()
-        if not available:
-            return state.column_count or 1
-        min_width = 200 if state.compact else 240
-        max_columns = 7 if state.compact else 7
-        columns = max(1, available // max(1, min_width))
-        return max(1, min(max_columns, columns))
+        return 7
 
     def _reposition_section_widgets(self, state: ShelfSectionState):
         columns = max(1, state.column_count or 1)
         active_rows: Set[int] = set()
         for index, base_id in enumerate(state.crate_order):
+            state.crate_index[base_id] = index
             crate = state.crate_widgets.get(base_id)
             if crate and crate.winfo_exists():
                 row_group = index // columns
@@ -357,7 +366,10 @@ class ObjectShelfView:
                 active_rows.add(row_group)
         for base_id, spec in list(state.open_specs.items()):
             if spec and spec.winfo_exists() and base_id in state.crate_order:
-                index = state.crate_order.index(base_id)
+                index = state.crate_index.get(base_id)
+                if index is None:
+                    index = state.crate_order.index(base_id)
+                    state.crate_index[base_id] = index
                 row_group = index // columns
                 spec_row = row_group * 2 + 1
                 spec.grid_configure(
@@ -374,6 +386,7 @@ class ObjectShelfView:
                 if strip and strip.winfo_exists():
                     strip.destroy()
                 state.shelf_rows.pop(row_group, None)
+        self._update_wrap_lengths(state)
 
     def _update_pin_button(self, state: ShelfSectionState):
         if not state.pin_button:
@@ -455,9 +468,77 @@ class ObjectShelfView:
         if not state.initialized:
             state.initialized = True
             state.loaded_count = 0
-            self._load_section_batch(state)
+            self._load_section_batch(state, batch_size=self._suggest_batch_size(state))
         else:
             self._maybe_load_more_crates(state, force=True)
+
+    def _suggest_batch_size(self, state: ShelfSectionState) -> int:
+        columns = state.column_count or self._determine_column_count(state)
+        columns = max(1, columns)
+        return max(12, min(48, columns * 4))
+
+    def _prepare_item_display(self, state: ShelfSectionState, item: dict) -> dict:
+        base_id = self.host._get_base_id(item)
+        cached = state.display_cache.get(base_id)
+        if cached:
+            return cached
+        clean_value = self.host.clean_value
+        unique = getattr(self.host, "unique_field", "")
+        raw_name = item.get(unique, "Unnamed") if unique else item.get("Name", "Unnamed")
+        name = clean_value(raw_name) or "Unnamed"
+        description = clean_value(item.get("Description", "--")) or "--"
+        size_source = item.get("Size")
+        secondary_label = "Size"
+        if not size_source:
+            stats_value = item.get("Stats")
+            if stats_value not in (None, ""):
+                size_source = stats_value
+                secondary_label = "Stats"
+        if not size_source:
+            size_source = "--"
+        secondary_value = clean_value(size_source) or "--"
+        content_lines = [f"Desc: {description}"]
+        content_lines.append(f"{secondary_label}: {secondary_value}")
+        display = {
+            "base_id": base_id,
+            "name_text": name.upper(),
+            "description": description,
+            "secondary_label": secondary_label,
+            "secondary_value": secondary_value,
+            "content_text": "\n".join(content_lines),
+        }
+        state.display_cache[base_id] = display
+        return display
+
+    def _register_wrap_targets(
+        self, state: ShelfSectionState, base_id: str, labels: Sequence[Optional[ctk.CTkLabel]]
+    ):
+        targets = [label for label in labels if label]
+        if not targets:
+            return
+        state.wrap_targets[base_id] = targets
+
+    def _update_wrap_lengths(self, state: ShelfSectionState):
+        grid = state.grid_frame
+        if not grid or not grid.winfo_exists():
+            return
+        try:
+            grid.update_idletasks()
+        except Exception:
+            pass
+        width = grid.winfo_width()
+        columns = max(1, state.column_count or 1)
+        if width <= 0 or columns <= 0:
+            return
+        column_width = max(80, (width // columns) - 16)
+        wrap_length = max(60, column_width - 20)
+        if wrap_length == state.current_wrap:
+            return
+        state.current_wrap = wrap_length
+        for labels in state.wrap_targets.values():
+            for label in labels:
+                if label and label.winfo_exists():
+                    label.configure(wraplength=wrap_length)
 
     def _load_section_batch(self, state: ShelfSectionState, batch_size=24):
         if state.collapsed:
@@ -467,12 +548,16 @@ class ObjectShelfView:
         columns = max(1, state.column_count or 4)
         for index in range(start, end):
             item = state.items[index]
-            base_id = self.host._get_base_id(item)
+            display = self._prepare_item_display(state, item)
+            base_id = display["base_id"]
             crate = state.crate_widgets.get(base_id)
             if not crate or not crate.winfo_exists():
-                crate = self._create_crate_widget(state, item)
+                crate = self._create_crate_widget(state, item, display)
                 state.crate_widgets[base_id] = crate
                 state.crate_order.append(base_id)
+                state.crate_index[base_id] = len(state.crate_order) - 1
+            else:
+                state.crate_index[base_id] = index
             row_group = index // columns
             row = row_group * 2
             col = index % columns
@@ -482,6 +567,7 @@ class ObjectShelfView:
         self._update_section_overlay_text(state)
         if state.loaded_count < len(state.items):
             state.grid_frame.after(150, lambda st=state: self._maybe_load_more_crates(st))
+        self._update_wrap_lengths(state)
 
     def _ensure_shelf_row(
         self,
@@ -796,10 +882,10 @@ class ObjectShelfView:
                 bottom = state.grid_frame.winfo_y() + state.grid_frame.winfo_height()
                 if bottom - visible_bottom > 400:
                     return
-        self._load_section_batch(state)
+        self._load_section_batch(state, batch_size=self._suggest_batch_size(state))
 
-    def _create_crate_widget(self, state: ShelfSectionState, item):
-        base_id = self.host._get_base_id(item)
+    def _create_crate_widget(self, state: ShelfSectionState, item, display: dict):
+        base_id = display["base_id"]
         crate = ctk.CTkFrame(
             state.grid_frame,
             fg_color="#1d1d1d",
@@ -808,48 +894,32 @@ class ObjectShelfView:
             border_color="#2d2d2d",
         )
         crate.configure(cursor="hand2")
-        name = self.host.clean_value(item.get(self.host.unique_field, "Unnamed")) or "Unnamed"
         compact = state.compact
-        name_font = ("Segoe UI", 12, "bold") if compact else ("Segoe UI", 14, "bold")
+        name_font = self._fonts["name_compact"] if compact else self._fonts["name"]
         name_label = ctk.CTkLabel(
             crate,
-            text=name.upper(),
+            text=display["name_text"],
             font=name_font,
             anchor="w",
         )
         name_label.pack(fill="x", padx=10, pady=(10, 4))
-        Description = self.host.clean_value(item.get("Description", "--")) or "--"
-        size_source = item.get("Size")
-        size_label_name = "Size"
-        if size_source in (None, ""):
-            stats_value = item.get("Stats")
-            if stats_value not in (None, ""):
-                size_source = stats_value
-                size_label_name = "Stats"
-        if size_source in (None, ""):
-            size_source = "--"
-        Size = self.host.clean_value(size_source) or "--"
         interactive_children = [name_label]
         wrap_targets: List[ctk.CTkLabel] = []
+        body_font = self._fonts["body"]
+        wrap_length = state.current_wrap or 260
+        content_text = display["content_text"]
         if compact:
             desc_label = ctk.CTkLabel(
                 crate,
-                text=f"Desc: {Description}",
-                font=("Segoe UI", 12, "bold"),
+                text=content_text,
+                font=body_font,
                 anchor="w",
                 justify="left",
+                wraplength=wrap_length,
             )
-            desc_label.pack(fill="x", padx=10, pady=(0, 2))
-            size_label = ctk.CTkLabel(
-                crate,
-                text=f"{size_label_name}: {Size}",
-                font=("Segoe UI", 12, "bold"),
-                anchor="w",
-                justify="left",
-            )
-            size_label.pack(fill="x", padx=10, pady=(0, 6))
-            interactive_children.extend([desc_label, size_label])
-            wrap_targets.extend([desc_label, size_label])
+            desc_label.pack(fill="x", padx=10, pady=(0, 8))
+            interactive_children.append(desc_label)
+            wrap_targets.append(desc_label)
         else:
             stats_frame = ctk.CTkFrame(
                 crate,
@@ -859,35 +929,18 @@ class ObjectShelfView:
                 border_color="#303030",
             )
             stats_frame.pack(fill="x", padx=10, pady=4)
-            desc_label = ctk.CTkLabel(
+            content_label = ctk.CTkLabel(
                 stats_frame,
-                text=f"Desc: {Description}",
-                font=("Segoe UI", 12, "bold"),
+                text=content_text,
+                font=body_font,
                 anchor="w",
                 justify="left",
+                wraplength=wrap_length,
             )
-            desc_label.pack(fill="x", padx=8, pady=(6, 2))
-            size_label = ctk.CTkLabel(
-                stats_frame,
-                text=f"{size_label_name}: {Size}",
-                font=("Segoe UI", 12, "bold"),
-                anchor="w",
-                justify="left",
-            )
-            size_label.pack(fill="x", padx=8, pady=(0, 6))
+            content_label.pack(fill="x", padx=8, pady=(6, 6))
             interactive_children.append(stats_frame)
             interactive_children.extend(stats_frame.winfo_children())
-            wrap_targets.extend([desc_label, size_label])
-
-        if wrap_targets:
-            def _update_wrap(_event=None, labels=tuple(wrap_targets)):
-                available = max(50, crate.winfo_width() - 20)
-                for label in labels:
-                    if label and label.winfo_exists():
-                        label.configure(wraplength=available)
-
-            crate.bind("<Configure>", _update_wrap, add="+")
-            crate.after(0, _update_wrap)
+            wrap_targets.append(content_label)
 
         crate.bind(
             "<Button-1>",
@@ -931,6 +984,7 @@ class ObjectShelfView:
                 lambda _e, it=item: self.host._edit_item(it),
                 add="+",
             )
+        self._register_wrap_targets(state, base_id, wrap_targets)
         return crate
 
     def _handle_crate_primary(self, event, state: ShelfSectionState, base_id):
@@ -965,9 +1019,12 @@ class ObjectShelfView:
         self._set_crate_selected(base_id, base_id in self.host.selected_iids, highlight=True)
 
     def _move_crate_focus(self, state: ShelfSectionState, base_id, delta):
-        if base_id not in state.crate_order:
-            return
-        index = state.crate_order.index(base_id)
+        index = state.crate_index.get(base_id)
+        if index is None:
+            if base_id not in state.crate_order:
+                return
+            index = state.crate_order.index(base_id)
+            state.crate_index[base_id] = index
         target = max(0, min(index + delta, len(state.crate_order) - 1))
         target_id = state.crate_order[target]
         crate = state.crate_widgets.get(target_id)
@@ -990,7 +1047,11 @@ class ObjectShelfView:
         self._build_spec_sheet_content(frame, item)
         if base_id not in state.crate_order:
             state.crate_order.append(base_id)
-        index = state.crate_order.index(base_id)
+            state.crate_index[base_id] = len(state.crate_order) - 1
+        index = state.crate_index.get(base_id)
+        if index is None:
+            index = state.crate_order.index(base_id)
+            state.crate_index[base_id] = index
         columns = max(1, state.column_count or 4)
         row_group = index // columns
         spec_row = row_group * 2 + 1
