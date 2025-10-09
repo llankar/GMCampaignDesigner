@@ -495,7 +495,7 @@ class ObjectShelfView:
         if not grid:
             return None
         strip = state.shelf_rows.get(row_group)
-        strip_pad = (8, 10) if row_group == 0 else (6, 10)
+        strip_pad = (6, 8) if row_group == 0 else (4, 8)
         if strip and strip.winfo_exists():
             strip.grid_configure(
                 row=row,
@@ -507,7 +507,7 @@ class ObjectShelfView:
             )
             strip.lower()
             return strip
-        grid.grid_rowconfigure(row, weight=1, minsize=140)
+        grid.grid_rowconfigure(row, weight=1, minsize=90)
         strip = ctk.CTkFrame(
             grid,
             fg_color="#120d08",
@@ -531,20 +531,20 @@ class ObjectShelfView:
             border_width=1,
             border_color="#2c1f14",
         )
-        plank.pack(fill="both", expand=True, padx=6, pady=(6, 8))
+        plank.pack(fill="both", expand=True, padx=6, pady=(4, 6))
         plank.pack_propagate(False)
-        top_edge = ctk.CTkFrame(plank, fg_color="#5f4330", height=6, corner_radius=4)
-        top_edge.pack(fill="x", padx=12, pady=(8, 4))
+        top_edge = ctk.CTkFrame(plank, fg_color="#5f4330", height=4, corner_radius=4)
+        top_edge.pack(fill="x", padx=12, pady=(4, 3))
         top_edge.pack_propagate(False)
-        slat = ctk.CTkFrame(plank, fg_color="#281b12", height=12, corner_radius=6)
-        slat.pack(fill="x", padx=10, pady=(0, 8))
+        slat = ctk.CTkFrame(plank, fg_color="#281b12", height=8, corner_radius=6)
+        slat.pack(fill="x", padx=10, pady=(0, 4))
         slat.pack_propagate(False)
-        shadow = ctk.CTkFrame(plank, fg_color="#080707", height=8, corner_radius=4)
-        shadow.pack(fill="x", padx=18, pady=(0, 6))
+        shadow = ctk.CTkFrame(plank, fg_color="#080707", height=6, corner_radius=4)
+        shadow.pack(fill="x", padx=18, pady=(0, 4))
         shadow.pack_propagate(False)
         for relx in (0.04, 0.96):
             post = ctk.CTkFrame(plank, fg_color="#3b2a1d", corner_radius=6, width=12)
-            post.place(relx=relx, rely=0.18, anchor="n", relheight=0.64)
+            post.place(relx=relx, rely=0.2, anchor="n", relheight=0.5)
             rivet = ctk.CTkFrame(plank, fg_color="#715236", width=10, height=10, corner_radius=5)
             rivet.place(relx=relx, rely=0.12, anchor="n")
         state.shelf_rows[row_group] = strip
