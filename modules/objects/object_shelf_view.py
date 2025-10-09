@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Dict, List, Optional, Sequence, Set
+from typing import Dict, List, Optional, Sequence, Set, Tuple
 
 import customtkinter as ctk
 
@@ -27,7 +27,8 @@ class ShelfSectionState:
     crate_widgets: Dict[str, ctk.CTkFrame] = field(default_factory=dict)
     crate_order: List[str] = field(default_factory=list)
     crate_index: Dict[str, int] = field(default_factory=dict)
-    open_specs: Dict[str, ctk.CTkFrame] = field(default_factory=dict)
+    spec_data_cache: Dict[str, List[Tuple[str, str, bool]]] = field(default_factory=dict)
+    item_map: Dict[str, dict] = field(default_factory=dict)
     collapsed_strip: Optional[ctk.CTkFrame] = None
     collapsed_title: Optional[ctk.CTkLabel] = None
     collapsed_detail: Optional[ctk.CTkLabel] = None
@@ -35,6 +36,7 @@ class ShelfSectionState:
     display_cache: Dict[str, dict] = field(default_factory=dict)
     wrap_targets: Dict[str, List[ctk.CTkLabel]] = field(default_factory=dict)
     current_wrap: int = 0
+    wrap_refresh_job: Optional[str] = None
     compact: bool = False
     column_count: int = 0
     configured_columns: int = 0
@@ -43,6 +45,11 @@ class ShelfSectionState:
     section_overlay_title: Optional[ctk.CTkLabel] = None
     section_overlay_count: Optional[ctk.CTkLabel] = None
     section_overlay_summary: Optional[ctk.CTkLabel] = None
+    layout_freeze: bool = False
+    pending_resize: bool = False
+    active_spec_id: Optional[str] = None
+    spec_overlay: Optional[ctk.CTkFrame] = None
+    spec_overlay_body: Optional[ctk.CTkFrame] = None
 
 
 class ObjectShelfView:
@@ -103,7 +110,11 @@ class ObjectShelfView:
             "name": ctk.CTkFont(family="Segoe UI", size=14, weight="bold"),
             "name_compact": ctk.CTkFont(family="Segoe UI", size=12, weight="bold"),
             "body": ctk.CTkFont(family="Segoe UI", size=12, weight="bold"),
+            "spec_header": ctk.CTkFont(family="Segoe UI", size=12, weight="bold"),
+            "spec_title": ctk.CTkFont(family="Segoe UI", size=12, weight="bold"),
+            "spec_body": ctk.CTkFont(family="Segoe UI", size=12),
         }
+        self._last_known_selection: Set[str] = set()
 
     # ------------------------------------------------------------------
     # Public API
@@ -139,10 +150,27 @@ class ObjectShelfView:
     def refresh_selection(self):
         if not self.is_available():
             return
-        selected = getattr(self.host, "selected_iids", set())
+        selected = self._get_current_selection()
         for state in self.sections:
             for base_id, crate in state.crate_widgets.items():
                 self._set_crate_selected(base_id, base_id in selected, crate)
+        self._last_known_selection = set(selected)
+
+    def _get_current_selection(self) -> Set[str]:
+        selected = getattr(self.host, "selected_iids", set())
+        try:
+            return set(selected)
+        except TypeError:
+            return set(list(selected))
+
+    def _sync_selection_delta(self, previous: Set[str], current: Set[str], highlight_target: Optional[str] = None):
+        removed = previous - current
+        added = current - previous
+        for base_id in removed:
+            self._set_crate_selected(base_id, False)
+        for base_id in added:
+            self._set_crate_selected(base_id, True, highlight=(base_id == highlight_target))
+        self._last_known_selection = set(current)
 
     def update_summary(self):
         if not self.is_available():
@@ -183,9 +211,13 @@ class ObjectShelfView:
         if not self.container:
             return
         for state in self.sections:
-            for spec in list(state.open_specs.values()):
-                if spec and spec.winfo_exists():
-                    spec.destroy()
+            if state.wrap_refresh_job:
+                try:
+                    self.host.after_cancel(state.wrap_refresh_job)
+                except Exception:
+                    pass
+                state.wrap_refresh_job = None
+            self._hide_spec_overlay(state)
         for child in self.container.winfo_children():
             child.destroy()
         self.sections = []
@@ -300,11 +332,18 @@ class ObjectShelfView:
         state.crate_widgets = {}
         state.crate_order = []
         state.crate_index = {}
-        state.open_specs = {}
+        state.spec_data_cache = {}
+        state.item_map = {}
         state.shelf_rows = {}
         state.display_cache = {}
         state.wrap_targets = {}
         state.current_wrap = 0
+        state.wrap_refresh_job = None
+        state.layout_freeze = False
+        state.pending_resize = False
+        state.active_spec_id = None
+        state.spec_overlay = None
+        state.spec_overlay_body = None
         state.section_overlay_summary = None
         if state.body_holder:
             state.body_holder.pack_forget()
@@ -335,6 +374,9 @@ class ObjectShelfView:
         state.configured_columns = state.column_count
 
     def _on_grid_resize(self, state: ShelfSectionState, width: int):
+        if state.layout_freeze:
+            state.pending_resize = True
+            return
         desired = self._determine_column_count(state, width)
         if desired <= 0:
             return
@@ -348,45 +390,48 @@ class ObjectShelfView:
         else:
             self._update_wrap_lengths(state)
 
+    def _freeze_layout(self, state: ShelfSectionState):
+        if not state:
+            return
+        state.layout_freeze = True
+
+    def _thaw_layout(self, state: ShelfSectionState):
+        if not state:
+            return
+        if not state.layout_freeze:
+            return
+        state.layout_freeze = False
+        if state.pending_resize:
+            state.pending_resize = False
+            width = state.grid_frame.winfo_width() if state.grid_frame else 0
+            self._on_grid_resize(state, width)
+
     def _determine_column_count(self, state: ShelfSectionState, width: Optional[int] = None) -> int:
         return 7
 
     def _reposition_section_widgets(self, state: ShelfSectionState):
         columns = max(1, state.column_count or 1)
         active_rows: Set[int] = set()
-        for index, base_id in enumerate(state.crate_order):
-            state.crate_index[base_id] = index
-            crate = state.crate_widgets.get(base_id)
-            if crate and crate.winfo_exists():
-                row_group = index // columns
-                row = row_group * 2
-                self._ensure_shelf_row(state, row_group, columns, row)
-                col = index % columns
-                crate.grid_configure(row=row, column=col, padx=8, pady=(10, 6), sticky="nsew")
-                active_rows.add(row_group)
-        for base_id, spec in list(state.open_specs.items()):
-            if spec and spec.winfo_exists() and base_id in state.crate_order:
-                index = state.crate_index.get(base_id)
-                if index is None:
-                    index = state.crate_order.index(base_id)
-                    state.crate_index[base_id] = index
-                row_group = index // columns
-                spec_row = row_group * 2 + 1
-                spec.grid_configure(
-                    row=spec_row,
-                    column=0,
-                    columnspan=columns,
-                    padx=8,
-                    pady=(0, 12),
-                    sticky="nsew",
-                )
-                active_rows.add(row_group)
-        for row_group, strip in list(state.shelf_rows.items()):
-            if row_group not in active_rows:
-                if strip and strip.winfo_exists():
-                    strip.destroy()
-                state.shelf_rows.pop(row_group, None)
-        self._update_wrap_lengths(state)
+        self._freeze_layout(state)
+        try:
+            for index, base_id in enumerate(state.crate_order):
+                state.crate_index[base_id] = index
+                crate = state.crate_widgets.get(base_id)
+                if crate and crate.winfo_exists():
+                    row_group = index // columns
+                    row = row_group * 2
+                    self._ensure_shelf_row(state, row_group, columns, row)
+                    col = index % columns
+                    crate.grid_configure(row=row, column=col, padx=8, pady=(10, 6), sticky="nsew")
+                    active_rows.add(row_group)
+            for row_group, strip in list(state.shelf_rows.items()):
+                if row_group not in active_rows:
+                    if strip and strip.winfo_exists():
+                        strip.destroy()
+                    state.shelf_rows.pop(row_group, None)
+            self._update_wrap_lengths(state)
+        finally:
+            self._thaw_layout(state)
 
     def _update_pin_button(self, state: ShelfSectionState):
         if not state.pin_button:
@@ -440,6 +485,13 @@ class ObjectShelfView:
     def _collapse_section(self, state: ShelfSectionState):
         if not state.body_holder:
             return
+        self._freeze_layout(state)
+        if state.wrap_refresh_job:
+            try:
+                self.host.after_cancel(state.wrap_refresh_job)
+            except Exception:
+                pass
+            state.wrap_refresh_job = None
         for crate in state.crate_widgets.values():
             if crate and crate.winfo_exists():
                 crate.grid_remove()
@@ -448,6 +500,8 @@ class ObjectShelfView:
                 strip.destroy()
         state.shelf_rows.clear()
         state.loaded_count = 0
+        self._hide_spec_overlay(state)
+        self._thaw_layout(state)
 
     def _toggle_section_pin(self, state: ShelfSectionState):
         state.pinned = not state.pinned
@@ -475,12 +529,13 @@ class ObjectShelfView:
     def _suggest_batch_size(self, state: ShelfSectionState) -> int:
         columns = state.column_count or self._determine_column_count(state)
         columns = max(1, columns)
-        return max(12, min(48, columns * 4))
+        return max(24, min(96, columns * 6))
 
     def _prepare_item_display(self, state: ShelfSectionState, item: dict) -> dict:
         base_id = self.host._get_base_id(item)
         cached = state.display_cache.get(base_id)
         if cached:
+            state.item_map[base_id] = item
             return cached
         clean_value = self.host.clean_value
         unique = getattr(self.host, "unique_field", "")
@@ -508,6 +563,7 @@ class ObjectShelfView:
             "content_text": "\n".join(content_lines),
         }
         state.display_cache[base_id] = display
+        state.item_map[base_id] = item
         return display
 
     def _register_wrap_targets(
@@ -518,15 +574,73 @@ class ObjectShelfView:
             return
         state.wrap_targets[base_id] = targets
 
-    def _update_wrap_lengths(self, state: ShelfSectionState):
+    def _prepare_spec_data(self, state: ShelfSectionState, item: dict) -> List[Tuple[str, str, bool]]:
+        base_id = self.host._get_base_id(item)
+        cached = state.spec_data_cache.get(base_id)
+        if cached:
+            return cached
+        clean_value = self.host.clean_value
+        result: List[Tuple[str, str, bool]] = []
+        seen: Set[str] = set()
+        default_order = ("Description", "Stats", "Secrets")
+        for key in default_order:
+            raw = item.get(key)
+            text = clean_value(raw)
+            if text in (None, ""):
+                continue
+            text = str(text)
+            is_stats = key.lower() == "stats"
+            if is_stats:
+                text = self._normalize_stats_text(text)
+            result.append((str(key), text, is_stats))
+            seen.add(key.lower())
+        unique_field = getattr(self.host, "unique_field", None)
+        for key, raw in item.items():
+            key_str = str(key)
+            key_lower = key_str.lower()
+            if key_lower in seen:
+                continue
+            if unique_field and key == unique_field:
+                continue
+            text = clean_value(raw)
+            if text in (None, ""):
+                continue
+            text = str(text)
+            is_stats = key_lower == "stats"
+            if is_stats:
+                text = self._normalize_stats_text(text)
+            result.append((key_str, text, is_stats))
+            seen.add(key_lower)
+        state.spec_data_cache[base_id] = result
+        return result
+
+    @staticmethod
+    def _normalize_stats_text(text: str) -> str:
+        normalized = text.replace("\r", "\n").split("\n")
+        lines = [segment.strip() for segment in normalized if segment.strip()]
+        return " ".join(lines) if lines else text
+
+    def _update_wrap_lengths(self, state: ShelfSectionState, *, immediate: bool = False):
+        if not immediate:
+            if state.wrap_refresh_job:
+                return
+            try:
+                state.wrap_refresh_job = self.host.after_idle(
+                    lambda st=state: self._update_wrap_lengths(st, immediate=True)
+                )
+                return
+            except Exception:
+                # Fallback to immediate update if scheduling fails
+                pass
+        state.wrap_refresh_job = None
+        if not state.wrap_targets:
+            return
         grid = state.grid_frame
         if not grid or not grid.winfo_exists():
             return
-        try:
-            grid.update_idletasks()
-        except Exception:
-            pass
         width = grid.winfo_width()
+        if width <= 0:
+            width = grid.winfo_reqwidth()
         columns = max(1, state.column_count or 1)
         if width <= 0 or columns <= 0:
             return
@@ -543,31 +657,35 @@ class ObjectShelfView:
     def _load_section_batch(self, state: ShelfSectionState, batch_size=24):
         if state.collapsed:
             return
-        start = state.loaded_count
-        end = min(start + batch_size, len(state.items))
-        columns = max(1, state.column_count or 4)
-        for index in range(start, end):
-            item = state.items[index]
-            display = self._prepare_item_display(state, item)
-            base_id = display["base_id"]
-            crate = state.crate_widgets.get(base_id)
-            if not crate or not crate.winfo_exists():
-                crate = self._create_crate_widget(state, item, display)
-                state.crate_widgets[base_id] = crate
-                state.crate_order.append(base_id)
-                state.crate_index[base_id] = len(state.crate_order) - 1
-            else:
-                state.crate_index[base_id] = index
-            row_group = index // columns
-            row = row_group * 2
-            col = index % columns
-            self._ensure_shelf_row(state, row_group, columns, row)
-            crate.grid(row=row, column=col, padx=8, pady=(10, 6), sticky="nsew")
-        state.loaded_count = end
-        self._update_section_overlay_text(state)
-        if state.loaded_count < len(state.items):
-            state.grid_frame.after(150, lambda st=state: self._maybe_load_more_crates(st))
-        self._update_wrap_lengths(state)
+        self._freeze_layout(state)
+        try:
+            start = state.loaded_count
+            end = min(start + batch_size, len(state.items))
+            columns = max(1, state.column_count or 4)
+            for index in range(start, end):
+                item = state.items[index]
+                display = self._prepare_item_display(state, item)
+                base_id = display["base_id"]
+                crate = state.crate_widgets.get(base_id)
+                if not crate or not crate.winfo_exists():
+                    crate = self._create_crate_widget(state, item, display)
+                    state.crate_widgets[base_id] = crate
+                    state.crate_order.append(base_id)
+                    state.crate_index[base_id] = len(state.crate_order) - 1
+                else:
+                    state.crate_index[base_id] = index
+                row_group = index // columns
+                row = row_group * 2
+                col = index % columns
+                self._ensure_shelf_row(state, row_group, columns, row)
+                crate.grid(row=row, column=col, padx=8, pady=(10, 6), sticky="nsew")
+            state.loaded_count = end
+            self._update_section_overlay_text(state)
+            if state.loaded_count < len(state.items):
+                state.grid_frame.after(200, lambda st=state: self._maybe_load_more_crates(st))
+            self._update_wrap_lengths(state)
+        finally:
+            self._thaw_layout(state)
 
     def _ensure_shelf_row(
         self,
@@ -995,20 +1113,24 @@ class ObjectShelfView:
         self._toggle_spec_sheet(state, base_id)
 
     def _on_crate_click(self, _state: ShelfSectionState, base_id):
+        previous = self._get_current_selection()
         self.host.selected_iids = {base_id}
         self.host._apply_selection_to_tree()
         self.host._refresh_grid_selection()
-        self.refresh_selection()
+        current = self._get_current_selection()
+        self._sync_selection_delta(previous, current, highlight_target=base_id)
         self.host._update_bulk_controls()
 
     def _toggle_crate_selection(self, base_id):
+        previous = self._get_current_selection()
         if base_id in self.host.selected_iids:
             self.host.selected_iids.remove(base_id)
         else:
             self.host.selected_iids.add(base_id)
         self.host._apply_selection_to_tree()
         self.host._refresh_grid_selection()
-        self.refresh_selection()
+        current = self._get_current_selection()
+        self._sync_selection_delta(previous, current, highlight_target=base_id)
         self.host._update_bulk_controls()
 
     def _focus_crate(self, base_id):
@@ -1032,100 +1154,147 @@ class ObjectShelfView:
             crate.focus_set()
 
     def _toggle_spec_sheet(self, state: ShelfSectionState, base_id):
-        if base_id in state.open_specs:
-            frame = state.open_specs.pop(base_id)
-            if frame and frame.winfo_exists():
-                frame.destroy()
+        if state.active_spec_id == base_id:
+            self._hide_spec_overlay(state)
             return
-        item = next(
-            (it for it in state.items if self.host._get_base_id(it) == base_id),
-            None,
-        )
+        item = state.item_map.get(base_id)
+        if not item:
+            item = next(
+                (it for it in state.items if self.host._get_base_id(it) == base_id),
+                None,
+            )
+            if item:
+                state.item_map[base_id] = item
         if not item:
             return
-        frame = ctk.CTkFrame(state.grid_frame, fg_color="#101010", corner_radius=10)
-        self._build_spec_sheet_content(frame, item)
-        if base_id not in state.crate_order:
-            state.crate_order.append(base_id)
-            state.crate_index[base_id] = len(state.crate_order) - 1
-        index = state.crate_index.get(base_id)
-        if index is None:
-            index = state.crate_order.index(base_id)
-            state.crate_index[base_id] = index
-        columns = max(1, state.column_count or 4)
-        row_group = index // columns
-        spec_row = row_group * 2 + 1
-        frame.grid(row=spec_row, column=0, columnspan=columns, sticky="nsew", padx=8, pady=(0, 12))
-        state.open_specs[base_id] = frame
-        try:
-            self.host.after_idle(lambda fr=frame: self._scroll_widget_into_view(fr))
-        except Exception:
-            self._scroll_widget_into_view(frame)
+        display = state.display_cache.get(base_id)
+        if not display:
+            display = self._prepare_item_display(state, item)
+        spec_data = self._prepare_spec_data(state, item)
+        crate = state.crate_widgets.get(base_id)
+        if crate and crate.winfo_exists():
+            try:
+                self.host.after_idle(lambda cr=crate: self._scroll_widget_into_view(cr))
+            except Exception:
+                self._scroll_widget_into_view(crate)
+        self._show_spec_overlay(state, base_id, display, spec_data)
 
-    def _build_spec_sheet_content(self, frame, item):
-        frame.pack_propagate(False)
-        header = ctk.CTkLabel(
-            frame,
-            text="SPEC SHEET",
-            font=("Segoe UI", 12, "bold"),
+    def _show_spec_overlay(
+        self,
+        state: ShelfSectionState,
+        base_id: str,
+        display: Dict[str, str],
+        spec_data: Sequence[Tuple[str, str, bool]],
+    ):
+        self._hide_spec_overlay(state)
+        overlay = ctk.CTkFrame(
+            state.body_holder,
+            fg_color="#0f0f0f",
+            corner_radius=14,
+            border_width=1,
+            border_color="#2f2f2f",
+        )
+        overlay.place(relx=0.5, rely=0.02, anchor="n", relwidth=0.96, relheight=0.96)
+        overlay.lift()
+        title_bar = ctk.CTkFrame(
+            overlay,
+            fg_color="#171717",
+            corner_radius=10,
+            border_width=1,
+            border_color="#2c2c2c",
+        )
+        title_bar.pack(fill="x", padx=12, pady=(12, 8))
+        name_label = ctk.CTkLabel(
+            title_bar,
+            text=display.get("name_text", ""),
+            font=self._fonts["name"],
             anchor="w",
         )
-        header.pack(fill="x", padx=12, pady=(12, 4))
-        fields = ["Description", "Stats", "Secrets"]
-        seen = set()
-        for key in fields:
-            value = item.get(key)
-            if value:
-                self._add_spec_field(frame, key, value)
-                seen.add(key)
-        for key, value in item.items():
-            if key in seen or key == self.host.unique_field:
-                continue
-            if value in (None, ""):
-                continue
-            self._add_spec_field(frame, key, value)
-
-    def _add_spec_field(self, parent, label, value):
-        label_text = str(label)
-        is_stats = label_text.lower() == "stats"
-        wrapper = ctk.CTkFrame(parent, fg_color="#141414", corner_radius=8)
-        if is_stats:
-            wrapper.pack(fill="x", padx=8, pady=(2, 6))
-        else:
-            wrapper.pack(fill="x", padx=10, pady=(4, 10))
-        title = ctk.CTkLabel(
-            wrapper,
-            text=label_text.upper(),
-            font=("Segoe UI", 12, "bold"),
-            anchor="w",
+        name_label.pack(side="left", fill="x", expand=True, padx=(12, 8), pady=8)
+        close_button = ctk.CTkButton(
+            title_bar,
+            text="Close",
+            width=80,
+            command=lambda st=state: self._hide_spec_overlay(st),
         )
-        if is_stats:
-            title.pack(fill="x", padx=8, pady=(4, 1))
-        else:
-            title.pack(fill="x", padx=10, pady=(6, 2))
-        text = self.host.clean_value(value)
-        if is_stats and isinstance(text, str):
-            normalized = text.replace("\r", "\n").split("\n")
-            lines = [segment.strip() for segment in normalized if segment.strip()]
-            text = " ".join(lines) if lines else text
-        body = ctk.CTkLabel(
-            wrapper,
-            text=text,
-            font=("Segoe UI", 12),
+        close_button.pack(side="right", padx=(8, 12), pady=8)
+
+        label_text = display.get("secondary_label", "Details")
+        value_text = display.get("secondary_value", "--")
+        summary_text = f"{label_text}: {value_text}"
+        summary_label = ctk.CTkLabel(
+            overlay,
+            text=summary_text,
+            font=self._fonts["body"],
             justify="left",
-            wraplength=1400,
             anchor="w",
         )
-        if is_stats:
-            body.pack(fill="x", padx=8, pady=(0, 6))
-        else:
-            body.pack(fill="x", padx=10, pady=(0, 8))
+        summary_label.pack(fill="x", padx=20, pady=(0, 6))
+
+        content = ctk.CTkScrollableFrame(
+            overlay,
+            fg_color="#101010",
+            corner_radius=10,
+        )
+        content.pack(fill="both", expand=True, padx=12, pady=(0, 12))
+        self._build_spec_sheet_content(content, spec_data)
+
+        overlay.bind("<Escape>", lambda _e, st=state: self._hide_spec_overlay(st))
+        overlay.after(10, overlay.focus_set)
+        state.spec_overlay = overlay
+        state.spec_overlay_body = content
+        state.active_spec_id = base_id
+
+    def _build_spec_sheet_content(self, parent, spec_data: Sequence[Tuple[str, str, bool]]):
+        for child in parent.winfo_children():
+            child.destroy()
+        wrap_labels: List[ctk.CTkLabel] = []
+        for label_text, text, is_stats in spec_data:
+            wrapper = ctk.CTkFrame(parent, fg_color="#161616", corner_radius=10)
+            pad_x = 12 if not is_stats else 10
+            pad_y = (6, 12) if not is_stats else (4, 10)
+            wrapper.pack(fill="x", padx=pad_x, pady=pad_y)
+            title = ctk.CTkLabel(
+                wrapper,
+                text=label_text.upper(),
+                font=self._fonts["spec_title"],
+                anchor="w",
+            )
+            title.pack(fill="x", padx=12, pady=(10, 4))
+            body = ctk.CTkLabel(
+                wrapper,
+                text=text,
+                font=self._fonts["spec_body"],
+                justify="left",
+                wraplength=780,
+                anchor="w",
+            )
+            body.pack(fill="x", padx=12, pady=(0, 12))
+            wrap_labels.append(body)
+
+        def _update_wrap(_event=None, labels=wrap_labels, widget=parent):
+            width = max(320, widget.winfo_width() - 40)
+            for label in labels:
+                if label and label.winfo_exists():
+                    label.configure(wraplength=width)
+
+        parent.bind("<Configure>", _update_wrap, add="+")
+        parent.after(50, _update_wrap)
+
+    def _hide_spec_overlay(self, state: ShelfSectionState, destroy: bool = True):
+        if not state:
+            return
+        overlay = state.spec_overlay
+        if overlay and overlay.winfo_exists():
+            overlay.place_forget()
+            if destroy:
+                overlay.destroy()
+        state.spec_overlay = None
+        state.spec_overlay_body = None
+        state.active_spec_id = None
 
     def _dispose_specs(self, state: ShelfSectionState):
-        for base_id, frame in list(state.open_specs.items()):
-            if frame and frame.winfo_exists():
-                frame.destroy()
-        state.open_specs.clear()
+        self._hide_spec_overlay(state)
 
     def _scroll_widget_into_view(self, widget, padding: int = 20):
         if not widget or not widget.winfo_exists():
@@ -1227,7 +1396,7 @@ class ObjectShelfView:
                 self._ensure_section_loaded(state)
                 self._maybe_load_more_crates(state)
             else:
-                if state.open_specs and not state.pinned:
+                if state.active_spec_id and not state.pinned:
                     self._dispose_specs(state)
         self._update_return_button()
 
