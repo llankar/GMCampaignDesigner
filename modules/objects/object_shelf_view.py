@@ -268,9 +268,8 @@ class ObjectShelfView:
         )
         body_holder.pack(fill="both", expand=True, padx=6, pady=(0, 6))
         collapsed_strip = self._build_collapsed_strip(state, container, before_widget=body_holder)
-        self._build_section_overlay(state, body_holder)
         grid_frame = ctk.CTkFrame(body_holder, fg_color="#141414")
-        grid_frame.pack(fill="both", expand=True, padx=12, pady=(44, 12))
+        grid_frame.pack(fill="both", expand=True, padx=12, pady=(12, 12))
         state.grid_frame = grid_frame
         #state.compact = len(state.items) > 40
         state.column_count = 10 if state.compact else 10
