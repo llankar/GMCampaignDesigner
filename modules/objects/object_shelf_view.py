@@ -562,8 +562,7 @@ class ObjectShelfView:
             corner_radius=0,
             border_width=0,
         )
-        strip.configure(height=54, cursor="hand2")
-        strip.pack_propagate(False)
+        strip.configure(cursor="hand2")
         strip.bind("<Button-1>", lambda _e, st=state: self._toggle_section_collapse(st))
         strip.bind("<Return>", lambda _e, st=state: self._toggle_section_collapse(st))
         strip.bind("<space>", lambda _e, st=state: self._toggle_section_collapse(st))
@@ -595,37 +594,48 @@ class ObjectShelfView:
         )
         surface.pack(fill="both", expand=True, padx=3, pady=3)
         surface.pack_propagate(False)
-        surface.grid_columnconfigure(1, weight=1)
-        surface.grid_columnconfigure(2, weight=1)
 
         bottom_band = ctk.CTkFrame(surface, fg_color="#1a120c", height=6, corner_radius=3)
         bottom_band.place(relx=0.5, rely=0.92, anchor="s", relwidth=0.88)
 
         left_post = ctk.CTkFrame(surface, fg_color="#3b2515", corner_radius=5, width=18)
-        left_post.grid(row=0, column=0, rowspan=2, sticky="ns", padx=(14, 8), pady=8)
+        left_post.place(relx=0.08, rely=0.5, anchor="center", relheight=0.72)
+
+        right_post = ctk.CTkFrame(surface, fg_color="#3b2515", corner_radius=5, width=18)
+        right_post.place(relx=0.92, rely=0.5, anchor="center", relheight=0.72)
+
+        info_frame = ctk.CTkFrame(
+            strip,
+            fg_color="#1a1a1a",
+            corner_radius=10,
+            border_width=1,
+            border_color="#262626",
+        )
+        info_frame.pack(fill="x", padx=12, pady=(0, 6))
+        info_frame.grid_columnconfigure(0, weight=1)
 
         title = ctk.CTkLabel(
-            surface,
+            info_frame,
             text="",
             font=("Segoe UI", 13, "bold"),
             anchor="w",
             justify="left",
             text_color="#f7f0e4",
         )
-        title.grid(row=0, column=1, sticky="w", pady=(6, 0))
+        title.grid(row=0, column=0, sticky="w", padx=10, pady=(6, 0))
 
         detail = ctk.CTkLabel(
-            surface,
+            info_frame,
             text="",
             font=("Segoe UI", 11),
             anchor="w",
             justify="left",
             text_color="#e5d4bb",
         )
-        detail.grid(row=1, column=1, sticky="w", pady=(0, 6))
+        detail.grid(row=1, column=0, sticky="w", padx=10, pady=(0, 8))
 
         pin_button = ctk.CTkButton(
-            surface,
+            info_frame,
             text="☆",
             width=28,
             height=28,
@@ -636,10 +646,10 @@ class ObjectShelfView:
             font=("Segoe UI", 16),
             command=lambda st=state: self._toggle_section_pin(st),
         )
-        pin_button.grid(row=0, column=3, rowspan=2, padx=(10, 6), pady=8)
+        pin_button.grid(row=0, column=1, rowspan=2, padx=(12, 6), pady=8)
 
         collapse_button = ctk.CTkButton(
-            surface,
+            info_frame,
             text=">",
             width=34,
             height=28,
@@ -648,12 +658,9 @@ class ObjectShelfView:
             hover_color="#1F6AA5",
             command=lambda st=state: self._toggle_section_collapse(st),
         )
-        collapse_button.grid(row=0, column=4, rowspan=2, padx=(0, 10), pady=8)
+        collapse_button.grid(row=0, column=2, rowspan=2, padx=(0, 10), pady=8)
 
-        right_post = ctk.CTkFrame(surface, fg_color="#3b2515", corner_radius=5, width=18)
-        right_post.grid(row=0, column=5, rowspan=2, sticky="ns", padx=(0, 12), pady=8)
-
-        interactive = [strip, plank, surface, left_post, title, detail, right_post, bottom_band]
+        interactive = [strip, plank, surface, left_post, right_post, bottom_band, info_frame, title, detail]
         for widget in interactive:
             widget.bind(
                 "<Button-1>",
@@ -735,13 +742,14 @@ class ObjectShelfView:
         if state.pinned:
             status_bits.append("Pinned")
         status_bits.append("Closed" if state.collapsed else "Open")
-        status_text = " | ".join(status_bits)
+        action_text = "click to reopen" if state.collapsed else "click to collapse"
         category_text = self._format_category_display(state).upper()
-        state.collapsed_title.configure(text=f"{category_text} SHELF  ({status_text})")
-        if state.collapsed:
-            detail_text = f"{count} {noun} stored - click to reopen"
-        else:
-            detail_text = f"{count} {noun} displayed - click to collapse"
+        state.collapsed_title.configure(text=category_text)
+        detail_parts = [f"{count} {noun}"]
+        if status_bits:
+            detail_parts.extend(status_bits)
+        detail_parts.append(action_text)
+        detail_text = " • ".join(detail_parts)
         state.collapsed_detail.configure(text=detail_text)
         self._update_section_overlay_text(state)
 
