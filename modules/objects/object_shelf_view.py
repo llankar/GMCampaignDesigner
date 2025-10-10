@@ -2,9 +2,11 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Dict, List, Optional, Sequence, Set, Tuple
 
 import customtkinter as ctk
+from PIL import Image
 
 
 @dataclass
@@ -58,7 +60,11 @@ class ObjectShelfView:
     def __init__(self, host, allowed_categories: Sequence[str]):
         self.host = host
         self.allowed_categories = [c for c in allowed_categories]
-        self.frame = ctk.CTkFrame(host, fg_color="#181818")
+        self.frame = ctk.CTkFrame(host, fg_color="transparent")
+        self._background_image_source = None
+        self._background_image = None
+        self._background_label: Optional[ctk.CTkLabel] = None
+        self._initialize_background()
         self.search_frame: Optional[ctk.CTkFrame] = None
         self.search_entry: Optional[ctk.CTkEntry] = None
         self.search_button: Optional[ctk.CTkButton] = None
@@ -82,7 +88,7 @@ class ObjectShelfView:
 
         self.container = ctk.CTkScrollableFrame(
             self.frame,
-            fg_color="#151515",
+            fg_color="transparent",
             corner_radius=0,
         )
         self.container.pack(fill="both", expand=True, padx=10, pady=10)
@@ -120,6 +126,46 @@ class ObjectShelfView:
             "spec_body": ctk.CTkFont(family="Segoe UI", size=12),
         }
         self._last_known_selection: Set[str] = set()
+
+    def _initialize_background(self):
+        """Create and manage the background image for the shelf view."""
+
+        image_path = Path(__file__).resolve().parents[2] / "assets" / "objects_shelves_background.jpg"
+        if not image_path.exists():
+            return
+        try:
+            with Image.open(image_path) as img:
+                self._background_image_source = img.convert("RGBA")
+        except Exception:
+            self._background_image_source = None
+            return
+
+        self._background_image = ctk.CTkImage(
+            light_image=self._background_image_source,
+            dark_image=self._background_image_source,
+        )
+        self._background_label = ctk.CTkLabel(
+            self.frame,
+            text="",
+            image=self._background_image,
+        )
+        self._background_label.place(relx=0, rely=0, relwidth=1, relheight=1)
+        self._background_label.lower()
+        self.frame.bind("<Configure>", self._on_frame_resize, add=True)
+
+    def _on_frame_resize(self, event):
+        """Resize the background image to keep it filling the frame."""
+
+        if not self._background_label or not self._background_image_source:
+            return
+        width = max(int(event.width), 1)
+        height = max(int(event.height), 1)
+        self._background_image = ctk.CTkImage(
+            light_image=self._background_image_source,
+            dark_image=self._background_image_source,
+            size=(width, height),
+        )
+        self._background_label.configure(image=self._background_image)
 
     def _build_search_bar(self):
         """Create a shelf-level search input that leverages the host filter."""
