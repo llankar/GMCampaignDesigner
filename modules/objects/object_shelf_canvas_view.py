@@ -428,8 +428,8 @@ class ObjectShelfView:
         # Centered text: "CATEGORY • 77 items"
         label = f"{row.display.upper()} • {row.count} items"
         self.canvas.create_text(
-            (x1 + x2) // 2,
-            y1 + height // 2,
+            x1 + 16 + panel_w // 2,
+            y1 + int(panel_h * 0.75),
             text=label,
             fill="#e9e9e9",
             font=("Segoe UI", 14, "bold"),
