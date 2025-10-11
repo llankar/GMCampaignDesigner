@@ -102,6 +102,8 @@ class ObjectShelfView:
         # Shelf rows and drawing cache
         self._rows: List[_ShelfRow] = []
         self._panel_cache: Dict[Tuple[int, int], ImageTk.PhotoImage] = {}
+        self._shelf_cache: Dict[Tuple[int, int], ImageTk.PhotoImage] = {}
+        self._crate_cache: Dict[Tuple[int, int], ImageTk.PhotoImage] = {}
         self._item_by_tag: Dict[str, dict] = {}
         self._detail_panel: Optional[ctk.CTkFrame] = None
         self._detail_body: Optional[ctk.CTkScrollableFrame] = None
@@ -417,6 +419,26 @@ class ObjectShelfView:
         # Guard against very small widths during early geometry phases
         panel_w = max(1, width - 32)
         panel_h = max(1, height)
+        # Draw wood-like shelf plank (fast cached image) and label, then return
+        try:
+            shelf_img = self._get_shelf_image(panel_w, panel_h)
+            self.canvas.create_image(
+                x1 + 16, y1, image=shelf_img, anchor="nw", tags=("shelf", f"row:{row.category_key}")
+            )
+            label = f"{row.display.upper()} • {row.count} items"
+            self.canvas.create_text(
+                x1 + 16 + panel_w // 2,
+                y1 + panel_h // 2,
+                text=label,
+                fill="#050300",
+                font=("Segoe UI", 14, "bold"),
+                anchor="center",
+                tags=("shelf", f"row:{row.category_key}"),
+            )
+            return
+        except Exception:
+            # Fallback to previous panel style if shelf image fails
+            pass
         panel = self._get_panel_image(panel_w, panel_h, radius=16)
         img_item = self.canvas.create_image(
             x1 + 16, y1, image=panel, anchor="nw", tags=("shelf", f"row:{row.category_key}")
@@ -459,6 +481,77 @@ class ObjectShelfView:
             self._rounded_rect(draw, (1, 1, x2, y2), max(0, r - 2), fill=(255, 255, 255, 18))
         photo = ImageTk.PhotoImage(img)
         self._panel_cache[key] = photo
+        return photo
+
+    def _get_shelf_image(self, width: int, height: int) -> ImageTk.PhotoImage:
+        """Cached wood-like plank image for shelf rows.
+
+        Uses a simple warm gradient with subtle plank lines for a shelf look.
+        """
+        key = (width, height)
+        cached = self._shelf_cache.get(key)
+        if cached is not None:
+            return cached
+        width = max(1, int(width))
+        height = max(1, int(height))
+        img = Image.new("RGBA", (width, height), (0, 0, 0, 0))
+        draw = ImageDraw.Draw(img)
+        # Base rounded plank
+        base_fill = (96, 64, 32, 230)  # warm brown
+        border = (35, 22, 10, 240)
+        self._rounded_rect(draw, (0, 0, width, height), 14, fill=base_fill, outline=border, width=2)
+        # Light gradient from top to bottom for depth
+        for i in range(height):
+            alpha = int(28 * (1 - i / max(1, height)))
+            draw.line([(2, i + 1), (width - 3, i + 1)], fill=(255, 235, 205, alpha))
+        # Plank seams
+        seam_color = (60, 40, 20, 70)
+        plank_h = max(16, height // 2)
+        y = 3 + plank_h
+        while y < height - 3:
+            draw.line([(6, y), (width - 6, y)], fill=seam_color, width=1)
+            y += plank_h
+        # Screw heads at corners
+        screw = (30, 25, 18, 180)
+        for sx, sy in [(10, 10), (width - 12, 10), (10, height - 12), (width - 12, height - 12)]:
+            draw.ellipse((sx, sy, sx + 4, sy + 4), fill=screw)
+        photo = ImageTk.PhotoImage(img)
+        self._shelf_cache[key] = photo
+        return photo
+
+    def _get_crate_image(self, width: int, height: int) -> ImageTk.PhotoImage:
+        """Cached crate tile image for object items.
+
+        Designed to be used as a single canvas image per item for speed.
+        """
+        key = (width, height)
+        cached = self._crate_cache.get(key)
+        if cached is not None:
+            return cached
+        width = max(8, int(width))
+        height = max(8, int(height))
+        img = Image.new("RGBA", (width, height), (0, 0, 0, 0))
+        draw = ImageDraw.Draw(img)
+        # Outer box
+        base = (58, 39, 22, 235)
+        border = (20, 12, 6, 240)
+        self._rounded_rect(draw, (0, 0, width, height), 6, fill=base, outline=border, width=2)
+        # Inner slats
+        slat_color = (85, 58, 34, 220)
+        pad = 4
+        slat_h = max(6, height // 3)
+        y = pad
+        for _ in range(3):
+            if y + slat_h > height - pad:
+                break
+            draw.rectangle((pad, y, width - pad, y + slat_h), fill=slat_color)
+            y += slat_h + 2
+        # Cross braces
+        brace = (40, 26, 14, 140)
+        draw.line([(pad + 1, pad + 1), (width - pad - 1, height - pad - 1)], fill=brace, width=2)
+        draw.line([(pad + 1, height - pad - 1), (width - pad - 1, pad + 1)], fill=brace, width=2)
+        photo = ImageTk.PhotoImage(img)
+        self._crate_cache[key] = photo
         return photo
 
     @staticmethod
@@ -532,7 +625,7 @@ class ObjectShelfView:
 
     def _measure_items_height(self, inner_width: int, row: _ShelfRow) -> int:
         padding = 16
-        tile_h = 30
+        tile_h = 36
         min_tile_w = 180
         cols = max(1, inner_width // min_tile_w)
         rows = (len(row.items) + cols - 1) // cols
@@ -541,7 +634,7 @@ class ObjectShelfView:
     def _draw_row_items(self, x: int, y: int, right: int, row: _ShelfRow):
         inner_width = right - x
         padding = 16
-        tile_h = 30
+        tile_h = 36
         min_tile_w = 180
         gap_x = 10
         gap_y = 6
@@ -557,11 +650,11 @@ class ObjectShelfView:
             ix = ox + c * (col_w + gap_x)
             # background chip (semi‑transparent)
             tag = f"obj:{row.category_key}:{idx}"
-            rect = self.canvas.create_rectangle(
-                ix, iy, ix + col_w, iy + tile_h,
-                fill="#2a2a2a",
-                outline="#000000",
-                width=1,
+            crate_img = self._get_crate_image(col_w, tile_h)
+            self.canvas.create_image(
+                ix, iy,
+                image=crate_img,
+                anchor="nw",
                 tags=items_tag + (tag,),
             )
             name = str(item.get("Name") or item.get("name") or "Unnamed")
@@ -569,7 +662,7 @@ class ObjectShelfView:
                 ix + col_w // 2,
                 iy + tile_h // 2,
                 text=name,
-                fill="#dddddd",
+                fill="#fff7e6",
                 font=("Segoe UI", 12),
                 anchor="center",
                 tags=items_tag + (tag,),
