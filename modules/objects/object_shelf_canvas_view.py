@@ -107,8 +107,18 @@ class ObjectShelfView:
         self._detail_body: Optional[ctk.CTkScrollableFrame] = None
         self._detail_title: Optional[ctk.CTkLabel] = None
         self._detail_meta: Optional[ctk.CTkLabel] = None
-        self._detail_desc: Optional[ctk.CTkTextbox] = None
+        self._detail_desc: Optional[object] = None  # can be CTkLabel or CTkTextbox
         self._detail_html_label = None
+
+        # New: fixed-height lower bar that never adapts to its content
+        self._fixed_panel: Optional[ctk.CTkFrame] = None
+        self._fixed_header: Optional[ctk.CTkFrame] = None
+        self._fixed_body: Optional[ctk.CTkScrollableFrame] = None
+        self._fixed_title: Optional[ctk.CTkLabel] = None
+        self._fixed_meta: Optional[ctk.CTkLabel] = None
+        self._fixed_desc: Optional[object] = None
+        self._fixed_html_label = None
+        self._fixed_bar_height: int = 160  # thin bar, constant height
 
         # Bindings
         self.canvas.bind("<Configure>", self._on_canvas_configure, add=True)
@@ -246,16 +256,75 @@ class ObjectShelfView:
         self.canvas.yview_scroll(int(delta / 120), "units")
 
     def _on_detail_mousewheel(self, event):
-        # Scroll only the detail body's own scrollable area and stop propagation
-        body = getattr(self, "_detail_body", None)
-        if body is None or not body.winfo_exists():
-            return
-        inner_canvas = getattr(body, "_parent_canvas", None)
-        if inner_canvas is None:
-            return "break"
-        delta = -1 * (event.delta if event.delta else 0)
-        inner_canvas.yview_scroll(int(delta / 120), "units")
+        # Scroll only the detail area's own scrollable canvas (fixed or legacy)
+        candidates = []
+        fb = getattr(self, "_fixed_body", None)
+        if fb is not None and hasattr(fb, "winfo_exists") and fb.winfo_exists():
+            candidates.append(fb)
+        db = getattr(self, "_detail_body", None)
+        if db is not None and hasattr(db, "winfo_exists") and db.winfo_exists():
+            candidates.append(db)
+        candidates.append(getattr(event, "widget", None))
+        for c in candidates:
+            if c is None:
+                continue
+            inner_canvas = getattr(c, "_parent_canvas", None)
+            if inner_canvas is not None:
+                delta = -1 * (event.delta if getattr(event, "delta", 0) else 0)
+                try:
+                    inner_canvas.yview_scroll(int(delta / 120), "units")
+                except Exception:
+                    pass
+                return "break"
         return "break"
+
+    def _update_detail_body_height(self, max_panel_height: int = 150, min_body_height: int = 40):
+        """Adjust detail scroll area height based on content, capping total panel height.
+
+        The overall detail panel should not exceed `max_panel_height`.
+        We compute available height for the scrollable body by subtracting the
+        header height and known paddings, then clamp the body height to that.
+        """
+        body = getattr(self, "_detail_body", None)
+        if not body or not body.winfo_exists():
+            return
+        try:
+            inner = getattr(body, "_scrollable_frame", None)
+            if inner and inner.winfo_exists():
+                inner.update_idletasks()
+                desired_content = inner.winfo_reqheight()
+            else:
+                body.update_idletasks()
+                desired_content = body.winfo_reqheight()
+
+            header = getattr(self, "_detail_header", None)
+            header_h = 0
+            header_pad = 10  # from header.pack(pady=(6,4))
+            if header and header.winfo_exists():
+                header.update_idletasks()
+                header_h = max(header.winfo_height(), header.winfo_reqheight())
+
+            body_pad_bottom = 4  # from body.pack(pady=(0,4))
+            available_for_body = max_panel_height - (header_h + header_pad + body_pad_bottom)
+            available_for_body = max(min_body_height, available_for_body)
+
+            # When the body hasn't been laid out yet (width/height ~ 0),
+            # force-start at the cap to avoid a visible grow-from-thin flicker.
+            if body.winfo_width() <= 1 or body.winfo_height() <= 1:
+                desired = int(available_for_body)
+            else:
+                desired = int(min(desired_content, available_for_body))
+            current = int(getattr(body, "_desired_height", 0) or 0)
+            # Optionally, set panel height explicitly to enforce the cap
+            panel = getattr(self, "_detail_panel", None)
+            if panel and panel.winfo_exists():
+                total = min(150,header_h + header_pad + desired + body_pad_bottom)
+                panel.configure(height=total)
+        except Exception:
+            try:
+                body.configure(height=total)
+            except Exception:
+                pass
 
     def _on_canvas_configure(self, _event):
         self._request_redraw()
@@ -522,9 +591,131 @@ class ObjectShelfView:
                 if t.startswith("obj:"):
                     it = self._item_by_tag.get(t)
                     if it is not None:
-                        self._show_item_detail(it)
+                        # Use the new fixed-height lower bar with its own scrollbar
+                        self._show_item_detail_fixed(it)
                         return "break"
         return None
+
+    # ----- Fixed lower bar (new implementation) -------------------------
+    def _ensure_fixed_detail_bar(self):
+        if self._fixed_panel and self._fixed_panel.winfo_exists():
+            return
+        panel = ctk.CTkFrame(
+            self.frame,
+            fg_color="#171717",
+            corner_radius=12,
+            border_width=1,
+            border_color="#2a2a2a",
+            height=self._fixed_bar_height,
+        )
+        # Prevent geometry propagation so children don't change the panel size
+        try:
+            panel.pack_propagate(False)
+            panel.grid_propagate(False)
+        except Exception:
+            pass
+        # Dock to bottom with a constant height; never adapts to content
+        panel.configure(height=self._fixed_bar_height)
+        panel.place(relx=0.0, rely=1.0, relwidth=1.0, anchor="sw", x=0, y=-8)
+        # Header
+        header = ctk.CTkFrame(panel, fg_color="#1f1f1f", corner_radius=10)
+        header.pack(fill="x", padx=10, pady=(6, 4))
+        title = ctk.CTkLabel(header, text="", font=("Segoe UI", 14, "bold"))
+        title.pack(side="left", padx=10, pady=(4, 2))
+        meta = ctk.CTkLabel(header, text="", font=("Segoe UI", 12))
+        meta.pack(side="left", padx=(8, 10), pady=(4, 2))
+        close_btn = ctk.CTkButton(header, text="Close", width=70, corner_radius=16, command=self._hide_fixed_detail_bar)
+        close_btn.pack(side="right", padx=10, pady=(4, 2))
+        # Scrollable content area: fills remaining height inside fixed panel
+        body = ctk.CTkScrollableFrame(panel, fg_color="#171717", corner_radius=10)
+        body.pack(fill="both", expand=True, padx=10, pady=(0, 6))
+        try:
+            body.bind("<MouseWheel>", self._on_detail_mousewheel, add=True)
+        except Exception:
+            pass
+        self._fixed_panel = panel
+        self._fixed_header = header
+        self._fixed_body = body
+        self._fixed_title = title
+        self._fixed_meta = meta
+
+    def _hide_fixed_detail_bar(self):
+        if self._fixed_panel and self._fixed_panel.winfo_exists():
+            self._fixed_panel.place_forget()
+
+    def _show_item_detail_fixed(self, item: dict):
+        # Build bar if needed and keep constant size; also hide legacy panel
+        self._ensure_fixed_detail_bar()
+        try:
+            self._hide_item_detail()
+        except Exception:
+            pass
+        if not self._fixed_panel or not self._fixed_body:
+            return
+        # Title & meta
+        name = str(item.get("Name") or item.get("name") or "Unnamed")
+        category = str(
+            item.get("Category") or item.get("category") or item.get("Type") or item.get("type") or ""
+        )
+        if self._fixed_title:
+            self._fixed_title.configure(text=name)
+        if self._fixed_meta:
+            self._fixed_meta.configure(text=category)
+
+        # Clear previous content except header
+        for child in list(self._fixed_body.winfo_children()):
+            child.destroy()
+
+        # Description: prefer HTML if available
+        raw_desc = item.get("Description") or item.get("description") or item.get("Text") or item.get("text") or ""
+        self._fixed_html_label = None
+        self._fixed_desc = None
+        if isinstance(raw_desc, dict) and HTMLLabel is not None:
+            try:
+                html_text = rtf_to_html(raw_desc)
+                hl = HTMLLabel(self._fixed_body, html=html_text, background="#171717", foreground="#F0F0F0")
+                hl.pack(fill="x", padx=10, pady=(4, 8))
+                self._fixed_html_label = hl
+            except Exception:
+                pass
+        if self._fixed_html_label is None:
+            # Plain label that wraps to container width
+            lbl = ctk.CTkLabel(
+                self._fixed_body,
+                text=(format_multiline_text(raw_desc) if isinstance(raw_desc, dict) else str(raw_desc)),
+                anchor="w",
+                justify="left",
+                font=("Segoe UI", 12),
+            )
+            lbl.pack(fill="x", padx=10, pady=(4, 8))
+            def _wrap(_e=None, l=lbl, p=self._fixed_body):
+                try:
+                    l.configure(wraplength=max(100, p.winfo_width() - 40))
+                except Exception:
+                    pass
+            try:
+                self._fixed_body.bind("<Configure>", _wrap, add=True)
+                self._fixed_body.after_idle(_wrap)
+            except Exception:
+                _wrap()
+            self._fixed_desc = lbl
+
+        # Optional stats (reusing existing renderer but targeting fixed body)
+        try:
+            self._rebuild_stats(body=self._fixed_body, item=item)
+        except Exception:
+            pass
+
+        # Finally, ensure bar is visible at bottom with constant height
+        try:
+            self._fixed_panel.configure(height=self._fixed_bar_height)
+        except Exception:
+            pass
+        self._fixed_panel.place(relx=0.0, rely=1.0, relwidth=1.0, anchor="sw", x=0, y=-8)
+        try:
+            self._fixed_panel.lift()
+        except Exception:
+            pass
 
     # ----- Detail panel --------------------------------------------------
     def _ensure_detail_panel(self):
@@ -536,16 +727,16 @@ class ObjectShelfView:
             corner_radius=12,
             border_width=1,
             border_color="#2a2a2a",
-            height=160,
         )
         # Dock to the bottom; full width, fixed height
         panel.place(relx=0.0, rely=1.0, relwidth=1.0, anchor="sw", x=0, y=-10)
         header = ctk.CTkFrame(panel, fg_color="#1f1f1f", corner_radius=10)
-        header.pack(fill="x", padx=10, pady=(10, 6))
+        header.pack(fill="x", padx=10, pady=(6, 4))
+        self._detail_header = header
         self._detail_title = ctk.CTkLabel(header, text="", font=("Segoe UI", 16, "bold"))
-        self._detail_title.pack(fill="x", padx=10, pady=(8, 4))
+        self._detail_title.pack(fill="x", padx=10, pady=(4, 0))
         self._detail_meta = ctk.CTkLabel(header, text="", font=("Segoe UI", 12))
-        self._detail_meta.pack(fill="x", padx=10, pady=(0, 8))
+        self._detail_meta.pack(fill="x", padx=10, pady=(0, 4))
 
         close_btn = ctk.CTkButton(
             header,
@@ -554,16 +745,32 @@ class ObjectShelfView:
             corner_radius=16,
             command=self._hide_item_detail,
         )
-        close_btn.pack(padx=10, pady=(0, 10), anchor="e")
+        # Keep the header compact: place the close button at the top-right
+        # so it shares the same row as the title instead of creating extra height.
+        try:
+            close_btn.place(relx=1.0, rely=0.0, anchor="ne", x=-10, y=6)
+        except Exception:
+            # Fallback to packing on the right if placing is unavailable
+            close_btn.pack(padx=10, pady=(0, 6), anchor="e")
 
-        body = ctk.CTkScrollableFrame(panel, fg_color="#171717", corner_radius=10)
-        body.pack(fill="both", expand=True, padx=10, pady=(0, 10))
+        # Detail body auto-sizes to content; we cap height dynamically later
+        body = ctk.CTkScrollableFrame(
+            panel,
+            fg_color="#171717",
+            corner_radius=10,
+        )
+        body.pack(fill="x", expand=False, padx=10, pady=(0, 4))
         self._detail_body = body
         try:
             self._detail_body.bind("<MouseWheel>", self._on_detail_mousewheel, add=True)
         except Exception:
             pass
-        # Description (HTML if available, else plain textbox)
+        try:
+            # Recompute body height whenever its size may change
+            body.bind("<Configure>", lambda _e: self._update_detail_body_height(), add=True)
+        except Exception:
+            pass
+        # Description (HTML if available, else wrapped label that autosizes)
         if HTMLLabel is not None:
             try:
                 self._detail_html_label = HTMLLabel(
@@ -572,13 +779,31 @@ class ObjectShelfView:
                     background="#171717",
                     foreground="#F0F0F0",
                 )
-                self._detail_html_label.pack(fill="x", padx=10, pady=(10, 12))
+                self._detail_html_label.pack(fill="x", padx=10, pady=(6, 8))
             except Exception:
                 self._detail_html_label = None
         if self._detail_html_label is None:
-            self._detail_desc = ctk.CTkTextbox(body, height=160, wrap="word")
-            self._detail_desc.pack(fill="x", padx=10, pady=(10, 12))
-            self._detail_desc.configure(state="disabled")
+            # Use a label that wraps to container width and grows with content
+            self._detail_desc = ctk.CTkLabel(
+                body,
+                text="",
+                anchor="w",
+                justify="left",
+                font=("Segoe UI", 12),
+            )
+            self._detail_desc.pack(fill="x", padx=10, pady=(6, 8))
+            # Bind wraplength to container width for natural height
+            def _resize_wrap(_e=None, lbl=self._detail_desc, parent=body):
+                try:
+                    wrap = max(100, parent.winfo_width() - 40)
+                    lbl.configure(wraplength=wrap)
+                except Exception:
+                    pass
+            try:
+                body.bind("<Configure>", _resize_wrap, add=True)
+                body.after_idle(_resize_wrap)
+            except Exception:
+                _resize_wrap()
         self._detail_panel = panel
 
     def _hide_item_detail(self):
@@ -605,36 +830,53 @@ class ObjectShelfView:
                 except Exception:
                     plain = format_multiline_text(raw_desc)
                     if self._detail_desc is None:
-                        self._detail_desc = ctk.CTkTextbox(self._detail_body, height=160, wrap="word")
-                        self._detail_desc.pack(fill="x", padx=10, pady=(10, 12))
-                    self._detail_desc.configure(state="normal")
-                    self._detail_desc.delete("1.0", "end")
-                    self._detail_desc.insert("1.0", plain or "(no description)")
-                    self._detail_desc.configure(state="disabled")
+                        self._detail_desc = ctk.CTkLabel(
+                            self._detail_body,
+                            text="",
+                            anchor="w",
+                            justify="left",
+                            font=("Segoe UI", 12),
+                        )
+                        self._detail_desc.pack(fill="x", padx=10, pady=(6, 8))
+                    self._detail_desc.configure(text=(plain or "(no description)"))
             else:
                 plain = format_multiline_text(raw_desc)
-                self._detail_desc.configure(state="normal")
-                self._detail_desc.delete("1.0", "end")
-                self._detail_desc.insert("1.0", plain or "(no description)")
-                self._detail_desc.configure(state="disabled")
+                if isinstance(self._detail_desc, ctk.CTkLabel):
+                    self._detail_desc.configure(text=(plain or "(no description)"))
+                else:
+                    # Fallback if a textbox exists from previous content
+                    try:
+                        self._detail_desc.configure(state="normal")
+                        self._detail_desc.delete("1.0", "end")
+                        self._detail_desc.insert("1.0", plain or "(no description)")
+                        self._detail_desc.configure(state="disabled")
+                    except Exception:
+                        pass
         else:
             text_val = str(raw_desc)
             if self._detail_html_label is not None:
                 safe = text_val.replace("\n", "<br>")
                 self._detail_html_label.set_html(f"<p>{safe}</p>")
             else:
-                self._detail_desc.configure(state="normal")
-                self._detail_desc.delete("1.0", "end")
-                self._detail_desc.insert("1.0", text_val or "(no description)")
-                self._detail_desc.configure(state="disabled")
+                if isinstance(self._detail_desc, ctk.CTkLabel):
+                    self._detail_desc.configure(text=(text_val or "(no description)"))
+                else:
+                    try:
+                        self._detail_desc.configure(state="normal")
+                        self._detail_desc.delete("1.0", "end")
+                        self._detail_desc.insert("1.0", text_val or "(no description)")
+                        self._detail_desc.configure(state="disabled")
+                    except Exception:
+                        pass
         # Stats grid
         for child in list(self._detail_body.winfo_children()):
             # keep the textbox; it's already in children
             pass
         # Rebuild stats area below the textbox
         self._rebuild_stats(body=self._detail_body, item=item)
-        # Ensure panel is visible (bottom dock)
-        self._detail_panel.place(relx=0.0, rely=1.0, relwidth=1.0, anchor="sw", x=0, y=-10)
+        # Ensure panel is visible (bottom dock) and height fits content
+        self._detail_panel.place(relx=0.0, rely=1.0, relwidth=1.0, anchor="sw", x=0, y=-2)
+        self._update_detail_body_height()
 
     def _rebuild_stats(self, body: ctk.CTkScrollableFrame, item: dict):
         # Remove any previous stat frames except the textbox
@@ -646,10 +888,8 @@ class ObjectShelfView:
         stats_long = item.get("Stats") or item.get("stats") or item.get("Rules") or item.get("rules")
         if stats_long:
             stats_block = ctk.CTkFrame(body, fg_color="#1f1f1f", corner_radius=10)
-            stats_block.pack(fill="x", padx=10, pady=(0, 10))
-            ctk.CTkLabel(stats_block, text="Rules & Stats", font=("Segoe UI", 14, "bold")).pack(
-                anchor="w", padx=10, pady=(8, 4)
-            )
+            stats_block.pack(fill="x", padx=10, pady=(0, 6))
+            ctk.CTkLabel(stats_block, text="Rules & Stats", font=("Segoe UI", 14, "bold")).pack(anchor="w", padx=10, pady=(6, 4))
             # Render as HTML if available, else plain text
             if isinstance(stats_long, dict) and HTMLLabel is not None:
                 try:
@@ -658,46 +898,74 @@ class ObjectShelfView:
                         fill="x", padx=10, pady=(0, 10)
                     )
                 except Exception:
-                    # fallback to plain
-                    txt = ctk.CTkTextbox(stats_block, height=120, wrap="word")
-                    txt.pack(fill="x", padx=10, pady=(0, 10))
-                    txt.insert("1.0", format_multiline_text(stats_long))
-                    txt.configure(state="disabled")
+                    # fallback to plain label that wraps and autosizes
+                    lbl = ctk.CTkLabel(
+                        stats_block,
+                        text=format_multiline_text(stats_long),
+                        anchor="w",
+                        justify="left",
+                        font=("Segoe UI", 12),
+                    )
+                    lbl.pack(fill="x", padx=10, pady=(0, 6))
+                    def _wrap(_e=None, l=lbl, p=stats_block):
+                        try:
+                            l.configure(wraplength=max(100, p.winfo_width() - 40))
+                        except Exception:
+                            pass
+                    try:
+                        stats_block.bind("<Configure>", _wrap, add=True)
+                        stats_block.after_idle(_wrap)
+                    except Exception:
+                        _wrap()
             else:
-                txt = ctk.CTkTextbox(stats_block, height=120, wrap="word")
-                txt.pack(fill="x", padx=10, pady=(0, 10))
-                txt.insert("1.0", format_multiline_text(stats_long))
-                txt.configure(state="disabled")
-        section = ctk.CTkFrame(body, fg_color="#1f1f1f", corner_radius=10)
-        section.pack(fill="x", padx=10, pady=(0, 10))
-        ctk.CTkLabel(section, text="Stats", font=("Segoe UI", 14, "bold")).pack(
-            anchor="w", padx=10, pady=(8, 4)
-        )
-
-        grid = ctk.CTkFrame(section, fg_color="#1b1b1b", corner_radius=8)
-        grid.pack(fill="x", padx=10, pady=(0, 10))
-        # Choose common keys first, then include simple numeric fields
+                lbl = ctk.CTkLabel(
+                    stats_block,
+                    text=format_multiline_text(stats_long),
+                    anchor="w",
+                    justify="left",
+                    font=("Segoe UI", 12),
+                )
+                lbl.pack(fill="x", padx=10, pady=(0, 6))
+                def _wrap2(_e=None, l=lbl, p=stats_block):
+                    try:
+                        l.configure(wraplength=max(100, p.winfo_width() - 40))
+                    except Exception:
+                        pass
+                try:
+                    stats_block.bind("<Configure>", _wrap2, add=True)
+                    stats_block.after_idle(_wrap2)
+                except Exception:
+                    _wrap2()
+        # Build compact stats rows first; only render section if there is content
         common_keys = [
             "Damage", "Armor", "AC", "DR", "Range", "Weight", "Cost", "Price", "Value",
             "Rarity", "Durability", "Charges", "Quantity", "Quality",
         ]
+        stats_rows = []
         shown = set()
-        row = 0
         for key in common_keys:
             val = item.get(key)
             if val is None:
                 continue
-            self._add_stat_row(grid, row, key, val)
+            stats_rows.append((key, val))
             shown.add(key)
-            row += 1
         # Add other small/simple fields
         exclude = {"Name", "name", "Category", "category", "Type", "type", "Description", "description", "Text", "text", "Portrait", "Image", "image"}
         for k, v in item.items():
             if k in shown or k in exclude:
                 continue
             if isinstance(v, (int, float)) or (isinstance(v, str) and len(v) <= 40):
+                stats_rows.append((k, v))
+        if stats_rows:
+            section = ctk.CTkFrame(body, fg_color="#1f1f1f", corner_radius=10)
+            section.pack(fill="x", padx=10, pady=(0, 6))
+            ctk.CTkLabel(section, text="Stats", font=("Segoe UI", 14, "bold")).pack(
+                anchor="w", padx=10, pady=(8, 4)
+            )
+            grid = ctk.CTkFrame(section, fg_color="#1b1b1b", corner_radius=8)
+            grid.pack(fill="x", padx=10, pady=(0, 6))
+            for row, (k, v) in enumerate(stats_rows):
                 self._add_stat_row(grid, row, k, v)
-                row += 1
 
     @staticmethod
     def _add_stat_row(parent, row: int, key: str, value):
@@ -705,4 +973,3 @@ class ObjectShelfView:
         v = ctk.CTkLabel(parent, text=str(value), font=("Segoe UI", 12))
         k.grid(row=row, column=0, sticky="w", padx=(10, 8), pady=4)
         v.grid(row=row, column=1, sticky="w", padx=(0, 10), pady=4)
-
