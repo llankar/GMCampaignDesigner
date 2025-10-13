@@ -126,6 +126,7 @@ class MainWindow(ctk.CTk):
         self.init_wrappers()
         self._normalize_entity_media_paths()
         self.current_gm_view = None
+        self._gm_mode = False
         self.dice_roller_window = None
         self.dice_bar_window = None
         self.audio_controller = get_audio_controller()
@@ -568,6 +569,51 @@ class MainWindow(ctk.CTk):
         self.current_open_view = None
 
     def _toggle_banner(self):
+        # GM Screen mode: reposition content and toggle banner without recreating views
+        if getattr(self, "_gm_mode", False):
+            if self.banner_visible:
+                if self.banner_frame.winfo_exists():
+                    try:
+                        self.banner_frame.grid_remove()
+                    except Exception:
+                        pass
+                try:
+                    self.inner_content_frame.grid(row=0, column=0, sticky="nsew")
+                except Exception:
+                    pass
+                self.content_frame.grid_rowconfigure(0, weight=1)
+                self.content_frame.grid_rowconfigure(1, weight=0)
+                self.banner_visible = False
+                try:
+                    self.banner_toggle_btn.configure(text="▼")
+                except Exception:
+                    pass
+            else:
+                try:
+                    self.banner_frame.grid(row=0, column=0, sticky="ew")
+                except Exception:
+                    pass
+                try:
+                    self.inner_content_frame.grid(row=1, column=0, sticky="nsew")
+                except Exception:
+                    pass
+                try:
+                    display_pcs_in_banner(
+                        self.banner_frame,
+                        {pc["Name"]: pc for pc in self.pc_wrapper.load_items()}
+                    )
+                except Exception:
+                    pass
+                self.inner_content_frame.grid_rowconfigure(0, weight=1)
+                self.inner_content_frame.grid_columnconfigure(0, weight=1)
+                self.content_frame.grid_rowconfigure(0, weight=0)
+                self.content_frame.grid_rowconfigure(1, weight=1)
+                self.banner_visible = True
+                try:
+                    self.banner_toggle_btn.configure(text="▲")
+                except Exception:
+                    pass
+            return
         # --- GRAPH MODE?  (no current_open_entity but a graph_type set) ---
         if self.current_open_entity is None and getattr(self, "_graph_type", None):
             # snapshot existing graph state
@@ -1036,15 +1082,36 @@ class MainWindow(ctk.CTk):
     # Methods Called by Icon Buttons (Event Handlers)
     # =============================================================
     def clear_current_content(self):
-        if self.banner_visible:
-            # If banner is visible, clear only inner_content_frame
+        # Always clear children of the inner content container
+        try:
             for widget in self.inner_content_frame.winfo_children():
                 widget.destroy()
-        else:
-            # If banner is hidden, clear ONLY dynamic children of content_frame, NOT banner_frame
+        except Exception:
+            pass
+
+        if not self.banner_visible:
+            # If banner is hidden, forget inner_content_frame from the grid so new content can occupy row 0
+            try:
+                self.inner_content_frame.grid_forget()
+            except Exception:
+                pass
+            # Clear dynamic children of content_frame (exclude the static frames)
             for widget in self.content_frame.winfo_children():
                 if widget not in (self.banner_frame, self.inner_content_frame):
-                    widget.destroy()
+                    try:
+                        widget.destroy()
+                    except Exception:
+                        pass
+        else:
+            # If banner is visible, ensure inner_content_frame is at row 1 and ready for new content
+            try:
+                self.inner_content_frame.grid(row=1, column=0, sticky="nsew")
+            except Exception:
+                pass
+
+        # Leaving GM screen mode when clearing
+        self._gm_mode = False
+        self.current_gm_view = None
 
     def move_current_view(self):
         """Move the current open view to the correct container based on banner state."""
@@ -1157,6 +1224,7 @@ class MainWindow(ctk.CTk):
     def open_gm_screen(self):
         # 1) Clear any existing content
         self.clear_current_content()
+        self._gm_mode = True
         # 2) Load all scenarios
         scenario_wrapper = GenericModelWrapper("scenarios")
         scenarios = scenario_wrapper.load_items()
@@ -1232,6 +1300,14 @@ class MainWindow(ctk.CTk):
         )
         list_selection.pack(fill="both", expand=True)
         self.current_gm_view = None
+        # Configure banner and enable toggle in GM screen
+        self.banner_visible = True
+        try:
+            self.banner_toggle_btn.configure(text="▲", state="normal")
+            # Ensure underlying private state is also normalized where used
+            self.banner_toggle_btn._state = "normal"
+        except Exception:
+            pass
         # 7) Lock banner and configure grid weights
         self.banner_visible = True
         self.banner_toggle_btn.configure(text="▲")
@@ -1245,6 +1321,12 @@ class MainWindow(ctk.CTk):
         # Make the inner_content_frame fully fill its cell
         self.inner_content_frame.grid_rowconfigure(0, weight=1)
         self.inner_content_frame.grid_columnconfigure(0, weight=1)
+        # Ensure the banner toggle is enabled for GM screen after layout
+        try:
+            self.banner_toggle_btn.configure(text="▲", state="normal")
+            self.banner_toggle_btn._state = "normal"
+        except Exception:
+            pass
 
     def open_npc_graph_editor(self):
         self._graph_type = 'npc'
