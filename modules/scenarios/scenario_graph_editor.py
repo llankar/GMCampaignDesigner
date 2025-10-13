@@ -3270,7 +3270,14 @@ class ScenarioGraphEditor(ctk.CTkFrame):
                         or t.startswith("npc_")
                         or t.startswith("creature_")
                         or t.startswith("place_")
+                        or t.startswith("faction_")
                         or t.startswith("scene_")), None)
+        # Ignore background and any non-node items that share a "scene_" prefix
+        if node_tag in ("background", "scene_flow_bg"):
+            node_tag = None
+        # Only allow dragging for nodes we actively track positions for
+        if node_tag and node_tag not in self.node_positions:
+            node_tag = None
         if node_tag:
             self.selected_node = node_tag
             self.selected_items = self.canvas.find_withtag(node_tag)
@@ -3282,6 +3289,11 @@ class ScenarioGraphEditor(ctk.CTkFrame):
 
     def on_drag(self, event):
         if not self.selected_node or not self.drag_start:
+            return
+        # Ensure the selected node is a tracked node
+        if self.selected_node not in self.node_positions:
+            self.selected_node = None
+            self.drag_start = None
             return
 
         # 1) canvas coords & delta
@@ -3297,7 +3309,13 @@ class ScenarioGraphEditor(ctk.CTkFrame):
             self.canvas.move(item_id, dx, dy)
 
         # 3) update position in memory
-        old_x, old_y = self.node_positions[self.selected_node]
+        # Guard against race conditions where a tag was removed
+        pos = self.node_positions.get(self.selected_node)
+        if not pos:
+            self.selected_node = None
+            self.drag_start = None
+            return
+        old_x, old_y = pos
         new_pos = (old_x + dx, old_y + dy)
         self.node_positions[self.selected_node] = new_pos
         for node in self.graph["nodes"]:
@@ -3385,7 +3403,8 @@ class ScenarioGraphEditor(ctk.CTkFrame):
         node_tag = next((t for t in tags if t.startswith("scenario_")
                         or t.startswith("npc_")
                         or t.startswith("creature_")
-                        or t.startswith("place_")), None)
+                        or t.startswith("place_")
+                        or t.startswith("faction_")), None)
         if node_tag:
             self.selected_node = node_tag
             self.show_node_menu(x, y)

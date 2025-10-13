@@ -958,25 +958,35 @@ class GMScreenView(ctk.CTkFrame):
                 layout_meta={"kind": "note"},
             )
         elif kind == "npc_graph":
+            # Ensure rich host exists for graph editors
+            if getattr(self, "_rich_host", None) is None or not self._rich_host.winfo_exists():
+                self._rich_host = ctk.CTkFrame(self)
+            parent = self._rich_host
             self.add_tab(
                 title or "NPC Graph",
-                self.create_npc_graph_frame(),
-                content_factory=lambda master: self.create_npc_graph_frame(master),
-                layout_meta={"kind": "npc_graph"},
+                self.create_npc_graph_frame(master=parent),
+                content_factory=lambda master=parent: self.create_npc_graph_frame(master),
+                layout_meta={"kind": "npc_graph", "host": "rich"},
             )
         elif kind == "pc_graph":
+            if getattr(self, "_rich_host", None) is None or not self._rich_host.winfo_exists():
+                self._rich_host = ctk.CTkFrame(self)
+            parent = self._rich_host
             self.add_tab(
                 title or "PC Graph",
-                self.create_pc_graph_frame(),
-                content_factory=lambda master: self.create_pc_graph_frame(master),
-                layout_meta={"kind": "pc_graph"},
+                self.create_pc_graph_frame(master=parent),
+                content_factory=lambda master=parent: self.create_pc_graph_frame(master),
+                layout_meta={"kind": "pc_graph", "host": "rich"},
             )
         elif kind == "scenario_graph":
+            if getattr(self, "_rich_host", None) is None or not self._rich_host.winfo_exists():
+                self._rich_host = ctk.CTkFrame(self)
+            parent = self._rich_host
             self.add_tab(
                 title or "Scenario Graph Editor",
-                self.create_scenario_graph_frame(),
-                content_factory=lambda master: self.create_scenario_graph_frame(master),
-                layout_meta={"kind": "scenario_graph"},
+                self.create_scenario_graph_frame(master=parent),
+                content_factory=lambda master=parent: self.create_scenario_graph_frame(master),
+                layout_meta={"kind": "scenario_graph", "host": "rich"},
             )
         elif kind == "world_map":
             name = tab_def.get("map_name")
@@ -1612,21 +1622,39 @@ class GMScreenView(ctk.CTkFrame):
             self.open_scene_flow_tab()
             return
         elif entity_type == "NPC Graph":
-            self.add_tab("NPC Graph", self.create_npc_graph_frame(),
-                        content_factory=lambda master: self.create_npc_graph_frame(master),
-                        layout_meta={"kind": "npc_graph"})
+            if getattr(self, "_rich_host", None) is None or not self._rich_host.winfo_exists():
+                self._rich_host = ctk.CTkFrame(self)
+            host_parent = self._rich_host
+            self.add_tab(
+                "NPC Graph",
+                self.create_npc_graph_frame(master=host_parent),
+                content_factory=lambda master=host_parent: self.create_npc_graph_frame(master),
+                layout_meta={"kind": "npc_graph", "host": "rich"}
+            )
 
             return
         elif entity_type == "PC Graph":
-            self.add_tab("PC Graph", self.create_pc_graph_frame(),
-                        content_factory=lambda master: self.create_pc_graph_frame(master),
-                        layout_meta={"kind": "pc_graph"})
+            if getattr(self, "_rich_host", None) is None or not self._rich_host.winfo_exists():
+                self._rich_host = ctk.CTkFrame(self)
+            host_parent = self._rich_host
+            self.add_tab(
+                "PC Graph",
+                self.create_pc_graph_frame(master=host_parent),
+                content_factory=lambda master=host_parent: self.create_pc_graph_frame(master),
+                layout_meta={"kind": "pc_graph", "host": "rich"}
+            )
 
             return
         elif entity_type == "Scenario Graph Editor":
-            self.add_tab("Scenario Graph Editor", self.create_scenario_graph_frame(),
-                        content_factory=lambda master: self.create_scenario_graph_frame(master),
-                        layout_meta={"kind": "scenario_graph"})
+            if getattr(self, "_rich_host", None) is None or not self._rich_host.winfo_exists():
+                self._rich_host = ctk.CTkFrame(self)
+            host_parent = self._rich_host
+            self.add_tab(
+                "Scenario Graph Editor",
+                self.create_scenario_graph_frame(master=host_parent),
+                content_factory=lambda master=host_parent: self.create_scenario_graph_frame(master),
+                layout_meta={"kind": "scenario_graph", "host": "rich"}
+            )
             return
 
         model_wrapper = self.wrappers[entity_type]
@@ -1713,10 +1741,8 @@ class GMScreenView(ctk.CTkFrame):
         log_info(f"Creating scenario graph frame", func_name="GMScreenView.create_scenario_graph_frame")
         if master is None:
             master = self.content_area
-        
-        frame = ctk.CTkFrame(master, height=700)
-        # Prevent the frame from shrinking to fit its child; allow it to expand fully
-        frame.pack_propagate(False)
+        # Allow frame to naturally expand to fill available space
+        frame = ctk.CTkFrame(master)
         # Create a ScenarioGraphEditor widget.
         # Note: Ensure that self.wrappers contains "Scenarios", "NPCs", and "Places" as required.
         scenario_graph_editor = ScenarioGraphEditor(
@@ -1820,8 +1846,7 @@ class GMScreenView(ctk.CTkFrame):
     def create_npc_graph_frame(self, master=None):
         if master is None:
             master = self.content_area
-        frame = ctk.CTkFrame(master, height=700)
-        frame.pack_propagate(False)
+        frame = ctk.CTkFrame(master)
         graph_editor = NPCGraphEditor(frame, self.wrappers["NPCs"], self.wrappers["Factions"])
         graph_editor.pack(fill="both", expand=True)
         frame.graph_editor = graph_editor  # Save a reference for state management
@@ -1831,8 +1856,7 @@ class GMScreenView(ctk.CTkFrame):
     def create_pc_graph_frame(self, master=None):
         if master is None:
             master = self.content_area
-        frame = ctk.CTkFrame(master, height=700)
-        frame.pack_propagate(False)
+        frame = ctk.CTkFrame(master)
         graph_editor = PCGraphEditor(frame, self.wrappers["PCs"], self.wrappers["Factions"])
         graph_editor.pack(fill="both", expand=True)
         frame.graph_editor = graph_editor  # Save a reference for state management
