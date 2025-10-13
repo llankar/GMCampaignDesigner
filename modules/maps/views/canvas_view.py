@@ -7,7 +7,7 @@ log_module_import(__name__)
 MIN_ZOOM = 0.01  # Minimum zoom level to prevent division by zero
 
 def _build_canvas(self):
-    self.canvas = tk.Canvas(self.parent, bg="black")
+    self.canvas = tk.Canvas(self.parent, bg="black", highlightthickness=0)
     self.canvas.pack(fill="both", expand=True)
 
     # Global Copy/Paste/Delete bindings on the real Tk root
@@ -41,8 +41,37 @@ def _build_canvas(self):
     
     # Zoom & resize
     self.canvas.bind("<MouseWheel>",       self.on_zoom)
-    # Configure binding might be better on self.canvas if self.parent is not the direct container that resizes
-    self.parent.bind("<Configure>",        lambda e: self._update_canvas_images() if self.base_img else None)
+    # Ensure canvas resizes with parent, accounting for toolbar height when present
+    def _on_parent_configure(_e=None):
+        try:
+            pw = int(self.parent.winfo_width())
+            ph = int(self.parent.winfo_height())
+        except Exception:
+            pw = ph = 0
+        th = 0
+        toolbar = getattr(self, "_toolbar_container", None)
+        if toolbar is not None:
+            try:
+                th = int(toolbar.winfo_height())
+            except Exception:
+                th = 0
+        if pw > 1 and ph > 1:
+            try:
+                self.canvas.configure(width=pw, height=max(1, ph - th))
+            except Exception:
+                pass
+        if getattr(self, "base_img", None) is not None:
+            try:
+                self._update_canvas_images()
+            except Exception:
+                pass
+
+    self.parent.bind("<Configure>", _on_parent_configure, add="+")
+    # Kick a first layout pass once widgets are realized
+    try:
+        self.parent.after(30, _on_parent_configure)
+    except Exception:
+        pass
 
     if hasattr(self, "_on_canvas_focus_out"):
         self.canvas.bind("<FocusOut>", self._on_canvas_focus_out)

@@ -25,6 +25,9 @@ from modules.helpers.logging_helper import (
     log_module_import,
 )
 from modules.scenarios.gm_layout_manager import GMScreenLayoutManager
+from modules.maps.world_map_view import WorldMapPanel
+from modules.maps.controllers.display_map_controller import DisplayMapController
+from modules.scenarios.scene_flow_viewer import create_scene_flow_frame, scene_flow_content_factory
 
 log_module_import(__name__)
 
@@ -190,6 +193,20 @@ class GMScreenView(ctk.CTkFrame):
 
         # Apply either the caller-specified layout or the scenario default
         self.after(100, self._apply_initial_layout)
+
+    # -- Runtime sizing helpers -------------------------------------------------
+    def _sync_fullbleed_now(self, container: ctk.CTkFrame | None):
+        if not container or not container.winfo_exists():
+            return
+        try:
+            viewport = self.content_area if hasattr(self, "content_area") else self
+            viewport.update_idletasks()
+            w = max(1, int(viewport.winfo_width()))
+            h = max(1, int(viewport.winfo_height()))
+            container.pack_propagate(False)
+            container.configure(width=w, height=h)
+        except Exception:
+            pass
 
 
     def _load_map_records(self):
@@ -566,6 +583,12 @@ class GMScreenView(ctk.CTkFrame):
             w.bind("<ButtonRelease-1>", lambda e, n=name: self._on_tab_release(e, n))
 
         self.reposition_add_button()
+        # Ensure the new content is stretched to full viewport size
+        try:
+            self._sync_fullbleed_now(content_frame)
+            self.after(60, lambda cf=content_frame: self._sync_fullbleed_now(cf))
+        except Exception:
+            pass
 
     def _apply_initial_layout(self):
         layout_name = self._pending_initial_layout
@@ -722,6 +745,40 @@ class GMScreenView(ctk.CTkFrame):
                 frame = tab_info.get("content_frame")
                 if frame is not None and hasattr(frame, "text_box"):
                     meta["text"] = frame.text_box.get("1.0", "end-1c")
+            elif meta.get("kind") == "world_map":
+                frame = tab_info.get("content_frame")
+                map_name = None
+                panel = getattr(frame, "world_map_panel", None)
+                if panel is not None:
+                    map_name = getattr(panel, "current_map_name", None)
+                if map_name:
+                    meta["map_name"] = map_name
+                else:
+                    meta.pop("map_name", None)
+            elif meta.get("kind") == "map_tool":
+                frame = tab_info.get("content_frame")
+                controller = getattr(frame, "map_controller", None)
+                current = getattr(controller, "current_map", None)
+                name = None
+                if isinstance(current, dict):
+                    name = current.get("Name") or current.get("Title")
+                if name:
+                    meta["map_name"] = name
+                else:
+                    meta.pop("map_name", None)
+            elif meta.get("kind") == "scene_flow":
+                frame = tab_info.get("content_frame")
+                viewer = getattr(frame, "scene_flow_viewer", None)
+                title = None
+                if viewer is not None and hasattr(viewer, "scenario_var"):
+                    try:
+                        title = str(viewer.scenario_var.get()).strip()
+                    except Exception:
+                        title = None
+                if title and title != "No scenarios available":
+                    meta["scenario_title"] = title
+                else:
+                    meta.pop("scenario_title", None)
             layout_tabs.append(meta)
         return {
             "scenario": self.scenario_name,
@@ -921,6 +978,15 @@ class GMScreenView(ctk.CTkFrame):
                 content_factory=lambda master: self.create_scenario_graph_frame(master),
                 layout_meta={"kind": "scenario_graph"},
             )
+        elif kind == "world_map":
+            name = tab_def.get("map_name")
+            self.open_world_map_tab(map_name=name, title=title or (f"World Map: {name}" if name else "World Map"))
+        elif kind == "map_tool":
+            name = tab_def.get("map_name")
+            self.open_map_tool_tab(map_name=name, title=title or (f"Map Tool: {name}" if name else "Map Tool"))
+        elif kind == "scene_flow":
+            scen = tab_def.get("scenario_title")
+            self.open_scene_flow_tab(scenario_title=scen, title=title or (f"Scene Flow: {scen}" if scen else "Scene Flow"))
         else:
             raise ValueError(f"Unsupported tab kind '{kind}'")
 
@@ -1200,6 +1266,149 @@ class GMScreenView(ctk.CTkFrame):
         frame.text_box = text_box
         return frame
 
+    # --- Full-bleed helpers for rich, interactive views hosted in the scrollable area ---
+    def _make_fullbleed(self, container: ctk.CTkFrame):
+        """Force a container to match the visible area height/width.
+
+        CTkScrollableFrame sizes its internal `_scrollable_frame` to content.
+        For interactive canvases (map tool, world map, scene flow) we want to
+        occupy all available space. This syncs the container size to the
+        viewport on resize.
+        """
+        # Measure against the visible viewport (the CTkScrollableFrame itself),
+        # not its inner _scrollable_frame (which tracks content height and can
+        # collapse after adding short views like the map selector).
+        try:
+            viewport = self.content_area if hasattr(self, "content_area") else self
+        except Exception:
+            viewport = self
+
+        try:
+            container.pack_propagate(False)
+        except Exception:
+            pass
+
+        def _sync(_evt=None):
+            try:
+                w = max(1, int(viewport.winfo_width()))
+                h = max(1, int(viewport.winfo_height()))
+                container.configure(width=w, height=h)
+            except Exception:
+                pass
+
+        try:
+            viewport.bind("<Configure>", _sync, add="+")
+        except Exception:
+            pass
+        # Initial sizing once mounted
+        self.after(50, _sync)
+
+    def open_world_map_tab(self, map_name=None, title=None):
+        """Open a WorldMapPanel inside a new GM-screen tab."""
+        # Mount heavy interactive views into a dedicated full-bleed host
+        if getattr(self, "_rich_host", None) is None or not self._rich_host.winfo_exists():
+            self._rich_host = ctk.CTkFrame(self)
+        container = ctk.CTkFrame(self._rich_host)
+        panel = WorldMapPanel(container)
+        panel.pack(fill="both", expand=True)
+        container.world_map_panel = panel
+        if map_name:
+            try:
+                panel.load_map(map_name, push_history=False)
+            except Exception:
+                pass
+
+        tab_title = title or (f"World Map: {map_name}" if map_name else "World Map")
+
+        def factory(master, _name=map_name):
+            c = ctk.CTkFrame(self._rich_host)
+            p = WorldMapPanel(c)
+            p.pack(fill="both", expand=True)
+            c.world_map_panel = p
+            if _name:
+                try:
+                    p.load_map(_name, push_history=False)
+                except Exception:
+                    pass
+            return c
+
+        self.add_tab(
+            tab_title,
+            container,
+            content_factory=factory,
+            layout_meta={"kind": "world_map", "map_name": map_name, "host": "rich"},
+        )
+
+    def open_map_tool_tab(self, map_name=None, title=None):
+        """Open the Map Tool (DisplayMapController) inside a GM-screen tab."""
+        if getattr(self, "_rich_host", None) is None or not self._rich_host.winfo_exists():
+            self._rich_host = ctk.CTkFrame(self)
+        container = ctk.CTkFrame(self._rich_host)
+        maps_wrapper = GenericModelWrapper("maps")
+        controller = DisplayMapController(
+            container,
+            maps_wrapper,
+            load_entity_template("maps"),
+            root_app=self,
+        )
+        container.map_controller = controller
+        if map_name and hasattr(controller, "open_map_by_name"):
+            try:
+                controller.open_map_by_name(map_name)
+            except Exception:
+                pass
+
+        tab_title = title or (f"Map Tool: {map_name}" if map_name else "Map Tool")
+
+        def factory(master, _name=map_name):
+            c = ctk.CTkFrame(self._rich_host)
+            mw = GenericModelWrapper("maps")
+            ctrl = DisplayMapController(
+                c,
+                mw,
+                load_entity_template("maps"),
+                root_app=self,
+            )
+            c.map_controller = ctrl
+            if _name and hasattr(ctrl, "open_map_by_name"):
+                try:
+                    ctrl.open_map_by_name(_name)
+                except Exception:
+                    pass
+            return c
+
+        self.add_tab(
+            tab_title,
+            container,
+            content_factory=factory,
+            layout_meta={"kind": "map_tool", "map_name": map_name, "host": "rich"},
+        )
+
+    def open_scene_flow_tab(self, scenario_title=None, title=None):
+        """Open the Scene Flow Viewer inside a GM-screen tab."""
+        if getattr(self, "_rich_host", None) is None or not self._rich_host.winfo_exists():
+            self._rich_host = ctk.CTkFrame(self)
+        container = ctk.CTkFrame(self._rich_host)
+        viewer = create_scene_flow_frame(container, scenario_title=scenario_title)
+        viewer.pack(fill="both", expand=True)
+        container.scene_flow_viewer = viewer
+
+        tab_title = title or (f"Scene Flow: {scenario_title}" if scenario_title else "Scene Flow")
+
+        def factory(master, _title=scenario_title):
+            c = ctk.CTkFrame(self._rich_host)
+            v = create_scene_flow_frame(c, scenario_title=_title)
+            v.pack(fill="both", expand=True)
+            c.scene_flow_viewer = v
+            return c
+
+        self.add_tab(
+            tab_title,
+            container,
+            content_factory=factory,
+            layout_meta={"kind": "scene_flow", "scenario_title": scenario_title, "host": "rich"},
+        )
+
 
     def reattach_tab(self, name):
         log_info(f"Reattaching tab: {name}", func_name="GMScreenView.reattach_tab")
@@ -1235,11 +1444,21 @@ class GMScreenView(ctk.CTkFrame):
         if factory is None:
             new_frame = current_frame
         else:
+            # Determine host for this tab
+            host_kind = (self.tabs[name].get("meta") or {}).get("host") or "scroll"
+            parent = None
+            if host_kind == "rich":
+                if getattr(self, "_rich_host", None) is None or not self._rich_host.winfo_exists():
+                    self._rich_host = ctk.CTkFrame(self)
+                parent = self._rich_host
+            else:
+                parent = getattr(self.content_area, "_scrollable_frame", self.content_area)
+
             # Note tabs get their text back
             if name.startswith("Note"):
-                new_frame = factory(self.content_area, initial_text=current_text)
+                new_frame = factory(parent, initial_text=current_text)
             else:
-                new_frame = factory(self.content_area)
+                new_frame = factory(parent)
 
             # Restore NPC-graph state, ensuring the canvas background exists first
             if saved_state and hasattr(new_frame, "graph_editor") and hasattr(new_frame.graph_editor, "set_state"):
@@ -1326,12 +1545,42 @@ class GMScreenView(ctk.CTkFrame):
         self.tabs[name]["button"].configure(fg_color=("gray55", "gray15"))
         # Only pack the content into the main content area if the tab is not detached.
         if not self.tabs[name]["detached"]:
-            self.tabs[name]["content_frame"].pack(fill="both", expand=True)
+            tab = self.tabs[name]
+            target_host = (tab.get("meta") or {}).get("host") or "scroll"
+            # Toggle which host is visible
+            if target_host == "rich":
+                # Hide scroll area and show rich host
+                try:
+                    self.content_area.pack_forget()
+                except Exception:
+                    pass
+                host = self._rich_host if getattr(self, "_rich_host", None) else None
+                if host is None or not host.winfo_exists():
+                    self._rich_host = ctk.CTkFrame(self)
+                    host = self._rich_host
+                host.pack(fill="both", expand=True)
+            else:
+                # Show scroll area and hide rich host
+                try:
+                    if getattr(self, "_rich_host", None) and self._rich_host.winfo_exists():
+                        self._rich_host.pack_forget()
+                except Exception:
+                    pass
+                self.content_area.pack(fill="both", expand=True)
+
+            frame = tab["content_frame"]
+            frame.pack(fill="both", expand=True)
 
     def add_new_tab(self):
         log_info("Opening entity selection for new tab", func_name="GMScreenView.add_new_tab")
-        # Added "Scenario Graph Editor" to the list of options.
-        options = ["Factions", "Places", "NPCs", "PCs", "Creatures","Scenarios", "Clues", "Informations","Note Tab", "NPC Graph", "PC Graph", "Scenario Graph Editor"]
+        # Include tools and viewers as first-class choices
+        options = [
+            "World Map",
+            "Map Tool",
+            "Scene Flow",
+            "Factions", "Places", "NPCs", "PCs", "Creatures", "Scenarios", "Clues", "Informations",
+            "Note Tab", "NPC Graph", "PC Graph", "Scenario Graph Editor",
+        ]
         popup = ctk.CTkToplevel(self)
         popup.title("Create New Tab")
         popup.geometry("300x400")
@@ -1352,6 +1601,15 @@ class GMScreenView(ctk.CTkFrame):
                 content_factory=lambda master, initial_text="": self.create_note_frame(master=master, initial_text=initial_text),
                 layout_meta={"kind": "note"},
             )
+            return
+        elif entity_type == "World Map":
+            self.open_world_map_tab()
+            return
+        elif entity_type == "Map Tool":
+            self.open_map_tool_tab()
+            return
+        elif entity_type == "Scene Flow":
+            self.open_scene_flow_tab()
             return
         elif entity_type == "NPC Graph":
             self.add_tab("NPC Graph", self.create_npc_graph_frame(),

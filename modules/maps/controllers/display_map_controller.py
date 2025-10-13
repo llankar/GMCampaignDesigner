@@ -145,6 +145,11 @@ class DisplayMapController:
 
         self._focus_bindings_registered = False
 
+        # --- View fit mode (initial zoom behaviour) ---
+        # One of: "Contain", "Width", "Height"
+        self.fit_mode = "Contain"
+        self._fit_initialized = False
+
         # Maintain a registry of all popup windows (token info cards and marker
         # descriptions) so the toolbar button can reliably dismiss every one of
         # them even if internal bookkeeping for a token becomes desynchronised.
@@ -168,6 +173,77 @@ class DisplayMapController:
         
         self._maps = {m["Name"]: m for m in maps_wrapper.load_items()}
         self.select_map()
+
+        # Re-apply fit on container size changes without clobbering user panning
+        try:
+            self.parent.bind("<Configure>", lambda e: self._apply_fit_mode(defer=True), add="+")
+        except Exception:
+            pass
+
+    # ------------------------------------------------------------------
+    # Fit-to-view behaviour
+    # ------------------------------------------------------------------
+    def _on_fit_mode_change(self, value):
+        mode = str(value or "").strip().title()
+        if mode not in ("Contain", "Width", "Height"):
+            mode = "Contain"
+        self.fit_mode = mode
+        self._fit_initialized = False
+        self._apply_fit_mode()
+
+    def _apply_fit_mode(self, *, defer: bool = False):
+        canvas = getattr(self, "canvas", None)
+        base = getattr(self, "base_img", None)
+        if canvas is None or base is None:
+            return
+        try:
+            if defer:
+                # Defer to allow geometry to settle
+                self.parent.after(10, lambda: self._apply_fit_mode(defer=False))
+                return
+        except Exception:
+            pass
+
+        try:
+            cw = int(canvas.winfo_width())
+            ch = int(canvas.winfo_height())
+        except Exception:
+            return
+        if cw <= 1 or ch <= 1:
+            return
+
+        bw, bh = base.size if hasattr(base, "size") else (0, 0)
+        if bw <= 0 or bh <= 0:
+            return
+
+        mode = (self.fit_mode or "Contain").title()
+        if mode == "Width":
+            zoom = cw / bw
+        elif mode == "Height":
+            zoom = ch / bh
+        else:  # Contain (default)
+            zoom = min(cw / bw, ch / bh)
+
+        # Clamp to controller's bounds
+        try:
+            zmin = float(MIN_ZOOM)
+        except Exception:
+            zmin = 0.05
+        try:
+            zmax = float(MAX_ZOOM)
+        except Exception:
+            zmax = 6.0
+        zoom = max(zmin, min(zmax, zoom))
+
+        # Center the image
+        self.zoom = zoom
+        self.pan_x = (cw - bw * zoom) / 2
+        self.pan_y = (ch - bh * zoom) / 2
+        self._fit_initialized = True
+        try:
+            self._update_canvas_images()
+        except Exception:
+            pass
 
     def _set_selection(self, items):
         """Centralised helper to assign the current selection list."""
@@ -538,6 +614,11 @@ class DisplayMapController:
             messagebox.showwarning("Not Found", f"Map '{target}' not found.")
             return False
         self._on_display_map("maps", target)
+        # Apply fit shortly after map swaps in
+        try:
+            self.parent.after(30, self._apply_fit_mode)
+        except Exception:
+            pass
         return True
 
     def open_global_search(self, event=None):

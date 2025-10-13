@@ -63,8 +63,12 @@ def _default_pin_image_path() -> str:
 
     return ""
 
-class WorldMapWindow(ctk.CTkToplevel):
-    """Interactive world map viewer with nested map support."""
+class WorldMapPanel(ctk.CTkFrame):
+    """Interactive world map panel with nested map support.
+
+    Can be embedded in other views (e.g., GM screen tabs). For legacy callers,
+    see WorldMapWindow below, which wraps this panel in a CTkToplevel.
+    """
 
     CANVAS_BG = "#05070D"
     PORTRAIT_SIZE = (320, 240)
@@ -74,9 +78,6 @@ class WorldMapWindow(ctk.CTkToplevel):
 
     def __init__(self, master=None):
         super().__init__(master)
-        self.title("World Map")
-        self.geometry("1400x900")
-        self.minsize(1200, 720)
         self.configure(fg_color="#0C0F1A")
 
         self.maps_wrapper = GenericModelWrapper("maps")
@@ -534,26 +535,44 @@ class WorldMapWindow(ctk.CTkToplevel):
             messagebox.showinfo("No Map Available", "Select a map to open in Map Tool.")
             return
 
-        master = getattr(self, "master", None)
-        if not master or not hasattr(master, "map_tool"):
-            messagebox.showwarning("Map Tool Unavailable", "The Map Tool is not available from this window.")
-            return
+        # Walk up the owner chain to find a host exposing either `map_tool` or
+        # `open_map_tool` and invoke it with the selected map.
+        owner = getattr(self, "master", None)
+        invoked = False
+        while owner is not None and not invoked:
+            try:
+                # Prefer GM-screen tab integration if available
+                if hasattr(owner, "open_map_tool_tab"):
+                    owner.open_map_tool_tab(target_map)
+                    invoked = True
+                    break
+                if hasattr(owner, "map_tool"):
+                    try:
+                        owner.map_tool(map_name=target_map)
+                    except TypeError:
+                        owner.map_tool(target_map)
+                    invoked = True
+                    break
+                if hasattr(owner, "open_map_tool"):
+                    owner.open_map_tool(target_map)
+                    invoked = True
+                    break
+            except Exception as exc:
+                log_error(
+                    f"Error invoking map tool from owner: {exc}",
+                    func_name="WorldMapPanel._open_in_map_tool",
+                )
+                break
+            finally:
+                owner = getattr(owner, "master", None)
 
-        try:
-            master.map_tool(map_name=target_map)
-        except TypeError:
-            master.map_tool(target_map)
-        except Exception as exc:
-            log_error(
-                f"Failed to open Map Tool for '{target_map}': {exc}",
-                func_name="WorldMapWindow._open_in_map_tool",
-            )
-            messagebox.showerror("Error", f"Could not open '{target_map}' in Map Tool.\n{exc}")
+        if not invoked:
+            messagebox.showwarning("Map Tool Unavailable", "The Map Tool is not available from this context.")
             return
 
         log_info(
             f"Opened map '{target_map}' in Map Tool",
-            func_name="WorldMapWindow._open_in_map_tool",
+            func_name="WorldMapPanel._open_in_map_tool",
         )
 
     def _focus_on_selected_token(self) -> None:
@@ -1529,7 +1548,7 @@ class WorldMapWindow(ctk.CTkToplevel):
 
     @staticmethod
     def _calculate_swatch_border(color: str) -> str:
-        normalized = WorldMapWindow._normalize_hex_color(color)
+        normalized = WorldMapPanel._normalize_hex_color(color)
         if not normalized:
             return "#4A5578"
         red = int(normalized[1:3], 16)
@@ -2024,5 +2043,39 @@ class WorldMapWindow(ctk.CTkToplevel):
     # Lifecycle
     # ------------------------------------------------------------------
     def _on_destroy(self, _event=None) -> None:
-        if getattr(self.master, "_world_map_window", None) is self:
-            self.master._world_map_window = None
+        # As an embeddable panel, avoid manipulating owner state here.
+        return
+
+
+class WorldMapWindow(ctk.CTkToplevel):
+    """Thin wrapper window that hosts a WorldMapPanel for legacy callers."""
+
+    def __init__(self, master=None, initial_map: str | None = None):
+        super().__init__(master)
+        self.title("World Map")
+        try:
+            self.geometry("1400x900")
+            self.minsize(1200, 720)
+        except Exception:
+            pass
+        self.configure(fg_color="#0C0F1A")
+
+        # Install the panel
+        self.panel = WorldMapPanel(self)
+        self.panel.pack(fill="both", expand=True)
+
+        if initial_map:
+            try:
+                self.panel.load_map(initial_map, push_history=False)
+            except Exception:
+                pass
+
+        def _on_close():
+            try:
+                if getattr(self.master, "_world_map_window", None) is self:
+                    self.master._world_map_window = None
+            except Exception:
+                pass
+            self.destroy()
+
+        self.protocol("WM_DELETE_WINDOW", _on_close)

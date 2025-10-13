@@ -1290,6 +1290,13 @@ class MainWindow(ctk.CTk):
     def open_world_map(self):
         """Launch the World Map nested navigation window."""
         log_info("Opening World Map window", func_name="main_window.MainWindow.open_world_map")
+        # If a GM screen is active, open as a tab instead
+        try:
+            if getattr(self, "current_gm_view", None) is not None and self.current_gm_view.winfo_exists():
+                self.current_gm_view.open_world_map_tab()
+                return
+        except Exception:
+            pass
         existing = getattr(self, "_world_map_window", None)
         if existing and existing.winfo_exists():
             existing.focus_force()
@@ -1331,7 +1338,13 @@ class MainWindow(ctk.CTk):
 
     def open_scene_flow_viewer(self):
         from modules.scenarios.scene_flow_viewer import SceneFlowViewerWindow
-
+        # If a GM screen is active, open as a tab instead
+        try:
+            if getattr(self, "current_gm_view", None) is not None and self.current_gm_view.winfo_exists():
+                self.current_gm_view.open_scene_flow_tab()
+                return
+        except Exception:
+            pass
         if getattr(self, "_scene_flow_window", None) and self._scene_flow_window.winfo_exists():
             try:
                 self._scene_flow_window.focus()
@@ -2358,6 +2371,13 @@ class MainWindow(ctk.CTk):
             f"Opening Map Tool (map={map_name})",
             func_name="main_window.MainWindow.map_tool",
         )
+        # If a GM screen is active, open as a tab instead
+        try:
+            if getattr(self, "current_gm_view", None) is not None and self.current_gm_view.winfo_exists():
+                self.current_gm_view.open_map_tool_tab(map_name)
+                return
+        except Exception:
+            pass
 
         existing = getattr(self, "_map_tool_window", None)
         if existing is not None and existing.winfo_exists():

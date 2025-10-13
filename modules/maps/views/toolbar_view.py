@@ -9,6 +9,11 @@ def _build_toolbar(self):
     # Main toolbar container that fills the width and holds the scrollable area
     toolbar_container = ctk.CTkFrame(self.parent)
     toolbar_container.pack(side="top", fill="x", pady=(0,2)) # Added small pady for visual separation
+    # Expose on controller for downstream layout sizing
+    try:
+        self._toolbar_container = toolbar_container
+    except Exception:
+        pass
 
     # Scrollable frame for the actual toolbar content
     # Set a fixed height for the scrollable area, width will be determined by content
@@ -165,6 +170,22 @@ def _build_toolbar(self):
     )
     self.hover_font_size_menu.set(str(current_hover_size))
     self.hover_font_size_menu.pack(side="left", padx=5, pady=8)
+
+    # --- Fit Mode selector ---
+    fit_label = ctk.CTkLabel(toolbar, text="Fit:")
+    fit_label.pack(side="left", padx=(14,2), pady=8)
+    fit_values = ["Contain", "Width", "Height"]
+    current_fit = getattr(self, "fit_mode", "Contain")
+    if current_fit not in fit_values:
+        current_fit = "Contain"
+    self.fit_mode_menu = ctk.CTkOptionMenu(
+        toolbar,
+        values=fit_values,
+        command=getattr(self, "_on_fit_mode_change", None) or (lambda _v: None),
+        width=dropdown_width,
+    )
+    self.fit_mode_menu.set(current_fit)
+    self.fit_mode_menu.pack(side="left", padx=5, pady=8)
 
     # --- Drawing Tool Selector ---
     tool_label = ctk.CTkLabel(toolbar, text="Active Tool:")

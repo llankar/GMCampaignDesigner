@@ -83,6 +83,9 @@ class SceneFlowViewerFrame(ScenarioGraphEditor):
         initial_scenario: Optional[dict] = None,
         **kwargs,
     ) -> None:
+        # Initial fit mode for zoom behaviour in the viewer
+        self.fit_mode: str = "Contain"  # Contain | Width | Height
+        self._fit_initialized = False
         self._initial_scenario = initial_scenario or {}
         self._initial_title = self._extract_title(self._initial_scenario)
         self._scenario_lookup: Dict[str, dict] = {}
@@ -100,6 +103,12 @@ class SceneFlowViewerFrame(ScenarioGraphEditor):
 
         self._apply_scene_flow_styling()
         self._populate_scenario_menu()
+
+        # Re-apply fit after the first real canvas size is known
+        try:
+            self.canvas.bind("<Configure>", self._on_canvas_resized, add="+")
+        except Exception:
+            pass
 
     # ------------------------------------------------------------------
     # Portrait handling
@@ -160,6 +169,24 @@ class SceneFlowViewerFrame(ScenarioGraphEditor):
         )
         self.detail_toggle.pack(side="right", padx=(0, 8))
         self.detail_toggle.select()
+
+        # Fit mode selector (initial zoom)
+        fit_label = ctk.CTkLabel(toolbar, text="Fit:")
+        fit_label.pack(side="right", padx=(8, 4))
+        self.fit_mode_menu = ctk.CTkOptionMenu(
+            toolbar,
+            values=["Contain", "Width", "Height"],
+            command=self._on_fit_mode_change,
+            width=120,
+        )
+        self.fit_mode_menu.set(self.fit_mode)
+        self.fit_mode_menu.pack(side="right", padx=(0, 8))
+
+        # Keep canvas full-height under the toolbar
+        try:
+            self.bind("<Configure>", self._on_layout_resize, add="+")
+        except Exception:
+            pass
 
     # ------------------------------------------------------------------
     # Scenario selection helpers
@@ -229,6 +256,104 @@ class SceneFlowViewerFrame(ScenarioGraphEditor):
             func_name="SceneFlowViewerFrame._load_selected_scenario",
         )
         self.load_scenario_scene_flow(scenario)
+        # Apply the selected fit mode on first load for better initial view
+        self._fit_initialized = False
+        self._fit_to_view()
+
+    def _on_canvas_resized(self, _event=None) -> None:
+        if not self._fit_initialized:
+            self._fit_to_view()
+
+    def _on_fit_mode_change(self, value: str) -> None:
+        self.fit_mode = (value or "Contain").title()
+        self._fit_initialized = False
+        self._fit_to_view()
+
+    def _fit_to_view(self) -> None:
+        canvas = getattr(self, "canvas", None)
+        if not canvas:
+            return
+        try:
+            canvas.update_idletasks()
+            cw = int(canvas.winfo_width())
+            # Account for toolbar height to compute available space
+            th = 0
+            try:
+                th = int(self.toolbar.winfo_height()) if hasattr(self, "toolbar") else 0
+            except Exception:
+                th = 0
+            ch = int(self.winfo_height()) - th if int(self.winfo_height()) > 1 else int(canvas.winfo_height())
+        except Exception:
+            return
+        if cw <= 1 or ch <= 1:
+            return
+
+        bbox = canvas.bbox("all")
+        if not bbox:
+            return
+        content_w = max(1, bbox[2] - bbox[0])
+        content_h = max(1, bbox[3] - bbox[1])
+
+        mode = (self.fit_mode or "Contain").title()
+        if mode == "Width":
+            scale = cw / content_w
+        elif mode == "Height":
+            scale = ch / content_h
+        else:
+            scale = min(cw / content_w, ch / content_h)
+
+        # Clamp to a sensible range
+        try:
+            scale = float(scale)
+        except Exception:
+            scale = 1.0
+        scale = max(0.2, min(3.0, scale))
+
+        if abs(getattr(self, "canvas_scale", 1.0) - scale) > 1e-3:
+            self.canvas_scale = scale
+            self.draw_graph()
+            canvas.update_idletasks()
+            bbox = canvas.bbox("all") or bbox
+
+        # Center the view within the scrollregion
+        try:
+            sx0, sy0, sx1, sy1 = canvas.bbox("all")
+        except Exception:
+            return
+        width_r = max(1, sx1 - sx0)
+        height_r = max(1, sy1 - sy0)
+        if width_r <= 0 or height_r <= 0:
+            return
+
+        if width_r > cw:
+            target_left = sx0 + (width_r - cw) / 2
+            frac_x = (target_left - sx0) / width_r
+            canvas.xview_moveto(max(0.0, min(1.0, frac_x)))
+        else:
+            canvas.xview_moveto(0.0)
+
+        if height_r > ch:
+            target_top = sy0 + (height_r - ch) / 2
+            frac_y = (target_top - sy0) / height_r
+            canvas.yview_moveto(max(0.0, min(1.0, frac_y)))
+        else:
+            canvas.yview_moveto(0.0)
+        self._fit_initialized = True
+
+    def _on_layout_resize(self, _event=None) -> None:
+        """Keep the canvas height matched to available space under the toolbar."""
+        canvas = getattr(self, "canvas", None)
+        if not canvas:
+            return
+        try:
+            self.update_idletasks()
+            w = int(self.winfo_width())
+            h = int(self.winfo_height())
+            th = int(self.toolbar.winfo_height()) if hasattr(self, "toolbar") else 0
+            if w > 1 and h > 1:
+                canvas.configure(width=w, height=max(1, h - th))
+        except Exception:
+            pass
 
     def _toggle_detail_panel(self, *_args) -> None:
         if getattr(self.detail_toggle, "get", lambda: True)():
@@ -294,4 +419,48 @@ class SceneFlowViewerFrame(ScenarioGraphEditor):
         self._populate_scenario_menu()
 
 
-__all__ = ["SceneFlowViewerFrame", "SceneFlowViewerWindow"]
+def create_scene_flow_frame(
+    master=None,
+    scenario_title: Optional[str] = None,
+):
+    """Convenience factory to embed a SceneFlowViewerFrame without a window.
+
+    Resolves local wrappers and optionally selects an initial scenario by title.
+    """
+    scenario_wrapper = GenericModelWrapper("scenarios")
+    npc_wrapper = GenericModelWrapper("npcs")
+    creature_wrapper = GenericModelWrapper("creatures")
+    place_wrapper = GenericModelWrapper("places")
+
+    initial_scenario = None
+    if scenario_title:
+        try:
+            items = scenario_wrapper.load_items() or []
+        except Exception:
+            items = []
+        initial_scenario = next(
+            (s for s in items if (s.get("Title") or s.get("Name")) == scenario_title),
+            None,
+        )
+
+    return SceneFlowViewerFrame(
+        master,
+        scenario_wrapper,
+        npc_wrapper,
+        creature_wrapper,
+        place_wrapper,
+        initial_scenario=initial_scenario,
+    )
+
+
+def scene_flow_content_factory(scenario_title: Optional[str] = None):
+    """Return a factory suitable for GM-screen tab restoration."""
+    return lambda master: create_scene_flow_frame(master, scenario_title)
+
+
+__all__ = [
+    "SceneFlowViewerFrame",
+    "SceneFlowViewerWindow",
+    "create_scene_flow_frame",
+    "scene_flow_content_factory",
+]
