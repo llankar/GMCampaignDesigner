@@ -110,7 +110,7 @@ def _template_context(*, attack_bonus: str, base: str) -> dict[str, str]:
 def make_attack_roll_formula(attack_bonus: str) -> str:
     """Format an attack roll formula using the active system template."""
 
-    normalized = str(attack_bonus or "").strip()
+    normalized_input = str(attack_bonus or "").strip()
     config = _attack_roll_config()
     base_candidates: Sequence[str | None] = (
         config.get("fallback"),
@@ -120,16 +120,33 @@ def make_attack_roll_formula(attack_bonus: str) -> str:
         "1d20",
     )
 
-    if not normalized:
+    def _fallback_formula() -> str:
         for candidate in base_candidates:
             canonical = canonicalize_formula(candidate)
             if canonical:
                 return canonical
         return "1d20"
 
-    canonical_bonus = canonicalize_formula(normalized)
-    if canonical_bonus:
-        return canonical_bonus
+    if not normalized_input:
+        return _fallback_formula()
+
+    normalized = normalized_input
+
+    try:
+        parsed_bonus = dice_engine.parse_formula(
+            normalized,
+            supported_faces=get_supported_faces(),
+        )
+    except dice_engine.FormulaError:
+        parsed_bonus = None
+    else:
+        if parsed_bonus.total_dice > 0:
+            return parsed_bonus.canonical()
+        modifier = parsed_bonus.modifier
+        normalized = f"{modifier:+d}" if modifier else ""
+
+    if not normalized:
+        return _fallback_formula()
 
     if "d" in normalized.lower():
         return normalized
