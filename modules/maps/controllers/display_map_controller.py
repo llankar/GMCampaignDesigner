@@ -46,6 +46,7 @@ from modules.helpers.logging_helper import log_module_import, log_warning
 from modules.helpers.dice_markup import parse_inline_actions
 from modules.maps.exporters.maptools import build_token_macros
 from modules.dice import dice_engine
+from modules.dice import dice_preferences
 from modules.audio.entity_audio import (
     get_entity_audio_value,
     play_entity_audio,
@@ -1536,22 +1537,45 @@ class DisplayMapController:
                 except Exception:
                     pass
 
-        label = str(action.get("label") or "Action")
+        base_label = str(action.get("label") or "Action")
+        display_label = base_label
         notes = str(action.get("notes") or "").strip()
 
-        roll_key = "attack_roll_formula" if roll_type == "attack" else "damage_formula"
-        formula = str(action.get(roll_key) or "").strip()
+        descriptor: str
+        descriptor_with_notes: str
 
-        descriptor = "Attack" if roll_type == "attack" else "Damage"
-        descriptor_with_notes = descriptor
-        if roll_type == "damage" and notes:
-            descriptor_with_notes = f"{descriptor} ({notes})"
+        if roll_type == "difficulty":
+            difficulty_info = action.get("_difficulty") or {}
+            formula = str(difficulty_info.get("formula") or "").strip()
+            difficulty_label = str(difficulty_info.get("label") or "").strip()
+            descriptor_base = str(difficulty_info.get("descriptor") or "Difficulty").strip() or "Difficulty"
+            difficulty_notes = str(difficulty_info.get("notes") or "").strip()
+            if difficulty_notes:
+                notes = difficulty_notes
+            descriptor_with_notes = descriptor_base
+            if difficulty_label:
+                if base_label:
+                    display_label = f"{base_label} – {difficulty_label}"
+                else:
+                    display_label = difficulty_label
+                if difficulty_label.lower() not in descriptor_base.lower():
+                    descriptor_with_notes = f"{descriptor_base} ({difficulty_label})"
+            if notes:
+                descriptor_with_notes = f"{descriptor_with_notes} ({notes})"
+            descriptor = descriptor_base
+        else:
+            roll_key = "attack_roll_formula" if roll_type == "attack" else "damage_formula"
+            formula = str(action.get(roll_key) or "").strip()
+            descriptor = "Attack" if roll_type == "attack" else "Damage"
+            descriptor_with_notes = descriptor
+            if roll_type == "damage" and notes:
+                descriptor_with_notes = f"{descriptor} ({notes})"
 
         if not formula:
             try:
                 messagebox.showinfo(
                     "Dice Roll",
-                    f"No {descriptor.lower()} formula configured for {label}.",
+                    f"No {descriptor.lower()} formula configured for {display_label}.",
                 )
             finally:
                 _restore_hover()
@@ -1570,15 +1594,14 @@ class DisplayMapController:
             except Exception:
                 separate = False
 
-        supported_faces = dice_engine.DEFAULT_DICE_SIZES
+        supported_faces = dice_preferences.get_supported_faces()
         TextSegmentCls = None
         if dice_window is not None:
             try:
-                from modules.dice.dice_bar_window import SUPPORTED_DICE_SIZES, TextSegment
+                from modules.dice.dice_bar_window import TextSegment
             except Exception:
                 TextSegmentCls = None
             else:
-                supported_faces = SUPPORTED_DICE_SIZES
                 TextSegmentCls = TextSegment
 
         try:
@@ -1589,7 +1612,7 @@ class DisplayMapController:
             )
         except dice_engine.DiceEngineError as exc:
             try:
-                messagebox.showerror("Dice Roll Failed", f"{label}: {exc}")
+                messagebox.showerror("Dice Roll Failed", f"{display_label}: {exc}")
             finally:
                 _restore_hover()
             return
@@ -1598,7 +1621,7 @@ class DisplayMapController:
             if dice_window is not None and TextSegmentCls is not None:
                 try:
                     segments, total_text = dice_window._format_roll_output(result, separate)
-                    prefix = TextSegmentCls(f"{label} – {descriptor_with_notes}: ")
+                    prefix = TextSegmentCls(f"{display_label} – {descriptor_with_notes}: ")
                     dice_window.formula_var.set(result.canonical())
                     dice_window._display_segments([prefix, *segments])
                     dice_window._set_total_text(total_text)
@@ -1611,7 +1634,7 @@ class DisplayMapController:
                     )
 
             summary = self._format_roll_summary(descriptor_with_notes, formula, result)
-            messagebox.showinfo("Dice Roll", f"{label}\n{summary}")
+            messagebox.showinfo("Dice Roll", f"{display_label}\n{summary}")
         finally:
             _restore_hover()
 
@@ -1769,6 +1792,22 @@ class DisplayMapController:
                                 buttons_row,
                                 text=damage_text,
                                 command=lambda a=action: self._execute_token_hover_action(token, a, "damage"),
+                                width=0,
+                            ).pack(side="left", padx=(0, 6))
+                            buttons_added = True
+
+                        difficulties = action.get("difficulties") or []
+                        for difficulty in difficulties:
+                            label_text = str(difficulty.get("label") or "Difficulty")
+                            payload = {
+                                "label": action.get("label"),
+                                "notes": action.get("notes"),
+                                "_difficulty": difficulty,
+                            }
+                            ctk.CTkButton(
+                                buttons_row,
+                                text=label_text,
+                                command=lambda p=payload: self._execute_token_hover_action(token, p, "difficulty"),
                                 width=0,
                             ).pack(side="left", padx=(0, 6))
                             buttons_added = True

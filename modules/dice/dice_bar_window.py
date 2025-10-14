@@ -9,11 +9,11 @@ from typing import List, Tuple
 import customtkinter as ctk
 
 from modules.dice import dice_engine
+from modules.dice import dice_preferences
 from modules.helpers.logging_helper import log_module_import
 
 log_module_import(__name__)
 
-SUPPORTED_DICE_SIZES: Tuple[int, ...] = dice_engine.DEFAULT_DICE_SIZES
 INTER_BAR_GAP = 0
 HEIGHT_PADDING = 10
 
@@ -37,7 +37,7 @@ class DiceBarWindow(ctk.CTkToplevel):
 
         self._drag_offset: Tuple[int, int] | None = None
 
-        self.formula_var = tk.StringVar(value="1d20")
+        self.formula_var = tk.StringVar(value="")
         self.exploding_var = tk.BooleanVar(value=False)
         self.separate_var = tk.BooleanVar(value=False)
         self.result_var = tk.StringVar(value="Enter a dice formula and roll.")
@@ -53,10 +53,15 @@ class DiceBarWindow(ctk.CTkToplevel):
         self._total_label: ctk.CTkLabel | None = None
         self._total_prefix_label: ctk.CTkLabel | None = None
 
+        self._supported_faces: Tuple[int, ...] = tuple()
+        self._last_system_default: str = ""
+        self._preset_frame: ctk.CTkFrame | None = None
+
         self._result_normal_font = ctk.CTkFont(size=16)
         self._result_emphasis_font = ctk.CTkFont(size=18, weight="bold")
 
         self._build_ui()
+        self.refresh_system_settings(initial=True)
         self._set_collapsed(True)
         self._apply_geometry()
 
@@ -146,15 +151,7 @@ class DiceBarWindow(ctk.CTkToplevel):
 
         preset_frame = ctk.CTkFrame(content, fg_color="transparent")
         preset_frame.grid(row=0, column=5, padx=(6, 4), pady=4, sticky="w")
-        for idx, faces in enumerate(SUPPORTED_DICE_SIZES):
-            button = ctk.CTkButton(
-                preset_frame,
-                text=f"d{faces}",
-                width=48,
-                height=30,
-                command=lambda f=faces: self._append_die(f),
-            )
-            button.grid(row=0, column=idx, padx=2, pady=0)
+        self._preset_frame = preset_frame
 
         result_frame = ctk.CTkFrame(content, fg_color="transparent")
         result_frame.grid(row=0, column=6, padx=(6, 4), pady=4, sticky="ew")
@@ -212,8 +209,9 @@ class DiceBarWindow(ctk.CTkToplevel):
     # ------------------------------------------------------------------
     def roll(self) -> None:
         formula_text = self.formula_var.get()
+        supported_faces = self._supported_faces or dice_preferences.get_supported_faces()
         try:
-            parsed = dice_engine.parse_formula(formula_text, supported_faces=SUPPORTED_DICE_SIZES)
+            parsed = dice_engine.parse_formula(formula_text, supported_faces=supported_faces)
         except dice_engine.FormulaError as exc:
             self._show_error(str(exc))
             return
@@ -238,8 +236,9 @@ class DiceBarWindow(ctk.CTkToplevel):
         fragment = f"1d{faces}"
         current = self.formula_var.get().strip()
         combined = fragment if not current else f"{current} + {fragment}"
+        supported_faces = self._supported_faces or dice_preferences.get_supported_faces()
         try:
-            parsed = dice_engine.parse_formula(combined, supported_faces=SUPPORTED_DICE_SIZES)
+            parsed = dice_engine.parse_formula(combined, supported_faces=supported_faces)
         except dice_engine.FormulaError as exc:
             self._show_error(str(exc))
             return
@@ -253,6 +252,39 @@ class DiceBarWindow(ctk.CTkToplevel):
         self._set_total_text("")
         if self._formula_entry is not None:
             self._formula_entry.focus_set()
+
+    def refresh_system_settings(self, *, initial: bool = False) -> None:
+        """Reload system-dependent dice presets and default formula."""
+
+        faces = dice_preferences.get_supported_faces()
+        if faces != self._supported_faces:
+            self._supported_faces = faces
+            self._rebuild_preset_buttons()
+
+        default_formula = dice_preferences.get_rollable_default_formula()
+        current = self.formula_var.get().strip()
+        if initial or not current or current == self._last_system_default:
+            self.formula_var.set(default_formula)
+        self._last_system_default = default_formula
+
+    def _rebuild_preset_buttons(self) -> None:
+        frame = self._preset_frame
+        if frame is None or not frame.winfo_exists():
+            return
+        for child in list(frame.winfo_children()):
+            try:
+                child.destroy()
+            except tk.TclError:
+                pass
+        for idx, faces in enumerate(self._supported_faces):
+            button = ctk.CTkButton(
+                frame,
+                text=f"d{faces}",
+                width=48,
+                height=30,
+                command=lambda f=faces: self._append_die(f),
+            )
+            button.grid(row=0, column=idx, padx=2, pady=0)
 
     def _format_roll_output(
         self, result: dice_engine.RollResult, separate: bool

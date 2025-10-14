@@ -17,6 +17,7 @@ except ImportError:  # pragma: no cover - scipy is listed in requirements, but f
 from modules.helpers.window_helper import position_window_at_top
 from modules.helpers.logging_helper import log_module_import
 from modules.dice import dice_engine
+from modules.dice import dice_preferences
 
 log_module_import(__name__)
 
@@ -219,13 +220,8 @@ def _build_dice_models() -> Dict[int, DiceModel]:
 
 DICE_MODELS = _build_dice_models()
 
-SUPPORTED_DICE_SIZES: Tuple[int, ...] = tuple(
-    faces for faces in dice_engine.DEFAULT_DICE_SIZES if faces in DICE_MODELS
-)
-
 
 class DiceRollerWindow(ctk.CTkToplevel):
-    DICE_CHOICES = tuple(f"d{faces}" for faces in SUPPORTED_DICE_SIZES)
 
     def __init__(self, master: ctk.CTk):
         super().__init__(master)
@@ -242,17 +238,52 @@ class DiceRollerWindow(ctk.CTkToplevel):
         self.dice_scale = 1.0
         self._last_dice_sequence: List[Dict[str, object]] = []
         self._preset_segmented: ctk.CTkSegmentedButton | None = None
+        self._supported_faces: Tuple[int, ...] = tuple(sorted(DICE_MODELS.keys()))
+        self._dice_choices: Tuple[str, ...] = tuple(f"d{faces}" for faces in self._supported_faces)
 
-        self.dice_selection_var = ctk.StringVar(value="d20")
+        default_choice = self._dice_choices[0] if self._dice_choices else "d20"
+        self.dice_selection_var = ctk.StringVar(value=default_choice)
         self.dice_count_var = ctk.IntVar(value=1)
         self.formula_var = ctk.StringVar(value="")
         self.exploding_var = ctk.BooleanVar(value=False)
         self.separate_var = ctk.BooleanVar(value=False)
 
         self._build_layout()
+        self.refresh_system_settings(initial=True)
 
         self.bind("<Return>", lambda _event: self.roll_dice())
         self.protocol("WM_DELETE_WINDOW", self._on_close)
+
+    def refresh_system_settings(self, *, initial: bool = False) -> None:
+        """Reload dice presets and default formulas for the active system."""
+
+        faces = tuple(face for face in dice_preferences.get_supported_faces() if face in DICE_MODELS)
+        if not faces:
+            faces = tuple(sorted(DICE_MODELS.keys()))
+
+        if faces != self._supported_faces:
+            self._supported_faces = faces
+            self._dice_choices = tuple(f"d{face}" for face in faces)
+            segmented = self._preset_segmented
+            if segmented is not None:
+                try:
+                    segmented.configure(values=self._dice_choices)
+                except Exception:
+                    pass
+            current_choice = self.dice_selection_var.get()
+            if current_choice not in self._dice_choices and self._dice_choices:
+                self.dice_selection_var.set(self._dice_choices[0])
+
+        if not self._dice_choices:
+            self._dice_choices = tuple(f"d{face}" for face in faces)
+
+        if self._preset_segmented is not None and getattr(self._preset_segmented, "_buttons_dict", None):
+            # Rebind double-clicks in case widgets were recreated by configure.
+            self.after_idle(self._setup_preset_double_clicks)
+
+        default_formula = dice_preferences.get_rollable_default_formula()
+        if initial or not self.formula_var.get().strip():
+            self.formula_var.set(default_formula)
 
     # -----------------
     # Layout & UI setup
@@ -274,7 +305,7 @@ class DiceRollerWindow(ctk.CTkToplevel):
 
         segmented = ctk.CTkSegmentedButton(
             controls_frame,
-            values=self.DICE_CHOICES,
+            values=self._dice_choices,
             variable=self.dice_selection_var,
             command=self._on_choice,
         )
@@ -444,8 +475,9 @@ class DiceRollerWindow(ctk.CTkToplevel):
         fragment = f"{count}d{faces}"
         current = self.formula_var.get().strip()
         combined = fragment if not current else f"{current} + {fragment}"
+        supported_faces = dice_preferences.get_supported_faces()
         try:
-            parsed = dice_engine.parse_formula(combined, supported_faces=SUPPORTED_DICE_SIZES)
+            parsed = dice_engine.parse_formula(combined, supported_faces=supported_faces)
         except dice_engine.FormulaError as exc:
             messagebox.showerror("Invalid Formula", str(exc))
             return
@@ -457,8 +489,9 @@ class DiceRollerWindow(ctk.CTkToplevel):
     # -----------------
     def roll_dice(self) -> None:
         formula_text = self.formula_var.get()
+        supported_faces = dice_preferences.get_supported_faces()
         try:
-            parsed = dice_engine.parse_formula(formula_text, supported_faces=SUPPORTED_DICE_SIZES)
+            parsed = dice_engine.parse_formula(formula_text, supported_faces=supported_faces)
         except dice_engine.FormulaError as exc:
             messagebox.showerror("Invalid Formula", str(exc))
             return
