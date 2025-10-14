@@ -3,6 +3,7 @@ import sqlite3
 import os
 import re
 import platform
+from typing import Dict, List, Optional
 from modules.helpers.config_helper import ConfigHelper
 from modules.helpers.template_loader import (
     load_template,
@@ -90,6 +91,84 @@ def _ensure_schema_for_entity(cursor, entity):
             f"ALTER TABLE {entity} ADD COLUMN {col} {typ}"
         )
 
+
+def _ensure_campaign_metadata_tables(cursor):
+    """Create metadata tables that track supported systems and settings."""
+
+    cursor.execute(
+        """
+        CREATE TABLE IF NOT EXISTS campaign_systems (
+            slug TEXT PRIMARY KEY,
+            label TEXT NOT NULL,
+            default_formula TEXT,
+            supported_faces_json TEXT,
+            analyzer_config_json TEXT
+        )
+        """
+    )
+
+    cursor.execute(
+        """
+        CREATE TABLE IF NOT EXISTS campaign_settings (
+            key TEXT PRIMARY KEY,
+            value TEXT
+        )
+        """
+    )
+
+
+_DEFAULT_SYSTEMS: List[Dict[str, Optional[str]]] = [
+    {
+        "slug": "d20",
+        "label": "D20 System",
+        "default_formula": "1d20 + mod",
+        "supported_faces_json": "[4,6,8,10,12,20]",
+        "analyzer_config_json": None,
+    },
+    {
+        "slug": "2d20",
+        "label": "2d20 System",
+        "default_formula": "2d20kh1 + mod",
+        "supported_faces_json": "[20]",
+        "analyzer_config_json": None,
+    },
+    {
+        "slug": "savage_fate",
+        "label": "Savage Fate",
+        "default_formula": "1dF + mod",
+        "supported_faces_json": '["F",4,6,8,10,12]',
+        "analyzer_config_json": None,
+    },
+]
+
+
+def _ensure_default_systems(cursor):
+    """Populate the systems catalog and default campaign settings when needed."""
+
+    cursor.execute("SELECT COUNT(*) FROM campaign_systems")
+    count = cursor.fetchone()[0]
+    if not count:
+        cursor.executemany(
+            """
+            INSERT INTO campaign_systems (
+                slug, label, default_formula, supported_faces_json, analyzer_config_json
+            ) VALUES (:slug, :label, :default_formula, :supported_faces_json, :analyzer_config_json)
+            """,
+            _DEFAULT_SYSTEMS,
+        )
+
+    cursor.execute(
+        "SELECT value FROM campaign_settings WHERE key = ?",
+        ("system_slug",),
+    )
+    row = cursor.fetchone()
+    if row is None:
+        default_slug = _DEFAULT_SYSTEMS[0]["slug"]
+        cursor.execute(
+            "INSERT OR REPLACE INTO campaign_settings (key, value) VALUES (?, ?)",
+            ("system_slug", default_slug),
+        )
+
 def get_connection():
     raw_db_path = ConfigHelper.get("Database", "path", fallback="default_campaign.db").strip()
     is_windows_style_path = re.match(r"^[a-zA-Z]:[\\/\\]", raw_db_path)
@@ -110,6 +189,9 @@ def initialize_db():
     _ensure_campaign_templates()
     conn   = get_connection()
     cursor = conn.cursor()
+
+    _ensure_campaign_metadata_tables(cursor)
+    _ensure_default_systems(cursor)
 
     # Create tables if missing
     for entity in list_known_entities():
@@ -149,6 +231,49 @@ def ensure_entity_schema(entity: str):
         conn.commit()
     finally:
         conn.close()
+
+
+def get_campaign_setting(key: str, default: Optional[str] = None) -> Optional[str]:
+    """Fetch a campaign setting value."""
+
+    conn = get_connection()
+    cursor = conn.cursor()
+    try:
+        cursor.execute(
+            "SELECT value FROM campaign_settings WHERE key = ?",
+            (key,),
+        )
+        row = cursor.fetchone()
+        return row[0] if row is not None else default
+    finally:
+        conn.close()
+
+
+def set_campaign_setting(key: str, value: Optional[str]) -> None:
+    """Create or update a campaign setting value."""
+
+    conn = get_connection()
+    cursor = conn.cursor()
+    try:
+        cursor.execute(
+            "INSERT OR REPLACE INTO campaign_settings (key, value) VALUES (?, ?)",
+            (key, value),
+        )
+        conn.commit()
+    finally:
+        conn.close()
+
+
+def get_selected_system_slug(default: Optional[str] = None) -> Optional[str]:
+    """Return the slug of the currently selected campaign system."""
+
+    return get_campaign_setting("system_slug", default)
+
+
+def set_selected_system_slug(slug: str) -> None:
+    """Persist the slug for the currently selected campaign system."""
+
+    set_campaign_setting("system_slug", slug)
 
 if __name__ == "__main__":
     initialize_db()
