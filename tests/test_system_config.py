@@ -1,4 +1,6 @@
+import json
 import os
+import re
 import sqlite3
 import time
 from contextlib import closing
@@ -88,3 +90,69 @@ def test_system_config_cache_invalidation_detects_db_changes(campaign_db):
 
     refreshed = get_current_system_config()
     assert refreshed.default_formula == new_formula
+
+
+def test_system_config_parses_analyzer_patterns(campaign_db):
+    initial = get_current_system_config()
+    assert initial is not None
+
+    payload = {
+        "attack_roll": {"base": "2d20", "template": "{base}{bonus}"},
+        "difficulty_buttons": [
+            {
+                "label": "Standard Challenge",
+                "template": "{attack_roll}",
+                "descriptor": "Standard",
+            }
+        ],
+        "patterns": [
+            {
+                "name": "2d20_stat_block",
+                "pattern": r"(?P<label>\\w+)\\s+(?P<attack>[+-]\\d+)\\s+TN\\s+(?P<tn>\\d+)",
+                "description": "2d20 inline stat block",
+                "notes_group": "tn",
+                "difficulties": [
+                    {
+                        "group": "tn",
+                        "label": "Target Number",
+                        "template": "{attack_roll}",
+                        "descriptor": "TN",
+                        "notes_group": "tn",
+                    }
+                ],
+            }
+        ],
+    }
+
+    with closing(sqlite3.connect(str(campaign_db))) as conn:
+        conn.execute(
+            "UPDATE campaign_systems SET analyzer_config_json = ? WHERE slug = ?",
+            (json.dumps(payload), initial.slug),
+        )
+        conn.commit()
+
+    os.utime(campaign_db, None)
+    time.sleep(0.01)
+
+    refreshed = get_current_system_config()
+    assert refreshed is not None
+    assert refreshed.analyzer_config["attack_roll"]["base"] == "2d20"
+
+    assert refreshed.analyzer_patterns, "Expected analyzer patterns to be parsed"
+    pattern = refreshed.analyzer_patterns[0]
+    assert pattern.name == "2d20_stat_block"
+    actual_pattern_text = re.compile(pattern.pattern).pattern
+    expected_pattern_text = re.compile(payload["patterns"][0]["pattern"]).pattern
+    assert actual_pattern_text == expected_pattern_text
+    assert pattern.description == "2d20 inline stat block"
+    assert pattern.metadata["notes_group"] == "tn"
+    difficulties = pattern.metadata["difficulties"]
+    assert isinstance(difficulties, list)
+    assert difficulties[0]["label"] == "Target Number"
+    assert difficulties[0]["template"] == "{attack_roll}"
+    assert difficulties[0]["descriptor"] == "TN"
+
+    default_buttons = refreshed.analyzer_config["difficulty_buttons"]
+    assert isinstance(default_buttons, list)
+    assert default_buttons[0]["label"] == "Standard Challenge"
+    assert default_buttons[0]["template"] == "{attack_roll}"

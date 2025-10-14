@@ -305,6 +305,35 @@ def test_parse_inline_actions_infers_unmarked_dm_segments(system_case: _SystemCa
     assert sword["display_text"] == "Epée • Attack +2 • Damage 1d8+1"
 
 
+def test_parse_inline_actions_adds_default_difficulty_buttons(system_case: _SystemCase):
+    text = "[Strike +4|1d8 slashing]"
+    display, actions, errors = parse_inline_actions(text)
+
+    assert display.startswith("Strike • Attack +4 • Damage 1d8 slashing")
+    assert errors == []
+    assert len(actions) == 1
+
+    action = actions[0]
+    expected_formula = dice_preferences.canonicalize_formula(
+        _expected_roll(system_case, "+4")
+    ) or _expected_roll(system_case, "+4")
+    difficulties = action["difficulties"]
+    assert difficulties, "Expected at least one default difficulty button"
+
+    expected_labels = [
+        entry.get("label", "")
+        for entry in system_case.config.analyzer_config.get("difficulty_buttons", tuple())
+        if isinstance(entry, dict)
+    ]
+    assert expected_labels, "System configuration must specify default difficulties"
+
+    for label in expected_labels:
+        matching = next((item for item in difficulties if item["label"] == label), None)
+        assert matching is not None, f"Missing difficulty button labeled '{label}'"
+        normalized = matching["formula"].replace(" ", "")
+        assert normalized == expected_formula.replace(" ", "")
+
+
 def test_parse_inline_actions_pattern_difficulties_for_2d20(system_case: _SystemCase, monkeypatch: pytest.MonkeyPatch):
     if system_case.slug != "2d20":
         pytest.skip("Pattern-specific checks only apply to the 2d20 configuration")
