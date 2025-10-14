@@ -219,6 +219,14 @@ def _get_action_patterns() -> Tuple[_ActionPattern, ...]:
     return _PATTERN_CACHE
 
 
+def invalidate_action_pattern_cache() -> None:
+    """Clear any cached analyzer patterns so they reload on next access."""
+
+    global _PATTERN_CACHE_SLUG, _PATTERN_CACHE
+    _PATTERN_CACHE_SLUG = None
+    _PATTERN_CACHE = tuple()
+
+
 def _canonicalize_formula_text(value: str | None) -> str | None:
     return dice_preferences.canonicalize_formula(value)
 

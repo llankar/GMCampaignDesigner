@@ -52,10 +52,12 @@ from modules.helpers.logging_helper import (
     log_methods,
     log_warning,
 )
+from modules.helpers import system_config
 from modules.helpers.system_config import register_system_change_listener
 from modules.ui.tooltip import ToolTip
 from modules.ui.icon_button import create_icon_button
 from modules.ui.portrait_importer import PortraitImporter
+from modules.ui.system_selector_dialog import CampaignSystemSelectorDialog
 
 from modules.generic.generic_list_view import GenericListView
 from modules.generic.generic_model_wrapper import GenericModelWrapper
@@ -69,7 +71,7 @@ from modules.objects.object_importer import ObjectImportWindow
 from modules.scenarios.scenario_generator_view import ScenarioGeneratorView
 from modules.scenarios.scenario_builder_wizard import ScenarioBuilderWizard
 from modules.generic.export_for_foundry import preview_and_export_foundry
-from modules.helpers import text_helpers
+from modules.helpers import text_helpers, dice_markup
 from db.db import initialize_db, ensure_entity_schema
 from modules.factions.faction_graph_editor import FactionGraphEditor
 from modules.pcs.display_pcs import display_pcs_in_banner
@@ -135,6 +137,7 @@ class MainWindow(ctk.CTk):
         self.audio_bar_window = None
         self.portrait_importer = PortraitImporter(self)
         self._busy_modal = None
+        self._system_selector_dialog = None
         root = self.winfo_toplevel()
         root.bind_all("<Control-f>", self._on_ctrl_f)
 
@@ -398,14 +401,94 @@ class MainWindow(ctk.CTk):
             except Exception:
                 self.db_tooltip = None
 
+            self.system_label = ctk.CTkLabel(
+                db_container,
+                text="System: --",
+                font=("Segoe UI", 13),
+                fg_color="transparent",
+                text_color="#d5e6ff",
+            )
+            self.system_label.pack(pady=(0, 2), anchor="center")
+            self.system_tooltip = None
+
+            system_button = ctk.CTkButton(
+                db_container,
+                text="Switch System",
+                command=self.open_system_selector,
+                width=160,
+            )
+            system_button.pack(pady=(0, 6))
+            self.system_button = system_button
+
             self.sidebar_sections_container = ctk.CTkFrame(self.sidebar_inner, fg_color="transparent")
             self.sidebar_sections_container.pack(fill="both", expand=True, padx=5, pady=5)
         else:
             for child in self.sidebar_sections_container.winfo_children():
                 child.destroy()
 
+        self.update_sidebar_metadata()
+
         self.create_accordion_sidebar()
 
+
+    def update_sidebar_metadata(self):
+        db_path = ConfigHelper.get("Database", "path", fallback="default_campaign.db")
+        db_name = os.path.splitext(os.path.basename(db_path))[0]
+
+        label = getattr(self, "db_name_label", None)
+        if label is not None and label.winfo_exists():
+            label.configure(text=db_name)
+
+        tooltip = getattr(self, "db_tooltip", None)
+        if tooltip is not None:
+            try:
+                tooltip.text = os.path.abspath(db_path)
+            except Exception:
+                tooltip.text = db_path
+
+        config = system_config.get_current_system_config()
+        system_label_text = "Unknown"
+        system_slug = None
+        if config is not None:
+            system_label_text = config.label or config.slug or "Unknown"
+            system_slug = config.slug
+
+        system_label = getattr(self, "system_label", None)
+        if system_label is not None and system_label.winfo_exists():
+            system_label.configure(text=f"System: {system_label_text}")
+
+        system_tooltip = getattr(self, "system_tooltip", None)
+        tooltip_text = (
+            f"Active slug: {system_slug}" if system_slug else "No system selected"
+        )
+        if system_tooltip is None and system_label is not None:
+            try:
+                self.system_tooltip = ToolTip(system_label, tooltip_text)
+            except Exception:
+                self.system_tooltip = None
+        elif system_tooltip is not None:
+            system_tooltip.text = tooltip_text
+
+    def open_system_selector(self):
+        existing = getattr(self, "_system_selector_dialog", None)
+        if existing is not None and existing.winfo_exists():
+            try:
+                existing.lift()
+                existing.focus_force()
+            except Exception:
+                pass
+            return
+
+        dialog = CampaignSystemSelectorDialog(self)
+        dialog.bind("<Destroy>", self._on_system_selector_destroyed)
+        self._system_selector_dialog = dialog
+
+    def _on_system_selector_destroyed(self, event=None):
+        if event is None:
+            self._system_selector_dialog = None
+            return
+        if event.widget is self._system_selector_dialog:
+            self._system_selector_dialog = None
 
     def create_accordion_sidebar(self):
         container = getattr(self, "sidebar_sections_container", None)
@@ -2415,6 +2498,22 @@ class MainWindow(ctk.CTk):
 
     def _on_system_changed(self, _config) -> None:
         """Refresh open dice windows when the campaign system changes."""
+
+        try:
+            dice_markup.invalidate_action_pattern_cache()
+        except Exception as exc:
+            log_warning(
+                f"Failed to invalidate analyzer cache: {exc}",
+                func_name="MainWindow._on_system_changed",
+            )
+
+        try:
+            self.update_sidebar_metadata()
+        except Exception as exc:
+            log_warning(
+                f"Failed to update sidebar metadata: {exc}",
+                func_name="MainWindow._on_system_changed",
+            )
 
         try:
             window = getattr(self, "dice_bar_window", None)
