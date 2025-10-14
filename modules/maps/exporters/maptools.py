@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import Any, Dict, List
 
 from modules.helpers.logging_helper import log_module_import, log_warning
+from modules.dice import dice_preferences
 
 log_module_import(__name__)
 
@@ -56,4 +57,5 @@ def _normalize_formula(value: Any) -> str:
     if value is None:
         return ""
     text = str(value).strip()
-    return text
+    canonical = dice_preferences.canonicalize_formula(text)
+    return canonical or text

@@ -52,6 +52,7 @@ from modules.helpers.logging_helper import (
     log_methods,
     log_warning,
 )
+from modules.helpers.system_config import register_system_change_listener
 from modules.ui.tooltip import ToolTip
 from modules.ui.icon_button import create_icon_button
 from modules.ui.portrait_importer import PortraitImporter
@@ -136,6 +137,8 @@ class MainWindow(ctk.CTk):
         self._busy_modal = None
         root = self.winfo_toplevel()
         root.bind_all("<Control-f>", self._on_ctrl_f)
+
+        self._system_listener_unsub = register_system_change_listener(self._on_system_changed)
 
         self.after(200, self.open_dice_bar)
         self.after(400, self.open_audio_bar)
@@ -2409,6 +2412,43 @@ class MainWindow(ctk.CTk):
             return
         if event.widget is self.dice_bar_window:
             self.dice_bar_window = None
+
+    def _on_system_changed(self, _config) -> None:
+        """Refresh open dice windows when the campaign system changes."""
+
+        try:
+            window = getattr(self, "dice_bar_window", None)
+            if window is not None and window.winfo_exists():
+                window.refresh_system_settings()
+        except Exception as exc:
+            log_warning(
+                f"Failed to refresh dice bar after system change: {exc}",
+                func_name="MainWindow._on_system_changed",
+            )
+
+        try:
+            roller = getattr(self, "dice_roller_window", None)
+            if roller is not None and roller.winfo_exists():
+                roller.refresh_system_settings()
+        except Exception as exc:
+            log_warning(
+                f"Failed to refresh dice roller after system change: {exc}",
+                func_name="MainWindow._on_system_changed",
+            )
+
+    def destroy(self) -> None:
+        listener = getattr(self, "_system_listener_unsub", None)
+        if callable(listener):
+            try:
+                listener()
+            except Exception as exc:
+                log_warning(
+                    f"Failed to unregister system listener: {exc}",
+                    func_name="MainWindow.destroy",
+                )
+            finally:
+                self._system_listener_unsub = None
+        super().destroy()
 
     def open_sound_manager(self):
         try:
