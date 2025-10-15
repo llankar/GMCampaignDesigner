@@ -13,6 +13,7 @@ from modules.helpers.system_config import (
     SystemConfigManager,
     get_current_system_config,
     list_available_systems,
+    refresh_current_system,
     register_system_change_listener,
     set_current_system,
 )
@@ -156,3 +157,31 @@ def test_system_config_parses_analyzer_patterns(campaign_db):
     assert isinstance(default_buttons, list)
     assert default_buttons[0]["label"] == "Standard Challenge"
     assert default_buttons[0]["template"] == "{attack_roll}"
+
+
+def test_refresh_current_system_forces_reload_when_signature_static(monkeypatch, campaign_db):
+    initial = get_current_system_config()
+    assert initial is not None
+
+    constant_signature = ("/fake/path.db", 1.0, 1, 1)
+    monkeypatch.setattr(
+        SystemConfigManager,
+        "_compute_db_signature",
+        classmethod(lambda cls: constant_signature),
+    )
+    SystemConfigManager._cached_signature = constant_signature
+
+    new_formula = "3d6+2"
+    with closing(sqlite3.connect(str(campaign_db))) as conn:
+        conn.execute(
+            "UPDATE campaign_systems SET default_formula = ? WHERE slug = ?",
+            (new_formula, initial.slug),
+        )
+        conn.commit()
+
+    cached = get_current_system_config()
+    assert cached.default_formula != new_formula
+
+    refreshed = refresh_current_system()
+    assert refreshed is not None
+    assert refreshed.default_formula == new_formula

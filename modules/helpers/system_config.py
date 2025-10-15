@@ -70,6 +70,16 @@ class SystemConfigManager:
         return config
 
     @classmethod
+    def refresh_current_system(cls) -> Optional[SystemConfig]:
+        """Force a reload of the active system configuration."""
+
+        with cls._lock:
+            config, changed = cls._refresh_cache(force=True)
+        if changed and config is not None:
+            cls._notify_listeners(config)
+        return config
+
+    @classmethod
     def set_current_system(cls, slug: str) -> Optional[SystemConfig]:
         """Persist a new active system slug and refresh the cache."""
 
@@ -362,6 +372,12 @@ def get_current_system_config() -> Optional[SystemConfig]:
     return SystemConfigManager.get_current_system_config()
 
 
+def refresh_current_system() -> Optional[SystemConfig]:
+    """Public shortcut for :meth:`SystemConfigManager.refresh_current_system`."""
+
+    return SystemConfigManager.refresh_current_system()
+
+
 def set_current_system(slug: str) -> Optional[SystemConfig]:
     """Public shortcut for :meth:`SystemConfigManager.set_current_system`."""
 
@@ -390,6 +406,7 @@ __all__ = [
     "AnalyzerPattern",
     "SystemConfig",
     "get_current_system_config",
+    "refresh_current_system",
     "set_current_system",
     "list_available_systems",
     "register_system_change_listener",

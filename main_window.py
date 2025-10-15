@@ -1903,6 +1903,8 @@ class MainWindow(ctk.CTk):
         # 4) Ensure the database (including campaign metadata tables) is initialized
         initialize_db()
 
+        self._reload_active_campaign_system()
+
         # 5) Open a fresh connection and create all tables based on JSON templates
         conn = sqlite3.connect(new_db_path)
         cursor = conn.cursor()
@@ -2536,6 +2538,24 @@ class MainWindow(ctk.CTk):
             log_warning(
                 f"Failed to refresh dice roller after system change: {exc}",
                 func_name="MainWindow._on_system_changed",
+            )
+
+    def _reload_active_campaign_system(self) -> None:
+        """Force the system configuration to match the active campaign DB."""
+
+        try:
+            config = system_config.refresh_current_system()
+        except Exception as exc:
+            log_warning(
+                f"Failed to reload campaign system after database switch: {exc}",
+                func_name="MainWindow._reload_active_campaign_system",
+            )
+            return
+
+        if config is None:
+            log_warning(
+                "No campaign system is configured for the selected database.",
+                func_name="MainWindow._reload_active_campaign_system",
             )
 
     def destroy(self) -> None:
