@@ -1571,7 +1571,30 @@ class DisplayMapController:
             if roll_type == "damage" and notes:
                 descriptor_with_notes = f"{descriptor} ({notes})"
 
-        if not formula:
+        def _register_formula_candidate(value: str, *, fallback: bool, container: list[tuple[str, bool]]) -> None:
+            text = str(value or "").strip()
+            if not text:
+                return
+            canonical = dice_preferences.canonicalize_formula(text)
+            normalized = canonical or text
+            if not normalized:
+                return
+            if not any(existing == normalized for existing, _ in container):
+                container.append((normalized, fallback))
+
+        candidate_formulas: list[tuple[str, bool]] = []
+        _register_formula_candidate(formula, fallback=False, container=candidate_formulas)
+
+        base_formula = formula
+
+        if roll_type == "attack":
+            attack_bonus_text = str(action.get("attack_bonus") or "").strip()
+            if attack_bonus_text:
+                fallback_formula = dice_preferences.make_attack_roll_formula(attack_bonus_text)
+                # Always treat formulas derived from the attack bonus as a fallback option.
+                _register_formula_candidate(fallback_formula, fallback=True, container=candidate_formulas)
+
+        if not candidate_formulas:
             try:
                 messagebox.showinfo(
                     "Dice Roll",
@@ -1604,18 +1627,56 @@ class DisplayMapController:
             else:
                 TextSegmentCls = TextSegment
 
-        try:
-            result = dice_engine.roll_formula(
-                formula,
-                explode=explode,
-                supported_faces=supported_faces,
-            )
-        except dice_engine.DiceEngineError as exc:
+        result = None
+        used_formula = None
+        used_fallback = False
+        last_error: dice_engine.DiceEngineError | None = None
+
+        for candidate, is_fallback in candidate_formulas:
             try:
-                messagebox.showerror("Dice Roll Failed", f"{display_label}: {exc}")
+                attempt = dice_engine.roll_formula(
+                    candidate,
+                    explode=explode,
+                    supported_faces=supported_faces,
+                )
+            except dice_engine.DiceEngineError as exc:
+                last_error = exc
+                continue
+
+            result = attempt
+            used_formula = candidate
+            used_fallback = is_fallback
+            break
+
+        if result is None or used_formula is None:
+            error_message = last_error or dice_engine.FormulaError("Unable to parse roll formula.")
+            try:
+                messagebox.showerror("Dice Roll Failed", f"{display_label}: {error_message}")
             finally:
                 _restore_hover()
             return
+
+        formula = used_formula
+
+        if roll_type == "difficulty":
+            difficulty_info["formula"] = formula
+        elif roll_type in {"attack", "damage"}:
+            roll_key = "attack_roll_formula" if roll_type == "attack" else "damage_formula"
+            try:
+                action[roll_key] = formula
+            except Exception:
+                pass
+
+        if used_fallback and base_formula and formula != base_formula:
+            log_warning(
+                f"Rolled fallback formula '{formula}' for {display_label}; stored formula '{base_formula}' failed.",
+                func_name="DisplayMapController._roll_token_action",
+            )
+        elif used_fallback and not base_formula:
+            log_warning(
+                f"Derived roll formula '{formula}' for {display_label} from attack bonus.",
+                func_name="DisplayMapController._roll_token_action",
+            )
 
         try:
             if dice_window is not None and TextSegmentCls is not None:
