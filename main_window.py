@@ -1900,14 +1900,17 @@ class MainWindow(ctk.CTk):
             except Exception:
                 pass
 
-        # 4) Open a fresh connection and create all tables based on JSON templates
+        # 4) Ensure the database (including campaign metadata tables) is initialized
+        initialize_db()
+
+        # 5) Open a fresh connection and create all tables based on JSON templates
         conn = sqlite3.connect(new_db_path)
         cursor = conn.cursor()
 
         for entity in load_entity_definitions().keys():
             ensure_entity_schema(entity)
 
-        # 4) Re‑create the graph viewer tables
+        # 6) Re‑create the graph viewer tables
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS nodes (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -1943,7 +1946,7 @@ class MainWindow(ctk.CTk):
         conn.commit()
         conn.close()
 
-        # 5) Re‑initialise your in‑memory wrappers & update the label
+        # 7) Re‑initialise your in‑memory wrappers & update the label
         #    (and run any schema‐migrations if you still need them)
         self.refresh_entities()
 
