@@ -768,8 +768,10 @@ class ChatbotDialog(ctk.CTkToplevel):
                 normalized = normalize_rtf_json(value)
                 text = normalized.get("text", "")
                 formatting: dict[str, list[tuple[int, int]]] = {}
+                allowed_tags = {"bold", "italic", "underline"}
                 for tag, runs in normalized.get("formatting", {}).items():
-                    if tag not in {"bold", "italic", "underline"}:
+                    tag_name = str(tag).lower()
+                    if tag_name not in allowed_tags:
                         continue
                     cleaned: list[tuple[int, int]] = []
                     for start, end in runs:
@@ -781,7 +783,8 @@ class ChatbotDialog(ctk.CTkToplevel):
                         if e > s:
                             cleaned.append((s, e))
                     if cleaned:
-                        formatting[tag] = cleaned
+                        existing = formatting.setdefault(tag_name, [])
+                        existing.extend(cleaned)
                 return NoteText(text, formatting).trimmed()
             parts: list[NoteText] = []
             for key, sub_value in value.items():
