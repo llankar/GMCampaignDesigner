@@ -70,7 +70,7 @@ def open_web_display(self, port=None):
     self._web_server_thread.start()
 
 
-def _render_map_image(self):
+def _render_map_image(self, *, for_export=False):
     if not self.base_img:
         return None
     w, h = self.base_img.size
@@ -123,6 +123,31 @@ def _render_map_image(self):
 
             img.paste(img_r, (sx, sy), img_r.convert('RGBA'))
             draw.rectangle([sx - 3, sy - 3, sx + nw + 3, sy + nh + 3], outline=item.get('border_color', '#0000ff'), width=3)
+        elif item_type == 'overlay':
+            ensure_state = getattr(self, '_ensure_overlay_render_state', None)
+            if callable(ensure_state):
+                overlay_state = self._ensure_overlay_render_state(item, Image.LANCZOS)
+            else:
+                overlay_state = item.setdefault('_overlay_animation', {})
+            pil_frames = overlay_state.get('pil_frames') or []
+            if not pil_frames:
+                continue
+            if for_export:
+                frame_index = 0
+            else:
+                frame_index = overlay_state.get('frame_index', 0)
+                if pil_frames:
+                    frame_index %= len(pil_frames)
+            frame_image = pil_frames[frame_index % len(pil_frames)] if pil_frames else None
+            if frame_image is None:
+                continue
+            if hasattr(self, '_compute_overlay_screen_position'):
+                ox, oy = self._compute_overlay_screen_position(item, overlay_state)
+            else:
+                ox, oy = xw * self.zoom + self.pan_x, yw * self.zoom + self.pan_y
+            fx = int(round(ox - min_x))
+            fy = int(round(oy - min_y))
+            img.paste(frame_image, (fx, fy), frame_image)
         elif item_type in ['rectangle', 'oval']:
             shape_w = int(item.get('width', 50) * self.zoom)
             shape_h = int(item.get('height', 50) * self.zoom)
