@@ -6,13 +6,19 @@ from modules.helpers.logging_helper import log_module_import
 log_module_import(__name__)
 
 class GenericModelWrapper:
-    def __init__(self, entity_type):
+    def __init__(self, entity_type, db_path=None):
         self.entity_type = entity_type
         # Assume your table name is the same as the entity type (e.g., "npcs")
-        self.table = entity_type  
+        self.table = entity_type
+        self._db_path = db_path
+
+    def _get_connection(self):
+        if self._db_path:
+            return sqlite3.connect(self._db_path)
+        return get_connection()
 
     def load_items(self):
-        conn = get_connection()
+        conn = self._get_connection()
         conn.row_factory = sqlite3.Row  # This makes rows behave like dictionaries.
         cursor = conn.cursor()
         cursor.execute(f"SELECT * FROM {self.table}")
@@ -79,8 +85,8 @@ class GenericModelWrapper:
 
         return existing_columns
 
-    def save_items(self, items):
-        conn = get_connection()
+    def save_items(self, items, *, replace=True):
+        conn = self._get_connection()
         conn.execute("PRAGMA busy_timeout = 5000")
         cursor = conn.cursor()
 
@@ -118,14 +124,15 @@ class GenericModelWrapper:
             # On construit la liste des identifiants uniques présents dans les items
             unique_ids = [item[unique_field] for item in items if unique_field in item]
 
-            if unique_ids:
-                placeholders = ", ".join("?" for _ in unique_ids)
-                delete_sql = f"DELETE FROM {self.table} WHERE {unique_field} NOT IN ({placeholders})"
-                cursor.execute(delete_sql, unique_ids)
-            else:
-                # S'il n'y a aucun item, supprimer tous les enregistrements de la table
-                delete_sql = f"DELETE FROM {self.table}"
-                cursor.execute(delete_sql)
+            if replace:
+                if unique_ids:
+                    placeholders = ", ".join("?" for _ in unique_ids)
+                    delete_sql = f"DELETE FROM {self.table} WHERE {unique_field} NOT IN ({placeholders})"
+                    cursor.execute(delete_sql, unique_ids)
+                else:
+                    # S'il n'y a aucun item, supprimer tous les enregistrements de la table
+                    delete_sql = f"DELETE FROM {self.table}"
+                    cursor.execute(delete_sql)
 
             conn.commit()
         finally:
