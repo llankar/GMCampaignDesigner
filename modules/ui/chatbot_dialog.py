@@ -484,6 +484,7 @@ class ChatbotDialog(ctk.CTkToplevel):
         self._note_fields = tuple(note_field_candidates or _NOTE_FIELD_CANDIDATES)
 
         self._results: list[tuple[str, str, dict]] = []
+        self._notes_text_widget: tk.Text | None = None
 
         self._build_ui()
         self._populate(initial=True)
@@ -568,8 +569,17 @@ class ChatbotDialog(ctk.CTkToplevel):
         self._underline_font = ctk.CTkFont(family=body_family, size=13, underline=True)
 
         text_theme = self._derive_text_theme()
-        self.notes_box = tk.Text(
+        self.notes_box = ctk.CTkTextbox(
             notes_frame,
+            wrap="word",
+            activate_scrollbars=False,
+            fg_color=text_theme["bg"],
+            text_color=text_theme["fg"],
+        )
+        self.notes_box.grid(row=1, column=0, sticky="nsew")
+
+        self._notes_text_widget = getattr(self.notes_box, "_textbox", self.notes_box)
+        self._notes_text_widget.configure(
             wrap="word",
             font=self._body_font,
             bg=text_theme["bg"],
@@ -582,17 +592,16 @@ class ChatbotDialog(ctk.CTkToplevel):
             padx=8,
             pady=8,
         )
-        self.notes_box.grid(row=1, column=0, sticky="nsew")
-        self.notes_box.configure(
-            state=tk.DISABLED,
+        self._set_notes_box_state("disabled")
+        self._notes_text_widget.configure(
             disabledbackground=text_theme["bg"],
             disabledforeground=text_theme["fg"],
         )
-        self.notes_box.tag_configure("section_title", font=self._section_font, spacing3=8)
-        self.notes_box.tag_configure("field_label", font=self._field_font)
-        self.notes_box.tag_configure("bold", font=self._bold_font)
-        self.notes_box.tag_configure("italic", font=self._italic_font)
-        self.notes_box.tag_configure("underline", font=self._underline_font)
+        self._notes_text_widget.tag_configure("section_title", font=self._section_font, spacing3=8)
+        self._notes_text_widget.tag_configure("field_label", font=self._field_font)
+        self._notes_text_widget.tag_configure("bold", font=self._bold_font)
+        self._notes_text_widget.tag_configure("italic", font=self._italic_font)
+        self._notes_text_widget.tag_configure("underline", font=self._underline_font)
 
     # ------------------------------------------------------------------
     # Event handlers
@@ -738,6 +747,16 @@ class ChatbotDialog(ctk.CTkToplevel):
             return NoteText.plain(f"{label}:\n") + note.indent_all_lines("  ")
         return NoteText.plain(f"{label}: ") + note
 
+    def _set_notes_box_state(self, state: str) -> None:
+        try:
+            self.notes_box.configure(state=state)
+        except Exception:
+            pass
+        try:
+            self._notes_text_widget.configure(state=state)
+        except Exception:
+            pass
+
     def _normalize_field_value(self, value: Any) -> NoteText:
         if value is None:
             return NoteText()
@@ -789,8 +808,11 @@ class ChatbotDialog(ctk.CTkToplevel):
         return NoteText.plain(str(value)).trimmed()
 
     def _render_note_text(self, text: NoteText | str) -> None:
-        self.notes_box.configure(state=tk.NORMAL)
-        self.notes_box.delete("1.0", tk.END)
+        text_widget = self._notes_text_widget
+        if text_widget is None:
+            return
+        self._set_notes_box_state("normal")
+        text_widget.delete("1.0", tk.END)
 
         if not isinstance(text, NoteText):
             note = NoteText.plain(str(text or ""))
@@ -801,7 +823,7 @@ class ChatbotDialog(ctk.CTkToplevel):
         if render_text and not render_text.endswith("\n"):
             render_text += "\n"
 
-        self.notes_box.insert(tk.END, render_text)
+        text_widget.insert(tk.END, render_text)
 
         for tag, runs in note.formatting.items():
             if tag not in {"bold", "italic", "underline"}:
@@ -812,7 +834,7 @@ class ChatbotDialog(ctk.CTkToplevel):
                 start_index = f"1.0+{start}c"
                 end_index = f"1.0+{end}c"
                 try:
-                    self.notes_box.tag_add(tag, start_index, end_index)
+                    text_widget.tag_add(tag, start_index, end_index)
                 except Exception:
                     continue
 
@@ -823,7 +845,7 @@ class ChatbotDialog(ctk.CTkToplevel):
             if not stripped:
                 continue
             if not line.startswith(" ") and stripped.endswith(":"):
-                self.notes_box.tag_add("section_title", f"{lineno}.0", f"{lineno}.end")
+                text_widget.tag_add("section_title", f"{lineno}.0", f"{lineno}.end")
                 continue
             colon_idx = line.find(":")
             if colon_idx == -1:
@@ -832,11 +854,11 @@ class ChatbotDialog(ctk.CTkToplevel):
             start_index = f"{lineno}.0+{leading_spaces}c"
             end_index = f"{lineno}.0+{colon_idx + 1}c"
             try:
-                self.notes_box.tag_add("field_label", start_index, end_index)
+                text_widget.tag_add("field_label", start_index, end_index)
             except Exception:
                 continue
 
-        self.notes_box.configure(state=tk.DISABLED)
+        self._set_notes_box_state("disabled")
 
     def _derive_listbox_theme(self) -> dict[str, str]:
         entry = self.query_entry
