@@ -217,6 +217,11 @@ def _on_display_map(self, entity_type, map_name): # entity_type here is the map'
     self.mask_tk = None
     self.base_id = None
     self.mask_id = None
+    if hasattr(self, "_stop_overlay_animation"):
+        try:
+            self._stop_overlay_animation(clear_state=True)
+        except Exception:
+            pass
     if hasattr(self, "canvas") and self.canvas is not None:
         try:
             self.canvas.destroy()

@@ -66,8 +66,18 @@ def _update_fullscreen_map(self):
                     except tk.TclError:
                         pass
             del item_to_clear['fs_cross_ids']
-        
+
         item_to_clear.pop('fs_tk', None) # Remove old PhotoImage reference to allow GC
+        overlay_state = item_to_clear.get("_overlay_animation")
+        if isinstance(overlay_state, dict):
+            fs_overlay_id = overlay_state.get("fs_canvas_id")
+            if fs_overlay_id:
+                try:
+                    self.fs_canvas.delete(fs_overlay_id)
+                except tk.TclError:
+                    pass
+            overlay_state.pop("fs_canvas_id", None)
+            overlay_state.pop("fs_frames", None)
 
     for item in self.tokens:
         item_type = item.get("type", "token")
@@ -150,10 +160,60 @@ def _update_fullscreen_map(self):
                         self.fs_canvas.delete(x_id)
                     del item['fs_cross_ids']
 
+        elif item_type == "overlay":
+            overlay_state = item.setdefault("_overlay_animation", {})
+            pil_frames = overlay_state.get("pil_frames") or []
+            if not pil_frames:
+                overlay_state.pop("fs_frames", None)
+                overlay_state.pop("fs_canvas_id", None)
+                continue
+
+            frame_index = overlay_state.get("frame_index", 0)
+            if pil_frames:
+                frame_index %= len(pil_frames)
+            overlay_state["frame_index"] = frame_index
+
+            fs_frames = overlay_state.get("fs_frames")
+            render_key = overlay_state.get("render_key")
+            if not fs_frames or overlay_state.get("fs_render_key") != render_key:
+                fs_frames = [ImageTk.PhotoImage(frame) for frame in pil_frames]
+                overlay_state["fs_frames"] = fs_frames
+                overlay_state["fs_render_key"] = render_key
+
+            if not fs_frames:
+                overlay_state.pop("fs_canvas_id", None)
+                continue
+
+            current_image = fs_frames[frame_index % len(fs_frames)]
+            if hasattr(self, "_compute_overlay_screen_position"):
+                sx_overlay, sy_overlay = self._compute_overlay_screen_position(item, overlay_state)
+            else:
+                sx_overlay, sy_overlay = sx, sy
+            sx_i, sy_i = int(round(sx_overlay)), int(round(sy_overlay))
+
+            fs_canvas_id = overlay_state.get("fs_canvas_id")
+            if fs_canvas_id:
+                try:
+                    self.fs_canvas.coords(fs_canvas_id, sx_i, sy_i)
+                    self.fs_canvas.itemconfig(fs_canvas_id, image=current_image)
+                except tk.TclError:
+                    try:
+                        self.fs_canvas.delete(fs_canvas_id)
+                    except tk.TclError:
+                        pass
+                    fs_canvas_id = None
+            if not fs_canvas_id:
+                try:
+                    fs_canvas_id = self.fs_canvas.create_image(sx_i, sy_i, image=current_image, anchor='nw')
+                except tk.TclError:
+                    fs_canvas_id = None
+            if fs_canvas_id:
+                overlay_state["fs_canvas_id"] = fs_canvas_id
+
         elif item_type in ["rectangle", "oval"]:
             shape_width_unscaled = item.get("width", 50) # Default if missing
             shape_height_unscaled = item.get("height", 50) # Default if missing
-            
+
             shape_width = int(shape_width_unscaled * self.zoom)
             shape_height = int(shape_height_unscaled * self.zoom)
 

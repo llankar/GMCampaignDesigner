@@ -2,6 +2,7 @@ import os
 import json
 import copy
 import re
+import time
 import webbrowser
 from pathlib import Path
 from tkinter import colorchooser, filedialog, messagebox
@@ -152,6 +153,9 @@ class DisplayMapController:
         self._marker_min_r    = 6
         self._marker_max_r    = 25
         self._hovered_marker  = None
+
+        self._overlay_animation_after_id = None
+        self._overlay_animation_tick_ms = 40
 
         self._focus_bindings_registered = False
 
@@ -465,6 +469,8 @@ class DisplayMapController:
         item_type = item.get("type")
         if item_type in ("rectangle", "oval"):
             return "shape"
+        if item_type == "overlay":
+            return "overlay"
         return item_type
 
     def _ensure_selection_for_context_menu(self, item):
@@ -515,6 +521,362 @@ class DisplayMapController:
         self._selection_icon_cache[key] = tk_image
         return tk_image, key
 
+    def _coerce_overlay_number(self, value, fallback=0.0):
+        try:
+            if isinstance(value, str):
+                value = value.strip()
+                if not value:
+                    return fallback
+            return float(value)
+        except (TypeError, ValueError):
+            return fallback
+
+    def _extract_overlay_geometry(self, item):
+        coverage = item.get("coverage") or {}
+        if not isinstance(coverage, dict):
+            coverage = {}
+
+        size = item.get("animation_size")
+        default_width = default_height = 0.0
+        if isinstance(size, (list, tuple)) and len(size) >= 2:
+            default_width, default_height = size[0], size[1]
+
+        def _lookup(mapping, keys, fallback=0.0):
+            for key in keys:
+                if key in mapping:
+                    candidate = self._coerce_overlay_number(mapping.get(key), None)
+                    if candidate is not None:
+                        return candidate
+            for nested_key in ("size", "dimensions", "bounds"):
+                nested = mapping.get(nested_key)
+                if isinstance(nested, dict):
+                    for key in keys:
+                        if key in nested:
+                            candidate = self._coerce_overlay_number(nested.get(key), None)
+                            if candidate is not None:
+                                return candidate
+            return fallback
+
+        width_units = _lookup(coverage, ("width", "w"), default_width or 1.0)
+        height_units = _lookup(coverage, ("height", "h"), default_height or width_units or 1.0)
+        offset_x_units = _lookup(coverage, ("offset_x", "x", "left"), 0.0)
+        offset_y_units = _lookup(coverage, ("offset_y", "y", "top"), 0.0)
+
+        anchor = coverage.get("anchor") or coverage.get("alignment") or coverage.get("origin") or "nw"
+        anchor = str(anchor).strip().lower()
+        if anchor in ("centre", "centred"):
+            anchor = "center"
+
+        playback = item.get("playback") or {}
+        paused = False
+        speed = 1.0
+        if isinstance(playback, dict):
+            paused = bool(playback.get("paused"))
+            for key in ("speed", "playback_speed", "rate", "multiplier"):
+                if key in playback:
+                    candidate = self._coerce_overlay_number(playback.get(key), None)
+                    if candidate is not None:
+                        speed = max(0.0, candidate)
+                        break
+        else:
+            playback = {}
+
+        return {
+            "width": width_units,
+            "height": height_units,
+            "offset_x": offset_x_units,
+            "offset_y": offset_y_units,
+            "anchor": anchor or "nw",
+            "speed": speed if speed > 0 else 0.0,
+            "paused": paused or speed == 0,
+        }
+
+    def _ensure_overlay_render_state(self, item, resample):
+        frames = item.get("animation_frames") or []
+        state = item.setdefault("_overlay_animation", {})
+
+        if not frames:
+            state.setdefault("tk_frames", [])
+            state.setdefault("pil_frames", [])
+            state.setdefault("current_size", (0, 0))
+            state.setdefault("frame_index", 0)
+            state.setdefault("offset_units", (0.0, 0.0))
+            state.setdefault("anchor", "nw")
+            state.setdefault("durations", item.get("animation_durations") or [])
+            return state
+
+        geometry = self._extract_overlay_geometry(item)
+        zoom = self.zoom if self.zoom else 1.0
+
+        width_units = geometry.get("width") or 0.0
+        height_units = geometry.get("height") or 0.0
+        if width_units <= 0 or height_units <= 0:
+            first_frame = frames[0]
+            try:
+                fw, fh = first_frame.size
+            except Exception:
+                fw = fh = 0
+            width_units = width_units or fw or 1.0
+            height_units = height_units or fh or 1.0
+
+        target_width = max(1, int(round(width_units * zoom)))
+        target_height = max(1, int(round(height_units * zoom)))
+
+        opacity = item.get("opacity", 1.0)
+        try:
+            opacity = float(opacity)
+        except (TypeError, ValueError):
+            opacity = 1.0
+        opacity = max(0.0, min(1.0, opacity))
+
+        render_key = (target_width, target_height, round(opacity, 3), round(zoom, 4))
+        processed_frames = state.get("pil_frames") or []
+        tk_frames = state.get("tk_frames") or []
+
+        if state.get("render_key") != render_key or not tk_frames:
+            processed_frames = []
+            tk_frames = []
+            for frame in frames:
+                try:
+                    working = frame.convert("RGBA")
+                except Exception:
+                    continue
+                if working.size != (target_width, target_height):
+                    working = working.resize((target_width, target_height), resample=resample)
+                if opacity < 1.0:
+                    working = working.copy()
+                    alpha_channel = working.split()[-1] if working.mode == "RGBA" else None
+                    if alpha_channel:
+                        alpha_channel = alpha_channel.point(lambda a: int(a * opacity))
+                        working.putalpha(alpha_channel)
+                    else:
+                        working.putalpha(int(255 * opacity))
+                processed_frames.append(working)
+                tk_frames.append(ImageTk.PhotoImage(working))
+            state["render_key"] = render_key
+            state["last_update"] = time.monotonic()
+
+        state["pil_frames"] = processed_frames
+        state["tk_frames"] = tk_frames
+        state["current_size"] = (target_width, target_height)
+        state["offset_units"] = (geometry.get("offset_x", 0.0), geometry.get("offset_y", 0.0))
+        state["anchor"] = geometry.get("anchor", "nw")
+        state["speed"] = geometry.get("speed", 1.0)
+        state["paused"] = geometry.get("paused", False)
+        state["durations"] = item.get("animation_durations") or state.get("durations") or []
+
+        frame_count = len(tk_frames)
+        frame_index = state.get("frame_index", 0)
+        if frame_count:
+            frame_index %= frame_count
+        else:
+            frame_index = 0
+        state["frame_index"] = frame_index
+        if frame_count:
+            state["current_pil_frame"] = processed_frames[frame_index % len(processed_frames)]
+        else:
+            state["current_pil_frame"] = None
+        state.setdefault("last_update", time.monotonic())
+        return state
+
+    def _compute_overlay_screen_position(self, item, state=None):
+        if state is None:
+            state = item.get("_overlay_animation") or {}
+        pos = item.get("position") or (0, 0)
+        try:
+            px, py = pos
+        except Exception:
+            px = py = 0
+
+        offset_units = state.get("offset_units") or (0.0, 0.0)
+        try:
+            ox, oy = offset_units
+        except Exception:
+            ox = oy = 0.0
+
+        zoom = self.zoom if self.zoom else 1.0
+        sx = (px + ox) * zoom + self.pan_x
+        sy = (py + oy) * zoom + self.pan_y
+
+        width, height = state.get("current_size", (0, 0))
+        anchor = (state.get("anchor") or "nw").lower()
+
+        if anchor in ("center", "c", "mid", "middle"):
+            sx -= width / 2
+            sy -= height / 2
+        elif anchor in ("n", "north", "top"):
+            sx -= width / 2
+        elif anchor in ("s", "south", "bottom"):
+            sx -= width / 2
+            sy -= height
+        elif anchor in ("e", "east", "right"):
+            sy -= height / 2
+            sx -= width
+        elif anchor in ("w", "west", "left"):
+            sy -= height / 2
+        elif anchor in ("se", "southeast"):
+            sx -= width
+            sy -= height
+        elif anchor in ("sw", "southwest"):
+            sy -= height
+        elif anchor in ("ne", "northeast"):
+            sx -= width
+
+        return float(sx), float(sy)
+
+    def _stop_overlay_animation(self, *, clear_state=False):
+        canvas = getattr(self, "canvas", None)
+        if self._overlay_animation_after_id and canvas:
+            try:
+                canvas.after_cancel(self._overlay_animation_after_id)
+            except tk.TclError:
+                pass
+        self._overlay_animation_after_id = None
+
+        if clear_state:
+            for item in self.tokens:
+                state = item.get("_overlay_animation")
+                if isinstance(state, dict):
+                    fs_canvas_id = state.get("fs_canvas_id")
+                    if fs_canvas_id and getattr(self, "fs_canvas", None):
+                        try:
+                            self.fs_canvas.delete(fs_canvas_id)
+                        except tk.TclError:
+                            pass
+                    item["_overlay_animation"] = {}
+
+    def _ensure_overlay_animation_schedule(self):
+        canvas = getattr(self, "canvas", None)
+        if not canvas or not canvas.winfo_exists():
+            if self._overlay_animation_after_id:
+                try:
+                    canvas.after_cancel(self._overlay_animation_after_id)
+                except Exception:
+                    pass
+            self._overlay_animation_after_id = None
+            return
+
+        needs_animation = False
+        for item in self.tokens:
+            if item.get("type") != "overlay":
+                continue
+            state = item.get("_overlay_animation")
+            if not isinstance(state, dict):
+                continue
+            if state.get("paused"):
+                continue
+            frames = state.get("tk_frames") or []
+            if len(frames) > 1:
+                needs_animation = True
+                break
+
+        if needs_animation:
+            if not self._overlay_animation_after_id:
+                try:
+                    self._overlay_animation_after_id = canvas.after(
+                        self._overlay_animation_tick_ms, self._animate_overlays
+                    )
+                except tk.TclError:
+                    self._overlay_animation_after_id = None
+        else:
+            if self._overlay_animation_after_id:
+                try:
+                    canvas.after_cancel(self._overlay_animation_after_id)
+                except tk.TclError:
+                    pass
+                self._overlay_animation_after_id = None
+
+    def _animate_overlays(self):
+        canvas = getattr(self, "canvas", None)
+        if not canvas or not canvas.winfo_exists():
+            self._overlay_animation_after_id = None
+            return
+
+        self._overlay_animation_after_id = None
+        now = time.monotonic()
+        min_delay = None
+        web_dirty = False
+
+        for item in self.tokens:
+            if item.get("type") != "overlay":
+                continue
+            state = item.get("_overlay_animation")
+            if not isinstance(state, dict):
+                continue
+            if state.get("paused"):
+                continue
+
+            frames = state.get("tk_frames") or []
+            pil_frames = state.get("pil_frames") or []
+            frame_count = len(frames)
+            if frame_count <= 1:
+                continue
+
+            durations = state.get("durations") or item.get("animation_durations") or []
+            frame_index = state.get("frame_index", 0) % frame_count
+            speed = state.get("speed", 1.0)
+            if speed <= 0:
+                continue
+
+            duration_ms = durations[frame_index % len(durations)] if durations else 100
+            try:
+                duration_ms = max(1, int(duration_ms / speed))
+            except Exception:
+                duration_ms = max(1, int(duration_ms))
+
+            last_update = state.get("last_update", now)
+            elapsed_ms = (now - last_update) * 1000.0
+
+            if elapsed_ms >= duration_ms:
+                frame_index = (frame_index + 1) % frame_count
+                state["frame_index"] = frame_index
+                state["last_update"] = now
+                state["current_pil_frame"] = (
+                    pil_frames[frame_index % len(pil_frames)] if pil_frames else None
+                )
+
+                canvas_id = state.get("canvas_id") or (item.get("canvas_ids") or (None,))[0]
+                if canvas_id:
+                    try:
+                        canvas.itemconfig(canvas_id, image=frames[frame_index])
+                    except tk.TclError:
+                        pass
+
+                fs_frames = state.get("fs_frames")
+                fs_canvas_id = state.get("fs_canvas_id")
+                if self.fs_canvas and fs_frames and fs_canvas_id:
+                    try:
+                        frame = fs_frames[frame_index % len(fs_frames)]
+                        self.fs_canvas.itemconfig(fs_canvas_id, image=frame)
+                    except tk.TclError:
+                        pass
+
+                if getattr(self, "_web_server_thread", None):
+                    web_dirty = True
+                elapsed_ms = 0.0
+
+            remaining_ms = duration_ms - elapsed_ms
+            if remaining_ms <= 0:
+                remaining_ms = duration_ms
+
+            if min_delay is None or remaining_ms < min_delay:
+                min_delay = remaining_ms
+
+        if web_dirty and getattr(self, "_web_server_thread", None):
+            try:
+                self._update_web_display_map()
+            except Exception:
+                pass
+
+        if min_delay is None:
+            return
+
+        delay_ms = max(15, int(min_delay))
+        try:
+            self._overlay_animation_after_id = canvas.after(delay_ms, self._animate_overlays)
+        except tk.TclError:
+            self._overlay_animation_after_id = None
+
     def _calculate_item_bbox(self, item):
         if not item or not getattr(self, "canvas", None):
             return None
@@ -542,6 +904,22 @@ class DisplayMapController:
                     item.get("handle_canvas_id"),
                 ]
             )
+        elif item_type == "overlay":
+            state = item.get("_overlay_animation") or {}
+            canvas_id = canvas_ids[0] if canvas_ids else None
+            coords = None
+            if canvas_id:
+                try:
+                    coords = self.canvas.coords(canvas_id)
+                except tk.TclError:
+                    coords = None
+            if coords and len(coords) >= 2:
+                sx, sy = coords[0], coords[1]
+            else:
+                sx, sy = self._compute_overlay_screen_position(item, state)
+            width, height = state.get("current_size", (0, 0))
+            if width and height:
+                return (sx, sy, sx + width, sy + height)
 
         for cid in preferred_ids:
             if not cid:
@@ -2567,6 +2945,58 @@ class DisplayMapController:
                     self._bind_item_events(item)
                     item['hover_bbox'] = (sx - 3, sy - 3, sx + nw + 3, sy + nh + 3)
                     self._refresh_token_hover_popup(item)
+            elif item_type == "overlay":
+                state = self._ensure_overlay_render_state(item, resample)
+                tk_frames = state.get("tk_frames") or []
+                pil_frames = state.get("pil_frames") or []
+                if not tk_frames:
+                    for cid in item.get("canvas_ids", ()): 
+                        if cid:
+                            try:
+                                self.canvas.delete(cid)
+                            except tk.TclError:
+                                pass
+                    item["canvas_ids"] = ()
+                    state.pop("canvas_id", None)
+                    continue
+
+                frame_index = state.get("frame_index", 0)
+                frame_count = len(tk_frames)
+                if frame_count:
+                    frame_index %= frame_count
+                state["frame_index"] = frame_index
+                current_image = tk_frames[frame_index]
+                if pil_frames:
+                    state["current_pil_frame"] = pil_frames[frame_index % len(pil_frames)]
+
+                sx, sy = self._compute_overlay_screen_position(item, state)
+                sx_i, sy_i = int(round(sx)), int(round(sy))
+
+                canvas_ids = item.get("canvas_ids") or ()
+                image_id = canvas_ids[0] if canvas_ids else None
+                if image_id:
+                    try:
+                        self.canvas.coords(image_id, sx_i, sy_i)
+                        self.canvas.itemconfig(image_id, image=current_image)
+                    except tk.TclError:
+                        try:
+                            self.canvas.delete(image_id)
+                        except tk.TclError:
+                            pass
+                        image_id = None
+                if not image_id:
+                    try:
+                        image_id = self.canvas.create_image(sx_i, sy_i, image=current_image, anchor='nw')
+                    except tk.TclError:
+                        image_id = None
+                if image_id:
+                    item["canvas_ids"] = (image_id,)
+                    state["canvas_id"] = image_id
+                    self._bind_item_events(item)
+                else:
+                    item["canvas_ids"] = ()
+                    state.pop("canvas_id", None)
+                state["last_update"] = state.get("last_update", time.monotonic())
             elif item_type == "marker":
                 item.setdefault("entry_width", 180)
                 item.setdefault("entry_expanded_width", item.get("entry_width", 180))
@@ -2714,6 +3144,7 @@ class DisplayMapController:
                     elif item_type == "oval": shape_id = self.canvas.create_oval(sx, sy, sx + shape_width, sy + shape_height, fill=fill_color, outline=border_color, width=2)
                     item['canvas_ids'] = (shape_id,) if shape_id else ();
                     if shape_id: self._bind_item_events(item)
+        self._ensure_overlay_animation_schedule()
         self._update_selection_indicators()
         if self.fs_canvas:
             self._update_fullscreen_map()
@@ -2859,6 +3290,9 @@ class DisplayMapController:
         if category == "marker":
             markers = [entry for entry in selection if self._get_item_category(entry) == "marker"]
             return self._show_marker_menu(event, markers)
+        if category == "overlay":
+            overlays = [entry for entry in selection if self._get_item_category(entry) == "overlay"]
+            return self._show_overlay_menu(event, overlays)
 
     def _show_shape_menu(self, event, shapes):
         valid_shapes = [s for s in shapes if isinstance(s, dict) and s.get("type") in ("rectangle", "oval")]
@@ -2903,6 +3337,32 @@ class DisplayMapController:
         )
 
         menu.tk_popup(event.x_root, event.y_root)
+
+    def _show_overlay_menu(self, event, overlays):
+        valid_overlays = [o for o in overlays if isinstance(o, dict) and o.get("type") == "overlay"]
+        if not valid_overlays:
+            return
+
+        count = len(valid_overlays)
+        plural = "s" if count != 1 else ""
+        menu = tk.Menu(self.canvas, tearoff=0)
+        menu.add_command(
+            label=f"Copy Overlay{plural}", command=lambda: self._copy_item(valid_overlays)
+        )
+        menu.add_command(
+            label=f"Delete Overlay{plural}", command=lambda: self._delete_items(valid_overlays)
+        )
+        menu.add_separator()
+        menu.add_command(
+            label="Bring to Front", command=lambda: self._bring_items_to_front(valid_overlays)
+        )
+        menu.add_command(
+            label="Send to Back", command=lambda: self._send_items_to_back(valid_overlays)
+        )
+        try:
+            menu.tk_popup(event.x_root, event.y_root)
+        except tk.TclError:
+            pass
 
     def _edit_shapes_color(self, shapes):
         valid_shapes = [s for s in shapes if isinstance(s, dict) and s.get("type") in ("rectangle", "oval")]
@@ -3328,6 +3788,7 @@ class DisplayMapController:
             "fs_canvas_ids",
             "fs_cross_ids",
             "drag_data",
+            "_overlay_animation",
         ]
         for key in keys_to_remove:
             clone.pop(key, None)
@@ -3438,6 +3899,16 @@ class DisplayMapController:
                 new_item_data["handle_canvas_id"] = None
                 new_item_data["entry_canvas_id"] = None
                 new_item_data["border_canvas_id"] = None
+            elif item_type == "overlay":
+                new_item_data.setdefault("opacity", 1.0)
+                playback = new_item_data.get("playback")
+                if not isinstance(playback, dict):
+                    new_item_data["playback"] = {}
+                coverage = new_item_data.get("coverage")
+                if coverage is None or not isinstance(coverage, dict):
+                    new_item_data["coverage"] = {}
+                new_item_data.pop("_overlay_animation", None)
+                new_item_data["canvas_ids"] = ()
             elif item_type in ["rectangle", "oval"]:
                 new_item_data.setdefault("shape_type", item_type)
                 new_item_data.setdefault("width", DEFAULT_SHAPE_WIDTH)
@@ -3486,6 +3957,18 @@ class DisplayMapController:
             handle_widget = item_to_delete.get("handle_widget")
             if handle_widget and handle_widget.winfo_exists():
                 handle_widget.destroy()
+        elif item_to_delete.get("type") == "overlay":
+            state = item_to_delete.get("_overlay_animation") or {}
+            if getattr(self, "fs_canvas", None):
+                fs_overlay_id = state.get("fs_canvas_id")
+                if fs_overlay_id:
+                    try:
+                        self.fs_canvas.delete(fs_overlay_id)
+                    except tk.TclError:
+                        pass
+                state.pop("fs_canvas_id", None)
+                state.pop("fs_frames", None)
+            item_to_delete["_overlay_animation"] = {}
         # Clean up fullscreen canvas artifacts if present
         if getattr(self, "fs_canvas", None):
             if item_to_delete.get("fs_canvas_ids"):
