@@ -84,6 +84,46 @@ def _build_toolbar(self):
         .pack(side="left", padx=2)
     create_icon_button(toolbar, icons["marker"], "Add Marker", command=self.add_marker)\
         .pack(side="left", padx=2)
+
+    # Overlay controls
+    overlay_label = ctk.CTkLabel(toolbar, text="Overlays:")
+    overlay_label.pack(side="left", padx=(14, 2), pady=8)
+
+    overlay_add_container = create_icon_button(
+        toolbar,
+        None,
+        "Add Overlay",
+        command=self.open_overlay_dialog,
+    )
+    overlay_add_container.pack(side="left", padx=2)
+    self.overlay_add_button = getattr(overlay_add_container, "button", None)
+
+    overlay_menu_placeholder = getattr(self, "_overlay_menu_placeholder", "No overlays")
+    self.overlay_menu_var = tk.StringVar(value=overlay_menu_placeholder)
+    self.overlay_menu = ctk.CTkOptionMenu(
+        toolbar,
+        variable=self.overlay_menu_var,
+        values=[overlay_menu_placeholder],
+        command=self._on_overlay_menu_change,
+        width=max(160, dropdown_width),
+    )
+    self.overlay_menu.set(overlay_menu_placeholder)
+    self.overlay_menu.pack(side="left", padx=5, pady=8)
+
+    overlay_edit_container = create_icon_button(
+        toolbar,
+        None,
+        "Edit Overlay",
+        command=self.edit_selected_overlay,
+    )
+    overlay_edit_container.pack(side="left", padx=2)
+    self.overlay_edit_button = getattr(overlay_edit_container, "button", None)
+
+    if hasattr(self, "_refresh_overlay_option_menu"):
+        try:
+            self._refresh_overlay_option_menu()
+        except Exception:
+            pass
     create_icon_button(toolbar, icons["fs"],    "Fullscreen",   command=self.open_fullscreen)\
         .pack(side="left", padx=2)
     create_icon_button(toolbar, icons["fs"],    "Web Display",   command=self.open_web_display)\
