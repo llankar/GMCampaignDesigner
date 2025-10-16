@@ -765,6 +765,14 @@ class DisplayMapController:
         except Exception:
             px = py = 0
 
+        anchor = (state.get("anchor") or "nw").lower()
+        if anchor in ("centre", "centred"):
+            anchor = "center"
+        if anchor in ("center", "c", "mid", "middle"):
+            map_center = self._map_center_position()
+            if map_center is not None:
+                px, py = map_center
+
         offset_units = state.get("offset_units") or (0.0, 0.0)
         try:
             ox, oy = offset_units
@@ -776,8 +784,6 @@ class DisplayMapController:
         sy = (py + oy) * zoom + self.pan_y
 
         width, height = state.get("current_size", (0, 0))
-        anchor = (state.get("anchor") or "nw").lower()
-
         if anchor in ("center", "c", "mid", "middle"):
             sx -= width / 2
             sy -= height / 2
@@ -923,6 +929,19 @@ class DisplayMapController:
         xw = (width / 2 - self.pan_x) / zoom if zoom else 0.0
         yw = (height / 2 - self.pan_y) / zoom if zoom else 0.0
         return (float(xw), float(yw))
+
+    def _map_center_position(self):
+        base_img = getattr(self, "base_img", None)
+        if base_img is not None:
+            try:
+                width, height = base_img.size
+            except Exception:
+                width = height = 0
+        else:
+            width = height = 0
+        if width and height:
+            return (float(width) / 2.0, float(height) / 2.0)
+        return None
 
     def _invalidate_overlay_render_cache(self, overlay):
         state = overlay.get("_overlay_animation")
@@ -1567,7 +1586,20 @@ class DisplayMapController:
         loop_checkbox.configure(command=update_loop)
         paused_checkbox.configure(command=update_paused)
         effect_menu.configure(command=on_effect_change)
-        anchor_menu.configure(command=lambda value: (anchor_var.set(value), commit_geometry()))
+        center_anchors = {"center", "centre", "centred", "c", "mid", "middle"}
+
+        def on_anchor_change(value):
+            anchor_var.set(value)
+            commit_geometry()
+            if str(value).strip().lower() in center_anchors:
+                map_center = self._map_center_position() or self._default_overlay_position()
+                if map_center:
+                    cx, cy = map_center
+                    pos_x_var.set(f"{cx:.2f}")
+                    pos_y_var.set(f"{cy:.2f}")
+                    commit_position()
+
+        anchor_menu.configure(command=on_anchor_change)
 
         for entry_widget in (width_entry, height_entry, offset_x_entry, offset_y_entry):
             entry_widget.bind("<FocusOut>", lambda _e: commit_geometry())
@@ -1930,6 +1962,15 @@ class DisplayMapController:
                 self._remove_selection_overlay(item_ref, key=key)
 
         for item in self.selected_items:
+            if self._get_item_category(item) == "overlay":
+                effect_value = (
+                    item.get("weather_effect")
+                    or item.get("effect_type")
+                    or item.get("procedural_effect")
+                    or ""
+                )
+                if str(effect_value).strip():
+                    continue
             bbox = self._calculate_item_bbox(item)
             if not bbox:
                 continue

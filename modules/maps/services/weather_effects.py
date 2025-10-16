@@ -140,19 +140,40 @@ def _generate_fog_frames(
         cx = rng.uniform(-width * 0.1, width * 1.1)
         cy = rng.uniform(-height * 0.1, height * 1.1)
         radius = rng.uniform(min(width, height) * 0.1, max(width, height) * 0.32)
-        mask_size = max(12, int(radius * 2.4))
+        mask_size = max(12, int(radius * 2.6))
         mask = Image.new("L", (mask_size, mask_size), 0)
         mask_draw = ImageDraw.Draw(mask)
-        point_count = rng.randint(8, 13)
-        points = []
-        for i in range(point_count):
-            angle = (math.tau * i) / point_count
-            distance = radius * rng.uniform(0.6, 1.15)
-            px = mask_size / 2 + math.cos(angle) * distance * rng.uniform(0.9, 1.2)
-            py = mask_size / 2 + math.sin(angle) * distance * rng.uniform(0.7, 1.3)
-            points.append((px, py))
-        mask_draw.polygon(points, fill=255)
-        mask = mask.filter(ImageFilter.GaussianBlur(radius * 0.35))
+
+        core_radius = radius * rng.uniform(0.55, 0.95)
+        mask_draw.ellipse(
+            (
+                mask_size / 2 - core_radius,
+                mask_size / 2 - core_radius,
+                mask_size / 2 + core_radius,
+                mask_size / 2 + core_radius,
+            ),
+            fill=255,
+        )
+
+        cluster_count = rng.randint(4, 7)
+        for _ in range(cluster_count):
+            angle = rng.uniform(0.0, math.tau)
+            distance = radius * rng.uniform(0.0, 0.65)
+            blob_cx = mask_size / 2 + math.cos(angle) * distance
+            blob_cy = mask_size / 2 + math.sin(angle) * distance * rng.uniform(0.8, 1.2)
+            blob_w = radius * rng.uniform(0.75, 1.55)
+            blob_h = radius * rng.uniform(0.6, 1.4)
+            mask_draw.ellipse(
+                (
+                    blob_cx - blob_w,
+                    blob_cy - blob_h,
+                    blob_cx + blob_w,
+                    blob_cy + blob_h,
+                ),
+                fill=255,
+            )
+
+        mask = mask.filter(ImageFilter.GaussianBlur(radius * 0.5))
         puffs.append(
             {
                 "cx": cx,
