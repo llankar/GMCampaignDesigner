@@ -79,7 +79,8 @@ def _update_fullscreen_map(self):
             overlay_state.pop("fs_canvas_id", None)
             overlay_state.pop("fs_frames", None)
 
-    for item in self.tokens:
+    render_items = self._iter_render_items() if hasattr(self, "_iter_render_items") else self.tokens
+    for item in render_items:
         item_type = item.get("type", "token")
         xw, yw = item.get('position', (0,0)) # Use .get() for position as well for safety
         sx = int(xw * self.zoom + self.pan_x)
@@ -209,6 +210,11 @@ def _update_fullscreen_map(self):
                     fs_canvas_id = None
             if fs_canvas_id:
                 overlay_state["fs_canvas_id"] = fs_canvas_id
+                if self.fs_base_id:
+                    try:
+                        self.fs_canvas.tag_raise(fs_canvas_id, self.fs_base_id)
+                    except tk.TclError:
+                        pass
 
         elif item_type in ["rectangle", "oval"]:
             shape_width_unscaled = item.get("width", 50) # Default if missing

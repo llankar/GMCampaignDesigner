@@ -139,11 +139,11 @@ def _build_toolbar(self):
 
     self.shape_menu = ctk.CTkOptionMenu(
         toolbar,
-        values=["Rectangle", "Circle"],
+        values=["Cloud", "Circle", "Rectangle"],
         command=self._on_brush_shape_change, # This is for fog brush shape
         width=dropdown_width,
     )
-    self.shape_menu.set("Rectangle") # Default fog brush shape
+    self.shape_menu.set("Cloud") # Default fog brush shape
     self.shape_menu.pack(side="left", padx=5, pady=8)
 
     # Brush‐size control in dark mode (for fog)

@@ -84,7 +84,8 @@ def _render_map_image(self, *, for_export=False):
     img.paste(base_resized, (x0 - min_x, y0 - min_y))
 
     draw = ImageDraw.Draw(img)
-    for item in self.tokens:
+    render_items = self._iter_render_items() if hasattr(self, "_iter_render_items") else self.tokens
+    for item in render_items:
         item_type = item.get('type', 'token')
         xw, yw = item.get('position', (0, 0))
         sx = int(xw * self.zoom + self.pan_x - min_x)

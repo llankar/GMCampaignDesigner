@@ -144,7 +144,7 @@ class DisplayMapController:
         self.hover_font_size_options = [10, 12, 14, 16, 18, 20, 24, 28, 32]
         self.hover_font_size = 14
         self.hover_font = ctk.CTkFont(size=self.hover_font_size)
-        self.brush_shape = "rectangle"
+        self.brush_shape = "cloud"
         self.fog_mode    = None
         self.tokens      = [] # List of all items (tokens and shapes)
         
@@ -3872,6 +3872,21 @@ class DisplayMapController:
     def _perform_zoom(self, final: bool):
         resample = Image.LANCZOS if final else self._fast_resample; self._update_canvas_images(resample=resample)
 
+    def _iter_render_items(self):
+        """Yield overlay items before other canvas entries for predictable layering."""
+        overlays = []
+        others = []
+        for item in self.tokens:
+            if isinstance(item, dict) and item.get("type") == "overlay":
+                overlays.append(item)
+            else:
+                others.append(item)
+
+        for overlay in overlays:
+            yield overlay
+        for item in others:
+            yield item
+
     def _update_canvas_images(self, resample=Image.LANCZOS):
         if not self.base_img: return
         
@@ -3895,7 +3910,7 @@ class DisplayMapController:
             mask_resized = self.mask_img.resize((sw,sh), resample=resample); self.mask_tk = ImageTk.PhotoImage(mask_resized)
             if self.mask_id: self.canvas.itemconfig(self.mask_id, image=self.mask_tk); self.canvas.coords(self.mask_id, x0, y0)
             else: self.mask_id = self.canvas.create_image(x0, y0, image=self.mask_tk, anchor='nw')
-        for item in self.tokens:
+        for item in self._iter_render_items():
             item_type = item.get("type", "token"); xw, yw = item['position']
             if item_type == "token":
                 source = item.get('source_image')
@@ -4010,6 +4025,11 @@ class DisplayMapController:
                     item["canvas_ids"] = (image_id,)
                     state["canvas_id"] = image_id
                     self._bind_item_events(item)
+                    if self.base_id:
+                        try:
+                            self.canvas.tag_raise(image_id, self.base_id)
+                        except tk.TclError:
+                            pass
                 else:
                     item["canvas_ids"] = ()
                     state.pop("canvas_id", None)
