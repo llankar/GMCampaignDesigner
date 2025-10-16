@@ -32,6 +32,7 @@ from modules.ui.chatbot_dialog import (
     open_chatbot_dialog,
     _DEFAULT_NAME_FIELD_OVERRIDES as CHATBOT_NAME_OVERRIDES,
 )
+from modules.objects.loot_generator_panel import LootGeneratorPanel
 
 log_module_import(__name__)
 
@@ -105,7 +106,8 @@ class GMScreenView(ctk.CTkFrame):
             "Factions": load_entity_template("factions"),
             "Creatures": load_entity_template("creatures"),
             "Clues": load_entity_template("clues"),
-            "Informations": load_entity_template("informations")
+            "Informations": load_entity_template("informations"),
+            "Objects": load_entity_template("objects"),
         }
 
         self.tabs = {}
@@ -1048,6 +1050,8 @@ class GMScreenView(ctk.CTkFrame):
         elif kind == "scene_flow":
             scen = tab_def.get("scenario_title")
             self.open_scene_flow_tab(scenario_title=scen, title=title or (f"Scene Flow: {scen}" if scen else "Scene Flow"))
+        elif kind == "loot_generator":
+            self.open_loot_generator_tab(title=title or "Loot Generator")
         else:
             raise ValueError(f"Unsupported tab kind '{kind}'")
 
@@ -1471,6 +1475,30 @@ class GMScreenView(ctk.CTkFrame):
         )
 
 
+    def open_loot_generator_tab(self, title=None):
+        """Open the embedded loot generator inside the GM screen."""
+        template = self.templates.get("Objects")
+        frame = LootGeneratorPanel(
+            self.content_area,
+            object_wrapper=self.wrappers.get("Objects"),
+            template=template,
+        )
+
+        def factory(master):
+            return LootGeneratorPanel(
+                master,
+                object_wrapper=self.wrappers.get("Objects"),
+                template=self.templates.get("Objects"),
+            )
+
+        self.add_tab(
+            title or "Loot Generator",
+            frame,
+            content_factory=factory,
+            layout_meta={"kind": "loot_generator"},
+        )
+
+
     def reattach_tab(self, name):
         log_info(f"Reattaching tab: {name}", func_name="GMScreenView.reattach_tab")
         print(f"[REATTACH] Start reattaching tab: {name}")
@@ -1639,6 +1667,7 @@ class GMScreenView(ctk.CTkFrame):
             "World Map",
             "Map Tool",
             "Scene Flow",
+            "Loot Generator",
             "Factions", "Places", "NPCs", "PCs", "Creatures", "Scenarios", "Clues", "Informations",
             "Note Tab", "NPC Graph", "PC Graph", "Scenario Graph Editor",
         ]
@@ -1671,6 +1700,9 @@ class GMScreenView(ctk.CTkFrame):
             return
         elif entity_type == "Scene Flow":
             self.open_scene_flow_tab()
+            return
+        elif entity_type == "Loot Generator":
+            self.open_loot_generator_tab()
             return
         elif entity_type == "NPC Graph":
             if getattr(self, "_rich_host", None) is None or not self._rich_host.winfo_exists():
