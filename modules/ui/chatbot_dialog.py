@@ -307,7 +307,7 @@ class ChatbotDialog(ctk.CTkToplevel):
         name_field_overrides: Mapping[str, str] | None = None,
         note_field_candidates: Iterable[str] | None = None,
         title: str = "Campaign Chatbot",
-        geometry: str = "520x560",
+        geometry: str = "840x720",
     ) -> None:
         super().__init__(master)
         self.title(title)
@@ -389,7 +389,7 @@ class ChatbotDialog(ctk.CTkToplevel):
             results_frame,
             text="",
             anchor="w",
-            wraplength=460,
+            wraplength=760,
             font=("Segoe UI", 13, "bold"),
         )
         self.selection_label.grid(row=2, column=0, sticky="ew", pady=(10, 4))
@@ -402,9 +402,15 @@ class ChatbotDialog(ctk.CTkToplevel):
         notes_label = ctk.CTkLabel(notes_frame, text="Notes", font=("Segoe UI", 14, "bold"))
         notes_label.grid(row=0, column=0, sticky="w", pady=(8, 4))
 
-        self.notes_box = ctk.CTkTextbox(notes_frame, wrap="word")
+        self._body_font = ctk.CTkFont(size=13)
+        self._section_font = ctk.CTkFont(size=18, weight="bold")
+        self._field_font = ctk.CTkFont(size=15, weight="bold")
+
+        self.notes_box = ctk.CTkTextbox(notes_frame, wrap="word", font=self._body_font)
         self.notes_box.grid(row=1, column=0, sticky="nsew")
         self.notes_box.configure(state=tk.DISABLED)
+        self.notes_box.tag_configure("section_title", font=self._section_font, spacing3=8)
+        self.notes_box.tag_configure("field_label", font=self._field_font)
 
     # ------------------------------------------------------------------
     # Event handlers
@@ -588,7 +594,32 @@ class ChatbotDialog(ctk.CTkToplevel):
     def _render_note_text(self, text: str) -> None:
         self.notes_box.configure(state=tk.NORMAL)
         self.notes_box.delete("1.0", tk.END)
+
+        if text and not text.endswith("\n"):
+            text += "\n"
+
         self.notes_box.insert(tk.END, text)
+
+        lines = text.splitlines()
+        for lineno, raw_line in enumerate(lines, start=1):
+            line = raw_line.rstrip("\n")
+            stripped = line.strip()
+            if not stripped:
+                continue
+            if not line.startswith(" ") and stripped.endswith(":"):
+                self.notes_box.tag_add("section_title", f"{lineno}.0", f"{lineno}.end")
+                continue
+            colon_idx = line.find(":")
+            if colon_idx == -1:
+                continue
+            leading_spaces = len(line) - len(line.lstrip(" "))
+            start_index = f"{lineno}.0+{leading_spaces}c"
+            end_index = f"{lineno}.0+{colon_idx + 1}c"
+            try:
+                self.notes_box.tag_add("field_label", start_index, end_index)
+            except Exception:
+                continue
+
         self.notes_box.configure(state=tk.DISABLED)
 
     def _derive_listbox_theme(self) -> dict[str, str]:

@@ -133,6 +133,12 @@ class WorldMapPanel(ctk.CTkFrame):
 
         self._chatbot_bindings.append(("<Control-Shift-c>", self.bind("<Control-Shift-c>", self.open_chatbot, add="+")))
         self._chatbot_bindings.append(("<Control-Shift-C>", self.bind("<Control-Shift-C>", self.open_chatbot, add="+")))
+        self._chatbot_bindings.append(
+            ("<Control-Shift-KeyRelease-c>", self.bind("<Control-Shift-KeyRelease-c>", self.open_chatbot, add="+"))
+        )
+        self._chatbot_bindings.append(
+            ("<Control-Shift-KeyRelease-C>", self.bind("<Control-Shift-KeyRelease-C>", self.open_chatbot, add="+"))
+        )
 
         if self.map_names:
             self.map_selector.configure(values=self.map_names)

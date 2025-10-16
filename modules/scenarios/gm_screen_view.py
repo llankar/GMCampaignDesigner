@@ -66,6 +66,8 @@ class GMScreenView(ctk.CTkFrame):
         self._ctrl_F_binding = None
         self._ctrl_shift_c_binding = None
         self._ctrl_shift_C_binding = None
+        self._ctrl_shift_c_release_binding = None
+        self._ctrl_shift_C_release_binding = None
         self.bind("<Destroy>", self._on_destroy, add="+")
         self._setup_toplevel_shortcuts()
 
@@ -374,12 +376,20 @@ class GMScreenView(ctk.CTkFrame):
             self._ctrl_F_binding = top.bind("<Control-F>", self.open_global_search, add="+")
             self._ctrl_shift_c_binding = top.bind("<Control-Shift-c>", self.open_chatbot, add="+")
             self._ctrl_shift_C_binding = top.bind("<Control-Shift-C>", self.open_chatbot, add="+")
+            self._ctrl_shift_c_release_binding = top.bind(
+                "<Control-Shift-KeyRelease-c>", self.open_chatbot, add="+"
+            )
+            self._ctrl_shift_C_release_binding = top.bind(
+                "<Control-Shift-KeyRelease-C>", self.open_chatbot, add="+"
+            )
         except Exception:
             self._bound_shortcut_owner = None
             self._ctrl_f_binding = None
             self._ctrl_F_binding = None
             self._ctrl_shift_c_binding = None
             self._ctrl_shift_C_binding = None
+            self._ctrl_shift_c_release_binding = None
+            self._ctrl_shift_C_release_binding = None
 
     def _teardown_toplevel_shortcuts(self):
         top = self._bound_shortcut_owner
@@ -394,6 +404,10 @@ class GMScreenView(ctk.CTkFrame):
                 top.unbind("<Control-Shift-c>", self._ctrl_shift_c_binding)
             if self._ctrl_shift_C_binding:
                 top.unbind("<Control-Shift-C>", self._ctrl_shift_C_binding)
+            if self._ctrl_shift_c_release_binding:
+                top.unbind("<Control-Shift-KeyRelease-c>", self._ctrl_shift_c_release_binding)
+            if self._ctrl_shift_C_release_binding:
+                top.unbind("<Control-Shift-KeyRelease-C>", self._ctrl_shift_C_release_binding)
         except Exception:
             pass
         finally:
@@ -402,6 +416,8 @@ class GMScreenView(ctk.CTkFrame):
             self._ctrl_shift_C_binding = None
             self._ctrl_f_binding = None
             self._ctrl_F_binding = None
+            self._ctrl_shift_c_release_binding = None
+            self._ctrl_shift_C_release_binding = None
 
     def _on_destroy(self, event=None):
         if event is not None and event.widget is not self:
