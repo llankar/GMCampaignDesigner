@@ -3404,8 +3404,11 @@ class DisplayMapController:
                 image_path = new_item_data.get("image_path")
                 if image_path:
                     try:
+                        resolved_path = _resolve_campaign_path(image_path)
+                        if not resolved_path or not os.path.exists(resolved_path):
+                            raise FileNotFoundError(resolved_path or image_path)
                         sz = new_item_data.get("size", self.token_size)
-                        source_img = Image.open(image_path).convert("RGBA")
+                        source_img = Image.open(resolved_path).convert("RGBA")
                         new_item_data["source_image"] = source_img
                         new_item_data["pil_image"] = source_img.resize((sz, sz), Image.LANCZOS)
                     except Exception as exc:
