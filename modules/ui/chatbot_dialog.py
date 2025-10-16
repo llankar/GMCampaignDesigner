@@ -391,13 +391,28 @@ def get_default_chatbot_wrappers() -> dict[str, GenericModelWrapper]:
 
 
 def _normalize_value(value: Any) -> RichTextValue | None:
+    preview = repr(value)
+    if len(preview) > 200:
+        preview = preview[:197] + "..."
+    log_debug(
+        f"ChatbotDialog._normalize_value - Processing value of type {type(value).__name__}: {preview}",
+        func_name="ChatbotDialog._normalize_value",
+    )
     if value is None:
+        log_debug(
+            "ChatbotDialog._normalize_value - Value was None; returning None",
+            func_name="ChatbotDialog._normalize_value",
+        )
         return None
     if isinstance(value, RichTextValue):
         return value
     if isinstance(value, str):
         stripped = value.strip()
         if stripped.lower() in _EMPTY_STRING_MARKERS:
+            log_debug(
+                "ChatbotDialog._normalize_value - String matched empty marker; returning None",
+                func_name="ChatbotDialog._normalize_value",
+            )
             return None
         return RichTextValue(value.replace("\r\n", "\n").replace("\r", "\n"))
     if isinstance(value, Mapping):
@@ -405,6 +420,10 @@ def _normalize_value(value: Any) -> RichTextValue | None:
             normalized = _from_rtf_json(value)
             text = (normalized.text or "").strip()
             if text.lower() in _EMPTY_STRING_MARKERS:
+                log_debug(
+                    "ChatbotDialog._normalize_value - Mapping with text matched empty marker; returning None",
+                    func_name="ChatbotDialog._normalize_value",
+                )
                 return None
             return normalized
         parts: list[str] = []
@@ -413,6 +432,10 @@ def _normalize_value(value: Any) -> RichTextValue | None:
                 continue
             parts.append(f"{key}: {val}")
         if not parts:
+            log_debug(
+                "ChatbotDialog._normalize_value - Mapping had no usable entries; returning None",
+                func_name="ChatbotDialog._normalize_value",
+            )
             return None
         return RichTextValue("\n".join(parts))
     if isinstance(value, (list, tuple, set)):
@@ -423,6 +446,10 @@ def _normalize_value(value: Any) -> RichTextValue | None:
                 continue
             bullets.append(_apply_line_prefix(normalized.cleaned(), "• ", "  "))
         if not bullets:
+            log_debug(
+                "ChatbotDialog._normalize_value - Iterable produced no bullet entries; returning None",
+                func_name="ChatbotDialog._normalize_value",
+            )
             return None
         joined_text = []
         joined_runs: dict[str, list[tuple[int, int]]] = {}
@@ -677,6 +704,7 @@ class ChatbotDialog(ctk.CTkToplevel):
                     f"ChatbotDialog._populate - Loaded records for {entity_type} but total count is unknown",
                     func_name="ChatbotDialog._populate",
                 )
+            added_for_entity = 0
             for record in items:
                 name = str(record.get(name_field, ""))
                 if not name:
@@ -689,6 +717,11 @@ class ChatbotDialog(ctk.CTkToplevel):
                     display = f"{entity_type.rstrip('s')}: {name}"
                     self.result_list.insert(tk.END, display)
                     self._results.append((entity_type, name, record))
+                    added_for_entity += 1
+            log_debug(
+                f"ChatbotDialog._populate - Added {added_for_entity} visible records for {entity_type}",
+                func_name="ChatbotDialog._populate",
+            )
 
         if self.result_list.size() > 0:
             self.result_list.selection_clear(0, tk.END)
@@ -716,6 +749,14 @@ class ChatbotDialog(ctk.CTkToplevel):
         if idx >= len(self._results):
             return
         entity_type, name, record = self._results[idx]
+        log_debug(
+            f"ChatbotDialog._display_selected_note - Selected index {idx} of {len(self._results)} results",
+            func_name="ChatbotDialog._display_selected_note",
+        )
+        log_debug(
+            f"ChatbotDialog._display_selected_note - Record keys: {sorted(record.keys())}",
+            func_name="ChatbotDialog._display_selected_note",
+        )
         log_info(
             f"ChatbotDialog._display_selected_note - Rendering notes for {entity_type} '{name}'",
             func_name="ChatbotDialog._display_selected_note",
@@ -730,6 +771,11 @@ class ChatbotDialog(ctk.CTkToplevel):
             )
             self._render_text(RichTextValue("No notes available for this record."))
             return
+        log_debug(
+            "ChatbotDialog._display_selected_note - Section summary: "
+            + ", ".join(f"{title} ({len(entries)} fields)" for title, entries in sections),
+            func_name="ChatbotDialog._display_selected_note",
+        )
         self._render_sections(sections)
 
     # ------------------------------------------------------------------
@@ -776,6 +822,10 @@ class ChatbotDialog(ctk.CTkToplevel):
                         func_name="ChatbotDialog._collate_sections",
                     )
                     continue
+                log_debug(
+                    f"ChatbotDialog._collate_sections - Field {field} produced {len(normalized.text or '')} chars",
+                    func_name="ChatbotDialog._collate_sections",
+                )
                 entries.append((field, normalized.cleaned()))
                 used.add(field)
             if entries:
@@ -796,6 +846,10 @@ class ChatbotDialog(ctk.CTkToplevel):
                     func_name="ChatbotDialog._collate_sections",
                 )
                 continue
+            log_debug(
+                f"ChatbotDialog._collate_sections - Additional field {key} produced {len(normalized.text or '')} chars",
+                func_name="ChatbotDialog._collate_sections",
+            )
             additional.append((key, normalized.cleaned()))
             used.add(key)
         if additional:
@@ -821,6 +875,10 @@ class ChatbotDialog(ctk.CTkToplevel):
                 self._notes_widget.configure(state=state)
             except Exception:
                 pass
+        log_debug(
+            f"ChatbotDialog._set_notes_state - Notes widget state changed to {state}",
+            func_name="ChatbotDialog._set_notes_state",
+        )
 
     def _render_text(self, value: RichTextValue) -> None:
         widget = self._notes_widget
@@ -842,6 +900,10 @@ class ChatbotDialog(ctk.CTkToplevel):
                 end_index = f"1.0+{end}c"
                 widget.tag_add(tag, start_index, end_index)
         self._set_notes_state("disabled")
+        log_debug(
+            f"ChatbotDialog._render_text - Rendered plain text with {len(text or '')} characters",
+            func_name="ChatbotDialog._render_text",
+        )
 
     def _render_sections(self, sections: Sequence[tuple[str, list[tuple[str, RichTextValue]]]]) -> None:
         widget = self._notes_widget
@@ -900,9 +962,17 @@ class ChatbotDialog(ctk.CTkToplevel):
                     cursor += len(value_text)
                     text_parts.append("\n")
                     cursor += 1
+                log_debug(
+                    f"ChatbotDialog._render_sections - Added entry {label!r} with {len(value_text)} chars (multiline={multiline})",
+                    func_name="ChatbotDialog._render_sections",
+                )
 
         final_text = "".join(text_parts)
         widget.insert("1.0", final_text)
+        log_debug(
+            f"ChatbotDialog._render_sections - Rendered {len(sections)} sections with total length {len(final_text)}",
+            func_name="ChatbotDialog._render_sections",
+        )
 
         for start, end in section_runs:
             widget.tag_add("section_title", f"1.0+{start}c", f"1.0+{end}c")
@@ -918,6 +988,11 @@ class ChatbotDialog(ctk.CTkToplevel):
                 widget.tag_add(tag, f"1.0+{start}c", f"1.0+{end}c")
 
         self._set_notes_state("disabled")
+        applied = {tag: len(runs) for tag, runs in tag_runs.items() if runs}
+        log_debug(
+            f"ChatbotDialog._render_sections - Applied formatting tags summary: {applied}",
+            func_name="ChatbotDialog._render_sections",
+        )
 
     def _derive_listbox_theme(self) -> dict[str, str]:
         entry = self.query_entry
