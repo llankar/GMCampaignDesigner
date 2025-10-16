@@ -34,6 +34,8 @@ def _build_toolbar(self):
         "creat": self.load_icon("assets/icons/creature.png", (48,48)),
         "pc":    self.load_icon("assets/icons/pc.png",       (48,48)),
         "marker":    self.load_icon("assets/icons/marker.png",       (48,48)),
+        "chatbot":    self.load_icon("assets/icons/chatbot.png",       (48,48)),
+        
     }
 
     # Fog controls
@@ -86,8 +88,8 @@ def _build_toolbar(self):
         .pack(side="left", padx=2)
     create_icon_button(toolbar, icons["fs"],    "Web Display",   command=self.open_web_display)\
         .pack(side="left", padx=2)
-    ctk.CTkButton(toolbar, text="Chatbot", width=120, command=self.open_chatbot_assistant).pack(side="left", padx=(8, 2), pady=8)
-
+    create_icon_button(toolbar, icons["chatbot"],    "Chatbot",   command=self.open_chatbot_assistant)\
+        .pack(side="left", padx=2)
     # Brush shape selector (for fog)
     shape_label = ctk.CTkLabel(toolbar, text="Fog Shape:") # Clarified label
     shape_label.pack(side="left", padx=(10,2), pady=8)
