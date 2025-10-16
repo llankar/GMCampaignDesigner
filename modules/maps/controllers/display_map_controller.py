@@ -3895,7 +3895,15 @@ class DisplayMapController:
             mask_resized = self.mask_img.resize((sw,sh), resample=resample); self.mask_tk = ImageTk.PhotoImage(mask_resized)
             if self.mask_id: self.canvas.itemconfig(self.mask_id, image=self.mask_tk); self.canvas.coords(self.mask_id, x0, y0)
             else: self.mask_id = self.canvas.create_image(x0, y0, image=self.mask_tk, anchor='nw')
-        for item in self.tokens:
+        overlay_items = []
+        other_items = []
+        for token_item in self.tokens:
+            if isinstance(token_item, dict) and token_item.get("type") == "overlay":
+                overlay_items.append(token_item)
+            else:
+                other_items.append(token_item)
+
+        for item in overlay_items + other_items:
             item_type = item.get("type", "token"); xw, yw = item['position']
             if item_type == "token":
                 source = item.get('source_image')
@@ -4010,6 +4018,7 @@ class DisplayMapController:
                     item["canvas_ids"] = (image_id,)
                     state["canvas_id"] = image_id
                     self._bind_item_events(item)
+                    self._ensure_overlay_stack_order(image_id)
                 else:
                     item["canvas_ids"] = ()
                     state.pop("canvas_id", None)
@@ -4167,6 +4176,17 @@ class DisplayMapController:
             self._update_fullscreen_map()
         if getattr(self, '_web_server_thread', None):
             self._update_web_display_map()
+
+    def _ensure_overlay_stack_order(self, canvas_id):
+        if not canvas_id:
+            return
+        try:
+            if self.mask_id:
+                self.canvas.tag_lower(canvas_id, self.mask_id)
+            elif self.base_id:
+                self.canvas.tag_raise(canvas_id, self.base_id)
+        except tk.TclError:
+            pass
 
     def _bind_item_events(self, item):
         if not item.get('canvas_ids'): return

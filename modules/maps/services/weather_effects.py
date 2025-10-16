@@ -5,7 +5,7 @@ import math
 import random
 from typing import List, Sequence, Tuple
 
-from PIL import Image, ImageDraw, ImageFilter
+from PIL import Image, ImageDraw, ImageFilter, ImageChops
 
 # Default frame count for procedural weather effects.  The specific
 # generators may override this to better fit their motion cycle.
@@ -174,6 +174,55 @@ def _generate_fog_frames(
             )
 
         mask = mask.filter(ImageFilter.GaussianBlur(radius * 0.5))
+
+        detail_mask = Image.new("L", mask.size, 0)
+        detail_draw = ImageDraw.Draw(detail_mask)
+        detail_blobs = rng.randint(12, 22)
+        for _ in range(detail_blobs):
+            blob_radius = radius * rng.uniform(0.12, 0.35)
+            if blob_radius <= 0:
+                continue
+            blob_cx = rng.uniform(blob_radius, mask_size - blob_radius)
+            blob_cy = rng.uniform(blob_radius, mask_size - blob_radius)
+            stretch_x = rng.uniform(0.75, 1.35)
+            stretch_y = rng.uniform(0.75, 1.35)
+            detail_draw.ellipse(
+                (
+                    blob_cx - blob_radius * stretch_x,
+                    blob_cy - blob_radius * stretch_y,
+                    blob_cx + blob_radius * stretch_x,
+                    blob_cy + blob_radius * stretch_y,
+                ),
+                fill=rng.randint(120, 220),
+            )
+        if detail_blobs:
+            blur_radius = max(1, int(radius * 0.2))
+            detail_mask = detail_mask.filter(ImageFilter.GaussianBlur(blur_radius))
+            mask = ImageChops.lighter(mask, detail_mask)
+
+        erosion_mask = Image.new("L", mask.size, 0)
+        erosion_draw = ImageDraw.Draw(erosion_mask)
+        erosion_blobs = rng.randint(6, 12)
+        for _ in range(erosion_blobs):
+            cut_radius = radius * rng.uniform(0.1, 0.4)
+            if cut_radius <= 0:
+                continue
+            cut_cx = rng.uniform(-cut_radius, mask_size + cut_radius)
+            cut_cy = rng.uniform(-cut_radius, mask_size + cut_radius)
+            erosion_draw.ellipse(
+                (
+                    cut_cx - cut_radius * rng.uniform(0.9, 1.4),
+                    cut_cy - cut_radius * rng.uniform(0.9, 1.4),
+                    cut_cx + cut_radius * rng.uniform(0.9, 1.4),
+                    cut_cy + cut_radius * rng.uniform(0.9, 1.4),
+                ),
+                fill=rng.randint(90, 180),
+            )
+        if erosion_blobs:
+            erosion_blur = max(1, int(radius * 0.25))
+            erosion_mask = erosion_mask.filter(ImageFilter.GaussianBlur(erosion_blur))
+            mask = ImageChops.subtract(mask, erosion_mask)
+
         puffs.append(
             {
                 "cx": cx,

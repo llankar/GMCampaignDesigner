@@ -84,7 +84,15 @@ def _render_map_image(self, *, for_export=False):
     img.paste(base_resized, (x0 - min_x, y0 - min_y))
 
     draw = ImageDraw.Draw(img)
-    for item in self.tokens:
+    overlay_items = []
+    other_items = []
+    for token_item in self.tokens:
+        if isinstance(token_item, dict) and token_item.get('type') == 'overlay':
+            overlay_items.append(token_item)
+        else:
+            other_items.append(token_item)
+
+    for item in overlay_items + other_items:
         item_type = item.get('type', 'token')
         xw, yw = item.get('position', (0, 0))
         sx = int(xw * self.zoom + self.pan_x - min_x)

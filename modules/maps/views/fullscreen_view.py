@@ -5,6 +5,17 @@ from modules.helpers.logging_helper import log_module_import
 
 log_module_import(__name__)
 
+def _ensure_fullscreen_overlay_stack_order(self, canvas_id):
+    if not canvas_id or not getattr(self, "fs_canvas", None):
+        return
+    try:
+        if getattr(self, "fs_mask_id", None):
+            self.fs_canvas.tag_lower(canvas_id, self.fs_mask_id)
+        elif getattr(self, "fs_base_id", None):
+            self.fs_canvas.tag_raise(canvas_id, self.fs_base_id)
+    except tk.TclError:
+        pass
+
 def open_fullscreen(self):
     monitors = get_monitors()
     if len(monitors) < 2:
@@ -79,7 +90,15 @@ def _update_fullscreen_map(self):
             overlay_state.pop("fs_canvas_id", None)
             overlay_state.pop("fs_frames", None)
 
-    for item in self.tokens:
+    overlay_items = []
+    other_items = []
+    for token_item in self.tokens:
+        if isinstance(token_item, dict) and token_item.get("type") == "overlay":
+            overlay_items.append(token_item)
+        else:
+            other_items.append(token_item)
+
+    for item in overlay_items + other_items:
         item_type = item.get("type", "token")
         xw, yw = item.get('position', (0,0)) # Use .get() for position as well for safety
         sx = int(xw * self.zoom + self.pan_x)
@@ -209,6 +228,7 @@ def _update_fullscreen_map(self):
                     fs_canvas_id = None
             if fs_canvas_id:
                 overlay_state["fs_canvas_id"] = fs_canvas_id
+                _ensure_fullscreen_overlay_stack_order(self, fs_canvas_id)
 
         elif item_type in ["rectangle", "oval"]:
             shape_width_unscaled = item.get("width", 50) # Default if missing
