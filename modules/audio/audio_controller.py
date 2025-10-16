@@ -55,13 +55,24 @@ class AudioController:
             if callback in self._listeners:
                 self._listeners.remove(callback)
 
-    def _emit(self, event: str, section: str, **payload: Any) -> None:
+    def _emit(
+        self,
+        event: str,
+        section: str,
+        payload: Optional[Dict[str, Any]] = None,
+        **extra: Any,
+    ) -> None:
         with self._lock:
             listeners = list(self._listeners)
-        payload.setdefault("section", section)
+        merged_payload: Dict[str, Any] = {}
+        if payload is not None:
+            merged_payload.update(dict(payload))
+        if extra:
+            merged_payload.update(extra)
+        merged_payload.setdefault("section", section)
         for callback in listeners:
             try:
-                callback(section, event, payload)
+                callback(section, event, merged_payload)
             except Exception as exc:  # pragma: no cover - listener safety
                 log_exception(
                     f"AudioController._emit - listener raised: {exc}",
