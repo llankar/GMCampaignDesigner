@@ -489,6 +489,18 @@ def _persist_tokens(self):
                     "coverage": coverage,
                     "label": t.get("label", ""),
                 })
+                effect_value = (
+                    t.get("weather_effect")
+                    or t.get("effect")
+                    or t.get("effect_type")
+                    or t.get("procedural_effect")
+                    or ""
+                )
+                effect_value = str(effect_value).strip().lower()
+                if effect_value:
+                    item_data["weather_effect"] = effect_value
+                    if t.get("weather_seed") is not None:
+                        item_data["weather_seed"] = t.get("weather_seed")
             else:
                 # Silently skip unknown types for now
                 continue

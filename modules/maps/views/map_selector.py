@@ -469,6 +469,14 @@ def _on_display_map(self, entity_type, map_name): # entity_type here is the map'
             coverage = _normalize_geometry(rec.get("coverage") or rec.get("coverage_geometry") or {})
             overlay_label = rec.get("label") or rec.get("name") or rec.get("display_name") or ""
             overlay_metadata = _load_overlay_animation_metadata(resolved_animation)
+            effect_value = (
+                rec.get("weather_effect")
+                or rec.get("effect")
+                or rec.get("effect_type")
+                or rec.get("procedural_effect")
+                or ""
+            )
+            effect_value = str(effect_value).strip().lower()
             item_data.update({
                 "animation_path": storage_animation,
                 "animation_asset_path": storage_animation,
@@ -478,6 +486,10 @@ def _on_display_map(self, entity_type, map_name): # entity_type here is the map'
                 "coverage": coverage,
                 "label": overlay_label,
             })
+            if effect_value:
+                item_data["weather_effect"] = effect_value
+                if rec.get("weather_seed") is not None:
+                    item_data["weather_seed"] = rec.get("weather_seed")
             item_data.update(overlay_metadata)
         else:
             print(f"[_on_display_map] Unknown item type '{item_type_from_rec}' in map data. Skipping: {rec}")
