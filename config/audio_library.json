@@ -1,14 +1,3239 @@
 {
   "music": {
-    "categories": {},
+    "categories": {
+      "Fantasy": {
+        "tracks": [
+          {
+            "id": "81bb756e41c74d028eb2c079e0223209",
+            "name": "01 - A Storm Is Coming",
+            "path": "D:\\Musique\\The Lord Of The Rings - The Return Of The King OST\\01 - A Storm Is Coming.flac",
+            "category": "Fantasy"
+          },
+          {
+            "id": "7e1ad9435ae048be98d0c776b316a8c1",
+            "name": "01 - Dragon Age Origins - Inon Zur - Dragon Age Origins",
+            "path": "D:\\Musique\\Dragon age\\Dragon age origins Soundtrack\\01 - Dragon Age Origins - Inon Zur - Dragon Age Origins.mp3",
+            "category": "Fantasy"
+          },
+          {
+            "id": "15bdde7fe7dd4e3f939da10648988752",
+            "name": "01 - The Prophecy",
+            "path": "D:\\Musique\\The Lord Of The Rings - The Fellowship Of The Ring OST\\01 - The Prophecy.flac",
+            "category": "Fantasy"
+          },
+          {
+            "id": "7d71d80db62741fe826261433d404c17",
+            "name": "01 Elora Danan",
+            "path": "D:\\Musique\\Willow\\01 Elora Danan.mp3",
+            "category": "Fantasy"
+          },
+          {
+            "id": "66e7ac7d6245424ab2b9a4e2411695db",
+            "name": "01 Main Theme",
+            "path": "D:\\Musique\\Pathfinder Kingmaker\\01 Main Theme.mp3",
+            "category": "Fantasy"
+          },
+          {
+            "id": "c2421113faf84a8db42ee92cc8c1dd5a",
+            "name": "01-howard_shore-fire_and_water",
+            "path": "D:\\Musique\\The Hobbit 3\\01-howard_shore-fire_and_water.mp3",
+            "category": "Fantasy"
+          },
+          {
+            "id": "12498007e774416e918c2be1ec59f52d",
+            "name": "01. Dragon Age Inquisition Theme",
+            "path": "D:\\Musique\\Dragon age\\Dragon Age Inquisition\\01. Dragon Age Inquisition Theme.mp3",
+            "category": "Fantasy"
+          },
+          {
+            "id": "d6a45a994aad4760a0d6064df2a1bc14",
+            "name": "02 - Concerning Hobbits",
+            "path": "D:\\Musique\\The Lord Of The Rings - The Fellowship Of The Ring OST\\02 - Concerning Hobbits.flac",
+            "category": "Fantasy"
+          },
+          {
+            "id": "e1f7d03537284e918800511794b1a270",
+            "name": "02 - Dragon Age Origins - Inon Zur - Ruins of Ostagar",
+            "path": "D:\\Musique\\Dragon age\\Dragon age origins Soundtrack\\02 - Dragon Age Origins - Inon Zur - Ruins of Ostagar.mp3",
+            "category": "Fantasy"
+          },
+          {
+            "id": "e7dd8ee17b914f9c951e5a7dcfa5c693",
+            "name": "02 - Hope And Memory",
+            "path": "D:\\Musique\\The Lord Of The Rings - The Return Of The King OST\\02 - Hope And Memory.flac",
+            "category": "Fantasy"
+          },
+          {
+            "id": "c9dd5006ff824056865b28ea96e77b09",
+            "name": "02 Escape From the Tavern",
+            "path": "D:\\Musique\\Willow\\02 Escape From the Tavern.mp3",
+            "category": "Fantasy"
+          },
+          {
+            "id": "946f4463bc2d4ee3964d3854d75393e3",
+            "name": "02 The Beginning",
+            "path": "D:\\Musique\\Pathfinder Kingmaker\\02 The Beginning.mp3",
+            "category": "Fantasy"
+          },
+          {
+            "id": "19ef869d551242b38b97dc9cfd2fcbf4",
+            "name": "02-howard_shore-shores_of_the_long_lake",
+            "path": "D:\\Musique\\The Hobbit 3\\02-howard_shore-shores_of_the_long_lake.mp3",
+            "category": "Fantasy"
+          },
+          {
+            "id": "96351e1db8734f0da1f4b7cedab74951",
+            "name": "02. Escape From The Fade",
+            "path": "D:\\Musique\\Dragon age\\Dragon Age Inquisition\\02. Escape From The Fade.mp3",
+            "category": "Fantasy"
+          },
+          {
+            "id": "bdba92f8f21444c786d1bc22ca78a176",
+            "name": "03 - Dragon Age Origins - Inon Zur - Elves At The Mercy Of Men",
+            "path": "D:\\Musique\\Dragon age\\Dragon age origins Soundtrack\\03 - Dragon Age Origins - Inon Zur - Elves At The Mercy Of Men.mp3",
+            "category": "Fantasy"
+          },
+          {
+            "id": "2a692f36c77a4d89b310cc1dfe5ac692",
+            "name": "03 - Minas Tirith (Featuring Ben Del Maestro)",
+            "path": "D:\\Musique\\The Lord Of The Rings - The Return Of The King OST\\03 - Minas Tirith (Featuring Ben Del Maestro).flac",
+            "category": "Fantasy"
+          },
+          {
+            "id": "42590c0a287e4efd821f3686040afcfc",
+            "name": "03 - The Shadow Of The Past",
+            "path": "D:\\Musique\\The Lord Of The Rings - The Fellowship Of The Ring OST\\03 - The Shadow Of The Past.flac",
+            "category": "Fantasy"
+          },
+          {
+            "id": "227c615dc7484dfe9b6850be316c064f",
+            "name": "03 Exploring the Stolen Lands",
+            "path": "D:\\Musique\\Pathfinder Kingmaker\\03 Exploring the Stolen Lands.mp3",
+            "category": "Fantasy"
+          },
+          {
+            "id": "0797aa8e3c5a4a89b3c73559f0aface1",
+            "name": "03 Willow's Journey Begins",
+            "path": "D:\\Musique\\Willow\\03 Willow's Journey Begins.mp3",
+            "category": "Fantasy"
+          },
+          {
+            "id": "70031ba72ad743aca15f06364ef9a94c",
+            "name": "03-howard_shore-beyond_sorrow_and_grief_(extended_ver_)",
+            "path": "D:\\Musique\\The Hobbit 3\\03-howard_shore-beyond_sorrow_and_grief_(extended_ver_).mp3",
+            "category": "Fantasy"
+          },
+          {
+            "id": "ec381c71f9db4e9eaa3b7412142bedf3",
+            "name": "03. The Wrath Of Heaven",
+            "path": "D:\\Musique\\Dragon age\\Dragon Age Inquisition\\03. The Wrath Of Heaven.mp3",
+            "category": "Fantasy"
+          },
+          {
+            "id": "e7c9481f6a6d4cf0a53da5a528143c81",
+            "name": "04 - Dragon Age Origins - Inon Zur - The Dwarven Nobles",
+            "path": "D:\\Musique\\Dragon age\\Dragon age origins Soundtrack\\04 - Dragon Age Origins - Inon Zur - The Dwarven Nobles.mp3",
+            "category": "Fantasy"
+          },
+          {
+            "id": "3396780bbe9049d6aae117d5c1c6ec02",
+            "name": "04 - The Treason Of Isengard",
+            "path": "D:\\Musique\\The Lord Of The Rings - The Fellowship Of The Ring OST\\04 - The Treason Of Isengard.flac",
+            "category": "Fantasy"
+          },
+          {
+            "id": "38ee5fb2681d44ddbaa289f0e7c35220",
+            "name": "04 - The White Tree",
+            "path": "D:\\Musique\\The Lord Of The Rings - The Return Of The King OST\\04 - The White Tree.flac",
+            "category": "Fantasy"
+          },
+          {
+            "id": "b57d17d05f57473e8eb1fedc1f9e9096",
+            "name": "04 Bittersweet (Nyrissa's Theme)",
+            "path": "D:\\Musique\\Pathfinder Kingmaker\\04 Bittersweet (Nyrissa's Theme).mp3",
+            "category": "Fantasy"
+          },
+          {
+            "id": "45d0a7f40b3b4597a1274e5ff105acc6",
+            "name": "04 Canyon Of Mazes",
+            "path": "D:\\Musique\\Willow\\04 Canyon Of Mazes.mp3",
+            "category": "Fantasy"
+          },
+          {
+            "id": "ce176090bfc5468c87f40be0ce2fbce5",
+            "name": "04-howard_shore-guardians_of_the_three_(extended_ver_)",
+            "path": "D:\\Musique\\The Hobbit 3\\04-howard_shore-guardians_of_the_three_(extended_ver_).mp3",
+            "category": "Fantasy"
+          },
+          {
+            "id": "9110b22ac08f48799bf713c5bcc7b901",
+            "name": "04. Calling The Inquisition",
+            "path": "D:\\Musique\\Dragon age\\Dragon Age Inquisition\\04. Calling The Inquisition.mp3",
+            "category": "Fantasy"
+          },
+          {
+            "id": "6925c506eea140c196801676745d29ac",
+            "name": "05 - Dragon Age Origins - Inon Zur - The Circle Tower",
+            "path": "D:\\Musique\\Dragon age\\Dragon age origins Soundtrack\\05 - Dragon Age Origins - Inon Zur - The Circle Tower.mp3",
+            "category": "Fantasy"
+          },
+          {
+            "id": "5032b23ea0774524ba24d0d81cc52ffd",
+            "name": "05 - The Black Rider",
+            "path": "D:\\Musique\\The Lord Of The Rings - The Fellowship Of The Ring OST\\05 - The Black Rider.flac",
+            "category": "Fantasy"
+          },
+          {
+            "id": "9d5f56b4f9774016923e520579b2355a",
+            "name": "05 - The Steward Of Gondor (Featuring Billy Boyd)",
+            "path": "D:\\Musique\\The Lord Of The Rings - The Return Of The King OST\\05 - The Steward Of Gondor (Featuring Billy Boyd).flac",
+            "category": "Fantasy"
+          },
+          {
+            "id": "cfc04ff1f0fb4b0bb82a52d95b230884",
+            "name": "05 Peaceful Lands",
+            "path": "D:\\Musique\\Pathfinder Kingmaker\\05 Peaceful Lands.mp3",
+            "category": "Fantasy"
+          },
+          {
+            "id": "85f4bb6ba65a4ec0b6a1e944c7686f7b",
+            "name": "05 Tir Asleen",
+            "path": "D:\\Musique\\Willow\\05 Tir Asleen.mp3",
+            "category": "Fantasy"
+          },
+          {
+            "id": "e7663d07504b47b5b59f9338e0c8e6f6",
+            "name": "05-howard_shore-the_ruins_of_dale",
+            "path": "D:\\Musique\\The Hobbit 3\\05-howard_shore-the_ruins_of_dale.mp3",
+            "category": "Fantasy"
+          },
+          {
+            "id": "4a5f7d12bff942c7b664d52415520916",
+            "name": "05. Champions Of The Just",
+            "path": "D:\\Musique\\Dragon age\\Dragon Age Inquisition\\05. Champions Of The Just.mp3",
+            "category": "Fantasy"
+          },
+          {
+            "id": "48ff6ca81fea42b78a1c7093fe4bab70",
+            "name": "06 - At The Sign Of The Prancing Pony",
+            "path": "D:\\Musique\\The Lord Of The Rings - The Fellowship Of The Ring OST\\06 - At The Sign Of The Prancing Pony.flac",
+            "category": "Fantasy"
+          },
+          {
+            "id": "8dadb689c1c04743b5cdb6b25d458935",
+            "name": "06 - Dragon Age Origins - Inon Zur - Mages In Their Chantry",
+            "path": "D:\\Musique\\Dragon age\\Dragon age origins Soundtrack\\06 - Dragon Age Origins - Inon Zur - Mages In Their Chantry.mp3",
+            "category": "Fantasy"
+          },
+          {
+            "id": "f73428d5f05344a19d3d7b859691a34c",
+            "name": "06 - Minas Morgul",
+            "path": "D:\\Musique\\The Lord Of The Rings - The Return Of The King OST\\06 - Minas Morgul.flac",
+            "category": "Fantasy"
+          },
+          {
+            "id": "42d960d5395b474ba975db8f197fa2f6",
+            "name": "06 The Shrike Hills",
+            "path": "D:\\Musique\\Pathfinder Kingmaker\\06 The Shrike Hills.mp3",
+            "category": "Fantasy"
+          },
+          {
+            "id": "d346b44da861408b9be12e9229d93c76",
+            "name": "06 Willow's Theme",
+            "path": "D:\\Musique\\Willow\\06 Willow's Theme.mp3",
+            "category": "Fantasy"
+          },
+          {
+            "id": "6821b8dd71284fcbbe6123b40fe0fca5",
+            "name": "06-HOWARD_SHORE-THE_GATHERING_OF_THE_CLOUDS_(EXTENDED_VER_)",
+            "path": "D:\\Musique\\The Hobbit 3\\06-HOWARD_SHORE-THE_GATHERING_OF_THE_CLOUDS_(EXTENDED_VER_).MP3",
+            "category": "Fantasy"
+          },
+          {
+            "id": "1ca0e2f3e26046ee855b5cb8444568d1",
+            "name": "06-HOWARD_SHORE-THE_GATHERING_OF_THE_CLOUDS_(EXTENDED_VER_)-(0001)",
+            "path": "D:\\Musique\\The Hobbit 3\\06-HOWARD_SHORE-THE_GATHERING_OF_THE_CLOUDS_(EXTENDED_VER_)-(0001).MP3",
+            "category": "Fantasy"
+          },
+          {
+            "id": "9fd8b31846574762ae705ab809aa312d",
+            "name": "06. Lord Seeker",
+            "path": "D:\\Musique\\Dragon age\\Dragon Age Inquisition\\06. Lord Seeker.mp3",
+            "category": "Fantasy"
+          },
+          {
+            "id": "58ae4a22ace142cbb3f5acfb08b5e193",
+            "name": "07 - A Knife In The Dark",
+            "path": "D:\\Musique\\The Lord Of The Rings - The Fellowship Of The Ring OST\\07 - A Knife In The Dark.flac",
+            "category": "Fantasy"
+          },
+          {
+            "id": "2ce453c499734c3c81c5760d54c058ac",
+            "name": "07 - Dragon Age Origins - Inon Zur - Human Nobility",
+            "path": "D:\\Musique\\Dragon age\\Dragon age origins Soundtrack\\07 - Dragon Age Origins - Inon Zur - Human Nobility.mp3",
+            "category": "Fantasy"
+          },
+          {
+            "id": "98275f893bf44139953fd7bd18f57a8d",
+            "name": "07 - The Ride Of The Rohirrim",
+            "path": "D:\\Musique\\The Lord Of The Rings - The Return Of The King OST\\07 - The Ride Of The Rohirrim.flac",
+            "category": "Fantasy"
+          },
+          {
+            "id": "e5ea3046ae274beb9f158afc647ffc15",
+            "name": "07 Bavmorda's Spell is Cast",
+            "path": "D:\\Musique\\Willow\\07 Bavmorda's Spell is Cast.mp3",
+            "category": "Fantasy"
+          },
+          {
+            "id": "70bebc8ec4df422fb0207b182db6a258",
+            "name": "07 Hills of Glenebon",
+            "path": "D:\\Musique\\Pathfinder Kingmaker\\07 Hills of Glenebon.mp3",
+            "category": "Fantasy"
+          },
+          {
+            "id": "643725f5dc6b4ba0bcbc09afc34979c7",
+            "name": "07-howard_shore-mithril",
+            "path": "D:\\Musique\\The Hobbit 3\\07-howard_shore-mithril.mp3",
+            "category": "Fantasy"
+          },
+          {
+            "id": "4af5786a053747cea6f107e946549704",
+            "name": "07. In Hushed Whispers",
+            "path": "D:\\Musique\\Dragon age\\Dragon Age Inquisition\\07. In Hushed Whispers.mp3",
+            "category": "Fantasy"
+          },
+          {
+            "id": "9f32b661988a41ee8213fed4f7ae7ef3",
+            "name": "08 - Dragon Age Origins - Inon Zur - Rise Of The Darkspawn",
+            "path": "D:\\Musique\\Dragon age\\Dragon age origins Soundtrack\\08 - Dragon Age Origins - Inon Zur - Rise Of The Darkspawn.mp3",
+            "category": "Fantasy"
+          },
+          {
+            "id": "21debedbbc0244b1b10b241131584abb",
+            "name": "08 - Flight To The Ford",
+            "path": "D:\\Musique\\The Lord Of The Rings - The Fellowship Of The Ring OST\\08 - Flight To The Ford.flac",
+            "category": "Fantasy"
+          },
+          {
+            "id": "e6dbcee1a1b54a86a004f4eee5b762d8",
+            "name": "08 - Twilight And Shadow (Featuring Ren�e Fleming)",
+            "path": "D:\\Musique\\The Lord Of The Rings - The Return Of The King OST\\08 - Twilight And Shadow (Featuring Ren�e Fleming).flac",
+            "category": "Fantasy"
+          },
+          {
+            "id": "17589f3040f54028a1152188825de89a",
+            "name": "08 Twilight at Glenebon",
+            "path": "D:\\Musique\\Pathfinder Kingmaker\\08 Twilight at Glenebon.mp3",
+            "category": "Fantasy"
+          },
+          {
+            "id": "e932839422334830a87b6ee37a7e2d09",
+            "name": "08 Willow the Sorcerer",
+            "path": "D:\\Musique\\Willow\\08 Willow the Sorcerer.mp3",
+            "category": "Fantasy"
+          },
+          {
+            "id": "5e7ebd6bba2b40239e7a0dbb517bfa80",
+            "name": "08-howard_shore-bred_for_war",
+            "path": "D:\\Musique\\The Hobbit 3\\08-howard_shore-bred_for_war.mp3",
+            "category": "Fantasy"
+          },
+          {
+            "id": "94527094c191446ebbad593d07796da8",
+            "name": "08. Sacrifice",
+            "path": "D:\\Musique\\Dragon age\\Dragon Age Inquisition\\08. Sacrifice.mp3",
+            "category": "Fantasy"
+          },
+          {
+            "id": "980651cd591f4fbaa5203943c861a7b0",
+            "name": "09 - Cirith Ungol",
+            "path": "D:\\Musique\\The Lord Of The Rings - The Return Of The King OST\\09 - Cirith Ungol.flac",
+            "category": "Fantasy"
+          },
+          {
+            "id": "d2fb3d4b1f754a28bf5b100c5aeccb8c",
+            "name": "09 - Dragon Age Origins - Inon Zur - Tavern Brawl",
+            "path": "D:\\Musique\\Dragon age\\Dragon age origins Soundtrack\\09 - Dragon Age Origins - Inon Zur - Tavern Brawl.mp3",
+            "category": "Fantasy"
+          },
+          {
+            "id": "4f62d71936b74b78bf70560f485a8dd1",
+            "name": "09 - Many Meetings",
+            "path": "D:\\Musique\\The Lord Of The Rings - The Fellowship Of The Ring OST\\09 - Many Meetings.flac",
+            "category": "Fantasy"
+          },
+          {
+            "id": "dc3f2a03054743198fa3a9a8150bdda3",
+            "name": "09 The Narlmarches",
+            "path": "D:\\Musique\\Pathfinder Kingmaker\\09 The Narlmarches.mp3",
+            "category": "Fantasy"
+          },
+          {
+            "id": "7c0d971404834bc78cb9bb906041eef9",
+            "name": "09-howard_shore-a_thief_in_the_night",
+            "path": "D:\\Musique\\The Hobbit 3\\09-howard_shore-a_thief_in_the_night.mp3",
+            "category": "Fantasy"
+          },
+          {
+            "id": "bf1ebb96f9db4c928458a96dcb972f90",
+            "name": "09. Alexius",
+            "path": "D:\\Musique\\Dragon age\\Dragon Age Inquisition\\09. Alexius.mp3",
+            "category": "Fantasy"
+          },
+          {
+            "id": "f08001372a3d475597bc47f0d266a145",
+            "name": "10 - And�ril",
+            "path": "D:\\Musique\\The Lord Of The Rings - The Return Of The King OST\\10 - And�ril.flac",
+            "category": "Fantasy"
+          },
+          {
+            "id": "890773d21c364bc18b27a6b897f4cd7a",
+            "name": "10 - Dragon Age Origins - Inon Zur - The Grey Warden Legacy",
+            "path": "D:\\Musique\\Dragon age\\Dragon age origins Soundtrack\\10 - Dragon Age Origins - Inon Zur - The Grey Warden Legacy.mp3",
+            "category": "Fantasy"
+          },
+          {
+            "id": "b1482d9d006b4e57adb84ffe7a89d7e4",
+            "name": "10 - The Council Of Elrond Featuring AnÃ­ron (Theme For Aragon And Arwen) (Composed & Performed By Enya)",
+            "path": "D:\\Musique\\The Lord Of The Rings - The Fellowship Of The Ring OST\\10 - The Council Of Elrond Featuring AnÃ­ron (Theme For Aragon And Arwen) (Composed & Performed By Enya).flac",
+            "category": "Fantasy"
+          },
+          {
+            "id": "475ab8a77aba47dcb84b6fca907ee269",
+            "name": "10 - The Council Of Elrond Featuring An�ron (Theme For Aragon And Arwen) (Composed & Performed By Enya)",
+            "path": "D:\\Musique\\The Lord Of The Rings - The Fellowship Of The Ring OST\\10 - The Council Of Elrond Featuring An�ron (Theme For Aragon And Arwen) (Composed & Performed By Enya).flac",
+            "category": "Fantasy"
+          },
+          {
+            "id": "57531c1b871c4aebb802fbfa759ae88f",
+            "name": "10 Sunset at the Narlmarches",
+            "path": "D:\\Musique\\Pathfinder Kingmaker\\10 Sunset at the Narlmarches.mp3",
+            "category": "Fantasy"
+          },
+          {
+            "id": "5312ff0e7e0a46aeb33d3ddeff5e9aca",
+            "name": "10-howard_shore-the_clouds_burst",
+            "path": "D:\\Musique\\The Hobbit 3\\10-howard_shore-the_clouds_burst.mp3",
+            "category": "Fantasy"
+          },
+          {
+            "id": "78f96c82b7904b3f8a1e0cc2e4fd2675",
+            "name": "10. In Your Heart Shall Burn",
+            "path": "D:\\Musique\\Dragon age\\Dragon Age Inquisition\\10. In Your Heart Shall Burn.mp3",
+            "category": "Fantasy"
+          },
+          {
+            "id": "3b71a44d4d9a491f8d6d69096c75fd49",
+            "name": "101 - My Dear Frodo",
+            "path": "D:\\Musique\\The Hobbit 1\\101 - My Dear Frodo.flac",
+            "category": "Fantasy"
+          },
+          {
+            "id": "e9610320e26f485da7144fa247edfa49",
+            "name": "101 - The Quest For Erebor",
+            "path": "D:\\Musique\\The Hobbit 1\\101 - The Quest For Erebor.flac",
+            "category": "Fantasy"
+          },
+          {
+            "id": "59cb4013cf4643dca7ba36ffb38686a9",
+            "name": "102 - Old Friends (Extended Version)",
+            "path": "D:\\Musique\\The Hobbit 1\\102 - Old Friends (Extended Version).flac",
+            "category": "Fantasy"
+          },
+          {
+            "id": "25497c66b53247fc9f4a152bb51f4dd3",
+            "name": "102 - Wilderland",
+            "path": "D:\\Musique\\The Hobbit 1\\102 - Wilderland.flac",
+            "category": "Fantasy"
+          },
+          {
+            "id": "7f1bbf9e109e4699840bebb05cd843f0",
+            "name": "103 - A Necromancer",
+            "path": "D:\\Musique\\The Hobbit 1\\103 - A Necromancer.flac",
+            "category": "Fantasy"
+          },
+          {
+            "id": "ae5ca20d87c64b17bede12218f018ab1",
+            "name": "103 - An Unexpected Party (Extended Version)",
+            "path": "D:\\Musique\\The Hobbit 1\\103 - An Unexpected Party (Extended Version).flac",
+            "category": "Fantasy"
+          },
+          {
+            "id": "dad7ec857a244d5380def259c7ab558d",
+            "name": "104 - Blunt The Knives (Performed By The Dwarf Cast)",
+            "path": "D:\\Musique\\The Hobbit 1\\104 - Blunt The Knives (Performed By The Dwarf Cast).flac",
+            "category": "Fantasy"
+          },
+          {
+            "id": "3e7a1222d4964d8590c40062d81c4096",
+            "name": "104 - The House Of Beorn (Extended Version)",
+            "path": "D:\\Musique\\The Hobbit 1\\104 - The House Of Beorn (Extended Version).flac",
+            "category": "Fantasy"
+          },
+          {
+            "id": "1e0745ea27794d34920d75bb2732c7fa",
+            "name": "105 - Axe Or Sword",
+            "path": "D:\\Musique\\The Hobbit 1\\105 - Axe Or Sword.flac",
+            "category": "Fantasy"
+          },
+          {
+            "id": "4617c83a609c42d3a0ce19d5e65c35b2",
+            "name": "105 - Mirkwood (Extended Version)",
+            "path": "D:\\Musique\\The Hobbit 1\\105 - Mirkwood (Extended Version).flac",
+            "category": "Fantasy"
+          },
+          {
+            "id": "47d3dbd3238049c7971631a583046909",
+            "name": "106 - Flies And Spiders (Extended Version)",
+            "path": "D:\\Musique\\The Hobbit 1\\106 - Flies And Spiders (Extended Version).flac",
+            "category": "Fantasy"
+          },
+          {
+            "id": "beda6eec218e4c73adccad1bf4ce1d9d",
+            "name": "106 - Misty Mountains (Performed By Richard Armitage And The Dwarf Cast)",
+            "path": "D:\\Musique\\The Hobbit 1\\106 - Misty Mountains (Performed By Richard Armitage And The Dwarf Cast).flac",
+            "category": "Fantasy"
+          },
+          {
+            "id": "4cb09a73d6984fffae4d5d074710d33a",
+            "name": "107 - The Adventure Begins",
+            "path": "D:\\Musique\\The Hobbit 1\\107 - The Adventure Begins.flac",
+            "category": "Fantasy"
+          },
+          {
+            "id": "55b3071d63c646d291b57767a0e656dc",
+            "name": "107 - The Woodland Realm (Extended Version)",
+            "path": "D:\\Musique\\The Hobbit 1\\107 - The Woodland Realm (Extended Version).flac",
+            "category": "Fantasy"
+          },
+          {
+            "id": "90913fbec03f4b1ca4dc19222857282a",
+            "name": "108 - Feast Of Starlight",
+            "path": "D:\\Musique\\The Hobbit 1\\108 - Feast Of Starlight.flac",
+            "category": "Fantasy"
+          },
+          {
+            "id": "7dfd76d63b90481f8d62572fcd8302de",
+            "name": "108 - The World Is Ahead",
+            "path": "D:\\Musique\\The Hobbit 1\\108 - The World Is Ahead.flac",
+            "category": "Fantasy"
+          },
+          {
+            "id": "4e8b5e393dce498ea193ee6d4736eb1d",
+            "name": "109 - An Ancient Enemy",
+            "path": "D:\\Musique\\The Hobbit 1\\109 - An Ancient Enemy.flac",
+            "category": "Fantasy"
+          },
+          {
+            "id": "275d6e4062454df7a6fcfcfd3eb2debc",
+            "name": "109 - Barrels Out Of Bond",
+            "path": "D:\\Musique\\The Hobbit 1\\109 - Barrels Out Of Bond.flac",
+            "category": "Fantasy"
+          },
+          {
+            "id": "9b136703a3814f4ea8a10550813a550d",
+            "name": "11 - Dragon Age Origins - Inon Zur - The Realm Of Orzamar",
+            "path": "D:\\Musique\\Dragon age\\Dragon age origins Soundtrack\\11 - Dragon Age Origins - Inon Zur - The Realm Of Orzamar.mp3",
+            "category": "Fantasy"
+          },
+          {
+            "id": "2e8dd4906e024990b60e5fa06c95f66d",
+            "name": "11 - Shelob's Lair",
+            "path": "D:\\Musique\\The Lord Of The Rings - The Return Of The King OST\\11 - Shelob's Lair.flac",
+            "category": "Fantasy"
+          },
+          {
+            "id": "71c3197a6a514392a4e01c810e450d90",
+            "name": "11 - The Ring Goes South",
+            "path": "D:\\Musique\\The Lord Of The Rings - The Fellowship Of The Ring OST\\11 - The Ring Goes South.flac",
+            "category": "Fantasy"
+          },
+          {
+            "id": "7dcb1ad2a87b407dab6ba598f90ce897",
+            "name": "11 Dawn at the Narlmarches",
+            "path": "D:\\Musique\\Pathfinder Kingmaker\\11 Dawn at the Narlmarches.mp3",
+            "category": "Fantasy"
+          },
+          {
+            "id": "6f5a95868cc44698a6be3ff747eb00ee",
+            "name": "11-howard_shore-battle_for_the_mountain",
+            "path": "D:\\Musique\\The Hobbit 3\\11-howard_shore-battle_for_the_mountain.mp3",
+            "category": "Fantasy"
+          },
+          {
+            "id": "36bf03bb164a496ea15c56c44c665edb",
+            "name": "11. The Dawn Will Come",
+            "path": "D:\\Musique\\Dragon age\\Dragon Age Inquisition\\11. The Dawn Will Come.mp3",
+            "category": "Fantasy"
+          },
+          {
+            "id": "9c7c27fea42f43f1a6323cf3607bc5ed",
+            "name": "110 - Radagast The Brown (Extended Version)",
+            "path": "D:\\Musique\\The Hobbit 1\\110 - Radagast The Brown (Extended Version).flac",
+            "category": "Fantasy"
+          },
+          {
+            "id": "06d07c5603154a30912788a96ebfd4bb",
+            "name": "110 - The Forest River (Extended Version)",
+            "path": "D:\\Musique\\The Hobbit 1\\110 - The Forest River (Extended Version).flac",
+            "category": "Fantasy"
+          },
+          {
+            "id": "0cf33002a3e84cd880cac7f6bf9dffcb",
+            "name": "111 - Bard, A Man Of Lake-town (Extended Version)",
+            "path": "D:\\Musique\\The Hobbit 1\\111 - Bard, A Man Of Lake-town (Extended Version).flac",
+            "category": "Fantasy"
+          },
+          {
+            "id": "430dba8bbe7c407b8af07a687a3c1874",
+            "name": "111 - The Trollshaws",
+            "path": "D:\\Musique\\The Hobbit 1\\111 - The Trollshaws.flac",
+            "category": "Fantasy"
+          },
+          {
+            "id": "7d8612a239754c1b92a73978ba7a92c7",
+            "name": "112 - Roast Mutton (Extended Version)",
+            "path": "D:\\Musique\\The Hobbit 1\\112 - Roast Mutton (Extended Version).flac",
+            "category": "Fantasy"
+          },
+          {
+            "id": "d9770cfb1a19454eb78451dd19d13cda",
+            "name": "112 - The High Fells (Extended Version)",
+            "path": "D:\\Musique\\The Hobbit 1\\112 - The High Fells (Extended Version).flac",
+            "category": "Fantasy"
+          },
+          {
+            "id": "3a4c5dd09210425c8d54c87ed4f825ef",
+            "name": "113 - A Troll-hoard",
+            "path": "D:\\Musique\\The Hobbit 1\\113 - A Troll-hoard.flac",
+            "category": "Fantasy"
+          },
+          {
+            "id": "245cc3e7802d47f7b05b8a9d817a5a13",
+            "name": "113 - The Nature Of Evil",
+            "path": "D:\\Musique\\The Hobbit 1\\113 - The Nature Of Evil.flac",
+            "category": "Fantasy"
+          },
+          {
+            "id": "75711f77d1c841238298e5b36f574cfc",
+            "name": "114 - Protector Of The Common Folk",
+            "path": "D:\\Musique\\The Hobbit 1\\114 - Protector Of The Common Folk.flac",
+            "category": "Fantasy"
+          },
+          {
+            "id": "a9bbcd4a1c164f6abdaef16c4d66773d",
+            "name": "114 - The Hill Of Sorcery",
+            "path": "D:\\Musique\\The Hobbit 1\\114 - The Hill Of Sorcery.flac",
+            "category": "Fantasy"
+          },
+          {
+            "id": "ad062739ac284e4e99149d2dfbdfe83d",
+            "name": "115 - Warg-scouts",
+            "path": "D:\\Musique\\The Hobbit 1\\115 - Warg-scouts.flac",
+            "category": "Fantasy"
+          },
+          {
+            "id": "01317c25bb6c43158293c4127cf68c9e",
+            "name": "12 - A Journey In The Dark",
+            "path": "D:\\Musique\\The Lord Of The Rings - The Fellowship Of The Ring OST\\12 - A Journey In The Dark.flac",
+            "category": "Fantasy"
+          },
+          {
+            "id": "ef2e7c21f7f94a5c8c2374363a3b7e15",
+            "name": "12 - Ash And Smoke",
+            "path": "D:\\Musique\\The Lord Of The Rings - The Return Of The King OST\\12 - Ash And Smoke.flac",
+            "category": "Fantasy"
+          },
+          {
+            "id": "b92b0563dd9d4174b1b5b3f41fe87a33",
+            "name": "12 - Dragon Age Origins - Inon Zur - The Urn Of Sacred Ashes",
+            "path": "D:\\Musique\\Dragon age\\Dragon age origins Soundtrack\\12 - Dragon Age Origins - Inon Zur - The Urn Of Sacred Ashes.mp3",
+            "category": "Fantasy"
+          },
+          {
+            "id": "ce4c30efed8643ac871dea25a6c5874b",
+            "name": "12 Old Sycamore Caves",
+            "path": "D:\\Musique\\Pathfinder Kingmaker\\12 Old Sycamore Caves.mp3",
+            "category": "Fantasy"
+          },
+          {
+            "id": "dfd5057612ce458fb24a0ffe03c07a7b",
+            "name": "12-howard_shore-the_darkest_hour",
+            "path": "D:\\Musique\\The Hobbit 3\\12-howard_shore-the_darkest_hour.mp3",
+            "category": "Fantasy"
+          },
+          {
+            "id": "b90ee4752cea4e93976c6de0416b92bf",
+            "name": "12. Journey To Skyhold",
+            "path": "D:\\Musique\\Dragon age\\Dragon Age Inquisition\\12. Journey To Skyhold.mp3",
+            "category": "Fantasy"
+          },
+          {
+            "id": "bcaa0dba48f341e3bd3fa6ee931af53c",
+            "name": "13 - Dragon Age Origins - Inon Zur - Lelianna's Song",
+            "path": "D:\\Musique\\Dragon age\\Dragon age origins Soundtrack\\13 - Dragon Age Origins - Inon Zur - Lelianna's Song.mp3",
+            "category": "Fantasy"
+          },
+          {
+            "id": "dd132c74a9b845ff9ed464795bc84107",
+            "name": "13 - The Bridge Of Khazad Dum",
+            "path": "D:\\Musique\\The Lord Of The Rings - The Fellowship Of The Ring OST\\13 - The Bridge Of Khazad Dum.flac",
+            "category": "Fantasy"
+          },
+          {
+            "id": "b664e7f3855c43dba3b67bcdc02fd6c6",
+            "name": "13 - The Fields Of The Pelennor",
+            "path": "D:\\Musique\\The Lord Of The Rings - The Return Of The King OST\\13 - The Fields Of The Pelennor.flac",
+            "category": "Fantasy"
+          },
+          {
+            "id": "53a3c7d699274b808a71224850991aee",
+            "name": "13 Thousand Grains",
+            "path": "D:\\Musique\\Pathfinder Kingmaker\\13 Thousand Grains.mp3",
+            "category": "Fantasy"
+          },
+          {
+            "id": "a768aa3d2a754f6aaf1a236126ab118a",
+            "name": "13-howard_shore-sons_of_durin",
+            "path": "D:\\Musique\\The Hobbit 3\\13-howard_shore-sons_of_durin.mp3",
+            "category": "Fantasy"
+          },
+          {
+            "id": "7db904365d8c4faf9d45f4bf36a6610a",
+            "name": "13. The Western Approach",
+            "path": "D:\\Musique\\Dragon age\\Dragon Age Inquisition\\13. The Western Approach.mp3",
+            "category": "Fantasy"
+          },
+          {
+            "id": "864a53ae148c48b1900634bf84d4ffc9",
+            "name": "14 - Dragon Age Origins - Inon Zur - The Deep Roads",
+            "path": "D:\\Musique\\Dragon age\\Dragon age origins Soundtrack\\14 - Dragon Age Origins - Inon Zur - The Deep Roads.mp3",
+            "category": "Fantasy"
+          },
+          {
+            "id": "d0e2e25d92a04481bfbc6f5c042354e3",
+            "name": "14 - Hope Fails",
+            "path": "D:\\Musique\\The Lord Of The Rings - The Return Of The King OST\\14 - Hope Fails.flac",
+            "category": "Fantasy"
+          },
+          {
+            "id": "b7d2a3f9332c439da520319ff5457209",
+            "name": "14 - Lothlorien",
+            "path": "D:\\Musique\\The Lord Of The Rings - The Fellowship Of The Ring OST\\14 - Lothlorien.flac",
+            "category": "Fantasy"
+          },
+          {
+            "id": "5174b9c263284704aa2b49fbc5ccf16e",
+            "name": "14 City of Hollow Eyes",
+            "path": "D:\\Musique\\Pathfinder Kingmaker\\14 City of Hollow Eyes.mp3",
+            "category": "Fantasy"
+          },
+          {
+            "id": "be7c98ba5a0549a2b2ebe156a403d148",
+            "name": "14-howard_shore-the_fallen",
+            "path": "D:\\Musique\\The Hobbit 3\\14-howard_shore-the_fallen.mp3",
+            "category": "Fantasy"
+          },
+          {
+            "id": "0476879c00a240129749d7234d12bc51",
+            "name": "14. Siege Of Adamant",
+            "path": "D:\\Musique\\Dragon age\\Dragon Age Inquisition\\14. Siege Of Adamant.mp3",
+            "category": "Fantasy"
+          },
+          {
+            "id": "c07586c04f5c477f8466c6ce42c39393",
+            "name": "15 - Dragon Age Origins - Inon Zur - The Nature Of The Beast",
+            "path": "D:\\Musique\\Dragon age\\Dragon age origins Soundtrack\\15 - Dragon Age Origins - Inon Zur - The Nature Of The Beast.mp3",
+            "category": "Fantasy"
+          },
+          {
+            "id": "485f454b6439493889ce6c0c939e4892",
+            "name": "15 - The Black Gate Opens (Featuring Sir James Galway)",
+            "path": "D:\\Musique\\The Lord Of The Rings - The Return Of The King OST\\15 - The Black Gate Opens (Featuring Sir James Galway).flac",
+            "category": "Fantasy"
+          },
+          {
+            "id": "a97b9d1d2fb446778848d00ba64ab3ce",
+            "name": "15 - The Great River",
+            "path": "D:\\Musique\\The Lord Of The Rings - The Fellowship Of The Ring OST\\15 - The Great River.flac",
+            "category": "Fantasy"
+          },
+          {
+            "id": "5f05cdc84dd24fd0a7461f790375ed68",
+            "name": "15 Tomb of the Iron Lord's Champion",
+            "path": "D:\\Musique\\Pathfinder Kingmaker\\15 Tomb of the Iron Lord's Champion.mp3",
+            "category": "Fantasy"
+          },
+          {
+            "id": "d3095cb44a4b4a2992535cb658d3808b",
+            "name": "15-howard_shore-ravenhill",
+            "path": "D:\\Musique\\The Hobbit 3\\15-howard_shore-ravenhill.mp3",
+            "category": "Fantasy"
+          },
+          {
+            "id": "12f726cf839b4ef48a82132e42f3dfea",
+            "name": "15. Adamant Fortress",
+            "path": "D:\\Musique\\Dragon age\\Dragon Age Inquisition\\15. Adamant Fortress.mp3",
+            "category": "Fantasy"
+          },
+          {
+            "id": "db600659dd584f529f6ac1862abdc60c",
+            "name": "16 - Amon Hen",
+            "path": "D:\\Musique\\The Lord Of The Rings - The Fellowship Of The Ring OST\\16 - Amon Hen.flac",
+            "category": "Fantasy"
+          },
+          {
+            "id": "ca7ee02eec5749c5beca5baa1a010a43",
+            "name": "16 - Dragon Age Origins - Inon Zur - Ferelden At War",
+            "path": "D:\\Musique\\Dragon age\\Dragon age origins Soundtrack\\16 - Dragon Age Origins - Inon Zur - Ferelden At War.mp3",
+            "category": "Fantasy"
+          },
+          {
+            "id": "f2b945a15f8d443da6da3513b96c1d17",
+            "name": "16 - The End Of All Things (Featuring Ren�e Fleming)",
+            "path": "D:\\Musique\\The Lord Of The Rings - The Return Of The King OST\\16 - The End Of All Things (Featuring Ren�e Fleming).flac",
+            "category": "Fantasy"
+          },
+          {
+            "id": "f0c0451c6823411e8027e493585c7177",
+            "name": "16 The Dunsward",
+            "path": "D:\\Musique\\Pathfinder Kingmaker\\16 The Dunsward.mp3",
+            "category": "Fantasy"
+          },
+          {
+            "id": "556cf84ff9034ea98e611484c31fc15b",
+            "name": "16-howard_shore-to_the_death_(extended_ver_)",
+            "path": "D:\\Musique\\The Hobbit 3\\16-howard_shore-to_the_death_(extended_ver_).mp3",
+            "category": "Fantasy"
+          },
+          {
+            "id": "52eb821f770e475d9f07179b6c792f52",
+            "name": "16. The Fall",
+            "path": "D:\\Musique\\Dragon age\\Dragon Age Inquisition\\16. The Fall.mp3",
+            "category": "Fantasy"
+          },
+          {
+            "id": "d66d959337b74119b5bf08bb225702a1",
+            "name": "17 - Dragon Age Origins - Inon Zur - I Am The One",
+            "path": "D:\\Musique\\Dragon age\\Dragon age origins Soundtrack\\17 - Dragon Age Origins - Inon Zur - I Am The One.mp3",
+            "category": "Fantasy"
+          },
+          {
+            "id": "b8e9975602324e1e8620a5962770253f",
+            "name": "17 - The Breaking Of The Fellowship",
+            "path": "D:\\Musique\\The Lord Of The Rings - The Fellowship Of The Ring OST\\17 - The Breaking Of The Fellowship.flac",
+            "category": "Fantasy"
+          },
+          {
+            "id": "836477702beb4f7986029410d10305da",
+            "name": "17 - The Return Of The King (Featuring Sir James Galway, Viggo Mortensen, and Ren�e Fleming)",
+            "path": "D:\\Musique\\The Lord Of The Rings - The Return Of The King OST\\17 - The Return Of The King (Featuring Sir James Galway, Viggo Mortensen, and Ren�e Fleming).flac",
+            "category": "Fantasy"
+          },
+          {
+            "id": "b6d7979d0121429c966aa8eef2bec0cd",
+            "name": "17 Sunset at the Dunsward",
+            "path": "D:\\Musique\\Pathfinder Kingmaker\\17 Sunset at the Dunsward.mp3",
+            "category": "Fantasy"
+          },
+          {
+            "id": "84a466d0a6a242598fd7a84e48704e80",
+            "name": "17-howard_shore-courage_and_wisdom",
+            "path": "D:\\Musique\\The Hobbit 3\\17-howard_shore-courage_and_wisdom.mp3",
+            "category": "Fantasy"
+          },
+          {
+            "id": "21739019df6b44ba92dabd6020dde257",
+            "name": "17. The Place Of All Fears",
+            "path": "D:\\Musique\\Dragon age\\Dragon Age Inquisition\\17. The Place Of All Fears.mp3",
+            "category": "Fantasy"
+          },
+          {
+            "id": "90d32e5d61b947a1b2e2c38680ef0251",
+            "name": "18 - Dragon Age Origins - Inon Zur - I Am The One - DJ Killa Remix",
+            "path": "D:\\Musique\\Dragon age\\Dragon age origins Soundtrack\\18 - Dragon Age Origins - Inon Zur - I Am The One - DJ Killa Remix.mp3",
+            "category": "Fantasy"
+          },
+          {
+            "id": "7139d660e3a548da8fd982b540ef1c59",
+            "name": "18 - May It Be (Composed & Performed By Enya)",
+            "path": "D:\\Musique\\The Lord Of The Rings - The Fellowship Of The Ring OST\\18 - May It Be (Composed & Performed By Enya).flac",
+            "category": "Fantasy"
+          },
+          {
+            "id": "6a1fc003f227433287573559d93ad41a",
+            "name": "18 - The Grey Havens (Featuring Sir James Galway)",
+            "path": "D:\\Musique\\The Lord Of The Rings - The Return Of The King OST\\18 - The Grey Havens (Featuring Sir James Galway).flac",
+            "category": "Fantasy"
+          },
+          {
+            "id": "765ecbf1c42745a4a13cd9177ea862ee",
+            "name": "18 Dawn at the Dunsward",
+            "path": "D:\\Musique\\Pathfinder Kingmaker\\18 Dawn at the Dunsward.mp3",
+            "category": "Fantasy"
+          },
+          {
+            "id": "193a63f3956c4a1c98b1223bedae7d12",
+            "name": "18-HOWARD_SHORE-THE_RETURN_JOURNEY",
+            "path": "D:\\Musique\\The Hobbit 3\\18-HOWARD_SHORE-THE_RETURN_JOURNEY.MP3",
+            "category": "Fantasy"
+          },
+          {
+            "id": "1e8573df1d7648408c047916fe722936",
+            "name": "18-HOWARD_SHORE-THE_RETURN_JOURNEY-(0001)",
+            "path": "D:\\Musique\\The Hobbit 3\\18-HOWARD_SHORE-THE_RETURN_JOURNEY-(0001).MP3",
+            "category": "Fantasy"
+          },
+          {
+            "id": "d5f05f0dec0442f0a1e534088f6b70ea",
+            "name": "18. Nightmare's End",
+            "path": "D:\\Musique\\Dragon age\\Dragon Age Inquisition\\18. Nightmare's End.mp3",
+            "category": "Fantasy"
+          },
+          {
+            "id": "84c4b818f50445dab31c8f37ab209289",
+            "name": "19 - Into The West (Performed By Annie Lennox)",
+            "path": "D:\\Musique\\The Lord Of The Rings - The Return Of The King OST\\19 - Into The West (Performed By Annie Lennox).flac",
+            "category": "Fantasy"
+          },
+          {
+            "id": "a476f52a2a7b410ea24e32849a7af8b5",
+            "name": "19 The Tarnished Jewel (Pitax Theme)",
+            "path": "D:\\Musique\\Pathfinder Kingmaker\\19 The Tarnished Jewel (Pitax Theme).mp3",
+            "category": "Fantasy"
+          },
+          {
+            "id": "c165df3f0520438f9b84bbfc9872ccaa",
+            "name": "19-howard_shore-there_and_back_again",
+            "path": "D:\\Musique\\The Hobbit 3\\19-howard_shore-there_and_back_again.mp3",
+            "category": "Fantasy"
+          },
+          {
+            "id": "35d50b1e3732484ba68033bfc8e62a81",
+            "name": "19. Val Royeaux",
+            "path": "D:\\Musique\\Dragon age\\Dragon Age Inquisition\\19. Val Royeaux.mp3",
+            "category": "Fantasy"
+          },
+          {
+            "id": "6d57183a23ee465b884b01f1d5e6b7fd",
+            "name": "20 The Coronation",
+            "path": "D:\\Musique\\Pathfinder Kingmaker\\20 The Coronation.mp3",
+            "category": "Fantasy"
+          },
+          {
+            "id": "c6bfc9a5e0324fbe83ffba5c2e80a73a",
+            "name": "20-billy_boyd-the_last_goodbye",
+            "path": "D:\\Musique\\The Hobbit 3\\20-billy_boyd-the_last_goodbye.mp3",
+            "category": "Fantasy"
+          },
+          {
+            "id": "d808dafcb7374525a5870fa700b3565d",
+            "name": "20. Wicked Eyes & Wicked Hearts",
+            "path": "D:\\Musique\\Dragon age\\Dragon Age Inquisition\\20. Wicked Eyes & Wicked Hearts.mp3",
+            "category": "Fantasy"
+          },
+          {
+            "id": "4d79efea9abc417ea28dedb7e9d86b1f",
+            "name": "201 - The Hidden Valley",
+            "path": "D:\\Musique\\The Hobbit 2\\201 - The Hidden Valley.flac",
+            "category": "Fantasy"
+          },
+          {
+            "id": "8db451aa3aac423bab5179ba3b05525b",
+            "name": "201 - Thrice Welcome",
+            "path": "D:\\Musique\\The Hobbit 2\\201 - Thrice Welcome.flac",
+            "category": "Fantasy"
+          },
+          {
+            "id": "46a349b8fe5643c6bf95e604539a134f",
+            "name": "202 - Girion, Lord Of Dale (Extended Version)",
+            "path": "D:\\Musique\\The Hobbit 2\\202 - Girion, Lord Of Dale (Extended Version).flac",
+            "category": "Fantasy"
+          },
+          {
+            "id": "12818030f3ff4fc6b368c85f931b31b8",
+            "name": "202 - Moon Runes (Extended Version)",
+            "path": "D:\\Musique\\The Hobbit 2\\202 - Moon Runes (Extended Version).flac",
+            "category": "Fantasy"
+          },
+          {
+            "id": "913687cfaae14564a2ac6b6b376bb263",
+            "name": "203 - Durin's Folk (Extended Version)",
+            "path": "D:\\Musique\\The Hobbit 2\\203 - Durin's Folk (Extended Version).flac",
+            "category": "Fantasy"
+          },
+          {
+            "id": "77a090230341446a843c80f7e5c2bc41",
+            "name": "203 - The Defiler",
+            "path": "D:\\Musique\\The Hobbit 2\\203 - The Defiler.flac",
+            "category": "Fantasy"
+          },
+          {
+            "id": "27451bda88924f028f72918a152be21c",
+            "name": "204 - In The Shadow Of The Mountain",
+            "path": "D:\\Musique\\The Hobbit 2\\204 - In The Shadow Of The Mountain.flac",
+            "category": "Fantasy"
+          },
+          {
+            "id": "bd6c6ac6fe7b480c918008c749f54a4d",
+            "name": "204 - The White Council (Extended Version)",
+            "path": "D:\\Musique\\The Hobbit 2\\204 - The White Council (Extended Version).flac",
+            "category": "Fantasy"
+          },
+          {
+            "id": "d1e6afdcfb9845c9a0e45a3926394ec4",
+            "name": "205 - A Spell Of Concealment (Extended Version)",
+            "path": "D:\\Musique\\The Hobbit 2\\205 - A Spell Of Concealment (Extended Version).flac",
+            "category": "Fantasy"
+          },
+          {
+            "id": "c75c5b4fa772416599c5bbb1fda5ed69",
+            "name": "205 - Over Hill",
+            "path": "D:\\Musique\\The Hobbit 2\\205 - Over Hill.flac",
+            "category": "Fantasy"
+          },
+          {
+            "id": "3dfc1088f4a645f799f0967af5fee86b",
+            "name": "206 - A Thunder Battle",
+            "path": "D:\\Musique\\The Hobbit 2\\206 - A Thunder Battle.flac",
+            "category": "Fantasy"
+          },
+          {
+            "id": "c254c9427f454b66b678c94c9741fd6b",
+            "name": "206 - On The Doorstep",
+            "path": "D:\\Musique\\The Hobbit 2\\206 - On The Doorstep.flac",
+            "category": "Fantasy"
+          },
+          {
+            "id": "3173d3efd154427bb6103c9a5f57dd15",
+            "name": "207 - The Courage Of Hobbits",
+            "path": "D:\\Musique\\The Hobbit 2\\207 - The Courage Of Hobbits.flac",
+            "category": "Fantasy"
+          },
+          {
+            "id": "586bd4a942a9425d90fbc52bfc10891c",
+            "name": "207 - Under Hill",
+            "path": "D:\\Musique\\The Hobbit 2\\207 - Under Hill.flac",
+            "category": "Fantasy"
+          },
+          {
+            "id": "5ff7a2fc822c482ba91bedbc6f5e5dd2",
+            "name": "208 - Inside Information",
+            "path": "D:\\Musique\\The Hobbit 2\\208 - Inside Information.flac",
+            "category": "Fantasy"
+          },
+          {
+            "id": "bbe645f0f314474d979816d46eb5d899",
+            "name": "208 - Inside Information-(0001)",
+            "path": "D:\\Musique\\The Hobbit 2\\208 - Inside Information-(0001).flac",
+            "category": "Fantasy"
+          },
+          {
+            "id": "0c020ba82792400a8d03310ed882dc22",
+            "name": "208 - Riddles In The Dark",
+            "path": "D:\\Musique\\The Hobbit 2\\208 - Riddles In The Dark.flac",
+            "category": "Fantasy"
+          },
+          {
+            "id": "ff194a97cae74655a47dba3fe0238c74",
+            "name": "209 - Brass Buttons",
+            "path": "D:\\Musique\\The Hobbit 2\\209 - Brass Buttons.flac",
+            "category": "Fantasy"
+          },
+          {
+            "id": "a0c1b3ec2674474b8d20c17630a9f2a9",
+            "name": "209 - Kingsfoil",
+            "path": "D:\\Musique\\The Hobbit 2\\209 - Kingsfoil.flac",
+            "category": "Fantasy"
+          },
+          {
+            "id": "af97c7dd279a495aa3524613f730377b",
+            "name": "21 Rule Of Chaos",
+            "path": "D:\\Musique\\Pathfinder Kingmaker\\21 Rule Of Chaos.mp3",
+            "category": "Fantasy"
+          },
+          {
+            "id": "543bf51352314de7a2f292091eb3cbc9",
+            "name": "21-howard_shore-ironfoot_(extended_ver_)",
+            "path": "D:\\Musique\\The Hobbit 3\\21-howard_shore-ironfoot_(extended_ver_).mp3",
+            "category": "Fantasy"
+          },
+          {
+            "id": "278a5853f43b4a9f8f45b31ef0ba21cd",
+            "name": "21. The Inquisition Marches",
+            "path": "D:\\Musique\\Dragon age\\Dragon Age Inquisition\\21. The Inquisition Marches.mp3",
+            "category": "Fantasy"
+          },
+          {
+            "id": "9775954160d345e0a84b1e9966e942f2",
+            "name": "210 - A Liar And A Thief",
+            "path": "D:\\Musique\\The Hobbit 2\\210 - A Liar And A Thief.flac",
+            "category": "Fantasy"
+          },
+          {
+            "id": "7c21bc3089f140258fe0b26440b0cdef",
+            "name": "210 - Out Of The Frying-Pan",
+            "path": "D:\\Musique\\The Hobbit 2\\210 - Out Of The Frying-Pan.flac",
+            "category": "Fantasy"
+          },
+          {
+            "id": "0746c8e7e46e40bb82ab06cef4eb51b7",
+            "name": "211 - A Good Omen",
+            "path": "D:\\Musique\\The Hobbit 2\\211 - A Good Omen.flac",
+            "category": "Fantasy"
+          },
+          {
+            "id": "8e750d31c2f44009a97c925e533566f1",
+            "name": "211 - The Hunters (Extended Version)",
+            "path": "D:\\Musique\\The Hobbit 2\\211 - The Hunters (Extended Version).flac",
+            "category": "Fantasy"
+          },
+          {
+            "id": "360c4aac33394b25b960df511c6f5dcc",
+            "name": "212 - Smaug (Extended Version)",
+            "path": "D:\\Musique\\The Hobbit 2\\212 - Smaug (Extended Version).flac",
+            "category": "Fantasy"
+          },
+          {
+            "id": "f2b91dd2d34e4ff58ffd2190cddd7d2f",
+            "name": "212 - Song Of The Lonely Mountain (Extended Version) (Performed By Neil Finn)",
+            "path": "D:\\Musique\\The Hobbit 2\\212 - Song Of The Lonely Mountain (Extended Version) (Performed By Neil Finn).flac",
+            "category": "Fantasy"
+          },
+          {
+            "id": "ede40410f6fb45debe06161d5c78b153",
+            "name": "213 - Dreaming Of Bag End",
+            "path": "D:\\Musique\\The Hobbit 2\\213 - Dreaming Of Bag End.flac",
+            "category": "Fantasy"
+          },
+          {
+            "id": "b4a7d200ac17403c9a38e7069f72e6b1",
+            "name": "213 - My Armor Is Iron",
+            "path": "D:\\Musique\\The Hobbit 2\\213 - My Armor Is Iron.flac",
+            "category": "Fantasy"
+          },
+          {
+            "id": "f47245d258744104a00ff9c0f16ed114",
+            "name": "214 - A Very Respectable Hobbit",
+            "path": "D:\\Musique\\The Hobbit 2\\214 - A Very Respectable Hobbit.flac",
+            "category": "Fantasy"
+          },
+          {
+            "id": "9996e7b7a5154010891d512a6fe38a36",
+            "name": "214 - I See Fire (Performed By Ed Sheeran)",
+            "path": "D:\\Musique\\The Hobbit 2\\214 - I See Fire (Performed By Ed Sheeran).flac",
+            "category": "Fantasy"
+          },
+          {
+            "id": "574f4e02e85a4890b46788acfd77f993",
+            "name": "215 - Beyond The Forest",
+            "path": "D:\\Musique\\The Hobbit 2\\215 - Beyond The Forest.flac",
+            "category": "Fantasy"
+          },
+          {
+            "id": "b5734976214c41319e51fb197e657f77",
+            "name": "215 - Erebor",
+            "path": "D:\\Musique\\The Hobbit 2\\215 - Erebor.flac",
+            "category": "Fantasy"
+          },
+          {
+            "id": "f21ae3097ea04a9eaae58e9a0dcb5e2c",
+            "name": "216 - The Dwarf Lords",
+            "path": "D:\\Musique\\The Hobbit 2\\216 - The Dwarf Lords.flac",
+            "category": "Fantasy"
+          },
+          {
+            "id": "c44c99ad37f84855a2b9d08d5b3a63d2",
+            "name": "217 - The Edge Of The Wild",
+            "path": "D:\\Musique\\The Hobbit 2\\217 - The Edge Of The Wild.flac",
+            "category": "Fantasy"
+          },
+          {
+            "id": "4e0da7f08e814e818bb87c71648a47e0",
+            "name": "22 Rule Of Balance",
+            "path": "D:\\Musique\\Pathfinder Kingmaker\\22 Rule Of Balance.mp3",
+            "category": "Fantasy"
+          },
+          {
+            "id": "6a5fbc2b24664cffacd68a106886832c",
+            "name": "22-howard_shore-dragon-sickness_(bonus_track)",
+            "path": "D:\\Musique\\The Hobbit 3\\22-howard_shore-dragon-sickness_(bonus_track).mp3",
+            "category": "Fantasy"
+          },
+          {
+            "id": "5db430e087c8470fbe4a67129c1e8ce8",
+            "name": "22. The Lost Temple",
+            "path": "D:\\Musique\\Dragon age\\Dragon Age Inquisition\\22. The Lost Temple.mp3",
+            "category": "Fantasy"
+          },
+          {
+            "id": "d7b534c5c6a94f8e9c1b0986cee5a7ef",
+            "name": "23 Rule Of Order",
+            "path": "D:\\Musique\\Pathfinder Kingmaker\\23 Rule Of Order.mp3",
+            "category": "Fantasy"
+          },
+          {
+            "id": "2399087472764b28acf2e54172df7a8f",
+            "name": "23-howard_shore-thrain_(bonus_track_-_from_the_hobbit_the_desolation_of_smaug_extended_edition)",
+            "path": "D:\\Musique\\The Hobbit 3\\23-howard_shore-thrain_(bonus_track_-_from_the_hobbit_the_desolation_of_smaug_extended_edition).mp3",
+            "category": "Fantasy"
+          },
+          {
+            "id": "05d8544bc48445bca6e846e526053122",
+            "name": "23. Death On The Bridge",
+            "path": "D:\\Musique\\Dragon age\\Dragon Age Inquisition\\23. Death On The Bridge.mp3",
+            "category": "Fantasy"
+          },
+          {
+            "id": "90f6c146609143049e819dfc0977ef9c",
+            "name": "24 Rule Of Good",
+            "path": "D:\\Musique\\Pathfinder Kingmaker\\24 Rule Of Good.mp3",
+            "category": "Fantasy"
+          },
+          {
+            "id": "1c92de5a3503440dbc24792c6b6189fa",
+            "name": "24. Guardians Of The Past",
+            "path": "D:\\Musique\\Dragon age\\Dragon Age Inquisition\\24. Guardians Of The Past.mp3",
+            "category": "Fantasy"
+          },
+          {
+            "id": "ee99668cd5a04555bebc5b9cfc8d351c",
+            "name": "25 Rule Of Evil",
+            "path": "D:\\Musique\\Pathfinder Kingmaker\\25 Rule Of Evil.mp3",
+            "category": "Fantasy"
+          },
+          {
+            "id": "eb81cfa9573d46d890a9eb468dfe5e81",
+            "name": "25. The Well Of Sorrows",
+            "path": "D:\\Musique\\Dragon age\\Dragon Age Inquisition\\25. The Well Of Sorrows.mp3",
+            "category": "Fantasy"
+          },
+          {
+            "id": "e130d636b05145929d988220483d3af3",
+            "name": "26 Steps of the Goddess",
+            "path": "D:\\Musique\\Pathfinder Kingmaker\\26 Steps of the Goddess.mp3",
+            "category": "Fantasy"
+          },
+          {
+            "id": "2bdeb4ef65294918b06cef2e2250d244",
+            "name": "26. Call His Wrath",
+            "path": "D:\\Musique\\Dragon age\\Dragon Age Inquisition\\26. Call His Wrath.mp3",
+            "category": "Fantasy"
+          },
+          {
+            "id": "040e19d2ecdc445db76f1e2eaa153707",
+            "name": "27 The Art of Ruling",
+            "path": "D:\\Musique\\Pathfinder Kingmaker\\27 The Art of Ruling.mp3",
+            "category": "Fantasy"
+          },
+          {
+            "id": "f32441144be44fabb1c0d0446297e4a2",
+            "name": "27. The Lie In Which You Linger",
+            "path": "D:\\Musique\\Dragon age\\Dragon Age Inquisition\\27. The Lie In Which You Linger.mp3",
+            "category": "Fantasy"
+          },
+          {
+            "id": "b5910c2388cf4f6f9b00417a3eff44c1",
+            "name": "28 Season Of Bloom",
+            "path": "D:\\Musique\\Pathfinder Kingmaker\\28 Season Of Bloom.mp3",
+            "category": "Fantasy"
+          },
+          {
+            "id": "abbfaaea395245b081540d01bd739d64",
+            "name": "28. Battle In The Sky",
+            "path": "D:\\Musique\\Dragon age\\Dragon Age Inquisition\\28. Battle In The Sky.mp3",
+            "category": "Fantasy"
+          },
+          {
+            "id": "0a3dd067c82e4819a9dd355772d52fad",
+            "name": "29 Canvas For The Gods",
+            "path": "D:\\Musique\\Pathfinder Kingmaker\\29 Canvas For The Gods.mp3",
+            "category": "Fantasy"
+          },
+          {
+            "id": "6a056a67fd6f401aa9548e2f1bd739c8",
+            "name": "29. Tooth And Scale",
+            "path": "D:\\Musique\\Dragon age\\Dragon Age Inquisition\\29. Tooth And Scale.mp3",
+            "category": "Fantasy"
+          },
+          {
+            "id": "7a18ff4f36134008bf3cf4b3dbc7f58d",
+            "name": "30 Where Trees Talk To The Stars",
+            "path": "D:\\Musique\\Pathfinder Kingmaker\\30 Where Trees Talk To The Stars.mp3",
+            "category": "Fantasy"
+          },
+          {
+            "id": "cd12680f39184dba9ae70b3de31823ff",
+            "name": "30. Let The Skies Boil",
+            "path": "D:\\Musique\\Dragon age\\Dragon Age Inquisition\\30. Let The Skies Boil.mp3",
+            "category": "Fantasy"
+          },
+          {
+            "id": "d1c9edbf538b4d3a86e68d7a24bb2954",
+            "name": "31 The Echo Born Before The Sound",
+            "path": "D:\\Musique\\Pathfinder Kingmaker\\31 The Echo Born Before The Sound.mp3",
+            "category": "Fantasy"
+          },
+          {
+            "id": "8eec418de95f4d12a07794263d5378d9",
+            "name": "31. Doom Upon All The World",
+            "path": "D:\\Musique\\Dragon age\\Dragon Age Inquisition\\31. Doom Upon All The World.mp3",
+            "category": "Fantasy"
+          },
+          {
+            "id": "08cf8b296d0848149bdfe7ece271666e",
+            "name": "32 Blade Of Your Own Choices",
+            "path": "D:\\Musique\\Pathfinder Kingmaker\\32 Blade Of Your Own Choices.mp3",
+            "category": "Fantasy"
+          },
+          {
+            "id": "b68ad81407a54544ad62c57921d1a389",
+            "name": "32. Orb Of Destruction",
+            "path": "D:\\Musique\\Dragon age\\Dragon Age Inquisition\\32. Orb Of Destruction.mp3",
+            "category": "Fantasy"
+          },
+          {
+            "id": "bb743916e4394431bf7984e9dc930ddb",
+            "name": "33 Bold Dog Barks Loud",
+            "path": "D:\\Musique\\Pathfinder Kingmaker\\33 Bold Dog Barks Loud.mp3",
+            "category": "Fantasy"
+          },
+          {
+            "id": "03940d444db94ef28572095897dd5ebf",
+            "name": "33. The Scar",
+            "path": "D:\\Musique\\Dragon age\\Dragon Age Inquisition\\33. The Scar.mp3",
+            "category": "Fantasy"
+          },
+          {
+            "id": "da80371e06974fa6a9fd726a0509eddf",
+            "name": "34 Skylark",
+            "path": "D:\\Musique\\Pathfinder Kingmaker\\34 Skylark.mp3",
+            "category": "Fantasy"
+          },
+          {
+            "id": "c60e12effd6746888c79439da2d6f957",
+            "name": "34. Return To Skyhold",
+            "path": "D:\\Musique\\Dragon age\\Dragon Age Inquisition\\34. Return To Skyhold.mp3",
+            "category": "Fantasy"
+          },
+          {
+            "id": "39f56fdc435244f9abe39b1c6b869798",
+            "name": "35 Who Rules Your Heart",
+            "path": "D:\\Musique\\Pathfinder Kingmaker\\35 Who Rules Your Heart.mp3",
+            "category": "Fantasy"
+          },
+          {
+            "id": "5a7ceaad8f304ccbb4382894e1e2bcb7",
+            "name": "35. Epilogue",
+            "path": "D:\\Musique\\Dragon age\\Dragon Age Inquisition\\35. Epilogue.mp3",
+            "category": "Fantasy"
+          },
+          {
+            "id": "cf7e1c0ae4334f1a8b29c1ec72a455d1",
+            "name": "36 Brevoy Folk Melody (Tavern Theme 1)",
+            "path": "D:\\Musique\\Pathfinder Kingmaker\\36 Brevoy Folk Melody (Tavern Theme 1).mp3",
+            "category": "Fantasy"
+          },
+          {
+            "id": "ffcf9e340cf54e7e931675f6ecdf8ff4",
+            "name": "36. The Elder One Theme",
+            "path": "D:\\Musique\\Dragon age\\Dragon Age Inquisition\\36. The Elder One Theme.mp3",
+            "category": "Fantasy"
+          },
+          {
+            "id": "3dd136828aa14da1b11d1efaf3cf7a4d",
+            "name": "37 The Heart of the Land (Tavern Theme 2)",
+            "path": "D:\\Musique\\Pathfinder Kingmaker\\37 The Heart of the Land (Tavern Theme 2).mp3",
+            "category": "Fantasy"
+          },
+          {
+            "id": "8cc3f202bbdc494fac4b7ef5f218275b",
+            "name": "37. Orlais Theme",
+            "path": "D:\\Musique\\Dragon age\\Dragon Age Inquisition\\37. Orlais Theme.mp3",
+            "category": "Fantasy"
+          },
+          {
+            "id": "eee44afc05e54946991d4076aca3928c",
+            "name": "38 Fey in the Hills (Tavern Theme 3)",
+            "path": "D:\\Musique\\Pathfinder Kingmaker\\38 Fey in the Hills (Tavern Theme 3).mp3",
+            "category": "Fantasy"
+          },
+          {
+            "id": "18fb2d007ab142f3bdd17a220b6cad05",
+            "name": "38. Thedas Love Theme",
+            "path": "D:\\Musique\\Dragon age\\Dragon Age Inquisition\\38. Thedas Love Theme.mp3",
+            "category": "Fantasy"
+          },
+          {
+            "id": "ba06b563ed6147b3b7fa5c63695eb2cc",
+            "name": "39 Lazy Morning (Tavern Theme 4)",
+            "path": "D:\\Musique\\Pathfinder Kingmaker\\39 Lazy Morning (Tavern Theme 4).mp3",
+            "category": "Fantasy"
+          },
+          {
+            "id": "59a613e77dd64841be03be4db150be86",
+            "name": "39. A World Torn Asunder (Gameplay Trailer)",
+            "path": "D:\\Musique\\Dragon age\\Dragon Age Inquisition\\39. A World Torn Asunder (Gameplay Trailer).mp3",
+            "category": "Fantasy"
+          },
+          {
+            "id": "30d8c1725d9f4d55a8601b87d5356801",
+            "name": "40 Rushlight Festival (Tavern Theme 5)",
+            "path": "D:\\Musique\\Pathfinder Kingmaker\\40 Rushlight Festival (Tavern Theme 5).mp3",
+            "category": "Fantasy"
+          },
+          {
+            "id": "b08c4dcdc3b8427388607daa74e0c54a",
+            "name": "41 Lake Of Mists And Veils (Tavern Theme 6)",
+            "path": "D:\\Musique\\Pathfinder Kingmaker\\41 Lake Of Mists And Veils (Tavern Theme 6).mp3",
+            "category": "Fantasy"
+          },
+          {
+            "id": "942dfb5e2c574f459ba0a3a1d1f91f03",
+            "name": "42 The Shrike Hills Battle Theme",
+            "path": "D:\\Musique\\Pathfinder Kingmaker\\42 The Shrike Hills Battle Theme.mp3",
+            "category": "Fantasy"
+          },
+          {
+            "id": "5a8fd9ae08774193aae0201ae97556f1",
+            "name": "43 Uplands Battle Theme",
+            "path": "D:\\Musique\\Pathfinder Kingmaker\\43 Uplands Battle Theme.mp3",
+            "category": "Fantasy"
+          },
+          {
+            "id": "f7a8942f9b784781b7ce3307b2df4407",
+            "name": "44 The Dunsward Battle Theme",
+            "path": "D:\\Musique\\Pathfinder Kingmaker\\44 The Dunsward Battle Theme.mp3",
+            "category": "Fantasy"
+          },
+          {
+            "id": "ff251e03fe1f49f1bfea26f8b1f87849",
+            "name": "45 The Narlmarches Battle Theme",
+            "path": "D:\\Musique\\Pathfinder Kingmaker\\45 The Narlmarches Battle Theme.mp3",
+            "category": "Fantasy"
+          },
+          {
+            "id": "20ce7c0453754766bb1ebd2e2f66f280",
+            "name": "46 Dungeon Battle Theme 1",
+            "path": "D:\\Musique\\Pathfinder Kingmaker\\46 Dungeon Battle Theme 1.mp3",
+            "category": "Fantasy"
+          },
+          {
+            "id": "25625cb795a14758b45ec6094cd107fd",
+            "name": "47 Dungeon Battle Theme 2",
+            "path": "D:\\Musique\\Pathfinder Kingmaker\\47 Dungeon Battle Theme 2.mp3",
+            "category": "Fantasy"
+          },
+          {
+            "id": "902cb9f33ebe46fe9a95d4f0a157fffa",
+            "name": "48 First World Battle Theme",
+            "path": "D:\\Musique\\Pathfinder Kingmaker\\48 First World Battle Theme.mp3",
+            "category": "Fantasy"
+          },
+          {
+            "id": "10f6c92024c54f5f965a0142af115e98",
+            "name": "49 Capital Under Attack",
+            "path": "D:\\Musique\\Pathfinder Kingmaker\\49 Capital Under Attack.mp3",
+            "category": "Fantasy"
+          },
+          {
+            "id": "c8e549c2f425459abe27d2ff070f5c57",
+            "name": "50 Ancient Ruins Battle Theme",
+            "path": "D:\\Musique\\Pathfinder Kingmaker\\50 Ancient Ruins Battle Theme.mp3",
+            "category": "Fantasy"
+          },
+          {
+            "id": "1a4044e317de40aaaa7260e50d573dcb",
+            "name": "51 Caves Battle Theme",
+            "path": "D:\\Musique\\Pathfinder Kingmaker\\51 Caves Battle Theme.mp3",
+            "category": "Fantasy"
+          },
+          {
+            "id": "fa2f9254b34e49409179d699884ae2df",
+            "name": "52 In The Name Of My Dream (Stag Lord Battle Theme)",
+            "path": "D:\\Musique\\Pathfinder Kingmaker\\52 In The Name Of My Dream (Stag Lord Battle Theme).mp3",
+            "category": "Fantasy"
+          },
+          {
+            "id": "a73286e0173a4632857e6d1ee1acaa96",
+            "name": "53 Dur Borba (Hargulka Battle Theme)",
+            "path": "D:\\Musique\\Pathfinder Kingmaker\\53 Dur Borba (Hargulka Battle Theme).mp3",
+            "category": "Fantasy"
+          },
+          {
+            "id": "e0bb5d7be7884ba99767297bfac31717",
+            "name": "54 Relic Of A Crumbled Empire (Vordakai Battle Theme)",
+            "path": "D:\\Musique\\Pathfinder Kingmaker\\54 Relic Of A Crumbled Empire (Vordakai Battle Theme).mp3",
+            "category": "Fantasy"
+          },
+          {
+            "id": "136e57d12c2545f491016cee9e9ea198",
+            "name": "55 False Destiny (Armag Battle Theme)",
+            "path": "D:\\Musique\\Pathfinder Kingmaker\\55 False Destiny (Armag Battle Theme).mp3",
+            "category": "Fantasy"
+          },
+          {
+            "id": "ec4a62e300a84d098621e3dcd05dfbeb",
+            "name": "56 The Proud, the Bitter, the Fallen (Nyrissa Battle Theme)",
+            "path": "D:\\Musique\\Pathfinder Kingmaker\\56 The Proud, the Bitter, the Fallen (Nyrissa Battle Theme).mp3",
+            "category": "Fantasy"
+          },
+          {
+            "id": "a26e13c78533450ca5d969a0ebfb8da0",
+            "name": "57 The Doomsayer",
+            "path": "D:\\Musique\\Pathfinder Kingmaker\\57 The Doomsayer.mp3",
+            "category": "Fantasy"
+          },
+          {
+            "id": "16d5dbe7333e4e06be2b3e0fa8c75746",
+            "name": "58 The Laughing Lie",
+            "path": "D:\\Musique\\Pathfinder Kingmaker\\58 The Laughing Lie.mp3",
+            "category": "Fantasy"
+          },
+          {
+            "id": "ac0a862a9ecb48f1a0927f4b94a114fb",
+            "name": "59 He Who Leads the Hunt",
+            "path": "D:\\Musique\\Pathfinder Kingmaker\\59 He Who Leads the Hunt.mp3",
+            "category": "Fantasy"
+          },
+          {
+            "id": "06eef942f2df4ec396f91f83fec89cdd",
+            "name": "60 A String that Holds the World in Place",
+            "path": "D:\\Musique\\Pathfinder Kingmaker\\60 A String that Holds the World in Place.mp3",
+            "category": "Fantasy"
+          },
+          {
+            "id": "448611819a8f47169f2eb10a15b5b042",
+            "name": "DragonHeart (1996) OST",
+            "path": "D:\\Musique\\Dragon Heart\\DragonHeart (1996) OST.mp3",
+            "category": "Fantasy"
+          },
+          {
+            "id": "8aed652d3e744099be3171615d872fac",
+            "name": "Dragonheart - Soundtrack - Randy Edelman - Bowen's Ride",
+            "path": "D:\\Musique\\Dragon Heart\\Dragonheart - Soundtrack - Randy Edelman - Bowen's Ride.mp3",
+            "category": "Fantasy"
+          },
+          {
+            "id": "d26dfa1f2f944e6e8c7d5051fc9eba92",
+            "name": "DragonHeart - To The Stars- By Randy Edelman.",
+            "path": "D:\\Musique\\Dragon Heart\\DragonHeart - To The Stars- By Randy Edelman..mp3",
+            "category": "Fantasy"
+          },
+          {
+            "id": "7e02a9d39c6f4dec84a34c9fe9295420",
+            "name": "Dragonheart Soundtrack_ The Last Dragon Slayer + Bowen's Ride (Edit)",
+            "path": "D:\\Musique\\Dragon Heart\\Dragonheart Soundtrack_ The Last Dragon Slayer + Bowen's Ride (Edit).mp3",
+            "category": "Fantasy"
+          },
+          {
+            "id": "6f0ec1e12982410e919da1e31b250db0",
+            "name": "Dragonheart Theme - Finale",
+            "path": "D:\\Musique\\Dragon Heart\\Dragonheart Theme - Finale.mp3",
+            "category": "Fantasy"
+          },
+          {
+            "id": "925b1cfeab0f4ee3a854cd58ee2ab14c",
+            "name": "Dragonheart_ corazón de dragón by Victor de Andres.",
+            "path": "D:\\Musique\\Dragon Heart\\Dragonheart_ corazón de dragón by Victor de Andres..mp3",
+            "category": "Fantasy"
+          }
+        ],
+        "directories": [
+          "D:\\Musique\\Dragon age",
+          "D:\\Musique\\Dragon Heart",
+          "D:\\Musique\\Pathfinder Kingmaker",
+          "D:\\Musique\\The Hobbit 1",
+          "D:\\Musique\\The Hobbit 2",
+          "D:\\Musique\\The Hobbit 3",
+          "D:\\Musique\\The Lord Of The Rings - The Fellowship Of The Ring OST",
+          "D:\\Musique\\The Lord Of The Rings - The Return Of The King OST",
+          "D:\\Musique\\Willow"
+        ]
+      },
+      "Cyberpunk": {
+        "tracks": [
+          {
+            "id": "5f85f78e1c0e46b09292d7abe6e8e6f9",
+            "name": "01 - Marcin Przybylowicz - V",
+            "path": "D:\\Musique\\Cyperpunk 2077\\01 - Marcin Przybylowicz - V.mp3",
+            "category": "Cyberpunk"
+          },
+          {
+            "id": "b1a19d351c124065bd3e0ef54504eb6d",
+            "name": "01 - P.T. Adamczyk - The Voice In My Head",
+            "path": "D:\\Musique\\Cyperpunk 2077\\01 - P.T. Adamczyk - The Voice In My Head.mp3",
+            "category": "Cyberpunk"
+          },
+          {
+            "id": "b62bb760713f471d91e91072a8a7978f",
+            "name": "01. Deathshead",
+            "path": "D:\\Musique\\Wolfenstein - The New Order\\01. Deathshead.mp3",
+            "category": "Cyberpunk"
+          },
+          {
+            "id": "59c3de971df8458db4c4708e583d4e68",
+            "name": "02 - Marcin Przybylowicz - Modern Anthill",
+            "path": "D:\\Musique\\Cyperpunk 2077\\02 - Marcin Przybylowicz - Modern Anthill.mp3",
+            "category": "Cyberpunk"
+          },
+          {
+            "id": "19fa3c45351b4e68ae9795bf77f515a8",
+            "name": "02 - Paul Leonard-Morgan - Extraction Action",
+            "path": "D:\\Musique\\Cyperpunk 2077\\02 - Paul Leonard-Morgan - Extraction Action.mp3",
+            "category": "Cyberpunk"
+          },
+          {
+            "id": "bd34f43173ba41919554bbea9fa8c23b",
+            "name": "02. Adrift",
+            "path": "D:\\Musique\\Wolfenstein - The New Order\\02. Adrift.mp3",
+            "category": "Cyberpunk"
+          },
+          {
+            "id": "4b6a5a8f71a947f5b84d74039ff655c0",
+            "name": "03 - P.T. Adamczyk - The Rebel Path",
+            "path": "D:\\Musique\\Cyperpunk 2077\\03 - P.T. Adamczyk - The Rebel Path.mp3",
+            "category": "Cyberpunk"
+          },
+          {
+            "id": "f4caea59091d457684c727517d551f76",
+            "name": "03 - Paul Leonard-Morgan - The Sacred And The Profane",
+            "path": "D:\\Musique\\Cyperpunk 2077\\03 - Paul Leonard-Morgan - The Sacred And The Profane.mp3",
+            "category": "Cyberpunk"
+          },
+          {
+            "id": "b47dcca6d0dc410f99f263d152ed5ab5",
+            "name": "03. The New Order",
+            "path": "D:\\Musique\\Wolfenstein - The New Order\\03. The New Order.mp3",
+            "category": "Cyberpunk"
+          },
+          {
+            "id": "940f9631af3f4179b63e810dece23cda",
+            "name": "04 - P.T. Adamczyk - Kang Tao Down",
+            "path": "D:\\Musique\\Cyperpunk 2077\\04 - P.T. Adamczyk - Kang Tao Down.mp3",
+            "category": "Cyberpunk"
+          },
+          {
+            "id": "0f8211a3ba6a4549a8f3caa7b2d1738f",
+            "name": "04 - Paul Leonard-Morgan - The Streets Are Long-Ass Gutters",
+            "path": "D:\\Musique\\Cyperpunk 2077\\04 - Paul Leonard-Morgan - The Streets Are Long-Ass Gutters.mp3",
+            "category": "Cyberpunk"
+          },
+          {
+            "id": "5f08427c798b4552ab119f25e44a9603",
+            "name": "04. 14 Years",
+            "path": "D:\\Musique\\Wolfenstein - The New Order\\04. 14 Years.mp3",
+            "category": "Cyberpunk"
+          },
+          {
+            "id": "2420b0dc411342eb94b36bbedd890c86",
+            "name": "05 - Marcin Przybylowicz - Cyberwildlife Park",
+            "path": "D:\\Musique\\Cyperpunk 2077\\05 - Marcin Przybylowicz - Cyberwildlife Park.mp3",
+            "category": "Cyberpunk"
+          },
+          {
+            "id": "126c7b757a024627847c6fa9f01cdc95",
+            "name": "05 - P.T. Adamczyk - Outsider No More",
+            "path": "D:\\Musique\\Cyperpunk 2077\\05 - P.T. Adamczyk - Outsider No More.mp3",
+            "category": "Cyberpunk"
+          },
+          {
+            "id": "22cf8660cd3e4bd698ae60eab95eed45",
+            "name": "05. Frau Engel",
+            "path": "D:\\Musique\\Wolfenstein - The New Order\\05. Frau Engel.mp3",
+            "category": "Cyberpunk"
+          },
+          {
+            "id": "4323a8f7f46d4895b26654e5077da355",
+            "name": "06 - Marcin Przybylowicz - Cloudy Day",
+            "path": "D:\\Musique\\Cyperpunk 2077\\06 - Marcin Przybylowicz - Cloudy Day.mp3",
+            "category": "Cyberpunk"
+          },
+          {
+            "id": "a326d5df037c4a74bb12c466be39f125",
+            "name": "06 - Marcin Przybylowicz - Consumer Cathedral",
+            "path": "D:\\Musique\\Cyperpunk 2077\\06 - Marcin Przybylowicz - Consumer Cathedral.mp3",
+            "category": "Cyberpunk"
+          },
+          {
+            "id": "7210c0cefdad4242bff9757bc8b734d0",
+            "name": "06. Papers, Please",
+            "path": "D:\\Musique\\Wolfenstein - The New Order\\06. Papers, Please.mp3",
+            "category": "Cyberpunk"
+          },
+          {
+            "id": "4f776e00f1224191b9afb99d7b2e34a1",
+            "name": "07 - Marcin Przybylowicz - Wushu Dolls",
+            "path": "D:\\Musique\\Cyperpunk 2077\\07 - Marcin Przybylowicz - Wushu Dolls.mp3",
+            "category": "Cyberpunk"
+          },
+          {
+            "id": "8ee978fd3dfe48c2ac640a8f2051e328",
+            "name": "07 - P.T. Adamczyk - Juiced Up",
+            "path": "D:\\Musique\\Cyperpunk 2077\\07 - P.T. Adamczyk - Juiced Up.mp3",
+            "category": "Cyberpunk"
+          },
+          {
+            "id": "99368d08e16747ddad998e86f2d4763e",
+            "name": "07. Kill Everyone",
+            "path": "D:\\Musique\\Wolfenstein - The New Order\\07. Kill Everyone.mp3",
+            "category": "Cyberpunk"
+          },
+          {
+            "id": "e7121b5318c1422aa54d9b7ae6d3d9c2",
+            "name": "08 - P.T. Adamczyk - Scavenger Hunt",
+            "path": "D:\\Musique\\Cyperpunk 2077\\08 - P.T. Adamczyk - Scavenger Hunt.mp3",
+            "category": "Cyberpunk"
+          },
+          {
+            "id": "9ed6ff30e3a64eb996a5fede72b7951b",
+            "name": "08 - Paul Leonard-Morgan - Bells Of Laguna Bend",
+            "path": "D:\\Musique\\Cyperpunk 2077\\08 - Paul Leonard-Morgan - Bells Of Laguna Bend.mp3",
+            "category": "Cyberpunk"
+          },
+          {
+            "id": "39123701286a40109b795fe1ba182ef9",
+            "name": "08. Concrete for Miles",
+            "path": "D:\\Musique\\Wolfenstein - The New Order\\08. Concrete for Miles.mp3",
+            "category": "Cyberpunk"
+          },
+          {
+            "id": "0569567a2398456eb879da10510a800f",
+            "name": "09 - Marcin Przybylowicz - Urban Downunder",
+            "path": "D:\\Musique\\Cyperpunk 2077\\09 - Marcin Przybylowicz - Urban Downunder.mp3",
+            "category": "Cyberpunk"
+          },
+          {
+            "id": "33b102f51adb4f3ab65a0d0d4137f1b0",
+            "name": "09 - P.T. Adamczyk - Мусорщики",
+            "path": "D:\\Musique\\Cyperpunk 2077\\09 - P.T. Adamczyk - Мусорщики.mp3",
+            "category": "Cyberpunk"
+          },
+          {
+            "id": "7623c0cd28d1471b856bf019db0dc7d2",
+            "name": "09. Zellenblock B-2",
+            "path": "D:\\Musique\\Wolfenstein - The New Order\\09. Zellenblock B-2.mp3",
+            "category": "Cyberpunk"
+          },
+          {
+            "id": "5e1580bceb3048259cd731920b751412",
+            "name": "10 - Marcin Przybylowicz - Close Probing",
+            "path": "D:\\Musique\\Cyperpunk 2077\\10 - Marcin Przybylowicz - Close Probing.mp3",
+            "category": "Cyberpunk"
+          },
+          {
+            "id": "1731be41fb864ae79d513c252594dae5",
+            "name": "10 - P.T. Adamczyk - Atlantis",
+            "path": "D:\\Musique\\Cyperpunk 2077\\10 - P.T. Adamczyk - Atlantis.mp3",
+            "category": "Cyberpunk"
+          },
+          {
+            "id": "1f24d2ef7e054f2aab9605079b6c0407",
+            "name": "10. The Kreisau Circle",
+            "path": "D:\\Musique\\Wolfenstein - The New Order\\10. The Kreisau Circle.mp3",
+            "category": "Cyberpunk"
+          },
+          {
+            "id": "822b3bfe97b54d0aac901540edba4b7b",
+            "name": "11 - Marcin Przybylowicz - Cyberninja",
+            "path": "D:\\Musique\\Cyperpunk 2077\\11 - Marcin Przybylowicz - Cyberninja.mp3",
+            "category": "Cyberpunk"
+          },
+          {
+            "id": "b63a893761a9439fb7f9b54f544cce39",
+            "name": "11 - Paul Leonard-Morgan - There_s Gonna Be A Parade!",
+            "path": "D:\\Musique\\Cyperpunk 2077\\11 - Paul Leonard-Morgan - There_s Gonna Be A Parade!.mp3",
+            "category": "Cyberpunk"
+          },
+          {
+            "id": "3d52bf1f52a8459f9cd186a974445f98",
+            "name": "11. London Nautica",
+            "path": "D:\\Musique\\Wolfenstein - The New Order\\11. London Nautica.mp3",
+            "category": "Cyberpunk"
+          },
+          {
+            "id": "2073dbfcd1794568a890e6df96b993ae",
+            "name": "12 - Paul Leonard-Morgan - The Suits Are Scared",
+            "path": "D:\\Musique\\Cyperpunk 2077\\12 - Paul Leonard-Morgan - The Suits Are Scared.mp3",
+            "category": "Cyberpunk"
+          },
+          {
+            "id": "bfd7c0deeca8408eb26da0e5e49747c1",
+            "name": "12 - Paul Leonard-Morgan - Trouble Finds Trouble",
+            "path": "D:\\Musique\\Cyperpunk 2077\\12 - Paul Leonard-Morgan - Trouble Finds Trouble.mp3",
+            "category": "Cyberpunk"
+          },
+          {
+            "id": "81fe68e19eec4a73a8ad8fa8ec5bb33b",
+            "name": "12. Konzentrationslager",
+            "path": "D:\\Musique\\Wolfenstein - The New Order\\12. Konzentrationslager.mp3",
+            "category": "Cyberpunk"
+          },
+          {
+            "id": "bee484b34ac942079a40dbd9d87f2819",
+            "name": "13 - P.T. Adamczyk - You Shall Never Have To Forgive Me Again",
+            "path": "D:\\Musique\\Cyperpunk 2077\\13 - P.T. Adamczyk - You Shall Never Have To Forgive Me Again.mp3",
+            "category": "Cyberpunk"
+          },
+          {
+            "id": "aafe6177093848f78a0abb764237a742",
+            "name": "13 - Paul Leonard-Morgan - Tower Lockdown",
+            "path": "D:\\Musique\\Cyperpunk 2077\\13 - Paul Leonard-Morgan - Tower Lockdown.mp3",
+            "category": "Cyberpunk"
+          },
+          {
+            "id": "ce3e5b8147304660afdbf9125272a260",
+            "name": "13. Herr Faust",
+            "path": "D:\\Musique\\Wolfenstein - The New Order\\13. Herr Faust.mp3",
+            "category": "Cyberpunk"
+          },
+          {
+            "id": "1adce2067bf142eb97450228153b0dfb",
+            "name": "14 - P.T. Adamczyk - Code Red Initiated",
+            "path": "D:\\Musique\\Cyperpunk 2077\\14 - P.T. Adamczyk - Code Red Initiated.mp3",
+            "category": "Cyberpunk"
+          },
+          {
+            "id": "ce576c101e764e1f9d3d511a9c8c8ebb",
+            "name": "14 - P.T. Adamczyk - To Hell and Back",
+            "path": "D:\\Musique\\Cyperpunk 2077\\14 - P.T. Adamczyk - To Hell and Back.mp3",
+            "category": "Cyberpunk"
+          },
+          {
+            "id": "04fb264593b1474b9025a4cb335d1705",
+            "name": "14. Der Mond",
+            "path": "D:\\Musique\\Wolfenstein - The New Order\\14. Der Mond.mp3",
+            "category": "Cyberpunk"
+          },
+          {
+            "id": "ddb348d9b0dd45ac9b9e76926decfd85",
+            "name": "15 - P.T. Adamczyk - The Heist",
+            "path": "D:\\Musique\\Cyperpunk 2077\\15 - P.T. Adamczyk - The Heist.mp3",
+            "category": "Cyberpunk"
+          },
+          {
+            "id": "b7e1ba123ee74ef8831c51078a9e81d5",
+            "name": "15 - Paul Leonard-Morgan - Adam Smasher",
+            "path": "D:\\Musique\\Cyperpunk 2077\\15 - Paul Leonard-Morgan - Adam Smasher.mp3",
+            "category": "Cyberpunk"
+          },
+          {
+            "id": "ab49a4bc32ce4859b04897259aef7a73",
+            "name": "15. Kybernetik",
+            "path": "D:\\Musique\\Wolfenstein - The New Order\\15. Kybernetik.mp3",
+            "category": "Cyberpunk"
+          },
+          {
+            "id": "1b7e600885b140419fe8eb512d25512c",
+            "name": "16 - Marcin Przybylowicz - Streetfighters",
+            "path": "D:\\Musique\\Cyperpunk 2077\\16 - Marcin Przybylowicz - Streetfighters.mp3",
+            "category": "Cyberpunk"
+          },
+          {
+            "id": "f360bfd965f74cf3a8375026e839d1f2",
+            "name": "16 - Paul Leonard-Morgan - Hanako _ Yorinobu",
+            "path": "D:\\Musique\\Cyperpunk 2077\\16 - Paul Leonard-Morgan - Hanako _ Yorinobu.mp3",
+            "category": "Cyberpunk"
+          },
+          {
+            "id": "c2fa85fe80a24a40aeaa88b9db3bcbae",
+            "name": "16. Ransacked",
+            "path": "D:\\Musique\\Wolfenstein - The New Order\\16. Ransacked.mp3",
+            "category": "Cyberpunk"
+          },
+          {
+            "id": "9eb9346c82304f9cb1e7f1d975e72c3c",
+            "name": "17 - Marcin Przybylowicz - Been Good To Know Ya",
+            "path": "D:\\Musique\\Cyperpunk 2077\\17 - Marcin Przybylowicz - Been Good To Know Ya.mp3",
+            "category": "Cyberpunk"
+          },
+          {
+            "id": "7e0e4f2bda4e49798c1c0e5f98a4b18c",
+            "name": "17 - Marcin Przybylowicz - Patri(di)ots",
+            "path": "D:\\Musique\\Cyperpunk 2077\\17 - Marcin Przybylowicz - Patri(di)ots.mp3",
+            "category": "Cyberpunk"
+          },
+          {
+            "id": "08535950c1304ed5ba725b466bd8b99b",
+            "name": "17. Prototype",
+            "path": "D:\\Musique\\Wolfenstein - The New Order\\17. Prototype.mp3",
+            "category": "Cyberpunk"
+          },
+          {
+            "id": "dc0bec8adc484dadbeb8ba8f459303af",
+            "name": "18 - P.T. Adamczyk - Never Fade Away (SAMURAI Cover) - feat. Olga Jankowska",
+            "path": "D:\\Musique\\Cyperpunk 2077\\18 - P.T. Adamczyk - Never Fade Away (SAMURAI Cover) - feat. Olga Jankowska.mp3",
+            "category": "Cyberpunk"
+          },
+          {
+            "id": "3e6eb7f934f4410281b7d43b803cb829",
+            "name": "18 - Paul Leonard-Morgan - Mining Minds",
+            "path": "D:\\Musique\\Cyperpunk 2077\\18 - Paul Leonard-Morgan - Mining Minds.mp3",
+            "category": "Cyberpunk"
+          },
+          {
+            "id": "4f904aba7e844d4f840bfcfad88d7b06",
+            "name": "18. Ende",
+            "path": "D:\\Musique\\Wolfenstein - The New Order\\18. Ende.mp3",
+            "category": "Cyberpunk"
+          },
+          {
+            "id": "4dc4a61f3af84b13b825a62468998499",
+            "name": "19 - P.T. Adamczyk - Rite Of Passage",
+            "path": "D:\\Musique\\Cyperpunk 2077\\19 - P.T. Adamczyk - Rite Of Passage.mp3",
+            "category": "Cyberpunk"
+          }
+        ],
+        "directories": [
+          "D:\\Musique\\Cyperpunk 2077",
+          "D:\\Musique\\Wolfenstein - The New Order"
+        ]
+      },
+      "Dresden": {
+        "tracks": [
+          {
+            "id": "1f7270ac602548e18620aa7002f61466",
+            "name": "00 (Intro) A Kiss To Build A Dream On",
+            "path": "D:\\Musique\\Fallout\\Fallout 3\\00 (Intro) A Kiss To Build A Dream On.mp3",
+            "category": "Dresden"
+          },
+          {
+            "id": "092996b58def400b8cd2ab152e0f16fb",
+            "name": "01 Fallout 4 Main Theme",
+            "path": "D:\\Musique\\Fallout\\Fallout 4\\01 Fallout 4 Main Theme.mp3",
+            "category": "Dresden"
+          },
+          {
+            "id": "8edfb8ac593246bbac75982d0c2058c1",
+            "name": "01 Maybe",
+            "path": "D:\\Musique\\Fallout\\Fallout\\01 Maybe.mp3",
+            "category": "Dresden"
+          },
+          {
+            "id": "3dec9a1b6395442c8456ce91693c30e7",
+            "name": "01 Trader's Life",
+            "path": "D:\\Musique\\Fallout\\Fallout 3\\01 Trader's Life.mp3",
+            "category": "Dresden"
+          },
+          {
+            "id": "9c9e3f20aa9d41d78d07c746dd31833a",
+            "name": "02 Moribund World",
+            "path": "D:\\Musique\\Fallout\\Fallout 3\\02 Moribund World.mp3",
+            "category": "Dresden"
+          },
+          {
+            "id": "b1cf883f1aa04770993066ac36f43ef8",
+            "name": "02 The Commonwealth",
+            "path": "D:\\Musique\\Fallout\\Fallout 4\\02 The Commonwealth.mp3",
+            "category": "Dresden"
+          },
+          {
+            "id": "cf3b39fdc2c345fcaa06b61e9a2ec1dd",
+            "name": "02 Vault 13",
+            "path": "D:\\Musique\\Fallout\\Fallout\\02 Vault 13.mp3",
+            "category": "Dresden"
+          },
+          {
+            "id": "46a0b9d1ba7b409086b53ab3bb2129cb",
+            "name": "03 Khans Of New California",
+            "path": "D:\\Musique\\Fallout\\Fallout 3\\03 Khans Of New California.mp3",
+            "category": "Dresden"
+          },
+          {
+            "id": "5bfc8b4ac3c74fec9f1fbf9b1ec483c6",
+            "name": "03 Of Green and Grey",
+            "path": "D:\\Musique\\Fallout\\Fallout 4\\03 Of Green and Grey.mp3",
+            "category": "Dresden"
+          },
+          {
+            "id": "65949c2deab4477f87884723d1256991",
+            "name": "03 World Map",
+            "path": "D:\\Musique\\Fallout\\Fallout\\03 World Map.mp3",
+            "category": "Dresden"
+          },
+          {
+            "id": "60b7459657c84c499c6f4ee3bb41bfcf",
+            "name": "04 Desert Wind",
+            "path": "D:\\Musique\\Fallout\\Fallout 3\\04 Desert Wind.mp3",
+            "category": "Dresden"
+          },
+          {
+            "id": "3d3b830c33de48139b7f2b5353b35937",
+            "name": "04 Portal to the Past",
+            "path": "D:\\Musique\\Fallout\\Fallout 4\\04 Portal to the Past.mp3",
+            "category": "Dresden"
+          },
+          {
+            "id": "60eccba8e9714c07b8eb862be01d317c",
+            "name": "04 Shady Sands",
+            "path": "D:\\Musique\\Fallout\\Fallout\\04 Shady Sands.mp3",
+            "category": "Dresden"
+          },
+          {
+            "id": "a401ca94faa24d84ac15beed25ac2aac",
+            "name": "05 Caverns",
+            "path": "D:\\Musique\\Fallout\\Fallout\\05 Caverns.mp3",
+            "category": "Dresden"
+          },
+          {
+            "id": "b7abb721716a4ac0b12e4f7c58b8122d",
+            "name": "05 Vats Of Goo",
+            "path": "D:\\Musique\\Fallout\\Fallout 3\\05 Vats Of Goo.mp3",
+            "category": "Dresden"
+          },
+          {
+            "id": "3f7d2885dc814263a0f04311e998ee65",
+            "name": "06 City Of Lost Angels",
+            "path": "D:\\Musique\\Fallout\\Fallout 3\\06 City Of Lost Angels.mp3",
+            "category": "Dresden"
+          },
+          {
+            "id": "33c8043cecd74994b5cab407ced16cfc",
+            "name": "06 Combat Ready",
+            "path": "D:\\Musique\\Fallout\\Fallout 4\\06 Combat Ready.mp3",
+            "category": "Dresden"
+          },
+          {
+            "id": "b1448bfcc02a44b1acd36970ea3a0c58",
+            "name": "06 Combat Ready (1)",
+            "path": "D:\\Musique\\Fallout\\Fallout 4\\06 Combat Ready (1).mp3",
+            "category": "Dresden"
+          },
+          {
+            "id": "1364ae2ead29429c9eeb3520c105f718",
+            "name": "06 Raiders",
+            "path": "D:\\Musique\\Fallout\\Fallout\\06 Raiders.mp3",
+            "category": "Dresden"
+          },
+          {
+            "id": "a4c9b17442ec4f45a362bcfb5a1a86fa",
+            "name": "07 Deeper and Darker",
+            "path": "D:\\Musique\\Fallout\\Fallout 4\\07 Deeper and Darker.mp3",
+            "category": "Dresden"
+          },
+          {
+            "id": "f7e91b12e0df4ff5b2cb401788186950",
+            "name": "07 Industrial Junk",
+            "path": "D:\\Musique\\Fallout\\Fallout 3\\07 Industrial Junk.mp3",
+            "category": "Dresden"
+          },
+          {
+            "id": "c4fee2249f1d4946a92ecf7b931ef005",
+            "name": "07 Junktown",
+            "path": "D:\\Musique\\Fallout\\Fallout\\07 Junktown.mp3",
+            "category": "Dresden"
+          },
+          {
+            "id": "b8397fb7097c4b499fb633f9bf683c82",
+            "name": "08 The Hub",
+            "path": "D:\\Musique\\Fallout\\Fallout\\08 The Hub.mp3",
+            "category": "Dresden"
+          },
+          {
+            "id": "5d1c12f464e9422fa6079e0d451b14bc",
+            "name": "08 Underground Troubles",
+            "path": "D:\\Musique\\Fallout\\Fallout 3\\08 Underground Troubles.mp3",
+            "category": "Dresden"
+          },
+          {
+            "id": "de286cb92ec34f2299aece4d81355d5e",
+            "name": "08 Wandering - The Blasted Forest, P",
+            "path": "D:\\Musique\\Fallout\\Fallout 4\\08 Wandering - The Blasted Forest, P.mp3",
+            "category": "Dresden"
+          },
+          {
+            "id": "11c14261d53146e6b791fca5ed7f600e",
+            "name": "09 Brightness Calling",
+            "path": "D:\\Musique\\Fallout\\Fallout 4\\09 Brightness Calling.mp3",
+            "category": "Dresden"
+          },
+          {
+            "id": "f042bc722bbf46e1b9871707f89da10e",
+            "name": "09 City Of The Dead",
+            "path": "D:\\Musique\\Fallout\\Fallout 3\\09 City Of The Dead.mp3",
+            "category": "Dresden"
+          },
+          {
+            "id": "25c65646d26d4989892f7a616f5fa184",
+            "name": "09 City of the Dead",
+            "path": "D:\\Musique\\Fallout\\Fallout\\09 City of the Dead.mp3",
+            "category": "Dresden"
+          },
+          {
+            "id": "dc6e7b869e6e4a3983e2e00655fe4481",
+            "name": "1. Into The Badlands Theme",
+            "path": "D:\\Musique\\Into The Badlands\\1. Into The Badlands Theme.mp3",
+            "category": "Dresden"
+          },
+          {
+            "id": "48532ae4c7504ef68448055e68b6e6ab",
+            "name": "10 Follower's Credo",
+            "path": "D:\\Musique\\Fallout\\Fallout 3\\10 Follower's Credo.mp3",
+            "category": "Dresden"
+          },
+          {
+            "id": "cfa698ebc4674756b253084026d3148c",
+            "name": "10 L.A. Boneyard",
+            "path": "D:\\Musique\\Fallout\\Fallout\\10 L.A. Boneyard.mp3",
+            "category": "Dresden"
+          },
+          {
+            "id": "49db63b051fc4dfa911e7403acf0cbfe",
+            "name": "10 Of the People, for the People",
+            "path": "D:\\Musique\\Fallout\\Fallout 4\\10 Of the People, for the People.mp3",
+            "category": "Dresden"
+          },
+          {
+            "id": "1a2cf89875414427b43a3e6b8b781903",
+            "name": "10. Ride To The River King",
+            "path": "D:\\Musique\\Into The Badlands\\10. Ride To The River King.mp3",
+            "category": "Dresden"
+          },
+          {
+            "id": "943bbcf6f3c046f9ab20b3e285e7a078",
+            "name": "11 Beyond The Canyon",
+            "path": "D:\\Musique\\Fallout\\Fallout 3\\11 Beyond The Canyon.mp3",
+            "category": "Dresden"
+          },
+          {
+            "id": "b047e6a5efcd4cb8bfea788efd818bff",
+            "name": "11 Hope Remains",
+            "path": "D:\\Musique\\Fallout\\Fallout 4\\11 Hope Remains.mp3",
+            "category": "Dresden"
+          },
+          {
+            "id": "8b68b01c2b0b47a2be13b6898a53e654",
+            "name": "11 The Brotherhood of Steel",
+            "path": "D:\\Musique\\Fallout\\Fallout\\11 The Brotherhood of Steel.mp3",
+            "category": "Dresden"
+          },
+          {
+            "id": "fc96fd3fe5394c41a52c78a6f96c0e85",
+            "name": "11. Prelude To A Fight",
+            "path": "D:\\Musique\\Into The Badlands\\11. Prelude To A Fight.mp3",
+            "category": "Dresden"
+          },
+          {
+            "id": "83595f713a7743cea3d7e0e93df594c5",
+            "name": "12 Dream Town",
+            "path": "D:\\Musique\\Fallout\\Fallout 3\\12 Dream Town.mp3",
+            "category": "Dresden"
+          },
+          {
+            "id": "8320e01af0f5433c86c0595d47834f9f",
+            "name": "12 The Glow",
+            "path": "D:\\Musique\\Fallout\\Fallout\\12 The Glow.mp3",
+            "category": "Dresden"
+          },
+          {
+            "id": "e7f387d13da54080a03e035f7d3ceec5",
+            "name": "12 Wandering - The Blasted Forest, P",
+            "path": "D:\\Musique\\Fallout\\Fallout 4\\12 Wandering - The Blasted Forest, P.mp3",
+            "category": "Dresden"
+          },
+          {
+            "id": "e1943ba60552494c9491e9a9b74d70fa",
+            "name": "12. Sunny Sets MK Free",
+            "path": "D:\\Musique\\Into The Badlands\\12. Sunny Sets MK Free.mp3",
+            "category": "Dresden"
+          },
+          {
+            "id": "437fb101ab52421d9c4fb26c26e287e3",
+            "name": "13 Biggest Little City In The World",
+            "path": "D:\\Musique\\Fallout\\Fallout 3\\13 Biggest Little City In The World.mp3",
+            "category": "Dresden"
+          },
+          {
+            "id": "34eff6fc8fd04190ad605bb44e7a7708",
+            "name": "13 Desert",
+            "path": "D:\\Musique\\Fallout\\Fallout\\13 Desert.mp3",
+            "category": "Dresden"
+          },
+          {
+            "id": "86e81485982c4877a8e9701316c380c4",
+            "name": "13 Predator and Prey",
+            "path": "D:\\Musique\\Fallout\\Fallout 4\\13 Predator and Prey.mp3",
+            "category": "Dresden"
+          },
+          {
+            "id": "5ae1e0ecc85240518ce8427cfa92efc4",
+            "name": "13. Arrival At The Abbots",
+            "path": "D:\\Musique\\Into The Badlands\\13. Arrival At The Abbots.mp3",
+            "category": "Dresden"
+          },
+          {
+            "id": "72e18d35432846fd8772a341a6188076",
+            "name": "14 Children of the Cathedral",
+            "path": "D:\\Musique\\Fallout\\Fallout\\14 Children of the Cathedral.mp3",
+            "category": "Dresden"
+          },
+          {
+            "id": "4a01651429a54f6daf6e032565044d30",
+            "name": "14 My Chrysalis Highwayman",
+            "path": "D:\\Musique\\Fallout\\Fallout 3\\14 My Chrysalis Highwayman.mp3",
+            "category": "Dresden"
+          },
+          {
+            "id": "b21188594a034479a2f93a14c07e90fa",
+            "name": "14 War in the Wastes",
+            "path": "D:\\Musique\\Fallout\\Fallout 4\\14 War in the Wastes.mp3",
+            "category": "Dresden"
+          },
+          {
+            "id": "93ea825251084babb757c8cdea867598",
+            "name": "14. Attack At Widow's House",
+            "path": "D:\\Musique\\Into The Badlands\\14. Attack At Widow's House.mp3",
+            "category": "Dresden"
+          },
+          {
+            "id": "7d6be251104f406ab41a6c23948bfd45",
+            "name": "15 Followers of the Apocalypse",
+            "path": "D:\\Musique\\Fallout\\Fallout\\15 Followers of the Apocalypse.mp3",
+            "category": "Dresden"
+          },
+          {
+            "id": "5e60a1b7e9e1499da2eaa3a6755203a6",
+            "name": "15 Many Contrasts",
+            "path": "D:\\Musique\\Fallout\\Fallout 3\\15 Many Contrasts.mp3",
+            "category": "Dresden"
+          },
+          {
+            "id": "775d2e018d2c42fc914633271504f984",
+            "name": "15 Time to Die",
+            "path": "D:\\Musique\\Fallout\\Fallout 4\\15 Time to Die.mp3",
+            "category": "Dresden"
+          },
+          {
+            "id": "0c9bc07a16a643deb89bd1122a637dc2",
+            "name": "15. Lydia Returns Home",
+            "path": "D:\\Musique\\Into The Badlands\\15. Lydia Returns Home.mp3",
+            "category": "Dresden"
+          },
+          {
+            "id": "29c8be0e2901445e90d105943b126476",
+            "name": "16 All-Clear Signal",
+            "path": "D:\\Musique\\Fallout\\Fallout 3\\16 All-Clear Signal.mp3",
+            "category": "Dresden"
+          },
+          {
+            "id": "f0e0c3c52ea1498b852882d48ba25d33",
+            "name": "16 The Master",
+            "path": "D:\\Musique\\Fallout\\Fallout\\16 The Master.mp3",
+            "category": "Dresden"
+          },
+          {
+            "id": "505cd9cb8a0f43958d752cf843a3c5ed",
+            "name": "16 Uninvited",
+            "path": "D:\\Musique\\Fallout\\Fallout 4\\16 Uninvited.mp3",
+            "category": "Dresden"
+          },
+          {
+            "id": "eedec39d0e7e485c9258ae7c4848b895",
+            "name": "16. Lydia Is Inducted",
+            "path": "D:\\Musique\\Into The Badlands\\16. Lydia Is Inducted.mp3",
+            "category": "Dresden"
+          },
+          {
+            "id": "8accaa036a61405189709642a6db05b1",
+            "name": "17 California Revisited",
+            "path": "D:\\Musique\\Fallout\\Fallout 3\\17 California Revisited.mp3",
+            "category": "Dresden"
+          },
+          {
+            "id": "bc761093e9ce4be6a3dacb2feb703d7c",
+            "name": "17 The Vats",
+            "path": "D:\\Musique\\Fallout\\Fallout\\17 The Vats.mp3",
+            "category": "Dresden"
+          },
+          {
+            "id": "c2c37edecaec43cf91938b86929c2de7",
+            "name": "17 Wandering - The City, Pt. 1",
+            "path": "D:\\Musique\\Fallout\\Fallout 4\\17 Wandering - The City, Pt. 1.mp3",
+            "category": "Dresden"
+          },
+          {
+            "id": "ffc02a55165b4f3d8395ebd241572ada",
+            "name": "17. MK And Tilda",
+            "path": "D:\\Musique\\Into The Badlands\\17. MK And Tilda.mp3",
+            "category": "Dresden"
+          },
+          {
+            "id": "57f1b88c3dae47a9aa78953fa589e196",
+            "name": "18 Gold Slouch",
+            "path": "D:\\Musique\\Fallout\\Fallout 3\\18 Gold Slouch.mp3",
+            "category": "Dresden"
+          },
+          {
+            "id": "5ffe66767b4849cb9d51a73c7f8a8663",
+            "name": "18 Rebuild, Renew",
+            "path": "D:\\Musique\\Fallout\\Fallout 4\\18 Rebuild, Renew.mp3",
+            "category": "Dresden"
+          },
+          {
+            "id": "606403484e0e4697bdde0ee0aac1c3a7",
+            "name": "18. Veil Treats Quinn",
+            "path": "D:\\Musique\\Into The Badlands\\18. Veil Treats Quinn.mp3",
+            "category": "Dresden"
+          },
+          {
+            "id": "fe56ff390ae2471c9a13c34542aa49e7",
+            "name": "19 Concrete Mysteries",
+            "path": "D:\\Musique\\Fallout\\Fallout 4\\19 Concrete Mysteries.mp3",
+            "category": "Dresden"
+          },
+          {
+            "id": "c45c34e4fc1840b183a15e57694a407e",
+            "name": "19. Quinn Clips Dr. And Hannah",
+            "path": "D:\\Musique\\Into The Badlands\\19. Quinn Clips Dr. And Hannah.mp3",
+            "category": "Dresden"
+          },
+          {
+            "id": "159e0b92a73142fe97dcc51c2f895013",
+            "name": "2. The Greatest Clipper In The Badlands",
+            "path": "D:\\Musique\\Into The Badlands\\2. The Greatest Clipper In The Badlands.mp3",
+            "category": "Dresden"
+          },
+          {
+            "id": "c78d260fdbb9409baeefaebc7cad79c3",
+            "name": "20 Tread Carefully",
+            "path": "D:\\Musique\\Fallout\\Fallout 4\\20 Tread Carefully.mp3",
+            "category": "Dresden"
+          },
+          {
+            "id": "99747bdfb72f4d2f9e48e80de52da42b",
+            "name": "20. Widow Ambushes Jeep",
+            "path": "D:\\Musique\\Into The Badlands\\20. Widow Ambushes Jeep.mp3",
+            "category": "Dresden"
+          },
+          {
+            "id": "844eec78e81b4be19280a5e9df63aa85",
+            "name": "21 The Infiltrator",
+            "path": "D:\\Musique\\Fallout\\Fallout 4\\21 The Infiltrator.mp3",
+            "category": "Dresden"
+          },
+          {
+            "id": "19e116f97aa0430fbcd32085afe79ed0",
+            "name": "21. The Graveyard Fight",
+            "path": "D:\\Musique\\Into The Badlands\\21. The Graveyard Fight.mp3",
+            "category": "Dresden"
+          },
+          {
+            "id": "b4fc0efee15d491cb32d775bae1d5ccc",
+            "name": "22 No Quarter",
+            "path": "D:\\Musique\\Fallout\\Fallout 4\\22 No Quarter.mp3",
+            "category": "Dresden"
+          },
+          {
+            "id": "5aa247db76df40fe9f8efba1c18e8eca",
+            "name": "22. Sunny And MK Make A Deal",
+            "path": "D:\\Musique\\Into The Badlands\\22. Sunny And MK Make A Deal.mp3",
+            "category": "Dresden"
+          },
+          {
+            "id": "cf3e79109411438194dce6e083fb5a5a",
+            "name": "23 Wandering - The City, Pt. 2",
+            "path": "D:\\Musique\\Fallout\\Fallout 4\\23 Wandering - The City, Pt. 2.mp3",
+            "category": "Dresden"
+          },
+          {
+            "id": "63be8fd667c3436793b5336b4882dc34",
+            "name": "23. MK Runs",
+            "path": "D:\\Musique\\Into The Badlands\\23. MK Runs.mp3",
+            "category": "Dresden"
+          },
+          {
+            "id": "77c7ab000a3c41d7980c52adb81c9497",
+            "name": "24 The Vigilant",
+            "path": "D:\\Musique\\Fallout\\Fallout 4\\24 The Vigilant.mp3",
+            "category": "Dresden"
+          },
+          {
+            "id": "574ae077923247e3839ca7e11a49a400",
+            "name": "24. River King Deal",
+            "path": "D:\\Musique\\Into The Badlands\\24. River King Deal.mp3",
+            "category": "Dresden"
+          },
+          {
+            "id": "497dd7268c51427cb67e1f1d7d589f6d",
+            "name": "25 The Warlord",
+            "path": "D:\\Musique\\Fallout\\Fallout 4\\25 The Warlord.mp3",
+            "category": "Dresden"
+          },
+          {
+            "id": "fd9a89aced8e4d1a9e4bd155f6d31b8e",
+            "name": "25. Cogs Are Dead",
+            "path": "D:\\Musique\\Into The Badlands\\25. Cogs Are Dead.mp3",
+            "category": "Dresden"
+          },
+          {
+            "id": "665e4827ff704d959b51900ec4872699",
+            "name": "26 Red Brick, Broken",
+            "path": "D:\\Musique\\Fallout\\Fallout 4\\26 Red Brick, Broken.mp3",
+            "category": "Dresden"
+          },
+          {
+            "id": "8f9533372cf0456abbc4d78588913b12",
+            "name": "26. The Journey Has Just Begun",
+            "path": "D:\\Musique\\Into The Badlands\\26. The Journey Has Just Begun.mp3",
+            "category": "Dresden"
+          },
+          {
+            "id": "a5243f5cd82440858a6924df06d66886",
+            "name": "27 Lonely Walls",
+            "path": "D:\\Musique\\Fallout\\Fallout 4\\27 Lonely Walls.mp3",
+            "category": "Dresden"
+          },
+          {
+            "id": "ba4a4e56bb774f16a0bcfa3a21eeea94",
+            "name": "28 Wandering - The City, Pt. 3",
+            "path": "D:\\Musique\\Fallout\\Fallout 4\\28 Wandering - The City, Pt. 3.mp3",
+            "category": "Dresden"
+          },
+          {
+            "id": "ce2dbf60ac0044e1b937148516e1d05c",
+            "name": "29 Regrouped, Reloaded",
+            "path": "D:\\Musique\\Fallout\\Fallout 4\\29 Regrouped, Reloaded.mp3",
+            "category": "Dresden"
+          },
+          {
+            "id": "67d2a1b17cba45c6b91b4adcf189a5ab",
+            "name": "3. Training On The Fort",
+            "path": "D:\\Musique\\Into The Badlands\\3. Training On The Fort.mp3",
+            "category": "Dresden"
+          },
+          {
+            "id": "9050095107fa478aa16a9ab3fc832d0f",
+            "name": "30 V.A.T.S. or Die",
+            "path": "D:\\Musique\\Fallout\\Fallout 4\\30 V.A.T.S. or Die.mp3",
+            "category": "Dresden"
+          },
+          {
+            "id": "3ff776056bb1438c9fa4909a533d54a5",
+            "name": "31 Wandering - The Foothills, Pt. 1",
+            "path": "D:\\Musique\\Fallout\\Fallout 4\\31 Wandering - The Foothills, Pt. 1.mp3",
+            "category": "Dresden"
+          },
+          {
+            "id": "e6a33fb65be54ba181128c3812b239e8",
+            "name": "32 Darkness Falls",
+            "path": "D:\\Musique\\Fallout\\Fallout 4\\32 Darkness Falls.mp3",
+            "category": "Dresden"
+          },
+          {
+            "id": "4e91c72c7f784f86be90882e711e1c1e",
+            "name": "33 War of Wills",
+            "path": "D:\\Musique\\Fallout\\Fallout 4\\33 War of Wills.mp3",
+            "category": "Dresden"
+          },
+          {
+            "id": "97c5c28a78b64c7794e450c5fc386b69",
+            "name": "34 Wandering - The Foothills, Pt. 2",
+            "path": "D:\\Musique\\Fallout\\Fallout 4\\34 Wandering - The Foothills, Pt. 2.mp3",
+            "category": "Dresden"
+          },
+          {
+            "id": "55820a7e2cc94210a1ef575bba7cbc59",
+            "name": "35 Only One Survives",
+            "path": "D:\\Musique\\Fallout\\Fallout 4\\35 Only One Survives.mp3",
+            "category": "Dresden"
+          },
+          {
+            "id": "527f74f463724f0684a2640bfcdb5e1b",
+            "name": "36 A Critical Chance",
+            "path": "D:\\Musique\\Fallout\\Fallout 4\\36 A Critical Chance.mp3",
+            "category": "Dresden"
+          },
+          {
+            "id": "7e20ccfe2d6b4cb08f39ed6bf4297052",
+            "name": "37 Dust & Danger",
+            "path": "D:\\Musique\\Fallout\\Fallout 4\\37 Dust & Danger.mp3",
+            "category": "Dresden"
+          },
+          {
+            "id": "77449580789846cebb887d11c4be7329",
+            "name": "38 Liberty Lives",
+            "path": "D:\\Musique\\Fallout\\Fallout 4\\38 Liberty Lives.mp3",
+            "category": "Dresden"
+          },
+          {
+            "id": "565e8c4dd608484284fc6f939202b6cc",
+            "name": "39 Lost Boston",
+            "path": "D:\\Musique\\Fallout\\Fallout 4\\39 Lost Boston.mp3",
+            "category": "Dresden"
+          },
+          {
+            "id": "01cd72eac2a946b1a3f3dcc4ed11c4f8",
+            "name": "4. Quinn Addresses The Boys",
+            "path": "D:\\Musique\\Into The Badlands\\4. Quinn Addresses The Boys.mp3",
+            "category": "Dresden"
+          },
+          {
+            "id": "b286920d395b4194ab6495002b8767cf",
+            "name": "40 Wandering- The Foothills, Pt. 3",
+            "path": "D:\\Musique\\Fallout\\Fallout 4\\40 Wandering- The Foothills, Pt. 3.mp3",
+            "category": "Dresden"
+          },
+          {
+            "id": "55d9001aac6e43b9bcc7e097aeeceb67",
+            "name": "41 Honor & Steel",
+            "path": "D:\\Musique\\Fallout\\Fallout 4\\41 Honor & Steel.mp3",
+            "category": "Dresden"
+          },
+          {
+            "id": "f25e06a6263c461aa3676eb93a46f3e9",
+            "name": "42 We Are Unstoppable",
+            "path": "D:\\Musique\\Fallout\\Fallout 4\\42 We Are Unstoppable.mp3",
+            "category": "Dresden"
+          },
+          {
+            "id": "053b76018b4d4e18b727e391a5416353",
+            "name": "43 Dominant Species",
+            "path": "D:\\Musique\\Fallout\\Fallout 4\\43 Dominant Species.mp3",
+            "category": "Dresden"
+          },
+          {
+            "id": "97da5e050306452ab44ce12ab38da3cf",
+            "name": "44 Explore and Discover",
+            "path": "D:\\Musique\\Fallout\\Fallout 4\\44 Explore and Discover.mp3",
+            "category": "Dresden"
+          },
+          {
+            "id": "e451816dbaa248b5a6e6357334a46b26",
+            "name": "45 Wandering - The Glowing Sea, Pt.",
+            "path": "D:\\Musique\\Fallout\\Fallout 4\\45 Wandering - The Glowing Sea, Pt..mp3",
+            "category": "Dresden"
+          },
+          {
+            "id": "f443577fa67b46a3b6b116ea7a6f421c",
+            "name": "46 The Stars My Solace",
+            "path": "D:\\Musique\\Fallout\\Fallout 4\\46 The Stars My Solace.mp3",
+            "category": "Dresden"
+          },
+          {
+            "id": "b2d70e6ad9814e2bbc7a74755b8e36f7",
+            "name": "47 Imagine Utopia",
+            "path": "D:\\Musique\\Fallout\\Fallout 4\\47 Imagine Utopia.mp3",
+            "category": "Dresden"
+          },
+          {
+            "id": "7e22d78b43804069b914f74fa76b1c63",
+            "name": "48 Lone Wandering",
+            "path": "D:\\Musique\\Fallout\\Fallout 4\\48 Lone Wandering.mp3",
+            "category": "Dresden"
+          },
+          {
+            "id": "b2075bc7e69447949c254e617d1d3906",
+            "name": "49 Wandering - The Glowing Sea, Pt.",
+            "path": "D:\\Musique\\Fallout\\Fallout 4\\49 Wandering - The Glowing Sea, Pt..mp3",
+            "category": "Dresden"
+          },
+          {
+            "id": "48f69ebdf9b44d3d88e1223052c8d9a3",
+            "name": "5. Sunny Searches His Soul",
+            "path": "D:\\Musique\\Into The Badlands\\5. Sunny Searches His Soul.mp3",
+            "category": "Dresden"
+          },
+          {
+            "id": "31f33f67a2e84acaaed06362071758e1",
+            "name": "54 Humanity's Hope",
+            "path": "D:\\Musique\\Fallout\\Fallout 4\\54 Humanity's Hope.mp3",
+            "category": "Dresden"
+          },
+          {
+            "id": "d6dc332989144822a3f29ea062acbfa5",
+            "name": "55 Endless Ocean, Endless Dreams",
+            "path": "D:\\Musique\\Fallout\\Fallout 4\\55 Endless Ocean, Endless Dreams.mp3",
+            "category": "Dresden"
+          },
+          {
+            "id": "07ea4d82132149ce9de512247e1976d7",
+            "name": "56 No Voices, No Cries",
+            "path": "D:\\Musique\\Fallout\\Fallout 4\\56 No Voices, No Cries.mp3",
+            "category": "Dresden"
+          },
+          {
+            "id": "4ac81e3109f1409db92af03293d06c38",
+            "name": "57 Wandering - The Coast, Pt. 2",
+            "path": "D:\\Musique\\Fallout\\Fallout 4\\57 Wandering - The Coast, Pt. 2.mp3",
+            "category": "Dresden"
+          },
+          {
+            "id": "228cc9e5ecd64439b809c015899def7f",
+            "name": "58 Covert Action",
+            "path": "D:\\Musique\\Fallout\\Fallout 4\\58 Covert Action.mp3",
+            "category": "Dresden"
+          },
+          {
+            "id": "ab9c063c719d4511a0c7bc7742db2c2d",
+            "name": "59 Rise and Prevail",
+            "path": "D:\\Musique\\Fallout\\Fallout 4\\59 Rise and Prevail.mp3",
+            "category": "Dresden"
+          },
+          {
+            "id": "fce5f19bcb1d464e80e63deb52b158c8",
+            "name": "6. Arrival At The Fort",
+            "path": "D:\\Musique\\Into The Badlands\\6. Arrival At The Fort.mp3",
+            "category": "Dresden"
+          },
+          {
+            "id": "b65fed2ba75a427abd7917c4c935b430",
+            "name": "60 No More Sails",
+            "path": "D:\\Musique\\Fallout\\Fallout 4\\60 No More Sails.mp3",
+            "category": "Dresden"
+          },
+          {
+            "id": "f91c96e5bc854fc2978260536eff3c7e",
+            "name": "61 Wandering - The Coast, Pt. 3",
+            "path": "D:\\Musique\\Fallout\\Fallout 4\\61 Wandering - The Coast, Pt. 3.mp3",
+            "category": "Dresden"
+          },
+          {
+            "id": "810697da682b47218f636267447c734f",
+            "name": "62 In This Together",
+            "path": "D:\\Musique\\Fallout\\Fallout 4\\62 In This Together.mp3",
+            "category": "Dresden"
+          },
+          {
+            "id": "d3c8c763885a41d9befc17a8855a8e35",
+            "name": "63 Still Standing",
+            "path": "D:\\Musique\\Fallout\\Fallout 4\\63 Still Standing.mp3",
+            "category": "Dresden"
+          },
+          {
+            "id": "164315b9e0c644bab2705613f9b8f85c",
+            "name": "64 Science & Secrecy",
+            "path": "D:\\Musique\\Fallout\\Fallout 4\\64 Science & Secrecy.mp3",
+            "category": "Dresden"
+          },
+          {
+            "id": "dfb9c80e79ef4d2a9703dd7c73168437",
+            "name": "65 Fallout 4 Main Theme ('Spinner' M",
+            "path": "D:\\Musique\\Fallout\\Fallout 4\\65 Fallout 4 Main Theme ('Spinner' M.mp3",
+            "category": "Dresden"
+          },
+          {
+            "id": "dae870f417f949dca78ba5d83f10b2a2",
+            "name": "7. Sunny Makes A Promise To Veil",
+            "path": "D:\\Musique\\Into The Badlands\\7. Sunny Makes A Promise To Veil.mp3",
+            "category": "Dresden"
+          },
+          {
+            "id": "bbf92efe510e43cea0ac6eb961db1943",
+            "name": "8. Abbot Fight",
+            "path": "D:\\Musique\\Into The Badlands\\8. Abbot Fight.mp3",
+            "category": "Dresden"
+          },
+          {
+            "id": "148008203b334fa39f12ab2e99f988e5",
+            "name": "9. Ryder Won't Be A Baron",
+            "path": "D:\\Musique\\Into The Badlands\\9. Ryder Won't Be A Baron.mp3",
+            "category": "Dresden"
+          }
+        ],
+        "directories": [
+          "D:\\Musique\\Fallout",
+          "D:\\Musique\\Into The Badlands"
+        ]
+      },
+      "Fallout": {
+        "tracks": [
+          {
+            "id": "8d358f1e1add49638fcf03398beb74b0",
+            "name": "00 (Intro) A Kiss To Build A Dream On",
+            "path": "D:\\Musique\\Fallout\\Fallout 3\\00 (Intro) A Kiss To Build A Dream On.mp3",
+            "category": "Fallout"
+          },
+          {
+            "id": "2c302f9ab4a74ef898593cce7ece9076",
+            "name": "01 Fallout 4 Main Theme",
+            "path": "D:\\Musique\\Fallout\\Fallout 4\\01 Fallout 4 Main Theme.mp3",
+            "category": "Fallout"
+          },
+          {
+            "id": "5259e5f45aa741e8b51f02bca2462076",
+            "name": "01 Maybe",
+            "path": "D:\\Musique\\Fallout\\Fallout\\01 Maybe.mp3",
+            "category": "Fallout"
+          },
+          {
+            "id": "647f2d7551f14ac985f2307af8fc0b6a",
+            "name": "01 Trader's Life",
+            "path": "D:\\Musique\\Fallout\\Fallout 3\\01 Trader's Life.mp3",
+            "category": "Fallout"
+          },
+          {
+            "id": "8f5ed555dd6d47cc9783fc9bf5bb5b94",
+            "name": "02 Moribund World",
+            "path": "D:\\Musique\\Fallout\\Fallout 3\\02 Moribund World.mp3",
+            "category": "Fallout"
+          },
+          {
+            "id": "4becf8a3ddc745399b9cc03740a8e98c",
+            "name": "02 The Commonwealth",
+            "path": "D:\\Musique\\Fallout\\Fallout 4\\02 The Commonwealth.mp3",
+            "category": "Fallout"
+          },
+          {
+            "id": "9b6fcf43c8084c7fb0e093090955d974",
+            "name": "02 Vault 13",
+            "path": "D:\\Musique\\Fallout\\Fallout\\02 Vault 13.mp3",
+            "category": "Fallout"
+          },
+          {
+            "id": "68cbeea61a5e4c24a807984a7a28aff0",
+            "name": "03 Khans Of New California",
+            "path": "D:\\Musique\\Fallout\\Fallout 3\\03 Khans Of New California.mp3",
+            "category": "Fallout"
+          },
+          {
+            "id": "67df6ff1e1404e7abf6d11f0c7a8816c",
+            "name": "03 Of Green and Grey",
+            "path": "D:\\Musique\\Fallout\\Fallout 4\\03 Of Green and Grey.mp3",
+            "category": "Fallout"
+          },
+          {
+            "id": "d71189dcad2d46548cac255b66731264",
+            "name": "03 World Map",
+            "path": "D:\\Musique\\Fallout\\Fallout\\03 World Map.mp3",
+            "category": "Fallout"
+          },
+          {
+            "id": "f053e23647fd440e913ac3c57d79ede5",
+            "name": "04 Desert Wind",
+            "path": "D:\\Musique\\Fallout\\Fallout 3\\04 Desert Wind.mp3",
+            "category": "Fallout"
+          },
+          {
+            "id": "fc6b568592ca4fc0b15e9cc9dca419b1",
+            "name": "04 Portal to the Past",
+            "path": "D:\\Musique\\Fallout\\Fallout 4\\04 Portal to the Past.mp3",
+            "category": "Fallout"
+          },
+          {
+            "id": "5818a26b19e44819b1fdf3e4a2201270",
+            "name": "04 Shady Sands",
+            "path": "D:\\Musique\\Fallout\\Fallout\\04 Shady Sands.mp3",
+            "category": "Fallout"
+          },
+          {
+            "id": "36f93966e2b54156b2f9f90895eaccfd",
+            "name": "05 Caverns",
+            "path": "D:\\Musique\\Fallout\\Fallout\\05 Caverns.mp3",
+            "category": "Fallout"
+          },
+          {
+            "id": "d1cd2063c71a42f49dbd770f287e4f76",
+            "name": "05 Vats Of Goo",
+            "path": "D:\\Musique\\Fallout\\Fallout 3\\05 Vats Of Goo.mp3",
+            "category": "Fallout"
+          },
+          {
+            "id": "39419423acc6476e8c268770d4104bc4",
+            "name": "06 City Of Lost Angels",
+            "path": "D:\\Musique\\Fallout\\Fallout 3\\06 City Of Lost Angels.mp3",
+            "category": "Fallout"
+          },
+          {
+            "id": "26375d02554446ad941d1ac0fbd48a12",
+            "name": "06 Combat Ready",
+            "path": "D:\\Musique\\Fallout\\Fallout 4\\06 Combat Ready.mp3",
+            "category": "Fallout"
+          },
+          {
+            "id": "36af1e73f08941abb6384e3b7da4b4f0",
+            "name": "06 Combat Ready (1)",
+            "path": "D:\\Musique\\Fallout\\Fallout 4\\06 Combat Ready (1).mp3",
+            "category": "Fallout"
+          },
+          {
+            "id": "0f6310d92d08476680c70d904034c0c9",
+            "name": "06 Raiders",
+            "path": "D:\\Musique\\Fallout\\Fallout\\06 Raiders.mp3",
+            "category": "Fallout"
+          },
+          {
+            "id": "9c7fba91d93740549470e1de245b05ac",
+            "name": "07 Deeper and Darker",
+            "path": "D:\\Musique\\Fallout\\Fallout 4\\07 Deeper and Darker.mp3",
+            "category": "Fallout"
+          },
+          {
+            "id": "c26f32f19ecb49eb889d6bfc9b77b222",
+            "name": "07 Industrial Junk",
+            "path": "D:\\Musique\\Fallout\\Fallout 3\\07 Industrial Junk.mp3",
+            "category": "Fallout"
+          },
+          {
+            "id": "a87123be22e246e0a66e7242ac93c368",
+            "name": "07 Junktown",
+            "path": "D:\\Musique\\Fallout\\Fallout\\07 Junktown.mp3",
+            "category": "Fallout"
+          },
+          {
+            "id": "a823f9a984d24e859377c06ca556ea20",
+            "name": "08 The Hub",
+            "path": "D:\\Musique\\Fallout\\Fallout\\08 The Hub.mp3",
+            "category": "Fallout"
+          },
+          {
+            "id": "28713292838a4113aaf04882e457df14",
+            "name": "08 Underground Troubles",
+            "path": "D:\\Musique\\Fallout\\Fallout 3\\08 Underground Troubles.mp3",
+            "category": "Fallout"
+          },
+          {
+            "id": "bc27cac40f514fc3ab498a73740e8104",
+            "name": "08 Wandering - The Blasted Forest, P",
+            "path": "D:\\Musique\\Fallout\\Fallout 4\\08 Wandering - The Blasted Forest, P.mp3",
+            "category": "Fallout"
+          },
+          {
+            "id": "0ab3a2ac31bc4f708958aa9cba69878f",
+            "name": "09 Brightness Calling",
+            "path": "D:\\Musique\\Fallout\\Fallout 4\\09 Brightness Calling.mp3",
+            "category": "Fallout"
+          },
+          {
+            "id": "2079ea1253b34f238be3f83d1ab6917b",
+            "name": "09 City Of The Dead",
+            "path": "D:\\Musique\\Fallout\\Fallout 3\\09 City Of The Dead.mp3",
+            "category": "Fallout"
+          },
+          {
+            "id": "4109365b5e6a43d6b5217d4cfbbfe6ef",
+            "name": "09 City of the Dead",
+            "path": "D:\\Musique\\Fallout\\Fallout\\09 City of the Dead.mp3",
+            "category": "Fallout"
+          },
+          {
+            "id": "ba56044172bd4297a6c89f4471770fa6",
+            "name": "10 Follower's Credo",
+            "path": "D:\\Musique\\Fallout\\Fallout 3\\10 Follower's Credo.mp3",
+            "category": "Fallout"
+          },
+          {
+            "id": "dc3d5e3af1544f1f95fc9d7d0bc9c1f5",
+            "name": "10 L.A. Boneyard",
+            "path": "D:\\Musique\\Fallout\\Fallout\\10 L.A. Boneyard.mp3",
+            "category": "Fallout"
+          },
+          {
+            "id": "066fbd19578748f6917e0a990c018d81",
+            "name": "10 Of the People, for the People",
+            "path": "D:\\Musique\\Fallout\\Fallout 4\\10 Of the People, for the People.mp3",
+            "category": "Fallout"
+          },
+          {
+            "id": "505238599f2b42d298b0a51853ae91f0",
+            "name": "11 Beyond The Canyon",
+            "path": "D:\\Musique\\Fallout\\Fallout 3\\11 Beyond The Canyon.mp3",
+            "category": "Fallout"
+          },
+          {
+            "id": "7f83c577c1594a92916a08482e1b06db",
+            "name": "11 Hope Remains",
+            "path": "D:\\Musique\\Fallout\\Fallout 4\\11 Hope Remains.mp3",
+            "category": "Fallout"
+          },
+          {
+            "id": "cf84c92db4cc4bf398f42dd0dd019a02",
+            "name": "11 The Brotherhood of Steel",
+            "path": "D:\\Musique\\Fallout\\Fallout\\11 The Brotherhood of Steel.mp3",
+            "category": "Fallout"
+          },
+          {
+            "id": "152cf0867fe841668fefb16ab11dee36",
+            "name": "12 Dream Town",
+            "path": "D:\\Musique\\Fallout\\Fallout 3\\12 Dream Town.mp3",
+            "category": "Fallout"
+          },
+          {
+            "id": "1e1c4def8da44ecb9667a38602340d7f",
+            "name": "12 The Glow",
+            "path": "D:\\Musique\\Fallout\\Fallout\\12 The Glow.mp3",
+            "category": "Fallout"
+          },
+          {
+            "id": "84563dbe30ef40fe88f87d868c44726a",
+            "name": "12 Wandering - The Blasted Forest, P",
+            "path": "D:\\Musique\\Fallout\\Fallout 4\\12 Wandering - The Blasted Forest, P.mp3",
+            "category": "Fallout"
+          },
+          {
+            "id": "dc70e2f34dcb47619fb11dade8fae2f6",
+            "name": "13 Biggest Little City In The World",
+            "path": "D:\\Musique\\Fallout\\Fallout 3\\13 Biggest Little City In The World.mp3",
+            "category": "Fallout"
+          },
+          {
+            "id": "3efdd9c669b0495c8ef6915e4dc5132b",
+            "name": "13 Desert",
+            "path": "D:\\Musique\\Fallout\\Fallout\\13 Desert.mp3",
+            "category": "Fallout"
+          },
+          {
+            "id": "bb75cc6ebb58483eb175737d24102753",
+            "name": "13 Predator and Prey",
+            "path": "D:\\Musique\\Fallout\\Fallout 4\\13 Predator and Prey.mp3",
+            "category": "Fallout"
+          },
+          {
+            "id": "e8bb741b02224d06b4741ea7df2a4cdb",
+            "name": "14 Children of the Cathedral",
+            "path": "D:\\Musique\\Fallout\\Fallout\\14 Children of the Cathedral.mp3",
+            "category": "Fallout"
+          },
+          {
+            "id": "68d6bf0d5e93484fa9a323891647e904",
+            "name": "14 My Chrysalis Highwayman",
+            "path": "D:\\Musique\\Fallout\\Fallout 3\\14 My Chrysalis Highwayman.mp3",
+            "category": "Fallout"
+          },
+          {
+            "id": "b09ed8d1a79944bca0b3f770928c86a4",
+            "name": "14 War in the Wastes",
+            "path": "D:\\Musique\\Fallout\\Fallout 4\\14 War in the Wastes.mp3",
+            "category": "Fallout"
+          },
+          {
+            "id": "9108bc3b897d44978ef8e0229ba73b52",
+            "name": "15 Followers of the Apocalypse",
+            "path": "D:\\Musique\\Fallout\\Fallout\\15 Followers of the Apocalypse.mp3",
+            "category": "Fallout"
+          },
+          {
+            "id": "6126a075e3b8494f831cfa281d57d042",
+            "name": "15 Many Contrasts",
+            "path": "D:\\Musique\\Fallout\\Fallout 3\\15 Many Contrasts.mp3",
+            "category": "Fallout"
+          },
+          {
+            "id": "dd71be9742d842e1a8236b7cca6ffc96",
+            "name": "15 Time to Die",
+            "path": "D:\\Musique\\Fallout\\Fallout 4\\15 Time to Die.mp3",
+            "category": "Fallout"
+          },
+          {
+            "id": "4a9bac9936f2486c8b786bce97a31033",
+            "name": "16 All-Clear Signal",
+            "path": "D:\\Musique\\Fallout\\Fallout 3\\16 All-Clear Signal.mp3",
+            "category": "Fallout"
+          },
+          {
+            "id": "9572c91404d4481aa4be8d69c26e901c",
+            "name": "16 The Master",
+            "path": "D:\\Musique\\Fallout\\Fallout\\16 The Master.mp3",
+            "category": "Fallout"
+          },
+          {
+            "id": "0f35316d3caa46be8c37cbc699a42f34",
+            "name": "16 Uninvited",
+            "path": "D:\\Musique\\Fallout\\Fallout 4\\16 Uninvited.mp3",
+            "category": "Fallout"
+          },
+          {
+            "id": "227dbff01f0d41eb9205b6daa37d075e",
+            "name": "17 California Revisited",
+            "path": "D:\\Musique\\Fallout\\Fallout 3\\17 California Revisited.mp3",
+            "category": "Fallout"
+          },
+          {
+            "id": "167bf55e72d4442bacfe739d96630e02",
+            "name": "17 The Vats",
+            "path": "D:\\Musique\\Fallout\\Fallout\\17 The Vats.mp3",
+            "category": "Fallout"
+          },
+          {
+            "id": "3d0e3940d7784bc68c928d4ea7aec206",
+            "name": "17 Wandering - The City, Pt. 1",
+            "path": "D:\\Musique\\Fallout\\Fallout 4\\17 Wandering - The City, Pt. 1.mp3",
+            "category": "Fallout"
+          },
+          {
+            "id": "9873a18cfb4746ffab0bef0e6e8e97e3",
+            "name": "18 Gold Slouch",
+            "path": "D:\\Musique\\Fallout\\Fallout 3\\18 Gold Slouch.mp3",
+            "category": "Fallout"
+          },
+          {
+            "id": "aad6674dd37149a7aa83d1202c867983",
+            "name": "18 Rebuild, Renew",
+            "path": "D:\\Musique\\Fallout\\Fallout 4\\18 Rebuild, Renew.mp3",
+            "category": "Fallout"
+          },
+          {
+            "id": "425a5c26bfdf4125ae81262d58deedd6",
+            "name": "19 Concrete Mysteries",
+            "path": "D:\\Musique\\Fallout\\Fallout 4\\19 Concrete Mysteries.mp3",
+            "category": "Fallout"
+          },
+          {
+            "id": "da2b46e1261c484892a4584dac00ed05",
+            "name": "20 Tread Carefully",
+            "path": "D:\\Musique\\Fallout\\Fallout 4\\20 Tread Carefully.mp3",
+            "category": "Fallout"
+          },
+          {
+            "id": "0ec7b9305a6a4664a9ae3eb5d620786a",
+            "name": "21 The Infiltrator",
+            "path": "D:\\Musique\\Fallout\\Fallout 4\\21 The Infiltrator.mp3",
+            "category": "Fallout"
+          },
+          {
+            "id": "ba538b2597f240478c512a89c940d4e9",
+            "name": "22 No Quarter",
+            "path": "D:\\Musique\\Fallout\\Fallout 4\\22 No Quarter.mp3",
+            "category": "Fallout"
+          },
+          {
+            "id": "f470848021414e7aa366e90595d4ff86",
+            "name": "23 Wandering - The City, Pt. 2",
+            "path": "D:\\Musique\\Fallout\\Fallout 4\\23 Wandering - The City, Pt. 2.mp3",
+            "category": "Fallout"
+          },
+          {
+            "id": "5d4dbd1ae5ea4622bbfd1fccaf90b275",
+            "name": "24 The Vigilant",
+            "path": "D:\\Musique\\Fallout\\Fallout 4\\24 The Vigilant.mp3",
+            "category": "Fallout"
+          },
+          {
+            "id": "90d20fbac9e647fda5ea461c7b807c3a",
+            "name": "25 The Warlord",
+            "path": "D:\\Musique\\Fallout\\Fallout 4\\25 The Warlord.mp3",
+            "category": "Fallout"
+          },
+          {
+            "id": "374ae206a0b54434a1443c3f7940914e",
+            "name": "26 Red Brick, Broken",
+            "path": "D:\\Musique\\Fallout\\Fallout 4\\26 Red Brick, Broken.mp3",
+            "category": "Fallout"
+          },
+          {
+            "id": "832d283a044442ecb7eb2def9bbe08be",
+            "name": "27 Lonely Walls",
+            "path": "D:\\Musique\\Fallout\\Fallout 4\\27 Lonely Walls.mp3",
+            "category": "Fallout"
+          },
+          {
+            "id": "8bdb1e7be8124ada9aa63cd617fefe62",
+            "name": "28 Wandering - The City, Pt. 3",
+            "path": "D:\\Musique\\Fallout\\Fallout 4\\28 Wandering - The City, Pt. 3.mp3",
+            "category": "Fallout"
+          },
+          {
+            "id": "b8210d842f324641a31525249b685bd9",
+            "name": "29 Regrouped, Reloaded",
+            "path": "D:\\Musique\\Fallout\\Fallout 4\\29 Regrouped, Reloaded.mp3",
+            "category": "Fallout"
+          },
+          {
+            "id": "2468ca5eb03f45d89a68fd94fbdbcc75",
+            "name": "30 V.A.T.S. or Die",
+            "path": "D:\\Musique\\Fallout\\Fallout 4\\30 V.A.T.S. or Die.mp3",
+            "category": "Fallout"
+          },
+          {
+            "id": "70f4d518aac64bb0a55cef7fd52442a3",
+            "name": "31 Wandering - The Foothills, Pt. 1",
+            "path": "D:\\Musique\\Fallout\\Fallout 4\\31 Wandering - The Foothills, Pt. 1.mp3",
+            "category": "Fallout"
+          },
+          {
+            "id": "6cf0204ec3694334bf97a6c45a762f42",
+            "name": "32 Darkness Falls",
+            "path": "D:\\Musique\\Fallout\\Fallout 4\\32 Darkness Falls.mp3",
+            "category": "Fallout"
+          },
+          {
+            "id": "ceaf2230fe2f484da8d2cef5d3455029",
+            "name": "33 War of Wills",
+            "path": "D:\\Musique\\Fallout\\Fallout 4\\33 War of Wills.mp3",
+            "category": "Fallout"
+          },
+          {
+            "id": "d1d058e4ccc74bd0b324bb1a3bace4e7",
+            "name": "34 Wandering - The Foothills, Pt. 2",
+            "path": "D:\\Musique\\Fallout\\Fallout 4\\34 Wandering - The Foothills, Pt. 2.mp3",
+            "category": "Fallout"
+          },
+          {
+            "id": "e0ec244a867f4e629ec0a74fe07383d2",
+            "name": "35 Only One Survives",
+            "path": "D:\\Musique\\Fallout\\Fallout 4\\35 Only One Survives.mp3",
+            "category": "Fallout"
+          },
+          {
+            "id": "0f28e4ce163548dbaa06b41bce5ddb50",
+            "name": "36 A Critical Chance",
+            "path": "D:\\Musique\\Fallout\\Fallout 4\\36 A Critical Chance.mp3",
+            "category": "Fallout"
+          },
+          {
+            "id": "c99ba966e35b49709a1b7b65f2e5a042",
+            "name": "37 Dust & Danger",
+            "path": "D:\\Musique\\Fallout\\Fallout 4\\37 Dust & Danger.mp3",
+            "category": "Fallout"
+          },
+          {
+            "id": "610fb1ff56fc48fc90da0f5032e595c9",
+            "name": "38 Liberty Lives",
+            "path": "D:\\Musique\\Fallout\\Fallout 4\\38 Liberty Lives.mp3",
+            "category": "Fallout"
+          },
+          {
+            "id": "092d588b6b6e4867a7d608642cf3263b",
+            "name": "39 Lost Boston",
+            "path": "D:\\Musique\\Fallout\\Fallout 4\\39 Lost Boston.mp3",
+            "category": "Fallout"
+          },
+          {
+            "id": "447b84198b10439289b6d18563dec350",
+            "name": "40 Wandering- The Foothills, Pt. 3",
+            "path": "D:\\Musique\\Fallout\\Fallout 4\\40 Wandering- The Foothills, Pt. 3.mp3",
+            "category": "Fallout"
+          },
+          {
+            "id": "3244ef1af93f49538f0438e906d65e49",
+            "name": "41 Honor & Steel",
+            "path": "D:\\Musique\\Fallout\\Fallout 4\\41 Honor & Steel.mp3",
+            "category": "Fallout"
+          },
+          {
+            "id": "0ff4d3f9c1524dd4ab55807cfc9b5148",
+            "name": "42 We Are Unstoppable",
+            "path": "D:\\Musique\\Fallout\\Fallout 4\\42 We Are Unstoppable.mp3",
+            "category": "Fallout"
+          },
+          {
+            "id": "4b22ae6476984cb7adf29d7bb48f7aac",
+            "name": "43 Dominant Species",
+            "path": "D:\\Musique\\Fallout\\Fallout 4\\43 Dominant Species.mp3",
+            "category": "Fallout"
+          },
+          {
+            "id": "14ec731041524519958bc170b7dd7070",
+            "name": "44 Explore and Discover",
+            "path": "D:\\Musique\\Fallout\\Fallout 4\\44 Explore and Discover.mp3",
+            "category": "Fallout"
+          },
+          {
+            "id": "ca36340e2fcf469ebc69b14b08e1207d",
+            "name": "45 Wandering - The Glowing Sea, Pt.",
+            "path": "D:\\Musique\\Fallout\\Fallout 4\\45 Wandering - The Glowing Sea, Pt..mp3",
+            "category": "Fallout"
+          },
+          {
+            "id": "6dcb2368bfb04ffc86861994edf76257",
+            "name": "46 The Stars My Solace",
+            "path": "D:\\Musique\\Fallout\\Fallout 4\\46 The Stars My Solace.mp3",
+            "category": "Fallout"
+          },
+          {
+            "id": "9c34ff64fa2b49b29512e90302a128a9",
+            "name": "47 Imagine Utopia",
+            "path": "D:\\Musique\\Fallout\\Fallout 4\\47 Imagine Utopia.mp3",
+            "category": "Fallout"
+          },
+          {
+            "id": "5790df5527f64485bb1a946b558e27fc",
+            "name": "48 Lone Wandering",
+            "path": "D:\\Musique\\Fallout\\Fallout 4\\48 Lone Wandering.mp3",
+            "category": "Fallout"
+          },
+          {
+            "id": "d3883b376e4f4099aed5910356711885",
+            "name": "49 Wandering - The Glowing Sea, Pt.",
+            "path": "D:\\Musique\\Fallout\\Fallout 4\\49 Wandering - The Glowing Sea, Pt..mp3",
+            "category": "Fallout"
+          },
+          {
+            "id": "17293ff008ad45fca265b86e05d23bff",
+            "name": "54 Humanity's Hope",
+            "path": "D:\\Musique\\Fallout\\Fallout 4\\54 Humanity's Hope.mp3",
+            "category": "Fallout"
+          },
+          {
+            "id": "fb6f1225458b4dc1b14347ffaeb0b209",
+            "name": "55 Endless Ocean, Endless Dreams",
+            "path": "D:\\Musique\\Fallout\\Fallout 4\\55 Endless Ocean, Endless Dreams.mp3",
+            "category": "Fallout"
+          },
+          {
+            "id": "db021a99bdad474eb7d3e1162d948777",
+            "name": "56 No Voices, No Cries",
+            "path": "D:\\Musique\\Fallout\\Fallout 4\\56 No Voices, No Cries.mp3",
+            "category": "Fallout"
+          },
+          {
+            "id": "f677da4f7bdf4deaa5b3f61a0efc2734",
+            "name": "57 Wandering - The Coast, Pt. 2",
+            "path": "D:\\Musique\\Fallout\\Fallout 4\\57 Wandering - The Coast, Pt. 2.mp3",
+            "category": "Fallout"
+          },
+          {
+            "id": "4bb81e2257a445d78d9ce291260ca58d",
+            "name": "58 Covert Action",
+            "path": "D:\\Musique\\Fallout\\Fallout 4\\58 Covert Action.mp3",
+            "category": "Fallout"
+          },
+          {
+            "id": "32abc7ee0954448495a2c9c17c3629fe",
+            "name": "59 Rise and Prevail",
+            "path": "D:\\Musique\\Fallout\\Fallout 4\\59 Rise and Prevail.mp3",
+            "category": "Fallout"
+          },
+          {
+            "id": "a6fa6402a1004c1c8f306ccde53bc769",
+            "name": "60 No More Sails",
+            "path": "D:\\Musique\\Fallout\\Fallout 4\\60 No More Sails.mp3",
+            "category": "Fallout"
+          },
+          {
+            "id": "b70700a0fa094746842ee746b0ba5913",
+            "name": "61 Wandering - The Coast, Pt. 3",
+            "path": "D:\\Musique\\Fallout\\Fallout 4\\61 Wandering - The Coast, Pt. 3.mp3",
+            "category": "Fallout"
+          },
+          {
+            "id": "5d06158f97014e8c8b8e44edf11d41c9",
+            "name": "62 In This Together",
+            "path": "D:\\Musique\\Fallout\\Fallout 4\\62 In This Together.mp3",
+            "category": "Fallout"
+          },
+          {
+            "id": "e6e584efeecc49b29858b9afc718f4d7",
+            "name": "63 Still Standing",
+            "path": "D:\\Musique\\Fallout\\Fallout 4\\63 Still Standing.mp3",
+            "category": "Fallout"
+          },
+          {
+            "id": "e9e434a5b1e846b89909ab2ebd41a46c",
+            "name": "64 Science & Secrecy",
+            "path": "D:\\Musique\\Fallout\\Fallout 4\\64 Science & Secrecy.mp3",
+            "category": "Fallout"
+          },
+          {
+            "id": "715a0f4d7afb4f3abbff2f3a33786d85",
+            "name": "65 Fallout 4 Main Theme ('Spinner' M",
+            "path": "D:\\Musique\\Fallout\\Fallout 4\\65 Fallout 4 Main Theme ('Spinner' M.mp3",
+            "category": "Fallout"
+          }
+        ],
+        "directories": [
+          "D:\\Musique\\Fallout"
+        ]
+      }
+    },
     "settings": {
       "volume": 1.0,
       "shuffle": true,
       "loop": true,
       "continue": true,
-      "last_directory": "D:/Sounds",
-      "last_category": "",
-      "last_track_id": ""
+      "last_directory": "D:/Musique/Fallout",
+      "last_category": "Fantasy",
+      "last_track_id": "7d71d80db62741fe826261433d404c17"
     }
   },
   "effects": {
@@ -1207,9 +4432,93 @@
       "Combat": {
         "tracks": [
           {
+            "id": "e8a5d9769f4b4c819394325099aab492",
+            "name": "battle-war-zone-gun-fight-32155",
+            "path": "D:\\Sounds\\Battle sounds\\battle-war-zone-gun-fight-32155.mp3",
+            "category": "Combat"
+          },
+          {
+            "id": "18cbf155b4534153b38e121f4ccb89fd",
+            "name": "battlefield-ambience-38564",
+            "path": "D:\\Sounds\\Battle sounds\\battlefield-ambience-38564.mp3",
+            "category": "Combat"
+          },
+          {
+            "id": "5627b8fbb3f742368a2b81943306a67c",
+            "name": "bomber-222738",
+            "path": "D:\\Sounds\\Battle sounds\\bomber-222738.mp3",
+            "category": "Combat"
+          },
+          {
+            "id": "c42790121fc54fdb8385fcfc579534c9",
+            "name": "distant-explosion-47562",
+            "path": "D:\\Sounds\\Battle sounds\\distant-explosion-47562.mp3",
+            "category": "Combat"
+          },
+          {
+            "id": "c6f5c143688d47acac5bfe8fc92e6c79",
+            "name": "fighter-jets-passing-overhead-30115",
+            "path": "D:\\Sounds\\Battle sounds\\fighter-jets-passing-overhead-30115.mp3",
+            "category": "Combat"
+          },
+          {
+            "id": "4ac49cae4d0042dc933dd0d43eb8856f",
+            "name": "fireball-impact-351961",
+            "path": "D:\\Sounds\\Battle sounds\\fireball-impact-351961.mp3",
+            "category": "Combat"
+          },
+          {
+            "id": "8ea4c1ef84bd402f9f2e0569bc99b37d",
+            "name": "gunshots-162139",
+            "path": "D:\\Sounds\\Battle sounds\\gunshots-162139.mp3",
+            "category": "Combat"
+          },
+          {
+            "id": "dc5c581a04a64f358ce9f7b01299150b",
+            "name": "guttural-screams-102060",
+            "path": "D:\\Sounds\\Battle sounds\\guttural-screams-102060.mp3",
+            "category": "Combat"
+          },
+          {
+            "id": "f1cabd6988ce4ce6b2b9617e3656753b",
+            "name": "katyusha-rocket-multiple-114774",
+            "path": "D:\\Sounds\\Battle sounds\\katyusha-rocket-multiple-114774.mp3",
+            "category": "Combat"
+          },
+          {
+            "id": "8034061ec82c4bbba2cc1420292bc220",
+            "name": "m1-garand-rifle-80192",
+            "path": "D:\\Sounds\\Battle sounds\\m1-garand-rifle-80192.mp3",
+            "category": "Combat"
+          },
+          {
             "id": "5266f034c4d04a17a007ff48288da945",
             "name": "magic1",
             "path": "D:\\Sounds\\rpg\\battle\\magic1.wav",
+            "category": "Combat"
+          },
+          {
+            "id": "f90c75ffdc1245a38d8c6f61e975cb38",
+            "name": "medium-explosion-40472",
+            "path": "D:\\Sounds\\Battle sounds\\medium-explosion-40472.mp3",
+            "category": "Combat"
+          },
+          {
+            "id": "d4ada3e0fcd24f95b2fc76c6d0735b64",
+            "name": "semi-automatic-weapon-sound-effect-359247",
+            "path": "D:\\Sounds\\Battle sounds\\semi-automatic-weapon-sound-effect-359247.mp3",
+            "category": "Combat"
+          },
+          {
+            "id": "c93d96f2a29a4d27877b2fc4b5969dbf",
+            "name": "soldiers_marching-394036",
+            "path": "D:\\Sounds\\Battle sounds\\soldiers_marching-394036.mp3",
+            "category": "Combat"
+          },
+          {
+            "id": "a7815dd784a94459ade3b04e9a95b022",
+            "name": "sound-effect-machine-gun-333524",
+            "path": "D:\\Sounds\\Battle sounds\\sound-effect-machine-gun-333524.mp3",
             "category": "Combat"
           },
           {
@@ -1234,6 +4543,12 @@
             "id": "6057300c07e94ae694538d55f5ad962b",
             "name": "swing3",
             "path": "D:\\Sounds\\rpg\\battle\\swing3.wav",
+            "category": "Combat"
+          },
+          {
+            "id": "d9f99c602d29451ea473cd1df088d9ed",
+            "name": "sword-against-sword-6341",
+            "path": "D:\\Sounds\\Battle sounds\\sword-against-sword-6341.mp3",
             "category": "Combat"
           },
           {
@@ -1267,7 +4582,9 @@
             "category": "Combat"
           }
         ],
-        "directories": []
+        "directories": [
+          "D:\\Sounds\\Battle sounds"
+        ]
       },
       "UI": {
         "tracks": [
@@ -1826,6 +5143,410 @@
           }
         ],
         "directories": []
+      },
+      "Monsters": {
+        "tracks": [
+          {
+            "id": "6cd8921e88f043d8916c47051cc47f58",
+            "name": "081618_hahahaha-cartoon-monster-88012",
+            "path": "D:\\Sounds\\Monsters\\081618_hahahaha-cartoon-monster-88012.mp3",
+            "category": "Monsters"
+          },
+          {
+            "id": "e0591020e4284bef8e8a4ff58899ba3e",
+            "name": "agressive-monster-growl-262615",
+            "path": "D:\\Sounds\\Monsters\\agressive-monster-growl-262615.mp3",
+            "category": "Monsters"
+          },
+          {
+            "id": "9f39edcb511c4799a17df69b60753656",
+            "name": "alien-monster-scream-259962",
+            "path": "D:\\Sounds\\Monsters\\alien-monster-scream-259962.mp3",
+            "category": "Monsters"
+          },
+          {
+            "id": "0009a23e8bbb4eecbaa09ac881bc576f",
+            "name": "big-monster-shout-104325",
+            "path": "D:\\Sounds\\Monsters\\big-monster-shout-104325.mp3",
+            "category": "Monsters"
+          },
+          {
+            "id": "cd9b68e9a8264e09a4c14184ab29db47",
+            "name": "cave-monster-43826",
+            "path": "D:\\Sounds\\Monsters\\cave-monster-43826.mp3",
+            "category": "Monsters"
+          },
+          {
+            "id": "b3b8d15d3b8c4a6a9a394e573e06aca3",
+            "name": "creepy-haunting-sound-322993",
+            "path": "D:\\Sounds\\Monsters\\creepy-haunting-sound-322993.mp3",
+            "category": "Monsters"
+          },
+          {
+            "id": "1c790981afeb45e39a6a0a25714f2e8c",
+            "name": "deep-monster-growl-86780",
+            "path": "D:\\Sounds\\Monsters\\deep-monster-growl-86780.mp3",
+            "category": "Monsters"
+          },
+          {
+            "id": "d78cad2cfe294a88b76e01e4d03abfa2",
+            "name": "girl-monster-crying-sobbing-woman-386642",
+            "path": "D:\\Sounds\\Monsters\\girl-monster-crying-sobbing-woman-386642.mp3",
+            "category": "Monsters"
+          },
+          {
+            "id": "2f8ce8c7946b47369e2515efc60fcf9c",
+            "name": "high-quality-monster-screech-65012",
+            "path": "D:\\Sounds\\Monsters\\high-quality-monster-screech-65012.mp3",
+            "category": "Monsters"
+          },
+          {
+            "id": "bc818381d0b845b4b50020bd74b7455d",
+            "name": "horror-sound-lurking-horror-monster-189948",
+            "path": "D:\\Sounds\\Monsters\\horror-sound-lurking-horror-monster-189948.mp3",
+            "category": "Monsters"
+          },
+          {
+            "id": "b5e6ed8bdb584ac29baaf862b2f90300",
+            "name": "horror-sound-monster-breath-189934",
+            "path": "D:\\Sounds\\Monsters\\horror-sound-monster-breath-189934.mp3",
+            "category": "Monsters"
+          },
+          {
+            "id": "0f6e83dfb40e4d5fa5850988db39ac6d",
+            "name": "horror-sound-monster-roar-2-189933",
+            "path": "D:\\Sounds\\Monsters\\horror-sound-monster-roar-2-189933.mp3",
+            "category": "Monsters"
+          },
+          {
+            "id": "722e97842788406f86183e0ca2fc57f3",
+            "name": "horror-sound-monster-snort-189930",
+            "path": "D:\\Sounds\\Monsters\\horror-sound-monster-snort-189930.mp3",
+            "category": "Monsters"
+          },
+          {
+            "id": "34ba9951c8f34ad1a04e2dbd759883e8",
+            "name": "large-monster-attack-195713",
+            "path": "D:\\Sounds\\Monsters\\large-monster-attack-195713.mp3",
+            "category": "Monsters"
+          },
+          {
+            "id": "2ca8b38100aa4e458912c5988082a71d",
+            "name": "large-monster-roar-195717",
+            "path": "D:\\Sounds\\Monsters\\large-monster-roar-195717.mp3",
+            "category": "Monsters"
+          },
+          {
+            "id": "dcdff7daa0f949e6be634c8cc9b82f76",
+            "name": "low-monster-roar-97413",
+            "path": "D:\\Sounds\\Monsters\\low-monster-roar-97413.mp3",
+            "category": "Monsters"
+          },
+          {
+            "id": "a0003cc85c3743458643732e132eba8e",
+            "name": "monster-05-grunt-and-growl-195715",
+            "path": "D:\\Sounds\\Monsters\\monster-05-grunt-and-growl-195715.mp3",
+            "category": "Monsters"
+          },
+          {
+            "id": "c4971965a9124adfa06a81781af1a8ef",
+            "name": "monster-05-grunt-and-growl-195715 (1)",
+            "path": "D:\\Sounds\\Monsters\\monster-05-grunt-and-growl-195715 (1).mp3",
+            "category": "Monsters"
+          },
+          {
+            "id": "31dd119d75f84dfaba9d223febbe9962",
+            "name": "monster-10-307190",
+            "path": "D:\\Sounds\\Monsters\\monster-10-307190.mp3",
+            "category": "Monsters"
+          },
+          {
+            "id": "c89e1f0a11e74161a24111a5d6e27764",
+            "name": "monster-15-337349",
+            "path": "D:\\Sounds\\Monsters\\monster-15-337349.mp3",
+            "category": "Monsters"
+          },
+          {
+            "id": "85af14db71fb46eaa0aebf6d2e3d125c",
+            "name": "monster-2-277522",
+            "path": "D:\\Sounds\\Monsters\\monster-2-277522.mp3",
+            "category": "Monsters"
+          },
+          {
+            "id": "c344adca52e44276a127b86c4eaa5924",
+            "name": "monster-211717",
+            "path": "D:\\Sounds\\Monsters\\monster-211717.mp3",
+            "category": "Monsters"
+          },
+          {
+            "id": "8c9a8493f682498b9e290d560643590e",
+            "name": "monster-footstep-162883",
+            "path": "D:\\Sounds\\Monsters\\monster-footstep-162883.mp3",
+            "category": "Monsters"
+          },
+          {
+            "id": "798c24d8b73b4e6e802fcde5f33b3c0a",
+            "name": "monster-footsteps-on-gravel-295850",
+            "path": "D:\\Sounds\\Monsters\\monster-footsteps-on-gravel-295850.mp3",
+            "category": "Monsters"
+          },
+          {
+            "id": "55084d24d443490bae495bd60d222b78",
+            "name": "monster-growl-251374",
+            "path": "D:\\Sounds\\Monsters\\monster-growl-251374.mp3",
+            "category": "Monsters"
+          },
+          {
+            "id": "e985a362df074865994a954253f6a9f0",
+            "name": "monster-growl-376892",
+            "path": "D:\\Sounds\\Monsters\\monster-growl-376892.mp3",
+            "category": "Monsters"
+          },
+          {
+            "id": "d7b42f72bfdd45b1be826bd7c3101519",
+            "name": "monster-growl-390285",
+            "path": "D:\\Sounds\\Monsters\\monster-growl-390285.mp3",
+            "category": "Monsters"
+          },
+          {
+            "id": "2ce78b90068a4ab7a7b7cd7890dc9195",
+            "name": "monster-growl-390285 (1)",
+            "path": "D:\\Sounds\\Monsters\\monster-growl-390285 (1).mp3",
+            "category": "Monsters"
+          },
+          {
+            "id": "261062cc7a5440679de5fa76c358ee9b",
+            "name": "monster-growl-410553",
+            "path": "D:\\Sounds\\Monsters\\monster-growl-410553.mp3",
+            "category": "Monsters"
+          },
+          {
+            "id": "bec061969efb4738adaa5b92fab7faaf",
+            "name": "monster-growl-6311",
+            "path": "D:\\Sounds\\Monsters\\monster-growl-6311.mp3",
+            "category": "Monsters"
+          },
+          {
+            "id": "aa35d7dcc4264d57ade0dd8f8a2e8980",
+            "name": "monster-howl-277521",
+            "path": "D:\\Sounds\\Monsters\\monster-howl-277521.mp3",
+            "category": "Monsters"
+          },
+          {
+            "id": "39889df36b9b45919eeef05dbc640f91",
+            "name": "monster-howl-85304",
+            "path": "D:\\Sounds\\Monsters\\monster-howl-85304.mp3",
+            "category": "Monsters"
+          },
+          {
+            "id": "ad97c385ffd34aa198a2d35c9192f53d",
+            "name": "monster-laugh-103278",
+            "path": "D:\\Sounds\\Monsters\\monster-laugh-103278.mp3",
+            "category": "Monsters"
+          },
+          {
+            "id": "79c5cc61a9654b74a498f01bb18bd7dd",
+            "name": "monster-roar-104049",
+            "path": "D:\\Sounds\\Monsters\\monster-roar-104049.mp3",
+            "category": "Monsters"
+          },
+          {
+            "id": "5e8cc577fc484d6088d719c74fa575a7",
+            "name": "monster-roar-6985",
+            "path": "D:\\Sounds\\Monsters\\monster-roar-6985.mp3",
+            "category": "Monsters"
+          },
+          {
+            "id": "ac2883d2638a4683a8c40cd20219cbb0",
+            "name": "monster-roars-177261",
+            "path": "D:\\Sounds\\Monsters\\monster-roars-177261.mp3",
+            "category": "Monsters"
+          },
+          {
+            "id": "56e1df9b27f944578b20b7a251165d05",
+            "name": "monster-shriek-100292",
+            "path": "D:\\Sounds\\Monsters\\monster-shriek-100292.mp3",
+            "category": "Monsters"
+          },
+          {
+            "id": "c470722c063e435bab7bde31b2044987",
+            "name": "monster-warrior-roar-195877",
+            "path": "D:\\Sounds\\Monsters\\monster-warrior-roar-195877.mp3",
+            "category": "Monsters"
+          },
+          {
+            "id": "8dc576c4f9ae4ef7a81fae5f31a7e39a",
+            "name": "monster-zombie-scream-105972",
+            "path": "D:\\Sounds\\Monsters\\monster-zombie-scream-105972.mp3",
+            "category": "Monsters"
+          },
+          {
+            "id": "4a91908a326446ad9abd6dbf0315c6c1",
+            "name": "sea-monster-screaming-loudly-414878",
+            "path": "D:\\Sounds\\Monsters\\sea-monster-screaming-loudly-414878.mp3",
+            "category": "Monsters"
+          },
+          {
+            "id": "ba31d8407930491ca7f128143502ce29",
+            "name": "small-monster-attack-195712",
+            "path": "D:\\Sounds\\Monsters\\small-monster-attack-195712.mp3",
+            "category": "Monsters"
+          },
+          {
+            "id": "3ba3502656044b73ac23ccee3bb3d3da",
+            "name": "snarls-and-growls-172823",
+            "path": "D:\\Sounds\\Monsters\\snarls-and-growls-172823.mp3",
+            "category": "Monsters"
+          }
+        ],
+        "directories": [
+          "D:\\Sounds\\Monsters"
+        ]
+      },
+      "Animals": {
+        "tracks": [
+          {
+            "id": "562b9627c18d485d9b9f3b7b9ff106eb",
+            "name": "bear-growl-fx-175165",
+            "path": "D:\\Sounds\\Animals\\bear-growl-fx-175165.mp3",
+            "category": "Animals"
+          },
+          {
+            "id": "8e88d6dd581440fcaf57ae42a9e472df",
+            "name": "birds-chirping-241045",
+            "path": "D:\\Sounds\\Animals\\birds-chirping-241045.mp3",
+            "category": "Animals"
+          },
+          {
+            "id": "2b1c201363df49e59f27556afbc6ad69",
+            "name": "cat-98721",
+            "path": "D:\\Sounds\\Animals\\cat-98721.mp3",
+            "category": "Animals"
+          },
+          {
+            "id": "2fb8995950034397823fe5707897ce68",
+            "name": "cow-sound-234947",
+            "path": "D:\\Sounds\\Animals\\cow-sound-234947.mp3",
+            "category": "Animals"
+          },
+          {
+            "id": "1e9cc2f81f694b389f5ae61b9b92f96d",
+            "name": "crow-64028",
+            "path": "D:\\Sounds\\Animals\\crow-64028.mp3",
+            "category": "Animals"
+          },
+          {
+            "id": "ce3dabfb78df485f9519079bf167168c",
+            "name": "dawn-of-birds-and-animals-246782",
+            "path": "D:\\Sounds\\Animals\\dawn-of-birds-and-animals-246782.mp3",
+            "category": "Animals"
+          },
+          {
+            "id": "c99bde6c738049858249bf2511c8c303",
+            "name": "dog-barking-at-cat-336373",
+            "path": "D:\\Sounds\\Animals\\dog-barking-at-cat-336373.mp3",
+            "category": "Animals"
+          },
+          {
+            "id": "161f52bd78644c27a620743f4b7dcd7f",
+            "name": "donkey-bray-36757",
+            "path": "D:\\Sounds\\Animals\\donkey-bray-36757.mp3",
+            "category": "Animals"
+          },
+          {
+            "id": "122c6d5e95764662b5416662052099e7",
+            "name": "eagle-scream-112940",
+            "path": "D:\\Sounds\\Animals\\eagle-scream-112940.mp3",
+            "category": "Animals"
+          },
+          {
+            "id": "0594cc8ef4ea4ac69ac52985969b2c67",
+            "name": "elephant-trumpets-growls-6047",
+            "path": "D:\\Sounds\\Animals\\elephant-trumpets-growls-6047.mp3",
+            "category": "Animals"
+          },
+          {
+            "id": "a6f7dd8a33f540fea991ddc7ab13a042",
+            "name": "horse-neigh-sfx-373051",
+            "path": "D:\\Sounds\\Animals\\horse-neigh-sfx-373051.mp3",
+            "category": "Animals"
+          },
+          {
+            "id": "3a8eea89dd1542c6af67b126a5e37f85",
+            "name": "leopard-attack-193175",
+            "path": "D:\\Sounds\\Animals\\leopard-attack-193175.mp3",
+            "category": "Animals"
+          },
+          {
+            "id": "bf8e661b25134e7ab83c6ce4f1e71f76",
+            "name": "lion-snarl-growl-354324",
+            "path": "D:\\Sounds\\Animals\\lion-snarl-growl-354324.mp3",
+            "category": "Animals"
+          },
+          {
+            "id": "b45d69a6758c44939c3f247d893bac98",
+            "name": "peacock-sound-effect-97606",
+            "path": "D:\\Sounds\\Animals\\peacock-sound-effect-97606.mp3",
+            "category": "Animals"
+          },
+          {
+            "id": "51831a09935a43a7bb1c369ea4ee9959",
+            "name": "rat-squeaks-4-fx-396298",
+            "path": "D:\\Sounds\\Animals\\rat-squeaks-4-fx-396298.mp3",
+            "category": "Animals"
+          },
+          {
+            "id": "1fc05629124649648936e4694b5397ab",
+            "name": "scary-wolf-growling-224086",
+            "path": "D:\\Sounds\\Animals\\scary-wolf-growling-224086.mp3",
+            "category": "Animals"
+          },
+          {
+            "id": "3edb8186a9934a85b518752f94b98e57",
+            "name": "seagulls_short-6004",
+            "path": "D:\\Sounds\\Animals\\seagulls_short-6004.mp3",
+            "category": "Animals"
+          },
+          {
+            "id": "2420da7be4494dd9949b17153393675e",
+            "name": "sheep-122256",
+            "path": "D:\\Sounds\\Animals\\sheep-122256.mp3",
+            "category": "Animals"
+          },
+          {
+            "id": "ca3d25a313ef4c7f8b6e296d6b258fd2",
+            "name": "small-dog-barking-84707",
+            "path": "D:\\Sounds\\Animals\\small-dog-barking-84707.mp3",
+            "category": "Animals"
+          },
+          {
+            "id": "431e61706c964a68bf2a4965cb38ba5f",
+            "name": "snake-hissing-6092",
+            "path": "D:\\Sounds\\Animals\\snake-hissing-6092.mp3",
+            "category": "Animals"
+          },
+          {
+            "id": "fe8db80dd5e54966988756acdceab5b7",
+            "name": "sound-of-hooting-owls-in-nighttime-hd-263177",
+            "path": "D:\\Sounds\\Animals\\sound-of-hooting-owls-in-nighttime-hd-263177.mp3",
+            "category": "Animals"
+          },
+          {
+            "id": "82ac527437434c92b1698fd67758af38",
+            "name": "tiger-371353",
+            "path": "D:\\Sounds\\Animals\\tiger-371353.mp3",
+            "category": "Animals"
+          },
+          {
+            "id": "63ae19efd673442c8b2d89059c01a318",
+            "name": "wolf-howling-140235",
+            "path": "D:\\Sounds\\Animals\\wolf-howling-140235.mp3",
+            "category": "Animals"
+          }
+        ],
+        "directories": [
+          "D:\\Sounds\\Animals"
+        ]
       }
     },
     "settings": {
@@ -1833,9 +5554,9 @@
       "shuffle": true,
       "loop": true,
       "continue": true,
-      "last_directory": "D:/Sounds/rpg",
-      "last_category": "Sci-Fi Voices",
-      "last_track_id": "43a2cb2b1e154df1b5f0bff329ac52fd"
+      "last_directory": "D:/Sounds/Monsters",
+      "last_category": "Monsters",
+      "last_track_id": "b3b8d15d3b8c4a6a9a394e573e06aca3"
     }
   }
 }
