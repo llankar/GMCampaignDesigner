@@ -307,11 +307,10 @@ class DisplayMapController:
             else:
                 new_selection.append(item)
         else:
-            if len(new_selection) == 1 and new_selection[0] is item:
-                new_selection = []
-                item_active = False
-            else:
-                new_selection = [item]
+            # Default (no modifiers): keep the current item selected so that a
+            # drag can immediately begin. Users can click empty space to
+            # clear the selection if needed.
+            new_selection = [item]
 
         self._set_selection(new_selection)
         return item_active and item in self.selected_items
