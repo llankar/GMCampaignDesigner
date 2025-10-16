@@ -155,13 +155,19 @@ _NOTE_FIELD_CANDIDATES: Sequence[str] = (
     "Gist",
     "Content",
     "Background",
+    "Overview",
+    "PlayerDisplay",
+    "FlavorText",
 )
+
+_EMPTY_STRING_MARKERS = {"", "none", "null", "n/a", "na", "undefined", "unknown"}
+
 
 _DEFAULT_SECTION_FIELDS: Mapping[str, Sequence[tuple[str, tuple[str, ...]]]] = {
     "default": (
-        ("Overview", tuple(dict.fromkeys((*_NOTE_FIELD_CANDIDATES, "Synopsis", "History")))),
+        ("Overview", tuple(dict.fromkeys((*_NOTE_FIELD_CANDIDATES, "Synopsis", "History", "GMNotes")))),
         (
-            "Identity & Role",
+            "Role",
             (
                 "Role",
                 "Title",
@@ -177,10 +183,11 @@ _DEFAULT_SECTION_FIELDS: Mapping[str, Sequence[tuple[str, tuple[str, ...]]]] = {
                 "Faction",
                 "Rank",
                 "Position",
+                "Concept",
             ),
         ),
         (
-            "Traits & Personality",
+            "Traits",
             (
                 "Traits",
                 "Personality",
@@ -189,21 +196,31 @@ _DEFAULT_SECTION_FIELDS: Mapping[str, Sequence[tuple[str, tuple[str, ...]]]] = {
                 "Mannerisms",
                 "Roleplay",
                 "RoleplayHints",
+                "RoleplayHint",
+                "RoleplayingHints",
+                "RoleplayingCues",
                 "Behavior",
                 "Voice",
+                "Quote",
             ),
         ),
         (
             "Statistics",
             (
                 "Stats",
+                "StatBlock",
                 "Attributes",
                 "Abilities",
                 "Skills",
                 "Combat",
                 "HP",
                 "HitPoints",
+                "HPMax",
                 "Level",
+                "ArmorClass",
+                "AC",
+                "Saves",
+                "Speed",
                 "Resources",
                 "Equipment",
                 "Inventory",
@@ -212,7 +229,7 @@ _DEFAULT_SECTION_FIELDS: Mapping[str, Sequence[tuple[str, tuple[str, ...]]]] = {
             ),
         ),
         (
-            "Motivations & Secrets",
+            "Secrets",
             (
                 "Motivation",
                 "Goals",
@@ -223,6 +240,7 @@ _DEFAULT_SECTION_FIELDS: Mapping[str, Sequence[tuple[str, tuple[str, ...]]]] = {
                 "Rumors",
                 "Secret",
                 "Secrets",
+                "GMSecret",
             ),
         ),
         (
@@ -236,13 +254,16 @@ _DEFAULT_SECTION_FIELDS: Mapping[str, Sequence[tuple[str, tuple[str, ...]]]] = {
                 "Enemies",
                 "Family",
                 "Friends",
+                "Factions",
+                "NPCs",
+                "Creatures",
             ),
         ),
     ),
     "NPCs": (
         ("Overview", tuple(dict.fromkeys((*_NOTE_FIELD_CANDIDATES, "Synopsis")))),
         (
-            "Identity & Role",
+            "Role",
             (
                 "Role",
                 "Title",
@@ -255,19 +276,22 @@ _DEFAULT_SECTION_FIELDS: Mapping[str, Sequence[tuple[str, tuple[str, ...]]]] = {
             ),
         ),
         (
-            "Traits & Personality",
+            "Traits",
             (
                 "Traits",
                 "Personality",
                 "Appearance",
                 "Quirks",
                 "RoleplayHints",
+                "RoleplayHint",
+                "RoleplayingCues",
                 "Behavior",
+                "Quote",
             ),
         ),
         ("Statistics", ("Stats", "Attributes", "Abilities", "HP", "Level")),
         (
-            "Motivations & Secrets",
+            "Secrets",
             (
                 "Goals",
                 "Motivation",
@@ -276,38 +300,61 @@ _DEFAULT_SECTION_FIELDS: Mapping[str, Sequence[tuple[str, tuple[str, ...]]]] = {
                 "PlotHooks",
             ),
         ),
-        ("Connections", ("Allies", "Contacts", "Enemies", "Friends")),
+        ("Connections", ("Allies", "Contacts", "Enemies", "Friends", "Factions")),
     ),
     "Creatures": (
         ("Overview", tuple(dict.fromkeys((*_NOTE_FIELD_CANDIDATES, "Ecology")))),
         (
-            "Identity & Role",
-            ("Type", "Role", "Environment", "Alignment"),
+            "Role",
+            ("Type", "Role", "Environment", "Alignment", "Habitat"),
         ),
         (
-            "Traits & Abilities",
-            ("Traits", "Abilities", "Powers", "Weakness", "SpecialAbilities"),
+            "Traits",
+            ("Traits", "Abilities", "Powers", "Weakness", "SpecialAbilities", "Behavior"),
         ),
-        ("Statistics", ("Stats", "Attributes", "Skills", "HP", "Level")),
-        ("Motivations & Secrets", ("Goals", "Motivation", "Secret", "Secrets")),
+        ("Statistics", ("Stats", "Attributes", "Skills", "HP", "Level", "AC", "Speed")),
+        ("Secrets", ("Goals", "Motivation", "Secret", "Secrets")),
     ),
     "Factions": (
         ("Overview", tuple(dict.fromkeys((*_NOTE_FIELD_CANDIDATES, "Background")))),
         (
-            "Identity & Role",
+            "Role",
             ("Type", "Alignment", "Scale", "Reach", "Resources"),
         ),
-        ("Goals & Secrets", ("Goals", "Agenda", "Secret", "Secrets", "PlotHooks")),
-        ("Connections", ("Allies", "Enemies", "Contacts")),
+        ("Secrets", ("Goals", "Agenda", "Secret", "Secrets", "PlotHooks")),
+        ("Connections", ("Allies", "Enemies", "Contacts", "Rivals")),
     ),
     "Places": (
-        ("Overview", tuple(dict.fromkeys((*_NOTE_FIELD_CANDIDATES, "History")))),
+        ("Overview", tuple(dict.fromkeys((*_NOTE_FIELD_CANDIDATES, "History", "Atmosphere")))),
         (
-            "Location Details",
+            "Role",
             ("Type", "Region", "Environment", "Tags", "Features", "SensoryDetails"),
         ),
-        ("Secrets & Hooks", ("Secrets", "Hooks", "PlotHooks", "Rumors")),
-        ("Occupants & Connections", ("NPCs", "Creatures", "Factions", "Allies", "Enemies")),
+        ("Secrets", ("Secrets", "Hooks", "PlotHooks", "Rumors")),
+        (
+            "Connections",
+            ("NPCs", "Creatures", "Factions", "Allies", "Enemies", "Objects"),
+        ),
+    ),
+    "Scenarios": (
+        ("Overview", tuple(dict.fromkeys((*_NOTE_FIELD_CANDIDATES, "Synopsis", "Setup")))),
+        ("Role", ("Type", "Theme", "Tone")),
+        (
+            "Traits",
+            ("Tags", "Challenges", "Complications"),
+        ),
+        (
+            "Statistics",
+            ("Difficulty", "XP", "Rewards"),
+        ),
+        (
+            "Secrets",
+            ("Secrets", "Twists", "PlotHooks", "GMNotes"),
+        ),
+        (
+            "Connections",
+            ("Scenes", "Places", "NPCs", "Creatures", "Objects", "Factions", "Clues"),
+        ),
     ),
 }
 
@@ -343,10 +390,17 @@ def _normalize_value(value: Any) -> RichTextValue | None:
     if isinstance(value, RichTextValue):
         return value
     if isinstance(value, str):
+        stripped = value.strip()
+        if stripped.lower() in _EMPTY_STRING_MARKERS:
+            return None
         return RichTextValue(value.replace("\r\n", "\n").replace("\r", "\n"))
     if isinstance(value, Mapping):
         if "text" in value:
-            return _from_rtf_json(value)
+            normalized = _from_rtf_json(value)
+            text = (normalized.text or "").strip()
+            if text.lower() in _EMPTY_STRING_MARKERS:
+                return None
+            return normalized
         parts: list[str] = []
         for key, val in value.items():
             if val in (None, ""):
