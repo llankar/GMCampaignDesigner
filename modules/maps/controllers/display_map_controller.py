@@ -38,6 +38,9 @@ from modules.maps.utils.icon_loader import load_icon
 from PIL import Image, ImageTk, ImageDraw
 from modules.generic.generic_model_wrapper import GenericModelWrapper
 from modules.helpers.template_loader import load_template
+
+
+CLIPBOARD_SKIP = object()
 from modules.helpers.text_helpers import format_longtext
 from modules.helpers.config_helper import ConfigHelper
 from modules.ui.image_viewer import show_portrait
@@ -3206,6 +3209,93 @@ class DisplayMapController:
 
         self.clipboard_token = clipboard_entries if clipboard_entries else None
 
+    def _clipboard_value_should_skip(self, value):
+        if value is None:
+            return False
+
+        module_name = getattr(getattr(value, "__class__", None), "__module__", "") or ""
+        if module_name.startswith(("tkinter", "_tkinter", "customtkinter")):
+            return True
+
+        if isinstance(value, (tk.Misc, tk.Variable, tkfont.Font)):
+            return True
+
+        if hasattr(value, "winfo_exists"):
+            return True
+
+        try:
+            if isinstance(value, ImageTk.PhotoImage):
+                return True
+        except Exception:
+            pass
+
+        return False
+
+    def _sanitize_clipboard_structure(self, value, memo=None):
+        if memo is None:
+            memo = {}
+
+        obj_id = id(value)
+        if obj_id in memo:
+            return memo[obj_id]
+
+        if self._clipboard_value_should_skip(value):
+            return CLIPBOARD_SKIP
+
+        if isinstance(value, dict):
+            sanitized_dict = {}
+            memo[obj_id] = sanitized_dict
+            for key, item in value.items():
+                sanitized_key = self._sanitize_clipboard_structure(key, memo)
+                sanitized_value = self._sanitize_clipboard_structure(item, memo)
+                if sanitized_key is CLIPBOARD_SKIP or sanitized_value is CLIPBOARD_SKIP:
+                    continue
+                sanitized_dict[sanitized_key] = sanitized_value
+            return sanitized_dict
+
+        if isinstance(value, list):
+            sanitized_list = []
+            memo[obj_id] = sanitized_list
+            for item in value:
+                sanitized_item = self._sanitize_clipboard_structure(item, memo)
+                if sanitized_item is CLIPBOARD_SKIP:
+                    continue
+                sanitized_list.append(sanitized_item)
+            return sanitized_list
+
+        if isinstance(value, tuple):
+            sanitized_tuple_items = []
+            memo[obj_id] = sanitized_tuple_items
+            for item in value:
+                sanitized_item = self._sanitize_clipboard_structure(item, memo)
+                if sanitized_item is CLIPBOARD_SKIP:
+                    continue
+                sanitized_tuple_items.append(sanitized_item)
+            sanitized_tuple = tuple(sanitized_tuple_items)
+            memo[obj_id] = sanitized_tuple
+            return sanitized_tuple
+
+        if isinstance(value, set):
+            sanitized_set = set()
+            memo[obj_id] = sanitized_set
+            for item in value:
+                sanitized_item = self._sanitize_clipboard_structure(item, memo)
+                if sanitized_item is CLIPBOARD_SKIP:
+                    continue
+                sanitized_set.add(sanitized_item)
+            return sanitized_set
+
+        if isinstance(value, (int, float, str, bool, type(None))):
+            memo[obj_id] = value
+            return value
+
+        try:
+            sanitized_value = copy.deepcopy(value)
+        except Exception:
+            sanitized_value = value
+        memo[obj_id] = sanitized_value
+        return sanitized_value
+
     def _clone_item_for_clipboard(self, item, reference_position):
         if not isinstance(item, dict):
             return None
@@ -3241,6 +3331,10 @@ class DisplayMapController:
         ]
         for key in keys_to_remove:
             clone.pop(key, None)
+
+        clone = self._sanitize_clipboard_structure(clone)
+        if clone is CLIPBOARD_SKIP:
+            return None
 
         pos = item.get("position") if isinstance(item.get("position"), tuple) else clone.get("position")
         try:
@@ -3292,7 +3386,9 @@ class DisplayMapController:
         for entry in clipboard_items:
             if not isinstance(entry, dict):
                 continue
-            new_item_data = copy.deepcopy(entry)
+            new_item_data = self._sanitize_clipboard_structure(entry)
+            if new_item_data is CLIPBOARD_SKIP:
+                continue
             offset = new_item_data.pop("_clipboard_offset", (0, 0))
             try:
                 ox, oy = offset
