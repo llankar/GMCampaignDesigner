@@ -542,6 +542,32 @@ def _determine_target_path(asset_type: str, original_path: str, campaign_dir: Pa
     return candidate, relative
 
 
+def detect_duplicates(
+    selected_records: Dict[str, List[dict]], target_campaign: CampaignDatabase
+) -> Dict[str, List[str]]:
+    duplicates: Dict[str, List[str]] = {}
+    for entity_type, records in selected_records.items():
+        if not records:
+            continue
+        try:
+            existing = load_entities(entity_type, target_campaign.db_path)
+        except Exception as exc:
+            log_warning(
+                f"Unable to load existing {entity_type}: {exc}",
+                func_name="modules.generic.cross_campaign_asset_service.detect_duplicates",
+            )
+            existing = []
+        existing_lookup = {_determine_record_key(item): item for item in existing}
+        dupes: List[str] = []
+        for record in records:
+            key = _determine_record_key(record)
+            if key in existing_lookup:
+                dupes.append(key)
+        if dupes:
+            duplicates[entity_type] = dupes
+    return duplicates
+
+
 def apply_import(
     analysis: BundleAnalysis,
     target_campaign: CampaignDatabase,
@@ -603,6 +629,67 @@ def apply_import(
         shutil.rmtree(analysis.temp_dir, ignore_errors=True)
 
     _call_progress(progress_callback, "Import complete", 1.0)
+    return summary
+
+
+def apply_direct_copy(
+    selected_records: Dict[str, List[dict]],
+    *,
+    source_campaign: CampaignDatabase,
+    target_campaign: CampaignDatabase,
+    overwrite: bool,
+    progress_callback=None,
+) -> Dict[str, int]:
+    replacements: Dict[str, str] = {}
+    summary: Dict[str, int] = {"imported": 0, "updated": 0, "skipped": 0}
+
+    asset_refs: List[AssetReference] = []
+    for entity_type, records in selected_records.items():
+        asset_refs.extend(collect_assets(entity_type, records, source_campaign.root))
+
+    total_assets = len(asset_refs) or 1
+    for index, asset in enumerate(asset_refs, start=1):
+        original = asset.original_path
+        if original in replacements:
+            _call_progress(progress_callback, f"Copying assets ({index}/{total_assets})", index / total_assets)
+            continue
+        target_path, relative = _determine_target_path(
+            asset.asset_type, asset.original_path, target_campaign.root
+        )
+        try:
+            target_path.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(asset.absolute_path, target_path)
+            replacements[original] = relative
+        except Exception as exc:
+            log_warning(
+                f"Failed to copy asset {asset.absolute_path}: {exc}",
+                func_name="modules.generic.cross_campaign_asset_service.apply_direct_copy",
+            )
+        _call_progress(progress_callback, f"Copying assets ({index}/{total_assets})", index / total_assets)
+
+    for entity_type, records in selected_records.items():
+        if not records:
+            continue
+        existing = load_entities(entity_type, target_campaign.db_path)
+        existing_map = {_determine_record_key(item): item for item in existing}
+        merged: Dict[str, dict] = {key: item for key, item in existing_map.items()}
+
+        for record in records:
+            key = _determine_record_key(record)
+            updated_record = _rewrite_record_paths(entity_type, record, replacements)
+            if key in existing_map:
+                if not overwrite:
+                    summary["skipped"] += 1
+                    continue
+                merged[key] = updated_record
+                summary["updated"] += 1
+            else:
+                merged[key] = updated_record
+                summary["imported"] += 1
+
+        save_entities(entity_type, target_campaign.db_path, list(merged.values()), replace=False)
+
+    _call_progress(progress_callback, "Copy complete", 1.0)
     return summary
 
 

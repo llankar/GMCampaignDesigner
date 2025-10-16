@@ -15,8 +15,10 @@ from tkinter import filedialog, messagebox, ttk, END
 from modules.generic.cross_campaign_asset_service import (
     CampaignDatabase,
     analyze_bundle,
+    apply_direct_copy,
     apply_import,
     cleanup_analysis,
+    detect_duplicates,
     discover_databases_in_directory,
     export_bundle,
     get_active_campaign,
@@ -129,14 +131,20 @@ class CrossCampaignAssetLibraryWindow(ctk.CTkToplevel):
 
         button_row = ctk.CTkFrame(self)
         button_row.grid(row=1, column=0, columnspan=2, sticky="ew", padx=10, pady=(0, 10))
-        button_row.grid_columnconfigure((0, 1, 2), weight=1)
+        button_row.grid_columnconfigure((0, 1, 2, 3), weight=1)
 
         self.export_btn = ctk.CTkButton(button_row, text="Export Selected…", command=self.export_selected)
         self.export_btn.grid(row=0, column=0, padx=6, pady=6, sticky="ew")
+        self.copy_btn = ctk.CTkButton(
+            button_row,
+            text="Copy to Current Campaign",
+            command=self.copy_selected_to_current_campaign,
+        )
+        self.copy_btn.grid(row=0, column=1, padx=6, pady=6, sticky="ew")
         self.import_btn = ctk.CTkButton(button_row, text="Import Bundle…", command=self.import_bundle)
-        self.import_btn.grid(row=0, column=1, padx=6, pady=6, sticky="ew")
+        self.import_btn.grid(row=0, column=2, padx=6, pady=6, sticky="ew")
         self.reload_btn = ctk.CTkButton(button_row, text="Refresh Source", command=self.reload_source)
-        self.reload_btn.grid(row=0, column=2, padx=6, pady=6, sticky="ew")
+        self.reload_btn.grid(row=0, column=3, padx=6, pady=6, sticky="ew")
 
     # --------------------------------------------------------- Campaign list
     def refresh_campaign_list(self):
@@ -334,20 +342,7 @@ class CrossCampaignAssetLibraryWindow(ctk.CTkToplevel):
             messagebox.showwarning("No Source", "Select a source campaign first.")
             return
 
-        selections: Dict[str, List[dict]] = {}
-        for entity_type, tree in self.treeviews.items():
-            records = self.entity_records.get(entity_type, [])
-            items: List[dict] = []
-            for item_id in tree.selection():
-                try:
-                    _, index_str = item_id.split(":", 1)
-                    index = int(index_str)
-                except ValueError:
-                    continue
-                if 0 <= index < len(records):
-                    items.append(copy.deepcopy(records[index]))
-            if items:
-                selections[entity_type] = items
+        selections = self._gather_selected_records()
 
         if not selections:
             messagebox.showinfo("No Selection", "Select at least one asset to export.")
@@ -373,6 +368,57 @@ class CrossCampaignAssetLibraryWindow(ctk.CTkToplevel):
             return "\n".join(lines)
 
         self._run_progress_task("Exporting Assets", worker, "Asset bundle created successfully.", detail)
+
+    def copy_selected_to_current_campaign(self):
+        if not self.selected_campaign:
+            messagebox.showwarning("No Source", "Select a source campaign first.")
+            return
+
+        selections = self._gather_selected_records()
+        if not selections:
+            messagebox.showinfo("No Selection", "Select at least one asset to copy.")
+            return
+
+        duplicates = detect_duplicates(selections, self.active_campaign)
+        if duplicates:
+            details = []
+            for entity_type, names in duplicates.items():
+                details.append(f"{entity_type.title()}: {len(names)}")
+            detail_text = "\n".join(details)
+            response = messagebox.askyesnocancel(
+                "Overwrite Existing Entries?",
+                "Some assets already exist in the active campaign:\n"
+                f"{detail_text}\n\nSelect Yes to overwrite them, No to skip duplicates, or Cancel to abort.",
+            )
+            if response is None:
+                return
+            overwrite = bool(response)
+        else:
+            overwrite = True
+
+        def worker(callback):
+            return apply_direct_copy(
+                selections,
+                source_campaign=self.selected_campaign,
+                target_campaign=self.active_campaign,
+                overwrite=overwrite,
+                progress_callback=callback,
+            )
+
+        def detail(summary: dict) -> str:
+            return (
+                f"Imported: {summary.get('imported', 0)}\n"
+                f"Updated: {summary.get('updated', 0)}\n"
+                f"Skipped: {summary.get('skipped', 0)}"
+            )
+
+        self._run_progress_task(
+            "Copying Assets",
+            worker,
+            "Assets copied into the active campaign.",
+            detail,
+            on_success=self._post_copy,
+        )
 
     # ------------------------------------------------------------- Importing
     def import_bundle(self):
@@ -449,6 +495,38 @@ class CrossCampaignAssetLibraryWindow(ctk.CTkToplevel):
                 f"Assets skipped: {summary.get('skipped', 0)}"
             ),
         )
+
+    def _post_copy(self, summary: dict):
+        if hasattr(self.master, "refresh_entities"):
+            try:
+                self.master.refresh_entities()
+            except Exception:
+                pass
+        messagebox.showinfo(
+            "Copy Complete",
+            (
+                f"Assets imported: {summary.get('imported', 0)}\n"
+                f"Assets updated: {summary.get('updated', 0)}\n"
+                f"Assets skipped: {summary.get('skipped', 0)}"
+            ),
+        )
+
+    def _gather_selected_records(self) -> Dict[str, List[dict]]:
+        selections: Dict[str, List[dict]] = {}
+        for entity_type, tree in self.treeviews.items():
+            records = self.entity_records.get(entity_type, [])
+            items: List[dict] = []
+            for item_id in tree.selection():
+                try:
+                    _, index_str = item_id.split(":", 1)
+                    index = int(index_str)
+                except ValueError:
+                    continue
+                if 0 <= index < len(records):
+                    items.append(copy.deepcopy(records[index]))
+            if items:
+                selections[entity_type] = items
+        return selections
 
     # ------------------------------------------------------- Busy handling
     def _run_progress_task(self, title, worker, success_message, detail_builder, on_success=None):
