@@ -42,6 +42,11 @@ from modules.helpers.text_helpers import format_longtext
 from modules.helpers.config_helper import ConfigHelper
 from modules.ui.image_viewer import show_portrait
 from modules.ui.video_player import play_video_on_second_screen
+from modules.ui.chatbot_dialog import (
+    get_default_chatbot_wrappers,
+    open_chatbot_dialog,
+    _DEFAULT_NAME_FIELD_OVERRIDES as CHATBOT_NAME_OVERRIDES,
+)
 from modules.helpers.logging_helper import log_module_import, log_warning
 from modules.helpers.dice_markup import parse_inline_actions
 from modules.maps.exporters.maptools import build_token_macros
@@ -84,6 +89,7 @@ class DisplayMapController:
             "Creature": GenericModelWrapper("creatures"),
             "PC": GenericModelWrapper("pcs"),
         }
+        self._chatbot_wrappers = get_default_chatbot_wrappers()
         self._templates = {
             "NPC":      load_template("npcs"),
             "Creature": load_template("creatures"),
@@ -654,6 +660,24 @@ class DisplayMapController:
             popup.destroy()
         entry.bind("<Return>", lambda e: on_select()); listbox.bind("<Return>", lambda e: on_select())
         listbox.bind("<Double-Button-1>", on_select)
+
+    def open_chatbot_assistant(self, event=None):
+        try:
+            host = self.parent.winfo_toplevel()
+        except Exception:
+            host = self.parent
+        try:
+            open_chatbot_dialog(
+                host,
+                wrappers=self._chatbot_wrappers,
+                name_field_overrides=CHATBOT_NAME_OVERRIDES,
+            )
+        except Exception as exc:
+            log_warning(
+                f"Failed to launch chatbot: {exc}",
+                func_name="DisplayMapController.open_chatbot_assistant",
+            )
+        return "break" if event else None
 
     def add_marker(self):
         if not getattr(self, "canvas", None):
