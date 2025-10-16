@@ -840,23 +840,38 @@ class ChatbotDialog(ctk.CTkToplevel):
         appearance = ctk.get_appearance_mode()
         idx = 1 if appearance == "Dark" else 0
 
-        def _resolve(value: str | Sequence[str]) -> str:
+        def _resolve(value: str | Sequence[str], fallback: str) -> str:
+            chosen: str | None = None
             if isinstance(value, (list, tuple)):
-                return value[idx if idx < len(value) else 0]
-            if isinstance(value, str):
+                if value:
+                    chosen = value[idx if idx < len(value) else 0]
+            elif isinstance(value, str):
                 parts = value.split()
                 if parts:
-                    return parts[idx if idx < len(parts) else 0]
-            return "#1f1f1f"
+                    chosen = parts[idx if idx < len(parts) else 0]
+                else:
+                    chosen = value
+            if not chosen:
+                return fallback
+            lowered = chosen.lower()
+            if lowered in {"", "none", "null", "transparent"}:
+                return fallback
+            return chosen
 
-        bg = _resolve(raw_bg)
-        fg = _resolve(raw_fg)
+        bg = _resolve(raw_bg, "#2b2b2b" if appearance == "Dark" else "#f6f6f6")
+        fg = _resolve(raw_fg, "#f5f5f5" if appearance == "Dark" else "#121212")
         sel_bg = "#3a3a3a" if appearance == "Dark" else "#d9d9d9"
+        if fg.lower() == bg.lower():
+            fg = "#f5f5f5" if appearance == "Dark" else "#121212"
         return {"bg": bg, "fg": fg, "sel_bg": sel_bg}
 
     def _derive_text_theme(self) -> dict[str, str]:
         base = self._derive_listbox_theme()
-        return {"bg": base["bg"], "fg": base["fg"], "sel_bg": base["sel_bg"]}
+        bg = base["bg"]
+        fg = base["fg"]
+        if fg.lower() == bg.lower():
+            fg = "#f5f5f5" if ctk.get_appearance_mode() == "Dark" else "#121212"
+        return {"bg": bg, "fg": fg, "sel_bg": base["sel_bg"]}
 
 
 # ---------------------------------------------------------------------------
