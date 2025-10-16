@@ -307,7 +307,7 @@ class ChatbotDialog(ctk.CTkToplevel):
         name_field_overrides: Mapping[str, str] | None = None,
         note_field_candidates: Iterable[str] | None = None,
         title: str = "Campaign Chatbot",
-        geometry: str = "840x720",
+        geometry: str = "1500x800",
     ) -> None:
         super().__init__(master)
         self.title(title)

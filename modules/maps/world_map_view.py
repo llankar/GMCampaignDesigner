@@ -2097,8 +2097,8 @@ class WorldMapWindow(ctk.CTkToplevel):
         super().__init__(master)
         self.title("World Map")
         try:
-            self.geometry("1400x900")
-            self.minsize(1200, 720)
+            self.geometry("1920X1080")
+            self.minsize(1920, 1080)
         except Exception:
             pass
         self.configure(fg_color="#0C0F1A")
