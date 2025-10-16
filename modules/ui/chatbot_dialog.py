@@ -9,7 +9,13 @@ import tkinter as tk
 import customtkinter as ctk
 
 from modules.generic.generic_model_wrapper import GenericModelWrapper
-from modules.helpers.logging_helper import log_module_import
+from modules.helpers.logging_helper import (
+    log_debug,
+    log_exception,
+    log_info,
+    log_module_import,
+    log_warning,
+)
 from modules.helpers.text_helpers import normalize_rtf_json
 
 log_module_import(__name__)
@@ -474,6 +480,10 @@ class ChatbotDialog(ctk.CTkToplevel):
         self._notes_widget: tk.Text | None = None
 
         self._build_ui()
+        log_info(
+            f"ChatbotDialog.__init__ - Initializing chatbot dialog with {len(self._wrappers)} wrappers",
+            func_name="ChatbotDialog.__init__",
+        )
         self._populate(initial=True)
         self.after(75, self._focus_query_entry)
 
@@ -624,10 +634,18 @@ class ChatbotDialog(ctk.CTkToplevel):
     # Data interaction
     # ------------------------------------------------------------------
     def _populate(self, *, initial: bool, query: str = "") -> None:
+        log_info(
+            f"ChatbotDialog._populate - Refreshing results (initial={initial}, query={query!r})",
+            func_name="ChatbotDialog._populate",
+        )
         self.result_list.delete(0, tk.END)
         self._results.clear()
 
         if not self._wrappers:
+            log_warning(
+                "ChatbotDialog._populate - No wrappers were provided; displaying empty state",
+                func_name="ChatbotDialog._populate",
+            )
             self._render_text(RichTextValue("No data sources are available for the chatbot."))
             return
 
@@ -635,11 +653,30 @@ class ChatbotDialog(ctk.CTkToplevel):
             try:
                 items = wrapper.load_items()
             except Exception:
+                log_exception(
+                    f"ChatbotDialog._populate - Failed to load items for {entity_type}",
+                    func_name="ChatbotDialog._populate",
+                )
                 continue
             name_field = self._name_field_overrides.get(entity_type, "Name")
+            try:
+                count = len(items)  # type: ignore[arg-type]
+                log_debug(
+                    f"ChatbotDialog._populate - Loaded {count} records for {entity_type} (name field: {name_field})",
+                    func_name="ChatbotDialog._populate",
+                )
+            except Exception:
+                log_debug(
+                    f"ChatbotDialog._populate - Loaded records for {entity_type} but total count is unknown",
+                    func_name="ChatbotDialog._populate",
+                )
             for record in items:
                 name = str(record.get(name_field, ""))
                 if not name:
+                    log_debug(
+                        f"ChatbotDialog._populate - Skipping {entity_type} record without a name",
+                        func_name="ChatbotDialog._populate",
+                    )
                     continue
                 if initial or (query and query in name.lower()):
                     display = f"{entity_type.rstrip('s')}: {name}"
@@ -652,6 +689,10 @@ class ChatbotDialog(ctk.CTkToplevel):
             self.result_list.activate(0)
             self._display_selected_note()
         else:
+            log_info(
+                f"ChatbotDialog._populate - No results matched query {query!r}",
+                func_name="ChatbotDialog._populate",
+            )
             self.selection_label.configure(text="")
             if query:
                 self._render_text(RichTextValue("No results matched that query."))
@@ -668,10 +709,18 @@ class ChatbotDialog(ctk.CTkToplevel):
         if idx >= len(self._results):
             return
         entity_type, name, record = self._results[idx]
+        log_info(
+            f"ChatbotDialog._display_selected_note - Rendering notes for {entity_type} '{name}'",
+            func_name="ChatbotDialog._display_selected_note",
+        )
         self.selection_label.configure(text=f"{entity_type}: {name}")
 
         sections = self._collate_sections(entity_type, record)
         if not sections:
+            log_warning(
+                "ChatbotDialog._display_selected_note - No sections found after collation",
+                func_name="ChatbotDialog._display_selected_note",
+            )
             self._render_text(RichTextValue("No notes available for this record."))
             return
         self._render_sections(sections)
@@ -696,6 +745,11 @@ class ChatbotDialog(ctk.CTkToplevel):
     def _collate_sections(
         self, entity_type: str, record: Mapping[str, Any]
     ) -> list[tuple[str, list[tuple[str, RichTextValue]]]]:
+        available_fields = sorted(str(key) for key in record.keys())
+        log_debug(
+            f"ChatbotDialog._collate_sections - Starting collation for {entity_type} with fields: {available_fields}",
+            func_name="ChatbotDialog._collate_sections",
+        )
         sections: list[tuple[str, list[tuple[str, RichTextValue]]]] = []
         used: set[str] = set()
 
@@ -703,14 +757,26 @@ class ChatbotDialog(ctk.CTkToplevel):
             entries: list[tuple[str, RichTextValue]] = []
             for field in field_names:
                 if field in used:
+                    log_debug(
+                        f"ChatbotDialog._collate_sections - Skipping duplicate field {field}",
+                        func_name="ChatbotDialog._collate_sections",
+                    )
                     continue
                 normalized = _normalize_value(record.get(field))
                 if not normalized or not normalized.has_content():
+                    log_debug(
+                        f"ChatbotDialog._collate_sections - Field {field} had no usable content",
+                        func_name="ChatbotDialog._collate_sections",
+                    )
                     continue
                 entries.append((field, normalized.cleaned()))
                 used.add(field)
             if entries:
                 sections.append((title, entries))
+                log_debug(
+                    f"ChatbotDialog._collate_sections - Added section '{title}' with fields {[label for label, _ in entries]}",
+                    func_name="ChatbotDialog._collate_sections",
+                )
 
         additional: list[tuple[str, RichTextValue]] = []
         for key, value in record.items():
@@ -718,11 +784,24 @@ class ChatbotDialog(ctk.CTkToplevel):
                 continue
             normalized = _normalize_value(value)
             if not normalized or not normalized.has_content():
+                log_debug(
+                    f"ChatbotDialog._collate_sections - Additional field {key} lacked content",
+                    func_name="ChatbotDialog._collate_sections",
+                )
                 continue
             additional.append((key, normalized.cleaned()))
             used.add(key)
         if additional:
             sections.append(("Additional Details", additional))
+            log_debug(
+                f"ChatbotDialog._collate_sections - Added Additional Details section with fields {[label for label, _ in additional]}",
+                func_name="ChatbotDialog._collate_sections",
+            )
+        if not sections:
+            log_warning(
+                "ChatbotDialog._collate_sections - No sections were generated for this record",
+                func_name="ChatbotDialog._collate_sections",
+            )
         return sections
 
     def _set_notes_state(self, state: str) -> None:
