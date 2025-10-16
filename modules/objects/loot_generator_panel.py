@@ -7,6 +7,7 @@ from tkinter import messagebox
 from modules.generic.generic_model_wrapper import GenericModelWrapper
 from modules.objects.object_constants import OBJECT_CATEGORY_ALLOWED
 from modules.helpers.template_loader import load_template
+from modules.helpers.text_helpers import format_multiline_text
 from modules.helpers.logging_helper import (
     log_info,
     log_exception,
@@ -277,6 +278,16 @@ class LootGeneratorPanel(ctk.CTkFrame):
         return None
 
     # ------------------------------------------------------------------
+    @staticmethod
+    def _text_from_rtf(value) -> str:
+        """Extract plain text from a rich text field."""
+        if isinstance(value, dict):
+            return value.get("text", "")
+        if value is None:
+            return ""
+        return str(value)
+
+    # ------------------------------------------------------------------
     def _filter_objects(self) -> List[dict]:
         selected_categories = [cat for cat, var in self.category_vars.items() if var.get()]
         include_keywords = self._keyword_list(self.include_var)
@@ -371,8 +382,8 @@ class LootGeneratorPanel(ctk.CTkFrame):
                 font=("TkDefaultFont", 14, "bold"),
                 anchor="w",
             ).grid(row=0, column=0, sticky="w", padx=8, pady=(8, 4))
-            description = item.get("Description") or ""
-            stats = item.get("Stats") or ""
+            description = format_multiline_text(self._text_from_rtf(item.get("Description"))).strip()
+            stats = format_multiline_text(self._text_from_rtf(item.get("Stats"))).strip()
             if description:
                 ctk.CTkLabel(
                     card,
@@ -405,8 +416,8 @@ class LootGeneratorPanel(ctk.CTkFrame):
             category = item.get("Category")
             header = name if not category else f"{name} ({category})"
             lines.append(header)
-            description = item.get("Description") or ""
-            stats = item.get("Stats") or ""
+            description = self._text_from_rtf(item.get("Description")).strip()
+            stats = self._text_from_rtf(item.get("Stats")).strip()
             if description:
                 lines.append(description)
             if stats:
