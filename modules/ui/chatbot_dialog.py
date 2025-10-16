@@ -406,11 +406,37 @@ class ChatbotDialog(ctk.CTkToplevel):
         self._section_font = ctk.CTkFont(size=18, weight="bold")
         self._field_font = ctk.CTkFont(size=15, weight="bold")
 
-        self.notes_box = ctk.CTkTextbox(notes_frame, wrap="word", font=self._body_font)
+        body_family = self._body_font.cget("family")
+        self._bold_font = ctk.CTkFont(family=body_family, size=13, weight="bold")
+        self._italic_font = ctk.CTkFont(family=body_family, size=13, slant="italic")
+        self._underline_font = ctk.CTkFont(family=body_family, size=13, underline=True)
+
+        text_theme = self._derive_text_theme()
+        self.notes_box = tk.Text(
+            notes_frame,
+            wrap="word",
+            font=self._body_font,
+            bg=text_theme["bg"],
+            fg=text_theme["fg"],
+            insertbackground=text_theme["fg"],
+            selectbackground=text_theme["sel_bg"],
+            selectforeground=text_theme["fg"],
+            highlightthickness=0,
+            borderwidth=0,
+            padx=8,
+            pady=8,
+        )
         self.notes_box.grid(row=1, column=0, sticky="nsew")
-        self.notes_box.configure(state=tk.DISABLED)
+        self.notes_box.configure(
+            state=tk.DISABLED,
+            disabledbackground=text_theme["bg"],
+            disabledforeground=text_theme["fg"],
+        )
         self.notes_box.tag_configure("section_title", font=self._section_font, spacing3=8)
         self.notes_box.tag_configure("field_label", font=self._field_font)
+        self.notes_box.tag_configure("bold", font=self._bold_font)
+        self.notes_box.tag_configure("italic", font=self._italic_font)
+        self.notes_box.tag_configure("underline", font=self._underline_font)
 
     # ------------------------------------------------------------------
     # Event handlers
@@ -643,6 +669,14 @@ class ChatbotDialog(ctk.CTkToplevel):
         fg_color = _resolve(raw_txt)
         sel_bg = "#3a3a3a" if appearance == "Dark" else "#d9d9d9"
         return {"bg": bg_color, "fg": fg_color, "sel_bg": sel_bg}
+
+    def _derive_text_theme(self) -> dict[str, str]:
+        theme = self._derive_listbox_theme()
+        return {
+            "bg": theme["bg"],
+            "fg": theme["fg"],
+            "sel_bg": theme["sel_bg"],
+        }
 
 
 def open_chatbot_dialog(
