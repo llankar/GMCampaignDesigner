@@ -71,6 +71,7 @@ from modules.objects.object_importer import ObjectImportWindow
 from modules.scenarios.scenario_generator_view import ScenarioGeneratorView
 from modules.scenarios.scenario_builder_wizard import ScenarioBuilderWizard
 from modules.generic.export_for_foundry import preview_and_export_foundry
+from modules.generic.cross_campaign_asset_library import CrossCampaignAssetLibraryWindow
 from modules.helpers import text_helpers, dice_markup
 from db.db import initialize_db, ensure_entity_schema
 from modules.factions.faction_graph_editor import FactionGraphEditor
@@ -136,6 +137,7 @@ class MainWindow(ctk.CTk):
         self.sound_manager_window = None
         self.audio_bar_window = None
         self.portrait_importer = PortraitImporter(self)
+        self._asset_library_window = None
         self._busy_modal = None
         self._system_selector_dialog = None
         root = self.winfo_toplevel()
@@ -245,6 +247,7 @@ class MainWindow(ctk.CTk):
             "customize_fields": "customize_fields.png",
             "new_entity_type": "customize_fields.png",
             "export_scenarios": "export_icon.png",
+            "asset_library": "icons/save.png",
             "gm_screen": "gm_screen_icon.png",
             "npc_graph": "npc_graph_icon.png",
             "pc_graph": "pc_graph_icon.png",
@@ -290,6 +293,26 @@ class MainWindow(ctk.CTk):
             log_exception(f"Failed to open Custom Fields Editor: {e}",
                           func_name="main_window.MainWindow.open_custom_fields_editor")
             messagebox.showerror("Error", f"Failed to open Custom Fields Editor:\n{e}")
+
+    def open_cross_campaign_asset_library(self):
+        try:
+            if self._asset_library_window and self._asset_library_window.winfo_exists():
+                self._asset_library_window.lift()
+                self._asset_library_window.focus_force()
+                return
+            log_info(
+                "Opening Cross-campaign Asset Library",
+                func_name="main_window.MainWindow.open_cross_campaign_asset_library",
+            )
+            window = CrossCampaignAssetLibraryWindow(self)
+            window.bind("<Destroy>", lambda _evt: setattr(self, "_asset_library_window", None))
+            self._asset_library_window = window
+        except Exception as exc:
+            log_exception(
+                f"Failed to open asset library: {exc}",
+                func_name="main_window.MainWindow.open_cross_campaign_asset_library",
+            )
+            messagebox.showerror("Error", f"Failed to open asset library window:\n{exc}")
 
     def open_new_entity_type_dialog(self):
         try:
@@ -573,6 +596,7 @@ class MainWindow(ctk.CTk):
             ("new_entity_type", "New Entity Type", self.open_new_entity_type_dialog),
             ("db_export", "Create Campaign Backup", self.prompt_campaign_backup),
             ("db_import", "Restore Campaign Backup", self.prompt_campaign_restore),
+            ("asset_library", "Cross-campaign Asset Library", self.open_cross_campaign_asset_library),
         ]
 
         entity_buttons = []

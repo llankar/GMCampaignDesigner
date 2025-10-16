@@ -25,6 +25,7 @@ Portrait support with automatic resizing and storage for NPCs and other entities
 Export Capabilities:
 
 Export selected scenario details to a DOCX file, compiling associated information (like NPCs and places) for convenient sharing and documentation.
+- Cross-campaign Asset Library to bundle NPCs, objects, and maps (with their images) for reuse between campaigns.
 Developer-Friendly Design:
 
 Modular architecture for easy expansion—new entities can be added with minimal effort.
@@ -83,6 +84,9 @@ Delete: Remove entries.
 Search & Filter: Quickly locate items using the built-in search functionality.
 Exporting Scenarios:
 The export functionality lets you select one or more scenarios and generate a DOCX file. This file compiles the scenario details along with related data (such as linked NPCs and places) for convenient offline viewing or sharing.
+
+Cross-campaign Asset Library:
+Use the **Cross-campaign Asset Library** button (Data & System section) to browse neighboring campaign databases, review their NPCs, objects, and maps, and export selected records—including portraits, map images, fog masks, and token assets—into a portable bundle. The same window can import bundles into the active campaign, reconcile duplicates, and copy all referenced media into the correct folders automatically.
 
 Contributing
 Contributions to GMCampaignDesigner2 are welcome! To contribute:
