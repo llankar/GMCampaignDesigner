@@ -1134,7 +1134,14 @@ class DisplayMapController:
         except Exception:
             position_x = position_y = 0.0
         name_var = tk.StringVar(value=existing_overlay.get("label", "") if is_edit else "")
-        asset_initial = existing_overlay.get("resolved_animation_path") or existing_overlay.get("animation_path") or ""
+        if is_edit:
+            asset_initial = (
+                existing_overlay.get("resolved_animation_path")
+                or existing_overlay.get("animation_path")
+                or ""
+            )
+        else:
+            asset_initial = ""
         path_var = tk.StringVar(value=asset_initial or "")
         width_var = tk.StringVar(value=f"{geometry.get('width', 0.0):.2f}")
         height_var = tk.StringVar(value=f"{geometry.get('height', 0.0):.2f}")
