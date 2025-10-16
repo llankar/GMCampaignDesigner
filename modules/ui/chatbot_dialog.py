@@ -504,6 +504,8 @@ class ChatbotDialog(ctk.CTkToplevel):
 
         self._results: list[tuple[str, str, Mapping[str, Any]]] = []
         self._notes_widget: tk.Text | None = None
+        self._item_cache: dict[str, list[Mapping[str, Any]]] = {}
+        self._search_cache: dict[str, list[str]] = {}
 
         self._build_ui()
         log_info(
@@ -683,14 +685,26 @@ class ChatbotDialog(ctk.CTkToplevel):
             return
 
         for entity_type, wrapper in self._wrappers.items():
-            try:
-                items = wrapper.load_items()
-            except Exception:
-                log_exception(
-                    f"ChatbotDialog._populate - Failed to load items for {entity_type}",
-                    func_name="ChatbotDialog._populate",
-                )
-                continue
+            if entity_type not in self._item_cache:
+                try:
+                    items = list(wrapper.load_items())
+                except Exception:
+                    log_exception(
+                        f"ChatbotDialog._populate - Failed to load items for {entity_type}",
+                        func_name="ChatbotDialog._populate",
+                    )
+                    self._item_cache[entity_type] = []
+                    self._search_cache[entity_type] = []
+                    continue
+                self._item_cache[entity_type] = items
+                self._search_cache[entity_type] = [
+                    self._build_search_blob(entity_type, record) for record in items
+                ]
+            items = self._item_cache.get(entity_type, [])
+            search_blobs = self._search_cache.get(entity_type, [])
+            if len(search_blobs) != len(items):
+                search_blobs = [self._build_search_blob(entity_type, record) for record in items]
+                self._search_cache[entity_type] = search_blobs
             name_field = self._name_field_overrides.get(entity_type, "Name")
             try:
                 count = len(items)  # type: ignore[arg-type]
@@ -704,7 +718,7 @@ class ChatbotDialog(ctk.CTkToplevel):
                     func_name="ChatbotDialog._populate",
                 )
             added_for_entity = 0
-            for record in items:
+            for idx, record in enumerate(items):
                 name = str(record.get(name_field, ""))
                 if not name:
                     log_debug(
@@ -712,7 +726,8 @@ class ChatbotDialog(ctk.CTkToplevel):
                         func_name="ChatbotDialog._populate",
                     )
                     continue
-                if initial or (query and query in name.lower()):
+                blob = search_blobs[idx] if idx < len(search_blobs) else ""
+                if initial or (query and (query in name.lower() or query in blob)):
                     display = f"{entity_type.rstrip('s')}: {name}"
                     self.result_list.insert(tk.END, display)
                     self._results.append((entity_type, name, record))
@@ -737,6 +752,39 @@ class ChatbotDialog(ctk.CTkToplevel):
                 self._render_text(RichTextValue("No results matched that query."))
             else:
                 self._render_text(RichTextValue("No records available to display."))
+
+    def _build_search_blob(self, entity_type: str, record: Mapping[str, Any]) -> str:
+        parts: list[str] = []
+
+        def visit(value: Any) -> None:
+            if value is None:
+                return
+            if isinstance(value, str):
+                stripped = value.strip()
+                if stripped:
+                    parts.append(stripped.lower())
+                return
+            if isinstance(value, Mapping):
+                for key, inner in value.items():
+                    parts.append(str(key).lower())
+                    visit(inner)
+                return
+            if isinstance(value, (list, tuple, set)):
+                for item in value:
+                    visit(item)
+                return
+            parts.append(str(value).lower())
+
+        for key, val in record.items():
+            parts.append(str(key).lower())
+            visit(val)
+
+        blob = " ".join(parts)
+        log_debug(
+            f"ChatbotDialog._build_search_blob - Generated blob of length {len(blob)} for {entity_type}",
+            func_name="ChatbotDialog._build_search_blob",
+        )
+        return blob
 
     def _display_selected_note(self, _event=None) -> None:
         selection = self.result_list.curselection()
