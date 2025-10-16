@@ -5,7 +5,7 @@ import os
 from functools import lru_cache
 import tkinter as tk
 import customtkinter as ctk
-from PIL import Image, ImageTk, ImageDraw
+from PIL import Image, ImageTk, ImageDraw, ImageSequence
 from modules.helpers.config_helper import ConfigHelper
 from modules.helpers.template_loader import load_template
 from modules.generic.generic_list_selection_view import GenericListSelectionView
@@ -39,6 +39,14 @@ def _campaign_relative_path(path: str) -> str:
     if relative.startswith(".."):  # outside the campaign directory
         return path
     return relative.replace(os.sep, "/")
+
+
+def _normalize_geometry(value):
+    if isinstance(value, dict):
+        return {key: _normalize_geometry(sub_value) for key, sub_value in value.items()}
+    if isinstance(value, (list, tuple)):
+        return [_normalize_geometry(item) for item in value]
+    return value
 
 
 @lru_cache(maxsize=1)
@@ -138,6 +146,40 @@ def select_map(self):
         on_select_callback=self._on_display_map
     )
     selector.pack(fill="both", expand=True)
+
+
+def _load_overlay_animation_metadata(path: str) -> dict:
+    metadata = {
+        "animation_frames": [],
+        "animation_durations": [],
+        "animation_frame_count": 0,
+        "animation_size": None,
+        "animation_loop": 0,
+    }
+
+    if not path:
+        return metadata
+
+    if not os.path.exists(path):
+        print(f"[_load_overlay_animation_metadata] Animation asset not found: {path}")
+        return metadata
+
+    try:
+        with Image.open(path) as img:
+            metadata["animation_size"] = img.size
+            metadata["animation_loop"] = img.info.get("loop", 0)
+            frames = []
+            durations = []
+            for frame in ImageSequence.Iterator(img):
+                frames.append(frame.convert("RGBA"))
+                durations.append(int(frame.info.get("duration", 100)))
+            metadata["animation_frames"] = frames
+            metadata["animation_durations"] = durations
+            metadata["animation_frame_count"] = len(frames)
+    except Exception as exc:
+        print(f"[_load_overlay_animation_metadata] Failed to load animation '{path}': {exc}")
+
+    return metadata
 
 def _on_display_map(self, entity_type, map_name): # entity_type here is the map's default, not token's
     """Callback from selector: build editor UI and load the chosen map."""
@@ -395,6 +437,41 @@ def _on_display_map(self, entity_type, map_name): # entity_type here is the map'
                 "description_editor": None,
                 "focus_pending": False,
             })
+        elif item_type_from_rec == "overlay":
+            animation_path = (rec.get("animation_asset_path") or rec.get("animation_path") or "").strip()
+            resolved_animation = _resolve_campaign_path(animation_path) if animation_path else ""
+            if resolved_animation and not os.path.exists(resolved_animation) and animation_path:
+                fallback_animation = _find_existing_token_image(animation_path)
+                if fallback_animation and os.path.exists(fallback_animation):
+                    resolved_animation = fallback_animation
+            storage_animation = _campaign_relative_path(resolved_animation) if resolved_animation else animation_path
+            if storage_animation and storage_animation != animation_path:
+                rec["animation_path"] = storage_animation
+                rec["animation_asset_path"] = storage_animation
+                token_paths_updated = True
+            playback = rec.get("playback") or rec.get("playback_settings") or {}
+            if not isinstance(playback, dict):
+                try:
+                    playback = dict(playback)
+                except Exception:
+                    playback = {}
+            opacity = rec.get("opacity", 1.0)
+            try:
+                opacity = float(opacity)
+            except (TypeError, ValueError):
+                opacity = 1.0
+            opacity = max(0.0, min(1.0, opacity))
+            coverage = _normalize_geometry(rec.get("coverage") or rec.get("coverage_geometry") or {})
+            overlay_metadata = _load_overlay_animation_metadata(resolved_animation)
+            item_data.update({
+                "animation_path": storage_animation,
+                "animation_asset_path": storage_animation,
+                "resolved_animation_path": resolved_animation,
+                "playback": playback,
+                "opacity": opacity,
+                "coverage": coverage,
+            })
+            item_data.update(overlay_metadata)
         else:
             print(f"[_on_display_map] Unknown item type '{item_type_from_rec}' in map data. Skipping: {rec}")
             continue

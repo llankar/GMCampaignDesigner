@@ -40,6 +40,15 @@ def _campaign_relative_path(path: str) -> str:
     return relative.replace(os.sep, "/")
 
 
+def _normalize_geometry(value):
+    """Convert tuples to lists for JSON serialisation while preserving structure."""
+    if isinstance(value, dict):
+        return {key: _normalize_geometry(sub_value) for key, sub_value in value.items()}
+    if isinstance(value, (list, tuple)):
+        return [_normalize_geometry(item) for item in value]
+    return value
+
+
 def _deserialize_tokens_field(raw_tokens: Any) -> Tuple[list, type]:
     """Return a list of token dicts and remember the original container type."""
     if isinstance(raw_tokens, list):
@@ -102,6 +111,16 @@ def normalize_existing_token_paths(maps_wrapper) -> bool:
                     relative_video = _campaign_relative_path(resolved_video)
                     if relative_video and relative_video != existing_video:
                         token["video_path"] = relative_video
+                        item_updated = True
+
+            if token.get("type") == "overlay":
+                overlay_path = token.get("animation_path") or token.get("animation_asset_path")
+                if overlay_path:
+                    resolved_overlay = _resolve_campaign_path(overlay_path)
+                    relative_overlay = _campaign_relative_path(resolved_overlay)
+                    if relative_overlay and relative_overlay != overlay_path:
+                        token["animation_path"] = relative_overlay
+                        token["animation_asset_path"] = relative_overlay
                         item_updated = True
 
         if item_updated:
@@ -445,6 +464,29 @@ def _persist_tokens(self):
                     "border_color": t.get("border_color", "#00ff00"),
                     "video_path": storage_video,
                     "linked_map": t.get("linked_map", ""),
+                })
+            elif item_type == "overlay":
+                animation_path = t.get("animation_path") or t.get("animation_asset_path") or ""
+                resolved_animation = _resolve_campaign_path(animation_path)
+                storage_animation = _campaign_relative_path(resolved_animation) if resolved_animation else animation_path
+                playback = t.get("playback") or t.get("playback_settings") or {}
+                if not isinstance(playback, dict):
+                    try:
+                        playback = dict(playback)
+                    except Exception:
+                        playback = {}
+                opacity = t.get("opacity", 1.0)
+                try:
+                    opacity = float(opacity)
+                except (TypeError, ValueError):
+                    opacity = 1.0
+                coverage = _normalize_geometry(t.get("coverage") or t.get("coverage_geometry") or {})
+                item_data.update({
+                    "animation_path": storage_animation,
+                    "animation_asset_path": storage_animation,
+                    "playback": playback,
+                    "opacity": opacity,
+                    "coverage": coverage,
                 })
             else:
                 # Silently skip unknown types for now
