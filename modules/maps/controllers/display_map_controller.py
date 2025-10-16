@@ -1,6 +1,7 @@
 import os
 import json
 import copy
+import random
 import re
 import time
 import importlib
@@ -38,6 +39,10 @@ from modules.maps.views.web_display_view import open_web_display, _update_web_di
 from modules.maps.services.entity_picker_service import open_entity_picker, on_entity_selected
 from modules.maps.utils.icon_loader import load_icon
 from PIL import Image, ImageTk, ImageDraw
+from modules.maps.services.weather_effects import (
+    available_weather_effects,
+    generate_weather_frames,
+)
 from modules.generic.generic_model_wrapper import GenericModelWrapper
 from modules.helpers.template_loader import load_template
 
@@ -608,25 +613,33 @@ class DisplayMapController:
         }
 
     def _ensure_overlay_render_state(self, item, resample):
-        frames = item.get("animation_frames") or []
         state = item.setdefault("_overlay_animation", {})
-
-        if not frames:
-            state.setdefault("tk_frames", [])
-            state.setdefault("pil_frames", [])
-            state.setdefault("current_size", (0, 0))
-            state.setdefault("frame_index", 0)
-            state.setdefault("offset_units", (0.0, 0.0))
-            state.setdefault("anchor", "nw")
-            state.setdefault("durations", item.get("animation_durations") or [])
-            return state
+        effect_value = (
+            item.get("weather_effect")
+            or item.get("effect_type")
+            or item.get("procedural_effect")
+            or ""
+        )
+        effect_value = str(effect_value).strip().lower()
+        frames = item.get("animation_frames") or []
 
         geometry = self._extract_overlay_geometry(item)
         zoom = self.zoom if self.zoom else 1.0
 
         width_units = geometry.get("width") or 0.0
         height_units = geometry.get("height") or 0.0
-        if width_units <= 0 or height_units <= 0:
+
+        if effect_value and (width_units <= 0 or height_units <= 0):
+            if self.base_img is not None:
+                try:
+                    base_w, base_h = self.base_img.size
+                except Exception:
+                    base_w = base_h = 0
+            else:
+                base_w = base_h = 0
+            width_units = width_units or base_w or 1.0
+            height_units = height_units or base_h or 1.0
+        elif (width_units <= 0 or height_units <= 0) and frames:
             first_frame = frames[0]
             try:
                 fw, fh = first_frame.size
@@ -645,33 +658,80 @@ class DisplayMapController:
             opacity = 1.0
         opacity = max(0.0, min(1.0, opacity))
 
-        render_key = (target_width, target_height, round(opacity, 3), round(zoom, 4))
+        render_key = (
+            target_width,
+            target_height,
+            round(opacity, 3),
+            round(zoom, 4),
+            effect_value,
+        )
+
         processed_frames = state.get("pil_frames") or []
         tk_frames = state.get("tk_frames") or []
+        durations = item.get("animation_durations") or state.get("durations") or []
 
-        if state.get("render_key") != render_key or not tk_frames:
-            processed_frames = []
-            tk_frames = []
-            for frame in frames:
-                try:
-                    working = frame.convert("RGBA")
-                except Exception:
-                    continue
-                if working.size != (target_width, target_height):
-                    working = working.resize((target_width, target_height), resample=resample)
-                if opacity < 1.0:
-                    working = working.copy()
-                    alpha_channel = working.split()[-1] if working.mode == "RGBA" else None
-                    if alpha_channel:
-                        alpha_channel = alpha_channel.point(lambda a: int(a * opacity))
-                        working.putalpha(alpha_channel)
-                    else:
-                        working.putalpha(int(255 * opacity))
-                processed_frames.append(working)
-                tk_frames.append(ImageTk.PhotoImage(working))
-            state["render_key"] = render_key
-            state["last_update"] = time.monotonic()
+        if effect_value:
+            seed = item.get("weather_seed")
+            if not isinstance(seed, int):
+                seed = random.randint(0, 0xFFFFFFFF)
+                item["weather_seed"] = seed
+            frame_count_override = item.get("weather_frame_count")
+            cache_key = (
+                effect_value,
+                target_width,
+                target_height,
+                round(opacity, 3),
+                seed,
+                int(frame_count_override or 0),
+            )
+            if state.get("weather_cache_key") != cache_key or not tk_frames:
+                generated_frames, generated_durations = generate_weather_frames(
+                    effect_value,
+                    target_width,
+                    target_height,
+                    frame_count=frame_count_override,
+                    seed=seed,
+                    opacity=opacity,
+                )
+                processed_frames = generated_frames
+                tk_frames = [ImageTk.PhotoImage(frame) for frame in generated_frames]
+                durations = generated_durations or durations
+                state["weather_cache_key"] = cache_key
+                state["last_update"] = time.monotonic()
+        else:
+            if not frames:
+                state.setdefault("tk_frames", [])
+                state.setdefault("pil_frames", [])
+                state.setdefault("current_size", (0, 0))
+                state.setdefault("frame_index", 0)
+                state.setdefault("offset_units", (0.0, 0.0))
+                state.setdefault("anchor", "nw")
+                state.setdefault("durations", durations)
+                return state
 
+            if state.get("render_key") != render_key or not tk_frames:
+                processed_frames = []
+                tk_frames = []
+                for frame in frames:
+                    try:
+                        working = frame.convert("RGBA")
+                    except Exception:
+                        continue
+                    if working.size != (target_width, target_height):
+                        working = working.resize((target_width, target_height), resample=resample)
+                    if opacity < 1.0:
+                        working = working.copy()
+                        alpha_channel = working.split()[-1] if working.mode == "RGBA" else None
+                        if alpha_channel:
+                            alpha_channel = alpha_channel.point(lambda a: int(a * opacity))
+                            working.putalpha(alpha_channel)
+                        else:
+                            working.putalpha(int(255 * opacity))
+                    processed_frames.append(working)
+                    tk_frames.append(ImageTk.PhotoImage(working))
+                state["last_update"] = time.monotonic()
+
+        state["render_key"] = render_key
         state["pil_frames"] = processed_frames
         state["tk_frames"] = tk_frames
         state["current_size"] = (target_width, target_height)
@@ -680,7 +740,7 @@ class DisplayMapController:
         state["speed"] = geometry.get("speed", 1.0)
         state["paused"] = geometry.get("paused", False)
         state["loop"] = bool(geometry.get("loop", True))
-        state["durations"] = item.get("animation_durations") or state.get("durations") or []
+        state["durations"] = durations or state.get("durations") or []
 
         frame_count = len(tk_frames)
         frame_index = state.get("frame_index", 0)
@@ -689,7 +749,7 @@ class DisplayMapController:
         else:
             frame_index = 0
         state["frame_index"] = frame_index
-        if frame_count:
+        if frame_count and processed_frames:
             state["current_pil_frame"] = processed_frames[frame_index % len(processed_frames)]
         else:
             state["current_pil_frame"] = None
@@ -867,7 +927,15 @@ class DisplayMapController:
     def _invalidate_overlay_render_cache(self, overlay):
         state = overlay.get("_overlay_animation")
         if isinstance(state, dict):
-            for key in ("tk_frames", "pil_frames", "render_key", "current_size", "fs_frames", "fs_render_key"):
+            for key in (
+                "tk_frames",
+                "pil_frames",
+                "render_key",
+                "current_size",
+                "fs_frames",
+                "fs_render_key",
+                "weather_cache_key",
+            ):
                 state.pop(key, None)
 
     def _apply_overlay_label(self, overlay, label):
@@ -959,6 +1027,29 @@ class DisplayMapController:
         state.setdefault("speed", float(playback.get("speed", 1.0)))
         state["last_update"] = time.monotonic()
         self._ensure_overlay_animation_schedule()
+        self._persist_tokens()
+
+    def _apply_overlay_effect(self, overlay, effect_name):
+        if not overlay:
+            return
+        normalized = str(effect_name or "").strip().lower()
+        if normalized:
+            overlay["weather_effect"] = normalized
+            if "weather_seed" not in overlay:
+                overlay["weather_seed"] = random.randint(0, 0xFFFFFFFF)
+            overlay["animation_path"] = ""
+            overlay["animation_asset_path"] = ""
+            overlay["resolved_animation_path"] = ""
+            overlay["animation_frames"] = []
+            overlay["animation_durations"] = []
+            overlay["animation_frame_count"] = 0
+            overlay["animation_size"] = None
+            overlay["animation_loop"] = 0
+        else:
+            overlay.pop("weather_effect", None)
+            overlay.pop("weather_seed", None)
+        self._invalidate_overlay_render_cache(overlay)
+        self._update_canvas_images()
         self._persist_tokens()
 
     def _normalize_overlay_asset_path(self, raw_path):
@@ -1088,6 +1179,8 @@ class DisplayMapController:
     def _apply_overlay_asset(self, overlay, storage_path, resolved_path, metadata):
         if not overlay:
             return
+        overlay.pop("weather_effect", None)
+        overlay.pop("weather_seed", None)
         overlay["animation_path"] = storage_path
         overlay["animation_asset_path"] = storage_path
         overlay["resolved_animation_path"] = resolved_path
@@ -1133,6 +1226,28 @@ class DisplayMapController:
             position_x, position_y = position
         except Exception:
             position_x = position_y = 0.0
+        effect_names = list(available_weather_effects())
+        effect_display_map = {name.title(): name for name in effect_names}
+        effect_lookup = {name.lower(): name for name in effect_names}
+        effect_options = ["None"] + [display for display in effect_display_map]
+
+        def _effect_display(value: str) -> str:
+            normalized = (value or "").strip().lower()
+            for display, key in effect_display_map.items():
+                if key == normalized:
+                    return display
+            return "None"
+
+        existing_effect = ""
+        if is_edit:
+            existing_effect = (
+                existing_overlay.get("weather_effect")
+                or existing_overlay.get("effect_type")
+                or existing_overlay.get("procedural_effect")
+                or ""
+            )
+            existing_effect = str(existing_effect).strip().lower()
+        effect_var = tk.StringVar(value=_effect_display(existing_effect))
         name_var = tk.StringVar(value=existing_overlay.get("label", "") if is_edit else "")
         if is_edit:
             asset_initial = (
@@ -1141,6 +1256,8 @@ class DisplayMapController:
                 or ""
             )
         else:
+            asset_initial = ""
+        if existing_effect:
             asset_initial = ""
         path_var = tk.StringVar(value=asset_initial or "")
         width_var = tk.StringVar(value=f"{geometry.get('width', 0.0):.2f}")
@@ -1170,9 +1287,15 @@ class DisplayMapController:
             "metadata": metadata,
             "storage_path": existing_overlay.get("animation_path") if is_edit else "",
             "resolved_path": existing_overlay.get("resolved_animation_path") if is_edit else "",
+            "effect": existing_effect,
+            "weather_seed": existing_overlay.get("weather_seed") if is_edit else None,
         }
 
-        metadata_var = tk.StringVar(value=self._describe_overlay_metadata(dialog_state["metadata"]))
+        if existing_effect:
+            metadata_text = f"Procedural {effect_var.get()} effect"
+        else:
+            metadata_text = self._describe_overlay_metadata(dialog_state["metadata"])
+        metadata_var = tk.StringVar(value=metadata_text)
 
         ctk.CTkLabel(container, text="Name").grid(row=0, column=0, sticky="w", pady=(0, 6))
         name_entry = ctk.CTkEntry(container, textvariable=name_var)
@@ -1197,30 +1320,38 @@ class DisplayMapController:
         browse_button = ctk.CTkButton(container, text="Browse", command=on_browse)
         browse_button.grid(row=1, column=2, sticky="ew")
 
+        if existing_effect:
+            asset_entry.configure(state="disabled")
+            browse_button.configure(state="disabled")
+
         metadata_label = ctk.CTkLabel(container, textvariable=metadata_var, anchor="w")
         metadata_label.grid(row=2, column=0, columnspan=3, sticky="ew", pady=(6, 12))
 
+        ctk.CTkLabel(container, text="Weather Effect").grid(row=3, column=0, sticky="w")
+        effect_menu = ctk.CTkOptionMenu(container, values=effect_options, variable=effect_var)
+        effect_menu.grid(row=3, column=1, columnspan=2, sticky="ew")
+
         speed_text_var = tk.StringVar(value=f"{speed_var.get():.2f}x")
-        ctk.CTkLabel(container, text="Playback Speed").grid(row=3, column=0, sticky="w")
+        ctk.CTkLabel(container, text="Playback Speed").grid(row=4, column=0, sticky="w")
         speed_slider = ctk.CTkSlider(container, from_=0.05, to=4.0, variable=speed_var)
-        speed_slider.grid(row=3, column=1, sticky="ew", padx=(0, 8))
+        speed_slider.grid(row=4, column=1, sticky="ew", padx=(0, 8))
         speed_value_label = ctk.CTkLabel(container, textvariable=speed_text_var)
-        speed_value_label.grid(row=3, column=2, sticky="e")
+        speed_value_label.grid(row=4, column=2, sticky="e")
 
         opacity_text_var = tk.StringVar(value=f"{opacity_var.get():.2f}")
-        ctk.CTkLabel(container, text="Opacity").grid(row=4, column=0, sticky="w", pady=(12, 0))
+        ctk.CTkLabel(container, text="Opacity").grid(row=5, column=0, sticky="w", pady=(12, 0))
         opacity_slider = ctk.CTkSlider(container, from_=0.0, to=1.0, variable=opacity_var)
-        opacity_slider.grid(row=4, column=1, sticky="ew", padx=(0, 8), pady=(12, 0))
+        opacity_slider.grid(row=5, column=1, sticky="ew", padx=(0, 8), pady=(12, 0))
         opacity_value_label = ctk.CTkLabel(container, textvariable=opacity_text_var)
-        opacity_value_label.grid(row=4, column=2, sticky="e", pady=(12, 0))
+        opacity_value_label.grid(row=5, column=2, sticky="e", pady=(12, 0))
 
         loop_checkbox = ctk.CTkCheckBox(container, text="Loop playback", variable=loop_var)
-        loop_checkbox.grid(row=5, column=0, sticky="w", pady=(12, 0))
+        loop_checkbox.grid(row=6, column=0, sticky="w", pady=(12, 0))
         paused_checkbox = ctk.CTkCheckBox(container, text="Start paused", variable=paused_var)
-        paused_checkbox.grid(row=5, column=1, columnspan=2, sticky="w", pady=(12, 0))
+        paused_checkbox.grid(row=6, column=1, columnspan=2, sticky="w", pady=(12, 0))
 
         size_frame = ctk.CTkFrame(container, fg_color="transparent")
-        size_frame.grid(row=6, column=0, columnspan=3, sticky="ew", pady=(12, 0))
+        size_frame.grid(row=7, column=0, columnspan=3, sticky="ew", pady=(12, 0))
         size_frame.columnconfigure((1, 3), weight=1)
         ctk.CTkLabel(size_frame, text="Width").grid(row=0, column=0, sticky="w")
         width_entry = ctk.CTkEntry(size_frame, textvariable=width_var)
@@ -1230,7 +1361,7 @@ class DisplayMapController:
         height_entry.grid(row=0, column=3, sticky="ew", padx=(4, 0))
 
         offset_frame = ctk.CTkFrame(container, fg_color="transparent")
-        offset_frame.grid(row=7, column=0, columnspan=3, sticky="ew", pady=(12, 0))
+        offset_frame.grid(row=8, column=0, columnspan=3, sticky="ew", pady=(12, 0))
         offset_frame.columnconfigure((1, 3), weight=1)
         ctk.CTkLabel(offset_frame, text="Offset X").grid(row=0, column=0, sticky="w")
         offset_x_entry = ctk.CTkEntry(offset_frame, textvariable=offset_x_var)
@@ -1239,16 +1370,16 @@ class DisplayMapController:
         offset_y_entry = ctk.CTkEntry(offset_frame, textvariable=offset_y_var)
         offset_y_entry.grid(row=0, column=3, sticky="ew", padx=(4, 0))
 
-        ctk.CTkLabel(container, text="Anchor").grid(row=8, column=0, sticky="w", pady=(12, 0))
+        ctk.CTkLabel(container, text="Anchor").grid(row=9, column=0, sticky="w", pady=(12, 0))
         anchor_menu = ctk.CTkOptionMenu(
             container,
             values=["NW", "N", "NE", "W", "CENTER", "E", "SW", "S", "SE"],
             variable=anchor_var,
         )
-        anchor_menu.grid(row=8, column=1, columnspan=2, sticky="ew", pady=(12, 0))
+        anchor_menu.grid(row=9, column=1, columnspan=2, sticky="ew", pady=(12, 0))
 
         position_frame = ctk.CTkFrame(container, fg_color="transparent")
-        position_frame.grid(row=9, column=0, columnspan=3, sticky="ew", pady=(12, 0))
+        position_frame.grid(row=10, column=0, columnspan=3, sticky="ew", pady=(12, 0))
         position_frame.columnconfigure((1, 3), weight=1)
         ctk.CTkLabel(position_frame, text="Position X").grid(row=0, column=0, sticky="w")
         pos_x_entry = ctk.CTkEntry(position_frame, textvariable=pos_x_var)
@@ -1258,7 +1389,7 @@ class DisplayMapController:
         pos_y_entry.grid(row=0, column=3, sticky="ew", padx=(4, 0))
 
         button_row = ctk.CTkFrame(container, fg_color="transparent")
-        button_row.grid(row=10, column=0, columnspan=3, sticky="ew", pady=(24, 0))
+        button_row.grid(row=11, column=0, columnspan=3, sticky="ew", pady=(24, 0))
         button_row.columnconfigure(0, weight=1)
         button_row.columnconfigure(1, weight=1)
 
@@ -1269,6 +1400,17 @@ class DisplayMapController:
                 return float(str(value).strip())
             except (TypeError, ValueError):
                 return float(fallback)
+
+        def normalize_effect_value(value):
+            candidate = str(value or "").strip()
+            lowered = candidate.lower()
+            if not candidate or lowered == "none":
+                return ""
+            if candidate in effect_display_map:
+                return effect_display_map[candidate]
+            if lowered in effect_lookup:
+                return effect_lookup[lowered]
+            return ""
 
         def commit_geometry(update_entries=False):
             width_val = parse_float(width_var, geometry.get("width", 0.0))
@@ -1339,6 +1481,9 @@ class DisplayMapController:
             dialog_state["paused"] = bool(value)
 
         def process_asset(value):
+            if normalize_effect_value(effect_var.get()):
+                messagebox.showerror("Overlay Asset", "Weather effects do not use image assets.")
+                return False
             normalized, resolved, storage = self._normalize_overlay_asset_path(value)
             if not resolved:
                 messagebox.showerror("Overlay Asset", "The selected asset could not be found.")
@@ -1366,6 +1511,51 @@ class DisplayMapController:
                 self._apply_overlay_asset(existing_overlay, storage, resolved, metadata)
             return True
 
+        def on_effect_change(selection):
+            normalized = normalize_effect_value(selection)
+            display_value = _effect_display(normalized)
+            if effect_var.get() != display_value:
+                effect_var.set(display_value)
+            dialog_state["effect"] = normalized
+            if normalized:
+                path_var.set("")
+                dialog_state["storage_path"] = ""
+                dialog_state["resolved_path"] = ""
+                dialog_state["metadata"] = {}
+                metadata_var.set(f"Procedural {display_value} effect")
+                asset_entry.configure(state="disabled")
+                browse_button.configure(state="disabled")
+                base_w = base_h = 0
+                if self.base_img is not None:
+                    try:
+                        base_w, base_h = self.base_img.size
+                    except Exception:
+                        base_w = base_h = 0
+                if base_w and base_h:
+                    current_w = parse_float(width_var, dialog_state.get("width", 0.0))
+                    current_h = parse_float(height_var, dialog_state.get("height", 0.0))
+                    if current_w <= 0.1:
+                        width_var.set(f"{float(base_w):.2f}")
+                        dialog_state["width"] = float(base_w)
+                    if current_h <= 0.1:
+                        height_var.set(f"{float(base_h):.2f}")
+                        dialog_state["height"] = float(base_h)
+                if not dialog_state.get("anchor"):
+                    anchor_var.set("NW")
+                    dialog_state["anchor"] = "nw"
+                commit_geometry(update_entries=False)
+                if existing_overlay:
+                    self._apply_overlay_effect(existing_overlay, normalized)
+                else:
+                    dialog_state["weather_seed"] = dialog_state.get("weather_seed") or random.randint(0, 0xFFFFFFFF)
+            else:
+                asset_entry.configure(state="normal")
+                browse_button.configure(state="normal")
+                metadata_var.set(self._describe_overlay_metadata(dialog_state.get("metadata")))
+                dialog_state["effect"] = ""
+                if existing_overlay:
+                    self._apply_overlay_effect(existing_overlay, "")
+
         def on_name_commit(event=None):
             if existing_overlay:
                 self._apply_overlay_label(existing_overlay, name_var.get())
@@ -1376,6 +1566,7 @@ class DisplayMapController:
         opacity_slider.configure(command=update_opacity)
         loop_checkbox.configure(command=update_loop)
         paused_checkbox.configure(command=update_paused)
+        effect_menu.configure(command=on_effect_change)
         anchor_menu.configure(command=lambda value: (anchor_var.set(value), commit_geometry()))
 
         for entry_widget in (width_entry, height_entry, offset_x_entry, offset_y_entry):
@@ -1389,6 +1580,8 @@ class DisplayMapController:
         name_entry.bind("<FocusOut>", on_name_commit)
         name_entry.bind("<Return>", lambda e: (on_name_commit(), "break"))
 
+        on_effect_change(effect_var.get())
+
         if path_var.get():
             process_asset(path_var.get())
 
@@ -1396,16 +1589,21 @@ class DisplayMapController:
             label_text = (name_var.get() or "").strip()
             if not label_text:
                 label_text = "Overlay"
+            effect_value = normalize_effect_value(effect_var.get())
             asset_value = path_var.get()
-            if not asset_value:
-                messagebox.showerror("Add Overlay", "Please choose an animation asset.")
-                return
-            if not process_asset(asset_value):
-                return
+            if not effect_value:
+                if not asset_value:
+                    messagebox.showerror("Add Overlay", "Please choose an animation asset or select a weather effect.")
+                    return
+                if not process_asset(asset_value):
+                    return
             metadata_value = dialog_state.get("metadata")
-            if not metadata_value or not metadata_value.get("animation_frames"):
-                messagebox.showerror("Add Overlay", "Unable to load animation frames from the chosen asset.")
-                return
+            if not effect_value:
+                if not metadata_value or not metadata_value.get("animation_frames"):
+                    messagebox.showerror("Add Overlay", "Unable to load animation frames from the chosen asset.")
+                    return
+            else:
+                metadata_value = metadata_value or {}
             commit_geometry()
             commit_position()
             speed_value = dialog_state.get("speed", speed_var.get())
@@ -1423,9 +1621,9 @@ class DisplayMapController:
                 "type": "overlay",
                 "label": label_text,
                 "position": position_value,
-                "animation_path": dialog_state.get("storage_path", ""),
-                "animation_asset_path": dialog_state.get("storage_path", ""),
-                "resolved_animation_path": dialog_state.get("resolved_path", ""),
+                "animation_path": dialog_state.get("storage_path", "") if not effect_value else "",
+                "animation_asset_path": dialog_state.get("storage_path", "") if not effect_value else "",
+                "resolved_animation_path": dialog_state.get("resolved_path", "") if not effect_value else "",
                 "opacity": max(0.0, min(1.0, float(opacity_value))),
                 "playback": {
                     "speed": float(speed_value),
@@ -1440,7 +1638,16 @@ class DisplayMapController:
                     "anchor": anchor_value,
                 },
             }
-            new_overlay.update(metadata_value)
+            if effect_value:
+                new_overlay["weather_effect"] = effect_value
+                new_overlay["weather_seed"] = dialog_state.get("weather_seed") or random.randint(0, 0xFFFFFFFF)
+                new_overlay["animation_frames"] = []
+                new_overlay["animation_durations"] = []
+                new_overlay["animation_frame_count"] = 0
+                new_overlay["animation_size"] = None
+                new_overlay["animation_loop"] = 0
+            else:
+                new_overlay.update(metadata_value)
             new_overlay["_overlay_animation"] = {}
             self.tokens.append(new_overlay)
             self._update_canvas_images()
@@ -1451,9 +1658,15 @@ class DisplayMapController:
 
         def apply_changes():
             on_name_commit()
+            effect_value = normalize_effect_value(effect_var.get())
+            if existing_overlay:
+                self._apply_overlay_effect(existing_overlay, effect_value)
             asset_value = path_var.get()
-            if asset_value and not process_asset(asset_value):
-                return
+            if effect_value:
+                dialog_state["effect"] = effect_value
+            elif asset_value:
+                if not process_asset(asset_value):
+                    return
             commit_geometry()
             commit_position()
             update_speed(speed_var.get())
