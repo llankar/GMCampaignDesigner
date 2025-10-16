@@ -467,6 +467,7 @@ def _on_display_map(self, entity_type, map_name): # entity_type here is the map'
                 opacity = 1.0
             opacity = max(0.0, min(1.0, opacity))
             coverage = _normalize_geometry(rec.get("coverage") or rec.get("coverage_geometry") or {})
+            overlay_label = rec.get("label") or rec.get("name") or rec.get("display_name") or ""
             overlay_metadata = _load_overlay_animation_metadata(resolved_animation)
             item_data.update({
                 "animation_path": storage_animation,
@@ -475,6 +476,7 @@ def _on_display_map(self, entity_type, map_name): # entity_type here is the map'
                 "playback": playback,
                 "opacity": opacity,
                 "coverage": coverage,
+                "label": overlay_label,
             })
             item_data.update(overlay_metadata)
         else:
@@ -521,3 +523,8 @@ def _on_display_map(self, entity_type, map_name): # entity_type here is the map'
     self._update_canvas_images()
     if getattr(self, '_web_server_thread', None):
         self._update_web_display_map()
+    if hasattr(self, "_refresh_overlay_option_menu"):
+        try:
+            self._refresh_overlay_option_menu()
+        except Exception:
+            pass

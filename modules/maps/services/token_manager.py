@@ -487,6 +487,7 @@ def _persist_tokens(self):
                     "playback": playback,
                     "opacity": opacity,
                     "coverage": coverage,
+                    "label": t.get("label", ""),
                 })
             else:
                 # Silently skip unknown types for now

@@ -3,6 +3,7 @@ import json
 import copy
 import re
 import time
+import importlib
 import webbrowser
 from pathlib import Path
 from tkinter import colorchooser, filedialog, messagebox
@@ -11,7 +12,7 @@ from tkinter import font as tkfont
 from types import SimpleNamespace
 from typing import TYPE_CHECKING
 import customtkinter as ctk
-from modules.maps.views.map_selector import select_map, _on_display_map
+from modules.maps.views.map_selector import select_map, _on_display_map, _load_overlay_animation_metadata
 from modules.maps.views.toolbar_view import (
     _build_toolbar,
     _on_brush_size_change,
@@ -78,6 +79,14 @@ ZOOM_STEP = 0.1  # 10% per wheel notch
 ctk.set_appearance_mode("dark")
 
 LINK_PATTERN = re.compile(r"(https?://|www\.)[^\s<>]+", re.IGNORECASE)
+
+_IMAGEIO_SPEC = importlib.util.find_spec("imageio")
+if _IMAGEIO_SPEC is not None:
+    imageio = importlib.import_module("imageio.v2")
+else:
+    imageio = None
+
+MAX_VIDEO_FRAMES = 600
 
 class DisplayMapController:
     def __init__(self, parent, maps_wrapper, map_template, *, root_app=None):
@@ -156,6 +165,10 @@ class DisplayMapController:
 
         self._overlay_animation_after_id = None
         self._overlay_animation_tick_ms = 40
+        self._overlay_menu_placeholder = "No overlays"
+        self._overlay_menu_lookup = {}
+        self._selected_overlay = None
+        self._suppress_overlay_menu_callback = False
 
         self._focus_bindings_registered = False
 
@@ -570,8 +583,10 @@ class DisplayMapController:
         playback = item.get("playback") or {}
         paused = False
         speed = 1.0
+        loop_enabled = True
         if isinstance(playback, dict):
             paused = bool(playback.get("paused"))
+            loop_enabled = bool(playback.get("loop", True))
             for key in ("speed", "playback_speed", "rate", "multiplier"):
                 if key in playback:
                     candidate = self._coerce_overlay_number(playback.get(key), None)
@@ -589,6 +604,7 @@ class DisplayMapController:
             "anchor": anchor or "nw",
             "speed": speed if speed > 0 else 0.0,
             "paused": paused or speed == 0,
+            "loop": loop_enabled,
         }
 
     def _ensure_overlay_render_state(self, item, resample):
@@ -663,6 +679,7 @@ class DisplayMapController:
         state["anchor"] = geometry.get("anchor", "nw")
         state["speed"] = geometry.get("speed", 1.0)
         state["paused"] = geometry.get("paused", False)
+        state["loop"] = bool(geometry.get("loop", True))
         state["durations"] = item.get("animation_durations") or state.get("durations") or []
 
         frame_count = len(tk_frames)
@@ -723,6 +740,732 @@ class DisplayMapController:
             sx -= width
 
         return float(sx), float(sy)
+
+    # ------------------------------------------------------------------
+    # Overlay management helpers
+    # ------------------------------------------------------------------
+
+    def _collect_overlays(self):
+        return [item for item in self.tokens if isinstance(item, dict) and item.get("type") == "overlay"]
+
+    def _format_overlay_label(self, overlay, index=None):
+        if not isinstance(overlay, dict):
+            return self._overlay_menu_placeholder
+        label = overlay.get("label") or overlay.get("name") or overlay.get("display_name") or ""
+        if not label:
+            path = overlay.get("animation_path") or overlay.get("animation_asset_path") or overlay.get("resolved_animation_path") or ""
+            label = os.path.splitext(os.path.basename(path))[0] if path else "Overlay"
+        label = label.strip() or "Overlay"
+        if index is not None:
+            return f"{index}. {label}"
+        return label
+
+    def _refresh_overlay_option_menu(self, selected_overlay=None):
+        menu = getattr(self, "overlay_menu", None)
+        var = getattr(self, "overlay_menu_var", None)
+        overlays = self._collect_overlays()
+        lookup = {}
+
+        if not menu or not hasattr(menu, "configure"):
+            self._overlay_menu_lookup = lookup
+            self._selected_overlay = selected_overlay if isinstance(selected_overlay, dict) else None
+            return
+
+        placeholder = self._overlay_menu_placeholder
+
+        self._suppress_overlay_menu_callback = True
+        try:
+            if overlays:
+                values = []
+                for idx, overlay in enumerate(overlays, start=1):
+                    base_label = self._format_overlay_label(overlay, index=idx)
+                    label = base_label
+                    suffix = 1
+                    while label in lookup:
+                        suffix += 1
+                        label = f"{base_label} ({suffix})"
+                    values.append(label)
+                    lookup[label] = overlay
+
+                try:
+                    menu.configure(values=values, state="normal")
+                except Exception:
+                    menu.configure(values=values)
+
+                if selected_overlay and selected_overlay in overlays:
+                    target_label = next((key for key, value in lookup.items() if value is selected_overlay), values[0])
+                else:
+                    current_value = var.get() if isinstance(var, tk.StringVar) else getattr(menu, "get", lambda: None)()
+                    target_label = current_value if current_value in lookup else values[0]
+
+                try:
+                    menu.set(target_label)
+                except Exception:
+                    pass
+                if isinstance(var, tk.StringVar):
+                    var.set(target_label)
+                self._selected_overlay = lookup.get(target_label)
+            else:
+                try:
+                    menu.configure(values=[placeholder], state="disabled")
+                except Exception:
+                    menu.configure(values=[placeholder])
+                try:
+                    menu.set(placeholder)
+                except Exception:
+                    pass
+                if isinstance(var, tk.StringVar):
+                    var.set(placeholder)
+                self._selected_overlay = None
+        finally:
+            self._suppress_overlay_menu_callback = False
+
+        self._overlay_menu_lookup = lookup
+
+        edit_button = getattr(self, "overlay_edit_button", None)
+        if edit_button:
+            try:
+                edit_button.configure(state=tk.NORMAL if lookup else tk.DISABLED)
+            except tk.TclError:
+                pass
+
+    def _on_overlay_menu_change(self, selected_value):
+        if self._suppress_overlay_menu_callback:
+            return
+        overlay = self._overlay_menu_lookup.get(selected_value)
+        if overlay:
+            self._selected_overlay = overlay
+            self._set_selection([overlay])
+        else:
+            self._selected_overlay = None
+
+    def edit_selected_overlay(self):
+        overlay = self._selected_overlay
+        if not overlay:
+            overlays = self._collect_overlays()
+            overlay = overlays[0] if overlays else None
+        if overlay:
+            self.open_overlay_dialog(overlay)
+
+    def _default_overlay_position(self):
+        canvas = getattr(self, "canvas", None)
+        if not canvas or not canvas.winfo_exists():
+            return (0.0, 0.0)
+        try:
+            canvas.update_idletasks()
+            width = canvas.winfo_width() or 0
+            height = canvas.winfo_height() or 0
+        except tk.TclError:
+            width = height = 0
+        zoom = self.zoom if self.zoom not in (None, 0) else 1.0
+        if zoom == 0:
+            zoom = 1.0
+        xw = (width / 2 - self.pan_x) / zoom if zoom else 0.0
+        yw = (height / 2 - self.pan_y) / zoom if zoom else 0.0
+        return (float(xw), float(yw))
+
+    def _invalidate_overlay_render_cache(self, overlay):
+        state = overlay.get("_overlay_animation")
+        if isinstance(state, dict):
+            for key in ("tk_frames", "pil_frames", "render_key", "current_size", "fs_frames", "fs_render_key"):
+                state.pop(key, None)
+
+    def _apply_overlay_label(self, overlay, label):
+        if not overlay:
+            return
+        label_text = (label or "").strip()
+        overlay["label"] = label_text
+        self._refresh_overlay_option_menu(selected_overlay=overlay)
+        self._persist_tokens()
+
+    def _apply_overlay_geometry(self, overlay, width=None, height=None, offset_x=None, offset_y=None, anchor=None):
+        if not overlay:
+            return
+        coverage = overlay.get("coverage")
+        if not isinstance(coverage, dict):
+            coverage = {}
+        if width is not None:
+            coverage["width"] = max(0.0, float(width))
+        if height is not None:
+            coverage["height"] = max(0.0, float(height))
+        if offset_x is not None:
+            coverage["offset_x"] = float(offset_x)
+        if offset_y is not None:
+            coverage["offset_y"] = float(offset_y)
+        if anchor is not None:
+            coverage["anchor"] = str(anchor).lower()
+        overlay["coverage"] = coverage
+        self._invalidate_overlay_render_cache(overlay)
+        self._update_canvas_images()
+        self._persist_tokens()
+
+    def _apply_overlay_position(self, overlay, x=None, y=None):
+        if not overlay:
+            return
+        px, py = overlay.get("position") or (0.0, 0.0)
+        if x is None:
+            x = px
+        if y is None:
+            y = py
+        try:
+            overlay["position"] = (float(x), float(y))
+        except (TypeError, ValueError):
+            overlay["position"] = (px, py)
+        self._update_canvas_images()
+        self._persist_tokens()
+
+    def _apply_overlay_opacity(self, overlay, opacity):
+        if not overlay:
+            return
+        try:
+            clamped = max(0.0, min(1.0, float(opacity)))
+        except (TypeError, ValueError):
+            clamped = overlay.get("opacity", 1.0)
+        overlay["opacity"] = clamped
+        self._invalidate_overlay_render_cache(overlay)
+        self._update_canvas_images()
+        self._persist_tokens()
+
+    def _apply_overlay_playback(self, overlay, *, speed=None, loop=None, paused=None):
+        if not overlay:
+            return
+        playback = overlay.get("playback")
+        if not isinstance(playback, dict):
+            playback = {}
+        state = overlay.get("_overlay_animation")
+        if not isinstance(state, dict):
+            state = {}
+        overlay["playback"] = playback
+        overlay["_overlay_animation"] = state
+        if speed is not None:
+            try:
+                speed_value = max(0.0, float(speed))
+            except (TypeError, ValueError):
+                speed_value = playback.get("speed", 1.0)
+            playback["speed"] = speed_value
+            state["speed"] = speed_value
+            if speed_value <= 0:
+                playback["paused"] = True
+                state["paused"] = True
+        if loop is not None:
+            playback["loop"] = bool(loop)
+            state["loop"] = bool(loop)
+        if paused is not None:
+            playback["paused"] = bool(paused)
+            state["paused"] = bool(paused)
+        else:
+            state.setdefault("paused", bool(playback.get("paused")))
+        state.setdefault("loop", bool(playback.get("loop", True)))
+        state.setdefault("speed", float(playback.get("speed", 1.0)))
+        state["last_update"] = time.monotonic()
+        self._ensure_overlay_animation_schedule()
+        self._persist_tokens()
+
+    def _normalize_overlay_asset_path(self, raw_path):
+        value = (raw_path or "").strip()
+        if not value:
+            return "", "", ""
+        resolved = _resolve_campaign_path(value)
+        if resolved and os.path.exists(resolved):
+            storage = _campaign_relative_path(resolved) or value
+            return value, resolved, storage
+        if os.path.isabs(value) and os.path.exists(value):
+            resolved = os.path.normpath(value)
+            storage = _campaign_relative_path(resolved) or resolved
+            return value, resolved, storage
+        if os.path.exists(value):
+            resolved = os.path.normpath(value)
+            storage = _campaign_relative_path(resolved) or value
+            return value, resolved, storage
+        return value, "", ""
+
+    def _load_animation_metadata(self, resolved_path):
+        metadata = {
+            "animation_frames": [],
+            "animation_durations": [],
+            "animation_frame_count": 0,
+            "animation_size": None,
+            "animation_loop": 0,
+        }
+        if not resolved_path or not os.path.exists(resolved_path):
+            return metadata
+        ext = os.path.splitext(resolved_path)[1].lower()
+        if ext in (".gif", ".apng", ".webp"):
+            return _load_overlay_animation_metadata(resolved_path)
+        if ext in (".mp4", ".mov", ".mkv", ".avi", ".webm"):
+            if imageio is None:
+                messagebox.showerror(
+                    "Overlay Asset",
+                    "Video support requires the 'imageio' package to be installed.",
+                )
+                return metadata
+            return self._load_video_animation(resolved_path)
+        return self._load_static_image_metadata(resolved_path)
+
+    def _load_static_image_metadata(self, resolved_path):
+        metadata = {
+            "animation_frames": [],
+            "animation_durations": [],
+            "animation_frame_count": 0,
+            "animation_size": None,
+            "animation_loop": 0,
+        }
+        try:
+            with Image.open(resolved_path) as img:
+                frame = img.convert("RGBA")
+            metadata["animation_frames"] = [frame]
+            metadata["animation_durations"] = [100]
+            metadata["animation_frame_count"] = 1
+            metadata["animation_size"] = frame.size
+            metadata["animation_loop"] = 0
+        except Exception as exc:
+            messagebox.showerror("Overlay Asset", f"Unable to load image: {exc}")
+        return metadata
+
+    def _load_video_animation(self, resolved_path):
+        metadata = {
+            "animation_frames": [],
+            "animation_durations": [],
+            "animation_frame_count": 0,
+            "animation_size": None,
+            "animation_loop": 0,
+        }
+        if imageio is None:
+            return metadata
+        reader = None
+        try:
+            reader = imageio.get_reader(resolved_path)
+            meta = reader.get_meta_data()
+            fps = meta.get("fps") or meta.get("fps_denominator")
+            if isinstance(fps, (tuple, list)) and len(fps) >= 2:
+                try:
+                    fps = float(fps[0]) / float(fps[1])
+                except Exception:
+                    fps = 0
+            try:
+                fps = float(fps)
+            except (TypeError, ValueError):
+                fps = 30.0
+            if fps <= 0:
+                fps = 30.0
+            duration_ms = max(1, int(round(1000.0 / fps)))
+            frames = []
+            durations = []
+            for idx, frame in enumerate(reader):
+                if idx >= MAX_VIDEO_FRAMES:
+                    break
+                pil_frame = Image.fromarray(frame).convert("RGBA")
+                frames.append(pil_frame)
+                durations.append(duration_ms)
+            if frames:
+                metadata["animation_frames"] = frames
+                metadata["animation_durations"] = durations
+                metadata["animation_frame_count"] = len(frames)
+                metadata["animation_size"] = frames[0].size
+        except Exception as exc:
+            messagebox.showerror("Overlay Asset", f"Unable to read video: {exc}")
+        finally:
+            if reader is not None:
+                try:
+                    reader.close()
+                except Exception:
+                    pass
+        return metadata
+
+    def _describe_overlay_metadata(self, metadata):
+        if not metadata:
+            return "No asset loaded"
+        frame_count = metadata.get("animation_frame_count") or 0
+        size = metadata.get("animation_size") or (0, 0)
+        width, height = size if isinstance(size, (list, tuple)) and len(size) >= 2 else (0, 0)
+        if frame_count and width and height:
+            plural = "s" if frame_count != 1 else ""
+            return f"{frame_count} frame{plural} • {int(width)}x{int(height)} px"
+        if width and height:
+            return f"{int(width)}x{int(height)} px"
+        return "No asset loaded"
+
+    def _apply_overlay_asset(self, overlay, storage_path, resolved_path, metadata):
+        if not overlay:
+            return
+        overlay["animation_path"] = storage_path
+        overlay["animation_asset_path"] = storage_path
+        overlay["resolved_animation_path"] = resolved_path
+        overlay["animation_frames"] = metadata.get("animation_frames") or []
+        overlay["animation_durations"] = metadata.get("animation_durations") or []
+        overlay["animation_frame_count"] = metadata.get("animation_frame_count") or len(overlay["animation_frames"])
+        overlay["animation_size"] = metadata.get("animation_size")
+        overlay["animation_loop"] = metadata.get("animation_loop", 0)
+        self._invalidate_overlay_render_cache(overlay)
+        self._update_canvas_images()
+        self._persist_tokens()
+
+    def open_overlay_dialog(self, overlay=None):
+        existing_overlay = overlay if isinstance(overlay, dict) and overlay.get("type") == "overlay" else None
+        is_edit = existing_overlay is not None
+
+        dialog = ctk.CTkToplevel(self.parent)
+        dialog.title("Edit Overlay" if is_edit else "Add Overlay")
+        dialog.geometry("420x560")
+        dialog.transient(self.parent)
+        dialog.grab_set()
+
+        container = ctk.CTkFrame(dialog)
+        container.pack(fill="both", expand=True, padx=16, pady=16)
+        container.columnconfigure(1, weight=1)
+        container.columnconfigure(2, weight=0)
+
+        playback = existing_overlay.get("playback") if is_edit else {}
+        if not isinstance(playback, dict):
+            playback = {}
+        geometry = self._extract_overlay_geometry(existing_overlay) if is_edit else {
+            "width": 0.0,
+            "height": 0.0,
+            "offset_x": 0.0,
+            "offset_y": 0.0,
+            "anchor": "nw",
+            "speed": 1.0,
+            "paused": False,
+            "loop": True,
+        }
+        position = existing_overlay.get("position") if is_edit else self._default_overlay_position()
+        try:
+            position_x, position_y = position
+        except Exception:
+            position_x = position_y = 0.0
+        name_var = tk.StringVar(value=existing_overlay.get("label", "") if is_edit else "")
+        asset_initial = existing_overlay.get("resolved_animation_path") or existing_overlay.get("animation_path") or ""
+        path_var = tk.StringVar(value=asset_initial or "")
+        width_var = tk.StringVar(value=f"{geometry.get('width', 0.0):.2f}")
+        height_var = tk.StringVar(value=f"{geometry.get('height', 0.0):.2f}")
+        offset_x_var = tk.StringVar(value=f"{geometry.get('offset_x', 0.0):.2f}")
+        offset_y_var = tk.StringVar(value=f"{geometry.get('offset_y', 0.0):.2f}")
+        anchor_value = geometry.get("anchor", "nw")
+        anchor_var = tk.StringVar(value=str(anchor_value).upper())
+        pos_x_var = tk.StringVar(value=f"{position_x:.2f}")
+        pos_y_var = tk.StringVar(value=f"{position_y:.2f}")
+        speed_initial = float(geometry.get("speed", playback.get("speed", 1.0) or 1.0))
+        speed_var = tk.DoubleVar(value=max(0.0, speed_initial))
+        opacity_initial = existing_overlay.get("opacity", 1.0) if is_edit else 1.0
+        opacity_var = tk.DoubleVar(value=max(0.0, min(1.0, float(opacity_initial))))
+        loop_var = tk.BooleanVar(value=bool(playback.get("loop", geometry.get("loop", True))))
+        paused_var = tk.BooleanVar(value=bool(playback.get("paused", geometry.get("paused", False))))
+
+        if is_edit:
+            metadata = {
+                "animation_frame_count": existing_overlay.get("animation_frame_count"),
+                "animation_size": existing_overlay.get("animation_size"),
+            }
+        else:
+            metadata = None
+
+        dialog_state = {
+            "metadata": metadata,
+            "storage_path": existing_overlay.get("animation_path") if is_edit else "",
+            "resolved_path": existing_overlay.get("resolved_animation_path") if is_edit else "",
+        }
+
+        metadata_var = tk.StringVar(value=self._describe_overlay_metadata(dialog_state["metadata"]))
+
+        ctk.CTkLabel(container, text="Name").grid(row=0, column=0, sticky="w", pady=(0, 6))
+        name_entry = ctk.CTkEntry(container, textvariable=name_var)
+        name_entry.grid(row=0, column=1, columnspan=2, sticky="ew", pady=(0, 6))
+
+        ctk.CTkLabel(container, text="Asset").grid(row=1, column=0, sticky="w")
+        asset_entry = ctk.CTkEntry(container, textvariable=path_var)
+        asset_entry.grid(row=1, column=1, sticky="ew", padx=(0, 8))
+
+        def on_browse():
+            filetypes = [
+                ("Animations", "*.gif *.apng *.webp *.mp4 *.mov *.mkv *.webm *.avi"),
+                ("GIF", "*.gif"),
+                ("Video", "*.mp4 *.mov *.mkv *.webm *.avi"),
+                ("All Files", "*.*"),
+            ]
+            selection = filedialog.askopenfilename(title="Select Overlay Asset", filetypes=filetypes)
+            if selection:
+                path_var.set(selection)
+                process_asset(selection)
+
+        browse_button = ctk.CTkButton(container, text="Browse", command=on_browse)
+        browse_button.grid(row=1, column=2, sticky="ew")
+
+        metadata_label = ctk.CTkLabel(container, textvariable=metadata_var, anchor="w")
+        metadata_label.grid(row=2, column=0, columnspan=3, sticky="ew", pady=(6, 12))
+
+        speed_text_var = tk.StringVar(value=f"{speed_var.get():.2f}x")
+        ctk.CTkLabel(container, text="Playback Speed").grid(row=3, column=0, sticky="w")
+        speed_slider = ctk.CTkSlider(container, from_=0.05, to=4.0, variable=speed_var)
+        speed_slider.grid(row=3, column=1, sticky="ew", padx=(0, 8))
+        speed_value_label = ctk.CTkLabel(container, textvariable=speed_text_var)
+        speed_value_label.grid(row=3, column=2, sticky="e")
+
+        opacity_text_var = tk.StringVar(value=f"{opacity_var.get():.2f}")
+        ctk.CTkLabel(container, text="Opacity").grid(row=4, column=0, sticky="w", pady=(12, 0))
+        opacity_slider = ctk.CTkSlider(container, from_=0.0, to=1.0, variable=opacity_var)
+        opacity_slider.grid(row=4, column=1, sticky="ew", padx=(0, 8), pady=(12, 0))
+        opacity_value_label = ctk.CTkLabel(container, textvariable=opacity_text_var)
+        opacity_value_label.grid(row=4, column=2, sticky="e", pady=(12, 0))
+
+        loop_checkbox = ctk.CTkCheckBox(container, text="Loop playback", variable=loop_var)
+        loop_checkbox.grid(row=5, column=0, sticky="w", pady=(12, 0))
+        paused_checkbox = ctk.CTkCheckBox(container, text="Start paused", variable=paused_var)
+        paused_checkbox.grid(row=5, column=1, columnspan=2, sticky="w", pady=(12, 0))
+
+        size_frame = ctk.CTkFrame(container, fg_color="transparent")
+        size_frame.grid(row=6, column=0, columnspan=3, sticky="ew", pady=(12, 0))
+        size_frame.columnconfigure((1, 3), weight=1)
+        ctk.CTkLabel(size_frame, text="Width").grid(row=0, column=0, sticky="w")
+        width_entry = ctk.CTkEntry(size_frame, textvariable=width_var)
+        width_entry.grid(row=0, column=1, sticky="ew", padx=(4, 16))
+        ctk.CTkLabel(size_frame, text="Height").grid(row=0, column=2, sticky="w")
+        height_entry = ctk.CTkEntry(size_frame, textvariable=height_var)
+        height_entry.grid(row=0, column=3, sticky="ew", padx=(4, 0))
+
+        offset_frame = ctk.CTkFrame(container, fg_color="transparent")
+        offset_frame.grid(row=7, column=0, columnspan=3, sticky="ew", pady=(12, 0))
+        offset_frame.columnconfigure((1, 3), weight=1)
+        ctk.CTkLabel(offset_frame, text="Offset X").grid(row=0, column=0, sticky="w")
+        offset_x_entry = ctk.CTkEntry(offset_frame, textvariable=offset_x_var)
+        offset_x_entry.grid(row=0, column=1, sticky="ew", padx=(4, 16))
+        ctk.CTkLabel(offset_frame, text="Offset Y").grid(row=0, column=2, sticky="w")
+        offset_y_entry = ctk.CTkEntry(offset_frame, textvariable=offset_y_var)
+        offset_y_entry.grid(row=0, column=3, sticky="ew", padx=(4, 0))
+
+        ctk.CTkLabel(container, text="Anchor").grid(row=8, column=0, sticky="w", pady=(12, 0))
+        anchor_menu = ctk.CTkOptionMenu(
+            container,
+            values=["NW", "N", "NE", "W", "CENTER", "E", "SW", "S", "SE"],
+            variable=anchor_var,
+        )
+        anchor_menu.grid(row=8, column=1, columnspan=2, sticky="ew", pady=(12, 0))
+
+        position_frame = ctk.CTkFrame(container, fg_color="transparent")
+        position_frame.grid(row=9, column=0, columnspan=3, sticky="ew", pady=(12, 0))
+        position_frame.columnconfigure((1, 3), weight=1)
+        ctk.CTkLabel(position_frame, text="Position X").grid(row=0, column=0, sticky="w")
+        pos_x_entry = ctk.CTkEntry(position_frame, textvariable=pos_x_var)
+        pos_x_entry.grid(row=0, column=1, sticky="ew", padx=(4, 16))
+        ctk.CTkLabel(position_frame, text="Position Y").grid(row=0, column=2, sticky="w")
+        pos_y_entry = ctk.CTkEntry(position_frame, textvariable=pos_y_var)
+        pos_y_entry.grid(row=0, column=3, sticky="ew", padx=(4, 0))
+
+        button_row = ctk.CTkFrame(container, fg_color="transparent")
+        button_row.grid(row=10, column=0, columnspan=3, sticky="ew", pady=(24, 0))
+        button_row.columnconfigure(0, weight=1)
+        button_row.columnconfigure(1, weight=1)
+
+        def parse_float(value, fallback=0.0):
+            try:
+                if isinstance(value, tk.Variable):
+                    value = value.get()
+                return float(str(value).strip())
+            except (TypeError, ValueError):
+                return float(fallback)
+
+        def commit_geometry(update_entries=False):
+            width_val = parse_float(width_var, geometry.get("width", 0.0))
+            height_val = parse_float(height_var, geometry.get("height", 0.0))
+            offset_x_val = parse_float(offset_x_var, geometry.get("offset_x", 0.0))
+            offset_y_val = parse_float(offset_y_var, geometry.get("offset_y", 0.0))
+            anchor_value = anchor_var.get().lower()
+            if update_entries:
+                width_var.set(f"{width_val:.2f}")
+                height_var.set(f"{height_val:.2f}")
+                offset_x_var.set(f"{offset_x_val:.2f}")
+                offset_y_var.set(f"{offset_y_val:.2f}")
+            if existing_overlay:
+                self._apply_overlay_geometry(
+                    existing_overlay,
+                    width=width_val,
+                    height=height_val,
+                    offset_x=offset_x_val,
+                    offset_y=offset_y_val,
+                    anchor=anchor_value,
+                )
+            dialog_state["width"] = width_val
+            dialog_state["height"] = height_val
+            dialog_state["offset_x"] = offset_x_val
+            dialog_state["offset_y"] = offset_y_val
+            dialog_state["anchor"] = anchor_value
+
+        def commit_position():
+            x_val = parse_float(pos_x_var, position_x)
+            y_val = parse_float(pos_y_var, position_y)
+            pos_x_var.set(f"{x_val:.2f}")
+            pos_y_var.set(f"{y_val:.2f}")
+            if existing_overlay:
+                self._apply_overlay_position(existing_overlay, x=x_val, y=y_val)
+            dialog_state["position"] = (x_val, y_val)
+
+        def update_speed(value):
+            try:
+                numeric = float(value)
+            except (TypeError, ValueError):
+                numeric = speed_var.get()
+            speed_text_var.set(f"{numeric:.2f}x")
+            if existing_overlay:
+                self._apply_overlay_playback(existing_overlay, speed=numeric)
+            dialog_state["speed"] = numeric
+
+        def update_opacity(value):
+            try:
+                numeric = float(value)
+            except (TypeError, ValueError):
+                numeric = opacity_var.get()
+            numeric = max(0.0, min(1.0, numeric))
+            opacity_text_var.set(f"{numeric:.2f}")
+            if existing_overlay:
+                self._apply_overlay_opacity(existing_overlay, numeric)
+            dialog_state["opacity"] = numeric
+
+        def update_loop():
+            value = loop_var.get()
+            if existing_overlay:
+                self._apply_overlay_playback(existing_overlay, loop=value)
+            dialog_state["loop"] = bool(value)
+
+        def update_paused():
+            value = paused_var.get()
+            if existing_overlay:
+                self._apply_overlay_playback(existing_overlay, paused=value)
+            dialog_state["paused"] = bool(value)
+
+        def process_asset(value):
+            normalized, resolved, storage = self._normalize_overlay_asset_path(value)
+            if not resolved:
+                messagebox.showerror("Overlay Asset", "The selected asset could not be found.")
+                return False
+            metadata = self._load_animation_metadata(resolved)
+            if not metadata.get("animation_frames"):
+                messagebox.showerror("Overlay Asset", "Failed to load any frames from the selected asset.")
+                return False
+            dialog_state["metadata"] = metadata
+            dialog_state["resolved_path"] = resolved
+            dialog_state["storage_path"] = storage
+            metadata_var.set(self._describe_overlay_metadata(metadata))
+            size = metadata.get("animation_size")
+            if size:
+                width_val, height_val = size
+                width_var.set(f"{float(width_val):.2f}")
+                height_var.set(f"{float(height_val):.2f}")
+                commit_geometry(update_entries=False)
+            if not name_var.get().strip():
+                base_label = os.path.splitext(os.path.basename(storage or resolved))[0] if (storage or resolved) else ""
+                if base_label:
+                    name_var.set(base_label)
+                    dialog_state["label"] = base_label
+            if existing_overlay:
+                self._apply_overlay_asset(existing_overlay, storage, resolved, metadata)
+            return True
+
+        def on_name_commit(event=None):
+            if existing_overlay:
+                self._apply_overlay_label(existing_overlay, name_var.get())
+            dialog_state["label"] = name_var.get()
+            return None
+
+        speed_slider.configure(command=update_speed)
+        opacity_slider.configure(command=update_opacity)
+        loop_checkbox.configure(command=update_loop)
+        paused_checkbox.configure(command=update_paused)
+        anchor_menu.configure(command=lambda value: (anchor_var.set(value), commit_geometry()))
+
+        for entry_widget in (width_entry, height_entry, offset_x_entry, offset_y_entry):
+            entry_widget.bind("<FocusOut>", lambda _e: commit_geometry())
+            entry_widget.bind("<Return>", lambda _e: (commit_geometry(), "break"))
+
+        for entry_widget in (pos_x_entry, pos_y_entry):
+            entry_widget.bind("<FocusOut>", lambda _e: commit_position())
+            entry_widget.bind("<Return>", lambda _e: (commit_position(), "break"))
+
+        name_entry.bind("<FocusOut>", on_name_commit)
+        name_entry.bind("<Return>", lambda e: (on_name_commit(), "break"))
+
+        if path_var.get():
+            process_asset(path_var.get())
+
+        def finalize_new_overlay():
+            label_text = (name_var.get() or "").strip()
+            if not label_text:
+                label_text = "Overlay"
+            asset_value = path_var.get()
+            if not asset_value:
+                messagebox.showerror("Add Overlay", "Please choose an animation asset.")
+                return
+            if not process_asset(asset_value):
+                return
+            metadata_value = dialog_state.get("metadata")
+            if not metadata_value or not metadata_value.get("animation_frames"):
+                messagebox.showerror("Add Overlay", "Unable to load animation frames from the chosen asset.")
+                return
+            commit_geometry()
+            commit_position()
+            speed_value = dialog_state.get("speed", speed_var.get())
+            opacity_value = dialog_state.get("opacity", opacity_var.get())
+            loop_value = dialog_state.get("loop", loop_var.get())
+            paused_value = dialog_state.get("paused", paused_var.get())
+            position_value = dialog_state.get("position", (position_x, position_y))
+            width_value = dialog_state.get("width", geometry.get("width", 0.0))
+            height_value = dialog_state.get("height", geometry.get("height", 0.0))
+            offset_x_value = dialog_state.get("offset_x", geometry.get("offset_x", 0.0))
+            offset_y_value = dialog_state.get("offset_y", geometry.get("offset_y", 0.0))
+            anchor_value = dialog_state.get("anchor", anchor_var.get().lower())
+
+            new_overlay = {
+                "type": "overlay",
+                "label": label_text,
+                "position": position_value,
+                "animation_path": dialog_state.get("storage_path", ""),
+                "animation_asset_path": dialog_state.get("storage_path", ""),
+                "resolved_animation_path": dialog_state.get("resolved_path", ""),
+                "opacity": max(0.0, min(1.0, float(opacity_value))),
+                "playback": {
+                    "speed": float(speed_value),
+                    "loop": bool(loop_value),
+                    "paused": bool(paused_value),
+                },
+                "coverage": {
+                    "width": float(width_value),
+                    "height": float(height_value),
+                    "offset_x": float(offset_x_value),
+                    "offset_y": float(offset_y_value),
+                    "anchor": anchor_value,
+                },
+            }
+            new_overlay.update(metadata_value)
+            new_overlay["_overlay_animation"] = {}
+            self.tokens.append(new_overlay)
+            self._update_canvas_images()
+            self._persist_tokens()
+            self._refresh_overlay_option_menu(selected_overlay=new_overlay)
+            self._set_selection([new_overlay])
+            dialog.destroy()
+
+        def apply_changes():
+            on_name_commit()
+            asset_value = path_var.get()
+            if asset_value and not process_asset(asset_value):
+                return
+            commit_geometry()
+            commit_position()
+            update_speed(speed_var.get())
+            update_opacity(opacity_var.get())
+            update_loop()
+            update_paused()
+
+        if is_edit:
+            close_button = ctk.CTkButton(button_row, text="Close", command=dialog.destroy)
+            close_button.grid(row=0, column=1, sticky="e", padx=(8, 0))
+            apply_button = ctk.CTkButton(button_row, text="Apply", command=apply_changes)
+            apply_button.grid(row=0, column=0, sticky="e")
+        else:
+            cancel_button = ctk.CTkButton(button_row, text="Cancel", command=dialog.destroy)
+            cancel_button.grid(row=0, column=0, sticky="e", padx=(0, 12))
+            add_button = ctk.CTkButton(button_row, text="Add Overlay", command=finalize_new_overlay)
+            add_button.grid(row=0, column=1, sticky="e")
+
+        dialog.focus_set()
 
     def _stop_overlay_animation(self, *, clear_state=False):
         canvas = getattr(self, "canvas", None)
@@ -828,7 +1571,20 @@ class DisplayMapController:
             elapsed_ms = (now - last_update) * 1000.0
 
             if elapsed_ms >= duration_ms:
-                frame_index = (frame_index + 1) % frame_count
+                next_index = frame_index + 1
+                loop_enabled = bool(state.get("loop", True))
+                if next_index >= frame_count:
+                    if loop_enabled:
+                        next_index %= frame_count
+                    else:
+                        state["frame_index"] = frame_count - 1
+                        state["paused"] = True
+                        playback = item.get("playback")
+                        if isinstance(playback, dict):
+                            playback["paused"] = True
+                        state["last_update"] = now
+                        continue
+                frame_index = next_index % frame_count
                 state["frame_index"] = frame_index
                 state["last_update"] = now
                 state["current_pil_frame"] = (
@@ -3346,6 +4102,33 @@ class DisplayMapController:
         count = len(valid_overlays)
         plural = "s" if count != 1 else ""
         menu = tk.Menu(self.canvas, tearoff=0)
+        if count == 1:
+            single_overlay = valid_overlays[0]
+            menu.add_command(
+                label="Edit Overlay",
+                command=lambda: self.open_overlay_dialog(single_overlay),
+            )
+        loop_states = [bool((overlay.get("playback") or {}).get("loop", True)) for overlay in valid_overlays]
+        target_loop = True if not all(loop_states) else False
+        loop_label = f"Enable Loop{plural}" if target_loop else f"Disable Loop{plural}"
+
+        def toggle_loop(value=target_loop):
+            for overlay in valid_overlays:
+                self._apply_overlay_playback(overlay, loop=value)
+
+        menu.add_command(label=loop_label, command=toggle_loop)
+
+        paused_states = [bool((overlay.get("playback") or {}).get("paused", False)) for overlay in valid_overlays]
+        any_playing = any(not state for state in paused_states)
+        target_paused = True if any_playing else False
+        pause_label = f"Pause Overlay{plural}" if any_playing else f"Resume Overlay{plural}"
+
+        def toggle_paused(value=target_paused):
+            for overlay in valid_overlays:
+                self._apply_overlay_playback(overlay, paused=value)
+
+        menu.add_command(label=pause_label, command=toggle_paused)
+        menu.add_separator()
         menu.add_command(
             label=f"Copy Overlay{plural}", command=lambda: self._copy_item(valid_overlays)
         )
@@ -3923,6 +4706,8 @@ class DisplayMapController:
         if not pasted_items:
             return
 
+        if any(item.get("type") == "overlay" for item in pasted_items if isinstance(item, dict)):
+            self._refresh_overlay_option_menu()
         self._update_canvas_images()
         self._persist_tokens()
         self._set_selection(pasted_items)
@@ -3993,6 +4778,8 @@ class DisplayMapController:
             self._set_selection(remaining)
         if getattr(self, "_hovered_marker", None) is item_to_delete:
             self._hovered_marker = None
+        if item_to_delete.get("type") == "overlay":
+            self._refresh_overlay_option_menu()
         self._persist_tokens(); self._update_canvas_images()
         try:
             if getattr(self, 'fs_canvas', None) and self.fs_canvas.winfo_exists():
