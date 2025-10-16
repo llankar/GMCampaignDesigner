@@ -24,7 +24,9 @@ def _build_canvas(self):
     
     root.bind_all("<Control-f>", self.open_global_search)
     root.bind_all("<Control-F>", self.open_global_search)
-    
+    root.bind_all("<Control-Shift-c>", self.open_chatbot_assistant)
+    root.bind_all("<Control-Shift-C>", self.open_chatbot_assistant)
+
     root.bind_all("<Control-s>", lambda e: self.save_map())
     root.bind_all("<Control-S>", lambda e: self.save_map())
 

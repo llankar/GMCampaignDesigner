@@ -17,6 +17,11 @@ from modules.generic.generic_list_selection_view import GenericListSelectionView
 from modules.helpers.config_helper import ConfigHelper
 from modules.helpers.template_loader import load_template
 from modules.helpers.text_helpers import format_longtext
+from modules.ui.chatbot_dialog import (
+    get_default_chatbot_wrappers,
+    open_chatbot_dialog,
+    _DEFAULT_NAME_FIELD_OVERRIDES as CHATBOT_NAME_OVERRIDES,
+)
 from modules.helpers.logging_helper import (
     log_debug,
     log_error,
@@ -88,6 +93,9 @@ class WorldMapPanel(ctk.CTkFrame):
 
         self.maps_wrapper_data = {item.get("Name", ""): item for item in self.maps_wrapper.load_items() if item.get("Name")}
 
+        self._chatbot_wrappers = get_default_chatbot_wrappers()
+        self._chatbot_bindings: list[tuple[str, str | None]] = []
+
         self.world_map_dir = os.path.join(ConfigHelper.get_campaign_dir(), "world_maps")
         os.makedirs(self.world_map_dir, exist_ok=True)
         self.world_map_file = os.path.join(self.world_map_dir, "world_map_data.json")
@@ -122,6 +130,9 @@ class WorldMapPanel(ctk.CTkFrame):
         self._suppress_map_change = False
 
         self._build_layout()
+
+        self._chatbot_bindings.append(("<Control-Shift-c>", self.bind("<Control-Shift-c>", self.open_chatbot, add="+")))
+        self._chatbot_bindings.append(("<Control-Shift-C>", self.bind("<Control-Shift-C>", self.open_chatbot, add="+")))
 
         if self.map_names:
             self.map_selector.configure(values=self.map_names)
@@ -182,6 +193,8 @@ class WorldMapPanel(ctk.CTkFrame):
             state=ctk.DISABLED,
         )
         self.map_tool_button.pack(side="right", padx=(0, 12))
+        self.chatbot_button = ctk.CTkButton(toolbar, text="Chatbot", width=140, command=self.open_chatbot)
+        self.chatbot_button.pack(side="right", padx=(0, 12))
 
         workspace = ctk.CTkFrame(self, fg_color="transparent")
         workspace.pack(fill="both", expand=True, padx=12, pady=12)
@@ -2043,8 +2056,32 @@ class WorldMapPanel(ctk.CTkFrame):
     # Lifecycle
     # ------------------------------------------------------------------
     def _on_destroy(self, _event=None) -> None:
-        # As an embeddable panel, avoid manipulating owner state here.
+        for sequence, bind_id in getattr(self, "_chatbot_bindings", []):
+            if bind_id:
+                try:
+                    self.unbind(sequence, bind_id)
+                except Exception:
+                    pass
+        self._chatbot_bindings = []
         return
+
+    def open_chatbot(self, event=None):
+        try:
+            host = self.winfo_toplevel()
+        except Exception:
+            host = self
+        try:
+            open_chatbot_dialog(
+                host,
+                wrappers=self._chatbot_wrappers,
+                name_field_overrides=CHATBOT_NAME_OVERRIDES,
+            )
+        except Exception as exc:
+            log_warning(
+                f"Failed to launch chatbot: {exc}",
+                func_name="WorldMapPanel.open_chatbot",
+            )
+        return "break" if event else None
 
 
 class WorldMapWindow(ctk.CTkToplevel):

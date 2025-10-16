@@ -28,6 +28,10 @@ from modules.scenarios.gm_layout_manager import GMScreenLayoutManager
 from modules.maps.world_map_view import WorldMapPanel
 from modules.maps.controllers.display_map_controller import DisplayMapController
 from modules.scenarios.scene_flow_viewer import create_scene_flow_frame, scene_flow_content_factory
+from modules.ui.chatbot_dialog import (
+    open_chatbot_dialog,
+    _DEFAULT_NAME_FIELD_OVERRIDES as CHATBOT_NAME_OVERRIDES,
+)
 
 log_module_import(__name__)
 
@@ -60,6 +64,8 @@ class GMScreenView(ctk.CTkFrame):
         self._bound_shortcut_owner = None
         self._ctrl_f_binding = None
         self._ctrl_F_binding = None
+        self._ctrl_shift_c_binding = None
+        self._ctrl_shift_C_binding = None
         self.bind("<Destroy>", self._on_destroy, add="+")
         self._setup_toplevel_shortcuts()
 
@@ -166,6 +172,12 @@ class GMScreenView(ctk.CTkFrame):
             command=self._open_load_layout_dialog,
         )
         self.load_layout_button.pack(side="left", pady=5)
+        self.chatbot_button = ctk.CTkButton(
+            self.layout_toolbar,
+            text="Chatbot",
+            command=self.open_chatbot,
+        )
+        self.chatbot_button.pack(side="left", padx=(5, 5), pady=5)
         self.layout_status_label = ctk.CTkLabel(self.layout_toolbar, text="")
         self.layout_status_label.pack(side="right", pady=5)
 
@@ -360,10 +372,14 @@ class GMScreenView(ctk.CTkFrame):
             self._bound_shortcut_owner = top
             self._ctrl_f_binding = top.bind("<Control-f>", self.open_global_search, add="+")
             self._ctrl_F_binding = top.bind("<Control-F>", self.open_global_search, add="+")
+            self._ctrl_shift_c_binding = top.bind("<Control-Shift-c>", self.open_chatbot, add="+")
+            self._ctrl_shift_C_binding = top.bind("<Control-Shift-C>", self.open_chatbot, add="+")
         except Exception:
             self._bound_shortcut_owner = None
             self._ctrl_f_binding = None
             self._ctrl_F_binding = None
+            self._ctrl_shift_c_binding = None
+            self._ctrl_shift_C_binding = None
 
     def _teardown_toplevel_shortcuts(self):
         top = self._bound_shortcut_owner
@@ -374,10 +390,16 @@ class GMScreenView(ctk.CTkFrame):
                 top.unbind("<Control-f>", self._ctrl_f_binding)
             if self._ctrl_F_binding:
                 top.unbind("<Control-F>", self._ctrl_F_binding)
+            if self._ctrl_shift_c_binding:
+                top.unbind("<Control-Shift-c>", self._ctrl_shift_c_binding)
+            if self._ctrl_shift_C_binding:
+                top.unbind("<Control-Shift-C>", self._ctrl_shift_C_binding)
         except Exception:
             pass
         finally:
             self._bound_shortcut_owner = None
+            self._ctrl_shift_c_binding = None
+            self._ctrl_shift_C_binding = None
             self._ctrl_f_binding = None
             self._ctrl_F_binding = None
 
@@ -510,7 +532,20 @@ class GMScreenView(ctk.CTkFrame):
 
         # 10) Double-click also selects
         listbox.bind("<Double-Button-1>", on_select)
-        
+
+    def open_chatbot(self, event=None):
+        try:
+            host = self.winfo_toplevel()
+        except Exception:
+            host = self
+        try:
+            open_chatbot_dialog(host, wrappers=self.wrappers, name_field_overrides=CHATBOT_NAME_OVERRIDES)
+        except Exception as exc:
+            log_warning(
+                f"Failed to launch chatbot: {exc}",
+                func_name="GMScreenView.open_chatbot",
+            )
+
     def load_template(self, filename):
         base_path = os.path.dirname(__file__)
         template_path = os.path.join(base_path, "..", filename)
