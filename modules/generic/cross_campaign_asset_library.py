@@ -25,11 +25,10 @@ from modules.generic.cross_campaign_asset_service import (
 )
 from modules.helpers.logging_helper import log_exception, log_info, log_warning
 from modules.helpers.selection_dialog import SelectionDialog
+from modules.helpers.template_loader import load_entity_definitions, list_known_entities
 
 
 class CrossCampaignAssetLibraryWindow(ctk.CTkToplevel):
-    ENTITY_TYPES = ("npcs", "objects", "maps")
-
     def __init__(self, master):
         super().__init__(master)
         self.title("Cross-campaign Asset Library")
@@ -39,10 +38,17 @@ class CrossCampaignAssetLibraryWindow(ctk.CTkToplevel):
         self.lift()
         self.focus_force()
 
+        self.entity_definitions = load_entity_definitions()
+        self.entity_types = tuple(list_known_entities()) or tuple(sorted(self.entity_definitions.keys()))
+        if not self.entity_types:
+            self.entity_types = ("npcs", "objects", "maps")
+        for slug in self.entity_types:
+            self.entity_definitions.setdefault(slug, {"label": slug.replace("_", " ").title()})
+        self.entity_records: Dict[str, List[dict]] = {key: [] for key in self.entity_types}
+
         self.active_campaign = get_active_campaign()
         self.source_campaigns: List[CampaignDatabase] = []
         self.selected_campaign: CampaignDatabase | None = None
-        self.entity_records: Dict[str, List[dict]] = {key: [] for key in self.ENTITY_TYPES}
         self._preview_image = None
 
         self._build_ui()
@@ -82,8 +88,12 @@ class CrossCampaignAssetLibraryWindow(ctk.CTkToplevel):
         self.tabview.grid(row=0, column=0, sticky="nsew", padx=(0, 10))
 
         self.treeviews: Dict[str, ttk.Treeview] = {}
-        for entity_type in self.ENTITY_TYPES:
-            tab = self.tabview.add(entity_type.title())
+        if not self.entity_types:
+            return
+
+        for entity_type in self.entity_types:
+            label = self.entity_definitions.get(entity_type, {}).get("label") or entity_type.replace("_", " ").title()
+            tab = self.tabview.add(label)
             tab.grid_rowconfigure(0, weight=1)
             tab.grid_columnconfigure(0, weight=1)
             columns = ("name", "summary")
@@ -189,7 +199,7 @@ class CrossCampaignAssetLibraryWindow(ctk.CTkToplevel):
             return
         with self._busy_cursor():
             try:
-                for entity_type in self.ENTITY_TYPES:
+                for entity_type in self.entity_types:
                     self.entity_records[entity_type] = load_entities(entity_type, self.selected_campaign.db_path)
             except Exception as exc:
                 log_exception(
@@ -205,7 +215,7 @@ class CrossCampaignAssetLibraryWindow(ctk.CTkToplevel):
         self.populate_lists()
 
     def clear_entities(self):
-        for entity_type in self.ENTITY_TYPES:
+        for entity_type in self.entity_types:
             self.entity_records[entity_type] = []
             tree = self.treeviews.get(entity_type)
             if tree:
@@ -218,7 +228,14 @@ class CrossCampaignAssetLibraryWindow(ctk.CTkToplevel):
             records = self.entity_records.get(entity_type, [])
             for idx, record in enumerate(records):
                 name = record.get("Name") or record.get("Title") or "<Unnamed>"
-                summary = record.get("Description") or record.get("Summary") or ""
+                summary = None
+                for field in ("Description", "Summary", "Information", "Notes", "Background", "Secret"):
+                    value = record.get(field)
+                    if value:
+                        summary = value
+                        break
+                if summary is None:
+                    summary = ""
                 summary_text = " ".join(str(summary).split())[:140]
                 tree.insert("", END, iid=f"{entity_type}:{idx}", values=(name, summary_text))
         self._set_preview(None, None)
@@ -258,14 +275,28 @@ class CrossCampaignAssetLibraryWindow(ctk.CTkToplevel):
         name = record.get("Name") or record.get("Title") or "<Unnamed>"
         self.preview_name.configure(text=name)
 
-        description = record.get("Description") or record.get("Summary") or ""
+        description = ""
+        for field in ("Description", "Summary", "Information", "Notes", "Background", "Secret"):
+            value = record.get(field)
+            if value:
+                description = value
+                break
         self.preview_text.configure(state="normal")
         self.preview_text.delete("1.0", END)
         self.preview_text.insert("1.0", description)
+        extra_lines: List[str] = []
+        audio_value = record.get("Audio")
+        if audio_value:
+            extra_lines.append(f"Audio: {audio_value}")
+        attachment_value = record.get("Attachment")
+        if attachment_value:
+            extra_lines.append(f"Attachment: {attachment_value}")
+        if extra_lines:
+            self.preview_text.insert("end", "\n\n" + "\n".join(extra_lines))
         self.preview_text.configure(state="disabled")
 
         image_path = None
-        if entity_type in {"npcs", "objects"}:
+        if entity_type in {"npcs", "objects", "pcs", "creatures", "places", "clues"}:
             image_path = record.get("Portrait")
         elif entity_type == "maps":
             image_path = record.get("Image")
@@ -319,7 +350,7 @@ class CrossCampaignAssetLibraryWindow(ctk.CTkToplevel):
                 selections[entity_type] = items
 
         if not selections:
-            messagebox.showinfo("No Selection", "Select at least one NPC, object, or map to export.")
+            messagebox.showinfo("No Selection", "Select at least one asset to export.")
             return
 
         default_name = f"asset_bundle_{self.selected_campaign.name.replace(' ', '_')}.zip"
