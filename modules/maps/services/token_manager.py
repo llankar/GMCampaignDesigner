@@ -202,17 +202,18 @@ def _on_token_move(self, event, token):
         bbox = None
     if bbox:
         token["hover_bbox"] = bbox
-    refresh = getattr(self, "_refresh_token_hover_popup", None)
-    if callable(refresh):
-        refresh(token)
-        if token.get("hover_visible"):
-            show_fn = getattr(self, "_show_token_hover", None)
-            if callable(show_fn):
-                show_fn(token)
     token["position"] = ((sx - self.pan_x)/self.zoom, (sy - self.pan_y)/self.zoom)
 
 def _on_token_release(self, event, token):
     token.pop("drag_data", None)
+
+    refresh = getattr(self, "_refresh_token_hover_popup", None)
+    if callable(refresh) and token.get("hover_visible"):
+        refresh(token)
+        show_fn = getattr(self, "_show_token_hover", None)
+        if callable(show_fn):
+            show_fn(token)
+
     # debounce any pending save
     try:
         self.canvas.after_cancel(self._persist_after_id)
