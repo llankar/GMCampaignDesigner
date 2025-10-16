@@ -587,7 +587,14 @@ class ChatbotDialog(ctk.CTkToplevel):
             padx=8,
             pady=8,
         )
-        widget.configure(disabledbackground=text_theme["bg"], disabledforeground=text_theme["fg"])
+        widget_config = widget.configure()
+        disabled_config: dict[str, object] = {}
+        if "disabledbackground" in widget_config:
+            disabled_config["disabledbackground"] = text_theme["bg"]
+        if "disabledforeground" in widget_config:
+            disabled_config["disabledforeground"] = text_theme["fg"]
+        if disabled_config:
+            widget.configure(**disabled_config)
         self._notes_widget = widget
         self._set_notes_state("disabled")
 
