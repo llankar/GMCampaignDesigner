@@ -13,6 +13,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Dict, Iterable, List, Optional, Tuple
 
+from modules.audio.entity_audio import normalize_audio_reference
 from modules.generic.generic_model_wrapper import GenericModelWrapper
 from modules.helpers.config_helper import ConfigHelper
 from modules.helpers.logging_helper import (
@@ -24,6 +25,14 @@ from modules.helpers.logging_helper import (
 log_module_import(__name__)
 
 BUNDLE_VERSION = 1
+
+
+PORTRAIT_ENTITY_TYPES = {"npcs", "objects", "pcs", "creatures", "places", "clues"}
+AUDIO_ENTITY_TYPES = {"npcs", "pcs", "creatures", "places"}
+ATTACHMENT_FIELDS = {
+    "clues": "Attachment",
+    "informations": "Attachment",
+}
 
 
 @dataclass
@@ -139,6 +148,61 @@ def _collect_portrait(entity_type: str, record: dict, campaign_dir: Path) -> Opt
     )
 
 
+def _collect_audio_asset(entity_type: str, record: dict, campaign_dir: Path) -> Optional[AssetReference]:
+    raw_value = record.get("Audio")
+    normalized = normalize_audio_reference(raw_value)
+    if not normalized:
+        return None
+    absolute = _campaign_join(campaign_dir, normalized)
+    if not absolute.exists():
+        log_warning(
+            f"Audio missing for record {_determine_record_key(record)}: {normalized}",
+            func_name="modules.generic.cross_campaign_asset_service._collect_audio_asset",
+        )
+        return None
+    return AssetReference(
+        entity_type=entity_type,
+        record_key=_determine_record_key(record),
+        asset_type="audio",
+        original_path=normalized,
+        absolute_path=absolute,
+    )
+
+
+def _collect_attachment_asset(
+    entity_type: str, record: dict, campaign_dir: Path, field_name: str
+) -> Optional[AssetReference]:
+    raw_value = record.get(field_name)
+    if raw_value is None:
+        return None
+    try:
+        normalized = str(raw_value).strip()
+    except Exception:
+        return None
+    if not normalized:
+        return None
+
+    absolute = _campaign_join(campaign_dir, normalized)
+    if not absolute.exists() and not Path(normalized).is_absolute():
+        uploads_candidate = campaign_dir / "assets" / "uploads" / normalized
+        if uploads_candidate.exists():
+            absolute = uploads_candidate
+    if not absolute.exists():
+        log_warning(
+            f"Attachment missing for record {_determine_record_key(record)}: {normalized}",
+            func_name="modules.generic.cross_campaign_asset_service._collect_attachment_asset",
+        )
+        return None
+
+    return AssetReference(
+        entity_type=entity_type,
+        record_key=_determine_record_key(record),
+        asset_type="attachment",
+        original_path=normalized,
+        absolute_path=absolute,
+    )
+
+
 def _campaign_join(campaign_dir: Path, path_value: str) -> Path:
     normalized = str(path_value).strip().replace("\\", "/")
     if not normalized:
@@ -233,15 +297,26 @@ def _collect_token_assets(record: dict, campaign_dir: Path) -> Iterable[AssetRef
 
 def collect_assets(entity_type: str, records: Iterable[dict], campaign_dir: Path) -> List[AssetReference]:
     collected: List[AssetReference] = []
-    if entity_type in {"npcs", "objects"}:
-        for record in records:
-            portrait = _collect_portrait(entity_type, record, campaign_dir)
-            if portrait:
-                collected.append(portrait)
-    elif entity_type == "maps":
+    if entity_type == "maps":
         for record in records:
             collected.extend(_collect_map_assets(record, campaign_dir))
             collected.extend(_collect_token_assets(record, campaign_dir))
+        return collected
+
+    attachment_field = ATTACHMENT_FIELDS.get(entity_type)
+    for record in records:
+        if entity_type in PORTRAIT_ENTITY_TYPES:
+            portrait = _collect_portrait(entity_type, record, campaign_dir)
+            if portrait:
+                collected.append(portrait)
+        if entity_type in AUDIO_ENTITY_TYPES:
+            audio = _collect_audio_asset(entity_type, record, campaign_dir)
+            if audio:
+                collected.append(audio)
+        if attachment_field:
+            attachment = _collect_attachment_asset(entity_type, record, campaign_dir, attachment_field)
+            if attachment:
+                collected.append(attachment)
     return collected
 
 
@@ -438,6 +513,12 @@ def _determine_target_path(asset_type: str, original_path: str, campaign_dir: Pa
     elif asset_type == "map_mask":
         base = campaign_dir / "masks"
         relative_base = Path("masks")
+    elif asset_type == "audio":
+        base = campaign_dir / "assets" / "audio"
+        relative_base = Path("assets/audio")
+    elif asset_type == "attachment":
+        base = campaign_dir / "assets" / "uploads"
+        relative_base = Path(".")
     else:  # token assets
         if original and not Path(original).is_absolute():
             rel = Path(original.lstrip("./"))
@@ -528,10 +609,21 @@ def apply_import(
 def _rewrite_record_paths(entity_type: str, record: dict, replacements: Dict[str, str]) -> dict:
     updated = copy.deepcopy(record)
 
-    if entity_type in {"npcs", "objects"}:
+    if entity_type in PORTRAIT_ENTITY_TYPES:
         portrait = updated.get("Portrait")
         if portrait in replacements:
             updated["Portrait"] = replacements[portrait]
+
+    if entity_type in AUDIO_ENTITY_TYPES:
+        audio = updated.get("Audio")
+        if audio in replacements:
+            updated["Audio"] = replacements[audio]
+
+    attachment_field = ATTACHMENT_FIELDS.get(entity_type)
+    if attachment_field:
+        attachment_value = updated.get(attachment_field)
+        if attachment_value in replacements:
+            updated[attachment_field] = replacements[attachment_value]
 
     if entity_type == "maps":
         image = updated.get("Image")
