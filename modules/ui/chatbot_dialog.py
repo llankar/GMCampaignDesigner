@@ -1,16 +1,172 @@
 """Shared chatbot dialog for querying campaign notes across entity wrappers."""
 from __future__ import annotations
 
-import tkinter as tk
+from collections import defaultdict
+from dataclasses import dataclass, field
 from typing import Any, Iterable, Mapping, Sequence
+import tkinter as tk
 
 import customtkinter as ctk
 
 from modules.generic.generic_model_wrapper import GenericModelWrapper
 from modules.helpers.logging_helper import log_module_import
-from modules.helpers.text_helpers import format_multiline_text
+from modules.helpers.text_helpers import normalize_rtf_json
 
 log_module_import(__name__)
+
+
+@dataclass
+class NoteText:
+    """Container for note text and optional rich-text formatting."""
+
+    text: str = ""
+    formatting: dict[str, list[tuple[int, int]]] = field(default_factory=dict)
+
+    def __bool__(self) -> bool:  # pragma: no cover - convenience helper
+        return bool(self.text)
+
+    def is_blank(self) -> bool:
+        return self.text.strip() == ""
+
+    @classmethod
+    def plain(cls, text: str) -> "NoteText":
+        return cls(text or "")
+
+    def trimmed(self) -> "NoteText":
+        text = self.text
+        if not text:
+            return self
+        start = 0
+        end = len(text)
+        while start < end and text[start].isspace():
+            start += 1
+        while end > start and text[end - 1].isspace():
+            end -= 1
+        if start == 0 and end == len(text):
+            return self
+        clipped = text[start:end]
+        if not clipped:
+            return NoteText()
+        clipped_runs: dict[str, list[tuple[int, int]]] = {}
+        for tag, runs in self.formatting.items():
+            adjusted: list[tuple[int, int]] = []
+            for s, e in runs:
+                ns = max(s - start, 0)
+                ne = max(min(e - start, len(clipped)), 0)
+                if ne > ns:
+                    adjusted.append((ns, ne))
+            if adjusted:
+                clipped_runs[tag] = adjusted
+        return NoteText(clipped, clipped_runs)
+
+    def with_prefix(self, prefix: str) -> "NoteText":
+        if not prefix:
+            return self
+        shift = len(prefix)
+        if not self.text:
+            return NoteText(prefix)
+        shifted = {
+            tag: [(s + shift, e + shift) for s, e in runs]
+            for tag, runs in self.formatting.items()
+        }
+        return NoteText(prefix + self.text, shifted)
+
+    def with_suffix(self, suffix: str) -> "NoteText":
+        if not suffix:
+            return self
+        if not self.text:
+            return NoteText(suffix)
+        shifted = {
+            tag: runs.copy()
+            for tag, runs in self.formatting.items()
+        }
+        return NoteText(self.text + suffix, shifted)
+
+    def _insert_repeated(self, insert_text: str, positions: Sequence[int]) -> "NoteText":
+        if not insert_text or not self.text:
+            return self
+        base = self.text
+        valid_positions = sorted(
+            pos for pos in positions if 0 <= pos <= len(base)
+        )
+        if not valid_positions:
+            return self
+        pieces: list[str] = []
+        last = 0
+        for pos in valid_positions:
+            pieces.append(base[last:pos])
+            pieces.append(insert_text)
+            last = pos
+        pieces.append(base[last:])
+        new_text = "".join(pieces)
+
+        insert_len = len(insert_text)
+        shifted_runs: dict[str, list[tuple[int, int]]] = {}
+        for tag, runs in self.formatting.items():
+            adjusted: list[tuple[int, int]] = []
+            for s, e in runs:
+                shift_start = _count_insertions(valid_positions, s) * insert_len
+                shift_end = _count_insertions(valid_positions, e) * insert_len
+                adjusted.append((s + shift_start, e + shift_end))
+            if adjusted:
+                shifted_runs[tag] = adjusted
+        return NoteText(new_text, shifted_runs)
+
+    def indent_all_lines(self, indent: str) -> "NoteText":
+        if not indent:
+            return self
+        positions = [0]
+        positions.extend(idx + 1 for idx, ch in enumerate(self.text) if ch == "\n")
+        return self._insert_repeated(indent, positions)
+
+    def indent_following_lines(self, indent: str) -> "NoteText":
+        if not indent:
+            return self
+        positions = [idx + 1 for idx, ch in enumerate(self.text) if ch == "\n"]
+        return self._insert_repeated(indent, positions)
+
+    def __add__(self, other: "NoteText") -> "NoteText":
+        if not isinstance(other, NoteText):
+            other = NoteText.plain(str(other))
+        if not self.text:
+            return other
+        if not other.text:
+            return self
+        combined_text = self.text + other.text
+        merged: defaultdict[str, list[tuple[int, int]]] = defaultdict(list)
+        for tag, runs in self.formatting.items():
+            merged[tag].extend(runs)
+        offset = len(self.text)
+        for tag, runs in other.formatting.items():
+            merged[tag].extend((s + offset, e + offset) for s, e in runs)
+        return NoteText(
+            combined_text,
+            {tag: ranges for tag, ranges in merged.items() if ranges},
+        )
+
+
+def _count_insertions(positions: Sequence[int], pos: int) -> int:
+    """Return the number of insertions that occur at or before pos."""
+
+    from bisect import bisect_right
+
+    return bisect_right(positions, pos)
+
+
+def _join_note_texts(parts: Sequence[NoteText], separator: str = "") -> NoteText:
+    parts = [part for part in parts if part and not part.is_blank()]
+    if not parts:
+        return NoteText()
+    if not separator:
+        result = parts[0]
+        for piece in parts[1:]:
+            result = result + piece
+        return result
+    sep = NoteText.plain(separator)
+    result = parts[0]
+    for piece in parts[1:]:
+        result = result + sep + piece
+    return result
 
 # Wrappers exposed by the GM screen that we want to make available everywhere.
 _DEFAULT_WRAPPER_FACTORIES: Sequence[tuple[str, str]] = (
@@ -483,10 +639,10 @@ class ChatbotDialog(ctk.CTkToplevel):
         entity_type, name, record = self._results[idx]
         self.selection_label.configure(text=f"{entity_type}: {name}")
         note_text = self._extract_note(entity_type, record)
-        if note_text:
-            formatted = format_multiline_text(note_text)
+        if note_text and not note_text.is_blank():
+            formatted = note_text
         else:
-            formatted = "No notes available for this record."
+            formatted = NoteText.plain("No notes available for this record.")
         self._render_note_text(formatted)
 
     # ------------------------------------------------------------------
@@ -527,12 +683,12 @@ class ChatbotDialog(ctk.CTkToplevel):
             else:
                 self._render_note_text("No records available to display.")
 
-    def _extract_note(self, entity_type: str, record: Mapping[str, Any]) -> str:
-        sections: list[str] = []
+    def _extract_note(self, entity_type: str, record: Mapping[str, Any]) -> NoteText:
+        sections: list[NoteText] = []
         used_fields: set[str] = set()
 
         for title, field_names in self._resolve_section_fields(entity_type):
-            entries: list[str] = []
+            entries: list[NoteText] = []
             for field in field_names:
                 if field in used_fields:
                     continue
@@ -544,7 +700,7 @@ class ChatbotDialog(ctk.CTkToplevel):
             if entries:
                 sections.append(self._format_section(title, entries))
 
-        additional_entries: list[str] = []
+        additional_entries: list[NoteText] = []
         for key, value in record.items():
             if key in used_fields or key in _IGNORED_FIELDS:
                 continue
@@ -555,78 +711,112 @@ class ChatbotDialog(ctk.CTkToplevel):
         if additional_entries:
             sections.append(self._format_section("Additional Details", additional_entries))
 
-        return "\n\n".join(section for section in sections if section).strip()
+        return _join_note_texts(sections, separator="\n\n").trimmed()
 
     def _resolve_section_fields(self, entity_type: str) -> Sequence[tuple[str, tuple[str, ...]]]:
         return _ENTITY_SECTION_OVERRIDES.get(entity_type, _DEFAULT_SECTION_FIELDS)
 
-    def _format_section(self, title: str, entries: Sequence[str]) -> str:
+    def _format_section(self, title: str, entries: Sequence[NoteText]) -> NoteText:
         if not entries:
-            return ""
-        lines = [f"{title}:"]
-        for entry in entries:
-            entry_lines = [part.rstrip() for part in str(entry).splitlines()]
-            if not entry_lines:
-                continue
-            lines.append("  " + "\n  ".join(entry_lines))
-        if len(lines) == 1:
-            return ""
-        return "\n".join(lines)
+            return NoteText()
+        body = _join_note_texts(
+            [entry.indent_all_lines("  ") for entry in entries],
+            separator="\n",
+        )
+        if not body or body.is_blank():
+            return NoteText()
+        return NoteText.plain(f"{title}:\n") + body
 
-    def _format_field_value(self, label: str, value: Any) -> str | None:
-        text = self._normalize_field_value(value)
-        if not text:
+    def _format_field_value(self, label: str, value: Any) -> NoteText | None:
+        note = self._normalize_field_value(value)
+        if not note or note.is_blank():
             return None
-        text = text.replace("\r\n", "\n").strip()
-        if not text:
+        note = note.trimmed()
+        if not note.text:
             return None
-        if "\n" in text:
-            indented = "\n  ".join(line.rstrip() for line in text.splitlines())
-            return f"{label}:\n  {indented}"
-        return f"{label}: {text}"
+        if "\n" in note.text:
+            return NoteText.plain(f"{label}:\n") + note.indent_all_lines("  ")
+        return NoteText.plain(f"{label}: ") + note
 
-    def _normalize_field_value(self, value: Any) -> str:
+    def _normalize_field_value(self, value: Any) -> NoteText:
         if value is None:
-            return ""
+            return NoteText()
         if isinstance(value, str):
-            return value.strip()
+            return NoteText.plain(value).trimmed()
         if isinstance(value, Mapping):
             text_value = value.get("text")
-            if isinstance(text_value, str) and text_value.strip():
-                return text_value.strip()
-            parts: list[str] = []
+            if isinstance(text_value, str):
+                normalized = normalize_rtf_json(value)
+                text = normalized.get("text", "")
+                formatting: dict[str, list[tuple[int, int]]] = {}
+                for tag, runs in normalized.get("formatting", {}).items():
+                    if tag not in {"bold", "italic", "underline"}:
+                        continue
+                    cleaned: list[tuple[int, int]] = []
+                    for start, end in runs:
+                        try:
+                            s = int(start)
+                            e = int(end)
+                        except Exception:
+                            continue
+                        if e > s:
+                            cleaned.append((s, e))
+                    if cleaned:
+                        formatting[tag] = cleaned
+                return NoteText(text, formatting).trimmed()
+            parts: list[NoteText] = []
             for key, sub_value in value.items():
                 if key in {"text", "formatting"}:
                     continue
                 formatted = self._format_field_value(str(key), sub_value)
-                if formatted:
+                if formatted and not formatted.is_blank():
                     parts.append(formatted)
-            return "\n".join(parts)
+            return _join_note_texts(parts, separator="\n").trimmed()
         if isinstance(value, (list, tuple, set)):
-            items: list[str] = []
+            items: list[NoteText] = []
             for item in value:
                 normalized = self._normalize_field_value(item)
-                if not normalized:
+                if not normalized or normalized.is_blank():
                     continue
-                normalized = normalized.replace("\r\n", "\n").strip()
-                if not normalized:
+                normalized = normalized.trimmed()
+                if not normalized.text:
                     continue
-                normalized = normalized.replace("\n", "\n    ")
-                bullet = normalized if normalized.startswith("• ") else f"• {normalized}"
-                items.append(bullet)
-            return "\n".join(items)
-        return str(value).strip()
+                normalized = normalized.indent_following_lines("    ")
+                if not normalized.text.startswith("• "):
+                    normalized = normalized.with_prefix("• ")
+                items.append(normalized)
+            return _join_note_texts(items, separator="\n")
+        return NoteText.plain(str(value)).trimmed()
 
-    def _render_note_text(self, text: str) -> None:
+    def _render_note_text(self, text: NoteText | str) -> None:
         self.notes_box.configure(state=tk.NORMAL)
         self.notes_box.delete("1.0", tk.END)
 
-        if text and not text.endswith("\n"):
-            text += "\n"
+        if not isinstance(text, NoteText):
+            note = NoteText.plain(str(text or ""))
+        else:
+            note = text
 
-        self.notes_box.insert(tk.END, text)
+        render_text = note.text
+        if render_text and not render_text.endswith("\n"):
+            render_text += "\n"
 
-        lines = text.splitlines()
+        self.notes_box.insert(tk.END, render_text)
+
+        for tag, runs in note.formatting.items():
+            if tag not in {"bold", "italic", "underline"}:
+                continue
+            for start, end in runs:
+                if end <= start:
+                    continue
+                start_index = f"1.0+{start}c"
+                end_index = f"1.0+{end}c"
+                try:
+                    self.notes_box.tag_add(tag, start_index, end_index)
+                except Exception:
+                    continue
+
+        lines = render_text.splitlines()
         for lineno, raw_line in enumerate(lines, start=1):
             line = raw_line.rstrip("\n")
             stripped = line.strip()
