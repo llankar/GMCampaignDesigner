@@ -86,6 +86,8 @@ def _build_toolbar(self):
         .pack(side="left", padx=2)
 
     # Overlay controls
+    dropdown_width = 160
+
     overlay_label = ctk.CTkLabel(toolbar, text="Overlays:")
     overlay_label.pack(side="left", padx=(14, 2), pady=8)
 
