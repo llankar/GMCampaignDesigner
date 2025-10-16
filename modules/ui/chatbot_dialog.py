@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 import tkinter as tk
-from typing import Iterable, Mapping, Sequence
+from typing import Any, Iterable, Mapping, Sequence
 
 import customtkinter as ctk
 
@@ -44,6 +44,242 @@ _NOTE_FIELD_CANDIDATES: Sequence[str] = (
     "Content",
     "Background",
 )
+
+_DEFAULT_SECTION_FIELDS: Sequence[tuple[str, tuple[str, ...]]] = (
+    (
+        "Overview",
+        tuple(
+            dict.fromkeys(
+                (*_NOTE_FIELD_CANDIDATES, "Synopsis", "Background", "History", "Flavor")
+            )
+        ),
+    ),
+    (
+        "Identity & Role",
+        (
+            "Role",
+            "Title",
+            "Type",
+            "Profession",
+            "Occupation",
+            "Alignment",
+            "Ancestry",
+            "Heritage",
+            "Species",
+            "Organization",
+            "Affiliation",
+            "Faction",
+            "Factions",
+            "Rank",
+            "Position",
+        ),
+    ),
+    (
+        "Traits & Personality",
+        (
+            "Traits",
+            "Personality",
+            "Appearance",
+            "Quirks",
+            "Mannerisms",
+            "Roleplay",
+            "RoleplayHint",
+            "RoleplayHints",
+            "Roleplay Hints",
+            "RoleplayingCues",
+            "Roleplaying Cues",
+            "Behavior",
+            "Voice",
+        ),
+    ),
+    (
+        "Statistics",
+        (
+            "Stats",
+            "Attributes",
+            "Abilities",
+            "Skills",
+            "Combat",
+            "HP",
+            "HitPoints",
+            "Level",
+            "Rank",
+            "Resources",
+            "Equipment",
+            "Inventory",
+            "Powers",
+            "Weakness",
+        ),
+    ),
+    (
+        "Motivations & Secrets",
+        (
+            "Motivation",
+            "Motivations",
+            "Goals",
+            "Agenda",
+            "PlotHook",
+            "PlotHooks",
+            "Hooks",
+            "Rumors",
+            "Secret",
+            "Secrets",
+        ),
+    ),
+    (
+        "Connections",
+        (
+            "Allies",
+            "Contacts",
+            "Relationships",
+            "Connections",
+            "Associates",
+            "Enemies",
+            "SupportingNPCs",
+            "Family",
+            "Friends",
+        ),
+    ),
+)
+
+_ENTITY_SECTION_OVERRIDES: Mapping[str, Sequence[tuple[str, tuple[str, ...]]]] = {
+    "NPCs": (
+        _DEFAULT_SECTION_FIELDS[0],
+        _DEFAULT_SECTION_FIELDS[1],
+        (
+            "Traits & Personality",
+            (
+                "Traits",
+                "Personality",
+                "Appearance",
+                "Quirks",
+                "RoleplayingCues",
+                "RoleplayHint",
+                "RoleplayHints",
+                "Behavior",
+            ),
+        ),
+        _DEFAULT_SECTION_FIELDS[3],
+        (
+            "Motivations & Secrets",
+            (
+                "Motivation",
+                "Goals",
+                "Agenda",
+                "Secret",
+                "Secrets",
+                "PlotHook",
+                "PlotHooks",
+            ),
+        ),
+        _DEFAULT_SECTION_FIELDS[5],
+    ),
+    "Creatures": (
+        _DEFAULT_SECTION_FIELDS[0],
+        (
+            "Identity & Role",
+            (
+                "Type",
+                "Role",
+                "Environment",
+                "Alignment",
+            ),
+        ),
+        (
+            "Traits & Abilities",
+            (
+                "Traits",
+                "Abilities",
+                "Powers",
+                "Weakness",
+                "SpecialAbilities",
+            ),
+        ),
+        (
+            "Statistics",
+            (
+                "Stats",
+                "Attributes",
+                "Skills",
+                "Combat",
+                "HP",
+                "HitPoints",
+                "Level",
+            ),
+        ),
+        _DEFAULT_SECTION_FIELDS[4],
+    ),
+    "Factions": (
+        _DEFAULT_SECTION_FIELDS[0],
+        (
+            "Identity & Role",
+            (
+                "Type",
+                "Alignment",
+                "Scale",
+                "Reach",
+                "Resources",
+            ),
+        ),
+        (
+            "Goals & Secrets",
+            (
+                "Goals",
+                "Agenda",
+                "Motivation",
+                "Secret",
+                "Secrets",
+                "PlotHooks",
+            ),
+        ),
+        _DEFAULT_SECTION_FIELDS[5],
+    ),
+    "Places": (
+        _DEFAULT_SECTION_FIELDS[0],
+        (
+            "Location Details",
+            (
+                "Type",
+                "Region",
+                "Environment",
+                "Tags",
+                "Features",
+                "SensoryDetails",
+            ),
+        ),
+        (
+            "Secrets & Hooks",
+            (
+                "Secrets",
+                "Hooks",
+                "PlotHooks",
+                "Rumors",
+            ),
+        ),
+        (
+            "Occupants & Connections",
+            (
+                "NPCs",
+                "Creatures",
+                "Factions",
+                "Allies",
+                "Enemies",
+            ),
+        ),
+    ),
+}
+
+_IGNORED_FIELDS: set[str] = {
+    "Name",
+    "Title",
+    "ID",
+    "Id",
+    "Uuid",
+    "UUID",
+    "Portrait",
+    "Image",
+    "Token",
+}
 
 
 def get_default_chatbot_wrappers() -> dict[str, GenericModelWrapper]:
@@ -214,7 +450,7 @@ class ChatbotDialog(ctk.CTkToplevel):
             return
         entity_type, name, record = self._results[idx]
         self.selection_label.configure(text=f"{entity_type}: {name}")
-        note_text = self._extract_note(record)
+        note_text = self._extract_note(entity_type, record)
         if note_text:
             formatted = format_multiline_text(note_text)
         else:
@@ -259,12 +495,95 @@ class ChatbotDialog(ctk.CTkToplevel):
             else:
                 self._render_note_text("No records available to display.")
 
-    def _extract_note(self, record: Mapping) -> str:
-        for field in self._note_fields:
-            value = record.get(field)
-            if isinstance(value, str) and value.strip():
-                return value
-        return ""
+    def _extract_note(self, entity_type: str, record: Mapping[str, Any]) -> str:
+        sections: list[str] = []
+        used_fields: set[str] = set()
+
+        for title, field_names in self._resolve_section_fields(entity_type):
+            entries: list[str] = []
+            for field in field_names:
+                if field in used_fields:
+                    continue
+                value = record.get(field)
+                formatted = self._format_field_value(field, value)
+                if formatted:
+                    entries.append(formatted)
+                    used_fields.add(field)
+            if entries:
+                sections.append(self._format_section(title, entries))
+
+        additional_entries: list[str] = []
+        for key, value in record.items():
+            if key in used_fields or key in _IGNORED_FIELDS:
+                continue
+            formatted = self._format_field_value(key, value)
+            if formatted:
+                additional_entries.append(formatted)
+                used_fields.add(key)
+        if additional_entries:
+            sections.append(self._format_section("Additional Details", additional_entries))
+
+        return "\n\n".join(section for section in sections if section).strip()
+
+    def _resolve_section_fields(self, entity_type: str) -> Sequence[tuple[str, tuple[str, ...]]]:
+        return _ENTITY_SECTION_OVERRIDES.get(entity_type, _DEFAULT_SECTION_FIELDS)
+
+    def _format_section(self, title: str, entries: Sequence[str]) -> str:
+        if not entries:
+            return ""
+        lines = [f"{title}:"]
+        for entry in entries:
+            entry_lines = [part.rstrip() for part in str(entry).splitlines()]
+            if not entry_lines:
+                continue
+            lines.append("  " + "\n  ".join(entry_lines))
+        if len(lines) == 1:
+            return ""
+        return "\n".join(lines)
+
+    def _format_field_value(self, label: str, value: Any) -> str | None:
+        text = self._normalize_field_value(value)
+        if not text:
+            return None
+        text = text.replace("\r\n", "\n").strip()
+        if not text:
+            return None
+        if "\n" in text:
+            indented = "\n  ".join(line.rstrip() for line in text.splitlines())
+            return f"{label}:\n  {indented}"
+        return f"{label}: {text}"
+
+    def _normalize_field_value(self, value: Any) -> str:
+        if value is None:
+            return ""
+        if isinstance(value, str):
+            return value.strip()
+        if isinstance(value, Mapping):
+            text_value = value.get("text")
+            if isinstance(text_value, str) and text_value.strip():
+                return text_value.strip()
+            parts: list[str] = []
+            for key, sub_value in value.items():
+                if key in {"text", "formatting"}:
+                    continue
+                formatted = self._format_field_value(str(key), sub_value)
+                if formatted:
+                    parts.append(formatted)
+            return "\n".join(parts)
+        if isinstance(value, (list, tuple, set)):
+            items: list[str] = []
+            for item in value:
+                normalized = self._normalize_field_value(item)
+                if not normalized:
+                    continue
+                normalized = normalized.replace("\r\n", "\n").strip()
+                if not normalized:
+                    continue
+                normalized = normalized.replace("\n", "\n    ")
+                bullet = normalized if normalized.startswith("• ") else f"• {normalized}"
+                items.append(bullet)
+            return "\n".join(items)
+        return str(value).strip()
 
     def _render_note_text(self, text: str) -> None:
         self.notes_box.configure(state=tk.NORMAL)
