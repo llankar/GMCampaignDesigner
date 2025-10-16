@@ -1673,7 +1673,7 @@ class GMScreenView(ctk.CTkFrame):
         ]
         popup = ctk.CTkToplevel(self)
         popup.title("Create New Tab")
-        popup.geometry("300x400")
+        popup.geometry("300x800")
         popup.transient(self.winfo_toplevel())
         popup.grab_set()
         popup.focus_force()
