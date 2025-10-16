@@ -35,6 +35,7 @@ from modules.helpers.logging_helper import (
     log_module_import,
 )
 from modules.objects.object_shelf_canvas_view import ObjectShelfView
+from modules.objects.object_constants import OBJECT_CATEGORY_ALLOWED
 
 log_module_import(__name__)
 
@@ -74,37 +75,6 @@ ENTITY_DISPLAY_LABELS = {
     "informations": "Informations",
     "maps": "Maps",
 }
-
-OBJECT_CATEGORY_ALLOWED = [
-    "Weapon",
-    "Armor",
-    "Shield",
-    "Ammunition",
-    "Tool",
-    "Kit",
-    "Resource",
-    "Food",
-    "Drink",
-    "Healing",
-    "Potion",
-    "Drug",
-    "Magic Item",
-    "Accessory",
-    "Jewelry",
-    "Clothing",
-    "Scroll",
-    "Wand",
-    "Staff",
-    "Ring",
-    "Wondrous Item",
-    "Explosive",
-    "Poison",
-    "Consumable",
-    "Container",
-    "Trinket",
-    "Miscellaneous",
-]
-
 
 AI_CATEGORIZE_BATCH_SIZE = 20
 

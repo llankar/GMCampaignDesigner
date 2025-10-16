@@ -5,7 +5,7 @@ import customtkinter as ctk
 from tkinter import messagebox
 
 from modules.generic.generic_model_wrapper import GenericModelWrapper
-from modules.generic.generic_list_view import OBJECT_CATEGORY_ALLOWED
+from modules.objects.object_constants import OBJECT_CATEGORY_ALLOWED
 from modules.helpers.template_loader import load_template
 from modules.helpers.logging_helper import (
     log_info,
