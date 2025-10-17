@@ -404,6 +404,8 @@ def _delete_token(self, token):
 
 def _persist_tokens(self):
     """Quickly capture token state, then hand off the heavy write to a daemon thread."""
+    if getattr(self, "_suspend_token_persistence", 0):
+        return
     # 1) Build the JSON in–memory (cheap)
     data = []
     try:
