@@ -94,11 +94,9 @@ class FinaleBlueprintStep(WizardStep):
         self.climax_var = ctk.StringVar(value=CLIMAX_STRUCTURES[0]["name"])
         self.callback_var = ctk.StringVar(value=CALLBACK_TACTICS[0])
         self.escalation_var = ctk.StringVar(value=STAKE_ESCALATIONS[0])
-        self.antagonists_var = ctk.StringVar()
-        self.allied_factions_var = ctk.StringVar()
-        self.npc_allies_var = ctk.StringVar()
         self.location_var = ctk.StringVar()
         self.title_var = ctk.StringVar()
+        self.entity_selectors = {}
 
         ctk.CTkLabel(selector_frame, text="Climax Structure:").grid(
             row=0, column=0, sticky="w", padx=10, pady=5
@@ -109,18 +107,26 @@ class FinaleBlueprintStep(WizardStep):
             values=[item["name"] for item in CLIMAX_STRUCTURES],
         ).grid(row=0, column=1, columnspan=2, sticky="ew", padx=10, pady=5)
 
-        ctk.CTkLabel(selector_frame, text="Antagonists (comma-separated):").grid(
+        ctk.CTkLabel(selector_frame, text="Antagonists:").grid(
             row=1, column=0, sticky="w", padx=10, pady=5
         )
-        ctk.CTkEntry(selector_frame, textvariable=self.antagonists_var).grid(
-            row=1, column=1, sticky="ew", padx=10, pady=5
+        self._create_entity_selector(
+            selector_frame,
+            row=1,
+            column=1,
+            key="antagonists",
+            button_text="Add Antagonist",
         )
 
-        ctk.CTkLabel(selector_frame, text="Allied Factions (comma-separated):").grid(
+        ctk.CTkLabel(selector_frame, text="Allied Factions:").grid(
             row=1, column=2, sticky="w", padx=10, pady=5
         )
-        ctk.CTkEntry(selector_frame, textvariable=self.allied_factions_var).grid(
-            row=1, column=3, sticky="ew", padx=10, pady=5
+        self._create_entity_selector(
+            selector_frame,
+            row=1,
+            column=3,
+            key="allied_factions",
+            button_text="Add Faction",
         )
 
         ctk.CTkLabel(selector_frame, text="Battlefield / Signature Place:").grid(
@@ -131,11 +137,15 @@ class FinaleBlueprintStep(WizardStep):
         )
         self.location_menu.grid(row=2, column=1, sticky="ew", padx=10, pady=5)
 
-        ctk.CTkLabel(selector_frame, text="Supporting NPC Allies (comma-separated):").grid(
+        ctk.CTkLabel(selector_frame, text="Supporting NPC Allies:").grid(
             row=2, column=2, sticky="w", padx=10, pady=5
         )
-        ctk.CTkEntry(selector_frame, textvariable=self.npc_allies_var).grid(
-            row=2, column=3, sticky="ew", padx=10, pady=5
+        self._create_entity_selector(
+            selector_frame,
+            row=2,
+            column=3,
+            key="npc_allies",
+            button_text="Add NPC Ally",
         )
 
         ctk.CTkLabel(selector_frame, text="Callback Tactic:").grid(
@@ -197,6 +207,68 @@ class FinaleBlueprintStep(WizardStep):
         self._refresh_parameter_suggestions()
 
     # ------------------------------------------------------------------
+    def _create_entity_selector(self, parent, row, column, key, button_text):
+        container = ctk.CTkFrame(parent, fg_color="transparent")
+        container.grid(row=row, column=column, sticky="nsew", padx=10, pady=5)
+        container.grid_columnconfigure(0, weight=1)
+
+        rows_container = ctk.CTkFrame(container, fg_color="transparent")
+        rows_container.grid(row=0, column=0, columnspan=2, sticky="nsew")
+        rows_container.grid_columnconfigure(0, weight=1)
+
+        selector = {
+            "frame": container,
+            "rows": [],
+            "vars": [],
+            "menus": [],
+            "options": ["None"],
+            "rows_container": rows_container,
+        }
+
+        def remove_row(row_frame, var):
+            row_frame.destroy()
+            if var in selector["vars"]:
+                idx = selector["vars"].index(var)
+                selector["vars"].pop(idx)
+                selector["menus"].pop(idx)
+                selector["rows"].pop(idx)
+
+        def add_row(initial_value=None):
+            options = selector["options"] or ["None"]
+            row_frame = ctk.CTkFrame(rows_container, fg_color="transparent")
+            row_frame.pack(fill="x", pady=2)
+            row_frame.columnconfigure(0, weight=1)
+
+            var = ctk.StringVar()
+            menu = ctk.CTkOptionMenu(row_frame, variable=var, values=options)
+            menu.grid(row=0, column=0, sticky="ew")
+
+            remove_btn = ctk.CTkButton(
+                row_frame,
+                text="-",
+                width=30,
+                command=lambda rf=row_frame, v=var: remove_row(rf, v),
+            )
+            remove_btn.grid(row=0, column=1, padx=5)
+
+            if initial_value and initial_value in options:
+                var.set(initial_value)
+            else:
+                var.set(options[0])
+
+            selector["rows"].append(row_frame)
+            selector["vars"].append(var)
+            selector["menus"].append(menu)
+
+        add_button = ctk.CTkButton(container, text=button_text, command=add_row)
+        add_button.grid(row=1, column=0, sticky="w", pady=(5, 0))
+
+        selector["add_button"] = add_button
+        selector["add_row"] = add_row
+
+        self.entity_selectors[key] = selector
+
+    # ------------------------------------------------------------------
     def _refresh_entities(self):
         def safe_load(wrapper):
             try:
@@ -204,10 +276,10 @@ class FinaleBlueprintStep(WizardStep):
             except Exception:
                 return []
 
-        self.npcs = safe_load(self.wizard.npc_wrapper)
-        self.factions = safe_load(self.wizard.faction_wrapper)
-        self.places = safe_load(self.wizard.place_wrapper)
-        self.scenarios = safe_load(self.wizard.scenario_wrapper)
+        self.npcs = safe_load(self.wizard.npc_wrapper) or []
+        self.factions = safe_load(self.wizard.faction_wrapper) or []
+        self.places = safe_load(self.wizard.place_wrapper) or []
+        self.scenarios = safe_load(self.wizard.scenario_wrapper) or []
 
         location_options = self._build_option_list(self.places)
 
@@ -215,6 +287,97 @@ class FinaleBlueprintStep(WizardStep):
 
         if self.location_var.get() not in location_options:
             self.location_var.set(location_options[0])
+
+        self._update_entity_selector("antagonists", self._get_selector_items("antagonists"))
+        self._update_entity_selector("allied_factions", self._get_selector_items("allied_factions"))
+        self._update_entity_selector("npc_allies", self._get_selector_items("npc_allies"))
+
+    # ------------------------------------------------------------------
+    def _get_selector_items(self, key):
+        if key == "antagonists":
+            return list(self.npcs) + list(self.factions)
+        if key == "allied_factions":
+            return list(self.factions)
+        if key == "npc_allies":
+            return list(self.npcs)
+        return []
+
+    # ------------------------------------------------------------------
+    def _update_entity_selector(self, key, items):
+        selector = self.entity_selectors.get(key)
+        if not selector:
+            return
+
+        names = self._build_name_list(items)
+        if names:
+            options = ["None"] + names
+        else:
+            options = ["None"]
+
+        selector["options"] = options
+
+        for menu, var in zip(selector["menus"], selector["vars"]):
+            menu.configure(values=options)
+            if var.get() not in options:
+                var.set(options[0])
+
+    # ------------------------------------------------------------------
+    def _ensure_selector_option(self, selector, value):
+        if not value:
+            return
+        options = selector.get("options") or ["None"]
+        if value not in options:
+            options = options + [value]
+            selector["options"] = options
+            for menu in selector["menus"]:
+                menu.configure(values=options)
+
+    # ------------------------------------------------------------------
+    def _set_entity_selector_values(self, key, values):
+        selector = self.entity_selectors.get(key)
+        if not selector:
+            return
+
+        self._clear_entity_selector(key)
+
+        for value in values or []:
+            self._ensure_selector_option(selector, value)
+            selector["add_row"](value)
+
+    # ------------------------------------------------------------------
+    def _clear_entity_selector(self, key):
+        selector = self.entity_selectors.get(key)
+        if not selector:
+            return
+
+        for row in selector["rows"]:
+            row.destroy()
+
+        selector["rows"].clear()
+        selector["vars"].clear()
+        selector["menus"].clear()
+
+    # ------------------------------------------------------------------
+    def _collect_entity_selector_values(self, key):
+        selector = self.entity_selectors.get(key)
+        if not selector:
+            return []
+
+        values = []
+        for var in selector["vars"]:
+            value = (var.get() or "").strip()
+            if value and value != "None":
+                values.append(value)
+        return self._deduplicate_preserve_order(values)
+
+    # ------------------------------------------------------------------
+    def _build_name_list(self, items):
+        names = []
+        for item in items or []:
+            name = self._format_name(item)
+            if name:
+                names.append(name)
+        return self._deduplicate_preserve_order(names)
 
     # ------------------------------------------------------------------
     def _build_option_list(self, items):
@@ -231,18 +394,6 @@ class FinaleBlueprintStep(WizardStep):
         if not isinstance(item, dict):
             return None
         return item.get("Title") or item.get("Name") or item.get("label")
-
-    # ------------------------------------------------------------------
-    @staticmethod
-    def _format_list(values):
-        if not values:
-            return ""
-        if isinstance(values, str):
-            return values
-        if isinstance(values, (list, tuple)):
-            filtered = [value for value in values if value]
-            return ", ".join(filtered)
-        return ""
 
     # ------------------------------------------------------------------
     @staticmethod
@@ -346,14 +497,14 @@ class FinaleBlueprintStep(WizardStep):
         self._set_if_available(self.climax_var, config.get("climax"), [c["name"] for c in CLIMAX_STRUCTURES])
         self._set_if_available(self.callback_var, config.get("callback"), CALLBACK_TACTICS)
         self._set_if_available(self.escalation_var, config.get("escalation"), STAKE_ESCALATIONS)
-        self.antagonists_var.set(
-            self._format_list(config.get("antagonists") or config.get("antagonist"))
+        self._set_entity_selector_values(
+            "antagonists", self._parse_list(config.get("antagonists") or config.get("antagonist"))
         )
-        self.allied_factions_var.set(
-            self._format_list(config.get("allied_factions") or config.get("ally"))
+        self._set_entity_selector_values(
+            "allied_factions", self._parse_list(config.get("allied_factions") or config.get("ally"))
         )
-        self.npc_allies_var.set(
-            self._format_list(config.get("npc_allies") or config.get("npc_allies_list"))
+        self._set_entity_selector_values(
+            "npc_allies", self._parse_list(config.get("npc_allies") or config.get("npc_allies_list"))
         )
         self._set_if_available(self.location_var, config.get("location"), self.location_menu.cget("values"))
 
@@ -381,9 +532,9 @@ class FinaleBlueprintStep(WizardStep):
             "climax": self.climax_var.get(),
             "callback": self.callback_var.get(),
             "escalation": self.escalation_var.get(),
-            "antagonists": self._parse_list(self.antagonists_var.get()),
-            "allied_factions": self._parse_list(self.allied_factions_var.get()),
-            "npc_allies": self._parse_list(self.npc_allies_var.get()),
+            "antagonists": self._collect_entity_selector_values("antagonists"),
+            "allied_factions": self._collect_entity_selector_values("allied_factions"),
+            "npc_allies": self._collect_entity_selector_values("npc_allies"),
             "location": self.location_var.get(),
         }
         state["_finale_config"] = config
@@ -423,9 +574,9 @@ class FinaleBlueprintStep(WizardStep):
             messagebox.showerror("Missing Data", "Select a climax structure before generating.")
             return None
 
-        antagonists = self._parse_list(self.antagonists_var.get())
-        allied_factions = self._parse_list(self.allied_factions_var.get())
-        npc_allies = self._parse_list(self.npc_allies_var.get())
+        antagonists = self._collect_entity_selector_values("antagonists")
+        allied_factions = self._collect_entity_selector_values("allied_factions")
+        npc_allies = self._collect_entity_selector_values("npc_allies")
         location = self._clean_selection(self.location_var.get())
         callback = self.callback_var.get()
         escalation = self.escalation_var.get()
