@@ -2726,14 +2726,21 @@ class DisplayMapController:
     def _bind_item_events(self, item):
         if not item.get('canvas_ids'): return
         ids_to_bind = item['canvas_ids']
+        existing_ids = set(self.canvas.find_all())
         for cid in ids_to_bind:
-            if not cid: continue
+            if not cid:
+                continue
+            if cid not in existing_ids:
+                continue
             if item.get("type") == "marker" and cid == item.get("entry_canvas_id"):
                 continue
-            self.canvas.tag_bind(cid, "<ButtonPress-1>", lambda e, i=item: self._on_item_press(e, i))
-            self.canvas.tag_bind(cid, "<B1-Motion>", lambda e, i=item: (self._on_item_move(e, i), "break")) # 'break' prevents event propagation
-            self.canvas.tag_bind(cid, "<ButtonRelease-1>", lambda e, i=item: self._on_item_release(e, i))
-            self.canvas.tag_bind(cid, "<Button-3>", lambda e, i=item: self._on_item_right_click(e, i))
+            try:
+                self.canvas.tag_bind(cid, "<ButtonPress-1>", lambda e, i=item: self._on_item_press(e, i))
+                self.canvas.tag_bind(cid, "<B1-Motion>", lambda e, i=item: (self._on_item_move(e, i), "break")) # 'break' prevents event propagation
+                self.canvas.tag_bind(cid, "<ButtonRelease-1>", lambda e, i=item: self._on_item_release(e, i))
+                self.canvas.tag_bind(cid, "<Button-3>", lambda e, i=item: self._on_item_right_click(e, i))
+            except tk.TclError:
+                continue
 
             item_type = item.get("type", "token")
             if item_type == "token":
