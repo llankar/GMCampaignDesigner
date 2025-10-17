@@ -8,12 +8,25 @@ from modules.helpers.logging_helper import log_module_import
 log_module_import(__name__)
 
 class GenericListSelectionView(ctk.CTkFrame):
-    def __init__(self, master, entity_type, model_wrapper, template, on_select_callback=None, *args, **kwargs):
+    def __init__(
+        self,
+        master,
+        entity_type,
+        model_wrapper,
+        template,
+        on_select_callback=None,
+        *args,
+        allow_multi_select=False,
+        on_multi_select_callback=None,
+        **kwargs,
+    ):
         super().__init__(master, *args, **kwargs)
         self.entity_type = entity_type
         self.model_wrapper = model_wrapper
         self.template = template
         self.on_select_callback = on_select_callback
+        self.on_multi_select_callback = on_multi_select_callback
+        self.allow_multi_select = allow_multi_select
 
         # Load items and prepare columns
         self.items = self.model_wrapper.load_items()
@@ -66,7 +79,7 @@ class GenericListSelectionView(ctk.CTkFrame):
             tree_frame,
             columns=self.columns,
             show="tree headings",
-            selectmode="browse",
+            selectmode="extended" if self.allow_multi_select else "browse",
             style="Custom.Treeview",
         )
         # Make header clicks sort the column
@@ -94,11 +107,18 @@ class GenericListSelectionView(ctk.CTkFrame):
         # --- Pack the Treeview ---
         self.tree.pack(fill="both", expand=True)
 
+        self.selection_indicator_image = tk.PhotoImage(width=4, height=30)
+        self.selection_indicator_image.put("#FFFFFF", to=(0, 0, 4, 30))
+        self._indicator_item_ids = set()
+        self.item_by_id = {}
+
         # Bind double-click event and initial refresh
         self.tree.bind("<Double-1>", self.on_double_click)
+        self.tree.bind("<<TreeviewSelect>>", self._on_tree_select_change)
         self.refresh_list()
 
-        ctk.CTkButton(self, text="Open Selected", command=self.open_selected).pack(
+        button_label = "Add Selected" if self.allow_multi_select else "Open Selected"
+        ctk.CTkButton(self, text=button_label, command=self.open_selected).pack(
             side="bottom", pady=5
         )
 
@@ -117,6 +137,7 @@ class GenericListSelectionView(ctk.CTkFrame):
 
     def refresh_list(self):
         self.tree.delete(*self.tree.get_children())
+        self.item_by_id = {}
         for item in self.filtered_items:
             # For the unique field (usually "Name")
             raw_val = item.get(self.unique_field, "")
@@ -132,7 +153,10 @@ class GenericListSelectionView(ctk.CTkFrame):
 
             values = [get_display_value(item.get(col, "")) for col in self.columns]
             self.tree.insert("", "end", iid=iid, text=raw_val, values=values)
-    
+            self.item_by_id[iid] = item
+
+        self._clear_selection_indicator()
+
     def sort_column(self, column_name):
         # Initialize sort directions dict on first use
         if not hasattr(self, "sort_directions"):
@@ -166,15 +190,39 @@ class GenericListSelectionView(ctk.CTkFrame):
         item_id = self.tree.identify_row(event.y) or self.tree.focus()
         if not item_id:
             return
-        selected_item = next(
-            (item for item in self.filtered_items if self.sanitize_id(str(item.get(self.unique_field, ""))) == item_id),
-            None
-        )
+        selected_item = self.item_by_id.get(item_id)
         if selected_item and self.on_select_callback:
             entity_name = selected_item.get("Name", selected_item.get("Title", "Unnamed"))
             self.on_select_callback(self.entity_type, entity_name)
 
     def open_selected(self):
+        selection_ids = list(self.tree.selection())
+
+        if self.allow_multi_select:
+            if not selection_ids:
+                messagebox.showwarning("No Selection", f"No {self.entity_type} selected.")
+                return
+
+            selected_items = [self.item_by_id.get(iid) for iid in selection_ids if iid in self.item_by_id]
+            selected_items = [item for item in selected_items if item]
+            if not selected_items:
+                messagebox.showwarning("No Selection", f"No {self.entity_type} available to select.")
+                return
+
+            if self.on_multi_select_callback:
+                self.on_multi_select_callback(self.entity_type, selected_items)
+            elif self.on_select_callback:
+                for item in selected_items:
+                    entity_name = item.get("Name", item.get("Title", "Unnamed"))
+                    self.on_select_callback(self.entity_type, entity_name)
+            return
+
+        if selection_ids:
+            selected_item = self.item_by_id.get(selection_ids[0])
+            if selected_item:
+                self.select_entity(selected_item)
+                return
+
         if self.filtered_items:
             # Open the first item by default
             self.select_entity(self.filtered_items[0])
@@ -187,3 +235,20 @@ class GenericListSelectionView(ctk.CTkFrame):
 
     def sanitize_id(self, s):
         return re.sub(r'[^a-zA-Z0-9]+', '_', str(s)).strip('_')
+
+    def _on_tree_select_change(self, _event=None):
+        current_ids = set(self.tree.selection())
+        to_clear = self._indicator_item_ids - current_ids
+        for iid in list(to_clear):
+            if self.tree.exists(iid):
+                self.tree.item(iid, image="")
+        for iid in current_ids:
+            if self.tree.exists(iid):
+                self.tree.item(iid, image=self.selection_indicator_image)
+        self._indicator_item_ids = current_ids
+
+    def _clear_selection_indicator(self):
+        for iid in list(self._indicator_item_ids):
+            if self.tree.exists(iid):
+                self.tree.item(iid, image="")
+        self._indicator_item_ids = set()
