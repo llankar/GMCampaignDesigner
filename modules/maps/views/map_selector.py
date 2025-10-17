@@ -239,9 +239,22 @@ def _on_display_map(self, entity_type, map_name): # entity_type here is the map'
     for t_obj in self.tokens: # Renamed t to t_obj to avoid conflict
         for cid in t_obj.get("canvas_ids", []):
             self.canvas.delete(cid)
-        if self.fs_canvas and t_obj.get("fs_canvas_ids"):
+        if (
+            self.fs_canvas
+            and t_obj.get("fs_canvas_ids")
+            and self.fs_canvas.winfo_exists()
+        ):
             for cid in t_obj["fs_canvas_ids"]:
-                self.fs_canvas.delete(cid)
+                try:
+                    self.fs_canvas.delete(cid)
+                except tk.TclError:
+                    # The fullscreen canvas was destroyed (for example, when a
+                    # linked map opens in a new window) before we had a chance
+                    # to remove the old token items. Silently ignore the
+                    # stale ids – they are no longer valid on a destroyed
+                    # widget, and attempting to delete them would otherwise
+                    # raise an exception and interrupt map loading.
+                    break
     self.tokens = []
 
     # 5) Parse persisted token list
