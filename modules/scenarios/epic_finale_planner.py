@@ -1,3 +1,4 @@
+import re
 import tkinter as tk
 from tkinter import messagebox
 
@@ -93,8 +94,9 @@ class FinaleBlueprintStep(WizardStep):
         self.climax_var = ctk.StringVar(value=CLIMAX_STRUCTURES[0]["name"])
         self.callback_var = ctk.StringVar(value=CALLBACK_TACTICS[0])
         self.escalation_var = ctk.StringVar(value=STAKE_ESCALATIONS[0])
-        self.antagonist_var = ctk.StringVar()
-        self.ally_var = ctk.StringVar()
+        self.antagonists_var = ctk.StringVar()
+        self.allied_factions_var = ctk.StringVar()
+        self.npc_allies_var = ctk.StringVar()
         self.location_var = ctk.StringVar()
         self.title_var = ctk.StringVar()
 
@@ -107,21 +109,19 @@ class FinaleBlueprintStep(WizardStep):
             values=[item["name"] for item in CLIMAX_STRUCTURES],
         ).grid(row=0, column=1, columnspan=2, sticky="ew", padx=10, pady=5)
 
-        ctk.CTkLabel(selector_frame, text="Main Antagonist (NPC):").grid(
+        ctk.CTkLabel(selector_frame, text="Antagonists (comma-separated):").grid(
             row=1, column=0, sticky="w", padx=10, pady=5
         )
-        self.antagonist_menu = ctk.CTkOptionMenu(
-            selector_frame, variable=self.antagonist_var, values=["None"]
+        ctk.CTkEntry(selector_frame, textvariable=self.antagonists_var).grid(
+            row=1, column=1, sticky="ew", padx=10, pady=5
         )
-        self.antagonist_menu.grid(row=1, column=1, sticky="ew", padx=10, pady=5)
 
-        ctk.CTkLabel(selector_frame, text="Allied Faction:").grid(
+        ctk.CTkLabel(selector_frame, text="Allied Factions (comma-separated):").grid(
             row=1, column=2, sticky="w", padx=10, pady=5
         )
-        self.ally_menu = ctk.CTkOptionMenu(
-            selector_frame, variable=self.ally_var, values=["None"]
+        ctk.CTkEntry(selector_frame, textvariable=self.allied_factions_var).grid(
+            row=1, column=3, sticky="ew", padx=10, pady=5
         )
-        self.ally_menu.grid(row=1, column=3, sticky="ew", padx=10, pady=5)
 
         ctk.CTkLabel(selector_frame, text="Battlefield / Signature Place:").grid(
             row=2, column=0, sticky="w", padx=10, pady=5
@@ -131,33 +131,40 @@ class FinaleBlueprintStep(WizardStep):
         )
         self.location_menu.grid(row=2, column=1, sticky="ew", padx=10, pady=5)
 
-        ctk.CTkLabel(selector_frame, text="Callback Tactic:").grid(
+        ctk.CTkLabel(selector_frame, text="Supporting NPC Allies (comma-separated):").grid(
             row=2, column=2, sticky="w", padx=10, pady=5
+        )
+        ctk.CTkEntry(selector_frame, textvariable=self.npc_allies_var).grid(
+            row=2, column=3, sticky="ew", padx=10, pady=5
+        )
+
+        ctk.CTkLabel(selector_frame, text="Callback Tactic:").grid(
+            row=3, column=0, sticky="w", padx=10, pady=5
         )
         ctk.CTkOptionMenu(
             selector_frame,
             variable=self.callback_var,
             values=CALLBACK_TACTICS,
-        ).grid(row=2, column=3, sticky="ew", padx=10, pady=5)
+        ).grid(row=3, column=1, sticky="ew", padx=10, pady=5)
 
         ctk.CTkLabel(selector_frame, text="Stakes Escalation:").grid(
-            row=3, column=0, sticky="w", padx=10, pady=5
+            row=3, column=2, sticky="w", padx=10, pady=5
         )
         ctk.CTkOptionMenu(
             selector_frame,
             variable=self.escalation_var,
             values=STAKE_ESCALATIONS,
-        ).grid(row=3, column=1, sticky="ew", padx=10, pady=5)
+        ).grid(row=3, column=3, sticky="ew", padx=10, pady=5)
 
         ctk.CTkLabel(selector_frame, text="Finale Title:").grid(
-            row=3, column=2, sticky="w", padx=10, pady=5
+            row=4, column=0, sticky="w", padx=10, pady=5
         )
         ctk.CTkEntry(selector_frame, textvariable=self.title_var).grid(
-            row=3, column=3, sticky="ew", padx=10, pady=5
+            row=4, column=1, columnspan=3, sticky="ew", padx=10, pady=5
         )
 
         button_row = ctk.CTkFrame(selector_frame, fg_color="transparent")
-        button_row.grid(row=4, column=0, columnspan=4, sticky="ew", padx=10, pady=(10, 0))
+        button_row.grid(row=5, column=0, columnspan=4, sticky="ew", padx=10, pady=(10, 0))
         button_row.grid_columnconfigure(0, weight=1)
 
         ctk.CTkButton(
@@ -202,18 +209,10 @@ class FinaleBlueprintStep(WizardStep):
         self.places = safe_load(self.wizard.place_wrapper)
         self.scenarios = safe_load(self.wizard.scenario_wrapper)
 
-        antagonist_options = self._build_option_list(self.npcs)
-        ally_options = self._build_option_list(self.factions)
         location_options = self._build_option_list(self.places)
 
-        self.antagonist_menu.configure(values=antagonist_options)
-        self.ally_menu.configure(values=ally_options)
         self.location_menu.configure(values=location_options)
 
-        if self.antagonist_var.get() not in antagonist_options:
-            self.antagonist_var.set(antagonist_options[0])
-        if self.ally_var.get() not in ally_options:
-            self.ally_var.set(ally_options[0])
         if self.location_var.get() not in location_options:
             self.location_var.set(location_options[0])
 
@@ -234,6 +233,68 @@ class FinaleBlueprintStep(WizardStep):
         return item.get("Title") or item.get("Name") or item.get("label")
 
     # ------------------------------------------------------------------
+    @staticmethod
+    def _format_list(values):
+        if not values:
+            return ""
+        if isinstance(values, str):
+            return values
+        if isinstance(values, (list, tuple)):
+            filtered = [value for value in values if value]
+            return ", ".join(filtered)
+        return ""
+
+    # ------------------------------------------------------------------
+    @staticmethod
+    def _parse_list(text):
+        if not text:
+            return []
+        if isinstance(text, list):
+            return [item for item in text if item]
+        if not isinstance(text, str):
+            return []
+        tokens = re.split(r"[\n,;]", text)
+        cleaned = [token.strip() for token in tokens]
+        return [token for token in cleaned if token]
+
+    # ------------------------------------------------------------------
+    @staticmethod
+    def _deduplicate_preserve_order(items):
+        seen = set()
+        ordered = []
+        for item in items:
+            if not item or item in seen:
+                continue
+            seen.add(item)
+            ordered.append(item)
+        return ordered
+
+    # ------------------------------------------------------------------
+    @staticmethod
+    def _format_scene_entities(scene):
+        def normalise(values):
+            if not values:
+                return []
+            if isinstance(values, (list, tuple)):
+                return [value for value in values if value]
+            if isinstance(values, str):
+                return [value.strip() for value in values.split(",") if value.strip()]
+            return []
+
+        def join(values):
+            return ", ".join(values) if values else "None"
+
+        npcs = normalise(scene.get("NPCs")) if isinstance(scene, dict) else []
+        places = normalise(scene.get("Places")) if isinstance(scene, dict) else []
+        creatures = normalise(scene.get("Creatures")) if isinstance(scene, dict) else []
+
+        return [
+            f"    NPCs: {join(npcs)}",
+            f"    Places: {join(places)}",
+            f"    Creatures: {join(creatures)}",
+        ]
+
+    # ------------------------------------------------------------------
     def _refresh_parameter_suggestions(self):
         lines = ["Potential Antagonists:"]
         if self.npcs:
@@ -248,6 +309,13 @@ class FinaleBlueprintStep(WizardStep):
                 lines.append(f" • {self._format_name(faction)}")
         else:
             lines.append(" • No factions available.")
+
+        lines.append("\nNPC Allies:")
+        if self.npcs:
+            for npc in self.npcs[:8]:
+                lines.append(f" • {self._format_name(npc)}")
+        else:
+            lines.append(" • No NPC allies recorded.")
 
         lines.append("\nSignature Locations:")
         if self.places:
@@ -278,8 +346,15 @@ class FinaleBlueprintStep(WizardStep):
         self._set_if_available(self.climax_var, config.get("climax"), [c["name"] for c in CLIMAX_STRUCTURES])
         self._set_if_available(self.callback_var, config.get("callback"), CALLBACK_TACTICS)
         self._set_if_available(self.escalation_var, config.get("escalation"), STAKE_ESCALATIONS)
-        self._set_if_available(self.antagonist_var, config.get("antagonist"), self.antagonist_menu.cget("values"))
-        self._set_if_available(self.ally_var, config.get("ally"), self.ally_menu.cget("values"))
+        self.antagonists_var.set(
+            self._format_list(config.get("antagonists") or config.get("antagonist"))
+        )
+        self.allied_factions_var.set(
+            self._format_list(config.get("allied_factions") or config.get("ally"))
+        )
+        self.npc_allies_var.set(
+            self._format_list(config.get("npc_allies") or config.get("npc_allies_list"))
+        )
         self._set_if_available(self.location_var, config.get("location"), self.location_menu.cget("values"))
 
         title = (state or {}).get("Title", "")
@@ -306,8 +381,9 @@ class FinaleBlueprintStep(WizardStep):
             "climax": self.climax_var.get(),
             "callback": self.callback_var.get(),
             "escalation": self.escalation_var.get(),
-            "antagonist": self.antagonist_var.get(),
-            "ally": self.ally_var.get(),
+            "antagonists": self._parse_list(self.antagonists_var.get()),
+            "allied_factions": self._parse_list(self.allied_factions_var.get()),
+            "npc_allies": self._parse_list(self.npc_allies_var.get()),
             "location": self.location_var.get(),
         }
         state["_finale_config"] = config
@@ -347,8 +423,9 @@ class FinaleBlueprintStep(WizardStep):
             messagebox.showerror("Missing Data", "Select a climax structure before generating.")
             return None
 
-        antagonist = self._clean_selection(self.antagonist_var.get())
-        ally = self._clean_selection(self.ally_var.get())
+        antagonists = self._parse_list(self.antagonists_var.get())
+        allied_factions = self._parse_list(self.allied_factions_var.get())
+        npc_allies = self._parse_list(self.npc_allies_var.get())
         location = self._clean_selection(self.location_var.get())
         callback = self.callback_var.get()
         escalation = self.escalation_var.get()
@@ -357,10 +434,14 @@ class FinaleBlueprintStep(WizardStep):
         if not title:
             title = self._default_title(climax_name, location)
 
+        primary_antagonist = antagonists[0] if antagonists else ""
+        primary_ally = allied_factions[0] if allied_factions else ""
+
         summary_lines = [
             f"Structure: {climax_name}",
-            f"Antagonist: {antagonist or 'Unspecified'}",
-            f"Allied Support: {ally or 'Unspecified'}",
+            f"Antagonists: {', '.join(antagonists) if antagonists else 'Unspecified'}",
+            f"Allied Factions: {', '.join(allied_factions) if allied_factions else 'Unspecified'}",
+            f"NPC Allies: {', '.join(npc_allies) if npc_allies else 'Unspecified'}",
             f"Location: {location or 'To Be Determined'}",
             f"Stakes Escalation: {escalation}",
             f"Callback: {callback}",
@@ -368,15 +449,16 @@ class FinaleBlueprintStep(WizardStep):
 
         scenes = []
         for idx, beat in enumerate(climax["beats"], start=1):
-            beat_text = self._personalise_beat(beat, antagonist, ally, location)
+            beat_text = self._personalise_beat(beat, primary_antagonist, primary_ally, location)
             scene_title = self._scene_title(idx, beat_text)
+            scene_npcs = self._deduplicate_preserve_order(antagonists + npc_allies)
             scenes.append(
                 {
                     "Title": scene_title,
                     "Summary": beat_text,
                     "Text": beat_text,
                     "SceneType": "Auto",
-                    "NPCs": [antagonist] if antagonist else [],
+                    "NPCs": scene_npcs,
                     "Places": [location] if location else [],
                     "Creatures": [],
                     "Maps": [],
@@ -391,9 +473,9 @@ class FinaleBlueprintStep(WizardStep):
             "Secrets": "\n".join(secrets),
             "Scenes": scenes,
             "Places": [location] if location else [],
-            "NPCs": [antagonist] if antagonist else [],
+            "NPCs": self._deduplicate_preserve_order(antagonists + npc_allies),
             "Creatures": [],
-            "Factions": [ally] if ally else [],
+            "Factions": allied_factions,
             "Objects": [],
         }
 
@@ -463,6 +545,7 @@ class FinaleBlueprintStep(WizardStep):
         lines = [scenario["Title"], "", scenario["Summary"], "", "Scenes:"]
         for scene in scenario["Scenes"]:
             lines.append(f" - {scene.get('Title')}: {scene.get('Summary')}")
+            lines.extend(self._format_scene_entities(scene))
         lines.append("")
         lines.append("Secrets:")
         for secret in scenario["Secrets"].split("\n"):
@@ -491,6 +574,7 @@ class FinaleBlueprintStep(WizardStep):
             for scene in scenes:
                 if isinstance(scene, dict):
                     lines.append(f" - {scene.get('Title', 'Scene')}: {scene.get('Summary', '')}")
+                    lines.extend(self._format_scene_entities(scene))
                 else:
                     lines.append(f" - {scene}")
         else:
