@@ -267,7 +267,7 @@ def insert_npc_table(parent, header, npc_names, open_entity_callback):
             # clicking the thumbnail pops up the full‑screen viewer
             widget.bind(
                 "<Button-1>",
-                lambda e, p=portrait_path, n=name: show_portrait(p, n)
+                lambda _event=None, p=portrait_path, n=name: show_portrait(p, n)
             )
         else:
             widget = CTkLabel(table, text="", anchor="center")
@@ -301,7 +301,7 @@ def insert_npc_table(parent, header, npc_names, open_entity_callback):
                     if open_entity_callback:
                         cell.bind(
                             "<Button-1>",
-                            lambda e, nm=name: open_entity_callback("NPCs", nm)
+                            lambda _event=None, nm=name: open_entity_callback("NPCs", nm)
                         )
                 else:
                     cell = CTkLabel(
