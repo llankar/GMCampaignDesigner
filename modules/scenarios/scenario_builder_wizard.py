@@ -147,7 +147,14 @@ class ScenesPlanningStep(WizardStep):
         "_extra_fields",
     }
 
-    def __init__(self, master, entity_wrappers, *, scenario_wrapper=None):
+    def __init__(
+        self,
+        master,
+        entity_wrappers,
+        *,
+        scenario_wrapper=None,
+        finale_planner_callback=None,
+    ):
         super().__init__(master)
         self.entity_wrappers = entity_wrappers or {}
         self.scenario_wrapper = scenario_wrapper
@@ -159,6 +166,7 @@ class ScenesPlanningStep(WizardStep):
         self._link_label_editor = None
         self._state_ref = None
         self._on_state_change = None
+        self._finale_planner_callback = finale_planner_callback
         self._root_extra_fields = {}
 
         self.scenario_title_var = ctk.StringVar()
@@ -194,6 +202,13 @@ class ScenesPlanningStep(WizardStep):
             btn_row, text="Load Scenario", command=self._load_existing_scenario
         )
         self.load_scenario_btn.pack(side="left")
+        if self._finale_planner_callback:
+            self.finale_planner_btn = ctk.CTkButton(
+                btn_row,
+                text="Epic Finale Planner",
+                command=self._switch_to_epic_finale_planner,
+            )
+            self.finale_planner_btn.pack(side="left", padx=(6, 0))
         self.notes_btn = ctk.CTkButton(btn_row, text="Edit Notes", command=self._edit_scenario_info)
         self.notes_btn.pack(side="left", padx=(6, 0))
         self.add_scene_btn = ctk.CTkButton(btn_row, text="Add Scene", command=self.add_scene)
@@ -244,6 +259,30 @@ class ScenesPlanningStep(WizardStep):
     def set_state_binding(self, state, on_state_change=None):
         self._state_ref = state
         self._on_state_change = on_state_change
+
+    def _switch_to_epic_finale_planner(self):  # pragma: no cover - UI interaction
+        if not self._finale_planner_callback:
+            return
+        if self._state_ref is None:
+            messagebox.showerror(
+                "Unavailable",
+                "The finale planner cannot be opened until the wizard has initialised.",
+            )
+            return
+        if not self.save_state(self._state_ref):
+            return
+        try:
+            payload = copy.deepcopy(self._state_ref)
+            self._finale_planner_callback(payload)
+        except Exception as exc:  # pragma: no cover - defensive path
+            log_exception(
+                f"Failed to switch to Epic Finale Planner: {exc}",
+                func_name="ScenesPlanningStep._switch_to_epic_finale_planner",
+            )
+            messagebox.showerror(
+                "Error",
+                "Unable to open the Epic Finale Planner from the wizard.",
+            )
 
     def _get_scene_links(self, scene):
         return normalise_scene_links(scene, self._split_to_list)
@@ -1995,6 +2034,7 @@ class ScenarioBuilderWizard(ctk.CTkToplevel):
                 if key in ("npcs", "creatures", "places", "maps")
             },
             scenario_wrapper=self.scenario_wrapper,
+            finale_planner_callback=self._launch_epic_finale_planner,
         )
 
         self.steps = [
@@ -2009,6 +2049,42 @@ class ScenarioBuilderWizard(ctk.CTkToplevel):
         for _, frame in self.steps:
             if hasattr(frame, "set_state_binding"):
                 frame.set_state_binding(self.wizard_state, self._on_wizard_state_changed)
+
+    def _launch_epic_finale_planner(self, state):  # pragma: no cover - UI interaction
+        try:
+            from modules.scenarios.epic_finale_planner import EpicFinalePlannerWizard
+        except Exception as exc:  # pragma: no cover - defensive path
+            log_exception(
+                f"Failed to import Epic Finale Planner: {exc}",
+                func_name="ScenarioBuilderWizard._launch_epic_finale_planner",
+            )
+            messagebox.showerror(
+                "Error",
+                "The Epic Finale Planner could not be loaded.",
+            )
+            return
+
+        payload = copy.deepcopy(state or {})
+        try:
+            wizard = EpicFinalePlannerWizard(
+                self.master,
+                on_saved=self.on_saved,
+                initial_scenario=payload,
+            )
+            wizard.grab_set()
+            wizard.focus_force()
+        except Exception as exc:  # pragma: no cover - defensive path
+            log_exception(
+                f"Failed to open Epic Finale Planner: {exc}",
+                func_name="ScenarioBuilderWizard._launch_epic_finale_planner",
+            )
+            messagebox.showerror(
+                "Error",
+                "Unable to open the Epic Finale Planner window.",
+            )
+            return
+
+        self.destroy()
 
     def _show_step(self, index):  # pragma: no cover - UI navigation
         title, frame = self.steps[index]

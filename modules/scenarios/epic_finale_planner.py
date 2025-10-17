@@ -3,8 +3,14 @@ from tkinter import messagebox
 
 import customtkinter as ctk
 
-from modules.generic.generic_model_wrapper import GenericModelWrapper
 from modules.helpers.logging_helper import log_module_import
+from modules.scenarios.scenario_builder_wizard import (
+    EntityLinkingStep,
+    ReviewStep,
+    ScenarioBuilderWizard,
+    ScenesPlanningStep,
+    WizardStep,
+)
 
 log_module_import(__name__)
 
@@ -69,47 +75,20 @@ STAKE_ESCALATIONS = [
 ]
 
 
-class EpicFinalePlannerWindow(ctk.CTkToplevel):
-    """Modal window helping the GM craft a finale using campaign entities."""
+class FinaleBlueprintStep(WizardStep):
+    """Wizard step for composing an epic finale outline before refinement."""
 
-    def __init__(self, parent):
-        super().__init__(parent)
-        self.title("Epic Finale Planner")
-        self.geometry("960x720")
-        self.minsize(800, 640)
-        self.transient(parent.winfo_toplevel())
-        self.grab_set()
-
+    def __init__(self, master, wizard):
+        super().__init__(master)
+        self.wizard = wizard
         self.generated_scenario = None
 
-        self._load_entities()
-        self._build_widgets()
-        self._refresh_parameter_suggestions()
-
-    # ------------------------------------------------------------------
-    def _load_entities(self):
-        self.factions = self._load_table("factions")
-        self.npcs = self._load_table("npcs")
-        self.places = self._load_table("places")
-        self.scenarios = self._load_table("scenarios")
-
-    # ------------------------------------------------------------------
-    @staticmethod
-    def _load_table(table_name):
-        try:
-            wrapper = GenericModelWrapper(table_name)
-            return wrapper.load_items()
-        except Exception:
-            return []
-
-    # ------------------------------------------------------------------
-    def _build_widgets(self):
-        self.columnconfigure(0, weight=1)
-        self.rowconfigure(1, weight=1)
+        self.grid_rowconfigure(1, weight=1)
+        self.grid_columnconfigure(0, weight=1)
 
         selector_frame = ctk.CTkFrame(self)
         selector_frame.grid(row=0, column=0, sticky="nsew", padx=20, pady=(20, 10))
-        selector_frame.columnconfigure((0, 1, 2, 3), weight=1)
+        selector_frame.grid_columnconfigure((0, 1, 2, 3), weight=1)
 
         self.climax_var = ctk.StringVar(value=CLIMAX_STRUCTURES[0]["name"])
         self.callback_var = ctk.StringVar(value=CALLBACK_TACTICS[0])
@@ -117,60 +96,87 @@ class EpicFinalePlannerWindow(ctk.CTkToplevel):
         self.antagonist_var = ctk.StringVar()
         self.ally_var = ctk.StringVar()
         self.location_var = ctk.StringVar()
-
-        # Dropdown helpers
-        ctk.CTkLabel(selector_frame, text="Climax Structure:").grid(row=0, column=0, sticky="w", padx=10, pady=5)
-        ctk.CTkOptionMenu(selector_frame, variable=self.climax_var,
-                          values=[item["name"] for item in CLIMAX_STRUCTURES]).grid(row=0, column=1, columnspan=2, sticky="ew", padx=10, pady=5)
-
-        ctk.CTkLabel(selector_frame, text="Main Antagonist (NPC):").grid(row=1, column=0, sticky="w", padx=10, pady=5)
-        antagonist_options = self._build_option_list(self.npcs)
-        ctk.CTkOptionMenu(selector_frame, variable=self.antagonist_var,
-                          values=antagonist_options).grid(row=1, column=1, sticky="ew", padx=10, pady=5)
-        self.antagonist_var.set(antagonist_options[0])
-
-        ctk.CTkLabel(selector_frame, text="Allied Faction:").grid(row=1, column=2, sticky="w", padx=10, pady=5)
-        ally_options = self._build_option_list(self.factions)
-        ctk.CTkOptionMenu(selector_frame, variable=self.ally_var,
-                          values=ally_options).grid(row=1, column=3, sticky="ew", padx=10, pady=5)
-        self.ally_var.set(ally_options[0])
-
-        ctk.CTkLabel(selector_frame, text="Battlefield / Signature Place:").grid(row=2, column=0, sticky="w", padx=10, pady=5)
-        location_options = self._build_option_list(self.places)
-        ctk.CTkOptionMenu(selector_frame, variable=self.location_var,
-                          values=location_options).grid(row=2, column=1, sticky="ew", padx=10, pady=5)
-        self.location_var.set(location_options[0])
-
-        ctk.CTkLabel(selector_frame, text="Callback Tactic:").grid(row=2, column=2, sticky="w", padx=10, pady=5)
-        ctk.CTkOptionMenu(selector_frame, variable=self.callback_var,
-                          values=CALLBACK_TACTICS).grid(row=2, column=3, sticky="ew", padx=10, pady=5)
-
-        ctk.CTkLabel(selector_frame, text="Stakes Escalation:").grid(row=3, column=0, sticky="w", padx=10, pady=5)
-        ctk.CTkOptionMenu(selector_frame, variable=self.escalation_var,
-                          values=STAKE_ESCALATIONS).grid(row=3, column=1, sticky="ew", padx=10, pady=5)
-
-        ctk.CTkLabel(selector_frame, text="Finale Title:").grid(row=3, column=2, sticky="w", padx=10, pady=5)
         self.title_var = ctk.StringVar()
-        ctk.CTkEntry(selector_frame, textvariable=self.title_var).grid(row=3, column=3, sticky="ew", padx=10, pady=5)
+
+        ctk.CTkLabel(selector_frame, text="Climax Structure:").grid(
+            row=0, column=0, sticky="w", padx=10, pady=5
+        )
+        ctk.CTkOptionMenu(
+            selector_frame,
+            variable=self.climax_var,
+            values=[item["name"] for item in CLIMAX_STRUCTURES],
+        ).grid(row=0, column=1, columnspan=2, sticky="ew", padx=10, pady=5)
+
+        ctk.CTkLabel(selector_frame, text="Main Antagonist (NPC):").grid(
+            row=1, column=0, sticky="w", padx=10, pady=5
+        )
+        self.antagonist_menu = ctk.CTkOptionMenu(
+            selector_frame, variable=self.antagonist_var, values=["None"]
+        )
+        self.antagonist_menu.grid(row=1, column=1, sticky="ew", padx=10, pady=5)
+
+        ctk.CTkLabel(selector_frame, text="Allied Faction:").grid(
+            row=1, column=2, sticky="w", padx=10, pady=5
+        )
+        self.ally_menu = ctk.CTkOptionMenu(
+            selector_frame, variable=self.ally_var, values=["None"]
+        )
+        self.ally_menu.grid(row=1, column=3, sticky="ew", padx=10, pady=5)
+
+        ctk.CTkLabel(selector_frame, text="Battlefield / Signature Place:").grid(
+            row=2, column=0, sticky="w", padx=10, pady=5
+        )
+        self.location_menu = ctk.CTkOptionMenu(
+            selector_frame, variable=self.location_var, values=["None"]
+        )
+        self.location_menu.grid(row=2, column=1, sticky="ew", padx=10, pady=5)
+
+        ctk.CTkLabel(selector_frame, text="Callback Tactic:").grid(
+            row=2, column=2, sticky="w", padx=10, pady=5
+        )
+        ctk.CTkOptionMenu(
+            selector_frame,
+            variable=self.callback_var,
+            values=CALLBACK_TACTICS,
+        ).grid(row=2, column=3, sticky="ew", padx=10, pady=5)
+
+        ctk.CTkLabel(selector_frame, text="Stakes Escalation:").grid(
+            row=3, column=0, sticky="w", padx=10, pady=5
+        )
+        ctk.CTkOptionMenu(
+            selector_frame,
+            variable=self.escalation_var,
+            values=STAKE_ESCALATIONS,
+        ).grid(row=3, column=1, sticky="ew", padx=10, pady=5)
+
+        ctk.CTkLabel(selector_frame, text="Finale Title:").grid(
+            row=3, column=2, sticky="w", padx=10, pady=5
+        )
+        ctk.CTkEntry(selector_frame, textvariable=self.title_var).grid(
+            row=3, column=3, sticky="ew", padx=10, pady=5
+        )
 
         button_row = ctk.CTkFrame(selector_frame, fg_color="transparent")
         button_row.grid(row=4, column=0, columnspan=4, sticky="ew", padx=10, pady=(10, 0))
-        button_row.columnconfigure((0, 1), weight=1)
+        button_row.grid_columnconfigure(0, weight=1)
 
-        self.generate_btn = ctk.CTkButton(button_row, text="Generate Finale Outline", command=self.generate_outline)
-        self.generate_btn.grid(row=0, column=0, padx=5, pady=5, sticky="ew")
-
-        self.save_btn = ctk.CTkButton(button_row, text="Add Finale to Database", command=self.save_to_db, state="disabled")
-        self.save_btn.grid(row=0, column=1, padx=5, pady=5, sticky="ew")
+        ctk.CTkButton(
+            button_row,
+            text="Generate Finale Outline",
+            command=self.generate_outline,
+        ).grid(row=0, column=0, padx=5, pady=5, sticky="ew")
 
         body = ctk.CTkFrame(self)
         body.grid(row=1, column=0, sticky="nsew", padx=20, pady=(0, 20))
-        body.columnconfigure(0, weight=1)
-        body.columnconfigure(1, weight=1)
-        body.rowconfigure(1, weight=1)
+        body.grid_columnconfigure((0, 1), weight=1)
+        body.grid_rowconfigure(1, weight=1)
 
-        ctk.CTkLabel(body, text="Campaign Parameters").grid(row=0, column=0, sticky="w", padx=10, pady=(10, 5))
-        ctk.CTkLabel(body, text="Finale Preview").grid(row=0, column=1, sticky="w", padx=10, pady=(10, 5))
+        ctk.CTkLabel(body, text="Campaign Parameters").grid(
+            row=0, column=0, sticky="w", padx=10, pady=(10, 5)
+        )
+        ctk.CTkLabel(body, text="Finale Preview").grid(
+            row=0, column=1, sticky="w", padx=10, pady=(10, 5)
+        )
 
         self.parameter_box = ctk.CTkTextbox(body, height=260, wrap="word")
         self.parameter_box.grid(row=1, column=0, sticky="nsew", padx=10, pady=5)
@@ -179,6 +185,37 @@ class EpicFinalePlannerWindow(ctk.CTkToplevel):
         self.preview_box = ctk.CTkTextbox(body, wrap="word")
         self.preview_box.grid(row=1, column=1, sticky="nsew", padx=10, pady=5)
         self.preview_box.configure(state="disabled")
+
+        self._refresh_entities()
+        self._refresh_parameter_suggestions()
+
+    # ------------------------------------------------------------------
+    def _refresh_entities(self):
+        def safe_load(wrapper):
+            try:
+                return wrapper.load_items()
+            except Exception:
+                return []
+
+        self.npcs = safe_load(self.wizard.npc_wrapper)
+        self.factions = safe_load(self.wizard.faction_wrapper)
+        self.places = safe_load(self.wizard.place_wrapper)
+        self.scenarios = safe_load(self.wizard.scenario_wrapper)
+
+        antagonist_options = self._build_option_list(self.npcs)
+        ally_options = self._build_option_list(self.factions)
+        location_options = self._build_option_list(self.places)
+
+        self.antagonist_menu.configure(values=antagonist_options)
+        self.ally_menu.configure(values=ally_options)
+        self.location_menu.configure(values=location_options)
+
+        if self.antagonist_var.get() not in antagonist_options:
+            self.antagonist_var.set(antagonist_options[0])
+        if self.ally_var.get() not in ally_options:
+            self.ally_var.set(ally_options[0])
+        if self.location_var.get() not in location_options:
+            self.location_var.set(location_options[0])
 
     # ------------------------------------------------------------------
     def _build_option_list(self, items):
@@ -192,12 +229,13 @@ class EpicFinalePlannerWindow(ctk.CTkToplevel):
     # ------------------------------------------------------------------
     @staticmethod
     def _format_name(item):
+        if not isinstance(item, dict):
+            return None
         return item.get("Title") or item.get("Name") or item.get("label")
 
     # ------------------------------------------------------------------
     def _refresh_parameter_suggestions(self):
-        lines = []
-        lines.append("Potential Antagonists:")
+        lines = ["Potential Antagonists:"]
         if self.npcs:
             for npc in self.npcs[:8]:
                 lines.append(f" • {self._format_name(npc)}")
@@ -232,12 +270,82 @@ class EpicFinalePlannerWindow(ctk.CTkToplevel):
         self.parameter_box.configure(state="disabled")
 
     # ------------------------------------------------------------------
-    def generate_outline(self):
+    def load_state(self, state):  # pragma: no cover - UI synchronization
+        self._refresh_entities()
+        self._refresh_parameter_suggestions()
+
+        config = (state or {}).get("_finale_config", {})
+        self._set_if_available(self.climax_var, config.get("climax"), [c["name"] for c in CLIMAX_STRUCTURES])
+        self._set_if_available(self.callback_var, config.get("callback"), CALLBACK_TACTICS)
+        self._set_if_available(self.escalation_var, config.get("escalation"), STAKE_ESCALATIONS)
+        self._set_if_available(self.antagonist_var, config.get("antagonist"), self.antagonist_menu.cget("values"))
+        self._set_if_available(self.ally_var, config.get("ally"), self.ally_menu.cget("values"))
+        self._set_if_available(self.location_var, config.get("location"), self.location_menu.cget("values"))
+
+        title = (state or {}).get("Title", "")
+        self.title_var.set(title)
+        self.generated_scenario = None
+        self._display_preview_from_state(state)
+
+    # ------------------------------------------------------------------
+    @staticmethod
+    def _set_if_available(var, value, options):
+        if not value:
+            return
+        if isinstance(options, tuple):
+            options = list(options)
+        if value in options:
+            var.set(value)
+
+    # ------------------------------------------------------------------
+    def save_state(self, state):  # pragma: no cover - UI synchronization
+        if state is None:
+            return False
+
+        config = {
+            "climax": self.climax_var.get(),
+            "callback": self.callback_var.get(),
+            "escalation": self.escalation_var.get(),
+            "antagonist": self.antagonist_var.get(),
+            "ally": self.ally_var.get(),
+            "location": self.location_var.get(),
+        }
+        state["_finale_config"] = config
+
+        title = self.title_var.get().strip()
+        if title:
+            state["Title"] = title
+
+        if self.generated_scenario is not None:
+            self._apply_scenario_to_state(state, self.generated_scenario)
+            self.generated_scenario = None
+            return True
+
+        if not state.get("Scenes"):
+            messagebox.showwarning(
+                "Generate Finale",
+                "Generate a finale outline before proceeding to the next step.",
+            )
+            return False
+
+        return True
+
+    # ------------------------------------------------------------------
+    def generate_outline(self):  # pragma: no cover - UI interaction
+        scenario = self._build_scenario_from_config()
+        if scenario is None:
+            return
+        self.generated_scenario = scenario
+        self.title_var.set(scenario["Title"])
+        self._display_preview(scenario)
+
+    # ------------------------------------------------------------------
+    def _build_scenario_from_config(self):
         climax_name = self.climax_var.get()
         climax = next((item for item in CLIMAX_STRUCTURES if item["name"] == climax_name), None)
         if not climax:
             messagebox.showerror("Missing Data", "Select a climax structure before generating.")
-            return
+            return None
 
         antagonist = self._clean_selection(self.antagonist_var.get())
         ally = self._clean_selection(self.ally_var.get())
@@ -248,7 +356,6 @@ class EpicFinalePlannerWindow(ctk.CTkToplevel):
         title = self.title_var.get().strip()
         if not title:
             title = self._default_title(climax_name, location)
-            self.title_var.set(title)
 
         summary_lines = [
             f"Structure: {climax_name}",
@@ -261,25 +368,22 @@ class EpicFinalePlannerWindow(ctk.CTkToplevel):
 
         scenes = []
         for idx, beat in enumerate(climax["beats"], start=1):
-            beat_text = beat
-            if antagonist and "antagonist" in beat.lower():
-                beat_text = beat_text.replace("the antagonist", antagonist)
-                beat_text = beat_text.replace("antagonist", antagonist)
-            if ally and any(token in beat.lower() for token in ("allies", "allied")):
-                beat_text = beat_text.replace("allied forces", ally)
-                beat_text = beat_text.replace("allies", ally)
-                beat_text = beat_text.replace("allied", ally)
-            if location and any(token in beat.lower() for token in ("stronghold", "site", "battleground")):
-                beat_text = beat_text.replace("stronghold", location)
-                beat_text = beat_text.replace("ritual site", location)
-                beat_text = beat_text.replace("battlefield", location)
-                beat_text = beat_text.replace("battleground", location)
-            scenes.append(f"Scene {idx}: {beat_text}")
+            beat_text = self._personalise_beat(beat, antagonist, ally, location)
+            scene_title = self._scene_title(idx, beat_text)
+            scenes.append(
+                {
+                    "Title": scene_title,
+                    "Summary": beat_text,
+                    "Text": beat_text,
+                    "SceneType": "Auto",
+                    "NPCs": [antagonist] if antagonist else [],
+                    "Places": [location] if location else [],
+                    "Creatures": [],
+                    "Maps": [],
+                }
+            )
 
-        secrets = [
-            escalation,
-            callback,
-        ]
+        secrets = [escalation, callback]
 
         scenario = {
             "Title": title,
@@ -293,9 +397,37 @@ class EpicFinalePlannerWindow(ctk.CTkToplevel):
             "Objects": [],
         }
 
-        self.generated_scenario = scenario
-        self._display_preview(scenario)
-        self.save_btn.configure(state="normal")
+        return scenario
+
+    # ------------------------------------------------------------------
+    @staticmethod
+    def _scene_title(index, beat_text):
+        headline = beat_text.split(".")[0].strip()
+        if not headline:
+            headline = f"Phase {index}"
+        if len(headline) > 60:
+            headline = headline[:57] + "..."
+        return f"Phase {index}: {headline}"
+
+    # ------------------------------------------------------------------
+    @staticmethod
+    def _personalise_beat(beat, antagonist, ally, location):
+        beat_text = beat
+        if antagonist and "antagonist" in beat.lower():
+            beat_text = beat_text.replace("the antagonist", antagonist)
+            beat_text = beat_text.replace("antagonist", antagonist)
+        if ally and any(token in beat.lower() for token in ("allies", "allied")):
+            beat_text = beat_text.replace("allied forces", ally)
+            beat_text = beat_text.replace("allies", ally)
+            beat_text = beat_text.replace("allied", ally)
+        if location and any(
+            token in beat.lower() for token in ("stronghold", "site", "battleground", "battlefield")
+        ):
+            beat_text = beat_text.replace("stronghold", location)
+            beat_text = beat_text.replace("ritual site", location)
+            beat_text = beat_text.replace("battlefield", location)
+            beat_text = beat_text.replace("battleground", location)
+        return beat_text
 
     # ------------------------------------------------------------------
     @staticmethod
@@ -313,10 +445,24 @@ class EpicFinalePlannerWindow(ctk.CTkToplevel):
         return base
 
     # ------------------------------------------------------------------
+    def _apply_scenario_to_state(self, state, scenario):
+        state["Title"] = scenario["Title"]
+        state["Summary"] = scenario["Summary"]
+        state["Secrets"] = scenario["Secrets"]
+        state["Secret"] = scenario["Secrets"]
+        state["Scenes"] = scenario["Scenes"]
+        state["_SceneLayout"] = []
+        state["Places"] = scenario["Places"]
+        state["NPCs"] = scenario["NPCs"]
+        state["Creatures"] = scenario["Creatures"]
+        state["Factions"] = scenario["Factions"]
+        state["Objects"] = scenario["Objects"]
+
+    # ------------------------------------------------------------------
     def _display_preview(self, scenario):
         lines = [scenario["Title"], "", scenario["Summary"], "", "Scenes:"]
         for scene in scenario["Scenes"]:
-            lines.append(f" - {scene}")
+            lines.append(f" - {scene.get('Title')}: {scene.get('Summary')}")
         lines.append("")
         lines.append("Secrets:")
         for secret in scenario["Secrets"].split("\n"):
@@ -329,27 +475,81 @@ class EpicFinalePlannerWindow(ctk.CTkToplevel):
         self.preview_box.configure(state="disabled")
 
     # ------------------------------------------------------------------
-    def save_to_db(self):
-        if not self.generated_scenario:
-            messagebox.showwarning("No Finale", "Generate a finale outline first.")
+    def _display_preview_from_state(self, state):
+        if not state:
+            self.preview_box.configure(state="normal")
+            self.preview_box.delete("1.0", tk.END)
+            self.preview_box.configure(state="disabled")
             return
 
-        title = self.generated_scenario.get("Title", "").strip()
-        if not title:
-            messagebox.showwarning("Missing Title", "Provide a title for the finale before saving.")
-            return
+        summary = state.get("Summary") or ""
+        secrets = state.get("Secrets") or ""
+        scenes = state.get("Scenes") or []
 
-        wrapper = GenericModelWrapper("scenarios")
-        existing = wrapper.load_items()
-        if any(item.get("Title") == title for item in existing):
-            messagebox.showwarning("Duplicate Title", f"A scenario titled '{title}' already exists.")
-            return
+        lines = [state.get("Title", ""), "", summary, "", "Scenes:"]
+        if scenes:
+            for scene in scenes:
+                if isinstance(scene, dict):
+                    lines.append(f" - {scene.get('Title', 'Scene')}: {scene.get('Summary', '')}")
+                else:
+                    lines.append(f" - {scene}")
+        else:
+            lines.append(" - (No scenes generated yet)")
 
-        try:
-            wrapper.save_items([self.generated_scenario], replace=False)
-        except Exception as exc:
-            messagebox.showerror("Database Error", f"Failed to save finale: {exc}")
-            return
+        lines.append("")
+        lines.append("Secrets:")
+        if secrets:
+            for secret in secrets.split("\n"):
+                lines.append(f" - {secret}")
+        else:
+            lines.append(" - (None)")
 
-        messagebox.showinfo("Finale Saved", f"Finale '{title}' added to database.")
-        self.save_btn.configure(state="disabled")
+        preview = "\n".join(lines)
+        self.preview_box.configure(state="normal")
+        self.preview_box.delete("1.0", tk.END)
+        self.preview_box.insert("1.0", preview)
+        self.preview_box.configure(state="disabled")
+
+
+class EpicFinalePlannerWizard(ScenarioBuilderWizard):
+    """Scenario builder variant tailored for planning epic finales."""
+
+    def __init__(self, master, on_saved=None, *, initial_scenario=None):
+        super().__init__(master, on_saved=on_saved, initial_scenario=initial_scenario)
+        self.title("Epic Finale Planner")
+        self.geometry("1500x900")
+
+    # ------------------------------------------------------------------
+    def _create_steps(self):  # pragma: no cover - UI layout
+        entity_wrappers = {
+            "npcs": self.npc_wrapper,
+            "places": self.place_wrapper,
+            "factions": self.faction_wrapper,
+            "creatures": self.creature_wrapper,
+            "objects": self.object_wrapper,
+            "maps": self.map_wrapper,
+        }
+
+        planning_step = ScenesPlanningStep(
+            self.step_container,
+            {
+                key: wrapper
+                for key, wrapper in entity_wrappers.items()
+                if key in ("npcs", "creatures", "places", "maps")
+            },
+            scenario_wrapper=self.scenario_wrapper,
+        )
+
+        self.steps = [
+            ("Finale Blueprint", FinaleBlueprintStep(self.step_container, self)),
+            ("Visual Builder", planning_step),
+            ("Entity Linking", EntityLinkingStep(self.step_container, entity_wrappers)),
+            ("Review", ReviewStep(self.step_container)),
+        ]
+
+        for _, frame in self.steps:
+            frame.grid(row=0, column=0, sticky="nsew")
+
+        for _, frame in self.steps:
+            if hasattr(frame, "set_state_binding"):
+                frame.set_state_binding(self.wizard_state, self._on_wizard_state_changed)

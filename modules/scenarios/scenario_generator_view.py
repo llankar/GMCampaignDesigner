@@ -7,7 +7,6 @@ import customtkinter as ctk
 from campaign_generator import GENERATOR_FUNCTIONS, export_to_docx
 from modules.generic.generic_model_wrapper import GenericModelWrapper
 from modules.helpers.logging_helper import log_module_import
-from modules.scenarios.epic_finale_planner import EpicFinalePlannerWindow
 
 log_module_import(__name__)
 
@@ -32,7 +31,6 @@ class ScenarioGeneratorView(ctk.CTkFrame):
         ctk.CTkOptionMenu(top, values=list(GENERATOR_FUNCTIONS.keys()),
                           variable=self.setting_var).pack(side="left", padx=5)
         ctk.CTkButton(top, text="Generate", command=self.generate_campaign).pack(side="left", padx=5)
-        ctk.CTkButton(top, text="Epic Finale Planner", command=self.open_epic_finale_planner).pack(side="left", padx=5)
 
 
         # Scrollable area for displaying generated scenario cards
@@ -51,7 +49,6 @@ class ScenarioGeneratorView(ctk.CTkFrame):
                                     command=self.add_to_db, state="disabled")
         self.add_btn.pack(side="left", padx=5)
 
-        self._planner_window = None
 
     # ------------------------------------------------------------------
     def generate_campaign(self):
@@ -152,14 +149,3 @@ class ScenarioGeneratorView(ctk.CTkFrame):
         messagebox.showinfo("Saved", f"Scenario '{title}' added to database.")
 
     # ------------------------------------------------------------------
-    def open_epic_finale_planner(self):
-        if self._planner_window is not None:
-            try:
-                if self._planner_window.winfo_exists():
-                    self._planner_window.focus_set()
-                    return
-            except tk.TclError:
-                self._planner_window = None
-
-        self._planner_window = EpicFinalePlannerWindow(self)
-

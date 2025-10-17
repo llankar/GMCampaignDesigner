@@ -1855,8 +1855,6 @@ class MainWindow(ctk.CTk):
             )
             messagebox.showerror("Error", f"Failed to open Scenario Builder:\n{exc}")
 
-    
-
     def change_database_storage(self):
         # 1) Pick or create .db
         # Ensure we start file dialogs in the Campaigns directory under the app directory
