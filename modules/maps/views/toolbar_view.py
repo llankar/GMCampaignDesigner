@@ -106,7 +106,7 @@ def _build_toolbar(self):
 
     # Brush‐size control in dark mode (for fog)
     size_label = ctk.CTkLabel(toolbar, text="Fog Brush Size:") # Clarified label
-    size_label.pack(side="left", padx=(10,2), pady=8)
+    size_label.pack(side="left", padx=(2,2), pady=8)
 
     brush_size_options = list(getattr(self, "brush_size_options", list(range(4, 129, 4))))
     current_brush_size = int(getattr(self, "brush_size", brush_size_options[0] if brush_size_options else 32))
@@ -122,7 +122,7 @@ def _build_toolbar(self):
         width=dropdown_width,
     )
     self.brush_size_menu.set(str(current_brush_size))
-    self.brush_size_menu.pack(side="left", padx=5, pady=8)
+    self.brush_size_menu.pack(side="left", padx=0, pady=5)
 
     # Key bindings for bracket adjustments (for fog brush)
     self.parent.bind("[", lambda e: self._change_brush(-4))
@@ -148,13 +148,6 @@ def _build_toolbar(self):
     self.token_size_menu.set(str(current_token_size))
     self.token_size_menu.pack(side="left", padx=5, pady=8)
     
-    self.token_size_value_label = ctk.CTkLabel(
-        toolbar,
-        text=str(self.token_size),
-        width=32
-    )
-    self.token_size_value_label.pack(side="left", padx=(2,10), pady=8)
-
     # Info card font size selector
     hover_font_label = ctk.CTkLabel(toolbar, text="Info Card Font Size:")
     hover_font_label.pack(side="left", padx=(10,2), pady=8)
