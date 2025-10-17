@@ -1984,6 +1984,34 @@ class ScenarioBuilderWizard(ctk.CTkToplevel):
         self.current_step_index = 0
         self._show_step(0)
 
+    def focus_set(self):  # pragma: no cover - UI focus handling
+        """Safely set focus on the wizard if it still exists."""
+
+        try:
+            if not self.winfo_exists():
+                return
+        except Exception:
+            return
+
+        try:
+            super().focus_set()
+        except tk.TclError:
+            pass
+
+    def focus_force(self):  # pragma: no cover - UI focus handling
+        """Safely force focus on the wizard if it still exists."""
+
+        try:
+            if not self.winfo_exists():
+                return
+        except Exception:
+            return
+
+        try:
+            super().focus_force()
+        except tk.TclError:
+            pass
+
     def _build_layout(self):  # pragma: no cover - UI layout
         self.grid_columnconfigure(0, weight=1)
         self.grid_rowconfigure(1, weight=1)
