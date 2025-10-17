@@ -1984,6 +1984,36 @@ class ScenarioBuilderWizard(ctk.CTkToplevel):
         self.current_step_index = 0
         self._show_step(0)
 
+        self._destroy_scheduled = False
+
+    def _schedule_safe_destroy(self):  # pragma: no cover - UI teardown
+        """Withdraw the window and destroy it once Tk has processed focus."""
+
+        if getattr(self, "_destroy_scheduled", False):
+            return
+
+        self._destroy_scheduled = True
+
+        try:
+            if self.winfo_exists():
+                self.withdraw()
+        except Exception:
+            pass
+
+        def _finalize():
+            try:
+                super(ScenarioBuilderWizard, self).destroy()
+            except Exception:
+                pass
+
+        try:
+            self.after(150, _finalize)
+        except Exception:
+            _finalize()
+
+    def destroy(self):  # pragma: no cover - UI teardown
+        self._schedule_safe_destroy()
+
     def focus_set(self):  # pragma: no cover - UI focus handling
         """Safely set focus on the wizard if it still exists."""
 
@@ -2127,10 +2157,7 @@ class ScenarioBuilderWizard(ctk.CTkToplevel):
                     return
             except Exception:
                 return
-            try:
-                super(ScenarioBuilderWizard, self).destroy()
-            except Exception:
-                pass
+            self._schedule_safe_destroy()
 
         # Use ``after`` to ensure the destroy happens once focus hand-off has
         # completed within Tk's event loop.
