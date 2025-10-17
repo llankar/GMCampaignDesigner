@@ -2112,7 +2112,32 @@ class ScenarioBuilderWizard(ctk.CTkToplevel):
             )
             return
 
-        self.destroy()
+        # Hide the wizard immediately to avoid any focus flicker, then
+        # destroy it shortly after the new planner has taken over. This
+        # prevents pending Tk focus callbacks from targeting a widget that
+        # has already been destroyed (which raised TclError in practice).
+        try:
+            self.withdraw()
+        except Exception:
+            pass
+
+        def _close_original_wizard():
+            try:
+                if not self.winfo_exists():
+                    return
+            except Exception:
+                return
+            try:
+                super(ScenarioBuilderWizard, self).destroy()
+            except Exception:
+                pass
+
+        # Use ``after`` to ensure the destroy happens once focus hand-off has
+        # completed within Tk's event loop.
+        try:
+            self.after(120, _close_original_wizard)
+        except Exception:
+            _close_original_wizard()
 
     def _show_step(self, index):  # pragma: no cover - UI navigation
         title, frame = self.steps[index]
