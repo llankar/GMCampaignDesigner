@@ -33,7 +33,11 @@ from modules.maps.services.token_manager import (
 )  # Keep this if it's used by other token_manager functions not moved
 from modules.maps.views.fullscreen_view import open_fullscreen, _update_fullscreen_map
 from modules.maps.views.web_display_view import open_web_display, _update_web_display_map, close_web_display
-from modules.maps.services.entity_picker_service import open_entity_picker, on_entity_selected
+from modules.maps.services.entity_picker_service import (
+    open_entity_picker,
+    on_entity_selected,
+    on_entities_selected,
+)
 from modules.maps.utils.icon_loader import load_icon
 from PIL import Image, ImageTk, ImageDraw
 from modules.generic.generic_model_wrapper import GenericModelWrapper
@@ -3754,6 +3758,7 @@ class DisplayMapController:
     clear_fog = clear_fog
     load_icon = load_icon
     on_entity_selected = on_entity_selected
+    on_entities_selected = on_entities_selected
     on_paint = on_paint # For fog
     open_entity_picker = open_entity_picker
     open_fullscreen = open_fullscreen
