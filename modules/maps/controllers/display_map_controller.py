@@ -2762,7 +2762,8 @@ class DisplayMapController:
             item.pop("drag_data", None)
             return
 
-        item["drag_data"] = {"x": event.x, "y": event.y, "moved": False}
+        for target in self._get_drag_targets(item):
+            target["drag_data"] = {"x": event.x, "y": event.y, "moved": False}
         # Handles are only drawn if "Edit Shape" is chosen from context menu.
 
     def _on_item_move(self, event, item):
@@ -2775,15 +2776,72 @@ class DisplayMapController:
             return
         dx = event.x - drag_data["x"]
         dy = event.y - drag_data["y"]
-        if not drag_data.get("moved") and (abs(dx) > 2 or abs(dy) > 2):
-            drag_data["moved"] = True
-        for cid in item.get("canvas_ids", []):
-            if cid: self.canvas.move(cid, dx, dy)
-        if item.get("type", "token") == "token":
-            if item.get("name_id"): self.canvas.move(item["name_id"], dx, dy)
+        movement_started = abs(dx) > 2 or abs(dy) > 2
+        targets = self._get_drag_targets(item)
+        for target in targets:
+            drag_info = target.setdefault("drag_data", {"x": event.x, "y": event.y, "moved": False})
+            if movement_started and not drag_info.get("moved"):
+                drag_info["moved"] = True
+            self._apply_drag_delta_to_item(target, dx, dy)
+            drag_info["x"] = event.x
+            drag_info["y"] = event.y
+
+        self._update_selection_indicators()
+
+
+    def _on_item_release(self, event, item):
+        # If a resize operation was active for this item, it's handled by _on_resize_handle_release
+        if self._active_resize_handle_info and self._active_resize_handle_info.get('item') == item:
+            # The actual release logic is in _on_resize_handle_release
+            return
+
+        drag_datas = []
+        for target in self._get_drag_targets(item):
+            drag_datas.append((target is item, target.pop("drag_data", None)))
+
+        any_moved = any(data and data.get("moved") for _, data in drag_datas)
+        primary_drag_data = next((data for is_primary, data in drag_datas if is_primary), None)
+
+        if primary_drag_data and not any_moved:
+            self._handle_item_click(event, item)
+        self._persist_tokens()
+        self._update_selection_indicators()
+
+    def _get_drag_targets(self, primary_item):
+        selection = [entry for entry in self.selected_items if entry]
+        if selection and primary_item in selection:
+            return selection
+        return [primary_item]
+
+    def _apply_drag_delta_to_item(self, item, dx, dy):
+        if not dx and not dy:
+            return
+
+        for cid in item.get("canvas_ids", []) or []:
+            if not cid:
+                continue
+            try:
+                self.canvas.move(cid, dx, dy)
+            except tk.TclError:
+                continue
+
+        item_type = item.get("type", "token")
+
+        if item_type == "token":
+            name_id = item.get("name_id")
+            if name_id:
+                try:
+                    self.canvas.move(name_id, dx, dy)
+                except tk.TclError:
+                    pass
             if item.get("hp_canvas_ids"):
                 for hp_cid in item["hp_canvas_ids"]:
-                    if hp_cid: self.canvas.move(hp_cid, dx, dy)
+                    if not hp_cid:
+                        continue
+                    try:
+                        self.canvas.move(hp_cid, dx, dy)
+                    except tk.TclError:
+                        continue
             main_id = item.get("canvas_ids", (None,))[0]
             bbox = None
             if main_id:
@@ -2796,33 +2854,22 @@ class DisplayMapController:
             self._refresh_token_hover_popup(item)
             if item.get("hover_visible"):
                 self._show_token_hover(item)
-        elif item.get("type") == "marker":
+        elif item_type == "marker":
             self._refresh_marker_description_popup(item)
-        drag_data["x"] = event.x
-        drag_data["y"] = event.y
-        main_canvas_id = item["canvas_ids"][0] if item.get("canvas_ids") else None
+
+        main_canvas_id = item.get("canvas_ids", (None,))[0] if item.get("canvas_ids") else None
+        coords = None
         if main_canvas_id:
-            coords = self.canvas.coords(main_canvas_id)
-            if coords: sx, sy = coords[0], coords[1]; item["position"] = ((sx - self.pan_x)/self.zoom, (sy - self.pan_y)/self.zoom)
-        
-        # If moving a shape that is in graphical edit mode, redraw its handles
-        if item == self._graphical_edit_mode_item and item.get("type") in ["rectangle", "oval"]:
+            try:
+                coords = self.canvas.coords(main_canvas_id)
+            except tk.TclError:
+                coords = None
+        if coords:
+            sx, sy = coords[0], coords[1]
+            item["position"] = ((sx - self.pan_x) / self.zoom, (sy - self.pan_y) / self.zoom)
+
+        if item == self._graphical_edit_mode_item and item_type in ["rectangle", "oval"]:
             self._draw_resize_handles(item)
-
-        self._update_selection_indicators()
-
-
-    def _on_item_release(self, event, item):
-        # If a resize operation was active for this item, it's handled by _on_resize_handle_release
-        if self._active_resize_handle_info and self._active_resize_handle_info.get('item') == item:
-            # The actual release logic is in _on_resize_handle_release
-            return
-
-        drag_data = item.pop("drag_data", None)
-        if drag_data and not drag_data.get("moved"):
-            self._handle_item_click(event, item)
-        self._persist_tokens()
-        self._update_selection_indicators()
 
     def _handle_item_click(self, event, item):
         item_type = item.get("type", "token")
