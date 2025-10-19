@@ -291,11 +291,18 @@ def _on_display_map(self, entity_type, map_name): # entity_type here is the map'
     pcs       = {r.get("Name"): r for r in self._model_wrappers["PC"].load_items()}
 
     # 7) Build self.tokens (now includes shapes)
-    token_paths_updated = False
+    tokens_normalized = False
 
     for rec in token_list:
-        item_type_from_rec = rec.get("type", "token") # Default to token if not specified
-        
+        marker_keys = ("linked_map", "video_path", "entry_width", "description")
+        item_type_from_rec = rec.get("type")
+        if not item_type_from_rec and any(key in rec for key in marker_keys):
+            item_type_from_rec = "marker"
+            rec["type"] = "marker"
+            tokens_normalized = True
+        elif not item_type_from_rec:
+            item_type_from_rec = "token"
+
         pos = rec.get("position") # Position should always be present
         if isinstance(pos, (list, tuple)) and len(pos) >= 2:
             xw, yw = pos
@@ -325,7 +332,7 @@ def _on_display_map(self, entity_type, map_name): # entity_type here is the map'
                         f"[_on_display_map] Updated missing token image path to '{portrait_path}'."
                     )
                     rec["image_path"] = portrait_path
-                    token_paths_updated = True
+                    tokens_normalized = True
 
             sz   = rec.get("size", self.token_size) # Use self.token_size as default
             pil_image = None
@@ -417,11 +424,11 @@ def _on_display_map(self, entity_type, map_name): # entity_type here is the map'
 
         self.tokens.append(item_data)
 
-    if token_paths_updated:
+    if tokens_normalized:
         try:
             self._persist_tokens()
         except Exception as exc:
-            print(f"[_on_display_map] Failed to persist updated token image paths: {exc}")
+            print(f"[_on_display_map] Failed to persist normalized token data: {exc}")
 
     # 8) Hydrate token metadata for info card display (ONLY FOR TOKENS)
     for current_item in self.tokens:
