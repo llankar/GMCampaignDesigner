@@ -128,7 +128,8 @@ class DisplayMapController:
     
         self.brush_size  = DEFAULT_BRUSH_SIZE
         self.brush_size_options = list(range(4, 129, 4))
-        self.token_size  = 48
+        self._default_token_size = 48
+        self.token_size  = self._default_token_size
         self.token_size_options = list(range(16, 129, 8))
         self.hover_font_size_options = [10, 12, 14, 16, 18, 20, 24, 28, 32]
         self.hover_font_size = 14

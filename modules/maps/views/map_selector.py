@@ -149,9 +149,12 @@ def _on_display_map(self, entity_type, map_name): # entity_type here is the map'
     self.current_map = item
 
     # Restore token size if set
+    default_token_size = getattr(self, "_default_token_size", 48)
     size = item.get("token_size")
-    if isinstance(size, int):
+    if isinstance(size, int) and size > 0:
         self.token_size = size
+    else:
+        self.token_size = default_token_size
 
     # Restore hover font size if persisted
     hover_size = item.get("hover_font_size")
