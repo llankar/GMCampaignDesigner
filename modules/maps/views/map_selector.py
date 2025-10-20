@@ -9,7 +9,7 @@ from PIL import Image, ImageTk, ImageDraw
 from modules.helpers.config_helper import ConfigHelper
 from modules.helpers.template_loader import load_template
 from modules.generic.generic_list_selection_view import GenericListSelectionView
-from modules.helpers.logging_helper import log_module_import
+from modules.helpers.logging_helper import log_module_import, log_debug, log_info, log_warning
 
 log_module_import(__name__)
 
@@ -142,11 +142,28 @@ def select_map(self):
 def _on_display_map(self, entity_type, map_name): # entity_type here is the map's default, not token's
     """Callback from selector: build editor UI and load the chosen map."""
     # 1) Lookup the chosen map record
+    previous_map_name = ""
+    if isinstance(getattr(self, "current_map", None), dict):
+        previous_map_name = (self.current_map.get("Name") or "").strip()
+    previous_map_label = previous_map_name or "<none>"
     item = self._maps.get(map_name)
     if not item:
+        log_warning(
+            f"Requested map '{map_name}' could not be found (previous map: '{previous_map_label}').",
+            func_name="map_selector._on_display_map",
+        )
         messagebox.showwarning("Not Found", f"Map '{map_name}' not found.")
         return
     self.current_map = item
+
+    log_info(
+        f"Starting map load for '{map_name}'.",
+        func_name="map_selector._on_display_map",
+    )
+    log_debug(
+        f"Switching from '{previous_map_label}' to '{map_name}' via entity_type '{entity_type}'.",
+        func_name="map_selector._on_display_map",
+    )
 
     # Restore token size if set
     default_token_size = getattr(self, "_default_token_size", 48)
@@ -237,8 +254,14 @@ def _on_display_map(self, entity_type, map_name): # entity_type here is the map'
         self.pan_y = float(pan_y_raw)
     except (TypeError, ValueError):
         self.pan_y = 0.0
-        
+
+    log_debug(
+        f"Restored persisted view state: zoom={self.zoom}, pan=({self.pan_x}, {self.pan_y}).",
+        func_name="map_selector._on_display_map",
+    )
+
     # 4) Clear out any old tokens from both canvases
+    removed_items = len(getattr(self, "tokens", []))
     for t_obj in self.tokens: # Renamed t to t_obj to avoid conflict
         for cid in t_obj.get("canvas_ids", []):
             self.canvas.delete(cid)
@@ -259,6 +282,11 @@ def _on_display_map(self, entity_type, map_name): # entity_type here is the map'
                     # raise an exception and interrupt map loading.
                     break
     self.tokens = []
+    if removed_items:
+        log_debug(
+            f"Cleared {removed_items} previously rendered items from the canvas before loading '{map_name}'.",
+            func_name="map_selector._on_display_map",
+        )
 
     # 5) Parse persisted token list
     raw = item.get("Tokens", [])
@@ -283,7 +311,10 @@ def _on_display_map(self, entity_type, map_name): # entity_type here is the map'
     else:
         token_list = []
     
-    print(f"[_on_display_map] Processing {len(token_list)} items from map data.")
+    log_info(
+        f"Parsing persisted item list with {len(token_list)} entries for map '{map_name}'.",
+        func_name="map_selector._on_display_map",
+    )
 
     # 6) Pre-load all Creature & NPC records once
     creatures = {r.get("Name"): r for r in self._model_wrappers["Creature"].load_items()}
@@ -293,6 +324,7 @@ def _on_display_map(self, entity_type, map_name): # entity_type here is the map'
     # 7) Build self.tokens (now includes shapes)
     tokens_normalized = False
 
+    expected_items = []
     for rec in token_list:
         marker_keys = ("linked_map", "video_path", "entry_width", "description")
         item_type_from_rec = rec.get("type")
@@ -314,6 +346,11 @@ def _on_display_map(self, entity_type, map_name): # entity_type here is the map'
         item_data = {
             "type": item_type_from_rec,
             "position": (xw, yw),
+        }
+
+        entry_summary = {
+            "type": item_type_from_rec,
+            "world_position": (xw, yw),
         }
 
         if item_type_from_rec == "token":
@@ -338,6 +375,12 @@ def _on_display_map(self, entity_type, map_name): # entity_type here is the map'
             pil_image = None
             source_image = None
             resolved_path = ""
+
+            entry_summary.update({
+                "entity_type": rec.get("entity_type"),
+                "entity_id": rec.get("entity_id"),
+                "size": sz,
+            })
 
             if path:
                 if os.path.exists(path):
@@ -402,6 +445,10 @@ def _on_display_map(self, entity_type, map_name): # entity_type here is the map'
                 "height":       rec.get("height", 50),# Default height for shapes
                 "pil_image":    None, # Shapes don't use PIL image for drawing
             })
+            entry_summary.update({
+                "width": item_data["width"],
+                "height": item_data["height"],
+            })
         elif item_type_from_rec == "marker":
             item_data.update({
                 "text": rec.get("text", "New Marker"),
@@ -418,11 +465,20 @@ def _on_display_map(self, entity_type, map_name): # entity_type here is the map'
                 "description_editor": None,
                 "focus_pending": False,
             })
+            entry_summary.update({
+                "text": item_data["text"],
+                "linked_map": item_data.get("linked_map", ""),
+            })
         else:
             print(f"[_on_display_map] Unknown item type '{item_type_from_rec}' in map data. Skipping: {rec}")
             continue
 
         self.tokens.append(item_data)
+        expected_items.append(entry_summary)
+        log_debug(
+            f"Prepared {entry_summary['type']} item with data {entry_summary}.",
+            func_name="map_selector._on_display_map",
+        )
 
     if tokens_normalized:
         try:
@@ -457,6 +513,25 @@ def _on_display_map(self, entity_type, map_name): # entity_type here is the map'
         current_item["hover_textbox"] = None
         current_item["hover_visible"] = False
         current_item["hover_bbox"] = None
+
+    token_count = sum(1 for entry in expected_items if entry.get("type") == "token")
+    marker_count = sum(1 for entry in expected_items if entry.get("type") == "marker")
+    shape_count = sum(1 for entry in expected_items if entry.get("type") in ("rectangle", "oval"))
+    log_info(
+        f"Token data normalisation complete for map '{map_name}'.",
+        func_name="map_selector._on_display_map",
+    )
+    log_debug(
+        f"Map '{map_name}' expects {token_count} tokens, {marker_count} markers, {shape_count} shapes at zoom={self.zoom} and pan=({self.pan_x}, {self.pan_y}).",
+        func_name="map_selector._on_display_map",
+    )
+
+    self._pending_render_debug_dump = {
+        "map_name": map_name,
+        "expected_items": expected_items,
+        "zoom": self.zoom,
+        "pan": (self.pan_x, self.pan_y),
+    }
 
     # 9) Finally draw everything onto the canvas
     self._update_canvas_images()
