@@ -603,6 +603,15 @@ class FinaleBlueprintStep(WizardStep):
         scenes = []
         aggregated_npcs = []
         aggregated_factions = []
+
+        callback_scene_index = self._select_callback_scene_index(climax["beats"])
+        escalation_scene_index = self._select_escalation_scene_index(
+            climax["beats"], callback_scene_index
+        )
+
+        callback_sentence = f"Callback Beat: {callback}"
+        escalation_sentence = f"Escalation Beat: {escalation}"
+
         for idx, beat in enumerate(climax["beats"], start=1):
             beat_text = self._personalise_beat(beat, primary_antagonist, primary_ally, location)
             scene_title = self._scene_title(idx, beat_text)
@@ -612,6 +621,17 @@ class FinaleBlueprintStep(WizardStep):
                 npc_allies,
                 allied_factions,
             )
+
+            scene_index = idx - 1
+            guidance_sentences = []
+            if scene_index == callback_scene_index:
+                guidance_sentences.append(callback_sentence)
+            if scene_index == escalation_scene_index:
+                guidance_sentences.append(escalation_sentence)
+
+            if guidance_sentences:
+                beat_text = self._append_guidance_sentences(beat_text, guidance_sentences)
+
             aggregated_npcs.extend(scene_npcs)
             aggregated_factions.extend(scene_factions)
             scenes.append(
@@ -673,6 +693,54 @@ class FinaleBlueprintStep(WizardStep):
             beat_text = beat_text.replace("battlefield", location)
             beat_text = beat_text.replace("battleground", location)
         return beat_text
+
+    # ------------------------------------------------------------------
+    @staticmethod
+    def _append_guidance_sentences(base_text, sentences):
+        text = base_text.rstrip()
+        if text and text[-1] not in ".!?":
+            text += "."
+        appended = " ".join(sentences)
+        return f"{text} {appended}" if text else appended
+
+    # ------------------------------------------------------------------
+    @staticmethod
+    def _select_callback_scene_index(beats):
+        if not beats:
+            return -1
+
+        keywords = (
+            "duel",
+            "confront",
+            "counterattack",
+            "disrupt",
+            "flip",
+            "defend",
+            "breach",
+            "ritual",
+        )
+        for index in range(len(beats) - 2, -1, -1):
+            beat_lower = beats[index].lower()
+            if any(keyword in beat_lower for keyword in keywords):
+                return index
+
+        if len(beats) >= 2:
+            return len(beats) - 2
+        return 0
+
+    # ------------------------------------------------------------------
+    @staticmethod
+    def _select_escalation_scene_index(beats, callback_index):
+        if not beats:
+            return -1
+
+        final_index = len(beats) - 1
+        if final_index != callback_index:
+            return final_index
+
+        if final_index - 1 >= 0:
+            return final_index - 1
+        return final_index
 
     # ------------------------------------------------------------------
     def _infer_scene_participants(self, beat, antagonists, npc_allies, allied_factions):
