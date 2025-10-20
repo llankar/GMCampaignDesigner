@@ -653,6 +653,12 @@ class FinaleBlueprintStep(WizardStep):
             f"Callback: {callback}",
         ]
 
+        gm_guidance_sentences = self._build_gm_guidance_sentences(
+            antagonists, allied_factions, npc_allies, location
+        )
+        if gm_guidance_sentences:
+            summary_lines.extend(gm_guidance_sentences)
+
         scenes = []
         aggregated_npcs = []
         aggregated_factions = []
@@ -664,6 +670,10 @@ class FinaleBlueprintStep(WizardStep):
 
         callback_sentence = f"Callback Beat: {callback}"
         escalation_sentence = f"Escalation Beat: {escalation}"
+
+        gm_guidance_per_scene = self._distribute_guidance_across_beats(
+            len(climax["beats"]), gm_guidance_sentences
+        )
 
         for idx, beat in enumerate(climax["beats"], start=1):
             beat_text = self._personalise_beat(beat, primary_antagonist, primary_ally, location)
@@ -681,6 +691,7 @@ class FinaleBlueprintStep(WizardStep):
                 guidance_sentences.append(callback_sentence)
             if scene_index == escalation_scene_index:
                 guidance_sentences.append(escalation_sentence)
+            guidance_sentences.extend(gm_guidance_per_scene[scene_index])
 
             if guidance_sentences:
                 beat_text = self._append_guidance_sentences(beat_text, guidance_sentences)
@@ -702,6 +713,7 @@ class FinaleBlueprintStep(WizardStep):
             )
 
         secrets = [escalation, callback]
+        secrets.extend(gm_guidance_sentences)
 
         scenario = {
             "Title": title,
@@ -716,6 +728,140 @@ class FinaleBlueprintStep(WizardStep):
         }
 
         return scenario
+
+    # ------------------------------------------------------------------
+    def _build_gm_guidance_sentences(
+        self, antagonists, allied_factions, npc_allies, location
+    ):
+        guidance = []
+
+        antagonist_sources = self._get_cached_entities("npcs") + self._get_cached_entities(
+            "factions"
+        )
+        faction_sources = self._get_cached_entities("factions")
+        ally_sources = self._get_cached_entities("npcs")
+        place_sources = self._get_cached_entities("places")
+
+        for name in antagonists or []:
+            guidance.extend(self._extract_entity_guidance(name, antagonist_sources))
+
+        for name in allied_factions or []:
+            guidance.extend(self._extract_entity_guidance(name, faction_sources))
+
+        for name in npc_allies or []:
+            guidance.extend(self._extract_entity_guidance(name, ally_sources))
+
+        if location:
+            guidance.extend(self._extract_entity_guidance(location, place_sources))
+
+        deduplicated = []
+        seen = set()
+        for sentence in guidance:
+            if sentence in seen:
+                continue
+            seen.add(sentence)
+            deduplicated.append(sentence)
+        return deduplicated
+
+    # ------------------------------------------------------------------
+    def _extract_entity_guidance(self, name, items):
+        record = self._find_entity_by_name(name, items)
+        if not record:
+            return []
+
+        sentences = []
+        seen_values = set()
+        for key, label in (("Secret", "secret"), ("Secrets", "secret"), ("Motivation", "motivation")):
+            value = record.get(key)
+            text = self._normalise_secret_value(value)
+            if not text or text in seen_values:
+                continue
+            seen_values.add(text)
+            sentences.append(self._format_gm_guidance(name, label, text))
+        return sentences
+
+    # ------------------------------------------------------------------
+    def _distribute_guidance_across_beats(self, beat_count, guidance_sentences):
+        if beat_count <= 0:
+            return []
+
+        per_scene = [[] for _ in range(beat_count)]
+        if not guidance_sentences:
+            return per_scene
+
+        for index, sentence in enumerate(guidance_sentences):
+            scene_index = index % beat_count
+            per_scene[scene_index].append(sentence)
+        return per_scene
+
+    # ------------------------------------------------------------------
+    def _get_cached_entities(self, attribute):
+        items = getattr(self, attribute, None)
+        if not items:
+            return []
+        return list(items)
+
+    # ------------------------------------------------------------------
+    def _find_entity_by_name(self, name, items):
+        cleaned_name = (name or "").strip()
+        if not cleaned_name:
+            return None
+
+        for item in items or []:
+            formatted = self._format_name(item)
+            if formatted and formatted.strip() == cleaned_name:
+                return item
+        return None
+
+    # ------------------------------------------------------------------
+    def _normalise_secret_value(self, value):
+        if not value:
+            return ""
+
+        if isinstance(value, dict):
+            # Prefer explicit text/value fields when present
+            parts = []
+            for key in ("text", "value"):
+                part = value.get(key)
+                if part:
+                    parts.append(str(part))
+            if not parts:
+                parts = [str(value)]
+            value = " ".join(parts)
+        elif isinstance(value, (list, tuple)):
+            parts = [self._normalise_secret_value(item) for item in value]
+            value = "; ".join(part for part in parts if part)
+        else:
+            value = str(value)
+
+        value = " ".join(value.split())
+        if not value:
+            return ""
+
+        return self._condense_guidance_text(value)
+
+    # ------------------------------------------------------------------
+    @staticmethod
+    def _condense_guidance_text(text, limit=160):
+        cleaned = (text or "").strip()
+        if not cleaned:
+            return ""
+
+        sentences = re.split(r"(?<=[.!?])\s+", cleaned)
+        condensed = sentences[0] if sentences else cleaned
+        condensed = condensed.strip()
+        if len(condensed) > limit:
+            condensed = condensed[: limit - 3].rstrip(",;.- ") + "..."
+        return condensed
+
+    # ------------------------------------------------------------------
+    @staticmethod
+    def _format_gm_guidance(name, label, text):
+        subject = (name or "").strip()
+        descriptor = (label or "secret").strip().lower()
+        if not subject or not text:
+            return ""
+        return f"GM Guidance: {subject}'s {descriptor} may surface — {text}"
 
     # ------------------------------------------------------------------
     @staticmethod

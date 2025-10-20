@@ -224,3 +224,53 @@ def test_escalation_summary_and_secrets_alignment():
     secrets_lines = scenario["Secrets"].splitlines()
     assert secrets_lines[0] == escalation_text
     assert secrets_lines[1] == epic_finale_planner.CALLBACK_TACTICS[0]
+
+
+def test_gm_guidance_surfaces_entity_secrets_and_motivations():
+    step = epic_finale_planner.FinaleBlueprintStep.__new__(
+        epic_finale_planner.FinaleBlueprintStep
+    )
+
+    structure = epic_finale_planner.CLIMAX_STRUCTURES[0]
+    step.climax_var = _StubVariable(structure["name"])
+    step.callback_var = _StubVariable(epic_finale_planner.CALLBACK_TACTICS[2])
+    step.escalation_var = _StubVariable(epic_finale_planner.STAKE_ESCALATIONS[1])
+    step.location_var = _StubVariable("Sky Citadel")
+    step.title_var = _StubVariable("")
+
+    selections = {
+        "antagonists": ["Shadow Queen"],
+        "allied_factions": ["Silent Hand"],
+        "npc_allies": ["Sir Galen"],
+    }
+    step._collect_entity_selector_values = lambda key: selections.get(key, [])
+
+    step.npcs = [
+        {"Name": "Shadow Queen", "Secret": "She is a dragon in disguise."},
+        {"Name": "Sir Galen", "Motivation": "Redeem his failures."},
+    ]
+    step.factions = [
+        {"Name": "Silent Hand", "Secrets": "Their bargains empower fiendish allies."}
+    ]
+    step.places = [
+        {"Title": "Sky Citadel", "Secrets": "Conceals a dormant planar gate."}
+    ]
+    step.entity_selectors = {}
+
+    scenario = step._build_scenario_from_config()
+
+    gm_guidance_lines = [
+        line for line in scenario["Summary"].splitlines() if line.startswith("GM Guidance:")
+    ]
+    assert len(gm_guidance_lines) >= 3
+    assert any("Shadow Queen" in line and "secret" in line.lower() for line in gm_guidance_lines)
+    assert any("Sir Galen" in line and "motivation" in line.lower() for line in gm_guidance_lines)
+    assert any("Sky Citadel" in line for line in gm_guidance_lines)
+
+    secrets_lines = scenario["Secrets"].splitlines()
+    for guidance in gm_guidance_lines:
+        assert guidance in secrets_lines
+
+    scene_texts = [scene["Summary"] for scene in scenario["Scenes"]]
+    assert any("Shadow Queen" in text for text in scene_texts)
+    assert any("Sir Galen" in text for text in scene_texts)
