@@ -627,7 +627,7 @@ class DisplayMapController:
                 "item": item,
             }
 
-    def open_map_by_name(self, map_name):
+    def open_map_by_name(self, map_name, *, apply_fit=True):
         target = (map_name or "").strip()
         if not target:
             log_warning(
@@ -662,10 +662,11 @@ class DisplayMapController:
             func_name="DisplayMapController.open_map_by_name",
         )
         # Apply fit shortly after map swaps in
-        try:
-            self.parent.after(30, self._apply_fit_mode)
-        except Exception:
-            pass
+        if apply_fit:
+            try:
+                self.parent.after(30, self._apply_fit_mode)
+            except Exception:
+                pass
         return True
 
     def open_global_search(self, event=None):
@@ -1133,7 +1134,7 @@ class DisplayMapController:
                 func_name="DisplayMapController._open_marker_linked_map",
             )
             return False
-        success = self.open_map_by_name(target)
+        success = self.open_map_by_name(target, apply_fit=False)
         log_info(
             f"Linked map open {'succeeded' if success else 'failed'} for marker '{marker_label}' (target '{target_label}').",
             func_name="DisplayMapController._open_marker_linked_map",
@@ -2890,7 +2891,7 @@ class DisplayMapController:
                 )
             for entry in rendered:
                 log_debug(
-                    f"Rendered {entry.get('type')} at world {entry.get('world_position')} screen={entry.get('screen_position')} details={entry}.",
+                    f"Rendered {entry.get('type')} at world {entry.get('world_position')} screen={entry.get('actual_screen') or entry.get('screen_position') or entry.get('expected_screen')} details={entry}.",
                     func_name="DisplayMapController._update_canvas_images",
                 )
             def _key_entry(entry):
