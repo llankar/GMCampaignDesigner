@@ -9,6 +9,7 @@ from modules.ui.image_viewer import show_portrait
 import tkinter.simpledialog as sd
 import tkinter as tk
 import threading
+import time
 from typing import Any, Tuple
 from modules.helpers.logging_helper import log_module_import
 
@@ -405,6 +406,12 @@ def _delete_token(self, token):
 
 def _persist_tokens(self):
     """Quickly capture token state, then hand off the heavy write to a daemon thread."""
+    # If a retry callback was responsible for triggering this invocation,
+    # clear the handle now that we are actually running.
+    retry_id = getattr(self, "_persist_retry_id", None)
+    if retry_id is not None:
+        self._persist_retry_id = None
+
     # 1) Build the JSON in–memory (cheap)
     data = []
     try:
@@ -477,6 +484,31 @@ def _persist_tokens(self):
         self._persist_lock = lock
 
     if not lock.acquire(blocking=False):
+        # A background save is still running. Schedule a retry so the latest
+        # state is eventually flushed instead of being silently dropped.
+        try:
+            existing_retry = getattr(self, "_persist_retry_id", None)
+            if existing_retry is not None:
+                # Replace any pending retry with the most recent state.
+                self.canvas.after_cancel(existing_retry)
+        except Exception:
+            # If the canvas has already been destroyed, just drop through and
+            # allow the caller to try again manually.
+            pass
+
+        try:
+            self._persist_retry_id = self.canvas.after(100, self._persist_tokens)
+        except Exception:
+            # Fallback: if we cannot schedule via Tk (e.g. canvas gone), try a
+            # simple delayed retry in a new thread so the save still happens.
+            def _delayed_retry():
+                time.sleep(0.1)
+                try:
+                    self._persist_tokens()
+                except Exception:
+                    pass
+
+            threading.Thread(target=_delayed_retry, daemon=True).start()
         return
 
     try:
