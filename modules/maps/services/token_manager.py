@@ -11,7 +11,7 @@ import tkinter as tk
 import threading
 import time
 from typing import Any, Tuple
-from modules.helpers.logging_helper import log_module_import
+from modules.helpers.logging_helper import log_info, log_module_import
 
 log_module_import(__name__)
 
@@ -412,8 +412,35 @@ def _persist_tokens(self):
     if retry_id is not None:
         self._persist_retry_id = None
 
+    active_map_name = ""
+    try:
+        if isinstance(getattr(self, "current_map", None), dict):
+            active_map_name = str(self.current_map.get("Name", "")).strip()
+    except Exception:
+        active_map_name = ""
+
     # 1) Build the JSON in–memory (cheap)
     data = []
+    counts_by_type: dict[str, int] = {}
+    token_preview: list[str] = []
+    marker_preview: list[str] = []
+    preview_limit = 5
+
+    def _format_position(x_val: Any, y_val: Any) -> str:
+        try:
+            return f"({round(float(x_val), 2)}, {round(float(y_val), 2)})"
+        except Exception:
+            return "(<unknown>, <unknown>)"
+
+    def _clean_label(raw: Any, *, default: str = "<unnamed>") -> str:
+        text = str(raw or "").strip()
+        if not text:
+            text = default
+        text = text.replace("\n", " ").replace("\r", " ")
+        if len(text) > 40:
+            text = text[:37] + "..."
+        return text
+
     try:
         if isinstance(getattr(self, "current_map", None), dict):
             hover_size = int(getattr(self, "hover_font_size", 14))
@@ -472,9 +499,49 @@ def _persist_tokens(self):
                 continue
 
             data.append(item_data)
+
+            counts_by_type[item_type] = counts_by_type.get(item_type, 0) + 1
+
+            if item_type == "token" and len(token_preview) < preview_limit:
+                identifier = _clean_label(
+                    item_data.get("entity_id") or item_data.get("entity_type"),
+                    default="<token>",
+                )
+                token_preview.append(
+                    f"{identifier}@{_format_position(item_data.get('x'), item_data.get('y'))}"
+                )
+            elif item_type == "marker" and len(marker_preview) < preview_limit:
+                marker_label = _clean_label(item_data.get("text"), default="<marker>")
+                marker_preview.append(
+                    f"{marker_label}@{_format_position(item_data.get('x'), item_data.get('y'))}"
+                )
         except Exception as e:
             print(f"Error processing item {t} for persistence: {e}")
             continue
+
+    if getattr(self, "tokens", None):
+        map_label = active_map_name or "<unnamed>"
+        counts_summary = {key: counts_by_type[key] for key in sorted(counts_by_type)}
+        total_items = sum(counts_summary.values())
+
+        if counts_by_type.get("token", 0) > len(token_preview):
+            token_preview.append("…")
+        if counts_by_type.get("marker", 0) > len(marker_preview):
+            marker_preview.append("…")
+
+        token_preview_str = ", ".join(token_preview) if token_preview else "<none>"
+        marker_preview_str = ", ".join(marker_preview) if marker_preview else "<none>"
+
+        log_info(
+            "Persisting map '%s' tokens. Counts=%s (total=%s). Token samples: %s. Marker samples: %s." % (
+                map_label,
+                counts_summary,
+                total_items,
+                token_preview_str,
+                marker_preview_str,
+            ),
+            func_name="token_manager._persist_tokens",
+        )
 
     self.current_map["Tokens"] = json.dumps(data)
 
