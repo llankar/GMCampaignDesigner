@@ -17,28 +17,52 @@ class GenericModelWrapper:
             return sqlite3.connect(self._db_path)
         return get_connection()
 
+    def _deserialize_row(self, row):
+        item = {}
+        for key in row.keys():
+            value = row[key]
+            if isinstance(value, str) and value.strip().startswith(("{", "[", "\"")):
+                try:
+                    item[key] = json.loads(value)
+                except (TypeError, json.JSONDecodeError):
+                    item[key] = value
+            else:
+                item[key] = value
+        return item
+
+    def _infer_key_field(self, key_field=None):
+        if key_field:
+            return key_field
+        if self.entity_type in {"scenarios", "books"}:
+            return "Title"
+        return "Name"
+
     def load_items(self):
         conn = self._get_connection()
         conn.row_factory = sqlite3.Row  # This makes rows behave like dictionaries.
         cursor = conn.cursor()
         cursor.execute(f"SELECT * FROM {self.table}")
         rows = cursor.fetchall()
-        items = []
-        for row in rows:
-            item = {}
-            for key in row.keys():
-                value = row[key]
-                # Decode only likely JSON: starts with {, [, or "
-                if isinstance(value, str) and value.strip().startswith(("{", "[", "\"")):
-                    try:
-                        item[key] = json.loads(value)
-                    except (TypeError, json.JSONDecodeError):
-                        item[key] = value
-                else:
-                    item[key] = value
-            items.append(item)
+        items = [self._deserialize_row(row) for row in rows]
         conn.close()
         return items
+
+    def load_item_by_key(self, key_value, key_field=None):
+        key_field = self._infer_key_field(key_field)
+        conn = self._get_connection()
+        conn.row_factory = sqlite3.Row
+        try:
+            cursor = conn.cursor()
+            cursor.execute(
+                f"SELECT * FROM {self.table} WHERE {key_field} = ?",
+                (key_value,),
+            )
+            row = cursor.fetchone()
+            if row is None:
+                return None
+            return self._deserialize_row(row)
+        finally:
+            conn.close()
 
 
     def _ensure_schema(self, cursor, items):
@@ -134,6 +158,37 @@ class GenericModelWrapper:
                     delete_sql = f"DELETE FROM {self.table}"
                     cursor.execute(delete_sql)
 
+            conn.commit()
+        finally:
+            conn.close()
+
+    def save_item(self, item, *, key_field=None):
+        if not isinstance(item, dict):
+            raise TypeError("item must be a dictionary")
+
+        conn = self._get_connection()
+        conn.execute("PRAGMA busy_timeout = 5000")
+        cursor = conn.cursor()
+
+        try:
+            existing_columns = self._ensure_schema(cursor, [item])
+            key_field = self._infer_key_field(key_field)
+
+            keys = [key for key in item.keys() if key in existing_columns]
+            values = []
+            for key in keys:
+                val = item[key]
+                if isinstance(val, (list, dict)):
+                    val = json.dumps(val)
+                values.append(val)
+
+            if not keys:
+                return
+
+            placeholders = ", ".join("?" for _ in keys)
+            cols = ", ".join(keys)
+            sql = f"INSERT OR REPLACE INTO {self.table} ({cols}) VALUES ({placeholders})"
+            cursor.execute(sql, values)
             conn.commit()
         finally:
             conn.close()
