@@ -121,6 +121,11 @@ STAKE_ESCALATIONS = [
     "Reveal the antagonist serves an even darker patron.",
     "Introduce collateral damage that jeopardizes allied factions.",
     "Twist the battlefield into a volatile, reality-warping arena.",
+    "Announce a ticking countdown that demands impossible sacrifices.",
+    "Reveal a cherished sanctuary becomes the ritual's next fuel.",
+    "Empower the villain with the heroes' own diverted triumphs.",
+    "Turn an allied champion into the doomsday conduit unless redeemed.",
+    "Unleash cataclysmic weather that erases havens and supply lines overnight.",
 ]
 
 
