@@ -38,6 +38,7 @@ TOOLTIP_FIELDS = {
     "Places": ("Description", "Secrets"),
     "Objects": ("Description", "Powers"),
     "Factions": ("Description", "Secrets"),
+    "Books": ("Subject", "Game", "Tags", "Notes"),
 }
 
 
@@ -57,7 +58,7 @@ def build_entity_tooltip(entity_type, data):
     if not isinstance(data, dict):
         return ""
 
-    name_field = "Title" if entity_type == "Scenarios" else "Name"
+    name_field = "Title" if entity_type in {"Scenarios", "Books"} else "Name"
     name_value = str(data.get(name_field, "")).strip()
     lines = []
     if name_value:
@@ -78,15 +79,17 @@ def _attach_portrait_tooltip(widget, entity_type, data):
     tooltip_text = build_entity_tooltip(entity_type, data)
     if tooltip_text:
         widget.tooltip = ToolTip(widget, tooltip_text)
+
 wrappers = {
-            "Scenarios": GenericModelWrapper("scenarios"),
-            "Places": GenericModelWrapper("places"),
-            "NPCs": GenericModelWrapper("npcs"),
-            "Factions": GenericModelWrapper("factions"),
-            "Objects": GenericModelWrapper("objects"),
-            "Creatures": GenericModelWrapper("creatures"),
-            "PCs": GenericModelWrapper("pcs"),
-        }
+    "Scenarios": GenericModelWrapper("scenarios"),
+    "Places": GenericModelWrapper("places"),
+    "NPCs": GenericModelWrapper("npcs"),
+    "Factions": GenericModelWrapper("factions"),
+    "Objects": GenericModelWrapper("objects"),
+    "Creatures": GenericModelWrapper("creatures"),
+    "PCs": GenericModelWrapper("pcs"),
+    "Books": GenericModelWrapper("books"),
+}
 
 @log_function
 def insert_text(parent, header, content):
@@ -174,7 +177,7 @@ def open_entity_tab(entity_type, name, master):
         return
 
     items = wrapper.load_items()
-    key_field = "Title" if entity_type == "Scenarios" else "Name"
+    key_field = "Title" if entity_type in {"Scenarios", "Books"} else "Name"
     item = next((i for i in items if i.get(key_field) == name), None)
     if not item:
         messagebox.showerror("Error", f"{entity_type[:-1]} '{name}' not found.")

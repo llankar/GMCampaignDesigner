@@ -1907,7 +1907,19 @@ class MainWindow(ctk.CTk):
         if is_new_db:
             try:
                 from shutil import copyfile
-                entities = ("pcs","npcs","scenarios","factions","places","objects","creatures","informations","clues","maps")
+                entities = (
+                    "pcs",
+                    "npcs",
+                    "scenarios",
+                    "factions",
+                    "places",
+                    "objects",
+                    "creatures",
+                    "informations",
+                    "clues",
+                    "maps",
+                    "books",
+                )
                 camp_dir = os.path.abspath(os.path.dirname(new_db_path))
                 tpl_dir = os.path.join(camp_dir, "templates")
                 os.makedirs(tpl_dir, exist_ok=True)

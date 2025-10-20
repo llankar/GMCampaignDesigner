@@ -32,6 +32,7 @@ AUDIO_ENTITY_TYPES = {"npcs", "pcs", "creatures", "places"}
 ATTACHMENT_FIELDS = {
     "clues": "Attachment",
     "informations": "Attachment",
+    "books": "Attachment",
 }
 
 
