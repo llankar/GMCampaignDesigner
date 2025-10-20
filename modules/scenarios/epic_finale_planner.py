@@ -732,9 +732,9 @@ class FinaleBlueprintStep(WizardStep):
         aggregated_npcs = []
         aggregated_factions = []
 
-        callback_scene_index = self._select_callback_scene_index(climax["beats"])
+        callback_scene_index = self._select_callback_scene_index(climax["beats"], rng)
         escalation_scene_index = self._select_escalation_scene_index(
-            climax["beats"], callback_scene_index
+            climax["beats"], callback_scene_index, rng
         )
 
         callback_sentence = f"Callback Beat: {callback}"
@@ -986,7 +986,7 @@ class FinaleBlueprintStep(WizardStep):
 
     # ------------------------------------------------------------------
     @staticmethod
-    def _select_callback_scene_index(beats):
+    def _select_callback_scene_index(beats, rng):
         if not beats:
             return -1
 
@@ -1000,10 +1000,17 @@ class FinaleBlueprintStep(WizardStep):
             "breach",
             "ritual",
         )
+        candidate_indexes = []
         for index in range(len(beats) - 2, -1, -1):
             beat_lower = beats[index].lower()
             if any(keyword in beat_lower for keyword in keywords):
-                return index
+                candidate_indexes.append(index)
+
+        if candidate_indexes:
+            chooser = getattr(rng, "choice", None)
+            if callable(chooser):
+                return chooser(candidate_indexes)
+            return random.choice(candidate_indexes)
 
         if len(beats) >= 2:
             return len(beats) - 2
@@ -1011,17 +1018,23 @@ class FinaleBlueprintStep(WizardStep):
 
     # ------------------------------------------------------------------
     @staticmethod
-    def _select_escalation_scene_index(beats, callback_index):
+    def _select_escalation_scene_index(beats, callback_index, rng):
         if not beats:
             return -1
 
-        final_index = len(beats) - 1
-        if final_index != callback_index:
-            return final_index
+        candidate_indexes = [
+            index for index in range(len(beats)) if index != callback_index
+        ]
+        if not candidate_indexes:
+            return 0
 
-        if final_index - 1 >= 0:
-            return final_index - 1
-        return final_index
+        if len(candidate_indexes) == 1:
+            return candidate_indexes[0]
+
+        chooser = getattr(rng, "choice", None)
+        if callable(chooser):
+            return chooser(candidate_indexes)
+        return random.choice(candidate_indexes)
 
     # ------------------------------------------------------------------
     def _infer_scene_participants(

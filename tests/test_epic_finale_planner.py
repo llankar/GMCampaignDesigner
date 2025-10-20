@@ -153,18 +153,9 @@ def test_scenario_guidance_highlights_callback_and_escalation():
     step.location_var = _StubVariable("Sky Citadel")
     step.title_var = _StubVariable("")
     step.entity_selectors = {}
+    step.wizard = types.SimpleNamespace(wizard_state={"_random_seed": 12345})
 
     scenario = step._build_scenario_from_config()
-
-    callback_index = step._select_callback_scene_index(
-        epic_finale_planner.CLIMAX_STRUCTURES[0]["beats"]
-    )
-    escalation_index = step._select_escalation_scene_index(
-        epic_finale_planner.CLIMAX_STRUCTURES[0]["beats"], callback_index
-    )
-
-    callback_scene = scenario["Scenes"][callback_index]
-    escalation_scene = scenario["Scenes"][escalation_index]
 
     expected_callback = (
         f"Callback Beat: {epic_finale_planner.CALLBACK_TACTICS[1]}"
@@ -172,6 +163,20 @@ def test_scenario_guidance_highlights_callback_and_escalation():
     expected_escalation = (
         f"Escalation Beat: {epic_finale_planner.STAKE_ESCALATIONS[2]}"
     )
+
+    callback_index = next(
+        idx
+        for idx, scene in enumerate(scenario["Scenes"])
+        if expected_callback in scene["Summary"]
+    )
+    escalation_index = next(
+        idx
+        for idx, scene in enumerate(scenario["Scenes"])
+        if expected_escalation in scene["Summary"]
+    )
+
+    callback_scene = scenario["Scenes"][callback_index]
+    escalation_scene = scenario["Scenes"][escalation_index]
 
     assert expected_callback in callback_scene["Summary"]
     assert expected_callback in callback_scene["Text"]
@@ -194,6 +199,7 @@ def test_new_climax_structures_drive_scene_generation():
     step.location_var = _StubVariable("")
     step.title_var = _StubVariable("")
     step.entity_selectors = {}
+    step.wizard = types.SimpleNamespace(wizard_state={"_random_seed": 98765})
 
     scenario = step._build_scenario_from_config()
 
@@ -216,6 +222,7 @@ def test_escalation_summary_and_secrets_alignment():
     step.location_var = _StubVariable("Stormwracked Expanse")
     step.title_var = _StubVariable("")
     step.entity_selectors = {}
+    step.wizard = types.SimpleNamespace(wizard_state={"_random_seed": 54321})
 
     scenario = step._build_scenario_from_config()
 
