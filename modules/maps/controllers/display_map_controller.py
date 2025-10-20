@@ -3,6 +3,7 @@ import json
 import copy
 import re
 import webbrowser
+import threading
 from pathlib import Path
 from tkinter import colorchooser, filedialog, messagebox
 import tkinter as tk
@@ -137,6 +138,7 @@ class DisplayMapController:
         self.brush_shape = "rectangle"
         self.fog_mode    = None
         self.tokens      = [] # List of all items (tokens and shapes)
+        self._persist_lock = threading.Lock()
         
         self.drawing_mode = "token"
         self.shape_is_filled = True

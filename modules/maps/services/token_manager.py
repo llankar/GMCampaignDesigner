@@ -3,6 +3,7 @@ import json
 from PIL import Image
 from tkinter import messagebox, colorchooser
 import os
+import copy
 from modules.helpers.config_helper import ConfigHelper
 from modules.ui.image_viewer import show_portrait
 import tkinter.simpledialog as sd
@@ -469,14 +470,36 @@ def _persist_tokens(self):
             continue
 
     self.current_map["Tokens"] = json.dumps(data)
-    all_maps = list(self._maps.values())
+
+    lock = getattr(self, "_persist_lock", None)
+    if lock is None:
+        lock = threading.Lock()
+        self._persist_lock = lock
+
+    if not lock.acquire(blocking=False):
+        return
+
+    try:
+        all_maps_snapshot = []
+        for m in self._maps.values():
+            try:
+                snapshot = copy.deepcopy(m)
+            except Exception:
+                snapshot = dict(m)
+            all_maps_snapshot.append(snapshot)
+    except Exception as snapshot_error:
+        lock.release()
+        print(f"[persist_tokens] Snapshot error: {snapshot_error}")
+        return
 
     # 2) Fire‐and‐forget the actual disk write so the UI never blocks
-    
+
     def _write_maps():
-            try:
-                    self.maps.save_items(all_maps)
-            except Exception as e:
-                    print(f"[persist_tokens] Background save error: {e}")
+        try:
+            self.maps.save_items(all_maps_snapshot)
+        except Exception as e:
+            print(f"[persist_tokens] Background save error: {e}")
+        finally:
+            lock.release()
 
     threading.Thread(target=_write_maps, daemon=True).start()
