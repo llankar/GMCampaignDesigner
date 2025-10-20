@@ -202,3 +202,25 @@ def test_new_climax_structures_drive_scene_generation():
     for scene, beat in zip(scenario["Scenes"], structure["beats"]):
         assert beat in scene["Summary"]
         assert scene["Summary"] == scene["Text"]
+
+
+def test_escalation_summary_and_secrets_alignment():
+    step = epic_finale_planner.FinaleBlueprintStep.__new__(
+        epic_finale_planner.FinaleBlueprintStep
+    )
+
+    step.climax_var = _StubVariable(epic_finale_planner.CLIMAX_STRUCTURES[1]["name"])
+    step.callback_var = _StubVariable(epic_finale_planner.CALLBACK_TACTICS[0])
+    step.escalation_var = _StubVariable(epic_finale_planner.STAKE_ESCALATIONS[-1])
+    step.location_var = _StubVariable("Stormwracked Expanse")
+    step.title_var = _StubVariable("")
+    step.entity_selectors = {}
+
+    scenario = step._build_scenario_from_config()
+
+    escalation_text = epic_finale_planner.STAKE_ESCALATIONS[-1]
+    assert escalation_text in scenario["Summary"]
+
+    secrets_lines = scenario["Secrets"].splitlines()
+    assert secrets_lines[0] == escalation_text
+    assert secrets_lines[1] == epic_finale_planner.CALLBACK_TACTICS[0]
