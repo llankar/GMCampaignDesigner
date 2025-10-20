@@ -2824,6 +2824,137 @@ class DisplayMapController:
                     f"Rendered {entry.get('type')} at world {entry.get('world_position')} screen={entry.get('screen_position')} details={entry}.",
                     func_name="DisplayMapController._update_canvas_images",
                 )
+            def _key_entry(entry):
+                item_type = entry.get("type")
+                if item_type == "token":
+                    return (item_type, entry.get("entity_id"))
+                if item_type == "marker":
+                    return (item_type, entry.get("text"), entry.get("linked_map"))
+                if item_type in ("rectangle", "oval"):
+                    world = entry.get("world_position")
+                    if isinstance(world, (list, tuple)):
+                        world = tuple(world)
+                    return (item_type, world)
+                return None
+
+            def _compute_screen(world_pos):
+                if isinstance(world_pos, (list, tuple)) and len(world_pos) >= 2:
+                    try:
+                        return (
+                            int(world_pos[0] * self.zoom + self.pan_x),
+                            int(world_pos[1] * self.zoom + self.pan_y),
+                        )
+                    except Exception:
+                        return None
+                return None
+
+            def _index_entries(entries, *, compute_screen=False):
+                index = {}
+                for entry in entries:
+                    key = _key_entry(entry)
+                    if key is None:
+                        continue
+                    world_pos = entry.get("world_position")
+                    if isinstance(world_pos, (list, tuple)):
+                        world_tuple = tuple(world_pos)
+                    else:
+                        world_tuple = None
+                    screen_pos = entry.get("screen_position") if not compute_screen else _compute_screen(world_pos)
+                    index.setdefault(key, []).append(
+                        {
+                            "entry": entry,
+                            "world": world_tuple,
+                            "screen": screen_pos,
+                        }
+                    )
+                return index
+
+            expected_index = _index_entries(expected, compute_screen=True)
+            rendered_index = _index_entries(rendered, compute_screen=False)
+
+            def _identifier_details(item_type, entry):
+                if item_type == "token":
+                    return f"entity_type={entry.get('entity_type')}, entity_id={entry.get('entity_id')}"
+                if item_type == "marker":
+                    return f"text={entry.get('text')!r}, linked_map={entry.get('linked_map')!r}"
+                if item_type in ("rectangle", "oval"):
+                    width = entry.get("width")
+                    height = entry.get("height")
+                    if width is not None or height is not None:
+                        return f"width={width}, height={height}"
+                return ""
+
+            expected_keys = set(expected_index.keys())
+            rendered_keys = set(rendered_index.keys())
+
+            for missing_key in expected_keys - rendered_keys:
+                for info in expected_index.get(missing_key, []):
+                    entry = info["entry"]
+                    item_type = entry.get("type")
+                    identifiers = _identifier_details(item_type, entry)
+                    world = info.get("world")
+                    screen = info.get("screen")
+                    log_warning(
+                        f"Missing rendered {item_type} ({identifiers}) expected at world {world} screen {screen} for key {missing_key}.",
+                        func_name="DisplayMapController._update_canvas_images",
+                    )
+
+            for unexpected_key in rendered_keys - expected_keys:
+                for info in rendered_index.get(unexpected_key, []):
+                    entry = info["entry"]
+                    item_type = entry.get("type")
+                    identifiers = _identifier_details(item_type, entry)
+                    world = info.get("world")
+                    screen = info.get("screen")
+                    log_warning(
+                        f"Unexpected rendered {item_type} ({identifiers}) at world {world} screen {screen} for key {unexpected_key}.",
+                        func_name="DisplayMapController._update_canvas_images",
+                    )
+
+            for common_key in expected_keys & rendered_keys:
+                expected_entries = expected_index.get(common_key, [])
+                rendered_entries = rendered_index.get(common_key, [])
+                pair_count = min(len(expected_entries), len(rendered_entries))
+                for idx in range(pair_count):
+                    exp_info = expected_entries[idx]
+                    ren_info = rendered_entries[idx]
+                    exp_entry = exp_info["entry"]
+                    ren_entry = ren_info["entry"]
+                    item_type = exp_entry.get("type") or ren_entry.get("type")
+                    identifiers = _identifier_details(item_type, exp_entry or ren_entry)
+                    exp_world = exp_info.get("world")
+                    exp_screen = exp_info.get("screen")
+                    ren_world = ren_info.get("world")
+                    ren_screen = ren_info.get("screen")
+                    if exp_world != ren_world or exp_screen != ren_screen:
+                        log_info(
+                            f"Repositioned {item_type} ({identifiers}) key {common_key}: expected world {exp_world} screen {exp_screen}, rendered world {ren_world} screen {ren_screen}.",
+                            func_name="DisplayMapController._update_canvas_images",
+                        )
+
+                if len(expected_entries) > pair_count:
+                    for extra in expected_entries[pair_count:]:
+                        entry = extra["entry"]
+                        item_type = entry.get("type")
+                        identifiers = _identifier_details(item_type, entry)
+                        world = extra.get("world")
+                        screen = extra.get("screen")
+                        log_warning(
+                            f"Missing rendered {item_type} ({identifiers}) expected at world {world} screen {screen} for key {common_key} (extra expected instance).",
+                            func_name="DisplayMapController._update_canvas_images",
+                        )
+                if len(rendered_entries) > pair_count:
+                    for extra in rendered_entries[pair_count:]:
+                        entry = extra["entry"]
+                        item_type = entry.get("type")
+                        identifiers = _identifier_details(item_type, entry)
+                        world = extra.get("world")
+                        screen = extra.get("screen")
+                        log_warning(
+                            f"Unexpected rendered {item_type} ({identifiers}) at world {world} screen {screen} for key {common_key} (extra rendered instance).",
+                            func_name="DisplayMapController._update_canvas_images",
+                        )
+
             if len(rendered) != len(expected):
                 log_warning(
                     f"Render count mismatch for map '{map_name}': expected {len(expected)} items but drew {len(rendered)}.",
