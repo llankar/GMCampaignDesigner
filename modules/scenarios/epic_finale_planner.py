@@ -741,7 +741,7 @@ class FinaleBlueprintStep(WizardStep):
         escalation_sentence = f"Escalation Beat: {escalation}"
 
         gm_guidance_per_scene = self._distribute_guidance_across_beats(
-            len(climax["beats"]), gm_guidance_sentences
+            climax["beats"], gm_guidance_sentences, rng
         )
 
         for idx, beat in enumerate(climax["beats"], start=1):
@@ -863,7 +863,8 @@ class FinaleBlueprintStep(WizardStep):
         return sentences
 
     # ------------------------------------------------------------------
-    def _distribute_guidance_across_beats(self, beat_count, guidance_sentences):
+    def _distribute_guidance_across_beats(self, beats, guidance_sentences, rng):
+        beat_count = len(beats or [])
         if beat_count <= 0:
             return []
 
@@ -871,10 +872,59 @@ class FinaleBlueprintStep(WizardStep):
         if not guidance_sentences:
             return per_scene
 
-        for index, sentence in enumerate(guidance_sentences):
+        sampler = getattr(rng, "sample", None)
+        if callable(sampler):
+            shuffled = sampler(guidance_sentences, len(guidance_sentences))
+        else:
+            shuffled = random.sample(guidance_sentences, len(guidance_sentences))
+
+        beats_lower = [str(beat or "").lower() for beat in beats]
+        chooser = getattr(rng, "choice", None)
+        unmatched = []
+
+        for sentence in shuffled:
+            subject = self._extract_guidance_subject(sentence)
+            if not subject:
+                unmatched.append(sentence)
+                continue
+
+            matching_indexes = [
+                index
+                for index, beat_lower in enumerate(beats_lower)
+                if subject in beat_lower
+            ]
+
+            if not matching_indexes:
+                unmatched.append(sentence)
+                continue
+
+            if callable(chooser):
+                target_index = chooser(matching_indexes)
+            else:
+                target_index = random.choice(matching_indexes)
+            per_scene[target_index].append(sentence)
+
+        for index, sentence in enumerate(unmatched):
             scene_index = index % beat_count
             per_scene[scene_index].append(sentence)
         return per_scene
+
+    # ------------------------------------------------------------------
+    @staticmethod
+    def _extract_guidance_subject(sentence):
+        text = (sentence or "").strip()
+        if not text:
+            return ""
+
+        prefix = "GM Guidance:"
+        if text.startswith(prefix):
+            remainder = text[len(prefix) :].strip()
+        else:
+            remainder = text
+
+        subject, _, _ = remainder.partition("'s")
+        subject = subject.strip().lower()
+        return subject
 
     # ------------------------------------------------------------------
     def _get_cached_entities(self, attribute):
