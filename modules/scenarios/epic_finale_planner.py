@@ -436,11 +436,13 @@ class FinaleBlueprintStep(WizardStep):
             return ", ".join(values) if values else "None"
 
         npcs = normalise(scene.get("NPCs")) if isinstance(scene, dict) else []
+        factions = normalise(scene.get("Factions")) if isinstance(scene, dict) else []
         places = normalise(scene.get("Places")) if isinstance(scene, dict) else []
         creatures = normalise(scene.get("Creatures")) if isinstance(scene, dict) else []
 
         return [
             f"    NPCs: {join(npcs)}",
+            f"    Factions: {join(factions)}",
             f"    Places: {join(places)}",
             f"    Creatures: {join(creatures)}",
         ]
@@ -599,10 +601,19 @@ class FinaleBlueprintStep(WizardStep):
         ]
 
         scenes = []
+        aggregated_npcs = []
+        aggregated_factions = []
         for idx, beat in enumerate(climax["beats"], start=1):
             beat_text = self._personalise_beat(beat, primary_antagonist, primary_ally, location)
             scene_title = self._scene_title(idx, beat_text)
-            scene_npcs = self._deduplicate_preserve_order(antagonists + npc_allies)
+            scene_npcs, scene_factions = self._infer_scene_participants(
+                beat,
+                antagonists,
+                npc_allies,
+                allied_factions,
+            )
+            aggregated_npcs.extend(scene_npcs)
+            aggregated_factions.extend(scene_factions)
             scenes.append(
                 {
                     "Title": scene_title,
@@ -613,6 +624,7 @@ class FinaleBlueprintStep(WizardStep):
                     "Places": [location] if location else [],
                     "Creatures": [],
                     "Maps": [],
+                    "Factions": scene_factions,
                 }
             )
 
@@ -624,9 +636,9 @@ class FinaleBlueprintStep(WizardStep):
             "Secrets": "\n".join(secrets),
             "Scenes": scenes,
             "Places": [location] if location else [],
-            "NPCs": self._deduplicate_preserve_order(antagonists + npc_allies),
+            "NPCs": self._deduplicate_preserve_order(aggregated_npcs or (antagonists + npc_allies)),
             "Creatures": [],
-            "Factions": allied_factions,
+            "Factions": self._deduplicate_preserve_order(aggregated_factions or allied_factions),
             "Objects": [],
         }
 
@@ -661,6 +673,82 @@ class FinaleBlueprintStep(WizardStep):
             beat_text = beat_text.replace("battlefield", location)
             beat_text = beat_text.replace("battleground", location)
         return beat_text
+
+    # ------------------------------------------------------------------
+    def _infer_scene_participants(self, beat, antagonists, npc_allies, allied_factions):
+        beat_lower = (beat or "").lower()
+
+        def name_in_text(name):
+            if not name:
+                return False
+            return name.lower() in beat_lower
+
+        antagonist_keywords = {
+            "antagonist",
+            "villain",
+            "enemy",
+            "mastermind",
+            "traitor",
+            "opponent",
+            "conspirator",
+            "commander",
+        }
+        ally_keywords = {
+            "allies",
+            "ally",
+            "allied",
+            "support",
+            "reinforcement",
+            "reinforcements",
+            "defenders",
+            "friends",
+            "aid",
+            "backup",
+            "supporting",
+            "supporters",
+            "forces",
+            "army",
+            "squad",
+            "faction",
+        }
+        faction_keywords = {
+            "faction",
+            "coalition",
+            "order",
+            "guild",
+            "clan",
+            "alliance",
+            "cabal",
+            "council",
+            "forces",
+        }
+
+        include_antagonists = bool(antagonists) and (
+            any(keyword in beat_lower for keyword in antagonist_keywords)
+            or any(name_in_text(name) for name in antagonists)
+        )
+        include_allies = bool(npc_allies) and (
+            any(keyword in beat_lower for keyword in ally_keywords)
+            or any(name_in_text(name) for name in npc_allies)
+        )
+        include_factions = bool(allied_factions) and (
+            any(keyword in beat_lower for keyword in faction_keywords)
+            or any(name_in_text(name) for name in allied_factions)
+            or include_allies
+        )
+
+        scene_npcs = []
+        scene_factions = []
+        if include_antagonists:
+            scene_npcs.extend(antagonists)
+        if include_allies:
+            scene_npcs.extend(npc_allies)
+        if include_factions:
+            scene_factions.extend(allied_factions)
+
+        scene_npcs = self._deduplicate_preserve_order(scene_npcs)
+        scene_factions = self._deduplicate_preserve_order(scene_factions)
+        return scene_npcs, scene_factions
 
     # ------------------------------------------------------------------
     @staticmethod
