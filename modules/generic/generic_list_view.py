@@ -26,6 +26,11 @@ from modules.ai.authoring_wizard import AuthoringWizardView
 from modules.ai.local_ai_client import LocalAIClient
 import shutil
 from modules.helpers.template_loader import load_template
+from modules.books.book_importer import (
+    extract_text_from_book,
+    prepare_books_from_directory,
+    prepare_books_from_files,
+)
 from modules.helpers.logging_helper import (
     log_debug,
     log_function,
@@ -239,6 +244,17 @@ class GenericListView(ctk.CTkFrame):
             ctk.CTkButton(self.search_frame, text="Import Directory",
                           command=self.import_map_directory)\
                 .pack(side="left", padx=5)
+        if self.model_wrapper.entity_type == "books":
+            ctk.CTkButton(
+                self.search_frame,
+                text="Import PDFs…",
+                command=self.import_books_from_files_dialog,
+            ).pack(side="left", padx=5)
+            ctk.CTkButton(
+                self.search_frame,
+                text="Import Folder…",
+                command=self.import_books_from_directory_dialog,
+            ).pack(side="left", padx=5)
         if self.model_wrapper.entity_type in ("npcs", "scenarios"):
             ctk.CTkButton(self.search_frame, text="AI Wizard",
                           command=self.open_ai_wizard)\
@@ -1380,6 +1396,193 @@ class GenericListView(ctk.CTkFrame):
             messagebox.showinfo("Import Complete", f"Imported {len(new_items)} maps from directory.")
         else:
             messagebox.showwarning("No Images Found", "No supported image files were found in the selected directory.")
+
+    def import_books_from_files_dialog(self):
+        if self.model_wrapper.entity_type != "books":
+            return
+        log_info("Importing books from file selection", func_name="GenericListView.import_books_from_files_dialog")
+        file_paths = filedialog.askopenfilenames(
+            title="Select PDF Files",
+            filetypes=[("PDF Files", "*.pdf"), ("All Files", "*.*")],
+        )
+        if not file_paths:
+            return
+        try:
+            records = prepare_books_from_files(file_paths, campaign_dir=ConfigHelper.get_campaign_dir())
+        except Exception as exc:
+            messagebox.showerror("Import PDFs", f"Failed to prepare books:\n{exc}")
+            return
+        self._persist_imported_books(records)
+
+    def import_books_from_directory_dialog(self):
+        if self.model_wrapper.entity_type != "books":
+            return
+        log_info("Importing books from directory", func_name="GenericListView.import_books_from_directory_dialog")
+        dir_path = filedialog.askdirectory(title="Select Folder Containing PDFs")
+        if not dir_path:
+            return
+        try:
+            records = prepare_books_from_directory(dir_path, campaign_dir=ConfigHelper.get_campaign_dir())
+        except Exception as exc:
+            messagebox.showerror("Import Folder", f"Failed to prepare books:\n{exc}")
+            return
+        self._persist_imported_books(records)
+
+    def _persist_imported_books(self, records):
+        records = [rec for rec in records if isinstance(rec, dict)]
+        if not records:
+            messagebox.showinfo("Import Books", "No new PDF files were found to import.")
+            return
+
+        try:
+            existing_items = self.model_wrapper.load_items()
+        except Exception as exc:
+            messagebox.showerror("Import Books", f"Failed to load existing books:\n{exc}")
+            return
+
+        existing_by_title = {}
+        for item in existing_items:
+            title = item.get("Title")
+            if isinstance(title, str):
+                existing_by_title[title.casefold()] = item
+
+        to_save = []
+        titles_for_indexing = []
+        for record in records:
+            title = record.get("Title", "")
+            if not isinstance(title, str) or not title.strip():
+                continue
+            key = title.casefold()
+            titles_for_indexing.append(title)
+            if key in existing_by_title:
+                merged = dict(existing_by_title[key])
+                merged.update(record)
+                to_save.append(merged)
+            else:
+                to_save.append(record)
+
+        if not to_save:
+            messagebox.showinfo("Import Books", "All selected books are already in the library.")
+            return
+
+        try:
+            self.model_wrapper.save_items(to_save, replace=False)
+        except Exception as exc:
+            messagebox.showerror("Import Books", f"Failed to save imported books:\n{exc}")
+            return
+
+        self.items = self.model_wrapper.load_items()
+        self.filter_items(self.search_var.get())
+        messagebox.showinfo(
+            "Import Books",
+            f"Imported {len(to_save)} book(s). Indexing will continue in the background.",
+        )
+        self._queue_book_indexing(titles_for_indexing)
+
+    def _queue_book_indexing(self, titles):
+        filtered_titles = [t.strip() for t in titles if isinstance(t, str) and t.strip()]
+        if not filtered_titles:
+            return
+
+        title_lookup = {t.casefold(): t for t in filtered_titles}
+
+        def worker():
+            try:
+                items = self.model_wrapper.load_items()
+            except Exception as exc:
+                log_warning(
+                    f"Failed to load books for indexing: {exc}",
+                    func_name="GenericListView._queue_book_indexing",
+                )
+                return
+
+            campaign_dir = ConfigHelper.get_campaign_dir()
+            target_records = []
+            for item in items:
+                title = item.get("Title")
+                if not isinstance(title, str):
+                    continue
+                if title.casefold() not in title_lookup:
+                    continue
+                target_records.append(dict(item))
+
+            if not target_records:
+                return
+
+            prepping = []
+            for record in target_records:
+                update = dict(record)
+                update["IndexStatus"] = "indexing"
+                prepping.append(update)
+
+            if prepping:
+                try:
+                    self.model_wrapper.save_items(prepping, replace=False)
+                except Exception as exc:
+                    log_warning(
+                        f"Failed to mark books as indexing: {exc}",
+                        func_name="GenericListView._queue_book_indexing",
+                    )
+                    return
+
+            final_updates = []
+            success = 0
+            failures = []
+            for record in target_records:
+                attachment = record.get("Attachment", "")
+                try:
+                    page_count, extracted_text, extracted_pages = extract_text_from_book(
+                        attachment, campaign_dir=campaign_dir
+                    )
+                    update = dict(record)
+                    update["PageCount"] = page_count
+                    update["ExtractedText"] = extracted_text
+                    update["ExtractedPages"] = extracted_pages
+                    update["IndexStatus"] = "indexed"
+                    final_updates.append(update)
+                    success += 1
+                except Exception as exc:
+                    log_warning(
+                        f"Failed to index book '{record.get('Title', 'Unknown')}': {exc}",
+                        func_name="GenericListView._queue_book_indexing",
+                    )
+                    update = dict(record)
+                    update.setdefault("ExtractedText", "")
+                    update.setdefault("ExtractedPages", [])
+                    update["IndexStatus"] = f"error: {exc}"
+                    final_updates.append(update)
+                    failures.append((record.get("Title"), str(exc)))
+
+            if final_updates:
+                try:
+                    self.model_wrapper.save_items(final_updates, replace=False)
+                except Exception as exc:
+                    log_warning(
+                        f"Failed to persist indexed books: {exc}",
+                        func_name="GenericListView._queue_book_indexing",
+                    )
+                    return
+
+            self.after(0, lambda: self._on_book_indexing_complete(success, failures))
+
+        threading.Thread(target=worker, daemon=True).start()
+
+    def _on_book_indexing_complete(self, success_count, failures):
+        try:
+            self.items = self.model_wrapper.load_items()
+        except Exception as exc:
+            messagebox.showerror("Book Indexing", f"Failed to refresh books after indexing:\n{exc}")
+            return
+        self.filter_items(self.search_var.get())
+
+        if failures:
+            failed_titles = ", ".join(title or "(Unknown)" for title, _ in failures[:5])
+            if len(failures) > 5:
+                failed_titles += ", …"
+            message = [f"Indexed {success_count} book(s).", f"Failed to index {len(failures)} book(s): {failed_titles}."]
+            messagebox.showwarning("Book Indexing", "\n".join(message))
+        else:
+            messagebox.showinfo("Book Indexing", f"Indexed {success_count} book(s).")
 
     def _copy_map_image(self, src_path, image_name):
         campaign_dir = ConfigHelper.get_campaign_dir()

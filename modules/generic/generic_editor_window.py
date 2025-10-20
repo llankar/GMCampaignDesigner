@@ -214,6 +214,7 @@ class GenericEditorWindow(ctk.CTkToplevel):
         self.saved = False
         self.model_wrapper = model_wrapper
         self.field_widgets = {}
+        self._file_field_info = {}
         
         self.transient(master)
         self.lift()
@@ -761,23 +762,40 @@ class GenericEditorWindow(ctk.CTkToplevel):
         frame = ctk.CTkFrame(self.scroll_frame)
         frame.pack(fill="x", pady=5)
 
-        # load existing attachment name (if any)
-        self.attachment_filename = self.item.get(field["name"], "")
-        label_text = os.path.basename(self.attachment_filename) or "[No Attachment]"
+        field_name = field.get("name")
+        storage_subdir = (field.get("storage_subdir") or "").strip()
 
-        self.attach_label = ctk.CTkLabel(frame, text=label_text)
-        self.attach_label.pack(side="left", padx=5)
+        raw_value = self.item.get(field_name, "") or ""
+        normalized = self._campaign_relative_path(raw_value)
+        if normalized and not normalized.startswith(".."):
+            label_text = os.path.basename(normalized)
+            abs_candidate = Path(ConfigHelper.get_campaign_dir()) / Path(normalized)
+            if not abs_candidate.exists():
+                label_text = f"{label_text} (missing)"
+        elif raw_value:
+            label_text = os.path.basename(str(raw_value))
+        else:
+            label_text = "[No Attachment]"
+
+        label_widget = ctk.CTkLabel(frame, text=label_text)
+        label_widget.pack(side="left", padx=5)
 
         ctk.CTkButton(
             frame,
             text="Browse Attachment",
-            command=self.select_attachment
+            command=lambda: self.select_attachment(field_name, label_widget, storage_subdir)
         ).pack(side="left", padx=5)
 
-        # placeholder so save() sees the key
-        self.field_widgets[field["name"]] = None
+        self._file_field_info[field_name] = {
+            "path": normalized,
+            "label": label_widget,
+            "storage_subdir": storage_subdir,
+        }
 
-    def select_attachment(self):
+        # placeholder so save() sees the key
+        self.field_widgets[field_name] = label_widget
+
+    def select_attachment(self, field_name, label_widget, storage_subdir):
         file_path = filedialog.askopenfilename(
             title="Select Attachment",
             filetypes=[("All Files", "*.*")]
@@ -787,19 +805,28 @@ class GenericEditorWindow(ctk.CTkToplevel):
 
         # ensure upload folder
         campaign_dir = ConfigHelper.get_campaign_dir()
-        upload_folder = os.path.join(campaign_dir, "assets", "uploads")
+        subdir = storage_subdir or "uploads"
+        upload_folder = os.path.join(campaign_dir, "assets", subdir)
         os.makedirs(upload_folder, exist_ok=True)
 
-        # copy into uploads/
         filename = os.path.basename(file_path)
+        name, ext = os.path.splitext(filename)
         dest = os.path.join(upload_folder, filename)
+        counter = 1
+        while os.path.exists(dest):
+            filename = f"{name}_{counter}{ext}"
+            dest = os.path.join(upload_folder, filename)
+            counter += 1
         try:
-            shutil.copy(file_path, dest)
-            self.attachment_filename = filename
-            self.attach_label.configure(text=filename)
+            shutil.copy2(file_path, dest)
+            rel_path = os.path.relpath(dest, campaign_dir).replace("\\", "/")
+            info = self._file_field_info.setdefault(field_name, {})
+            info["path"] = rel_path
+            info["storage_subdir"] = storage_subdir
+            label_widget.configure(text=os.path.basename(filename))
         except Exception as e:
             messagebox.showerror("Error", f"Could not copy file:\n{e}")
-    
+
     def create_boolean_field(self, field):
         # Define the two possible dropdown options.
         options = ["True", "False"]
@@ -1105,6 +1132,8 @@ class GenericEditorWindow(ctk.CTkToplevel):
             label_text = f"Add {fname}"
 
         initial_values = self.item.get(field["name"]) or []
+        if isinstance(initial_values, str):
+            initial_values = [val.strip() for val in initial_values.split(",") if val.strip()]
 
         def remove_this(row, entry_widget):
             row.destroy()
@@ -1138,19 +1167,21 @@ class GenericEditorWindow(ctk.CTkToplevel):
             row.pack(fill="x", pady=2)
 
             var = ctk.StringVar()
-            entry = ctk.CTkEntry(row, textvariable=var, state="readonly")
+            state = "normal" if not options_list else "readonly"
+            entry = ctk.CTkEntry(row, textvariable=var, state=state)
             entry.pack(side="left", expand=True, fill="x")
 
-            # open the dropdown on click *or* focus for EVERY dynamic combobox:
-            entry.bind("<Button-1>",  lambda e, w=entry, v=var: open_dropdown(w, v))
+            if options_list:
+                entry.bind("<Button-1>",  lambda e, w=entry, v=var: open_dropdown(w, v))
 
-            if initial_value and initial_value in options_list:
+            if initial_value:
                 var.set(initial_value)
             elif options_list:
                 var.set(options_list[0])
 
-            btn = ctk.CTkButton(row, text="▼", width=30, command=lambda: open_dropdown(entry, var))
-            btn.pack(side="left", padx=5)
+            if options_list:
+                btn = ctk.CTkButton(row, text="▼", width=30, command=lambda: open_dropdown(entry, var))
+                btn.pack(side="left", padx=5)
 
             remove_btn = ctk.CTkButton(row, text="-", width=30, command=lambda: remove_this(row, entry))
             remove_btn.pack(side="left", padx=5)
@@ -1267,12 +1298,34 @@ class GenericEditorWindow(ctk.CTkToplevel):
                     self.item[field_name] = ""
                 else:
                     self.item[field_name] = data
-            elif field_name in ["Places", "NPCs", "Factions", "Objects", "Creatures", "PCs"] or \
-                 (field_type == "list" and field.get("linked_type")):
-                self.item[field_name] = [cb.get() for cb in widget if cb.get()]
+            elif field_type == "list":
+                values = []
+                if isinstance(widget, list):
+                    for entry in widget:
+                        if hasattr(entry, "get"):
+                            raw = entry.get()
+                        else:
+                            raw = entry
+                        if raw:
+                            values.append(raw)
+                elif hasattr(widget, "get"):
+                    raw = widget.get()
+                    if raw:
+                        values.append(raw)
+
+                if field_name == "Tags":
+                    tags = []
+                    for value in values:
+                        tags.extend(
+                            [tag.strip() for tag in str(value).split(",") if tag.strip()]
+                        )
+                    self.item[field_name] = tags
+                else:
+                    self.item[field_name] = values
             elif field_type == "file":
-                # store the filename (not full path) into the model
-                self.item[field_name] = getattr(self, "attachment_filename", "")
+                file_info = self._file_field_info.get(field_name, {})
+                stored_path = file_info.get("path", "")
+                self.item[field_name] = self._campaign_relative_path(stored_path)
             elif field_type == "audio" or field_name.lower() == "audio":
                 value = widget.get() if hasattr(widget, "get") else str(widget)
                 self.item[field_name] = self._campaign_relative_path(value)
