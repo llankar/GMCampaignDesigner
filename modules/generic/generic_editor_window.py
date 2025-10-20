@@ -185,6 +185,10 @@ def load_objects_list():
 def load_creatures_list():
     return load_entities_list("creatures")
 
+@log_function
+def load_books_list():
+    return load_entities_list("books")
+
 """
 A customizable editor window for creating and editing generic items with dynamic field generation.
 
@@ -1127,6 +1131,9 @@ class GenericEditorWindow(ctk.CTkToplevel):
         elif linked == "Creatures" or fname == "Creatures":
             options_list = load_creatures_list()
             label_text = f"Add {linked or 'Creature'}"
+        elif linked == "Books" or fname == "Books":
+            options_list = load_books_list()
+            label_text = f"Add {linked or 'Book'}"
         else:
             options_list = []
             label_text = f"Add {fname}"

@@ -143,11 +143,13 @@ _DEFAULT_WRAPPER_FACTORIES: Sequence[tuple[str, str]] = (
     ("Clues", "clues"),
     ("Informations", "informations"),
     ("Objects", "Objects"),
+    ("Books", "books"),
 )
 
 _DEFAULT_NAME_FIELD_OVERRIDES: Mapping[str, str] = {
     "Scenarios": "Title",
     "Informations": "Title",
+    "Books": "Title",
 }
 
 _NOTE_FIELD_CANDIDATES: Sequence[str] = (
@@ -341,6 +343,11 @@ _DEFAULT_SECTION_FIELDS: Mapping[str, Sequence[tuple[str, tuple[str, ...]]]] = {
             ("NPCs", "Creatures", "Factions", "Allies", "Enemies", "Objects"),
         ),
     ),
+    "Books": (
+        ("Details", ("Title", "Subject", "Game", "Tags", "Authors")),
+        ("Notes", tuple(dict.fromkeys((*_NOTE_FIELD_CANDIDATES, "Synopsis", "Summary", "Notes")))),
+        ("Content", ("ExtractedText", "ExtractedPages", "Contents", "Text")),
+    ),
     "Scenarios": (
         ("Overview", tuple(dict.fromkeys((*_NOTE_FIELD_CANDIDATES, "Synopsis", "Setup")))),
         ("Role", ("Type", "Theme", "Tone")),
@@ -506,6 +513,7 @@ class ChatbotDialog(ctk.CTkToplevel):
         self._notes_widget: tk.Text | None = None
         self._item_cache: dict[str, list[Mapping[str, Any]]] = {}
         self._search_cache: dict[str, list[str]] = {}
+        self._books_only_var = tk.BooleanVar(self, False)
 
         self._build_ui()
         log_info(
@@ -539,6 +547,14 @@ class ChatbotDialog(ctk.CTkToplevel):
         self.query_entry.bind("<Return>", self._on_submit)
         self.query_entry.bind("<KP_Enter>", self._on_submit)
         self.query_entry.bind("<Down>", self._focus_results)
+
+        self.books_only_checkbox = ctk.CTkCheckBox(
+            header,
+            text="Show only books",
+            variable=self._books_only_var,
+            command=self._on_scope_changed,
+        )
+        self.books_only_checkbox.grid(row=3, column=0, columnspan=2, sticky="w", pady=(8, 0))
 
         results_frame = ctk.CTkFrame(self)
         results_frame.grid(row=1, column=0, sticky="nsew", padx=12, pady=(0, 8))
@@ -662,6 +678,10 @@ class ChatbotDialog(ctk.CTkToplevel):
         query = self.query_entry.get().strip().lower()
         self._populate(initial=(query == ""), query=query)
 
+    def _on_scope_changed(self) -> None:
+        query = self.query_entry.get().strip().lower()
+        self._populate(initial=(query == ""), query=query)
+
     def _on_submit(self, _event=None) -> None:
         self._display_selected_note()
 
@@ -684,7 +704,11 @@ class ChatbotDialog(ctk.CTkToplevel):
             self._render_text(RichTextValue("No data sources are available for the chatbot."))
             return
 
+        limit_to_books = bool(self._books_only_var.get()) if hasattr(self, "_books_only_var") else False
+
         for entity_type, wrapper in self._wrappers.items():
+            if limit_to_books and entity_type != "Books":
+                continue
             if entity_type not in self._item_cache:
                 try:
                     items = list(wrapper.load_items())
@@ -756,13 +780,20 @@ class ChatbotDialog(ctk.CTkToplevel):
     def _build_search_blob(self, entity_type: str, record: Mapping[str, Any]) -> str:
         parts: list[str] = []
 
+        def append_chunked_text(text: str, *, chunk_size: int = 1200) -> None:
+            stripped = text.strip()
+            if not stripped:
+                return
+            for start_idx in range(0, len(stripped), chunk_size):
+                chunk = stripped[start_idx:start_idx + chunk_size]
+                if chunk:
+                    parts.append(chunk.lower())
+
         def visit(value: Any) -> None:
             if value is None:
                 return
             if isinstance(value, str):
-                stripped = value.strip()
-                if stripped:
-                    parts.append(stripped.lower())
+                append_chunked_text(value)
                 return
             if isinstance(value, Mapping):
                 for key, inner in value.items():
@@ -775,9 +806,28 @@ class ChatbotDialog(ctk.CTkToplevel):
                 return
             parts.append(str(value).lower())
 
+        def visit_extracted(value: Any) -> None:
+            if value is None:
+                return
+            if isinstance(value, str):
+                append_chunked_text(value)
+                return
+            if isinstance(value, Mapping):
+                for inner in value.values():
+                    visit_extracted(inner)
+                return
+            if isinstance(value, (list, tuple, set)):
+                for item in value:
+                    visit_extracted(item)
+                return
+            append_chunked_text(str(value))
+
         for key, val in record.items():
             parts.append(str(key).lower())
-            visit(val)
+            if entity_type == "Books" and key in {"ExtractedText", "ExtractedPages"}:
+                visit_extracted(val)
+            else:
+                visit(val)
 
         blob = " ".join(parts)
         log_debug(

@@ -19,6 +19,7 @@ from modules.audio.entity_audio import (
     resolve_audio_path,
     stop_entity_audio,
 )
+from modules.books.book_viewer import open_book_viewer
 from modules.helpers.logging_helper import (
     log_function,
     log_info,
@@ -92,6 +93,27 @@ wrappers = {
 }
 
 @log_function
+def _open_book_link(parent, book_title: str) -> None:
+    title = str(book_title or "").strip()
+    if not title:
+        return
+    wrapper = wrappers.get("Books")
+    if wrapper is None:
+        messagebox.showerror("Books", "Book library is not available.")
+        return
+    try:
+        items = list(wrapper.load_items())
+    except Exception as exc:
+        messagebox.showerror("Books", f"Unable to load books: {exc}")
+        return
+    record = next((item for item in items if str(item.get("Title", "")).strip() == title), None)
+    if not record:
+        messagebox.showerror("Books", f"Book '{title}' not found.")
+        return
+    master = parent.winfo_toplevel() if parent is not None else None
+    open_book_viewer(master, record)
+
+@log_function
 def insert_text(parent, header, content):
     label = ctk.CTkLabel(parent, text=f"{header}:", font=("Arial", 16, "bold"))
     label.pack(anchor="w", padx=10)
@@ -144,11 +166,16 @@ def insert_longtext(parent, header, content):
 def insert_links(parent, header, items, linked_type, open_entity_callback):
     ctk.CTkLabel(parent, text=f"{header}:", font=("Arial", 14, "bold")).pack(anchor="w", padx=10)
     for item in items:
-        label = CTkLabel(parent, text=item, text_color="#00BFFF", cursor="hand2")
+        display_text = str(item)
+        if not display_text:
+            continue
+        label = CTkLabel(parent, text=display_text, text_color="#00BFFF", cursor="hand2")
         label.pack(anchor="w", padx=10)
-        if open_entity_callback is not None:
+        if linked_type == "Books":
+            label.bind("<Button-1>", lambda _event, title=display_text: _open_book_link(parent, title))
+        elif open_entity_callback is not None:
             # Capture the current values with lambda defaults.
-            label.bind("<Button-1>", lambda event, l=linked_type, i=item: open_entity_callback(l, i))
+            label.bind("<Button-1>", lambda event, l=linked_type, i=display_text: open_entity_callback(l, i))
 
 
 @log_function

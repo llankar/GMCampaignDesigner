@@ -8,7 +8,8 @@
       {"name": "NPCs", "type": "list", "linked_type": "NPCs"},
       {"name": "Creatures", "type": "list", "linked_type": "Creatures"},
       {"name": "Factions", "type": "list", "linked_type": "Factions"},
-      {"name": "Objects", "type": "list", "linked_type": "Objects"}
-      
+      {"name": "Objects", "type": "list", "linked_type": "Objects"},
+      {"name": "Books", "type": "list", "linked_type": "Books"}
+
   ]
 }
