@@ -61,6 +61,7 @@ GM_SCREEN_ENTITY_TYPES = {
     "objects": "Objects",
     "clues": "Clues",
     "informations": "Informations",
+    "books": "Books",
 }
 
 ENTITY_DISPLAY_LABELS = {
@@ -74,6 +75,7 @@ ENTITY_DISPLAY_LABELS = {
     "clues": "Clues",
     "informations": "Informations",
     "maps": "Maps",
+    "books": "Books",
 }
 
 AI_CATEGORIZE_BATCH_SIZE = 20
