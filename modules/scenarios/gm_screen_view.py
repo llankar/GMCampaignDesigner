@@ -86,10 +86,11 @@ class GMScreenView(ctk.CTkFrame):
             "NPCs": GenericModelWrapper("npcs"),
             "PCs": GenericModelWrapper("pcs"),
             "Factions": GenericModelWrapper("factions"),
-            "Creatures": GenericModelWrapper("Creatures"),
-            "Clues": GenericModelWrapper("Clues"),
+            "Creatures": GenericModelWrapper("creatures"),
+            "Clues": GenericModelWrapper("clues"),
             "Informations": GenericModelWrapper("informations"),
-            "Objects": GenericModelWrapper("Objects")
+            "Objects": GenericModelWrapper("objects"),
+            "Books": GenericModelWrapper("books"),
         }
 
         # Dedicated map store for thumbnails and quick lookup
