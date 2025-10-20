@@ -1010,6 +1010,7 @@ class MainWindow(ctk.CTk):
             "objects": ["object_wrapper"],
             "creatures": ["creature_wrapper"],
             "clues": ["clues_wrapper"],
+            "books": ["books_wrapper"],
             "informations": ["informations_wrapper", "information_wrapper"],
             "maps": ["maps_wrapper"],
         }
