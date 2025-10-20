@@ -1,3 +1,4 @@
+import random
 import re
 import tkinter as tk
 from tkinter import messagebox
@@ -698,8 +699,18 @@ class FinaleBlueprintStep(WizardStep):
         if not title:
             title = self._default_title(climax_name, location)
 
-        primary_antagonist = antagonists[0] if antagonists else ""
-        primary_ally = allied_factions[0] if allied_factions else ""
+        rng = self._get_rng_for_generation()
+
+        primary_antagonist = rng.choice(antagonists) if antagonists else ""
+        primary_ally = rng.choice(allied_factions) if allied_factions else ""
+
+        antagonist_cycle = self._prepare_rotation_cycle(antagonists, rng)
+        ally_cycle = self._prepare_rotation_cycle(npc_allies, rng)
+        faction_cycle = self._prepare_rotation_cycle(allied_factions, rng)
+
+        antagonist_pointer = 0
+        ally_pointer = 0
+        faction_pointer = 0
 
         summary_lines = [
             f"Structure: {climax_name}",
@@ -736,11 +747,24 @@ class FinaleBlueprintStep(WizardStep):
         for idx, beat in enumerate(climax["beats"], start=1):
             beat_text = self._personalise_beat(beat, primary_antagonist, primary_ally, location)
             scene_title = self._scene_title(idx, beat_text)
-            scene_npcs, scene_factions = self._infer_scene_participants(
+            (
+                scene_npcs,
+                scene_factions,
+                antagonist_pointer,
+                ally_pointer,
+                faction_pointer,
+            ) = self._infer_scene_participants(
                 beat,
                 antagonists,
                 npc_allies,
                 allied_factions,
+                rng,
+                antagonist_cycle,
+                ally_cycle,
+                faction_cycle,
+                antagonist_pointer,
+                ally_pointer,
+                faction_pointer,
             )
 
             scene_index = idx - 1
@@ -1000,7 +1024,20 @@ class FinaleBlueprintStep(WizardStep):
         return final_index
 
     # ------------------------------------------------------------------
-    def _infer_scene_participants(self, beat, antagonists, npc_allies, allied_factions):
+    def _infer_scene_participants(
+        self,
+        beat,
+        antagonists,
+        npc_allies,
+        allied_factions,
+        rng,
+        antagonist_cycle,
+        ally_cycle,
+        faction_cycle,
+        antagonist_pointer,
+        ally_pointer,
+        faction_pointer,
+    ):
         beat_lower = (beat or "").lower()
 
         def name_in_text(name):
@@ -1064,16 +1101,74 @@ class FinaleBlueprintStep(WizardStep):
 
         scene_npcs = []
         scene_factions = []
+
         if include_antagonists:
-            scene_npcs.extend(antagonists)
+            focus, antagonist_pointer = self._draw_from_rotation(
+                antagonist_cycle, antagonist_pointer, rng
+            )
+            if focus:
+                scene_npcs.extend(focus)
+
         if include_allies:
-            scene_npcs.extend(npc_allies)
+            focus, ally_pointer = self._draw_from_rotation(ally_cycle, ally_pointer, rng)
+            if focus:
+                scene_npcs.extend(focus)
+
         if include_factions:
-            scene_factions.extend(allied_factions)
+            focus, faction_pointer = self._draw_from_rotation(
+                faction_cycle, faction_pointer, rng
+            )
+            if focus:
+                scene_factions.extend(focus)
 
         scene_npcs = self._deduplicate_preserve_order(scene_npcs)
         scene_factions = self._deduplicate_preserve_order(scene_factions)
-        return scene_npcs, scene_factions
+        return scene_npcs, scene_factions, antagonist_pointer, ally_pointer, faction_pointer
+
+    # ------------------------------------------------------------------
+    def _get_rng_for_generation(self):
+        wizard = getattr(self, "wizard", None)
+        state = getattr(wizard, "wizard_state", None)
+        if isinstance(state, dict):
+            seed = state.get("_random_seed")
+            counter = state.get("_random_counter", 0)
+            if seed is None:
+                seed = random.randrange(1 << 30)
+                state["_random_seed"] = seed
+            state["_random_counter"] = counter + 1
+            seed_value = (seed + counter) % (1 << 30)
+            return random.Random(seed_value)
+        return random
+
+    # ------------------------------------------------------------------
+    @staticmethod
+    def _prepare_rotation_cycle(items, rng):
+        if not items:
+            return []
+        cycle = list(items)
+        if len(cycle) > 1 and hasattr(rng, "shuffle"):
+            rng.shuffle(cycle)
+        return cycle
+
+    # ------------------------------------------------------------------
+    @staticmethod
+    def _draw_from_rotation(cycle, pointer, rng):
+        if not cycle:
+            return [], pointer
+        if len(cycle) == 1:
+            return [cycle[0]], pointer
+
+        if pointer >= len(cycle):
+            pointer = 0
+            if hasattr(rng, "shuffle"):
+                rng.shuffle(cycle)
+
+        selection = cycle[pointer]
+        pointer += 1
+        if pointer >= len(cycle) and hasattr(rng, "shuffle"):
+            rng.shuffle(cycle)
+            pointer = 0
+        return [selection], pointer
 
     # ------------------------------------------------------------------
     @staticmethod
