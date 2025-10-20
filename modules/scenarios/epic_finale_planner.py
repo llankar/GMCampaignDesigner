@@ -105,6 +105,14 @@ CALLBACK_TACTICS = [
     "Have a redeemed villain return to settle an old debt.",
     "Tie the finale to an unresolved mystery from the campaign's first act.",
     "Let a fallen ally's message resurface at the pivotal moment.",
+    "Call upon a patron deity whose omen foreshadowed the climax.",
+    "Let a rival adventuring party arrive demanding joint glory.",
+    "Uncover a prophecy mural the heroes once ignored.",
+    "Resurrect an old battle map revealing hidden escape routes.",
+    "Reveal a mentor's contingency plan encoded in bardic lyrics.",
+    "Have the antagonist exploit a party secret teased in session zero.",
+    "Show a relic reacting to a companion's latent heritage.",
+    "Bring back an innocuous NPC whose gossip unravels the villain's ploy.",
 ]
 
 STAKE_ESCALATIONS = [
