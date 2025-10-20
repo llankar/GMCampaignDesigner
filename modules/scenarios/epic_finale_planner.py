@@ -241,9 +241,21 @@ class FinaleBlueprintStep(WizardStep):
         body.grid_columnconfigure((0, 1), weight=1)
         body.grid_rowconfigure(1, weight=1)
 
-        ctk.CTkLabel(body, text="Campaign Parameters").grid(
-            row=0, column=0, sticky="w", padx=10, pady=(10, 5)
+        parameter_header = ctk.CTkFrame(body, fg_color="transparent")
+        parameter_header.grid(row=0, column=0, sticky="w", padx=10, pady=(10, 5))
+        parameter_header.grid_columnconfigure(0, weight=1)
+
+        ctk.CTkLabel(parameter_header, text="Campaign Parameters").grid(
+            row=0, column=0, sticky="w"
         )
+
+        self.show_parameter_details_var = ctk.BooleanVar(value=True)
+        ctk.CTkCheckBox(
+            parameter_header,
+            text="Show hook details",
+            variable=self.show_parameter_details_var,
+            command=self._refresh_parameter_suggestions,
+        ).grid(row=0, column=1, padx=(10, 0))
         ctk.CTkLabel(body, text="Finale Preview").grid(
             row=0, column=1, sticky="w", padx=10, pady=(10, 5)
         )
@@ -501,32 +513,78 @@ class FinaleBlueprintStep(WizardStep):
         ]
 
     # ------------------------------------------------------------------
+    @staticmethod
+    def _entity_hook_text(entity):
+        if not isinstance(entity, dict):
+            return ""
+
+        def _normalise(value):
+            if value is None:
+                return ""
+            if isinstance(value, (list, tuple, set)):
+                flattened = ", ".join(str(item).strip() for item in value if item)
+            else:
+                flattened = str(value)
+            flattened = re.sub(r"\s+", " ", flattened).strip()
+            if len(flattened) > 120:
+                flattened = flattened[:117].rstrip() + "..."
+            return flattened
+
+        for field in ("Role", "Motivation", "Secrets", "Secret", "Description"):
+            text = _normalise(entity.get(field))
+            if text:
+                return text
+        return ""
+
+    # ------------------------------------------------------------------
+    def _format_entity_suggestion(self, entity):
+        name = self._format_name(entity)
+        if not name:
+            return None
+        if not getattr(self, "show_parameter_details_var", None):
+            return name
+        if not self.show_parameter_details_var.get():
+            return name
+        hook = self._entity_hook_text(entity)
+        if hook:
+            return f"{name} — {hook}"
+        return name
+
+    # ------------------------------------------------------------------
     def _refresh_parameter_suggestions(self):
         lines = ["Potential Antagonists:"]
         if self.npcs:
             for npc in self.npcs[:8]:
-                lines.append(f" • {self._format_name(npc)}")
+                suggestion = self._format_entity_suggestion(npc)
+                if suggestion:
+                    lines.append(f" • {suggestion}")
         else:
             lines.append(" • No NPCs in current campaign database.")
 
         lines.append("\nAllied Factions:")
         if self.factions:
             for faction in self.factions[:8]:
-                lines.append(f" • {self._format_name(faction)}")
+                suggestion = self._format_entity_suggestion(faction)
+                if suggestion:
+                    lines.append(f" • {suggestion}")
         else:
             lines.append(" • No factions available.")
 
         lines.append("\nNPC Allies:")
         if self.npcs:
             for npc in self.npcs[:8]:
-                lines.append(f" • {self._format_name(npc)}")
+                suggestion = self._format_entity_suggestion(npc)
+                if suggestion:
+                    lines.append(f" • {suggestion}")
         else:
             lines.append(" • No NPC allies recorded.")
 
         lines.append("\nSignature Locations:")
         if self.places:
             for place in self.places[:8]:
-                lines.append(f" • {self._format_name(place)}")
+                suggestion = self._format_entity_suggestion(place)
+                if suggestion:
+                    lines.append(f" • {suggestion}")
         else:
             lines.append(" • No places recorded in database.")
 
