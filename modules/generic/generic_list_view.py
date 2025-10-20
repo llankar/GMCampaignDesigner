@@ -1037,15 +1037,24 @@ class GenericListView(ctk.CTkFrame):
         if ellipsis_width >= available:
             return self._ellipsis if ellipsis_width <= width else ""
 
-        truncated = []
-        current_width = 0
-        for char in text:
-            char_width = self._tree_font.measure(char)
-            if current_width + char_width > available - ellipsis_width:
-                break
-            truncated.append(char)
-            current_width += char_width
-        return "".join(truncated) + self._ellipsis
+        max_width = available - ellipsis_width
+        if max_width <= 0:
+            return self._ellipsis
+
+        # Binary search the longest prefix that fits the available width.
+        low, high = 0, len(text)
+        best_prefix = ""
+        while low <= high:
+            mid = (low + high) // 2
+            candidate = text[:mid]
+            candidate_width = self._tree_font.measure(candidate)
+            if candidate_width <= max_width:
+                best_prefix = candidate
+                low = mid + 1
+            else:
+                high = mid - 1
+
+        return best_prefix + self._ellipsis
 
     def sort_column(self, column_name):
         if not hasattr(self, "sort_directions"):
