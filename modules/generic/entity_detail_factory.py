@@ -102,11 +102,10 @@ def _open_book_link(parent, book_title: str) -> None:
         messagebox.showerror("Books", "Book library is not available.")
         return
     try:
-        items = list(wrapper.load_items())
+        record = wrapper.load_item_by_key(title, key_field="Title")
     except Exception as exc:
         messagebox.showerror("Books", f"Unable to load books: {exc}")
         return
-    record = next((item for item in items if str(item.get("Title", "")).strip() == title), None)
     if not record:
         messagebox.showerror("Books", f"Book '{title}' not found.")
         return
@@ -203,9 +202,8 @@ def open_entity_tab(entity_type, name, master):
         messagebox.showerror("Error", f"Unknown type '{entity_type}'")
         return
 
-    items = wrapper.load_items()
     key_field = "Title" if entity_type in {"Scenarios", "Books"} else "Name"
-    item = next((i for i in items if i.get(key_field) == name), None)
+    item = wrapper.load_item_by_key(name, key_field=key_field)
     if not item:
         messagebox.showerror("Error", f"{entity_type[:-1]} '{name}' not found.")
         return
@@ -999,28 +997,25 @@ def create_scenario_detail_frame(entity_type, scenario_item, master, open_entity
 
 @log_function
 def EditWindow(self, item, template, model_wrapper, creation_mode=False, on_save=None):
-    # load the full list so saves actually persist
-    items = model_wrapper.load_items()
-    key_field = "Title" if model_wrapper.entity_type == "scenarios" else "Name"
-    # 3) Find the same dict in our list and edit *that*
-    target = next((it for it in items if it.get(key_field) == item.get(key_field)), None)
+    key_field = "Title" if model_wrapper.entity_type in {"scenarios", "books"} else "Name"
+    key_value = item.get(key_field)
+    target = None
+    if key_value:
+        target = model_wrapper.load_item_by_key(key_value, key_field=key_field)
     if target is None:
-        # Fallback: fall back to editing the passed-in dict, and append if new
-        target = item
-        items.append(target)
+        target = dict(item)
     editor = GenericEditorWindow(
         self, target, template,
         model_wrapper, creation_mode
     )
     self.master.wait_window(editor)
     if getattr(editor, "saved", False):
-        model_wrapper.save_items(items)
+        model_wrapper.save_item(target, key_field=key_field)
         # let the detail frame know it should refresh itself
         if callable(on_save):
             on_save(target)
-   # 2) Identify the unique key field ("Title" for scenarios, else "Name")
-  
-        
+
+
 @log_function
 def create_entity_detail_frame(entity_type, entity, master, open_entity_callback=None):
     """
