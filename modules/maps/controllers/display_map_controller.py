@@ -55,7 +55,7 @@ from modules.ui.chatbot_dialog import (
     open_chatbot_dialog,
     _DEFAULT_NAME_FIELD_OVERRIDES as CHATBOT_NAME_OVERRIDES,
 )
-from modules.helpers.logging_helper import log_module_import, log_warning
+from modules.helpers.logging_helper import log_module_import, log_warning, log_info, log_debug
 from modules.helpers.dice_markup import parse_inline_actions
 from modules.maps.exporters.maptools import build_token_macros
 from modules.dice import dice_engine
@@ -630,11 +630,37 @@ class DisplayMapController:
     def open_map_by_name(self, map_name):
         target = (map_name or "").strip()
         if not target:
+            log_warning(
+                "open_map_by_name invoked with an empty map name.",
+                func_name="DisplayMapController.open_map_by_name",
+            )
             return False
+        previous_map_name = ""
+        if isinstance(getattr(self, "current_map", None), dict):
+            previous_map_name = (self.current_map.get("Name") or "").strip()
+        previous_label = previous_map_name or "<none>"
+        log_info(
+            f"Opening map '{target}' (previous map '{previous_label}').",
+            func_name="DisplayMapController.open_map_by_name",
+        )
         if target not in self._maps:
+            log_warning(
+                f"Map '{target}' is not present in the controller cache.",
+                func_name="DisplayMapController.open_map_by_name",
+            )
             messagebox.showwarning("Not Found", f"Map '{target}' not found.")
             return False
         self._on_display_map("maps", target)
+        item_counts = {
+            "tokens": sum(1 for entry in getattr(self, "tokens", []) if entry.get("type") == "token"),
+            "markers": sum(1 for entry in getattr(self, "tokens", []) if entry.get("type") == "marker"),
+            "shapes": sum(1 for entry in getattr(self, "tokens", []) if entry.get("type") in ("rectangle", "oval")),
+            "total": len(getattr(self, "tokens", [])),
+        }
+        log_info(
+            f"Map '{target}' loaded with {item_counts['tokens']} tokens, {item_counts['markers']} markers, {item_counts['shapes']} shapes (total {item_counts['total']}).",
+            func_name="DisplayMapController.open_map_by_name",
+        )
         # Apply fit shortly after map swaps in
         try:
             self.parent.after(30, self._apply_fit_mode)
@@ -1083,11 +1109,36 @@ class DisplayMapController:
         if not marker or marker.get("type") != "marker":
             return False
         target = (marker.get("linked_map") or "").strip()
+        current_map_name = ""
+        if isinstance(getattr(self, "current_map", None), dict):
+            current_map_name = (self.current_map.get("Name") or "").strip()
+        marker_label = (marker.get("text") or marker.get("entity_id") or "").strip() or f"marker@{id(marker):x}"
+        marker_position = marker.get("position")
+        current_map_label = current_map_name or "<unknown>"
+        target_label = target or "<empty>"
+        marker_debug_data = {key: marker.get(key) for key in ("linked_map", "border_color", "entry_width")}
+        log_info(
+            f"Marker '{marker_label}' on map '{current_map_label}' requested linked map '{target_label}'.",
+            func_name="DisplayMapController._open_marker_linked_map",
+        )
+        log_debug(
+            f"Marker state before linked map open: position={marker_position}, data={marker_debug_data}.",
+            func_name="DisplayMapController._open_marker_linked_map",
+        )
         if not target:
             if not silent:
                 messagebox.showinfo("Linked Map", "No linked map is assigned to this marker.")
+            log_warning(
+                f"Marker '{marker_label}' does not have a linked map configured.",
+                func_name="DisplayMapController._open_marker_linked_map",
+            )
             return False
-        return self.open_map_by_name(target)
+        success = self.open_map_by_name(target)
+        log_info(
+            f"Linked map open {'succeeded' if success else 'failed'} for marker '{marker_label}' (target '{target_label}').",
+            func_name="DisplayMapController._open_marker_linked_map",
+        )
+        return success
 
     def _choose_marker_linked_map(self, marker):
         if not marker or marker.get("type") != "marker":
@@ -2490,6 +2541,9 @@ class DisplayMapController:
 
     def _update_canvas_images(self, resample=Image.LANCZOS):
         if not self.base_img: return
+        debug_payload = getattr(self, "_pending_render_debug_dump", None)
+        if debug_payload is not None:
+            debug_payload.setdefault("rendered_items", [])
         
         # Redraw handles if graphical edit mode is active for the selected item
         # and not currently in a drag-resize operation.
@@ -2543,6 +2597,16 @@ class DisplayMapController:
 
                 tkimg = ImageTk.PhotoImage(img_r); item['tk_image'] = tkimg
                 sx, sy = int(xw*self.zoom + self.pan_x), int(yw*self.zoom + self.pan_y)
+                if debug_payload is not None:
+                    debug_payload["rendered_items"].append({
+                        "type": "token",
+                        "entity_id": item.get("entity_id"),
+                        "entity_type": item.get("entity_type"),
+                        "world_position": (xw, yw),
+                        "screen_position": (sx, sy),
+                        "size": (nw, nh),
+                        "border_color": item.get("border_color"),
+                    })
                 if item.get('canvas_ids'):
                     b_id, i_id = item['canvas_ids']
                     self.canvas.itemconfig(b_id, outline=item.get('border_color','#0000ff'))
@@ -2585,6 +2649,14 @@ class DisplayMapController:
                 item.setdefault("handle_width", 22)
                 item.setdefault("border_color", "#00ff00")
                 sx, sy = int(xw*self.zoom + self.pan_x), int(yw*self.zoom + self.pan_y)
+                if debug_payload is not None:
+                    debug_payload["rendered_items"].append({
+                        "type": "marker",
+                        "text": item.get("text"),
+                        "linked_map": item.get("linked_map"),
+                        "world_position": (xw, yw),
+                        "screen_position": (sx, sy),
+                    })
                 entry = item.get("entry_widget")
                 desired_text = item.get("text", "")
                 if not entry or not entry.winfo_exists():
@@ -2713,6 +2785,15 @@ class DisplayMapController:
                 shape_width = shape_width_unscaled * self.zoom; shape_height = shape_height_unscaled * self.zoom
                 if shape_width <=0 or shape_height <=0: continue
                 sx, sy = int(xw*self.zoom + self.pan_x), int(yw*self.zoom + self.pan_y)
+                if debug_payload is not None:
+                    debug_payload["rendered_items"].append({
+                        "type": item_type,
+                        "world_position": (xw, yw),
+                        "screen_position": (sx, sy),
+                        "size": (shape_width, shape_height),
+                        "fill": item.get("fill_color"),
+                        "border_color": item.get("border_color"),
+                    })
                 fill_color = item.get("fill_color", "") if item.get("is_filled") else ""; border_color = item.get("border_color", "#000000")
                 if item.get('canvas_ids') and item['canvas_ids'][0] is not None:
                     shape_id = item['canvas_ids'][0]
@@ -2725,6 +2806,30 @@ class DisplayMapController:
                     elif item_type == "oval": shape_id = self.canvas.create_oval(sx, sy, sx + shape_width, sy + shape_height, fill=fill_color, outline=border_color, width=2)
                     item['canvas_ids'] = (shape_id,) if shape_id else ();
                     if shape_id: self._bind_item_events(item)
+        if debug_payload is not None:
+            expected = debug_payload.get("expected_items", [])
+            rendered = debug_payload.get("rendered_items", [])
+            map_name = debug_payload.get("map_name", "<unknown>")
+            log_info(
+                f"Rendered map '{map_name}' with {len(rendered)} items (expected {len(expected)}). zoom={self.zoom}, pan=({self.pan_x}, {self.pan_y}).",
+                func_name="DisplayMapController._update_canvas_images",
+            )
+            for entry in expected:
+                log_debug(
+                    f"Expected {entry.get('type')} at world {entry.get('world_position')} details={entry}.",
+                    func_name="DisplayMapController._update_canvas_images",
+                )
+            for entry in rendered:
+                log_debug(
+                    f"Rendered {entry.get('type')} at world {entry.get('world_position')} screen={entry.get('screen_position')} details={entry}.",
+                    func_name="DisplayMapController._update_canvas_images",
+                )
+            if len(rendered) != len(expected):
+                log_warning(
+                    f"Render count mismatch for map '{map_name}': expected {len(expected)} items but drew {len(rendered)}.",
+                    func_name="DisplayMapController._update_canvas_images",
+                )
+            setattr(self, "_pending_render_debug_dump", None)
         self._update_selection_indicators()
         if self.fs_canvas:
             self._update_fullscreen_map()
