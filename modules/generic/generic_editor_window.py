@@ -38,6 +38,94 @@ log_module_import(__name__)
 
 SWARMUI_PROCESS = None
 
+
+class ReadOnlyLongTextPreview(ctk.CTkFrame):
+    """Lightweight preview widget for very large longtext fields.
+
+    The Books entity uses a massive OCR transcript (``ExtractedText``) that can
+    contain hundreds of thousands of characters.  Rendering that content inside
+    ``RichTextEditor`` freezes Tk for several seconds because the widget
+    re-computes the layout for every line.  This helper keeps the editor fast by
+    showing only a short, read-only preview and deferring the full transcript to
+    a separate window when requested.
+    """
+
+    PREVIEW_CHAR_LIMIT = 2000
+
+    def __init__(self, parent, field_label: str, raw_value):
+        super().__init__(parent)
+        self.field_label = field_label
+        # Preserve the original payload so ``save()`` can write it back without
+        # forcing the UI to materialise the whole transcript.
+        self._raw_value = raw_value if raw_value is not None else ""
+        self._full_text = self._coerce_to_text(self._raw_value)
+
+        info = ctk.CTkLabel(
+            self,
+            text=(
+                f"{field_label} preview (read-only). "
+                "Open the full transcript to view everything."
+            ),
+            anchor="w",
+        )
+        info.pack(fill="x", padx=5, pady=(5, 0))
+
+        preview_text = self._full_text
+        trimmed = False
+        if len(preview_text) > self.PREVIEW_CHAR_LIMIT:
+            preview_text = preview_text[: self.PREVIEW_CHAR_LIMIT].rstrip()
+            trimmed = True
+
+        self.textbox = ctk.CTkTextbox(self, height=180, wrap="word")
+        self.textbox.insert("1.0", preview_text or "(No text extracted yet)")
+        if trimmed:
+            self.textbox.insert(
+                "end",
+                "\n\n… (truncated for speed – open the full transcript to read everything)",
+            )
+        self.textbox.configure(state="disabled")
+        self.textbox.pack(fill="x", expand=False, padx=5, pady=5)
+
+        btn_row = ctk.CTkFrame(self)
+        btn_row.pack(fill="x", padx=5, pady=(0, 5))
+
+        open_btn = ctk.CTkButton(
+            btn_row,
+            text="Open Full Transcript",
+            command=self._open_full_transcript,
+        )
+        open_btn.pack(side="right")
+
+    @staticmethod
+    def _coerce_to_text(value) -> str:
+        if isinstance(value, dict):
+            text_val = value.get("text")
+            if isinstance(text_val, str):
+                return text_val
+            return json.dumps(value)
+        if isinstance(value, list):
+            try:
+                return "\n".join(str(v) for v in value)
+            except Exception:
+                return str(value)
+        return str(value or "")
+
+    def _open_full_transcript(self):
+        top = ctk.CTkToplevel(self)
+        top.title(f"{self.field_label} – Full Transcript")
+        top.geometry("900x600")
+        position_window_at_top(top)
+
+        textbox = ctk.CTkTextbox(top, wrap="word")
+        textbox.pack(fill="both", expand=True, padx=10, pady=10)
+        textbox.insert("1.0", self._full_text or "(No text extracted yet)")
+        textbox.configure(state="disabled")
+
+    def get_text_data(self):
+        """Return the original longtext payload for persistence."""
+
+        return self._raw_value
+
 @log_methods
 class CustomDropdown(ctk.CTkToplevel):
     def __init__(self, master, options, command, width=None, max_height=300, **kwargs):
@@ -357,6 +445,15 @@ class GenericEditorWindow(ctk.CTkToplevel):
 
     def create_longtext_field(self, field):
         raw = self.item.get(field["name"], "")
+        if field["name"] == "ExtractedText":
+            preview = ReadOnlyLongTextPreview(
+                self.scroll_frame,
+                field.get("label") or field["name"],
+                raw,
+            )
+            preview.pack(fill="x", pady=5)
+            self.field_widgets[field["name"]] = preview
+            return
         editor = self._make_richtext_editor(self.scroll_frame, raw)
         self.field_widgets[field["name"]] = editor
 
