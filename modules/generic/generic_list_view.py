@@ -440,6 +440,11 @@ class GenericListView(ctk.CTkFrame):
             self.batch_size = 100
         else:
             self.batch_size = 50
+        self._default_batch_size = self.batch_size
+        self._first_batch_size = min(50, self.batch_size)
+        self.batch_size = self._first_batch_size
+        self._first_batch_pending = self._default_batch_size != self._first_batch_size and total_items > self._first_batch_size
+        self._batch_delay_ms = 50
         if self.group_column:
             self.insert_grouped_items()
         else:
@@ -850,8 +855,16 @@ class GenericListView(ctk.CTkFrame):
             except Exception as e:
                 print("[ERROR] inserting item:", e, iid, vals)
         self.batch_index = end
+        if getattr(self, "_first_batch_pending", False):
+            self.batch_size = getattr(self, "_default_batch_size", self.batch_size)
+            self._first_batch_pending = False
         if end < len(self.filtered_items):
-            self.after_idle(self.insert_next_batch)
+            delay = getattr(self, "_batch_delay_ms", 50)
+            try:
+                delay = max(1, int(delay))
+            except (TypeError, ValueError):
+                delay = 50
+            self.after(delay, self.insert_next_batch)
         self._update_tree_selection_tags()
 
     def insert_grouped_items(self):
