@@ -2,11 +2,13 @@ import json
 import re
 import time
 import os
+import sys
+import subprocess
 import threading
 import customtkinter as ctk
 import tkinter as tk
 import tkinter.font as tkfont
-from tkinter import ttk, messagebox, filedialog
+from tkinter import ttk, messagebox, filedialog, simpledialog
 import copy
 from PIL import Image
 from modules.generic.generic_editor_window import GenericEditorWindow
@@ -30,6 +32,11 @@ from modules.books.book_importer import (
     extract_text_from_book,
     prepare_books_from_directory,
     prepare_books_from_files,
+)
+from modules.books.book_viewer import open_book_viewer
+from modules.books.pdf_processing import (
+    export_pdf_page_range,
+    get_pdf_page_count,
 )
 from modules.helpers.logging_helper import (
     log_debug,
@@ -202,6 +209,8 @@ class GenericListView(ctk.CTkFrame):
             f["name"] for f in self.template["fields"]
             if f["name"] not in skip_for_columns
         ]
+        if self.model_wrapper.entity_type == "books" and "Excerpts" not in self.columns:
+            self.columns.append("Excerpts")
 
         # --- Column configuration ---
         self.column_section = f"ColumnSettings_{self.model_wrapper.entity_type}"
@@ -603,7 +612,12 @@ class GenericListView(ctk.CTkFrame):
             name_label.grid(row=1, column=0, padx=10, pady=(0, 10))
 
             def bind_open(widget):
-                widget.bind("<Double-Button-1>", lambda e, it=item: self._edit_item(it))
+                widget.bind(
+                    "<Double-Button-1>",
+                    lambda e, it=item: self.open_book(it)
+                    if self.model_wrapper.entity_type == "books"
+                    else self._edit_item(it),
+                )
 
             bind_open(image_label)
             bind_open(card)
@@ -615,6 +629,35 @@ class GenericListView(ctk.CTkFrame):
             bind_select(image_label)
             bind_select(card)
             bind_select(name_label)
+            if self.model_wrapper.entity_type == "books":
+                summary = self._summarize_book_excerpts(item)
+                if summary:
+                    summary_label = ctk.CTkLabel(
+                        card,
+                        text=summary,
+                        justify="center",
+                        wraplength=160,
+                        font=("Segoe UI", 10),
+                    )
+                    summary_label.grid(row=2, column=0, padx=10, pady=(0, 5))
+                    bind_select(summary_label)
+                    bind_open(summary_label)
+                    excerpt_button = ctk.CTkButton(
+                        card,
+                        text="Open Excerpts",
+                        width=140,
+                        command=lambda it=item, widget=card: self._show_book_excerpts_menu(it, widget),
+                    )
+                    excerpt_button.grid(row=3, column=0, padx=10, pady=(0, 10))
+                else:
+                    hint_label = ctk.CTkLabel(
+                        card,
+                        text="No excerpts",
+                        font=("Segoe UI", 9, "italic"),
+                    )
+                    hint_label.grid(row=2, column=0, padx=10, pady=(0, 10))
+                    bind_select(hint_label)
+                    bind_open(hint_label)
             base_id = self._get_base_id(item)
             if base_id:
                 self.grid_cards.append({"base_id": base_id, "card": card})
@@ -860,7 +903,7 @@ class GenericListView(ctk.CTkFrame):
             iid = unique_iid(self.tree, base_id)
             name_text = self._format_cell("#0", item.get(self.unique_field, ""), iid)
             vals = tuple(
-                self._format_cell(c, item.get(c, ""), iid) for c in self.columns
+                self._format_cell(c, self._get_display_value(item, c), iid) for c in self.columns
             )
             try:
                 self.tree.insert("", "end", iid=iid, text=name_text, values=vals)
@@ -903,7 +946,7 @@ class GenericListView(ctk.CTkFrame):
                 iid = unique_iid(self.tree, base_iid)
                 name_text = self._format_cell("#0", item.get(self.unique_field, ""), iid)
                 vals = tuple(
-                    self._format_cell(c, item.get(c, ""), iid) for c in self.columns
+                    self._format_cell(c, self._get_display_value(item, c), iid) for c in self.columns
                 )
                 try:
                     self.tree.insert(group_id, "end", iid=iid, text=name_text, values=vals)
@@ -921,10 +964,255 @@ class GenericListView(ctk.CTkFrame):
         if val is None:
             return ""
         if isinstance(val, dict):
-            return self.clean_value(val.get("text", ""))
+            if "text" in val:
+                return self.clean_value(val.get("text", ""))
+            if "Label" in val or "label" in val:
+                label = val.get("Label", val.get("label", ""))
+                return str(label).strip()
+            if "Path" in val or "path" in val:
+                start = val.get("StartPage") or val.get("start_page")
+                end = val.get("EndPage") or val.get("end_page")
+                if isinstance(val.get("page_range"), (list, tuple)) and len(val["page_range"]) >= 2:
+                    start = start or val["page_range"][0]
+                    end = end or val["page_range"][1]
+                label = None
+                if start and end and start != end:
+                    label = f"pp. {start}-{end}"
+                elif start:
+                    label = f"p. {start}"
+                return label or os.path.basename(str(val.get("Path") or val.get("path") or ""))
+            return ", ".join(self.clean_value(v) for v in val.values())
         if isinstance(val, list):
             return ", ".join(self.clean_value(v) for v in val if v is not None)
         return str(val).replace("{", "").replace("}", "").strip()
+
+    def _get_display_value(self, item, column):
+        if self.model_wrapper.entity_type == "books" and column == "Excerpts":
+            return self._summarize_book_excerpts(item)
+        return item.get(column, "")
+
+    def _summarize_book_excerpts(self, item):
+        excerpts = list(self._iter_book_excerpts(item))
+        labels = []
+        for excerpt in excerpts:
+            label = excerpt.get("Label")
+            if not label:
+                start = excerpt.get("StartPage")
+                end = excerpt.get("EndPage")
+                if start and end and start != end:
+                    label = f"pp. {start}-{end}"
+                elif start:
+                    label = f"p. {start}"
+                else:
+                    label = os.path.basename(str(excerpt.get("Path", "")))
+            if label:
+                labels.append(str(label))
+        return ", ".join(labels)
+
+    def _iter_book_excerpts(self, item):
+        pages = item.get("ExtractedPages") if isinstance(item, dict) else None
+        if not isinstance(pages, list):
+            return
+        for entry in pages:
+            if not isinstance(entry, dict):
+                continue
+            path = entry.get("Path") or entry.get("path")
+            if not path:
+                continue
+            start = entry.get("StartPage") or entry.get("start_page")
+            end = entry.get("EndPage") or entry.get("end_page")
+            if isinstance(entry.get("page_range"), (list, tuple)) and len(entry["page_range"]) >= 2:
+                start = start or entry["page_range"][0]
+                end = end or entry["page_range"][1]
+            label = entry.get("Label") or entry.get("label")
+            yield {
+                "StartPage": start,
+                "EndPage": end,
+                "Path": path,
+                "Label": label,
+                "Filename": entry.get("Filename") or entry.get("filename"),
+            }
+
+    def _build_excerpt_entry(self, metadata):
+        page_range = metadata.get("page_range") if isinstance(metadata, dict) else None
+        start = end = None
+        if isinstance(page_range, (list, tuple)) and len(page_range) >= 2:
+            start, end = int(page_range[0]), int(page_range[1])
+        else:
+            start = metadata.get("StartPage") or metadata.get("start_page")
+            end = metadata.get("EndPage") or metadata.get("end_page")
+        path = metadata.get("path") or metadata.get("Path")
+        filename = metadata.get("filename") or metadata.get("Filename")
+        label = metadata.get("label") or metadata.get("Label")
+        if not label:
+            if start and end and start != end:
+                label = f"pp. {start}-{end}"
+            elif start:
+                label = f"p. {start}"
+            elif filename:
+                label = filename
+            else:
+                label = os.path.basename(str(path or "Excerpt"))
+        return {
+            "Type": "excerpt",
+            "StartPage": start,
+            "EndPage": end,
+            "Path": path,
+            "Label": label,
+            "Filename": filename,
+            "page_range": page_range,
+        }
+
+    def _parse_page_range_input(self, text, total_pages):
+        cleaned = text.strip()
+        match = re.fullmatch(r"(\d+)(?:\s*-\s*(\d+))?", cleaned)
+        if not match:
+            raise ValueError("Enter a page number or range such as '5-8'.")
+        start = int(match.group(1))
+        end = int(match.group(2)) if match.group(2) else start
+        if start < 1 or end < 1:
+            raise ValueError("Page numbers must be positive.")
+        if end < start:
+            raise ValueError("End page must be greater than or equal to start page.")
+        if total_pages and (start > total_pages or end > total_pages):
+            raise ValueError(f"Pages must be within 1-{total_pages}.")
+        return start, end
+
+    def _resolve_book_path(self, relative_path):
+        if not relative_path:
+            return ""
+        if os.path.isabs(relative_path):
+            return relative_path
+        return os.path.join(ConfigHelper.get_campaign_dir(), relative_path)
+
+    def _open_book_excerpt(self, excerpt):
+        path = excerpt.get("Path") if isinstance(excerpt, dict) else None
+        if not path:
+            messagebox.showwarning("Open Excerpt", "This excerpt does not have an associated file.")
+            return
+        resolved = self._resolve_book_path(path)
+        if not os.path.exists(resolved):
+            messagebox.showwarning(
+                "Open Excerpt",
+                f"The excerpt file could not be found:\n{resolved}",
+            )
+            return
+        try:
+            if sys.platform.startswith("win"):
+                os.startfile(resolved)  # type: ignore[attr-defined]
+            elif sys.platform == "darwin":
+                subprocess.Popen(["open", resolved])
+            else:
+                subprocess.Popen(["xdg-open", resolved])
+            log_info(
+                f"Opened book excerpt '{resolved}'.",
+                func_name="GenericListView._open_book_excerpt",
+            )
+        except Exception as exc:
+            log_warning(
+                f"Failed to open excerpt '{resolved}': {exc}",
+                func_name="GenericListView._open_book_excerpt",
+            )
+            messagebox.showerror("Open Excerpt", f"Failed to open the file:\n{exc}")
+
+    def _show_book_excerpts_menu(self, item, widget=None):
+        excerpts = list(self._iter_book_excerpts(item))
+        if not excerpts:
+            messagebox.showinfo("Book Excerpts", "No excerpts available for this book.")
+            return
+        menu = tk.Menu(self, tearoff=0)
+        for index, excerpt in enumerate(excerpts, start=1):
+            label = excerpt.get("Label") or f"Excerpt {index}"
+            menu.add_command(label=label, command=lambda e=excerpt: self._open_book_excerpt(e))
+        x = y = 0
+        if widget is not None:
+            x = widget.winfo_rootx()
+            y = widget.winfo_rooty() + widget.winfo_height()
+        else:
+            x = self.winfo_pointerx()
+            y = self.winfo_pointery()
+        try:
+            menu.tk_popup(x, y)
+        finally:
+            menu.grab_release()
+
+    def open_book(self, item):
+        if not item:
+            return
+        top = self.winfo_toplevel() if hasattr(self, "winfo_toplevel") else self.master
+        open_book_viewer(top, item)
+
+    def extract_book_pages(self, item):
+        if not item:
+            return
+        attachment = item.get("Attachment", "")
+        if not attachment:
+            messagebox.showwarning("Extract Pages", "This book has no attachment to extract from.")
+            return
+        campaign_dir = ConfigHelper.get_campaign_dir()
+        try:
+            total_pages = get_pdf_page_count(attachment, campaign_dir=campaign_dir)
+        except Exception as exc:
+            log_warning(
+                f"Failed to determine page count for '{attachment}': {exc}",
+                func_name="GenericListView.extract_book_pages",
+            )
+            messagebox.showerror("Extract Pages", f"Unable to load the PDF:\n{exc}")
+            return
+
+        prompt = simpledialog.askstring(
+            "Extract Pages",
+            f"Enter the page range to extract (1-{total_pages}):",
+            parent=self,
+        )
+        if not prompt:
+            return
+        try:
+            start_page, end_page = self._parse_page_range_input(prompt, total_pages)
+        except ValueError as exc:
+            messagebox.showerror("Extract Pages", str(exc))
+            return
+
+        try:
+            metadata = export_pdf_page_range(
+                attachment,
+                start_page,
+                end_page,
+                campaign_dir=campaign_dir,
+            )
+        except Exception as exc:
+            log_warning(
+                f"Failed to export pages {start_page}-{end_page} for '{attachment}': {exc}",
+                func_name="GenericListView.extract_book_pages",
+            )
+            messagebox.showerror("Extract Pages", f"Failed to export pages:\n{exc}")
+            return
+
+        excerpt_entry = self._build_excerpt_entry(metadata)
+        extracted = item.get("ExtractedPages")
+        if isinstance(extracted, list):
+            extracted = list(extracted)
+        else:
+            extracted = []
+        extracted.append(excerpt_entry)
+        item["ExtractedPages"] = extracted
+        log_info(
+            f"Added excerpt {excerpt_entry.get('Label')} to book '{item.get(self.unique_field, 'Unknown')}'.",
+            func_name="GenericListView.extract_book_pages",
+        )
+        try:
+            self.model_wrapper.save_items(self.items)
+        except Exception as exc:
+            log_warning(
+                f"Failed to save book excerpts: {exc}",
+                func_name="GenericListView.extract_book_pages",
+            )
+            messagebox.showerror("Extract Pages", f"Unable to save the updated book:\n{exc}")
+            return
+        self.filter_items(self.search_var.get())
+        label = excerpt_entry.get("Label") or f"Pages {start_page}-{end_page}"
+        messagebox.showinfo("Extract Pages", f"Created excerpt {label}.")
+
 
     def _normalize_unique_value(self, value):
         if value is None:
@@ -1099,7 +1387,14 @@ class GenericListView(ctk.CTkFrame):
         self.tree.focus(iid)
         item, _ = self._find_item_by_iid(iid)
         if item:
-            self._edit_item(item)
+            modifiers = getattr(event, "state", 0)
+            if (
+                self.model_wrapper.entity_type == "books"
+                and not (modifiers & 0x0004 or modifiers & 0x0001)
+            ):
+                self.open_book(item)
+            else:
+                self._edit_item(item)
 
     def on_right_click(self, event):
         region = self.tree.identify("region", event.x, event.y)
@@ -1128,6 +1423,30 @@ class GenericListView(ctk.CTkFrame):
             has_portrait = False
 
         menu = tk.Menu(self, tearoff=0)
+        if self.model_wrapper.entity_type == "books" and item:
+            menu.add_command(
+                label="Open Book",
+                command=lambda it=item: self.open_book(it),
+            )
+            menu.add_command(
+                label="Extract Pages…",
+                command=lambda it=item: self.extract_book_pages(it),
+            )
+            excerpts = list(self._iter_book_excerpts(item))
+            if excerpts:
+                excerpt_menu = tk.Menu(menu, tearoff=0)
+                for index, excerpt in enumerate(excerpts, start=1):
+                    label = excerpt.get("Label") or f"Excerpt {index}"
+                    excerpt_menu.add_command(
+                        label=label,
+                        command=lambda e=excerpt: self._open_book_excerpt(e),
+                    )
+                menu.add_cascade(label="Open Excerpt", menu=excerpt_menu)
+            menu.add_command(
+                label="Edit Details…",
+                command=lambda it=item: self._edit_item(it),
+            )
+            menu.add_separator()
         if self.model_wrapper.entity_type == "scenarios":
             menu.add_command(
                 label="Open in GM Screen",
