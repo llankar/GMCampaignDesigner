@@ -1,3 +1,4 @@
+import random
 import sys
 import types
 
@@ -274,3 +275,68 @@ def test_gm_guidance_surfaces_entity_secrets_and_motivations():
     scene_texts = [scene["Summary"] for scene in scenario["Scenes"]]
     assert any("Shadow Queen" in text for text in scene_texts)
     assert any("Sir Galen" in text for text in scene_texts)
+
+
+def test_random_rotation_cycles_entities_per_scene():
+    step = epic_finale_planner.FinaleBlueprintStep.__new__(
+        epic_finale_planner.FinaleBlueprintStep
+    )
+
+    structure = epic_finale_planner.CLIMAX_STRUCTURES[0]
+    step.climax_var = _StubVariable(structure["name"])
+    step.callback_var = _StubVariable(epic_finale_planner.CALLBACK_TACTICS[0])
+    step.escalation_var = _StubVariable(epic_finale_planner.STAKE_ESCALATIONS[0])
+    step.location_var = _StubVariable("Sky Citadel")
+    step.title_var = _StubVariable("")
+    step.entity_selectors = {}
+
+    selections = {
+        "antagonists": ["Shadow Queen", "Frost King", "Ember Warden"],
+        "allied_factions": ["Silent Hand", "Iron Banner"],
+        "npc_allies": ["Sir Galen", "Mira", "Thalia"],
+    }
+
+    step._collect_entity_selector_values = lambda key: list(selections.get(key, []))
+    step._get_rng_for_generation = lambda: random.Random(7)
+
+    scenario = step._build_scenario_from_config()
+
+    focused_pairs = [
+        tuple(scene["NPCs"]) for scene in scenario["Scenes"] if scene.get("NPCs")
+    ]
+    focused_factions = [
+        scene["Factions"] for scene in scenario["Scenes"] if scene.get("Factions")
+    ]
+
+    highlighted_antagonists = [pair[0] for pair in focused_pairs if pair]
+    highlighted_allies = [pair[1] for pair in focused_pairs if len(pair) > 1]
+    highlighted_factions = [factions[0] for factions in focused_factions if factions]
+
+    assert len(set(highlighted_antagonists)) >= 2
+    assert len(set(highlighted_allies)) >= 2
+    assert len(set(highlighted_factions)) >= 2
+
+    expected_npc_order = []
+    for pair in focused_pairs:
+        expected_npc_order.extend(pair)
+
+    dedup_npcs = []
+    seen_npcs = set()
+    for name in expected_npc_order:
+        if name and name not in seen_npcs:
+            seen_npcs.add(name)
+            dedup_npcs.append(name)
+
+    expected_faction_order = []
+    for factions in focused_factions:
+        expected_faction_order.extend(factions)
+
+    dedup_factions = []
+    seen_factions = set()
+    for name in expected_faction_order:
+        if name and name not in seen_factions:
+            seen_factions.add(name)
+            dedup_factions.append(name)
+
+    assert scenario["NPCs"] == dedup_npcs
+    assert scenario["Factions"] == dedup_factions
