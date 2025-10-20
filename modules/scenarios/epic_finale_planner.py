@@ -57,6 +57,46 @@ CLIMAX_STRUCTURES = [
             "Rebuild trust and reshape the political order going forward.",
         ],
     },
+    {
+        "name": "Heist of the Fallen Star",
+        "summary": "Steal back a world-shaping artifact before the villain can wield it.",
+        "beats": [
+            "Discover the artifact's secret vault and its layered defenses.",
+            "Infiltrate the gala front to bypass arcane security unnoticed.",
+            "Seize the Fallen Star amid betrayals and shifting alliances.",
+            "Escape the collapsing vault and decide who safeguards the prize.",
+        ],
+    },
+    {
+        "name": "Trial of the Ascendant",
+        "summary": "Navigate divine judgment that will anoint or destroy the heroes' champion.",
+        "beats": [
+            "Interpret omens to prepare for the coming celestial tribunal.",
+            "Face avatars of past deeds who argue for the heroes' unworthiness.",
+            "Champion undergoes the trial by cosmic ordeal before assembled pantheons.",
+            "Accept the verdict and channel newfound power into the campaign's destiny.",
+        ],
+    },
+    {
+        "name": "Reckoning at the Fractured Gate",
+        "summary": "Seal a planar rupture before it unravels reality across every realm.",
+        "beats": [
+            "Stabilize the gate long enough to learn the rupture's true cause.",
+            "Coordinate allied mages to anchor the battlefield against planar tides.",
+            "Battle manifestations of the breach while reversing the cascade.",
+            "Choose which realm remains linked as the gate snaps shut forever.",
+        ],
+    },
+    {
+        "name": "Rebellion of the Broken Crown",
+        "summary": "Lead a populist uprising that topples a tyrant's empire in one decisive strike.",
+        "beats": [
+            "Rally splintered cells with a unifying call to storm the capital.",
+            "Sabotage the crown's war machine to level the playing field.",
+            "Topple the tyrant in a duel before the eyes of liberated citizens.",
+            "Found a new order that honors the sacrifices of the rebellion.",
+        ],
+    },
 ]
 
 CALLBACK_TACTICS = [

@@ -179,3 +179,26 @@ def test_scenario_guidance_highlights_callback_and_escalation():
     assert expected_escalation in escalation_scene["Summary"]
     assert expected_escalation in escalation_scene["Text"]
     assert escalation_scene["Summary"] == escalation_scene["Text"]
+
+
+def test_new_climax_structures_drive_scene_generation():
+    step = epic_finale_planner.FinaleBlueprintStep.__new__(
+        epic_finale_planner.FinaleBlueprintStep
+    )
+
+    structure = epic_finale_planner.CLIMAX_STRUCTURES[-1]
+    step.climax_var = _StubVariable(structure["name"])
+    step.callback_var = _StubVariable(epic_finale_planner.CALLBACK_TACTICS[0])
+    step.escalation_var = _StubVariable(epic_finale_planner.STAKE_ESCALATIONS[0])
+    step.location_var = _StubVariable("")
+    step.title_var = _StubVariable("")
+    step.entity_selectors = {}
+
+    scenario = step._build_scenario_from_config()
+
+    assert f"Structure: {structure['name']}" in scenario["Summary"]
+    assert len(scenario["Scenes"]) == len(structure["beats"])
+
+    for scene, beat in zip(scenario["Scenes"], structure["beats"]):
+        assert beat in scene["Summary"]
+        assert scene["Summary"] == scene["Text"]
