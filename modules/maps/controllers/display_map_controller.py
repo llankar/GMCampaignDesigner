@@ -2890,7 +2890,7 @@ class DisplayMapController:
                 )
             for entry in rendered:
                 log_debug(
-                    f"Rendered {entry.get('type')} at world {entry.get('world_position')} screen={entry.get('screen_position')} details={entry}.",
+                    f"Rendered {entry.get('type')} at world {entry.get('world_position')} screen={entry.get('actual_screen') or entry.get('screen_position') or entry.get('expected_screen')} details={entry}.",
                     func_name="DisplayMapController._update_canvas_images",
                 )
             def _key_entry(entry):
