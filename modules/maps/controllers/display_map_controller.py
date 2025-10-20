@@ -2544,6 +2544,33 @@ class DisplayMapController:
         debug_payload = getattr(self, "_pending_render_debug_dump", None)
         if debug_payload is not None:
             debug_payload.setdefault("rendered_items", [])
+
+        def _safe_canvas_coords(cid):
+            if not cid:
+                return None
+            try:
+                coords = self.canvas.coords(cid)
+            except tk.TclError:
+                return None
+            if not coords:
+                return None
+            try:
+                converted = []
+                for value in coords:
+                    if isinstance(value, (int, float)):
+                        converted.append(int(round(value)))
+                    else:
+                        converted.append(value)
+                return tuple(converted)
+            except Exception:
+                return tuple(coords)
+
+        def _primary_screen_from_coords(coords):
+            if not coords:
+                return None
+            if len(coords) >= 2:
+                return (int(coords[0]), int(coords[1]))
+            return None
         
         # Redraw handles if graphical edit mode is active for the selected item
         # and not currently in a drag-resize operation.
@@ -2597,16 +2624,17 @@ class DisplayMapController:
 
                 tkimg = ImageTk.PhotoImage(img_r); item['tk_image'] = tkimg
                 sx, sy = int(xw*self.zoom + self.pan_x), int(yw*self.zoom + self.pan_y)
+                debug_entry = None
                 if debug_payload is not None:
-                    debug_payload["rendered_items"].append({
+                    debug_entry = {
                         "type": "token",
                         "entity_id": item.get("entity_id"),
                         "entity_type": item.get("entity_type"),
                         "world_position": (xw, yw),
-                        "screen_position": (sx, sy),
+                        "expected_screen": (sx, sy),
                         "size": (nw, nh),
                         "border_color": item.get("border_color"),
-                    })
+                    }
                 if item.get('canvas_ids'):
                     b_id, i_id = item['canvas_ids']
                     self.canvas.itemconfig(b_id, outline=item.get('border_color','#0000ff'))
@@ -2642,6 +2670,22 @@ class DisplayMapController:
                     self._bind_item_events(item)
                     item['hover_bbox'] = (sx - 3, sy - 3, sx + nw + 3, sy + nh + 3)
                     self._refresh_token_hover_popup(item)
+                if debug_entry is not None:
+                    canvas_ids = item.get('canvas_ids') or ()
+                    border_id = canvas_ids[0] if len(canvas_ids) >= 1 else None
+                    image_id = canvas_ids[1] if len(canvas_ids) >= 2 else (canvas_ids[0] if len(canvas_ids) == 1 else None)
+                    image_coords = _safe_canvas_coords(image_id)
+                    border_coords = _safe_canvas_coords(border_id)
+                    name_coords = _safe_canvas_coords(item.get('name_id')) if item.get('name_id') else None
+                    debug_entry.update({
+                        "canvas_coords": {
+                            "image": image_coords,
+                            "border": border_coords,
+                            "name": name_coords,
+                        },
+                        "actual_screen": _primary_screen_from_coords(image_coords) or (sx, sy),
+                    })
+                    debug_payload["rendered_items"].append(debug_entry)
             elif item_type == "marker":
                 item.setdefault("entry_width", 180)
                 item.setdefault("entry_expanded_width", item.get("entry_width", 180))
@@ -2649,14 +2693,15 @@ class DisplayMapController:
                 item.setdefault("handle_width", 22)
                 item.setdefault("border_color", "#00ff00")
                 sx, sy = int(xw*self.zoom + self.pan_x), int(yw*self.zoom + self.pan_y)
+                debug_entry = None
                 if debug_payload is not None:
-                    debug_payload["rendered_items"].append({
+                    debug_entry = {
                         "type": "marker",
                         "text": item.get("text"),
                         "linked_map": item.get("linked_map"),
                         "world_position": (xw, yw),
-                        "screen_position": (sx, sy),
-                    })
+                        "expected_screen": (sx, sy),
+                    }
                 entry = item.get("entry_widget")
                 desired_text = item.get("text", "")
                 if not entry or not entry.winfo_exists():
@@ -2780,20 +2825,34 @@ class DisplayMapController:
                     if item.get("description_visible"):
                         self._show_marker_description(item)
                 self._refresh_marker_description_popup(item)
+                if debug_entry is not None:
+                    entry_coords = _safe_canvas_coords(item.get("entry_canvas_id")) if item.get("entry_canvas_id") else None
+                    handle_coords = _safe_canvas_coords(item.get("handle_canvas_id")) if item.get("handle_canvas_id") else None
+                    border_coords = _safe_canvas_coords(item.get("border_canvas_id")) if item.get("border_canvas_id") else None
+                    debug_entry.update({
+                        "canvas_coords": {
+                            "entry": entry_coords,
+                            "handle": handle_coords,
+                            "border": border_coords,
+                        },
+                        "actual_screen": _primary_screen_from_coords(entry_coords) or (sx, sy),
+                    })
+                    debug_payload["rendered_items"].append(debug_entry)
             elif item_type in ["rectangle", "oval"]:
                 shape_width_unscaled = item.get("width", DEFAULT_SHAPE_WIDTH); shape_height_unscaled = item.get("height", DEFAULT_SHAPE_HEIGHT)
                 shape_width = shape_width_unscaled * self.zoom; shape_height = shape_height_unscaled * self.zoom
                 if shape_width <=0 or shape_height <=0: continue
                 sx, sy = int(xw*self.zoom + self.pan_x), int(yw*self.zoom + self.pan_y)
+                debug_entry = None
                 if debug_payload is not None:
-                    debug_payload["rendered_items"].append({
+                    debug_entry = {
                         "type": item_type,
                         "world_position": (xw, yw),
-                        "screen_position": (sx, sy),
+                        "expected_screen": (sx, sy),
                         "size": (shape_width, shape_height),
                         "fill": item.get("fill_color"),
                         "border_color": item.get("border_color"),
-                    })
+                    }
                 fill_color = item.get("fill_color", "") if item.get("is_filled") else ""; border_color = item.get("border_color", "#000000")
                 if item.get('canvas_ids') and item['canvas_ids'][0] is not None:
                     shape_id = item['canvas_ids'][0]
@@ -2806,6 +2865,16 @@ class DisplayMapController:
                     elif item_type == "oval": shape_id = self.canvas.create_oval(sx, sy, sx + shape_width, sy + shape_height, fill=fill_color, outline=border_color, width=2)
                     item['canvas_ids'] = (shape_id,) if shape_id else ();
                     if shape_id: self._bind_item_events(item)
+                if debug_entry is not None:
+                    primary_id = item.get('canvas_ids', (None,))[0] if item.get('canvas_ids') else None
+                    primary_coords = _safe_canvas_coords(primary_id)
+                    debug_entry.update({
+                        "canvas_coords": {
+                            "shape": primary_coords,
+                        },
+                        "actual_screen": _primary_screen_from_coords(primary_coords) or (sx, sy),
+                    })
+                    debug_payload["rendered_items"].append(debug_entry)
         if debug_payload is not None:
             expected = debug_payload.get("expected_items", [])
             rendered = debug_payload.get("rendered_items", [])
@@ -2859,7 +2928,10 @@ class DisplayMapController:
                         world_tuple = tuple(world_pos)
                     else:
                         world_tuple = None
-                    screen_pos = entry.get("screen_position") if not compute_screen else _compute_screen(world_pos)
+                    if compute_screen:
+                        screen_pos = _compute_screen(world_pos)
+                    else:
+                        screen_pos = entry.get("actual_screen") or entry.get("screen_position") or entry.get("expected_screen")
                     index.setdefault(key, []).append(
                         {
                             "entry": entry,
@@ -2960,6 +3032,16 @@ class DisplayMapController:
                     f"Render count mismatch for map '{map_name}': expected {len(expected)} items but drew {len(rendered)}.",
                     func_name="DisplayMapController._update_canvas_images",
                 )
+            if debug_payload is not None:
+                try:
+                    stack_snapshot = tuple(reversed(self.canvas.find_all()))  # topmost first
+                except tk.TclError:
+                    stack_snapshot = ()
+                if stack_snapshot:
+                    log_debug(
+                        f"Canvas stack top 15 IDs: {stack_snapshot[:15]}",
+                        func_name="DisplayMapController._update_canvas_images",
+                    )
             setattr(self, "_pending_render_debug_dump", None)
         self._update_selection_indicators()
         if self.fs_canvas:
