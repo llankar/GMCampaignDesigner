@@ -1,6 +1,7 @@
 """Campaign chatbot dialog with rich text rendering for entity notes."""
 from __future__ import annotations
 
+import os
 from contextlib import contextmanager
 from dataclasses import dataclass, field
 from typing import Any, Iterable, Mapping, Sequence
@@ -9,7 +10,9 @@ import tkinter as tk
 
 import customtkinter as ctk
 
+from modules.books.book_importer import extract_text_from_book
 from modules.generic.generic_model_wrapper import GenericModelWrapper
+from modules.helpers.config_helper import ConfigHelper
 from modules.helpers.logging_helper import (
     log_debug,
     log_exception,
@@ -596,6 +599,83 @@ def _highlight_snippet(snippet: str, query: str) -> RichTextValue:
     return value
 
 
+def _extract_text_from_pdf(path: str) -> str:
+    if not path:
+        return ""
+
+    try:
+        _, full_text, page_texts = extract_text_from_book(
+            path, campaign_dir=ConfigHelper.get_campaign_dir()
+        )
+    except FileNotFoundError as exc:
+        log_warning(
+            f"Excerpt PDF not found at '{path}': {exc}",
+            func_name="chatbot_dialog._extract_text_from_pdf",
+        )
+        return ""
+    except Exception as exc:  # pragma: no cover - defensive catch
+        log_exception(
+            f"Failed to extract text from excerpt '{path}': {exc}",
+            func_name="chatbot_dialog._extract_text_from_pdf",
+        )
+        return ""
+
+    if isinstance(full_text, str) and full_text.strip():
+        return full_text.strip()
+
+    snippets = [text.strip() for text in page_texts if isinstance(text, str) and text.strip()]
+    return "\n\n".join(snippets)
+
+
+def _normalize_page_number(value: Any) -> int | None:
+    try:
+        if value is None:
+            return None
+        if isinstance(value, str) and not value.strip():
+            return None
+        if isinstance(value, (int, float)):
+            return int(value)
+        return int(float(str(value)))
+    except (TypeError, ValueError):
+        return None
+
+
+def _label_for_excerpt(page: Mapping[str, Any], default_index: int) -> str:
+    for key in ("Label", "label"):
+        raw_label = page.get(key)
+        if isinstance(raw_label, str) and raw_label.strip():
+            return raw_label.strip()
+
+    for key in ("Page", "page", "PageNumber", "pagenumber", "Index", "index"):
+        normalized = _normalize_page_number(page.get(key))
+        if normalized is not None:
+            return f"Page {normalized}"
+
+    start = page.get("StartPage") or page.get("start_page")
+    end = page.get("EndPage") or page.get("end_page")
+    range_value = page.get("page_range")
+    if isinstance(range_value, (list, tuple)) and len(range_value) >= 2:
+        start = start or range_value[0]
+        end = end or range_value[1]
+
+    start_num = _normalize_page_number(start)
+    end_num = _normalize_page_number(end)
+    if start_num is not None and end_num is not None:
+        if start_num == end_num:
+            return f"Page {start_num}"
+        return f"Pages {start_num}-{end_num}"
+    if start_num is not None:
+        return f"Page {start_num}"
+
+    path_value = page.get("Path") or page.get("path")
+    if isinstance(path_value, str) and path_value.strip():
+        basename = os.path.basename(path_value.strip())
+        if basename:
+            return basename
+
+    return f"Page {default_index + 1}"
+
+
 def _collect_book_excerpts(record: Mapping[str, Any], query: str) -> list[tuple[str, RichTextValue]]:
     query_text = (query or "").strip()
     query_lower = query_text.lower()
@@ -603,6 +683,7 @@ def _collect_book_excerpts(record: Mapping[str, Any], query: str) -> list[tuple[
         return []
 
     candidates: list[tuple[str, str]] = []
+    extracted_cache: dict[str, str] = {}
 
     extracted_text = record.get("ExtractedText")
     if isinstance(extracted_text, str) and extracted_text.strip():
@@ -614,13 +695,18 @@ def _collect_book_excerpts(record: Mapping[str, Any], query: str) -> list[tuple[
             if isinstance(page, str) and page.strip():
                 candidates.append((f"Page {idx + 1}", page))
             elif isinstance(page, Mapping):
-                text = page.get("Text")
+                text = page.get("Text") or page.get("text") or page.get("Content") or page.get("content")
+                if not isinstance(text, str) or not text.strip():
+                    path_value = page.get("Path") or page.get("path")
+                    if isinstance(path_value, str) and path_value.strip():
+                        cached_text = extracted_cache.get(path_value)
+                        if cached_text is None:
+                            recovered = _extract_text_from_pdf(path_value)
+                            extracted_cache[path_value] = recovered
+                            cached_text = recovered
+                        text = cached_text
                 if isinstance(text, str) and text.strip():
-                    label_value = page.get("Page")
-                    if isinstance(label_value, (int, float)):
-                        label = f"Page {int(label_value)}"
-                    else:
-                        label = str(label_value).strip() or f"Page {idx + 1}"
+                    label = _label_for_excerpt(page, idx)
                     candidates.append((label, text))
 
     contents = record.get("Contents")
