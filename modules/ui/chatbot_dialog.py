@@ -727,23 +727,30 @@ class ChatbotDialog(ctk.CTkToplevel):
         header = ctk.CTkFrame(self)
         header.grid(row=0, column=0, sticky="ew", padx=12, pady=(12, 6))
         header.grid_columnconfigure(1, weight=1)
+        header.grid_columnconfigure(2, weight=0)
 
         title_label = ctk.CTkLabel(header, text="Ask the Campaign", font=("Segoe UI", 18, "bold"))
-        title_label.grid(row=0, column=0, columnspan=2, sticky="w", pady=(4, 10))
+        title_label.grid(row=0, column=0, columnspan=3, sticky="w", pady=(4, 10))
 
         prompt_label = ctk.CTkLabel(header, text="Search by name or keyword to reveal matching notes.")
-        prompt_label.grid(row=1, column=0, columnspan=2, sticky="w")
+        prompt_label.grid(row=1, column=0, columnspan=3, sticky="w")
 
         ctk.CTkLabel(header, text="Query:").grid(row=2, column=0, sticky="w", pady=(12, 0))
         self.query_entry = ctk.CTkEntry(header, placeholder_text="e.g. cult, hidden door, plot hook")
         self.query_entry.grid(row=2, column=1, sticky="ew", padx=(8, 0), pady=(12, 0))
-        self.query_entry.bind("<KeyRelease>", self._on_query_changed)
-        self.query_entry.bind("<Return>", self._on_submit)
-        self.query_entry.bind("<KP_Enter>", self._on_submit)
+        self.query_entry.bind("<Return>", self._on_query_submit)
+        self.query_entry.bind("<KP_Enter>", self._on_query_submit)
         self.query_entry.bind("<Down>", self._focus_results)
 
+        self.search_button = ctk.CTkButton(
+            header,
+            text="Search",
+            command=self._on_query_submit,
+        )
+        self.search_button.grid(row=2, column=2, padx=(8, 0), pady=(12, 0), sticky="ew")
+
         nav_frame = ctk.CTkFrame(header)
-        nav_frame.grid(row=3, column=0, columnspan=2, sticky="ew", pady=(10, 0))
+        nav_frame.grid(row=3, column=0, columnspan=3, sticky="ew", pady=(10, 0))
         nav_frame.grid_columnconfigure(0, weight=1)
         nav_frame.grid_columnconfigure(1, weight=1)
         self._prev_match_button = ctk.CTkButton(
@@ -772,7 +779,7 @@ class ChatbotDialog(ctk.CTkToplevel):
             variable=self._books_only_var,
             command=self._on_scope_changed,
         )
-        self.books_only_checkbox.grid(row=4, column=0, columnspan=2, sticky="w", pady=(8, 0))
+        self.books_only_checkbox.grid(row=4, column=0, columnspan=3, sticky="w", pady=(8, 0))
 
         results_frame = ctk.CTkFrame(self)
         results_frame.grid(row=1, column=0, sticky="nsew", padx=12, pady=(0, 8))
@@ -911,13 +918,15 @@ class ChatbotDialog(ctk.CTkToplevel):
             return "break"
         return None
 
-    def _on_query_changed(self, _event=None) -> None:
-        query = self.query_entry.get().strip().lower()
-        self._populate(initial=(query == ""), query=query)
-
     def _on_scope_changed(self) -> None:
         query = self.query_entry.get().strip().lower()
         self._populate(initial=(query == ""), query=query)
+
+    def _on_query_submit(self, _event=None):
+        query = self.query_entry.get().strip().lower()
+        self._populate(initial=(query == ""), query=query)
+        if _event is not None:
+            return "break"
 
     def _on_submit(self, _event=None) -> None:
         self._display_selected_note()
