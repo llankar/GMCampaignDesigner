@@ -719,7 +719,6 @@ class BookViewer(ctk.CTkToplevel):
                 tags=("highlight",),
             )
         self.canvas.tag_raise("highlight", "page")
-        self.destroy()
 
 
 def open_book_viewer(master, book_record: dict):
