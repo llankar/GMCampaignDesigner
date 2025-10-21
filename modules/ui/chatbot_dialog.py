@@ -1,6 +1,7 @@
 """Campaign chatbot dialog with rich text rendering for entity notes."""
 from __future__ import annotations
 
+from contextlib import contextmanager
 from dataclasses import dataclass, field
 from typing import Any, Iterable, Mapping, Sequence
 import bisect
@@ -1223,27 +1224,54 @@ class ChatbotDialog(ctk.CTkToplevel):
             func_name="ChatbotDialog._set_notes_state",
         )
 
+    @contextmanager
+    def _temporarily_enable_notes(self):
+        widgets: list[tuple[Any, str]] = []
+        for target in (getattr(self, "notes_box", None), self._notes_widget):
+            if target is None:
+                continue
+            try:
+                current_state = str(target.cget("state"))
+            except Exception:
+                continue
+            if current_state == "normal":
+                continue
+            try:
+                target.configure(state="normal")
+                widgets.append((target, current_state))
+            except Exception:
+                continue
+        try:
+            yield
+        finally:
+            for target, state in widgets:
+                try:
+                    target.configure(state=state)
+                except Exception:
+                    pass
+
     def _refresh_search_highlights(self) -> None:
         widget = self._notes_widget
         if widget is None:
             return
-        widget.tag_remove("search_highlight", "1.0", tk.END)
-        widget.tag_remove("search_active", "1.0", tk.END)
-        self._match_ranges.clear()
-        self._active_match_index = -1
-        query = self._active_query
-        if not query:
-            self._update_navigation_state()
-            return
-        start_index = "1.0"
-        while True:
-            match = widget.search(query, start_index, nocase=True, stopindex=tk.END)
-            if not match:
-                break
-            end_index = f"{match}+{len(query)}c"
-            self._match_ranges.append((match, end_index))
-            widget.tag_add("search_highlight", match, end_index)
-            start_index = end_index
+        with self._temporarily_enable_notes():
+            widget.tag_remove("search_highlight", "1.0", tk.END)
+            widget.tag_remove("search_active", "1.0", tk.END)
+            self._match_ranges.clear()
+            self._active_match_index = -1
+            query = self._active_query
+            if not query:
+                self._update_navigation_state()
+                return
+            start_index = "1.0"
+            while True:
+                match = widget.search(query, start_index, nocase=True, stopindex=tk.END)
+                if not match:
+                    break
+                end_index = f"{match}+{len(query)}c"
+                self._match_ranges.append((match, end_index))
+                widget.tag_add("search_highlight", match, end_index)
+                start_index = end_index
         self._update_navigation_state()
 
     def _focus_match(self, delta: int) -> None:
@@ -1264,16 +1292,17 @@ class ChatbotDialog(ctk.CTkToplevel):
         widget = self._notes_widget
         if widget is None:
             return
-        widget.tag_remove("search_active", "1.0", tk.END)
-        if 0 <= self._active_match_index < len(self._match_ranges):
-            start, end = self._match_ranges[self._active_match_index]
-            widget.tag_add("search_active", start, end)
-            widget.tag_raise("search_active")
-            if scroll:
-                try:
-                    widget.see(start)
-                except Exception:
-                    pass
+        with self._temporarily_enable_notes():
+            widget.tag_remove("search_active", "1.0", tk.END)
+            if 0 <= self._active_match_index < len(self._match_ranges):
+                start, end = self._match_ranges[self._active_match_index]
+                widget.tag_add("search_active", start, end)
+                widget.tag_raise("search_active")
+                if scroll:
+                    try:
+                        widget.see(start)
+                    except Exception:
+                        pass
 
     def _update_navigation_state(self) -> None:
         state = "normal" if self._match_ranges else "disabled"
