@@ -512,7 +512,7 @@ def _extract_paragraph_snippet(
     match_index: int,
     query_lower: str,
     *,
-    max_chars: int = 600,
+    max_chars: int = 2000,
     fallback_window: int = 240,
 ) -> str:
     if match_index < 0 or match_index >= len(text):
