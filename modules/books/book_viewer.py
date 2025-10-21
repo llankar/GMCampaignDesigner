@@ -190,29 +190,57 @@ class BookViewer(ctk.CTkToplevel):
                 else:
                     sequential_texts.append(text_value)
 
+        highest_numbered_page = max(numbered_pages) if numbered_pages else 0
         record_texts: list[str] = []
         if numbered_pages:
-            highest_page = max(numbered_pages)
-            target_count = self.page_count or highest_page
+            target_count = self.page_count or highest_numbered_page
             for index in range(1, target_count + 1):
                 record_texts.append(numbered_pages.get(index, "").strip())
         elif sequential_texts:
             record_texts = [text.strip() for text in sequential_texts]
 
+        def normalize_to_page_count(texts: list[str]) -> list[str]:
+            normalized = list(texts)
+            if self.page_count:
+                if len(normalized) < self.page_count:
+                    normalized.extend([""] * (self.page_count - len(normalized)))
+                elif len(normalized) > self.page_count:
+                    normalized = normalized[: self.page_count]
+            return normalized
+
         def covers_full_book(texts: list[str]) -> bool:
             if not texts or pages_marked_as_excerpt:
                 return False
+
+            if numbered_pages:
+                required_pages = max(self.page_count or 0, highest_numbered_page)
+                if required_pages <= 0:
+                    required_pages = len(numbered_pages)
+
+                distinct_pages = {page for page in numbered_pages.keys() if page is not None}
+                if len(distinct_pages) < required_pages:
+                    return False
+
+                non_empty_pages = {
+                    page
+                    for page, text in numbered_pages.items()
+                    if str(text or "").strip()
+                }
+                if len(non_empty_pages) < required_pages:
+                    return False
+
+                if len(texts) < required_pages:
+                    return False
+
+                return True
+
+            non_empty_entries = sum(1 for text in texts if str(text or "").strip())
             if self.page_count:
-                return len(texts) >= self.page_count
-            return len(texts) > 1
+                return len(texts) >= self.page_count and non_empty_entries >= self.page_count
+            return len(texts) > 1 and non_empty_entries == len(texts)
 
         if covers_full_book(record_texts):
-            if self.page_count:
-                if len(record_texts) < self.page_count:
-                    record_texts.extend([""] * (self.page_count - len(record_texts)))
-                elif len(record_texts) > self.page_count:
-                    record_texts = record_texts[: self.page_count]
-            return record_texts
+            return normalize_to_page_count(record_texts)
 
         extracted = self._extract_page_texts_from_pdf()
         has_pdf_content = any(text.strip() for text in extracted)
@@ -233,13 +261,8 @@ class BookViewer(ctk.CTkToplevel):
                     transcript_pages = transcript_pages[: self.page_count]
             return transcript_pages
 
-        if record_texts and not pages_marked_as_excerpt:
-            if self.page_count:
-                if len(record_texts) < self.page_count:
-                    record_texts.extend([""] * (self.page_count - len(record_texts)))
-                elif len(record_texts) > self.page_count:
-                    record_texts = record_texts[: self.page_count]
-            return record_texts
+        if covers_full_book(record_texts):
+            return normalize_to_page_count(record_texts)
 
         return extracted
 
