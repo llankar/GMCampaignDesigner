@@ -650,6 +650,12 @@ class BookViewer(ctk.CTkToplevel):
                 self._document.close()
             except Exception:
                 pass
+            finally:
+                self._document = None
+
+        # Ensure the toplevel window actually closes when the user presses the
+        # window close button.
+        self.destroy()
 
     def _refresh_search_highlight(self):
         self._prepare_highlight_boxes_for_current_page()
