@@ -6,6 +6,7 @@ import tkinter as tk
 from tkinter import messagebox
 
 import customtkinter as ctk
+import fitz
 from PIL import ImageTk
 
 from modules.books.pdf_processing import open_document, render_pdf_page_to_image
@@ -32,9 +33,11 @@ class BookViewer(ctk.CTkToplevel):
         self._page_image = None
         self._search_cache: list[int] = []
         self._search_query = ""
+        self._search_query_display = ""
         self._search_index = -1
         self._signets: list[dict[str, int | str]] = []
         self._suppress_signet_events = False
+        self._highlight_boxes: list[tuple[float, float, float, float]] = []
 
         self.title(self.book_record.get("Title") or "Book Viewer")
         self.geometry("1024x768")
@@ -65,6 +68,8 @@ class BookViewer(ctk.CTkToplevel):
         self._render_current_page()
 
         self.bind("<MouseWheel>", self._on_mouse_wheel)
+        self.bind("<Button-4>", self._on_mouse_wheel)
+        self.bind("<Button-5>", self._on_mouse_wheel)
         self.bind("<Shift-MouseWheel>", self._on_shift_mouse_wheel)
         self.protocol("WM_DELETE_WINDOW", self._on_close)
 
@@ -420,6 +425,7 @@ class BookViewer(ctk.CTkToplevel):
         self.page_var.set(str(self.current_page))
         self.zoom_label.configure(text=self._format_zoom_label())
         self._center_image()
+        self._refresh_search_highlight()
         self._highlight_current_signet()
         log_debug(
             f"Displayed page {self.current_page} at zoom {self.zoom:.2f}.",
@@ -437,6 +443,7 @@ class BookViewer(ctk.CTkToplevel):
         x = max((canvas_width - image_width) // 2, 0)
         y = max((canvas_height - image_height) // 2, 0)
         self.canvas.coords("page", x, y)
+        self._draw_highlight_overlays()
 
     # ------------------------------------------------------------------
     # Navigation
@@ -488,15 +495,18 @@ class BookViewer(ctk.CTkToplevel):
     # ------------------------------------------------------------------
 
     def _prepare_search_results(self, query: str):
-        lowered = query.strip().lower()
+        stripped = query.strip()
+        lowered = stripped.lower()
         if not lowered:
             self._search_cache = []
             self._search_query = ""
+            self._search_query_display = ""
             self._search_index = -1
             self.search_status.configure(text="")
+            self._refresh_search_highlight()
             return
 
-        if lowered == self._search_query:
+        if lowered == self._search_query and stripped == self._search_query_display:
             return
 
         matches: list[int] = []
@@ -510,10 +520,12 @@ class BookViewer(ctk.CTkToplevel):
 
         self._search_cache = matches
         self._search_query = lowered
+        self._search_query_display = stripped
         self._search_index = -1
         total = len(matches)
         status = f"{total} match(es)" if total else "No matches"
         self.search_status.configure(text=status)
+        self._refresh_search_highlight()
         log_debug(
             f"Search '{lowered}' found {total} page(s).",
             func_name="BookViewer._prepare_search_results",
@@ -538,7 +550,10 @@ class BookViewer(ctk.CTkToplevel):
         self.search_status.configure(
             text=f"Match {self._search_index + 1}/{len(self._search_cache)}"
         )
+        previous_page = self.current_page
         self.go_to_page(target_page)
+        if target_page == previous_page:
+            self._refresh_search_highlight()
 
     def search_forward(self):
         self._advance_search(True)
@@ -603,11 +618,21 @@ class BookViewer(ctk.CTkToplevel):
         self._activate_selected_signet()
 
     def _on_mouse_wheel(self, event):
-        if event.state & 0x0004:  # Control key pressed
-            delta = 0.25 if event.delta > 0 else -0.25
-            self.adjust_zoom(delta)
-        else:
-            self.canvas.yview_scroll(-1 if event.delta > 0 else 1, "units")
+        ctrl_mask = 0x0004
+        num = getattr(event, "num", 0)
+        delta = event.delta
+
+        if event.state & ctrl_mask:
+            if delta > 0 or num == 4:
+                self.adjust_zoom(0.25)
+            elif delta < 0 or num == 5:
+                self.adjust_zoom(-0.25)
+            return
+
+        if delta > 0 or num == 4:
+            self.go_to_page(self.current_page - 1)
+        elif delta < 0 or num == 5:
+            self.go_to_page(self.current_page + 1)
 
     def _on_shift_mouse_wheel(self, event):
         self.canvas.xview_scroll(-1 if event.delta > 0 else 1, "units")
@@ -618,6 +643,75 @@ class BookViewer(ctk.CTkToplevel):
                 self._document.close()
             except Exception:
                 pass
+
+    def _refresh_search_highlight(self):
+        self._prepare_highlight_boxes_for_current_page()
+        self._draw_highlight_overlays()
+
+    def _prepare_highlight_boxes_for_current_page(self):
+        self._highlight_boxes = []
+        if not self._document:
+            return
+
+        if not self._search_query_display:
+            return
+
+        if self._search_cache and self.current_page not in self._search_cache:
+            return
+
+        try:
+            page = self._document.load_page(self.current_page - 1)
+        except Exception as exc:  # pragma: no cover - defensive catch
+            log_warning(
+                f"Failed to prepare highlights for page {self.current_page}: {exc}",
+                func_name="BookViewer._prepare_highlight_boxes_for_current_page",
+            )
+            return
+
+        flags = 0
+        for attr in ("TEXT_DEHYPHENATE", "TEXT_IGNORECASE"):
+            flags |= getattr(fitz, attr, 0)
+
+        try:
+            results = page.search_for(self._search_query_display, flags=flags)
+        except TypeError:
+            results = page.search_for(self._search_query_display)
+        except Exception as exc:  # pragma: no cover - defensive catch
+            log_warning(
+                f"Failed to locate search results on page {self.current_page}: {exc}",
+                func_name="BookViewer._prepare_highlight_boxes_for_current_page",
+            )
+            return
+
+        zoom = self.zoom
+        self._highlight_boxes = [
+            (rect.x0 * zoom, rect.y0 * zoom, rect.x1 * zoom, rect.y1 * zoom)
+            for rect in results
+        ]
+
+    def _draw_highlight_overlays(self):
+        self.canvas.delete("highlight")
+        if not self._highlight_boxes:
+            return
+
+        coords = self.canvas.coords("page")
+        if not coords:
+            return
+
+        x_offset, y_offset = coords[0], coords[1]
+        for left, top, right, bottom in self._highlight_boxes:
+            self.canvas.create_rectangle(
+                x_offset + left,
+                y_offset + top,
+                x_offset + right,
+                y_offset + bottom,
+                outline="#FFD54F",
+                width=2,
+                fill="#FFD54F",
+                stipple="gray50",
+                tags=("highlight",),
+            )
+        self.canvas.tag_raise("highlight", "page")
         self.destroy()
 
 
