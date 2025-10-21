@@ -596,10 +596,11 @@ def _highlight_snippet(snippet: str, query: str) -> RichTextValue:
     return value
 
 
-def _find_book_excerpt(record: Mapping[str, Any], query: str) -> tuple[str, RichTextValue] | None:
-    query_lower = (query or "").strip().lower()
+def _collect_book_excerpts(record: Mapping[str, Any], query: str) -> list[tuple[str, RichTextValue]]:
+    query_text = (query or "").strip()
+    query_lower = query_text.lower()
     if not query_lower:
-        return None
+        return []
 
     candidates: list[tuple[str, str]] = []
 
@@ -630,17 +631,28 @@ def _find_book_excerpt(record: Mapping[str, Any], query: str) -> tuple[str, Rich
     if isinstance(text_field, str) and text_field.strip():
         candidates.append(("Text", text_field))
 
-    for label, text in candidates:
+    seen: set[tuple[str, str]] = set()
+    excerpts: list[tuple[str, RichTextValue]] = []
+
+    for raw_label, text in candidates:
+        normalized_label = str(raw_label or "").strip()
         normalized = _normalize_excerpt_source(text)
         lowered = normalized.lower()
-        match_index = lowered.find(query_lower)
-        if match_index == -1:
-            continue
-        snippet = _extract_paragraph_snippet(normalized, match_index, query_lower)
-        if snippet:
-            return label, _highlight_snippet(snippet, query)
+        start = 0
+        while True:
+            match_index = lowered.find(query_lower, start)
+            if match_index == -1:
+                break
+            snippet = _extract_paragraph_snippet(normalized, match_index, query_lower)
+            if snippet:
+                snippet_key = snippet.strip().lower()
+                dedupe_key = (normalized_label, snippet_key)
+                if dedupe_key not in seen:
+                    seen.add(dedupe_key)
+                    excerpts.append((normalized_label, _highlight_snippet(snippet, query_text)))
+            start = match_index + len(query_lower)
 
-    return None
+    return excerpts
 
 
 # ---------------------------------------------------------------------------
@@ -690,6 +702,12 @@ class ChatbotDialog(ctk.CTkToplevel):
         self._active_match_index: int = -1
         self._prev_match_button: ctk.CTkButton | None = None
         self._next_match_button: ctk.CTkButton | None = None
+        self._active_entity: tuple[str, str] | None = None
+        self._active_record: Mapping[str, Any] | None = None
+        self._base_sections: list[tuple[str, list[tuple[str, RichTextValue]]]] | None = None
+        self._book_excerpts: list[tuple[str, RichTextValue]] = []
+        self._active_excerpt_index: int = -1
+        self._excerpt_status_label: ctk.CTkLabel | None = None
 
         self._build_ui()
         log_info(
@@ -740,6 +758,13 @@ class ChatbotDialog(ctk.CTkToplevel):
             command=lambda: self._focus_match(1),
         )
         self._next_match_button.grid(row=0, column=1, sticky="ew")
+        self._excerpt_status_label = ctk.CTkLabel(
+            nav_frame,
+            text="",
+            anchor="w",
+            font=("Segoe UI", 12),
+        )
+        self._excerpt_status_label.grid(row=1, column=0, columnspan=2, sticky="w", pady=(6, 0))
 
         self.books_only_checkbox = ctk.CTkCheckBox(
             header,
@@ -906,6 +931,7 @@ class ChatbotDialog(ctk.CTkToplevel):
             f"ChatbotDialog._populate - Refreshing results (initial={initial}, query={query!r})",
             func_name="ChatbotDialog._populate",
         )
+        self._reset_active_record()
         self.result_list.delete(0, tk.END)
         self._results.clear()
 
@@ -1049,9 +1075,42 @@ class ChatbotDialog(ctk.CTkToplevel):
         )
         return blob
 
+    def _update_excerpt_status(self) -> None:
+        if self._excerpt_status_label is None:
+            return
+        if (
+            self._active_entity
+            and self._active_entity[0] == "Books"
+            and self._book_excerpts
+        ):
+            total = len(self._book_excerpts)
+            index = self._active_excerpt_index
+            if index < 0:
+                index = 0
+            else:
+                index %= total
+            label = self._book_excerpts[index][0] or "Excerpt"
+            display_label = label if label else "Excerpt"
+            self._excerpt_status_label.configure(
+                text=f"{display_label} – {index + 1}/{total}"
+            )
+        else:
+            self._excerpt_status_label.configure(text="")
+
+    def _reset_active_record(self) -> None:
+        self._active_entity = None
+        self._active_record = None
+        self._base_sections = None
+        self._book_excerpts = []
+        self._active_excerpt_index = -1
+        self._match_ranges.clear()
+        self._active_match_index = -1
+        self._update_navigation_state()
+
     def _display_selected_note(self, _event=None) -> None:
         selection = self.result_list.curselection()
         if not selection:
+            self._reset_active_record()
             if self.result_list.size() == 0:
                 self._render_text(RichTextValue("No matches yet. Try refining your query."))
             return
@@ -1059,6 +1118,9 @@ class ChatbotDialog(ctk.CTkToplevel):
         if idx >= len(self._results):
             return
         entity_type, name, record = self._results[idx]
+        self._reset_active_record()
+        self._active_entity = (entity_type, name)
+        self._active_record = record
         log_debug(
             f"ChatbotDialog._display_selected_note - Selected index {idx} of {len(self._results)} results",
             func_name="ChatbotDialog._display_selected_note",
@@ -1075,13 +1137,28 @@ class ChatbotDialog(ctk.CTkToplevel):
 
         sections = self._collate_sections(entity_type, record)
         if entity_type == "Books":
-            sections = self._focus_book_sections(sections, record)
+            self._base_sections = [(title, list(entries)) for title, entries in sections]
+            raw_query = self.query_entry.get() if hasattr(self, "query_entry") else ""
+            query_for_excerpts = raw_query if raw_query.strip() else self._active_query
+            self._book_excerpts = _collect_book_excerpts(record, query_for_excerpts)
+            log_info(
+                f"ChatbotDialog._display_selected_note - Prepared {len(self._book_excerpts)} excerpts for focused navigation",
+                func_name="ChatbotDialog._display_selected_note",
+            )
+            if self._book_excerpts:
+                self._active_excerpt_index = 0
+                initial_excerpt = self._book_excerpts[0]
+            else:
+                self._active_excerpt_index = -1
+                initial_excerpt = None
+            sections = self._focus_book_sections(self._base_sections, initial_excerpt)
         if not sections:
             log_warning(
                 "ChatbotDialog._display_selected_note - No sections found after collation",
                 func_name="ChatbotDialog._display_selected_note",
             )
             self._render_text(RichTextValue("No notes available for this record."))
+            self._update_excerpt_status()
             return
         log_debug(
             "ChatbotDialog._display_selected_note - Section summary: "
@@ -1089,6 +1166,7 @@ class ChatbotDialog(ctk.CTkToplevel):
             func_name="ChatbotDialog._display_selected_note",
         )
         self._render_sections(sections)
+        self._update_excerpt_status()
 
     # ------------------------------------------------------------------
     # Rendering helpers
@@ -1096,34 +1174,47 @@ class ChatbotDialog(ctk.CTkToplevel):
     def _focus_book_sections(
         self,
         sections: Sequence[tuple[str, list[tuple[str, RichTextValue]]]],
-        record: Mapping[str, Any],
+        excerpt: tuple[str, RichTextValue] | None,
     ) -> list[tuple[str, list[tuple[str, RichTextValue]]]]:
-        query = getattr(self, "_active_query", "").strip().lower()
-        if not query:
-            return list(sections)
-        excerpt = _find_book_excerpt(record, query)
-        if not excerpt:
-            return list(sections)
-        label, value = excerpt
-        if label:
-            display_label = f"{label} (excerpt)"
-        else:
-            display_label = "Excerpt"
-        updated: list[tuple[str, list[tuple[str, RichTextValue]]]] = []
+        focused: list[tuple[str, list[tuple[str, RichTextValue]]]] = []
+        replacement_label = replacement_value = None
+        if excerpt is not None:
+            replacement_label, replacement_value = excerpt
+            if replacement_label:
+                replacement_label = f"{replacement_label} (excerpt)"
+            else:
+                replacement_label = "Excerpt"
+
         replaced = False
         for title, entries in sections:
-            if title == "Content":
-                updated.append((title, [(display_label, value)]))
+            copied_entries = list(entries)
+            if replacement_label is not None and title == "Content":
+                copied_entries = [(replacement_label, replacement_value)]
                 replaced = True
-            else:
-                updated.append((title, list(entries)))
-        if not replaced:
-            updated.append(("Content", [(display_label, value)]))
-        log_info(
-            "ChatbotDialog._focus_book_sections - Showing focused excerpt for book query",
-            func_name="ChatbotDialog._focus_book_sections",
-        )
-        return updated
+            focused.append((title, copied_entries))
+
+        if replacement_label is not None and not replaced:
+            focused.append(("Content", [(replacement_label, replacement_value)]))
+        if replacement_label is not None:
+            log_info(
+                "ChatbotDialog._focus_book_sections - Showing focused excerpt for book query",
+                func_name="ChatbotDialog._focus_book_sections",
+            )
+        return focused
+
+    def _render_active_book_excerpt(self) -> None:
+        if self._base_sections is None:
+            return
+        excerpt: tuple[str, RichTextValue] | None = None
+        if self._book_excerpts:
+            if self._active_excerpt_index < 0:
+                self._active_excerpt_index = 0
+            total = len(self._book_excerpts)
+            if total:
+                self._active_excerpt_index %= total
+                excerpt = self._book_excerpts[self._active_excerpt_index]
+        sections = self._focus_book_sections(self._base_sections, excerpt)
+        self._render_sections(sections)
 
     def _section_layout(self, entity_type: str) -> Sequence[tuple[str, tuple[str, ...]]]:
         base = self._section_overrides.get(entity_type, self._section_overrides["default"])
@@ -1275,6 +1366,19 @@ class ChatbotDialog(ctk.CTkToplevel):
         self._update_navigation_state()
 
     def _focus_match(self, delta: int) -> None:
+        if (
+            delta
+            and self._active_entity
+            and self._active_entity[0] == "Books"
+            and self._book_excerpts
+        ):
+            if self._active_excerpt_index < 0:
+                self._active_excerpt_index = 0
+            total = len(self._book_excerpts)
+            if total:
+                self._active_excerpt_index = (self._active_excerpt_index + delta) % total
+            self._render_active_book_excerpt()
+            return
         if not self._match_ranges:
             self._active_match_index = -1
             self._update_navigation_state()
@@ -1305,7 +1409,12 @@ class ChatbotDialog(ctk.CTkToplevel):
                         pass
 
     def _update_navigation_state(self) -> None:
-        state = "normal" if self._match_ranges else "disabled"
+        has_excerpts = (
+            self._active_entity is not None
+            and self._active_entity[0] == "Books"
+            and bool(self._book_excerpts)
+        )
+        state = "normal" if self._match_ranges or has_excerpts else "disabled"
         if self._prev_match_button is not None:
             try:
                 self._prev_match_button.configure(state=state)
@@ -1316,6 +1425,7 @@ class ChatbotDialog(ctk.CTkToplevel):
                 self._next_match_button.configure(state=state)
             except Exception:
                 pass
+        self._update_excerpt_status()
 
     def _on_next_match(self, _event=None):
         self._focus_match(1)
