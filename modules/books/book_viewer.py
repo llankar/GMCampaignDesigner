@@ -135,35 +135,138 @@ class BookViewer(ctk.CTkToplevel):
     # ------------------------------------------------------------------
 
     def _collect_page_texts(self) -> list[str]:
-        texts: list[str] = []
-        pages = self.book_record.get("ExtractedPages")
-        if isinstance(pages, list):
-            for entry in pages:
-                text_value = None
+        def normalize_page_number(value) -> int | None:
+            try:
+                if isinstance(value, str) and not value.strip():
+                    return None
+                if isinstance(value, (int, float)):
+                    return int(value)
+                if isinstance(value, str):
+                    return int(float(value))
+            except (TypeError, ValueError):
+                return None
+            return None
+
+        pages_raw = self.book_record.get("ExtractedPages")
+        sequential_texts: list[str] = []
+        numbered_pages: dict[int, str] = {}
+        pages_marked_as_excerpt = False
+
+        if isinstance(pages_raw, list):
+            for entry in pages_raw:
+                text_value: str | None = None
+                page_number: int | None = None
+
                 if isinstance(entry, str):
                     text_value = entry
                 elif isinstance(entry, dict):
-                    for key in ("Text", "text", "Content", "content"):
-                        value = entry.get(key)
-                        if isinstance(value, str) and value.strip():
-                            text_value = value
-                            break
-                if text_value is not None:
-                    texts.append(str(text_value).strip())
+                    lowered_keys = {str(key).lower(): key for key in entry.keys()}
+                    entry_type_key = lowered_keys.get("type")
+                    if entry_type_key:
+                        entry_type = entry.get(entry_type_key)
+                        if isinstance(entry_type, str) and entry_type.strip().lower() == "excerpt":
+                            pages_marked_as_excerpt = True
+                    if "path" in lowered_keys and "page" not in lowered_keys and "pagenumber" not in lowered_keys:
+                        pages_marked_as_excerpt = True
 
-        if self.page_count and len(texts) >= self.page_count:
-            return texts[: self.page_count]
+                    for key in ("Text", "text", "Content", "content"):
+                        if key in entry and isinstance(entry[key], str):
+                            text_value = entry[key]
+                            break
+
+                    for key in ("Page", "page", "PageNumber", "pagenumber", "Index", "index"):
+                        if key in entry:
+                            page_number = normalize_page_number(entry[key])
+                            if page_number is not None:
+                                break
+
+                if text_value is None:
+                    text_value = ""
+
+                text_value = str(text_value).strip()
+
+                if page_number is not None:
+                    numbered_pages[page_number] = text_value
+                else:
+                    sequential_texts.append(text_value)
+
+        record_texts: list[str] = []
+        if numbered_pages:
+            highest_page = max(numbered_pages)
+            target_count = self.page_count or highest_page
+            for index in range(1, target_count + 1):
+                record_texts.append(numbered_pages.get(index, "").strip())
+        elif sequential_texts:
+            record_texts = [text.strip() for text in sequential_texts]
+
+        def covers_full_book(texts: list[str]) -> bool:
+            if not texts or pages_marked_as_excerpt:
+                return False
+            if self.page_count:
+                return len(texts) >= self.page_count
+            return len(texts) > 1
+
+        if covers_full_book(record_texts):
+            if self.page_count:
+                if len(record_texts) < self.page_count:
+                    record_texts.extend([""] * (self.page_count - len(record_texts)))
+                elif len(record_texts) > self.page_count:
+                    record_texts = record_texts[: self.page_count]
+            return record_texts
 
         extracted = self._extract_page_texts_from_pdf()
-        if extracted:
-            if texts and self.book_record.get("IndexStatus") == "indexed":
-                limit = min(len(texts), len(extracted))
+        has_pdf_content = any(text.strip() for text in extracted)
+        if has_pdf_content:
+            if record_texts and self.book_record.get("IndexStatus") == "indexed" and not pages_marked_as_excerpt:
+                limit = min(len(record_texts), len(extracted))
                 for index in range(limit):
-                    if texts[index]:
-                        extracted[index] = texts[index]
+                    if record_texts[index]:
+                        extracted[index] = record_texts[index]
             return extracted
 
-        return texts
+        transcript_pages = self._split_transcript_into_pages(self.book_record.get("ExtractedText"))
+        if transcript_pages:
+            if self.page_count:
+                if len(transcript_pages) < self.page_count:
+                    transcript_pages.extend([""] * (self.page_count - len(transcript_pages)))
+                elif len(transcript_pages) > self.page_count:
+                    transcript_pages = transcript_pages[: self.page_count]
+            return transcript_pages
+
+        if record_texts and not pages_marked_as_excerpt:
+            if self.page_count:
+                if len(record_texts) < self.page_count:
+                    record_texts.extend([""] * (self.page_count - len(record_texts)))
+                elif len(record_texts) > self.page_count:
+                    record_texts = record_texts[: self.page_count]
+            return record_texts
+
+        return extracted
+
+    def _split_transcript_into_pages(self, transcript) -> list[str]:
+        if not isinstance(transcript, str):
+            return []
+
+        cleaned = transcript.replace("\r\n", "\n").replace("\r", "\n").strip()
+        if not cleaned:
+            return []
+
+        for separator in ("\f", "\u000c"):
+            if separator in cleaned:
+                return [part.strip() for part in cleaned.split(separator)]
+
+        if self.page_count and self.page_count > 0:
+            approx_length = max(1, len(cleaned) // self.page_count)
+            pages: list[str] = []
+            start = 0
+            for _ in range(self.page_count - 1):
+                end = start + approx_length
+                pages.append(cleaned[start:end].strip())
+                start = end
+            pages.append(cleaned[start:].strip())
+            return pages
+
+        return [cleaned]
 
     def _extract_page_texts_from_pdf(self) -> list[str]:
         texts: list[str] = []
