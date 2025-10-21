@@ -33,6 +33,8 @@ class BookViewer(ctk.CTkToplevel):
         self._search_cache: list[int] = []
         self._search_query = ""
         self._search_index = -1
+        self._signets: list[dict[str, int | str]] = []
+        self._suppress_signet_events = False
 
         self.title(self.book_record.get("Title") or "Book Viewer")
         self.geometry("1024x768")
@@ -57,6 +59,7 @@ class BookViewer(ctk.CTkToplevel):
             self.page_count = self.book_record.get("PageCount") or 0
 
         self._page_texts = self._collect_page_texts()
+        self._signets = self._collect_signets()
 
         self._build_ui()
         self._render_current_page()
@@ -117,18 +120,55 @@ class BookViewer(ctk.CTkToplevel):
         viewer_frame = ctk.CTkFrame(self)
         viewer_frame.pack(fill="both", expand=True, padx=10, pady=(0, 10))
         viewer_frame.grid_rowconfigure(0, weight=1)
-        viewer_frame.grid_columnconfigure(0, weight=1)
+        viewer_frame.grid_columnconfigure(0, weight=0)
+        viewer_frame.grid_columnconfigure(1, weight=1)
+
+        if self._signets:
+            self.signet_panel = ctk.CTkFrame(viewer_frame)
+            self.signet_panel.grid(row=0, column=0, rowspan=2, sticky="nsew", padx=(0, 10))
+            self.signet_panel.grid_rowconfigure(1, weight=1)
+
+            signet_title = ctk.CTkLabel(self.signet_panel, text="Signets", anchor="w")
+            signet_title.grid(row=0, column=0, sticky="ew", padx=5, pady=(5, 0))
+
+            self._signet_list_var = tk.StringVar(value=[self._format_signet_label(item) for item in self._signets])
+            signet_listbox = tk.Listbox(
+                self.signet_panel,
+                listvariable=self._signet_list_var,
+                exportselection=False,
+                activestyle="none",
+                background="#1E1E1E",
+                foreground="#E0E0E0",
+                highlightthickness=0,
+                selectbackground="#3A7EBF",
+            )
+            signet_listbox.grid(row=1, column=0, sticky="nsew", padx=5, pady=5)
+
+            signet_scrollbar = tk.Scrollbar(self.signet_panel, orient="vertical", command=signet_listbox.yview)
+            signet_scrollbar.grid(row=1, column=1, sticky="ns", pady=5)
+            signet_listbox.configure(yscrollcommand=signet_scrollbar.set)
+
+            signet_listbox.bind("<<ListboxSelect>>", self._on_signet_select)
+            signet_listbox.bind("<Double-Button-1>", self._on_signet_activate)
+            signet_listbox.bind("<Return>", self._on_signet_activate)
+            self._signet_listbox = signet_listbox
+        else:
+            self.signet_panel = None
+            self._signet_list_var = None
+            self._signet_listbox = None
 
         self.canvas = tk.Canvas(viewer_frame, background="#1E1E1E", highlightthickness=0)
-        self.canvas.grid(row=0, column=0, sticky="nsew")
+        self.canvas.grid(row=0, column=1, sticky="nsew")
 
         self.v_scroll = ctk.CTkScrollbar(viewer_frame, orientation="vertical", command=self.canvas.yview)
-        self.v_scroll.grid(row=0, column=1, sticky="ns")
+        self.v_scroll.grid(row=0, column=2, sticky="ns")
         self.h_scroll = ctk.CTkScrollbar(viewer_frame, orientation="horizontal", command=self.canvas.xview)
-        self.h_scroll.grid(row=1, column=0, sticky="ew")
+        self.h_scroll.grid(row=1, column=1, sticky="ew")
 
         self.canvas.configure(yscrollcommand=self.v_scroll.set, xscrollcommand=self.h_scroll.set)
         self.canvas.bind("<Configure>", lambda _e: self._center_image())
+
+        self._highlight_current_signet()
 
     # ------------------------------------------------------------------
     # Rendering helpers
@@ -314,6 +354,45 @@ class BookViewer(ctk.CTkToplevel):
 
         return texts
 
+    def _collect_signets(self) -> list[dict[str, int | str]]:
+        signets: list[dict[str, int | str]] = []
+        if not self._document:
+            return signets
+
+        try:
+            toc = self._document.get_toc(simple=True) or []
+        except Exception as exc:  # pragma: no cover - defensive catch
+            log_warning(
+                f"Failed to collect signets: {exc}",
+                func_name="BookViewer._collect_signets",
+            )
+            return signets
+
+        for entry in toc:
+            if not isinstance(entry, (list, tuple)) or len(entry) < 3:
+                continue
+            level, title, page = entry[:3]
+            try:
+                page_number = int(page)
+            except (TypeError, ValueError):
+                continue
+            if page_number < 1:
+                continue
+            try:
+                level_value = int(level)
+            except (TypeError, ValueError):
+                level_value = 1
+
+            label = str(title or "").strip() or f"Page {page_number}"
+            signets.append({"title": label, "page": page_number, "level": max(level_value, 1)})
+
+        if signets:
+            log_debug(
+                f"Collected {len(signets)} signet(s) from PDF.",
+                func_name="BookViewer._collect_signets",
+            )
+        return signets
+
     def _render_current_page(self):
         if not self._document:
             return
@@ -341,6 +420,7 @@ class BookViewer(ctk.CTkToplevel):
         self.page_var.set(str(self.current_page))
         self.zoom_label.configure(text=self._format_zoom_label())
         self._center_image()
+        self._highlight_current_signet()
         log_debug(
             f"Displayed page {self.current_page} at zoom {self.zoom:.2f}.",
             func_name="BookViewer._render_current_page",
@@ -469,6 +549,58 @@ class BookViewer(ctk.CTkToplevel):
     # ------------------------------------------------------------------
     # Event handlers
     # ------------------------------------------------------------------
+
+    def _format_signet_label(self, signet: dict[str, int | str]) -> str:
+        indent = "    " * (max(int(signet.get("level", 1)) - 1, 0))
+        title = str(signet.get("title", "")).strip()
+        page = signet.get("page", "")
+        page_display = f" (p. {page})" if page else ""
+        return f"{indent}{title}{page_display}".rstrip()
+
+    def _highlight_current_signet(self):
+        if not self._signets or not self._signet_listbox:
+            return
+
+        target_index = None
+        for idx, signet in enumerate(self._signets):
+            if signet.get("page") == self.current_page:
+                target_index = idx
+                break
+
+        self._suppress_signet_events = True
+        try:
+            self._signet_listbox.selection_clear(0, "end")
+            if target_index is not None:
+                self._signet_listbox.selection_set(target_index)
+                self._signet_listbox.see(target_index)
+        finally:
+            self._suppress_signet_events = False
+
+    def _activate_selected_signet(self):
+        if not self._signets or not self._signet_listbox:
+            return
+
+        selection = self._signet_listbox.curselection()
+        if not selection:
+            return
+        index = selection[0]
+        try:
+            signet = self._signets[index]
+        except IndexError:
+            return
+        page = signet.get("page")
+        if isinstance(page, int):
+            self.go_to_page(page)
+
+    def _on_signet_select(self, _event):
+        if self._suppress_signet_events:
+            return
+        self._activate_selected_signet()
+
+    def _on_signet_activate(self, _event=None):
+        if self._suppress_signet_events:
+            return
+        self._activate_selected_signet()
 
     def _on_mouse_wheel(self, event):
         if event.state & 0x0004:  # Control key pressed
