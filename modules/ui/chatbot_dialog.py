@@ -685,6 +685,10 @@ class ChatbotDialog(ctk.CTkToplevel):
         self._search_cache: dict[str, list[str]] = {}
         self._books_only_var = tk.BooleanVar(self, False)
         self._active_query: str = ""
+        self._match_ranges: list[tuple[str, str]] = []
+        self._active_match_index: int = -1
+        self._prev_match_button: ctk.CTkButton | None = None
+        self._next_match_button: ctk.CTkButton | None = None
 
         self._build_ui()
         log_info(
@@ -719,13 +723,30 @@ class ChatbotDialog(ctk.CTkToplevel):
         self.query_entry.bind("<KP_Enter>", self._on_submit)
         self.query_entry.bind("<Down>", self._focus_results)
 
+        nav_frame = ctk.CTkFrame(header)
+        nav_frame.grid(row=3, column=0, columnspan=2, sticky="ew", pady=(10, 0))
+        nav_frame.grid_columnconfigure(0, weight=1)
+        nav_frame.grid_columnconfigure(1, weight=1)
+        self._prev_match_button = ctk.CTkButton(
+            nav_frame,
+            text="Previous match",
+            command=lambda: self._focus_match(-1),
+        )
+        self._prev_match_button.grid(row=0, column=0, padx=(0, 8), sticky="ew")
+        self._next_match_button = ctk.CTkButton(
+            nav_frame,
+            text="Next match",
+            command=lambda: self._focus_match(1),
+        )
+        self._next_match_button.grid(row=0, column=1, sticky="ew")
+
         self.books_only_checkbox = ctk.CTkCheckBox(
             header,
             text="Show only books",
             variable=self._books_only_var,
             command=self._on_scope_changed,
         )
-        self.books_only_checkbox.grid(row=3, column=0, columnspan=2, sticky="w", pady=(8, 0))
+        self.books_only_checkbox.grid(row=4, column=0, columnspan=2, sticky="w", pady=(8, 0))
 
         results_frame = ctk.CTkFrame(self)
         results_frame.grid(row=1, column=0, sticky="nsew", padx=12, pady=(0, 8))
@@ -818,6 +839,25 @@ class ChatbotDialog(ctk.CTkToplevel):
         widget.tag_configure("bold", font=self._bold_font)
         widget.tag_configure("italic", font=self._italic_font)
         widget.tag_configure("underline", font=self._underline_font)
+        widget.tag_configure(
+            "search_highlight",
+            background="#3d6fb4",
+            foreground=text_theme["fg"],
+        )
+        widget.tag_configure(
+            "search_active",
+            background="#f4b942",
+            foreground=text_theme["fg"],
+        )
+        widget.tag_lower("search_highlight")
+        widget.tag_raise("search_active")
+
+        self.bind("<Control-g>", self._on_next_match)
+        self.bind("<Control-G>", self._on_next_match)
+        self.bind("<Shift-Return>", self._on_prev_match)
+        self.bind("<Shift-KP_Enter>", self._on_prev_match)
+
+        self._update_navigation_state()
 
     # ------------------------------------------------------------------
     # Event handlers
@@ -1183,6 +1223,79 @@ class ChatbotDialog(ctk.CTkToplevel):
             func_name="ChatbotDialog._set_notes_state",
         )
 
+    def _refresh_search_highlights(self) -> None:
+        widget = self._notes_widget
+        if widget is None:
+            return
+        widget.tag_remove("search_highlight", "1.0", tk.END)
+        widget.tag_remove("search_active", "1.0", tk.END)
+        self._match_ranges.clear()
+        self._active_match_index = -1
+        query = self._active_query
+        if not query:
+            self._update_navigation_state()
+            return
+        start_index = "1.0"
+        while True:
+            match = widget.search(query, start_index, nocase=True, stopindex=tk.END)
+            if not match:
+                break
+            end_index = f"{match}+{len(query)}c"
+            self._match_ranges.append((match, end_index))
+            widget.tag_add("search_highlight", match, end_index)
+            start_index = end_index
+        self._update_navigation_state()
+
+    def _focus_match(self, delta: int) -> None:
+        if not self._match_ranges:
+            self._active_match_index = -1
+            self._update_navigation_state()
+            return
+        if self._active_match_index < 0 or self._active_match_index >= len(self._match_ranges):
+            if delta < 0:
+                self._active_match_index = len(self._match_ranges) - 1
+            else:
+                self._active_match_index = 0
+        elif delta:
+            self._active_match_index = (self._active_match_index + delta) % len(self._match_ranges)
+        self._apply_active_match(scroll=True)
+
+    def _apply_active_match(self, *, scroll: bool) -> None:
+        widget = self._notes_widget
+        if widget is None:
+            return
+        widget.tag_remove("search_active", "1.0", tk.END)
+        if 0 <= self._active_match_index < len(self._match_ranges):
+            start, end = self._match_ranges[self._active_match_index]
+            widget.tag_add("search_active", start, end)
+            widget.tag_raise("search_active")
+            if scroll:
+                try:
+                    widget.see(start)
+                except Exception:
+                    pass
+
+    def _update_navigation_state(self) -> None:
+        state = "normal" if self._match_ranges else "disabled"
+        if self._prev_match_button is not None:
+            try:
+                self._prev_match_button.configure(state=state)
+            except Exception:
+                pass
+        if self._next_match_button is not None:
+            try:
+                self._next_match_button.configure(state=state)
+            except Exception:
+                pass
+
+    def _on_next_match(self, _event=None):
+        self._focus_match(1)
+        return "break"
+
+    def _on_prev_match(self, _event=None):
+        self._focus_match(-1)
+        return "break"
+
     def _render_text(self, value: RichTextValue) -> None:
         widget = self._notes_widget
         if widget is None:
@@ -1202,6 +1315,8 @@ class ChatbotDialog(ctk.CTkToplevel):
                 start_index = f"1.0+{start}c"
                 end_index = f"1.0+{end}c"
                 widget.tag_add(tag, start_index, end_index)
+        self._refresh_search_highlights()
+        self._focus_match(0)
         self._set_notes_state("disabled")
         log_debug(
             f"ChatbotDialog._render_text - Rendered plain text with {len(text or '')} characters",
@@ -1290,6 +1405,8 @@ class ChatbotDialog(ctk.CTkToplevel):
                     continue
                 widget.tag_add(tag, f"1.0+{start}c", f"1.0+{end}c")
 
+        self._refresh_search_highlights()
+        self._focus_match(0)
         self._set_notes_state("disabled")
         applied = {tag: len(runs) for tag, runs in tag_runs.items() if runs}
         log_debug(
