@@ -40,7 +40,7 @@ class BookViewer(ctk.CTkToplevel):
         self._highlight_boxes: list[tuple[float, float, float, float]] = []
 
         self.title(self.book_record.get("Title") or "Book Viewer")
-        self.geometry("1024x768")
+        self.geometry("1920x1080+0+0")
         self.minsize(720, 480)
 
         self.current_page = 1
