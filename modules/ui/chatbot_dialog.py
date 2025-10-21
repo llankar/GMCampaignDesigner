@@ -472,6 +472,93 @@ def _normalize_value(value: Any) -> RichTextValue | None:
     return RichTextValue(str(value))
 
 
+def _extract_paragraph_snippet(text: str, match_index: int) -> str:
+    if match_index < 0 or match_index >= len(text):
+        return ""
+
+    paragraph_start = text.rfind("\n\n", 0, match_index)
+    if paragraph_start == -1:
+        paragraph_start = 0
+    else:
+        paragraph_start += 2
+
+    paragraph_end = text.find("\n\n", match_index)
+    if paragraph_end == -1:
+        paragraph_end = len(text)
+
+    snippet = text[paragraph_start:paragraph_end].strip()
+    if not snippet:
+        window = 400
+        start = max(match_index - window, 0)
+        end = min(match_index + window, len(text))
+        snippet = text[start:end].strip()
+        prefix = "…" if start > 0 else ""
+        suffix = "…" if end < len(text) else ""
+    else:
+        prefix = "…" if paragraph_start > 0 else ""
+        suffix = "…" if paragraph_end < len(text) else ""
+
+    if not snippet:
+        return ""
+
+    if len(snippet) > 1200:
+        snippet = snippet[:1197].rsplit(" ", 1)[0] + "…"
+
+    parts: list[str] = []
+    if prefix:
+        parts.append(prefix)
+    parts.append(snippet)
+    if suffix:
+        parts.append(suffix)
+    return " ".join(parts).strip()
+
+
+def _find_book_excerpt(record: Mapping[str, Any], query: str) -> tuple[str, RichTextValue] | None:
+    query_lower = (query or "").strip().lower()
+    if not query_lower:
+        return None
+
+    candidates: list[tuple[str, str]] = []
+
+    extracted_text = record.get("ExtractedText")
+    if isinstance(extracted_text, str) and extracted_text.strip():
+        candidates.append(("Excerpt", extracted_text))
+
+    pages = record.get("ExtractedPages")
+    if isinstance(pages, list):
+        for idx, page in enumerate(pages):
+            if isinstance(page, str) and page.strip():
+                candidates.append((f"Page {idx + 1}", page))
+            elif isinstance(page, Mapping):
+                text = page.get("Text")
+                if isinstance(text, str) and text.strip():
+                    label_value = page.get("Page")
+                    if isinstance(label_value, (int, float)):
+                        label = f"Page {int(label_value)}"
+                    else:
+                        label = str(label_value).strip() or f"Page {idx + 1}"
+                    candidates.append((label, text))
+
+    contents = record.get("Contents")
+    if isinstance(contents, str) and contents.strip():
+        candidates.append(("Contents", contents))
+
+    text_field = record.get("Text")
+    if isinstance(text_field, str) and text_field.strip():
+        candidates.append(("Text", text_field))
+
+    for label, text in candidates:
+        lowered = text.lower()
+        match_index = lowered.find(query_lower)
+        if match_index == -1:
+            continue
+        snippet = _extract_paragraph_snippet(text, match_index)
+        if snippet:
+            return label, RichTextValue(snippet)
+
+    return None
+
+
 # ---------------------------------------------------------------------------
 # Dialog implementation
 # ---------------------------------------------------------------------------
@@ -514,6 +601,7 @@ class ChatbotDialog(ctk.CTkToplevel):
         self._item_cache: dict[str, list[Mapping[str, Any]]] = {}
         self._search_cache: dict[str, list[str]] = {}
         self._books_only_var = tk.BooleanVar(self, False)
+        self._active_query: str = ""
 
         self._build_ui()
         log_info(
@@ -689,6 +777,7 @@ class ChatbotDialog(ctk.CTkToplevel):
     # Data interaction
     # ------------------------------------------------------------------
     def _populate(self, *, initial: bool, query: str = "") -> None:
+        self._active_query = query
         log_info(
             f"ChatbotDialog._populate - Refreshing results (initial={initial}, query={query!r})",
             func_name="ChatbotDialog._populate",
@@ -861,6 +950,8 @@ class ChatbotDialog(ctk.CTkToplevel):
         self.selection_label.configure(text=f"{entity_type}: {name}")
 
         sections = self._collate_sections(entity_type, record)
+        if entity_type == "Books":
+            sections = self._focus_book_sections(sections, record)
         if not sections:
             log_warning(
                 "ChatbotDialog._display_selected_note - No sections found after collation",
@@ -878,6 +969,35 @@ class ChatbotDialog(ctk.CTkToplevel):
     # ------------------------------------------------------------------
     # Rendering helpers
     # ------------------------------------------------------------------
+    def _focus_book_sections(
+        self,
+        sections: Sequence[tuple[str, list[tuple[str, RichTextValue]]]],
+        record: Mapping[str, Any],
+    ) -> list[tuple[str, list[tuple[str, RichTextValue]]]]:
+        query = getattr(self, "_active_query", "").strip().lower()
+        if not query:
+            return list(sections)
+        excerpt = _find_book_excerpt(record, query)
+        if not excerpt:
+            return list(sections)
+        label, value = excerpt
+        display_label = label or "Excerpt"
+        updated: list[tuple[str, list[tuple[str, RichTextValue]]]] = []
+        replaced = False
+        for title, entries in sections:
+            if title == "Content":
+                updated.append((title, [(display_label, value)]))
+                replaced = True
+            else:
+                updated.append((title, list(entries)))
+        if not replaced:
+            updated.append(("Content", [(display_label, value)]))
+        log_info(
+            "ChatbotDialog._focus_book_sections - Showing focused excerpt for book query",
+            func_name="ChatbotDialog._focus_book_sections",
+        )
+        return updated
+
     def _section_layout(self, entity_type: str) -> Sequence[tuple[str, tuple[str, ...]]]:
         base = self._section_overrides.get(entity_type, self._section_overrides["default"])
         if self._note_fields == _NOTE_FIELD_CANDIDATES:
