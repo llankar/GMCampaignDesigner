@@ -139,11 +139,53 @@ class BookViewer(ctk.CTkToplevel):
         pages = self.book_record.get("ExtractedPages")
         if isinstance(pages, list):
             for entry in pages:
+                text_value = None
                 if isinstance(entry, str):
-                    texts.append(entry)
+                    text_value = entry
                 elif isinstance(entry, dict):
-                    if "Text" in entry:
-                        texts.append(str(entry.get("Text", "")))
+                    for key in ("Text", "text", "Content", "content"):
+                        value = entry.get(key)
+                        if isinstance(value, str) and value.strip():
+                            text_value = value
+                            break
+                if text_value is not None:
+                    texts.append(str(text_value).strip())
+
+        if self.page_count and len(texts) >= self.page_count:
+            return texts[: self.page_count]
+
+        extracted = self._extract_page_texts_from_pdf()
+        if extracted:
+            if texts and self.book_record.get("IndexStatus") == "indexed":
+                limit = min(len(texts), len(extracted))
+                for index in range(limit):
+                    if texts[index]:
+                        extracted[index] = texts[index]
+            return extracted
+
+        return texts
+
+    def _extract_page_texts_from_pdf(self) -> list[str]:
+        texts: list[str] = []
+        if not self._document:
+            return texts
+
+        total_pages = getattr(self._document, "page_count", 0) or 0
+        if not total_pages:
+            return texts
+
+        for index in range(total_pages):
+            try:
+                page = self._document.load_page(index)
+                text = page.get_text("text") or ""
+            except Exception as exc:  # pragma: no cover - defensive catch
+                log_warning(
+                    f"Failed to extract text for page {index + 1}: {exc}",
+                    func_name="BookViewer._extract_page_texts_from_pdf",
+                )
+                text = ""
+            texts.append(text.strip())
+
         return texts
 
     def _render_current_page(self):
