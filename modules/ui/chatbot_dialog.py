@@ -472,10 +472,53 @@ def _normalize_value(value: Any) -> RichTextValue | None:
     return RichTextValue(str(value))
 
 
-def _extract_paragraph_snippet(text: str, match_index: int) -> str:
+def _normalize_excerpt_source(text: str) -> str:
+    """Normalize extracted text before searching for snippets."""
+
+    return text.replace("\r\n", "\n").replace("\r", "\n")
+
+
+def _clip_snippet(
+    snippet: str,
+    match_pos: int,
+    query_len: int,
+    max_chars: int,
+) -> tuple[str, bool, bool]:
+    if max_chars <= 0 or len(snippet) <= max_chars:
+        return snippet, False, False
+
+    if match_pos < 0:
+        clipped = snippet[:max_chars].rstrip()
+        if " " in clipped and len(clipped) == max_chars:
+            clipped = clipped.rsplit(" ", 1)[0]
+        suffix = len(clipped) < len(snippet)
+        return clipped, False, suffix
+
+    half = max_chars // 2
+    span = max(query_len, 1)
+    center = match_pos + span // 2
+    start = max(center - half, 0)
+    end = min(start + max_chars, len(snippet))
+    if end - start < max_chars:
+        start = max(end - max_chars, 0)
+    clipped = snippet[start:end].strip()
+    prefix = start > 0
+    suffix = end < len(snippet)
+    return clipped, prefix, suffix
+
+
+def _extract_paragraph_snippet(
+    text: str,
+    match_index: int,
+    query_lower: str,
+    *,
+    max_chars: int = 600,
+    fallback_window: int = 240,
+) -> str:
     if match_index < 0 or match_index >= len(text):
         return ""
 
+    text_length = len(text)
     paragraph_start = text.rfind("\n\n", 0, match_index)
     if paragraph_start == -1:
         paragraph_start = 0
@@ -484,33 +527,72 @@ def _extract_paragraph_snippet(text: str, match_index: int) -> str:
 
     paragraph_end = text.find("\n\n", match_index)
     if paragraph_end == -1:
-        paragraph_end = len(text)
+        paragraph_end = text_length
 
-    snippet = text[paragraph_start:paragraph_end].strip()
+    start = paragraph_start
+    end = paragraph_end
+    snippet_source = text[start:end]
+
+    snippet = snippet_source.strip()
     if not snippet:
-        window = 400
-        start = max(match_index - window, 0)
-        end = min(match_index + window, len(text))
-        snippet = text[start:end].strip()
-        prefix = "…" if start > 0 else ""
-        suffix = "…" if end < len(text) else ""
-    else:
-        prefix = "…" if paragraph_start > 0 else ""
-        suffix = "…" if paragraph_end < len(text) else ""
+        start = max(match_index - fallback_window, 0)
+        end = min(match_index + fallback_window, text_length)
+        snippet_source = text[start:end]
+        snippet = snippet_source.strip()
 
     if not snippet:
         return ""
 
-    if len(snippet) > 1200:
-        snippet = snippet[:1197].rsplit(" ", 1)[0] + "…"
+    leading_trim = len(snippet_source) - len(snippet_source.lstrip())
+    trailing_trim = len(snippet_source) - len(snippet_source.rstrip())
+    start += leading_trim
+    end -= trailing_trim
 
-    parts: list[str] = []
-    if prefix:
-        parts.append(prefix)
-    parts.append(snippet)
-    if suffix:
-        parts.append(suffix)
-    return " ".join(parts).strip()
+    prefix_needed = start > 0
+    suffix_needed = end < text_length
+
+    normalized = " ".join(snippet.split())
+    if not normalized:
+        return ""
+
+    snippet_lower = normalized.lower()
+    match_pos = snippet_lower.find(query_lower) if query_lower else -1
+    clipped_prefix = clipped_suffix = False
+    if len(normalized) > max_chars:
+        normalized, clipped_prefix, clipped_suffix = _clip_snippet(
+            normalized, match_pos, len(query_lower), max_chars
+        )
+
+    prefix_needed = prefix_needed or clipped_prefix
+    suffix_needed = suffix_needed or clipped_suffix
+
+    if prefix_needed:
+        normalized = f"… {normalized}" if not normalized.startswith("…") else normalized
+    if suffix_needed:
+        normalized = f"{normalized} …" if not normalized.endswith("…") else normalized
+
+    return normalized.strip()
+
+
+def _highlight_snippet(snippet: str, query: str) -> RichTextValue:
+    value = RichTextValue(snippet)
+    query_text = (query or "").strip()
+    if not query_text:
+        return value
+
+    snippet_lower = snippet.lower()
+    query_lower = query_text.lower()
+    start = 0
+    matches: list[tuple[int, int]] = []
+    while True:
+        idx = snippet_lower.find(query_lower, start)
+        if idx == -1:
+            break
+        matches.append((idx, idx + len(query_text)))
+        start = idx + len(query_lower)
+    if matches:
+        value.formatting = {"bold": matches}
+    return value
 
 
 def _find_book_excerpt(record: Mapping[str, Any], query: str) -> tuple[str, RichTextValue] | None:
@@ -548,13 +630,14 @@ def _find_book_excerpt(record: Mapping[str, Any], query: str) -> tuple[str, Rich
         candidates.append(("Text", text_field))
 
     for label, text in candidates:
-        lowered = text.lower()
+        normalized = _normalize_excerpt_source(text)
+        lowered = normalized.lower()
         match_index = lowered.find(query_lower)
         if match_index == -1:
             continue
-        snippet = _extract_paragraph_snippet(text, match_index)
+        snippet = _extract_paragraph_snippet(normalized, match_index, query_lower)
         if snippet:
-            return label, RichTextValue(snippet)
+            return label, _highlight_snippet(snippet, query)
 
     return None
 
@@ -981,7 +1064,10 @@ class ChatbotDialog(ctk.CTkToplevel):
         if not excerpt:
             return list(sections)
         label, value = excerpt
-        display_label = label or "Excerpt"
+        if label:
+            display_label = f"{label} (excerpt)"
+        else:
+            display_label = "Excerpt"
         updated: list[tuple[str, list[tuple[str, RichTextValue]]]] = []
         replaced = False
         for title, entries in sections:
