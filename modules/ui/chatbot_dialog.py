@@ -1375,6 +1375,30 @@ class ChatbotDialog(ctk.CTkToplevel):
         self._update_navigation_state()
 
     def _focus_match(self, delta: int) -> None:
+        total_matches = len(self._match_ranges)
+        if total_matches:
+            if self._active_match_index < 0 or self._active_match_index >= total_matches:
+                self._active_match_index = total_matches - 1 if delta < 0 else 0
+                self._apply_active_match(scroll=True)
+                return
+            if delta:
+                new_index = self._active_match_index + delta
+                if 0 <= new_index < total_matches:
+                    self._active_match_index = new_index
+                    self._apply_active_match(scroll=True)
+                    return
+                if not (
+                    self._active_entity
+                    and self._active_entity[0] == "Books"
+                    and self._book_excerpts
+                ):
+                    self._active_match_index = new_index % total_matches
+                    self._apply_active_match(scroll=True)
+                    return
+            else:
+                self._apply_active_match(scroll=True)
+                return
+
         if (
             delta
             and self._active_entity
@@ -1383,23 +1407,17 @@ class ChatbotDialog(ctk.CTkToplevel):
         ):
             if self._active_excerpt_index < 0:
                 self._active_excerpt_index = 0
-            total = len(self._book_excerpts)
-            if total:
-                self._active_excerpt_index = (self._active_excerpt_index + delta) % total
+            total_excerpts = len(self._book_excerpts)
+            if total_excerpts:
+                self._active_excerpt_index = (
+                    self._active_excerpt_index + delta
+                ) % total_excerpts
+            self._active_match_index = -1
             self._render_active_book_excerpt()
             return
-        if not self._match_ranges:
-            self._active_match_index = -1
-            self._update_navigation_state()
-            return
-        if self._active_match_index < 0 or self._active_match_index >= len(self._match_ranges):
-            if delta < 0:
-                self._active_match_index = len(self._match_ranges) - 1
-            else:
-                self._active_match_index = 0
-        elif delta:
-            self._active_match_index = (self._active_match_index + delta) % len(self._match_ranges)
-        self._apply_active_match(scroll=True)
+
+        self._active_match_index = -1
+        self._update_navigation_state()
 
     def _apply_active_match(self, *, scroll: bool) -> None:
         widget = self._notes_widget
