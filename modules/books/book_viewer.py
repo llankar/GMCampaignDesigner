@@ -582,6 +582,9 @@ class BookViewer(ctk.CTkToplevel):
                 target_index = idx
                 break
 
+        if not self._signet_listbox or not int(self._signet_listbox.winfo_exists()):
+            return
+
         self._suppress_signet_events = True
         try:
             self._signet_listbox.selection_clear(0, "end")
@@ -592,7 +595,11 @@ class BookViewer(ctk.CTkToplevel):
             self._suppress_signet_events = False
 
     def _activate_selected_signet(self):
-        if not self._signets or not self._signet_listbox:
+        if (
+            not self._signets
+            or not self._signet_listbox
+            or not int(self._signet_listbox.winfo_exists())
+        ):
             return
 
         selection = self._signet_listbox.curselection()
