@@ -209,8 +209,20 @@ class GenericListView(ctk.CTkFrame):
             f["name"] for f in self.template["fields"]
             if f["name"] not in skip_for_columns
         ]
-        if self.model_wrapper.entity_type == "books" and "Excerpts" not in self.columns:
-            self.columns.append("Excerpts")
+        if self.model_wrapper.entity_type == "books":
+            lightweight_columns = [
+                "Title",
+                "Subject",
+                "Game",
+                "Folder",
+                "Tags",
+                "PageCount",
+                "Notes",
+                "Attachment",
+            ]
+            self.columns = [c for c in self.columns if c in lightweight_columns]
+            if "Excerpts" not in self.columns:
+                self.columns.append("Excerpts")
 
         # --- Column configuration ---
         self.column_section = f"ColumnSettings_{self.model_wrapper.entity_type}"
@@ -987,8 +999,12 @@ class GenericListView(ctk.CTkFrame):
         return str(val).replace("{", "").replace("}", "").strip()
 
     def _get_display_value(self, item, column):
-        if self.model_wrapper.entity_type == "books" and column == "Excerpts":
-            return self._summarize_book_excerpts(item)
+        if self.model_wrapper.entity_type == "books":
+            if column == "Excerpts":
+                return self._summarize_book_excerpts(item)
+            if column in {"ExtractedText", "ExtractedPages"}:
+                # Heavy fields are omitted from the list view; avoid pulling large payloads.
+                return ""
         return item.get(column, "")
 
     def _summarize_book_excerpts(self, item):
@@ -1595,9 +1611,16 @@ class GenericListView(ctk.CTkFrame):
         log_info(f"Filtering {self.model_wrapper.entity_type} with query: {query}", func_name="GenericListView.filter_items")
         q = query.strip().lower()
         if q:
+            def iter_search_values(item):
+                if self.model_wrapper.entity_type == "books":
+                    for col in self.columns:
+                        yield self._get_display_value(item, col)
+                else:
+                    yield from item.values()
+
             self.filtered_items = [
                 it for it in self.items
-                if any(q in self.clean_value(v).lower() for v in it.values())
+                if any(q in self.clean_value(v).lower() for v in iter_search_values(it))
             ]
         else:
             self.filtered_items = list(self.items)
