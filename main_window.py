@@ -2666,6 +2666,7 @@ class MainWindow(ctk.CTk):
             existing.after_idle(lambda: existing.attributes("-topmost", False))
             controller = getattr(self, "map_controller", None)
             if map_name and controller and hasattr(controller, "open_map_by_name"):
+                # Fit to the window when opening from external GM windows
                 controller.open_map_by_name(map_name)
             return
 
@@ -2689,6 +2690,7 @@ class MainWindow(ctk.CTk):
             root_app=self,
         )
         if map_name and hasattr(self.map_controller, "open_map_by_name"):
+            # Fit to the window on initial open
             self.map_controller.open_map_by_name(map_name)
 
         def _on_close():

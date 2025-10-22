@@ -598,7 +598,8 @@ class ScenarioImportWindow(ctk.CTkToplevel):
         self._busy(False)
     # --- UI helpers ---
     def _set_status(self, text: str):
-        log_info(f"Import status: {message}", func_name="ScenarioImportWindow._set_status")
+        # Log the provided status text (fix NameError from 'message')
+        log_info(f"Import status: {text}", func_name="ScenarioImportWindow._set_status")
         def _do():
             try:
                 self.status_label.configure(text=text)

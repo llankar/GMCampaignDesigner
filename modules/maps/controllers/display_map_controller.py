@@ -661,10 +661,13 @@ class DisplayMapController:
             f"Map '{target}' loaded with {item_counts['tokens']} tokens, {item_counts['markers']} markers, {item_counts['shapes']} shapes (total {item_counts['total']}).",
             func_name="DisplayMapController.open_map_by_name",
         )
-        # Apply fit shortly after map swaps in
+        # Apply fit shortly after map swaps in. Use a deferred call and a few
+        # retries to allow geometry to settle so we don't compute a tiny
+        # initial zoom based on an undersized canvas.
         if apply_fit:
             try:
-                self.parent.after(30, self._apply_fit_mode)
+                for delay in (30, 120, 300):
+                    self.parent.after(delay, lambda: self._apply_fit_mode(defer=True))
             except Exception:
                 pass
         return True
