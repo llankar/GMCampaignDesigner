@@ -1,4 +1,4 @@
-import os
+﻿import os
 import sys
 import ast
 import re
@@ -383,7 +383,7 @@ def screenshot_app_views():
 
     capture_sidebar_sections()
 
-    for ent in ["scenarios", "pcs", "npcs", "creatures", "factions", "places", "objects", "informations", "clues", "maps"]:
+    for ent in ["scenarios", "pcs", "npcs", "creatures", "factions", "places", "objects", "informations", "clues", "books", "maps"]:
         try:
             app.open_entity(ent)
             app.update()
@@ -414,6 +414,22 @@ def screenshot_app_views():
         app.open_scenario_importer()
         app.update()
         shots["scenario_importer"] = str(grab_widget_screenshot(app, "scenario_importer") or "")
+    except Exception:
+        pass
+    try:
+        app.open_scenario_builder()
+        app.update()
+        shots["scenario_builder"] = str(grab_widget_screenshot(app, "scenario_builder") or "")
+    except Exception:
+        pass
+    try:
+        app.open_scene_flow_viewer()
+        app.update(); app.update_idletasks()
+        import customtkinter as ctk
+        tops = [w for w in app.winfo_children() if isinstance(w, ctk.CTkToplevel)]
+        sf_top = tops[-1] if tops else None
+        if sf_top:
+            shots["scene_flow_viewer"] = str(grab_widget_screenshot(sf_top, "scene_flow_viewer") or "")
     except Exception:
         pass
 
@@ -630,6 +646,92 @@ def screenshot_app_views():
     except Exception:
         pass
 
+
+
+    # World Map (nested navigation)
+    try:
+        app.open_world_map()
+        app.update(); app.update_idletasks()
+        tops = [w for w in app.winfo_children() if isinstance(w, ctk.CTkToplevel)]
+        wm_top = tops[-1] if tops else None
+        if wm_top:
+            shots["world_map"] = str(grab_widget_screenshot(wm_top, "world_map") or "")
+    except Exception:
+        pass
+
+    # Dice Roller and Dice Bar
+    try:
+        app.open_dice_roller()
+        app.update(); app.update_idletasks()
+        tops = [w for w in app.winfo_children() if isinstance(w, ctk.CTkToplevel)]
+        dr_top = tops[-1] if tops else None
+        if dr_top:
+            shots["dice_roller"] = str(grab_widget_screenshot(dr_top, "dice_roller") or "")
+    except Exception:
+        pass
+    try:
+        app.open_dice_bar()
+        app.update(); app.update_idletasks()
+        tops = [w for w in app.winfo_children() if isinstance(w, ctk.CTkToplevel)]
+        db_top = tops[-1] if tops else None
+        if db_top:
+            shots["dice_bar"] = str(grab_widget_screenshot(db_top, "dice_bar") or "")
+    except Exception:
+        pass
+
+    # Sound & Music Manager + Audio Controls Bar
+    try:
+        app.open_sound_manager()
+        app.update(); app.update_idletasks()
+        tops = [w for w in app.winfo_children() if isinstance(w, ctk.CTkToplevel)]
+        sm_top = tops[-1] if tops else None
+        if sm_top:
+            shots["sound_manager"] = str(grab_widget_screenshot(sm_top, "sound_manager") or "")
+    except Exception:
+        pass
+    try:
+        app.open_audio_bar()
+        app.update(); app.update_idletasks()
+        tops = [w for w in app.winfo_children() if isinstance(w, ctk.CTkToplevel)]
+        ab_top = tops[-1] if tops else None
+        if ab_top:
+            shots["audio_bar"] = str(grab_widget_screenshot(ab_top, "audio_bar") or "")
+    except Exception:
+        pass
+
+    # Book Viewer (generate a sample PDF if needed)
+    try:
+        from modules.helpers.config_helper import ConfigHelper
+        from modules.books.book_viewer import open_book_viewer
+        try:
+            from pypdf import PdfWriter
+        except Exception:
+            PdfWriter = None  # pragma: no cover - fallback if pypdf unavailable
+
+        campaign_dir = Path(ConfigHelper.get_campaign_dir())
+        books_dir = campaign_dir / "assets" / "books"
+        books_dir.mkdir(parents=True, exist_ok=True)
+        sample_pdf = books_dir / "docs_sample.pdf"
+        if not sample_pdf.exists() and PdfWriter is not None:
+            try:
+                writer = PdfWriter()
+                # A4 portrait in points
+                writer.add_blank_page(width=595, height=842)
+                with sample_pdf.open("wb") as fh:
+                    writer.write(fh)
+            except Exception:
+                pass
+        if sample_pdf.exists():
+            rel = sample_pdf.relative_to(campaign_dir).as_posix()
+            book_record = {"Title": "Docs Sample Book", "Attachment": rel, "PageCount": 1}
+            open_book_viewer(app, book_record)
+            app.update(); app.update_idletasks()
+            tops = [w for w in app.winfo_children() if isinstance(w, ctk.CTkToplevel)]
+            bv_top = tops[-1] if tops else None
+            if bv_top:
+                shots["book_viewer"] = str(grab_widget_screenshot(bv_top, "book_viewer") or "")
+    except Exception:
+        pass
 
     try:
         app.open_gm_screen()
@@ -871,7 +973,7 @@ def build_user_manual(shots, menu_data, py_files):
             [
                 '<b>Manage Scenarios</b>: Maintain adventure outlines and summaries.',
                 '<b>Manage NPCs / PCs / Creatures</b>: Track cast members, their traits, and portraits.',
-                '<b>Manage Places, Factions, Objects, Informations, Clues, Maps</b>: Open the corresponding list view.',
+                '<b>Manage Places, Factions, Objects, Informations, Clues, Books, Maps</b>: Open the corresponding list view.',
             ],
             'accordion_campaign_workshop',
         ),
@@ -887,9 +989,11 @@ def build_user_manual(shots, menu_data, py_files):
             'Utilities',
             'Launch helper tools for session prep and presentation.',
             [
-                '<b>Generate Scenario</b> and <b>AI Wizard</b>: Automate outline or content generation.',
+                '<b>Generate Scenario</b>, <b>Scenario Builder Wizard</b>, and <b>AI Wizard</b>: Automate outline or content generation.',
                 '<b>Import Scenario</b>: Map external documents into campaign data.',
-                '<b>GM Screen</b> and <b>Map Tool</b>: Present scenario details or share battle maps.',
+                '<b>GM Screen</b>, <b>Scene Flow Viewer</b>, <b>World Map</b>, and <b>Map Tool</b>: Present scenario details or share battle/world maps.',
+                '<b>Dice Bar</b> and <b>Open Dice Roller</b>: Quick always-on-top roller and full formula roller.',
+                '<b>Sound &amp; Music Manager</b> and <b>Audio Controls Bar</b>: Organize playlists and control playback.',
                 '<b>Export Scenarios</b> / <b>Export for Foundry</b>: Produce shareable outputs.',
             ],
             'accordion_utilities',
@@ -900,18 +1004,7 @@ def build_user_manual(shots, menu_data, py_files):
         "<html><head><meta charset='utf-8'><title>GMCampaignDesigner User Manual</title>",
         "<link rel='stylesheet' href='user-manual.css'></head><body>",
         "<header><h1>GMCampaignDesigner User Manual</h1></header>",
-        "<nav>",
-        "<a href='#getting-started'>Getting Started</a>",
-        "<a href='#sidebar-accordion'>Sidebar Accordion</a>",
-        "<a href='#entity-managers'>Entity Managers</a>",
-        "<a href='#detail-windows'>Detail Windows</a>",
-        "<a href='#editor-tools'>Editor Tools</a>",
-        "<a href='#graph-editors'>Graph Editors</a>",
-        "<a href='#gm-screen'>GM Screen</a>",
-        "<a href='#scenario-tools'>Scenario Tools</a>",
-        "<a href='#map-tool'>Map Tool</a>",
-        "<a href='#tips'>Tips</a>",
-        "</nav><div class='container'>"
+        "<nav><a href='#getting-started'>Getting Started</a><a href='#sidebar-accordion'>Sidebar Accordion</a><a href='#entity-managers'>Entity Managers</a><a href='#detail-windows'>Detail Windows</a><a href='#editor-tools'>Editor Tools</a><a href='#graph-editors'>Graph Editors</a><a href='#gm-screen'>GM Screen</a><a href='#scenario-tools'>Scenario Tools</a><a href='#scene-flow'>Scene Flow</a><a href='#map-tool'>Map Tool</a><a href='#world-map'>World Map</a><a href='#dice-roller'>Dice Roller</a><a href='#audio-&-music'>Audio &amp; Music</a><a href='#books'>Books</a><a href='#tips'>Tips</a></nav><div class='container'>"
     ]
 
     parts.append(section('Getting Started',
@@ -962,7 +1055,7 @@ def build_user_manual(shots, menu_data, py_files):
     parts.append(section('Entity Managers', entity_body))
 
     detail_body = ''.join([
-        "<p><b>EntityDetailFactory</b> renders rich detail views—used inside the GM Screen and any pop-out detail window. Select a scenario and choose <i>Open in GM Screen</i> (from the scenario list) or open the GM Screen from Utilities, then pick a tab to see the structured layout with collapsible scenes, linked NPC tables, and quick navigation.</p>",
+        "<p><b>EntityDetailFactory</b> renders rich detail viewsâ€”used inside the GM Screen and any pop-out detail window. Select a scenario and choose <i>Open in GM Screen</i> (from the scenario list) or open the GM Screen from Utilities, then pick a tab to see the structured layout with collapsible scenes, linked NPC tables, and quick navigation.</p>",
         "<p>The preview below shows the standalone layout with an <b>Edit</b> button that reopens the Generic Editor for the same record.</p>",
         img('scenario_detail', 'Scenario detail view')
     ])
@@ -1007,16 +1100,28 @@ def build_user_manual(shots, menu_data, py_files):
     ))
 
     parts.append(section('Scenario Tools',
-        "<p>Two helpers streamline content creation:</p>"
+        "<p>Scenario toolkit for rapid authoring:</p>"
         "<ul>"
+        "<li><b>Scenario Builder Wizard:</b> Plan scenes step-by-step, link NPCs/Places/Maps, and preview a scene flow before saving.</li>"
         "<li><b>Scenario Generator:</b> Configure prompts and let the AI draft outline sections you can review and tweak.</li>"
         "<li><b>Scenario Importer:</b> Map headings from external documents into template fields before saving.</li>"
         "</ul>"
-        + img('scenario_generator', 'Scenario Generator') + img('scenario_importer', 'Scenario Importer')
+        + img('scenario_builder', 'Scenario Builder Wizard') + img('scenario_generator', 'Scenario Generator') + img('scenario_importer', 'Scenario Importer')
     ))
 
     map_tok_html = ''.join(f"<li>{i}</li>" for i in map_token_items) if map_token_items else ''
     map_shape_html = ''.join(f"<li>{i}</li>" for i in map_shape_items) if map_shape_items else ''
+    
+
+    parts.append(section('Scene Flow',
+        "<p>Visualize your scenario as a flow of scenes and links. Drag nodes to rearrange, connect scenes with labeled links, and preview the structure before a session.</p>"
+        "<ul>"
+        "<li><b>Open:</b> Utilities &rarr; Open Scene Flow Viewer (or add a tab inside the GM Screen).</li>"
+        "<li><b>Nodes & links:</b> Create, rename, colorize scenes; add directional links with labels.</li>"
+        "<li><b>Layout:</b> Pan and zoom the canvas; arrange scenes for readability.</li>"
+        "</ul>"
+        + (img('scene_flow_viewer', 'Scene Flow Viewer') if shots.get('scene_flow_viewer') else '')
+    ))
     parts.append(section('Map Tool',
 
         "<p>The Map Tool opens in its own window so you can prep encounters while the campaign lists stay visible. Use the selector view to choose or import a battle map, then switch to the editor to reveal fog, drop tokens, and broadcast to players.</p>"
@@ -1055,6 +1160,54 @@ def build_user_manual(shots, menu_data, py_files):
 
 
 
+    
+
+    parts.append(section('World Map',
+        "<p>The World Map window lets you navigate nested maps, place NPC/PC/Creature/Place tokens, and drill down to regional maps while reviewing a compact inspector for the selected entity.</p>"
+        "<ul>"
+        "<li><b>Open:</b> Utilities &rarr; Open World Map (or from the GM Screen via <i>Add Panel &rarr; World Map</i>).</li>"
+        "<li><b>Select map:</b> Load an existing entry or create a new one and assign a background image.</li>"
+        "<li><b>Tokens:</b> Add NPCs, PCs, Creatures, Places, and Maps as pins. Selecting a Map token opens its child map.</li>"
+        "<li><b>Pan &amp; zoom:</b> Middle-drag to pan; mouse wheel to zoom. View state persists per map.</li>"
+        "<li><b>Inspector:</b> Click a token to view summary, notes, and quick stats; switch tabs to review more context.</li>"
+        "</ul>"
+        + img('world_map', 'World Map')
+    ))
+
+    parts.append(section('Dice Roller',
+        "<p>Use the full Dice Roller for formula-based rolls with polyhedral previews, or the compact Dice Bar for always-on-top quick rolls.</p>"
+        "<ul>"
+        "<li><b>Open:</b> Utilities &rarr; Dice Bar and Utilities &rarr; Open Dice Roller.</li>"
+        "<li><b>System presets:</b> Supported dice and default formulas adapt to the selected campaign system.</li>"
+        "<li><b>Formula entry:</b> Build expressions (e.g., <code>2d20+5</code>), double-click presets to add dice, press Enter or click Roll.</li>"
+        "<li><b>Exploding:</b> Toggle exploding dice to reroll max results.</li>"
+        "<li><b>Results &amp; history:</b> See grouped breakdowns and totals; recent rolls are logged for reuse.</li>"
+        "</ul>"
+        + img('dice_roller', 'Dice Roller') + img('dice_bar', 'Dice Bar')
+    ))
+
+    parts.append(section('Audio & Music',
+        "<p>Organize and play background music and sound effects, with persistent playlists per section.</p>"
+        "<ul>"
+        "<li><b>Open:</b> Utilities &rarr; Sound &amp; Music Manager. Use tabs for Music, Ambience, and SFX.</li>"
+        "<li><b>Library:</b> Create types, add files or entire folders, rescan, and remove tracks.</li>"
+        "<li><b>Playback:</b> Play/Pause, Next/Prev, volume, and per-section loop. Last playlist and loop settings are restored.</li>"
+        "<li><b>AI Sorting:</b> Optionally categorize folders with local AI (if configured).</li>"
+        "<li><b>Audio Controls Bar:</b> Utilities &rarr; Audio Controls Bar opens a compact always-on-top controller.</li>"
+        "</ul>"
+        + img('sound_manager', 'Sound & Music Manager') + img('audio_bar', 'Audio Controls Bar')
+    ))
+
+    parts.append(section('Books',
+        "<p>Store and browse PDFs tied to your campaign. Imported books are indexed so you can search and reference excerpts.</p>"
+        "<ul>"
+        "<li><b>Open:</b> Campaign Workshop &rarr; Manage Books.</li>"
+        "<li><b>Import:</b> Add individual PDFs or a whole folder. Indexing runs in the background.</li>"
+        "<li><b>View:</b> Double-click a row or choose <i>Open Book</i> to launch the viewer. Use page navigation, zoom, and find (Prev/Next).</li>"
+        "<li><b>Excerpts:</b> Export page ranges to <code>assets/books/excerpts</code>; excerpts appear in the <b>Excerpts</b> column for quick access.</li>"
+        "</ul>"
+        + img('entity_books', 'Books Manager') + img('book_viewer', 'Book Viewer')
+    ))
     parts.append(section('Tips',
         "<div class='tip'><b>Screenshots:</b> Run <code>python scripts/generate_docs.py</code> to refresh this manual after UI changes.</div>"
         "<div class='tip'><b>Exports:</b> Use <i>Export Scenarios</i> or <i>Export for Foundry</i> (Utilities section) to share content.</div>"
@@ -1068,3 +1221,6 @@ def build_user_manual(shots, menu_data, py_files):
 
 if __name__ == "__main__":
     main()
+
+
+
