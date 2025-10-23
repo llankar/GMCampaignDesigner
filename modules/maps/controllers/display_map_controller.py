@@ -3467,7 +3467,10 @@ class DisplayMapController:
             menu.add_command(
                 label="Show Portrait",
                 command=lambda: show_portrait(
-                    valid_tokens[0]["image_path"], valid_tokens[0].get("entity_type")
+                    valid_tokens[0]["image_path"],
+                    valid_tokens[0].get("entity_id")
+                    or valid_tokens[0].get("entity_type")
+                    or "Entity",
                 ),
             )
         elif count > 1:
@@ -3493,7 +3496,10 @@ class DisplayMapController:
         for token in tokens:
             path = token.get("image_path")
             if path:
-                show_portrait(path, token.get("entity_type"))
+                show_portrait(
+                    path,
+                    token.get("entity_id") or token.get("entity_type") or "Entity",
+                )
 
     def _play_audio_for_tokens(self, tokens):
         for token in tokens:
