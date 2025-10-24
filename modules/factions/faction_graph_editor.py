@@ -2,6 +2,7 @@
 
 import os, math
 import customtkinter as ctk
+from modules.helpers import theme_manager
 from tkinter import filedialog, messagebox, Menu, ttk
 from PIL import Image, ImageTk
 from modules.generic.generic_list_selection_view import GenericListSelectionView
@@ -11,7 +12,7 @@ from modules.helpers.logging_helper import log_module_import
 log_module_import(__name__)
 
 ctk.set_appearance_mode("Dark")
-ctk.set_default_color_theme("blue")
+theme_manager.apply_theme(theme_manager.get_theme())
 
 class FactionGraphEditor(ctk.CTkFrame):
     def __init__(self, master, faction_wrapper: GenericModelWrapper, *args, **kwargs):

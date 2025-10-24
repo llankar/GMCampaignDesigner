@@ -29,6 +29,7 @@ from docx import Document
 
 # Modular helper imports
 from modules.helpers.window_helper import position_window_at_top
+from modules.helpers import theme_manager
 from modules.helpers.template_loader import (
     load_template,
     load_entity_definitions,
@@ -94,7 +95,8 @@ log_module_import(__name__)
 
 # Set up CustomTkinter appearance
 ctk.set_appearance_mode("Dark")
-ctk.set_default_color_theme("blue")
+# Apply configured theme palette (default/medieval/sf)
+theme_manager.apply_theme(theme_manager.get_theme())
 
 # Global process variable for SwarmUI
 SWARMUI_PROCESS = None
@@ -144,6 +146,8 @@ class MainWindow(ctk.CTk):
         root.bind_all("<Control-f>", self._on_ctrl_f)
 
         self._system_listener_unsub = register_system_change_listener(self._on_system_changed)
+        # Rebuild colorized UI bits when theme changes
+        self._theme_listener_unsub = theme_manager.register_theme_change_listener(self._on_theme_changed)
 
         self.after(200, self.open_dice_bar)
         self.after(400, self.open_audio_bar)
@@ -368,10 +372,16 @@ class MainWindow(ctk.CTk):
         )
         return None
 
-    def create_sidebar(self):
-        first_time = not hasattr(self, "sidebar_frame")
+    def create_sidebar(self, force: bool = False):
+        first_time = not hasattr(self, "sidebar_frame") or force
 
         if first_time:
+            # If forcing a rebuild, drop the existing sidebar completely
+            if force and hasattr(self, "sidebar_frame"):
+                try:
+                    self.sidebar_frame.destroy()
+                except Exception:
+                    pass
             self.sidebar_frame = ctk.CTkFrame(self.main_frame, width=220)
             self.sidebar_frame.pack(side="left", fill="y", padx=5, pady=5)
             self.sidebar_frame.pack_propagate(False)
@@ -392,10 +402,11 @@ class MainWindow(ctk.CTk):
             header_label.pack(pady=(0, 2), anchor="center")
 
             # Database display container
+            tokens = theme_manager.get_tokens()
             db_container = ctk.CTkFrame(
                 self.sidebar_inner,
                 fg_color="transparent",
-                border_color="#005fa3",
+                border_color=tokens.get("button_border"),
                 border_width=2,
                 corner_radius=8,
             )
@@ -434,11 +445,14 @@ class MainWindow(ctk.CTk):
             self.system_label.pack(pady=(0, 2), anchor="center")
             self.system_tooltip = None
 
+            sys_tokens = theme_manager.get_tokens()
             system_button = ctk.CTkButton(
                 db_container,
                 text="Switch System",
                 command=self.open_system_selector,
                 width=160,
+                fg_color=sys_tokens.get("accent_button_fg"),
+                hover_color=sys_tokens.get("accent_button_hover"),
             )
             system_button.pack(pady=(0, 6))
             self.system_button = system_button
@@ -446,6 +460,26 @@ class MainWindow(ctk.CTk):
             self.sidebar_sections_container = ctk.CTkFrame(self.sidebar_inner, fg_color="transparent")
             self.sidebar_sections_container.pack(fill="both", expand=True, padx=5, pady=5)
         else:
+            # Refresh top metadata styles to pick up new theme tokens
+            try:
+                tokens = theme_manager.get_tokens()
+                # Update border color on DB container if present
+                for child in self.sidebar_inner.winfo_children():
+                    try:
+                        if isinstance(child, ctk.CTkFrame) and getattr(child, "border_width", 0):
+                            child.configure(border_color=tokens.get("button_border"))
+                    except Exception:
+                        pass
+                if getattr(self, "system_button", None) is not None:
+                    try:
+                        self.system_button.configure(
+                            fg_color=tokens.get("accent_button_fg"),
+                            hover_color=tokens.get("accent_button_hover"),
+                        )
+                    except Exception:
+                        pass
+            except Exception:
+                pass
             for child in self.sidebar_sections_container.winfo_children():
                 child.destroy()
 
@@ -513,6 +547,86 @@ class MainWindow(ctk.CTk):
         if event.widget is self._system_selector_dialog:
             self._system_selector_dialog = None
 
+    def _on_theme_changed(self, _theme_key: str) -> None:
+        # Reapply palette and rebuild widgets that used tokenized colors
+        # Track which floating windows are currently open so we can recreate them
+        reopen_audio_bar = False
+        reopen_dice_bar = False
+        reopen_dice_roller = False
+        reopen_sound_manager = False
+        try:
+            if getattr(self, "audio_bar_window", None) is not None and self.audio_bar_window.winfo_exists():
+                reopen_audio_bar = True
+                try:
+                    self.audio_bar_window.destroy()
+                except Exception:
+                    pass
+        except Exception:
+            pass
+        try:
+            if getattr(self, "dice_bar_window", None) is not None and self.dice_bar_window.winfo_exists():
+                reopen_dice_bar = True
+                try:
+                    self.dice_bar_window.destroy()
+                except Exception:
+                    pass
+        except Exception:
+            pass
+        try:
+            if getattr(self, "dice_roller_window", None) is not None and self.dice_roller_window.winfo_exists():
+                reopen_dice_roller = True
+                try:
+                    self.dice_roller_window.destroy()
+                except Exception:
+                    pass
+        except Exception:
+            pass
+        try:
+            if getattr(self, "sound_manager_window", None) is not None and self.sound_manager_window.winfo_exists():
+                reopen_sound_manager = True
+                try:
+                    self.sound_manager_window.destroy()
+                except Exception:
+                    pass
+        except Exception:
+            pass
+
+        try:
+            theme_manager.apply_theme(_theme_key)
+        except Exception:
+            pass
+        try:
+            # Recreate sidebar so header bands and borders update
+            self.create_sidebar(force=True)
+        except Exception:
+            # Fallback: at least rebuild the sections area
+            try:
+                self.create_accordion_sidebar()
+            except Exception:
+                pass
+
+        # Re-open floating bars/windows to pick up the new palette immediately
+        try:
+            if reopen_audio_bar:
+                self.after(25, self.open_audio_bar)
+        except Exception:
+            pass
+        try:
+            if reopen_dice_bar:
+                self.after(25, self.open_dice_bar)
+        except Exception:
+            pass
+        try:
+            if reopen_dice_roller:
+                self.after(50, self.open_dice_roller)
+        except Exception:
+            pass
+        try:
+            if reopen_sound_manager:
+                self.after(75, self.open_sound_manager)
+        except Exception:
+            pass
+
     def create_accordion_sidebar(self):
         container = getattr(self, "sidebar_sections_container", None)
         if container is None:
@@ -528,7 +642,8 @@ class MainWindow(ctk.CTk):
             sec = ctk.CTkFrame(parent)
             sec.pack(fill="x", pady=(4, 6))
 
-            header = ctk.CTkFrame(sec, fg_color="#0b3d6e")
+            header_color = theme_manager.get_tokens().get("sidebar_header_bg")
+            header = ctk.CTkFrame(sec, fg_color=header_color)
             header.pack(fill="x")
             title_lbl = ctk.CTkLabel(header, text=title, anchor="center")
             title_lbl.pack(fill="x", pady=6)
@@ -2592,6 +2707,14 @@ class MainWindow(ctk.CTk):
                 "No campaign system is configured for the selected database.",
                 func_name="MainWindow._reload_active_campaign_system",
             )
+        # Apply campaign-specific theme when DB changes
+        try:
+            from modules.helpers import theme_manager
+            theme_key = theme_manager.get_theme()
+            theme_manager.apply_theme(theme_key)
+            self._on_theme_changed(theme_key)
+        except Exception:
+            pass
 
     def destroy(self) -> None:
         listener = getattr(self, "_system_listener_unsub", None)

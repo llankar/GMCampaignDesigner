@@ -1,6 +1,7 @@
 import json
 import math
 import customtkinter as ctk
+from modules.helpers import theme_manager
 import tkinter.font as tkFont
 import re
 import os
@@ -40,7 +41,7 @@ PORTRAIT_FOLDER = os.path.join(ConfigHelper.get_campaign_dir(), "assets", "portr
 MAX_PORTRAIT_SIZE = (128, 128)
 ENTITY_TOOLTIP_PORTRAIT_MAX_SIZE = (180, 180)
 ctk.set_appearance_mode("Dark")
-ctk.set_default_color_theme("blue")
+theme_manager.apply_theme(theme_manager.get_theme())
 
 
 class LinkEditDialog(ctk.CTkToplevel):

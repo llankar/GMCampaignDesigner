@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from typing import List, Tuple
 
 import customtkinter as ctk
+from modules.helpers import theme_manager
 
 from modules.dice import dice_engine
 from modules.dice import dice_preferences
@@ -75,7 +76,8 @@ class DiceBarWindow(ctk.CTkToplevel):
         self.grid_rowconfigure(0, weight=1)
         self.grid_columnconfigure(0, weight=1)
 
-        bar = ctk.CTkFrame(self, corner_radius=0)
+        tokens = theme_manager.get_tokens()
+        bar = ctk.CTkFrame(self, corner_radius=0, fg_color=tokens.get("panel_bg"))
         bar.grid(row=0, column=0, sticky="nsew", padx=8, pady=4)
         bar.grid_columnconfigure(0, weight=0)
         bar.grid_columnconfigure(1, weight=1)
@@ -88,12 +90,13 @@ class DiceBarWindow(ctk.CTkToplevel):
             bar,
             text="◀",
             width=32,
+            fg_color=tokens.get("button_fg"),
             command=self._toggle_collapsed,
         )
         collapse_button.grid(row=0, column=0, padx=(4, 6), pady=4, sticky="nsw")
         self._collapse_button = collapse_button
 
-        content = ctk.CTkFrame(bar, corner_radius=0)
+        content = ctk.CTkFrame(bar, corner_radius=0, fg_color=tokens.get("panel_alt_bg"))
         self._content_grid_options = {"row": 0, "column": 1, "padx": 0, "pady": 0, "sticky": "nsew"}
         content.grid(**self._content_grid_options)
         content.grid_columnconfigure(0, weight=0)
@@ -276,6 +279,7 @@ class DiceBarWindow(ctk.CTkToplevel):
                 child.destroy()
             except tk.TclError:
                 pass
+        tokens = theme_manager.get_tokens()
         for idx, faces in enumerate(self._supported_faces):
             button = ctk.CTkButton(
                 frame,
@@ -283,6 +287,8 @@ class DiceBarWindow(ctk.CTkToplevel):
                 width=48,
                 height=30,
                 command=lambda f=faces: self._append_die(f),
+                fg_color=tokens.get("accent_button_fg"),
+                hover_color=tokens.get("accent_button_hover"),
             )
             button.grid(row=0, column=idx, padx=2, pady=0)
 
@@ -482,3 +488,4 @@ class DiceBarWindow(ctk.CTkToplevel):
         prefix = self._total_prefix_label
         if prefix is not None:
             prefix.configure(text="Total" if text else "")
+

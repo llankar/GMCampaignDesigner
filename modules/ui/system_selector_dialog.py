@@ -9,6 +9,7 @@ from typing import Callable
 import customtkinter as ctk
 
 from modules.helpers import system_config
+from modules.helpers import theme_manager
 from modules.helpers.logging_helper import (
     log_exception,
     log_info,
@@ -39,6 +40,7 @@ class CampaignSystemSelectorDialog(ctk.CTkToplevel):
         self._on_selected = on_selected
         self._system_var = tk.StringVar()
         self._system_var.trace_add("write", lambda *_args: self._update_confirm_state())
+        self._theme_var = tk.StringVar(value=theme_manager.get_theme())
 
         self._radio_container: ctk.CTkScrollableFrame | None = None
         self._confirm_button: ctk.CTkButton | None = None
@@ -91,6 +93,19 @@ class CampaignSystemSelectorDialog(ctk.CTkToplevel):
         )
         confirm.pack(side="right")
         self._confirm_button = confirm
+
+        # Theme selection row below the list
+        theme_row = ctk.CTkFrame(container, fg_color="transparent")
+        theme_row.grid(row=3, column=0, sticky="ew", pady=(8, 0))
+        ctk.CTkLabel(theme_row, text="Visual Theme:").pack(side="left", padx=(0, 8))
+        themes = [
+            ("Default", theme_manager.THEME_DEFAULT),
+            ("Medieval", theme_manager.THEME_MEDIEVAL),
+            ("Sci‑Fi", theme_manager.THEME_SF),
+        ]
+        for label, key in themes:
+            rb = ctk.CTkRadioButton(theme_row, text=label, value=key, variable=self._theme_var)
+            rb.pack(side="left", padx=6)
 
     def _load_systems(self) -> None:
         container = self._radio_container
@@ -170,14 +185,24 @@ class CampaignSystemSelectorDialog(ctk.CTkToplevel):
         self.destroy()
 
     def _confirm_selection(self) -> None:
+        # Always persist/apply theme selection, even if system doesn't change
+        try:
+            sel_theme = self._theme_var.get().strip()
+            if sel_theme:
+                theme_manager.set_theme(sel_theme)
+        except Exception:
+            pass
+
         slug = self._system_var.get().strip()
         if not slug:
             self._update_confirm_state()
+            self.destroy()
             return
 
         current = system_config.get_current_system_config()
         current_slug = getattr(current, "slug", None)
         if slug == current_slug:
+            # Theme already applied; no system change needed
             self.destroy()
             return
 

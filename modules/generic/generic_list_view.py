@@ -17,6 +17,7 @@ from modules.generic.generic_list_selection_view import GenericListSelectionView
 from modules.ui.image_viewer import show_portrait
 from modules.ui.second_screen_display import show_entity_on_second_screen
 from modules.helpers.config_helper import ConfigHelper
+from modules.helpers import theme_manager
 from modules.audio.entity_audio import (
     get_entity_audio_value,
     play_entity_audio,
@@ -53,7 +54,7 @@ log_module_import(__name__)
 
 PORTRAIT_FOLDER = os.path.join(ConfigHelper.get_campaign_dir(), "assets", "portraits")
 ctk.set_appearance_mode("Dark")
-ctk.set_default_color_theme("blue")
+theme_manager.apply_theme(theme_manager.get_theme())
 
 SCENARIO_LINK_FIELDS = {
     "npcs": "NPCs",

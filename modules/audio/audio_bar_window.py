@@ -7,6 +7,7 @@ import tkinter as tk
 from typing import Any, Dict, Optional
 
 import customtkinter as ctk
+from modules.helpers import theme_manager
 
 from modules.audio.audio_constants import DEFAULT_SECTION, SECTION_TITLES
 from modules.audio.audio_controller import AudioController, get_audio_controller
@@ -75,7 +76,8 @@ class AudioBarWindow(ctk.CTkToplevel):
         self.grid_rowconfigure(0, weight=1)
         self.grid_columnconfigure(0, weight=1)
 
-        bar = ctk.CTkFrame(self, corner_radius=0)
+        tokens = theme_manager.get_tokens()
+        bar = ctk.CTkFrame(self, corner_radius=0, fg_color=tokens.get("panel_bg"))
         bar.grid(row=0, column=0, sticky="nsew", padx=8, pady=8)
         bar.grid_columnconfigure(0, weight=0)
         bar.grid_columnconfigure(1, weight=1)
@@ -85,11 +87,12 @@ class AudioBarWindow(ctk.CTkToplevel):
             bar,
             text="◀",
             width=32,
+            fg_color=tokens.get("button_fg"),
             command=self._toggle_collapsed,
         )
         self._collapse_button.grid(row=0, column=0, padx=(4, 6), pady=4, sticky="nsw")
 
-        content = ctk.CTkFrame(bar, corner_radius=0)
+        content = ctk.CTkFrame(bar, corner_radius=0, fg_color=tokens.get("panel_alt_bg"))
         self._content_grid_options = {"row": 0, "column": 1, "padx": 0, "pady": 0, "sticky": "nsew"}
         content.grid(**self._content_grid_options)
         content.grid_columnconfigure(0, weight=0)
@@ -144,19 +147,31 @@ class AudioBarWindow(ctk.CTkToplevel):
         self.now_playing_menu.configure(state="disabled")
         self.now_playing_var.trace_add("write", self._keep_now_playing_dropdown_width)
 
-        self.prev_button = ctk.CTkButton(content, text="Prev", command=self._on_prev_clicked, width=70)
+        self.prev_button = ctk.CTkButton(
+            content, text="Prev", command=self._on_prev_clicked, width=70,
+            fg_color=tokens.get("accent_button_fg"), hover_color=tokens.get("accent_button_hover")
+        )
         self.prev_button.grid(row=0, column=4, padx=4, pady=4, sticky="ew")
 
-        self.play_button = ctk.CTkButton(content, text="Play", command=self._on_play_clicked, width=70)
+        self.play_button = ctk.CTkButton(
+            content, text="Play", command=self._on_play_clicked, width=70,
+            fg_color=tokens.get("accent_button_fg"), hover_color=tokens.get("accent_button_hover")
+        )
         self.play_button.grid(row=0, column=5, padx=4, pady=4, sticky="ew")
 
         #self.pause_button = ctk.CTkButton(content, text="Pause", command=self._on_pause_clicked, width=70)
         #self.pause_button.grid(row=0, column=6, padx=4, pady=4, sticky="ew")
 
-        self.stop_button = ctk.CTkButton(content, text="Stop", command=self._on_stop_clicked, width=70)
+        self.stop_button = ctk.CTkButton(
+            content, text="Stop", command=self._on_stop_clicked, width=70,
+            fg_color=tokens.get("accent_button_fg"), hover_color=tokens.get("accent_button_hover")
+        )
         self.stop_button.grid(row=0, column=7, padx=4, pady=4, sticky="ew")
 
-        self.next_button = ctk.CTkButton(content, text="Next", command=self._on_next_clicked, width=70)
+        self.next_button = ctk.CTkButton(
+            content, text="Next", command=self._on_next_clicked, width=70,
+            fg_color=tokens.get("accent_button_fg"), hover_color=tokens.get("accent_button_hover")
+        )
         self.next_button.grid(row=0, column=8, padx=4, pady=4, sticky="ew")
 
         self.shuffle_checkbox = ctk.CTkCheckBox(

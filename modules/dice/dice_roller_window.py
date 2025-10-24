@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from typing import Dict, List, Tuple, Set
 
 import customtkinter as ctk
+from modules.helpers import theme_manager
 from tkinter import messagebox
 import numpy as np
 from matplotlib import cm
@@ -289,10 +290,11 @@ class DiceRollerWindow(ctk.CTkToplevel):
     # Layout & UI setup
     # -----------------
     def _build_layout(self) -> None:
-        container = ctk.CTkFrame(self, fg_color="#111c2a")
+        tokens = theme_manager.get_tokens()
+        container = ctk.CTkFrame(self, fg_color=tokens.get("panel_bg"))
         container.pack(fill="both", expand=True, padx=12, pady=12)
 
-        controls_frame = ctk.CTkFrame(container, fg_color="#132133", corner_radius=14)
+        controls_frame = ctk.CTkFrame(container, fg_color=tokens.get("panel_alt_bg"), corner_radius=14)
         controls_frame.pack(side="left", fill="y", padx=(12, 8), pady=12)
         controls_frame.pack_propagate(False)
         controls_frame.configure(width=280)
@@ -313,7 +315,7 @@ class DiceRollerWindow(ctk.CTkToplevel):
         self._preset_segmented = segmented
         self._setup_preset_double_clicks()
 
-        count_frame = ctk.CTkFrame(controls_frame, fg_color="#111c2a")
+        count_frame = ctk.CTkFrame(controls_frame, fg_color=tokens.get("panel_bg"))
         count_frame.pack(fill="x", padx=16, pady=(24, 8))
         ctk.CTkLabel(count_frame, text="Number of dice", anchor="w").pack(fill="x", pady=(6, 2))
         slider = ctk.CTkSlider(
@@ -328,7 +330,7 @@ class DiceRollerWindow(ctk.CTkToplevel):
         self.count_value_label = ctk.CTkLabel(count_frame, text="1", font=("Segoe UI", 14, "bold"))
         self.count_value_label.pack(pady=(6, 0))
 
-        builder_frame = ctk.CTkFrame(controls_frame, fg_color="#111c2a")
+        builder_frame = ctk.CTkFrame(controls_frame, fg_color=tokens.get("panel_bg"))
         builder_frame.pack(fill="x", padx=16, pady=(12, 4))
         ctk.CTkLabel(
             builder_frame,
@@ -338,11 +340,12 @@ class DiceRollerWindow(ctk.CTkToplevel):
         ctk.CTkButton(
             builder_frame,
             text="Clear Formula",
-            fg_color="#303c5a",
+            fg_color=tokens.get("accent_button_fg"),
+            hover_color=tokens.get("accent_button_hover"),
             command=self._clear_formula,
         ).pack(fill="x", pady=(0, 8))
 
-        toggle_frame = ctk.CTkFrame(controls_frame, fg_color="#111c2a")
+        toggle_frame = ctk.CTkFrame(controls_frame, fg_color=tokens.get("panel_bg"))
         toggle_frame.pack(fill="x", padx=16, pady=(4, 4))
         ctk.CTkCheckBox(
             toggle_frame,
@@ -355,7 +358,7 @@ class DiceRollerWindow(ctk.CTkToplevel):
             variable=self.separate_var
         ).pack(fill="x", pady=(0, 6))
 
-        formula_frame = ctk.CTkFrame(controls_frame, fg_color="#111c2a")
+        formula_frame = ctk.CTkFrame(controls_frame, fg_color=tokens.get("panel_bg"))
         formula_frame.pack(fill="x", padx=16, pady=(10, 4))
         ctk.CTkLabel(formula_frame, text="Dice Formula", anchor="w").pack(fill="x", pady=(6, 2))
         self.formula_entry = ctk.CTkEntry(formula_frame, textvariable=self.formula_var)

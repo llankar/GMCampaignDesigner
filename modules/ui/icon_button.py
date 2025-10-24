@@ -1,5 +1,6 @@
 import tkinter as tk
 import customtkinter as ctk
+from modules.helpers import theme_manager
 from modules.ui.tooltip import ToolTip
 from modules.helpers.logging_helper import log_module_import
 
@@ -18,6 +19,8 @@ def create_icon_button(parent, icon, tooltip_text, command):
         width = 160
         height = 48
 
+    tokens = theme_manager.get_tokens()
+
     btn = ctk.CTkButton(
         container,
         text=display_text,
@@ -26,10 +29,10 @@ def create_icon_button(parent, icon, tooltip_text, command):
         width=width,
         height=height,
         corner_radius=12,
-        fg_color="#0077CC",
-        hover_color="#005fa3",
+        fg_color=tokens.get("button_fg"),
+        hover_color=tokens.get("button_hover"),
         border_width=1,
-        border_color="#005fa3"
+        border_color=tokens.get("button_border"),
     )
 
     if not has_icon:

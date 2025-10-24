@@ -28,6 +28,12 @@ from typing import Dict, List, Optional, Sequence, Tuple
 import tkinter as tk
 import customtkinter as ctk
 from PIL import Image, ImageDraw, ImageTk
+from modules.helpers.theme_manager import (
+    get_theme,
+    register_theme_change_listener,
+    THEME_MEDIEVAL,
+    THEME_SF,
+)
 from modules.helpers.text_helpers import rtf_to_html, format_multiline_text
 try:
     from tkhtmlview import HTMLLabel  # type: ignore
@@ -98,6 +104,11 @@ class ObjectShelfView:
         self._bg_photo: Optional[ImageTk.PhotoImage] = None
         self._bg_item: Optional[int] = None
         self._load_background()
+        # React to theme changes (swap background)
+        try:
+            self._unsub_theme = register_theme_change_listener(lambda _t: self._on_theme_changed())
+        except Exception:
+            self._unsub_theme = None
 
         # Shelf rows and drawing cache
         self._rows: List[_ShelfRow] = []
@@ -143,6 +154,8 @@ class ObjectShelfView:
     def hide(self):
         self.frame.pack_forget()
         self.stop_visibility_monitor()
+        # Optional: stop listening when hidden
+        # (kept active to reflect theme changes when shown again)
 
     def populate(self):
         if not self.is_available():
@@ -237,13 +250,41 @@ class ObjectShelfView:
 
     # ----- Internals -----------------------------------------------------
     def _load_background(self):
-        image_path = Path(__file__).resolve().parents[2] / "assets" / "objects_shelves_background.jpg"
+        assets_dir = Path(__file__).resolve().parents[2] / "assets"
+        theme = get_theme()
+        filename = "objects_shelves_background.jpg"
+        if theme == THEME_MEDIEVAL:
+            filename = "objects_shelves_background_medieval.png"
+        elif theme == THEME_SF:
+            filename = "objects_shelves_background_sf.png"
+        image_path = assets_dir / filename
         if image_path.exists():
             try:
                 with Image.open(image_path) as img:
                     self._bg_source = img.convert("RGBA")
             except Exception:
                 self._bg_source = None
+        else:
+            # Fall back to default if themed image missing
+            fallback = assets_dir / "objects_shelves_background.jpg"
+            try:
+                if fallback.exists():
+                    with Image.open(fallback) as img:
+                        self._bg_source = img.convert("RGBA")
+            except Exception:
+                self._bg_source = None
+        # Force a redraw to show new background
+        try:
+            self._request_redraw()
+        except Exception:
+            pass
+
+    def _on_theme_changed(self):
+        # Invalidate cached background and reload per theme
+        self._bg_source = None
+        self._bg_photo = None
+        self._bg_item = None
+        self._load_background()
 
     def _on_visibility_tick(self):
         # Redraw if needed and keep monitoring while visible
@@ -430,7 +471,7 @@ class ObjectShelfView:
                 x1 + 16 + panel_w // 2,
                 y1 + panel_h // 2,
                 text=label,
-                fill="#050300",
+                fill=("#FFFFFF" if get_theme() == THEME_MEDIEVAL else "#050300"),
                 font=("Segoe UI", 14, "bold"),
                 anchor="center",
                 tags=("shelf", f"row:{row.category_key}"),
@@ -453,7 +494,7 @@ class ObjectShelfView:
             x1 + 16 + panel_w // 2,
             y1 + int(panel_h * 0.75),
             text=label,
-            fill="#e9e9e9",
+            fill=("#FFFFFF" if get_theme() == THEME_MEDIEVAL else "#050300"),
             font=("Segoe UI", 14, "bold"),
             anchor="center",
             tags=("shelf", f"row:{row.category_key}"),
