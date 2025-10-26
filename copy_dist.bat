@@ -4,3 +4,4 @@ xcopy ".\modules" "D:\SynologyDrive\CampaignManager\modules" /E /I /Y /R
 xcopy ".\config" "D:\SynologyDrive\CampaignManager\config" /E /I /Y /R
 xcopy ".\modules" "D:\SynologyDrive\CampaignManager\_internal\modules" /E /I /Y /R
 xcopy ".\docs" "D:\SynologyDrive\CampaignManager\docs" /E /I /Y /R
+xcopy ".\version.txt" "D:\SynologyDrive\CampaignManager\" /E /I /Y /R
