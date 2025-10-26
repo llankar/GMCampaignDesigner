@@ -152,7 +152,7 @@ class MainWindow(ctk.CTk):
 
         self.after(200, self.open_dice_bar)
         self.after(400, self.open_audio_bar)
-        self.after(600, self._queue_update_check)
+        self.after(600, lambda: self._queue_update_check(force=True))
 
     def open_ai_settings(self):
         log_info("Opening AI settings dialog", func_name="main_window.MainWindow.open_ai_settings")
@@ -1679,7 +1679,7 @@ class MainWindow(ctk.CTk):
     def export_foundry(self):
         preview_and_export_foundry(self)
 
-    def _queue_update_check(self):
+    def _queue_update_check(self, *, force: bool = False):
         try:
             updates_enabled = ConfigHelper.getboolean("Updates", "enabled", fallback=True)
         except Exception:
@@ -1688,10 +1688,14 @@ class MainWindow(ctk.CTk):
             return
         if self._update_thread and self._update_thread.is_alive():
             return
-        self._update_thread = threading.Thread(target=self._async_check_for_updates, daemon=True)
+        self._update_thread = threading.Thread(
+            target=self._async_check_for_updates,
+            kwargs={"force": force},
+            daemon=True,
+        )
         self._update_thread.start()
 
-    def _async_check_for_updates(self):
+    def _async_check_for_updates(self, *, force: bool = False):
         channel = ConfigHelper.get("Updates", "channel", fallback="stable") or "stable"
         preferred_asset = ConfigHelper.get("Updates", "asset_name", fallback="") or None
         try:
@@ -1701,7 +1705,7 @@ class MainWindow(ctk.CTk):
         except (TypeError, ValueError):
             interval_hours = 24.0
         last_check_raw = ConfigHelper.get("Updates", "last_check", fallback="") or ""
-        if last_check_raw:
+        if last_check_raw and not force:
             try:
                 last_check_ts = float(last_check_raw)
             except (TypeError, ValueError):
