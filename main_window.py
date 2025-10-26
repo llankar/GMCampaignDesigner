@@ -53,7 +53,7 @@ from modules.helpers.logging_helper import (
     log_methods,
     log_warning,
 )
-from modules.helpers import system_config
+from modules.helpers import system_config, update_helper
 from modules.helpers.system_config import register_system_change_listener
 from modules.ui.tooltip import ToolTip
 from modules.ui.icon_button import create_icon_button
@@ -142,6 +142,7 @@ class MainWindow(ctk.CTk):
         self._asset_library_window = None
         self._busy_modal = None
         self._system_selector_dialog = None
+        self._update_thread = None
         root = self.winfo_toplevel()
         root.bind_all("<Control-f>", self._on_ctrl_f)
 
@@ -151,6 +152,7 @@ class MainWindow(ctk.CTk):
 
         self.after(200, self.open_dice_bar)
         self.after(400, self.open_audio_bar)
+        self.after(600, self._queue_update_check)
 
     def open_ai_settings(self):
         log_info("Opening AI settings dialog", func_name="main_window.MainWindow.open_ai_settings")
@@ -1676,6 +1678,126 @@ class MainWindow(ctk.CTk):
 
     def export_foundry(self):
         preview_and_export_foundry(self)
+
+    def _queue_update_check(self):
+        try:
+            updates_enabled = ConfigHelper.getboolean("Updates", "enabled", fallback=True)
+        except Exception:
+            updates_enabled = True
+        if not updates_enabled:
+            return
+        if self._update_thread and self._update_thread.is_alive():
+            return
+        self._update_thread = threading.Thread(target=self._async_check_for_updates, daemon=True)
+        self._update_thread.start()
+
+    def _async_check_for_updates(self):
+        channel = ConfigHelper.get("Updates", "channel", fallback="stable") or "stable"
+        preferred_asset = ConfigHelper.get("Updates", "asset_name", fallback="") or None
+        try:
+            interval_hours = float(
+                ConfigHelper.get("Updates", "check_interval_hours", fallback="24") or "24"
+            )
+        except (TypeError, ValueError):
+            interval_hours = 24.0
+        last_check_raw = ConfigHelper.get("Updates", "last_check", fallback="") or ""
+        if last_check_raw:
+            try:
+                last_check_ts = float(last_check_raw)
+            except (TypeError, ValueError):
+                last_check_ts = 0.0
+            else:
+                if time.time() - last_check_ts < interval_hours * 3600:
+                    log_debug(
+                        "Skipping update check; interval not yet elapsed",
+                        func_name="main_window.MainWindow._async_check_for_updates",
+                    )
+                    return
+        try:
+            current_version, candidate = update_helper.check_for_update(
+                channel=channel,
+                preferred_asset=preferred_asset,
+            )
+            ConfigHelper.set("Updates", "last_check", str(time.time()))
+            ConfigHelper.load_config()
+        except Exception as exc:
+            log_warning(
+                f"Update check failed: {exc}",
+                func_name="main_window.MainWindow._async_check_for_updates",
+            )
+            return
+
+        if not candidate:
+            return
+
+        log_info(
+            f"Update available: {candidate.version}",
+            func_name="main_window.MainWindow._async_check_for_updates",
+        )
+        self.after(0, lambda: self._prompt_update(str(current_version), candidate))
+
+    def _prompt_update(self, current_version: str, candidate: update_helper.UpdateCandidate):
+        release_notes = (candidate.release_notes or "").strip()
+        if len(release_notes) > 800:
+            release_notes = release_notes[:800].rstrip() + "\u2026"
+        message_lines = [
+            f"A new version ({candidate.version}) is available.",
+            f"You are currently running {current_version}.",
+        ]
+        if release_notes:
+            message_lines.append("Release notes:")
+            message_lines.append(release_notes)
+        message_lines.append("Download and install now?")
+
+        if not messagebox.askyesno("Update Available", "\n\n".join(message_lines)):
+            return
+
+        self._begin_update_download(candidate)
+
+    def _begin_update_download(self, candidate: update_helper.UpdateCandidate):
+        log_info(
+            f"Preparing download for update {candidate.version}",
+            func_name="main_window.MainWindow._begin_update_download",
+        )
+        if getattr(sys, "frozen", False):
+            install_root = Path(sys.executable).resolve().parent
+            restart_target = sys.executable
+        else:
+            install_root = Path(__file__).resolve().parents[1]
+            restart_target = None
+        preserve = ["Campaigns", "config/config.ini"]
+
+        def worker(progress_cb):
+            stage_root, payload_root = update_helper.prepare_staging_area(
+                candidate,
+                progress_callback=progress_cb,
+            )
+            process = update_helper.launch_installer(
+                payload_root,
+                install_root=install_root,
+                restart_target=restart_target,
+                wait_for_pid=os.getpid(),
+                preserve=preserve,
+                cleanup_root=stage_root,
+            )
+            return {"installer_pid": getattr(process, "pid", None)}
+
+        def detail_builder(result):
+            pid = result.get("installer_pid") if isinstance(result, dict) else None
+            detail = (
+                "An installer helper is waiting for GMCampaignDesigner to close before copying the new files."
+            )
+            if pid:
+                detail += f" (PID {pid})"
+            detail += " Close the app when you are ready so the update can finish."
+            return detail
+
+        self._run_progress_task(
+            "Downloading Update",
+            worker,
+            "Update downloaded.",
+            detail_builder=detail_builder,
+        )
 
     def _run_progress_task(self, title, worker, success_message, detail_builder=None):
         progress_win = ctk.CTkToplevel(self)
