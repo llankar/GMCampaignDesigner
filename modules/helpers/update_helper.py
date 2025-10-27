@@ -49,6 +49,7 @@ _REQUEST_TIMEOUT = int(os.environ.get("GMCD_UPDATES_TIMEOUT", "30"))
 _PROJECT_ROOT = Path(__file__).resolve().parents[2]
 _VERSION_FILE = _PROJECT_ROOT / "version.txt"
 _INSTALL_HELPER = _PROJECT_ROOT / "scripts" / "apply_update.py"
+_FROZEN_INSTALL_HELPER_NAME = "RPGCampaignUpdater.exe" if os.name == "nt" else "RPGCampaignUpdater"
 _VERSION_PATTERN = re.compile(r"(\d+(?:\.\d+)+)")
 
 
@@ -269,15 +270,17 @@ def launch_installer(
     cleanup_root: Optional[Path | str] = None,
 ) -> subprocess.Popen:
     frozen = getattr(sys, "frozen", False)
-    if not frozen and not _INSTALL_HELPER.exists():
-        raise FileNotFoundError(f"Expected installer helper at {_INSTALL_HELPER}")
 
     install_dir = Path(install_root) if install_root is not None else _PROJECT_ROOT
-    args = [sys.executable]
     if frozen:
-        args.append("--apply-update")
+        helper_path = Path(sys.executable).with_name(_FROZEN_INSTALL_HELPER_NAME)
+        if not helper_path.exists():
+            raise FileNotFoundError(f"Expected frozen installer helper at {helper_path}")
+        args = [str(helper_path)]
     else:
-        args.append(str(_INSTALL_HELPER))
+        if not _INSTALL_HELPER.exists():
+            raise FileNotFoundError(f"Expected installer helper at {_INSTALL_HELPER}")
+        args = [sys.executable, str(_INSTALL_HELPER)]
 
     args.extend(
         [
