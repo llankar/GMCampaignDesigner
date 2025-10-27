@@ -73,15 +73,15 @@ def _copy_release_tree(source: Path, target: Path, preserved: Set[Tuple[str, ...
     for root, dirs, files in os.walk(source):
         root_path = Path(root)
         rel_root = root_path.relative_to(source)
-        rel_parts = rel_root.parts
-        if _is_preserved(rel_parts, preserved):
+        rel_root_parts = rel_root.parts
+        if _is_preserved(_normalize_parts(rel_root_parts), preserved):
             dirs[:] = []
             continue
         target_root = target / rel_root
         target_root.mkdir(parents=True, exist_ok=True)
         for name in files:
-            rel_path = rel_root / name if rel_parts else Path(name)
-            if _is_preserved(rel_path.parts, preserved):
+            rel_path = rel_root / name if rel_root_parts else Path(name)
+            if _is_preserved(_normalize_parts(rel_path.parts), preserved):
                 continue
             src_file = root_path / name
             dest_file = target / rel_path
@@ -95,7 +95,14 @@ def _copy_release_tree(source: Path, target: Path, preserved: Set[Tuple[str, ...
 
 
 def _normalize_preserve_path(value: str) -> Tuple[str, ...]:
-    return tuple(part for part in Path(value).parts if part not in (".", ""))
+    parts = tuple(part for part in Path(value).parts if part not in (".", ""))
+    return _normalize_parts(parts)
+
+
+def _normalize_parts(parts: Sequence[str]) -> Tuple[str, ...]:
+    if os.name == "nt":
+        return tuple(part.casefold() for part in parts)
+    return tuple(parts)
 
 
 def _is_preserved(rel_parts: Sequence[str], preserved: Set[Tuple[str, ...]]) -> bool:
