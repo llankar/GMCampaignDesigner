@@ -13,19 +13,17 @@ Zip (or otherwise archive) the entire dist/RPGCampaignManager output, since that
 cd dist
 zip -r ../RPGCampaignManager-v1.2.3.zip RPGCampaignManager
 cd ..
-(On Windows you can use powershell Compress-Archive -Path dist\RPGCampaignManager\* -DestinationPath RPGCampaignManager-v1.2.3.zip instead.)
+(On Windows you can use powershell Compress-Archive -Path dist\RPGCampaignManager\* -DestinationPath RPGCampaignManager-v1.0.0.X.zip instead.)
 
 Tag the release in Git and push the tag.
 
-TAG=v1.2.3
+TAG=v1.0.0.4
 git tag "$TAG"
 git push origin "$TAG"
 Upload the archive as a GitHub Release asset.
 Use the GitHub CLI (or the web UI) so the updater’s GitHub Releases API call can discover the asset and read its browser_download_url. This is the “correct GitHub directory” the application will query later.
 
-gh release create "$TAG" RPGCampaignManager-v1.2.3.zip \
-  --title "GMCampaignDesigner $TAG" \
-  --notes-file docs/release-notes.md
+gh release create "v1.0.0.4" RPGCampaignManager-v1.0.0.4.zip --title "GMCampaignDesigner v1.0.0.4" --notes-file docs/release-notes.md
 If you want to stage draft notes first, you can add --draft and then publish once you’re ready.
 
 Verify the asset is reachable.
