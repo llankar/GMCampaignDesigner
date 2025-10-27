@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import os
 import re
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -267,16 +268,30 @@ def launch_installer(
     restart_target: Optional[str] = None,
     wait_for_pid: Optional[int] = None,
     preserve: Optional[Sequence[str]] = None,
-    cleanup_root: Optional[Path | str] = None,
+    cleanup_root: Optional[Path | str | Sequence[Path | str]] = None,
 ) -> subprocess.Popen:
     frozen = getattr(sys, "frozen", False)
 
     install_dir = Path(install_root) if install_root is not None else _PROJECT_ROOT
+    cleanup_roots: list[str] = []
+    if cleanup_root:
+        if isinstance(cleanup_root, (str, os.PathLike)):
+            cleanup_roots.append(str(Path(cleanup_root)))
+        else:
+            cleanup_roots.extend(str(Path(entry)) for entry in cleanup_root)
     if frozen:
         helper_path = Path(sys.executable).with_name(_FROZEN_INSTALL_HELPER_NAME)
         if not helper_path.exists():
             raise FileNotFoundError(f"Expected frozen installer helper at {helper_path}")
-        args = [str(helper_path)]
+        temp_dir = Path(tempfile.mkdtemp(prefix="gmcd-update-helper-"))
+        temp_helper_path = temp_dir / helper_path.name
+        try:
+            shutil.copy2(helper_path, temp_helper_path)
+        except Exception:
+            shutil.rmtree(temp_dir, ignore_errors=True)
+            raise
+        cleanup_roots.append(str(temp_dir))
+        args = [str(temp_helper_path)]
     else:
         if not _INSTALL_HELPER.exists():
             raise FileNotFoundError(f"Expected installer helper at {_INSTALL_HELPER}")
@@ -299,8 +314,8 @@ def launch_installer(
     if preserve:
         for entry in preserve:
             args.extend(["--preserve", entry])
-    if cleanup_root:
-        args.extend(["--cleanup-root", str(cleanup_root)])
+    for root in cleanup_roots:
+        args.extend(["--cleanup-root", root])
 
     log_info(
         f"Launching installer helper: {' '.join(args)}",

@@ -19,7 +19,12 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--wait-for-pid", type=int, default=0, help="PID to wait on before copying.")
     parser.add_argument("--wait-timeout", type=int, default=900, help="Seconds to wait for the PID to exit.")
     parser.add_argument("--restart-target", help="Executable to relaunch after copying.")
-    parser.add_argument("--cleanup-root", help="Temporary directory to delete once finished.")
+    parser.add_argument(
+        "--cleanup-root",
+        action="append",
+        default=[],
+        help="Temporary directory to delete once finished. May be provided multiple times.",
+    )
     return parser.parse_args()
 
 
@@ -39,8 +44,8 @@ def main() -> None:
     print(f"Applying update from {source} to {target}")
     _copy_release_tree(source, target, preserved)
 
-    if args.cleanup_root:
-        cleanup_root = Path(args.cleanup_root)
+    for entry in args.cleanup_root:
+        cleanup_root = Path(entry)
         shutil.rmtree(cleanup_root, ignore_errors=True)
 
     if args.restart_target:
