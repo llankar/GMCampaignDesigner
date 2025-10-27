@@ -1,0 +1,34 @@
+Step-by-step release publishing workflow
+Bump the version metadata that ships in the build.
+Edit version.txt (and, if needed, the PyInstaller spec) so the new semantic version is embedded in the executable metadata that the updater reads.
+
+nano version.txt            # update FileVersion/ProductVersion etc.
+Regenerate the packaged build with PyInstaller.
+From the repository root, rebuild the distributable folder that lives under dist/RPGCampaignManager so the release asset contains the updated binaries and data files.
+
+pyinstaller --noconfirm main_window.spec
+Assemble the archive you will publish.
+Zip (or otherwise archive) the entire dist/RPGCampaignManager output, since that directory is what the updater expects to download and install. Including assets, config, static files, and modules mirrors the existing copy script used for manual distribution.
+
+cd dist
+zip -r ../RPGCampaignManager-v1.2.3.zip RPGCampaignManager
+cd ..
+(On Windows you can use powershell Compress-Archive -Path dist\RPGCampaignManager\* -DestinationPath RPGCampaignManager-v1.2.3.zip instead.)
+
+Tag the release in Git and push the tag.
+
+TAG=v1.2.3
+git tag "$TAG"
+git push origin "$TAG"
+Upload the archive as a GitHub Release asset.
+Use the GitHub CLI (or the web UI) so the updater’s GitHub Releases API call can discover the asset and read its browser_download_url. This is the “correct GitHub directory” the application will query later.
+
+gh release create "$TAG" RPGCampaignManager-v1.2.3.zip \
+  --title "GMCampaignDesigner $TAG" \
+  --notes-file docs/release-notes.md
+If you want to stage draft notes first, you can add --draft and then publish once you’re ready.
+
+Verify the asset is reachable.
+After the release is published, open the “Assets” section of the tag on GitHub and copy the download URL; that URL is what the updater will fetch during its automatic check.
+
+Following this sequence ensures each release lands in the GitHub Releases asset list, which is exactly where the planned updater will look for new builds.
