@@ -1767,7 +1767,7 @@ class MainWindow(ctk.CTk):
             install_root = Path(sys.executable).resolve().parent
             restart_target = sys.executable
         else:
-            install_root = Path(__file__).resolve().parents[1]
+            install_root = Path(__file__).resolve().parent
             restart_target = None
         preserve = ["Campaigns", "config/config.ini"]
 
