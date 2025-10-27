@@ -2097,7 +2097,7 @@ class WorldMapWindow(ctk.CTkToplevel):
         super().__init__(master)
         self.title("World Map")
         try:
-            self.geometry("1920X1080")
+            self.geometry("1920X1080+0+0")
             self.minsize(1920, 1080)
         except Exception:
             pass

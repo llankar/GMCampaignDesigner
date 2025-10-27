@@ -1,7 +1,7 @@
-xcopy /Y /S /R dist\RPGCampaignManager\* D:\SynologyDrive\CampaignManager
-xcopy ".\assets" "D:\SynologyDrive\CampaignManager\assets\" /E /I /Y /R
-xcopy ".\modules" "D:\SynologyDrive\CampaignManager\modules" /E /I /Y /R
-xcopy ".\config" "D:\SynologyDrive\CampaignManager\config" /E /I /Y /R
-xcopy ".\modules" "D:\SynologyDrive\CampaignManager\_internal\modules" /E /I /Y /R
-xcopy ".\docs" "D:\SynologyDrive\CampaignManager\docs" /E /I /Y /R
-xcopy ".\version.txt" "D:\SynologyDrive\CampaignManager\" /E /I /Y /R
+xcopy ".\assets" "D:\SynologyDrive\rpg\Python\GMCampaignDesigner\GMCampaignDesigner\dist\RPGCampaignManager\assets" /E /I /Y /R
+xcopy ".\modules" "D:\SynologyDrive\rpg\Python\GMCampaignDesigner\GMCampaignDesigner\dist\RPGCampaignManager\modules" /E /I /Y /R
+xcopy ".\config" "D:\SynologyDrive\rpg\Python\GMCampaignDesigner\GMCampaignDesigner\dist\RPGCampaignManager\config" /E /I /Y /R
+xcopy ".\modules" "D:\SynologyDrive\rpg\Python\GMCampaignDesigner\GMCampaignDesigner\dist\RPGCampaignManager\_internal\modules" /E /I /Y /R
+xcopy ".\docs" "D:\SynologyDrive\rpg\Python\GMCampaignDesigner\GMCampaignDesigner\dist\RPGCampaignManager\docs" /E /I /Y /R
+xcopy ".\version.txt" "D:\SynologyDrive\rpg\Python\GMCampaignDesigner\GMCampaignDesigner\dist\RPGCampaignManager\_internal" /Y
+xcopy ".\version.txt" "D:\SynologyDrive\rpg\Python\GMCampaignDesigner\GMCampaignDesigner\dist\RPGCampaignManager" /Y

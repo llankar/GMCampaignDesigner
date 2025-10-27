@@ -1,18 +1,11 @@
 # -*- mode: python ; coding: utf-8 -*-
+from PyInstaller.building.datastruct import Tree
+
 a = Analysis(
     ['main_window.py'],
     pathex=[],
     binaries=[],
-    datas=[
-        ('assets', 'assets'),
-        ('config', 'config'),
-        ('static', 'static'),
-        ('scripts', 'scripts'),
-        ('modules', 'modules'),
-        ('modules', '_internal/modules'),
-        ('docs', 'docs'),
-        ('version.txt', '.'),
-    ],
+    datas= [ ('assets', 'assets'), ('config', 'config'), ('static', 'static'), ('scripts', 'scripts')],
     hiddenimports=[],
     hookspath=[],
     hooksconfig={},
@@ -46,16 +39,9 @@ coll = COLLECT(
     exe,
     a.binaries,
     a.datas,
-    Tree('assets', prefix='assets'),
-    Tree('config', prefix='config'),
-    Tree('static', prefix='static'),
-    Tree('scripts', prefix='scripts'),
-    Tree('docs', prefix='docs'),
-    Tree('modules', prefix='modules'),
-    Tree('modules', prefix='_internal/modules'),
     strip=False,
     upx=True,
     upx_exclude=[],
-    name='.',
+    name='RPGCampaignManager',
 )
 

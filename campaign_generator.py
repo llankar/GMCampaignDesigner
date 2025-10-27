@@ -1459,7 +1459,7 @@ class CampaignGeneratorApp(tk.Tk):
         super().__init__()
         self.title("Scenario Generator")
         # Set a sensible default window size; allow resizing
-        self.geometry("1920x1080")
+        self.geometry("1920x1080+0+0")
         self.minsize(500, 500)
         # Primary background colour for a dark theme
         self.configure(bg="#2c3e50")
