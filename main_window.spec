@@ -56,6 +56,6 @@ coll = COLLECT(
     strip=False,
     upx=True,
     upx_exclude=[],
-    name='RPGCampaignManager',
+    name='.',
 )
 
