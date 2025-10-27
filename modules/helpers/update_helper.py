@@ -268,18 +268,25 @@ def launch_installer(
     preserve: Optional[Sequence[str]] = None,
     cleanup_root: Optional[Path | str] = None,
 ) -> subprocess.Popen:
-    if not _INSTALL_HELPER.exists():
+    frozen = getattr(sys, "frozen", False)
+    if not frozen and not _INSTALL_HELPER.exists():
         raise FileNotFoundError(f"Expected installer helper at {_INSTALL_HELPER}")
 
     install_dir = Path(install_root) if install_root is not None else _PROJECT_ROOT
-    args = [
-        sys.executable,
-        str(_INSTALL_HELPER),
-        "--source",
-        str(Path(payload_root)),
-        "--target",
-        str(install_dir),
-    ]
+    args = [sys.executable]
+    if frozen:
+        args.append("--apply-update")
+    else:
+        args.append(str(_INSTALL_HELPER))
+
+    args.extend(
+        [
+            "--source",
+            str(Path(payload_root)),
+            "--target",
+            str(install_dir),
+        ]
+    )
     if wait_for_pid is None:
         wait_for_pid = os.getpid()
     if wait_for_pid:
