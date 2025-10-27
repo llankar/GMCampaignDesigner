@@ -63,11 +63,69 @@ def _wait_for_pid(pid: int, timeout: int) -> None:
 def _is_pid_alive(pid: int) -> bool:
     if pid <= 0:
         return False
+
+    if os.name == "nt":
+        win_status = _is_pid_alive_windows(pid)
+        if win_status is not None:
+            return win_status
+
     try:
         os.kill(pid, 0)
+    except ProcessLookupError:
+        return False
+    except PermissionError as exc:
+        if os.name == "nt" and getattr(exc, "winerror", None) == 5:
+            return True
+        return True
     except OSError:
         return False
     return True
+
+
+def _is_pid_alive_windows(pid: int) -> bool | None:
+    """Return ``True`` if ``pid`` is running on Windows, ``False`` if it exited."""
+
+    try:
+        import ctypes
+        from ctypes import wintypes
+    except ImportError:
+        return None
+
+    kernel32 = ctypes.windll.kernel32  # type: ignore[attr-defined]
+
+    PROCESS_QUERY_INFORMATION = 0x0400
+    PROCESS_QUERY_LIMITED_INFORMATION = 0x1000
+    SYNCHRONIZE = 0x00100000
+    WAIT_OBJECT_0 = 0x00000000
+    WAIT_TIMEOUT = 0x00000102
+
+    access = SYNCHRONIZE | PROCESS_QUERY_LIMITED_INFORMATION
+
+    ctypes.set_last_error(0)
+    handle = kernel32.OpenProcess(access, False, wintypes.DWORD(pid))
+    if not handle and ctypes.get_last_error() == 5:
+        return True
+
+    if not handle:
+        ctypes.set_last_error(0)
+        handle = kernel32.OpenProcess(SYNCHRONIZE | PROCESS_QUERY_INFORMATION, False, wintypes.DWORD(pid))
+        if not handle:
+            last_error = ctypes.get_last_error()
+            if last_error == 5:
+                return True
+            if last_error in (0, 87):
+                return False
+            return None
+
+    try:
+        result = kernel32.WaitForSingleObject(handle, 0)
+        if result == WAIT_TIMEOUT:
+            return True
+        if result == WAIT_OBJECT_0:
+            return False
+        return None
+    finally:
+        kernel32.CloseHandle(handle)
 
 
 def _copy_release_tree(source: Path, target: Path, preserved: Set[Tuple[str, ...]]) -> None:
