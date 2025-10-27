@@ -7,7 +7,7 @@ This document explains how GMCampaignDesigner now checks for new releases, how t
 - **Startup polling** – When `MainWindow` launches it schedules `_queue_update_check`. The first poll in each application session is forced (ignoring the configured interval) so newly published releases are detected immediately. Subsequent polls honour the `[Updates]` section in `config/config.ini` and spawn a background thread. The worker calls `modules.helpers.update_helper.check_for_update`, compares the installed version from `version.txt` with the latest GitHub Release, and prompts the user only if a newer asset is available.
 - **User prompt** – The dialog summarises the target version and truncates release notes to a readable snippet. Declining closes the prompt; accepting triggers the download workflow.
 - **Download + staging** – `_run_progress_task` hosts the progress dialog while `update_helper.prepare_staging_area` streams the zip asset into a temporary folder and extracts it. Progress messages update the modal without blocking Tkinter’s event loop.
-- **Applying the update** – Once staged, `update_helper.launch_installer` starts `scripts/apply_update.py`. That helper waits for the main process to exit, copies the staged payload into the install directory, skips preserved paths such as `Campaigns/` and `config/config.ini`, optionally restarts the executable, and removes the temporary staging directory.
+- **Applying the update** – Once staged, `update_helper.launch_installer` starts `RPGCampaignUpdater.exe` when running from a packaged build (falling back to `scripts/apply_update.py` while developing). The helper waits for the main process to exit, copies the staged payload into the install directory, skips preserved paths such as `Campaigns/` and `config/config.ini`, optionally restarts the executable, and removes the temporary staging directory.
 
 ## Configuration keys (`config/config.ini`)
 
@@ -69,4 +69,4 @@ last_check =
 - Errors during HTTP requests, extraction, or helper launch surface through the existing logging infrastructure, and the UI will display an error message if the worker raises an exception.
 - The helper waits up to 15 minutes for the main process to exit; adjust `--wait-timeout` if larger installations need more time for shutdown scripts.
 
-This pipeline keeps release management simple—package the PyInstaller output, attach it to a GitHub Release, and the application will discover and install the update without touching campaign data.
+This pipeline keeps release management simple—package the PyInstaller output (which now includes `RPGCampaignUpdater.exe` alongside `RPGCampaignManager.exe`), attach it to a GitHub Release, and the application will discover and install the update without touching campaign data thanks to the preserved `Campaigns/` and `config/config.ini` directories.

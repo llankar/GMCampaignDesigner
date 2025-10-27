@@ -5,7 +5,7 @@ a = Analysis(
     ['main_window.py'],
     pathex=[],
     binaries=[],
-    datas= [ ('assets', 'assets'), ('config', 'config'), ('static', 'static'), ('scripts', 'scripts')],
+    datas=[('assets', 'assets'), ('config', 'config'), ('static', 'static'), ('scripts', 'scripts')],
     hiddenimports=[],
     hookspath=[],
     hooksconfig={},
@@ -35,10 +35,46 @@ exe = EXE(
     version='version.txt',
     icon='assets/GMCampaignDesigner.ico'
 )
+
+update_analysis = Analysis(
+    ['scripts/update_entry.py'],
+    pathex=['scripts'],
+    binaries=[],
+    datas=[],
+    hiddenimports=[],
+    hookspath=[],
+    hooksconfig={},
+    runtime_hooks=[],
+    excludes=['torch', 'torchvision', 'torchaudio', 'onnx', 'transformers', 'simplejson'],
+    noarchive=False,
+    optimize=0,
+)
+update_pyz = PYZ(update_analysis.pure)
+
+update_exe = EXE(
+    update_pyz,
+    update_analysis.scripts,
+    [],
+    exclude_binaries=True,
+    name='RPGCampaignUpdater',
+    debug=False,
+    bootloader_ignore_signals=False,
+    strip=False,
+    upx=False,
+    console=True,
+    disable_windowed_traceback=False,
+    argv_emulation=False,
+    target_arch=None,
+    codesign_identity=None,
+    entitlements_file=None,
+)
 coll = COLLECT(
     exe,
+    update_exe,
     a.binaries,
     a.datas,
+    update_analysis.binaries,
+    update_analysis.datas,
     strip=False,
     upx=True,
     upx_exclude=[],
