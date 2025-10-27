@@ -1,11 +1,16 @@
 # -*- mode: python ; coding: utf-8 -*-
-from PyInstaller.building.datastruct import Tree
-
 a = Analysis(
     ['main_window.py'],
     pathex=[],
     binaries=[],
     datas=[
+        ('assets', 'assets'),
+        ('config', 'config'),
+        ('static', 'static'),
+        ('scripts', 'scripts'),
+        ('modules', 'modules'),
+        ('modules', '_internal/modules'),
+        ('docs', 'docs'),
         ('version.txt', '.'),
     ],
     hiddenimports=[],
