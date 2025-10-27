@@ -6,6 +6,7 @@ import shutil
 import subprocess
 import sys
 import time
+import uuid
 from pathlib import Path
 from typing import Sequence, Set, Tuple
 
@@ -89,9 +90,18 @@ def _copy_release_tree(source: Path, target: Path, preserved: Set[Tuple[str, ...
                 if dest_file.is_dir():
                     shutil.rmtree(dest_file)
                 else:
-                    dest_file.unlink()
-            dest_file.parent.mkdir(parents=True, exist_ok=True)
-            shutil.copy2(src_file, dest_file)
+                    _copy_file_with_replace(src_file, dest_file)
+                    continue
+            _copy_file_with_replace(src_file, dest_file)
+
+
+def _copy_file_with_replace(src_file: Path, dest_file: Path) -> None:
+    """Copy ``src_file`` to ``dest_file`` replacing the target atomically."""
+
+    dest_file.parent.mkdir(parents=True, exist_ok=True)
+    temp_name = dest_file.parent / f".{dest_file.name}.tmp.{uuid.uuid4().hex}"
+    shutil.copy2(src_file, temp_name)
+    _replace_with_retry(temp_name, dest_file)
 
 
 def _normalize_preserve_path(value: str) -> Tuple[str, ...]:
@@ -110,6 +120,27 @@ def _is_preserved(rel_parts: Sequence[str], preserved: Set[Tuple[str, ...]]) -> 
         if rel_parts[: len(entry)] == entry:
             return True
     return False
+
+
+def _replace_with_retry(src: Path, dest: Path, attempts: int = 10, delay: float = 0.5) -> None:
+    last_exc: Exception | None = None
+    for _ in range(max(1, attempts)):
+        try:
+            os.replace(src, dest)
+            return
+        except PermissionError as exc:
+            last_exc = exc
+            if attempts <= 1:
+                break
+            time.sleep(max(0, delay))
+        except Exception:
+            src.unlink(missing_ok=True)
+            raise
+
+    src.unlink(missing_ok=True)
+    if last_exc is not None:
+        raise last_exc
+    raise PermissionError(f"Unable to replace {dest}")
 
 
 if __name__ == "__main__":
