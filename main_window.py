@@ -2958,5 +2958,11 @@ class MainWindow(ctk.CTk):
         self._map_tool_window = top
 
 if __name__ == "__main__":
-    app = MainWindow()
-    app.mainloop()
+    if "--apply-update" in sys.argv:
+        sys.argv.remove("--apply-update")
+        from scripts import apply_update as _apply_update
+
+        _apply_update.main()
+    else:
+        app = MainWindow()
+        app.mainloop()
