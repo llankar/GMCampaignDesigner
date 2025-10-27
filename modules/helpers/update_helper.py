@@ -287,6 +287,7 @@ def launch_installer(
         temp_helper_path = temp_dir / helper_path.name
         try:
             shutil.copy2(helper_path, temp_helper_path)
+            _copy_frozen_helper_dependencies(helper_path, temp_dir)
         except Exception:
             shutil.rmtree(temp_dir, ignore_errors=True)
             raise
@@ -367,6 +368,38 @@ def _collapse_root(root: Path) -> Path:
     if len(entries) == 1 and entries[0].is_dir():
         return entries[0]
     return root
+
+
+def _copy_frozen_helper_dependencies(helper_path: Path, destination_root: Path) -> None:
+    """Copy runtime dependencies for the frozen installer helper.
+
+    PyInstaller 6 changed the default one-folder layout to place resources inside an
+    ``_internal`` directory that must sit alongside the executable. When the helper
+    is staged into a temporary directory we replicate the required sibling
+    directories (and any loose files) so the helper can start successfully.
+    """
+
+    parent = helper_path.parent
+    if not parent.exists():
+        return
+
+    candidates: list[Path] = []
+
+    internal_dir = parent / "_internal"
+    if internal_dir.exists():
+        candidates.append(internal_dir)
+
+    for entry in parent.iterdir():
+        if entry == helper_path or entry.name == "_internal":
+            continue
+        candidates.append(entry)
+
+    for candidate in candidates:
+        destination = destination_root / candidate.name
+        if candidate.is_dir():
+            shutil.copytree(candidate, destination, dirs_exist_ok=True)
+        elif candidate.is_file():
+            shutil.copy2(candidate, destination)
 
 
 log_module_import(__name__)
