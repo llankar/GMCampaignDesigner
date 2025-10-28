@@ -29,7 +29,9 @@ from modules.generic.cross_campaign_asset_service import (
     load_entities,
 )
 from modules.generic.github_gallery_client import GalleryBundleSummary, GithubGalleryClient
+from modules.helpers.config_helper import ConfigHelper
 from modules.helpers.logging_helper import log_exception, log_info, log_warning
+from modules.helpers.secret_helper import decrypt_secret, encrypt_secret
 from modules.helpers.selection_dialog import SelectionDialog
 from modules.helpers.template_loader import load_entity_definitions, list_known_entities
 
@@ -137,7 +139,7 @@ class CrossCampaignAssetLibraryWindow(ctk.CTkToplevel):
 
         button_row = ctk.CTkFrame(self)
         button_row.grid(row=1, column=0, columnspan=2, sticky="ew", padx=10, pady=(0, 10))
-        for column_index in range(6):
+        for column_index in range(7):
             button_row.grid_columnconfigure(column_index, weight=1)
 
         self.export_btn = ctk.CTkButton(button_row, text="Export Selected…", command=self.export_selected)
@@ -164,6 +166,15 @@ class CrossCampaignAssetLibraryWindow(ctk.CTkToplevel):
             command=self.open_online_gallery,
         )
         self.gallery_btn.grid(row=0, column=5, padx=6, pady=6, sticky="ew")
+
+        self.github_token_btn = ctk.CTkButton(
+            button_row,
+            text=self._github_token_button_label(),
+            command=self.configure_github_token,
+        )
+        self.github_token_btn.grid(row=0, column=6, padx=6, pady=6, sticky="ew")
+
+        self._update_publish_button_state()
 
     # --------------------------------------------------------- Campaign list
     def refresh_campaign_list(self):
@@ -627,11 +638,76 @@ class CrossCampaignAssetLibraryWindow(ctk.CTkToplevel):
                 pass
             return
         self._online_dialog = OnlineGalleryDialog(self, self.gallery_client, self)
+        self._online_dialog.update_permissions(self.gallery_client.can_publish)
 
     def _refresh_online_dialog(self):
         dialog = self._online_dialog
         if dialog and dialog.winfo_exists():
             dialog.refresh()
+
+    def configure_github_token(self):
+        raw_value = (ConfigHelper.get("Gallery", "github_token", fallback="") or "").strip()
+        existing_token = decrypt_secret(raw_value)
+
+        prompt_lines = [
+            "Enter a GitHub personal access token with the repo scope.",
+        ]
+        if existing_token:
+            prompt_lines.append("Leave the field blank to remove the stored token.")
+
+        token = simpledialog.askstring(
+            "GitHub Token",
+            "\n".join(prompt_lines),
+            parent=self,
+            show="*",
+        )
+        if token is None:
+            return
+
+        token = token.strip()
+        if not token:
+            ConfigHelper.set("Gallery", "github_token", "")
+            self.gallery_client.set_token(None)
+            messagebox.showinfo("GitHub Token", "The stored GitHub token has been cleared.")
+            self._update_publish_button_state()
+            return
+
+        try:
+            encrypted_value = encrypt_secret(token)
+        except Exception as exc:
+            messagebox.showerror(
+                "Encryption Error",
+                f"Unable to store the GitHub token securely.\n{exc}",
+            )
+            return
+
+        ConfigHelper.set("Gallery", "github_token", encrypted_value)
+        self.gallery_client.set_token(token)
+        messagebox.showinfo("GitHub Token", "Your GitHub token has been saved securely.")
+        self._update_publish_button_state()
+
+    def _github_token_button_label(self) -> str:
+        return "Set GitHub Token…" if not self.gallery_client.can_publish else "Update GitHub Token…"
+
+    def _update_publish_button_state(self):
+        state = "normal" if self.gallery_client.can_publish else "disabled"
+        try:
+            self.publish_btn.configure(state=state)
+        except Exception:
+            pass
+        try:
+            self.github_token_btn.configure(text=self._github_token_button_label())
+        except Exception:
+            pass
+        self._update_online_dialog_permissions()
+
+    def _update_online_dialog_permissions(self):
+        dialog = self._online_dialog
+        if dialog and dialog.winfo_exists():
+            try:
+                dialog.update_permissions(self.gallery_client.can_publish)
+            except Exception:
+                pass
 
     def _download_gallery_bundle(self, bundle: GalleryBundleSummary):
         temp_dir = Path(tempfile.mkdtemp(prefix="gallery_download_"))
@@ -978,4 +1054,11 @@ class OnlineGalleryDialog(ctk.CTkToplevel):
             if value < 1024 or unit == units[-1]:
                 return f"{value:.1f} {unit}" if unit != "B" else f"{int(value)} {unit}"
             value /= 1024
+
+    def update_permissions(self, can_publish: bool) -> None:
+        state = "normal" if can_publish else "disabled"
+        try:
+            self.delete_btn.configure(state=state)
+        except Exception:
+            pass
 
