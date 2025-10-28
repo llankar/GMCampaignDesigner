@@ -158,8 +158,6 @@ class CrossCampaignAssetLibraryWindow(ctk.CTkToplevel):
             command=self.publish_selected_to_github,
         )
         self.publish_btn.grid(row=0, column=4, padx=6, pady=6, sticky="ew")
-        if not self.gallery_client.can_publish:
-            self.publish_btn.configure(state="disabled")
         self.gallery_btn = ctk.CTkButton(
             button_row,
             text="Browse Online Gallery…",
