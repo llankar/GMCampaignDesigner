@@ -6,6 +6,7 @@ import copy
 import json
 import os
 import shutil
+import sqlite3
 import tempfile
 import zipfile
 from dataclasses import dataclass
@@ -113,7 +114,16 @@ def discover_databases_in_directory(directory: Path) -> List[CampaignDatabase]:
 
 def load_entities(entity_type: str, db_path: Path) -> List[dict]:
     wrapper = GenericModelWrapper(entity_type, db_path=str(db_path))
-    return wrapper.load_items()
+    try:
+        return wrapper.load_items()
+    except sqlite3.OperationalError as exc:
+        if "no such table" in str(exc).lower():
+            log_warning(
+                f"Skipping entity type '{entity_type}' in {db_path}: {exc}",
+                func_name="modules.generic.cross_campaign_asset_service.load_entities",
+            )
+            return []
+        raise
 
 
 def save_entities(entity_type: str, db_path: Path, items: List[dict], *, replace: bool = True) -> None:
