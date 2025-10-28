@@ -3,14 +3,17 @@
 from __future__ import annotations
 
 import copy
+import re
+import shutil
+import tempfile
 import threading
 from contextlib import contextmanager
 from pathlib import Path
-from typing import Dict, List
+from typing import Callable, Dict, List, Optional
 
 import customtkinter as ctk
 from PIL import Image
-from tkinter import filedialog, messagebox, ttk, END
+from tkinter import END, filedialog, messagebox, simpledialog, ttk
 
 from modules.generic.cross_campaign_asset_service import (
     CampaignDatabase,
@@ -25,6 +28,7 @@ from modules.generic.cross_campaign_asset_service import (
     list_sibling_campaigns,
     load_entities,
 )
+from modules.generic.github_gallery_client import GalleryBundleSummary, GithubGalleryClient
 from modules.helpers.logging_helper import log_exception, log_info, log_warning
 from modules.helpers.selection_dialog import SelectionDialog
 from modules.helpers.template_loader import load_entity_definitions, list_known_entities
@@ -48,6 +52,8 @@ class CrossCampaignAssetLibraryWindow(ctk.CTkToplevel):
             self.entity_definitions.setdefault(slug, {"label": slug.replace("_", " ").title()})
         self.entity_records: Dict[str, List[dict]] = {key: [] for key in self.entity_types}
 
+        self.gallery_client = GithubGalleryClient()
+        self._online_dialog: Optional["OnlineGalleryDialog"] = None
         self.active_campaign = get_active_campaign()
         self.source_campaigns: List[CampaignDatabase] = []
         self.selected_campaign: CampaignDatabase | None = None
@@ -131,7 +137,8 @@ class CrossCampaignAssetLibraryWindow(ctk.CTkToplevel):
 
         button_row = ctk.CTkFrame(self)
         button_row.grid(row=1, column=0, columnspan=2, sticky="ew", padx=10, pady=(0, 10))
-        button_row.grid_columnconfigure((0, 1, 2, 3), weight=1)
+        for column_index in range(6):
+            button_row.grid_columnconfigure(column_index, weight=1)
 
         self.export_btn = ctk.CTkButton(button_row, text="Export Selected…", command=self.export_selected)
         self.export_btn.grid(row=0, column=0, padx=6, pady=6, sticky="ew")
@@ -145,6 +152,20 @@ class CrossCampaignAssetLibraryWindow(ctk.CTkToplevel):
         self.import_btn.grid(row=0, column=2, padx=6, pady=6, sticky="ew")
         self.reload_btn = ctk.CTkButton(button_row, text="Refresh Source", command=self.reload_source)
         self.reload_btn.grid(row=0, column=3, padx=6, pady=6, sticky="ew")
+        self.publish_btn = ctk.CTkButton(
+            button_row,
+            text="Publish to GitHub…",
+            command=self.publish_selected_to_github,
+        )
+        self.publish_btn.grid(row=0, column=4, padx=6, pady=6, sticky="ew")
+        if not self.gallery_client.can_publish:
+            self.publish_btn.configure(state="disabled")
+        self.gallery_btn = ctk.CTkButton(
+            button_row,
+            text="Browse Online Gallery…",
+            command=self.open_online_gallery,
+        )
+        self.gallery_btn.grid(row=0, column=5, padx=6, pady=6, sticky="ew")
 
     # --------------------------------------------------------- Campaign list
     def refresh_campaign_list(self):
@@ -369,6 +390,84 @@ class CrossCampaignAssetLibraryWindow(ctk.CTkToplevel):
 
         self._run_progress_task("Exporting Assets", worker, "Asset bundle created successfully.", detail)
 
+    def publish_selected_to_github(self):
+        if not self.selected_campaign:
+            messagebox.showwarning("No Source", "Select a source campaign first.")
+            return
+        if not self.gallery_client.can_publish:
+            messagebox.showerror(
+                "GitHub Token Required",
+                "Configure a GitHub personal access token with repo scope before publishing.",
+            )
+            return
+
+        selections = self._gather_selected_records()
+        if not selections:
+            messagebox.showinfo("No Selection", "Select at least one asset to publish.")
+            return
+
+        default_title = self.selected_campaign.name or "Campaign Bundle"
+        title = simpledialog.askstring(
+            "Bundle Title",
+            "Enter a title for the GitHub release:",
+            initialvalue=default_title,
+            parent=self,
+        )
+        if title is None:
+            return
+        title = title.strip()
+        if not title:
+            messagebox.showwarning("Invalid Title", "Enter a non-empty title for the bundle.")
+            return
+
+        description = simpledialog.askstring(
+            "Bundle Description",
+            "Optional description for the bundle:",
+            parent=self,
+        )
+        if description is None:
+            return
+        description = description.strip()
+
+        temp_dir = Path(tempfile.mkdtemp(prefix="gallery_publish_"))
+        slug = re.sub(r"[^A-Za-z0-9]+", "_", title).strip("_") or "bundle"
+        if len(slug) > 48:
+            slug = slug[:48]
+        archive_path = temp_dir / f"{slug}.zip"
+
+        def worker(callback):
+            try:
+                manifest = export_bundle(archive_path, self.selected_campaign, selections, progress_callback=callback)
+                return self.gallery_client.publish_bundle(
+                    archive_path,
+                    manifest,
+                    title=title,
+                    description=description,
+                    progress_callback=callback,
+                )
+            finally:
+                shutil.rmtree(temp_dir, ignore_errors=True)
+
+        def on_success(summary: GalleryBundleSummary):
+            lines = [
+                f"Release: {summary.display_title}",
+                f"Tag: {summary.tag or '—'}",
+                f"Download URL: {summary.download_url}",
+            ]
+            if summary.entity_counts:
+                lines.append("")
+                lines.append("Entities:")
+                for entity_type, count in sorted(summary.entity_counts.items()):
+                    lines.append(f"  {entity_type}: {count}")
+            message = "Bundle published to GitHub releases."
+            detail_text = "\n".join(lines)
+            if detail_text:
+                message = f"{message}\n\n{detail_text}"
+            messagebox.showinfo("Bundle Published", message)
+            self._refresh_online_dialog()
+
+        self._run_progress_task("Publishing Bundle", worker, None, None, on_success=on_success)
+
     def copy_selected_to_current_campaign(self):
         if not self.selected_campaign:
             messagebox.showwarning("No Source", "Select a source campaign first.")
@@ -428,58 +527,7 @@ class CrossCampaignAssetLibraryWindow(ctk.CTkToplevel):
         )
         if not bundle_path:
             return
-
-        target_campaign = self.active_campaign
-
-        def analyze_worker(_callback):
-            return analyze_bundle(Path(bundle_path), target_campaign.db_path)
-
-        def after_analysis(analysis):
-            duplicates = analysis.duplicates
-            if duplicates:
-                details = []
-                for entity_type, names in duplicates.items():
-                    details.append(f"{entity_type.title()}: {len(names)}")
-                detail_text = "\n".join(details)
-                response = messagebox.askyesnocancel(
-                    "Overwrite Existing Entries?",
-                    "Some assets already exist in the active campaign:\n"
-                    f"{detail_text}\n\nSelect Yes to overwrite them, No to skip duplicates, or Cancel to abort.",
-                )
-                if response is None:
-                    cleanup_analysis(analysis)
-                    return
-                overwrite = bool(response)
-            else:
-                overwrite = True
-
-            def import_worker(callback):
-                try:
-                    return apply_import(analysis, target_campaign, overwrite=overwrite, progress_callback=callback)
-                except Exception:
-                    cleanup_analysis(analysis)
-                    raise
-
-            def detail(summary: dict) -> str:
-                return (
-                    f"Imported: {summary.get('imported', 0)}\n"
-                    f"Updated: {summary.get('updated', 0)}\n"
-                    f"Skipped: {summary.get('skipped', 0)}"
-                )
-
-            def finalize(result):
-                cleanup_analysis(analysis)
-                self._post_import(result, overwrite)
-
-            self._run_progress_task(
-                "Importing Assets",
-                import_worker,
-                "Bundle imported into the active campaign.",
-                detail,
-                on_success=finalize,
-            )
-
-        self._run_progress_task("Analyzing Bundle", analyze_worker, None, None, on_success=after_analysis)
+        self._start_import_from_bundle(Path(bundle_path))
 
     def _post_import(self, summary: dict, overwrite: bool):
         if hasattr(self.master, "refresh_entities"):
@@ -495,6 +543,120 @@ class CrossCampaignAssetLibraryWindow(ctk.CTkToplevel):
                 f"Assets skipped: {summary.get('skipped', 0)}"
             ),
         )
+
+    def _start_import_from_bundle(self, bundle_path: Path, *, cleanup: Optional[Callable[[], None]] = None):
+        target_campaign = self.active_campaign
+
+        def analyze_worker(_callback):
+            try:
+                return analyze_bundle(bundle_path, target_campaign.db_path)
+            except Exception:
+                if cleanup:
+                    cleanup()
+                raise
+
+        def after_analysis(analysis):
+            duplicates = analysis.duplicates
+            if duplicates:
+                details = []
+                for entity_type, names in duplicates.items():
+                    details.append(f"{entity_type.title()}: {len(names)}")
+                detail_text = "\n".join(details)
+                response = messagebox.askyesnocancel(
+                    "Overwrite Existing Entries?",
+                    "Some assets already exist in the active campaign:\n"
+                    f"{detail_text}\n\nSelect Yes to overwrite them, No to skip duplicates, or Cancel to abort.",
+                )
+                if response is None:
+                    cleanup_analysis(analysis)
+                    if cleanup:
+                        cleanup()
+                    return
+                overwrite = bool(response)
+            else:
+                overwrite = True
+
+            def import_worker(callback):
+                try:
+                    return apply_import(analysis, target_campaign, overwrite=overwrite, progress_callback=callback)
+                except Exception:
+                    cleanup_analysis(analysis)
+                    if cleanup:
+                        cleanup()
+                    raise
+
+            def detail(summary: dict) -> str:
+                return (
+                    f"Imported: {summary.get('imported', 0)}\n"
+                    f"Updated: {summary.get('updated', 0)}\n"
+                    f"Skipped: {summary.get('skipped', 0)}"
+                )
+
+            def finalize(result):
+                try:
+                    self._post_import(result, overwrite)
+                finally:
+                    cleanup_analysis(analysis)
+                    if cleanup:
+                        cleanup()
+
+            self._run_progress_task(
+                "Importing Assets",
+                import_worker,
+                "Bundle imported into the active campaign.",
+                detail,
+                on_success=finalize,
+            )
+
+        self._run_progress_task("Analyzing Bundle", analyze_worker, None, None, on_success=after_analysis)
+
+    def open_online_gallery(self):
+        if self._online_dialog and self._online_dialog.winfo_exists():
+            try:
+                self._online_dialog.lift()
+                self._online_dialog.focus_force()
+            except Exception:
+                pass
+            return
+        self._online_dialog = OnlineGalleryDialog(self, self.gallery_client, self)
+
+    def _refresh_online_dialog(self):
+        dialog = self._online_dialog
+        if dialog and dialog.winfo_exists():
+            dialog.refresh()
+
+    def _download_gallery_bundle(self, bundle: GalleryBundleSummary):
+        temp_dir = Path(tempfile.mkdtemp(prefix="gallery_download_"))
+        asset_name = bundle.asset_name or (bundle.tag or "bundle")
+        asset_name = Path(asset_name).name
+        if not asset_name.lower().endswith(".zip"):
+            asset_name = f"{asset_name}.zip"
+        archive_path = temp_dir / asset_name
+
+        def worker(callback):
+            try:
+                return self.gallery_client.download_bundle(bundle, archive_path, progress_callback=callback)
+            except Exception:
+                shutil.rmtree(temp_dir, ignore_errors=True)
+                raise
+
+        def handle_success(path: Path):
+            self._start_import_from_bundle(path, cleanup=lambda: shutil.rmtree(temp_dir, ignore_errors=True))
+
+        self._run_progress_task("Downloading Bundle", worker, None, None, on_success=handle_success)
+
+    def _delete_gallery_bundle(self, bundle: GalleryBundleSummary):
+        def worker(callback):
+            return self.gallery_client.delete_bundle(bundle, progress_callback=callback)
+
+        def handle_success(_result):
+            messagebox.showinfo(
+                "Bundle Deleted",
+                f"Bundle '{bundle.display_title}' has been removed from GitHub releases.",
+            )
+            self._refresh_online_dialog()
+
+        self._run_progress_task("Deleting Bundle", worker, None, None, on_success=handle_success)
 
     def _post_copy(self, summary: dict):
         if hasattr(self.master, "refresh_entities"):
@@ -603,3 +765,202 @@ class CrossCampaignAssetLibraryWindow(ctk.CTkToplevel):
                 self.configure(cursor="")
             except Exception:
                 pass
+
+
+class OnlineGalleryDialog(ctk.CTkToplevel):
+    def __init__(self, master, client: GithubGalleryClient, parent_window: CrossCampaignAssetLibraryWindow):
+        super().__init__(master)
+        self.client = client
+        self.parent_window = parent_window
+        self.title("Online Campaign Gallery")
+        self.geometry("960x600")
+        self.minsize(720, 480)
+        self.transient(master)
+        self.lift()
+        self.focus_force()
+
+        self.grid_rowconfigure(0, weight=1)
+        self.grid_columnconfigure(0, weight=3)
+        self.grid_columnconfigure(2, weight=2)
+
+        self.tree = ttk.Treeview(
+            self,
+            columns=("title", "size", "published", "author"),
+            show="headings",
+            selectmode="browse",
+        )
+        self.tree.heading("title", text="Bundle")
+        self.tree.heading("size", text="Size")
+        self.tree.heading("published", text="Published")
+        self.tree.heading("author", text="Author")
+        self.tree.column("title", width=380, anchor="w")
+        self.tree.column("size", width=90, anchor="e")
+        self.tree.column("published", width=160, anchor="w")
+        self.tree.column("author", width=140, anchor="w")
+        self.tree.grid(row=0, column=0, sticky="nsew", padx=(10, 0), pady=(10, 0))
+
+        yscroll = ttk.Scrollbar(self, orient="vertical", command=self.tree.yview)
+        self.tree.configure(yscrollcommand=yscroll.set)
+        yscroll.grid(row=0, column=1, sticky="ns", pady=(10, 0))
+
+        detail_frame = ctk.CTkFrame(self)
+        detail_frame.grid(row=0, column=2, sticky="nsew", padx=(10, 10), pady=(10, 0))
+        detail_frame.grid_rowconfigure(1, weight=1)
+
+        ctk.CTkLabel(detail_frame, text="Details", font=("Segoe UI", 15, "bold")).grid(
+            row=0, column=0, sticky="w", pady=(6, 4)
+        )
+        self.detail_text = ctk.CTkTextbox(detail_frame, wrap="word")
+        self.detail_text.grid(row=1, column=0, sticky="nsew")
+        self.detail_text.configure(state="disabled")
+
+        button_bar = ctk.CTkFrame(self)
+        button_bar.grid(row=1, column=0, columnspan=3, sticky="ew", padx=10, pady=(10, 10))
+        button_bar.grid_columnconfigure((0, 1, 2), weight=1)
+
+        self.refresh_btn = ctk.CTkButton(button_bar, text="Refresh", command=self.refresh)
+        self.refresh_btn.grid(row=0, column=0, padx=6, pady=6, sticky="ew")
+        self.download_btn = ctk.CTkButton(button_bar, text="Download & Import…", command=self._download_selected)
+        self.download_btn.grid(row=0, column=1, padx=6, pady=6, sticky="ew")
+        self.delete_btn = ctk.CTkButton(button_bar, text="Delete from GitHub…", command=self._delete_selected)
+        self.delete_btn.grid(row=0, column=2, padx=6, pady=6, sticky="ew")
+        if not self.client.can_publish:
+            self.delete_btn.configure(state="disabled")
+
+        self.status_label = ctk.CTkLabel(self, text="", anchor="w")
+        self.status_label.grid(row=2, column=0, columnspan=3, sticky="ew", padx=10, pady=(0, 10))
+
+        self.tree.bind("<<TreeviewSelect>>", self._on_select)
+        self._bundle_map: Dict[str, GalleryBundleSummary] = {}
+        self.protocol("WM_DELETE_WINDOW", self._on_close)
+
+        self.after(150, self.refresh)
+
+    # ----------------------------------------------------------------- Helpers
+    def refresh(self):
+        self.status_label.configure(text="Loading bundles…")
+        self.tree.delete(*self.tree.get_children())
+        self._bundle_map.clear()
+        self._show_detail(None)
+
+        def worker():
+            try:
+                bundles = self.client.list_bundles()
+            except Exception as exc:
+                self.after(0, lambda: self._handle_error(exc))
+                return
+            self.after(0, lambda: self._populate(bundles))
+
+        threading.Thread(target=worker, daemon=True).start()
+
+    def _populate(self, bundles: List[GalleryBundleSummary]):
+        if bundles:
+            self.status_label.configure(text=f"Found {len(bundles)} bundle(s).")
+        else:
+            self.status_label.configure(text="No bundles available.")
+        for bundle in bundles:
+            iid = str(bundle.asset_id)
+            self._bundle_map[iid] = bundle
+            size_text = self._format_size(bundle.size)
+            if bundle.published_at:
+                published = bundle.published_at
+                if published.tzinfo:
+                    published = published.astimezone()
+                date_text = published.strftime("%Y-%m-%d %H:%M:%S")
+            else:
+                date_text = "—"
+            author_text = bundle.author or "—"
+            self.tree.insert("", END, iid=iid, values=(bundle.display_title, size_text, date_text, author_text))
+
+    def _handle_error(self, exc: Exception):
+        self.status_label.configure(text=f"Failed to load bundles: {exc}")
+        messagebox.showerror("Gallery Error", f"Unable to fetch GitHub releases.\n{exc}")
+
+    def _on_select(self, _event):
+        selection = self.tree.selection()
+        if not selection:
+            self._show_detail(None)
+            return
+        bundle = self._bundle_map.get(selection[0])
+        self._show_detail(bundle)
+
+    def _show_detail(self, bundle: Optional[GalleryBundleSummary]):
+        self.detail_text.configure(state="normal")
+        self.detail_text.delete("1.0", END)
+        if not bundle:
+            self.detail_text.configure(state="disabled")
+            return
+        lines = [
+            f"Release: {bundle.display_title}",
+            f"Tag: {bundle.tag or '—'}",
+            f"Author: {bundle.author or '—'}",
+            f"Size: {self._format_size(bundle.size)}",
+        ]
+        if bundle.published_at:
+            published = bundle.published_at
+            if published.tzinfo:
+                published = published.astimezone()
+            lines.append(f"Published: {published.strftime('%Y-%m-%d %H:%M:%S %Z').strip()}")
+        if bundle.asset_download_count:
+            lines.append(f"Downloads: {bundle.asset_download_count}")
+        if bundle.source_campaign:
+            lines.append(f"Source campaign: {bundle.source_campaign}")
+        if bundle.entity_counts:
+            lines.append("")
+            lines.append("Entities:")
+            for entity_type, count in sorted(bundle.entity_counts.items()):
+                lines.append(f"  {entity_type}: {count}")
+        if bundle.description:
+            lines.append("")
+            lines.append(bundle.description)
+        lines.append("")
+        lines.append(f"Download URL: {bundle.download_url}")
+        self.detail_text.insert("1.0", "\n".join(lines))
+        self.detail_text.configure(state="disabled")
+
+    def _download_selected(self):
+        bundle = self._current_selection()
+        if not bundle:
+            messagebox.showinfo("No Selection", "Select a bundle to download.")
+            return
+        self.parent_window._download_gallery_bundle(bundle)
+
+    def _delete_selected(self):
+        if not self.client.can_publish:
+            messagebox.showerror("Unavailable", "Configure a GitHub token to delete bundles.")
+            return
+        bundle = self._current_selection()
+        if not bundle:
+            messagebox.showinfo("No Selection", "Select a bundle to delete.")
+            return
+        confirm = messagebox.askyesno(
+            "Delete Bundle",
+            f"Remove '{bundle.display_title}' from GitHub releases?",
+            parent=self,
+        )
+        if not confirm:
+            return
+        self.parent_window._delete_gallery_bundle(bundle)
+
+    def _current_selection(self) -> Optional[GalleryBundleSummary]:
+        selection = self.tree.selection()
+        if not selection:
+            return None
+        return self._bundle_map.get(selection[0])
+
+    def _on_close(self):
+        try:
+            self.parent_window._online_dialog = None
+        except Exception:
+            pass
+        self.destroy()
+
+    @staticmethod
+    def _format_size(size: int) -> str:
+        units = ["B", "KB", "MB", "GB", "TB"]
+        value = float(size)
+        for unit in units:
+            if value < 1024 or unit == units[-1]:
+                return f"{value:.1f} {unit}" if unit != "B" else f"{int(value)} {unit}"
+            value /= 1024
+
