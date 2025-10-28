@@ -401,8 +401,18 @@ class CrossCampaignAssetLibraryWindow(ctk.CTkToplevel):
 
         selections = self._gather_selected_records()
         if not selections:
-            messagebox.showinfo("No Selection", "Select at least one asset to publish.")
-            return
+            if not messagebox.askyesno(
+                "Publish Entire Campaign",
+                "No assets are selected.\n\nDo you want to publish the entire campaign database, including all attachments?",
+            ):
+                return
+            selections = self._gather_all_records()
+            if not selections:
+                messagebox.showinfo(
+                    "Nothing to Publish",
+                    "The selected campaign does not contain any exportable assets.",
+                )
+                return
 
         default_title = self.selected_campaign.name or "Campaign Bundle"
         title = simpledialog.askstring(
@@ -687,6 +697,13 @@ class CrossCampaignAssetLibraryWindow(ctk.CTkToplevel):
             if items:
                 selections[entity_type] = items
         return selections
+
+    def _gather_all_records(self) -> Dict[str, List[dict]]:
+        return {
+            entity_type: [copy.deepcopy(record) for record in records]
+            for entity_type, records in self.entity_records.items()
+            if records
+        }
 
     # ------------------------------------------------------- Busy handling
     def _run_progress_task(self, title, worker, success_message, detail_builder, on_success=None):
