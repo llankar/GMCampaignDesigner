@@ -1,5 +1,8 @@
-﻿import configparser
+import configparser
 import os
+from pathlib import Path
+from typing import Union
+
 
 class ConfigHelper:
     _instance = None
@@ -7,24 +10,27 @@ class ConfigHelper:
     _config_mtime = None
     _campaign_config = None
     _campaign_mtime = None
+    _config_path: Path = Path("config/config.ini")
 
     @classmethod
-    def load_config(cls, file_path="config/config.ini"):
+    def load_config(cls, file_path: Union[str, os.PathLike] = "config/config.ini"):
         """Load the configuration from ``file_path``.
 
         The file is read only when it's not cached or when the file has
         changed on disk since the last load. This allows updating the
         configuration without restarting the application.
         """
-        mtime = os.path.getmtime(file_path) if os.path.exists(file_path) else None
+        path = Path(file_path)
+        cls._config_path = path
+        mtime = os.path.getmtime(path) if path.exists() else None
 
         if cls._config is None or mtime != cls._config_mtime:
             cls._config = configparser.ConfigParser()
             if mtime is not None:
-                cls._config.read(file_path)
+                cls._config.read(str(path), encoding="utf-8")
                 cls._config_mtime = mtime
             else:
-                print(f"Warning: config file '{file_path}' not found.")
+                print(f"Warning: config file '{path}' not found.")
                 cls._config_mtime = None
 
         return cls._config
@@ -47,27 +53,40 @@ class ConfigHelper:
             print(f"Config error: [{section}] {key} â€” {e}")
             return fallback
 
-    def set(section, key, value, file_path="config/config.ini"):
+    @classmethod
+    def set(cls, section, key, value, file_path: Union[str, os.PathLike, None] = None):
+        if file_path is None:
+            config_path = cls.get_config_path()
+        else:
+            config_path = Path(file_path)
+
         config = configparser.ConfigParser()
-        if os.path.exists(file_path):
-            config.read(file_path)
+        if config_path.exists():
+            config.read(str(config_path), encoding="utf-8")
 
         if not config.has_section(section):
             config.add_section(section)
 
         config.set(section, key, str(value))
 
-        with open(file_path, "w", encoding="utf-8") as configfile:
+        config_path.parent.mkdir(parents=True, exist_ok=True)
+        with open(config_path, "w", encoding="utf-8") as configfile:
             config.write(configfile)
+
+        # Refresh cached configuration so subsequent reads observe the new value.
+        cls.load_config(str(config_path))
+
+    @classmethod
+    def get_config_path(cls) -> Path:
+        if not isinstance(cls._config_path, Path):
+            cls._config_path = Path("config/config.ini")
+        return cls._config_path
 
     @classmethod
     def get_campaign_dir(cls):
         """Return the directory containing the configured database file."""
         db_path = cls.get("Database", "path", fallback="default_campaign.db")
         return os.path.abspath(os.path.dirname(db_path))
-
-
-
 
     @classmethod
     def get_campaign_settings_path(cls):
@@ -89,8 +108,8 @@ class ConfigHelper:
             cls._campaign_config = cfg
         return cls._campaign_config
 
+
 # Late import to avoid circular dependency with logging_helper
 from modules.helpers.logging_helper import log_module_import
 
 log_module_import(__name__)
-

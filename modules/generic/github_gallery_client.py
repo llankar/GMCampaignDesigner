@@ -15,6 +15,7 @@ import requests
 
 from modules.helpers.config_helper import ConfigHelper
 from modules.helpers.logging_helper import log_exception, log_info, log_module_import, log_warning
+from modules.helpers.secret_helper import decrypt_secret
 
 ProgressCallback = Callable[[str, float], None]
 
@@ -58,7 +59,8 @@ class GithubGalleryClient:
     def __init__(self, repo: Optional[str] = None, token: Optional[str] = None, timeout: Optional[int] = None):
         repo_config = (ConfigHelper.get("Gallery", "github_repo", fallback="") or "").strip()
         repo_env = os.environ.get("GMCD_GALLERY_REPO", "").strip()
-        token_config = (ConfigHelper.get("Gallery", "github_token", fallback="") or "").strip()
+        token_config_raw = (ConfigHelper.get("Gallery", "github_token", fallback="") or "").strip()
+        token_config = decrypt_secret(token_config_raw)
         token_env = os.environ.get("GMCD_GALLERY_TOKEN", "").strip()
 
         self._repo = repo or repo_config or repo_env or DEFAULT_REPO
@@ -79,6 +81,17 @@ class GithubGalleryClient:
     @property
     def timeout(self) -> int:
         return self._timeout
+
+    # --------------------------------------------------------- Credentials
+    def set_token(self, token: Optional[str]) -> None:
+        if token is not None:
+            self._token = token or None
+            return
+
+        token_config_raw = (ConfigHelper.get("Gallery", "github_token", fallback="") or "").strip()
+        token_config = decrypt_secret(token_config_raw)
+        token_env = os.environ.get("GMCD_GALLERY_TOKEN", "").strip()
+        self._token = token_config or token_env or None
 
     # ----------------------------------------------------------------- Session
     def _create_session(self, *, auth: bool = False) -> requests.Session:
