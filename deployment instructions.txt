@@ -6,14 +6,15 @@ nano version.txt            # update FileVersion/ProductVersion etc.
 Regenerate the packaged build with PyInstaller.
 From the repository root, rebuild the distributable folder that lives under dist/RPGCampaignManager so the release asset contains the updated binaries and data files.
 
+./create_release v1_0_0_X
+
+
+###### Manual Method :
 pyinstaller --noconfirm main_window.spec
 Assemble the archive you will publish.
 Zip (or otherwise archive) the entire dist/RPGCampaignManager output, since that directory is what the updater expects to download and install. Including assets, config, static files, and modules mirrors the existing copy script used for manual distribution.
-
-cd dist
-zip -r ../RPGCampaignManager-v1.2.3.zip RPGCampaignManager
-cd ..
-(On Windows you can use powershell Compress-Archive -Path dist\RPGCampaignManager\* -DestinationPath RPGCampaignManager-v1.0.0.X.zip instead.)
+./copy_dist.bat
+On Windows you can use powershell Compress-Archive -Path dist\RPGCampaignManager\* -DestinationPath RPGCampaignManager-v1.0.0.X.zip instead.
 
 Tag the release in Git and push the tag.
 
