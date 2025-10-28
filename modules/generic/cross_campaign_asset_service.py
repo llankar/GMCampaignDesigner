@@ -519,7 +519,7 @@ def _determine_target_path(asset_type: str, original_path: str, campaign_dir: Pa
         relative_base = Path("assets/audio")
     elif asset_type == "attachment":
         base = campaign_dir / "assets" / "uploads"
-        relative_base = Path(".")
+        relative_base = Path("assets/uploads")
     else:  # token assets
         if original and not Path(original).is_absolute():
             rel = Path(original.lstrip("./"))
