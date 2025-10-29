@@ -62,6 +62,7 @@ class BundleAnalysis:
     assets: List[dict]
     temp_dir: Path
     duplicates: Dict[str, List[str]]
+    database: Optional[dict] = None
 
 
 def _resolve_active_campaign() -> CampaignDatabase:
@@ -351,6 +352,8 @@ def export_bundle(
     destination: Path,
     source_campaign: CampaignDatabase,
     selected_records: Dict[str, List[dict]],
+    *,
+    include_database: bool = False,
     progress_callback=None,
 ) -> dict:
     destination = destination.resolve()
@@ -370,6 +373,7 @@ def export_bundle(
         },
         "entities": {},
         "assets": [],
+        "bundle_mode": "full_campaign" if include_database else "asset_bundle",
     }
 
     assets_lookup: Dict[str, Path] = {}
@@ -412,6 +416,26 @@ def export_bundle(
                     }
                 )
 
+        if include_database:
+            try:
+                if not source_campaign.db_path.exists():
+                    raise FileNotFoundError(source_campaign.db_path)
+                db_dir = temp_root / "database"
+                db_dir.mkdir(parents=True, exist_ok=True)
+                db_destination = db_dir / source_campaign.db_path.name
+                shutil.copy2(source_campaign.db_path, db_destination)
+                stat = source_campaign.db_path.stat()
+                manifest["database"] = {
+                    "file_name": source_campaign.db_path.name,
+                    "relative_path": f"database/{source_campaign.db_path.name}",
+                    "size": int(stat.st_size),
+                    "modified_at": datetime.utcfromtimestamp(stat.st_mtime).isoformat() + "Z",
+                }
+            except Exception as exc:
+                log_warning(
+                    f"Unable to include campaign database in bundle: {exc}",
+                    func_name="modules.generic.cross_campaign_asset_service.export_bundle",
+                )
         _call_progress(progress_callback, "Writing bundle archive...", 0.8)
         archive_path = temp_root / "manifest.json"
         archive_path.write_text(json.dumps(manifest, indent=2, ensure_ascii=False), encoding="utf-8")
@@ -499,12 +523,17 @@ def analyze_bundle(bundle_path: Path, target_db: Path) -> BundleAnalysis:
             if dupes:
                 duplicates[entity_type] = dupes
 
+        database_entry = manifest.get("database")
+        if not isinstance(database_entry, dict):
+            database_entry = None
+
         return BundleAnalysis(
             manifest=manifest,
             data_by_type=data_by_type,
             assets=manifest.get("assets", []),
             temp_dir=temp_dir,
             duplicates=duplicates,
+            database=database_entry,
         )
     except Exception:
         shutil.rmtree(temp_dir, ignore_errors=True)
@@ -641,6 +670,95 @@ def apply_import(
 
     _call_progress(progress_callback, "Import complete", 1.0)
     return summary
+
+
+def install_full_campaign_bundle(
+    bundle_path: Path,
+    target_dir: Path,
+    *,
+    progress_callback=None,
+) -> CampaignDatabase:
+    """Install a full campaign bundle by extracting its database and assets."""
+
+    bundle_path = Path(bundle_path).resolve()
+    target_dir = Path(target_dir).resolve()
+
+    temp_dir = Path(tempfile.mkdtemp(prefix="campaign_install_"))
+    try:
+        with zipfile.ZipFile(bundle_path, "r") as zf:
+            zf.extractall(temp_dir)
+
+        manifest_path = temp_dir / "manifest.json"
+        if not manifest_path.exists():
+            raise ValueError("Bundle manifest missing")
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+
+        database_entry = manifest.get("database")
+        if not isinstance(database_entry, dict):
+            raise ValueError("Bundle does not contain a campaign database")
+
+        relative_path = str(database_entry.get("relative_path") or "").strip()
+        if not relative_path:
+            relative_path = database_entry.get("path") or database_entry.get("file_name") or ""
+        if not relative_path:
+            raise ValueError("Bundle database entry is missing a path")
+
+        db_source = (temp_dir / relative_path).resolve()
+        if not db_source.exists():
+            raise FileNotFoundError(db_source)
+
+        db_name = str(database_entry.get("file_name") or Path(relative_path).name or "campaign.db")
+
+        if not target_dir.exists():
+            target_dir.mkdir(parents=True, exist_ok=True)
+
+        db_destination = target_dir / db_name
+        shutil.copy2(db_source, db_destination)
+
+        assets = manifest.get("assets") or []
+        total_steps = max(len(assets) + 1, 1)
+        _call_progress(progress_callback, "Copying database", 1 / total_steps)
+
+        target_root = target_dir.resolve()
+        for index, asset in enumerate(assets, start=1):
+            bundle_rel = asset.get("bundle_path")
+            if not bundle_rel:
+                continue
+            source_asset = (temp_dir / bundle_rel).resolve()
+            if not source_asset.exists():
+                log_warning(
+                    f"Missing asset in bundle: {bundle_rel}",
+                    func_name="modules.generic.cross_campaign_asset_service.install_full_campaign_bundle",
+                )
+                continue
+
+            original_path = str(asset.get("original_path") or "").replace("\\", "/").strip()
+            relative_parts = [part for part in Path(original_path).parts if part not in ("", ".", "..")]
+            relative = Path(*relative_parts) if relative_parts else Path(source_asset.name)
+            destination = (target_root / relative).resolve()
+            if not str(destination).startswith(str(target_root)):
+                destination = target_root / source_asset.name
+
+            destination.parent.mkdir(parents=True, exist_ok=True)
+            try:
+                shutil.copy2(source_asset, destination)
+            except Exception as exc:
+                log_warning(
+                    f"Failed to copy asset {source_asset}: {exc}",
+                    func_name="modules.generic.cross_campaign_asset_service.install_full_campaign_bundle",
+                )
+                continue
+
+            _call_progress(
+                progress_callback,
+                f"Copying assets ({index}/{len(assets)})",
+                min((index + 1) / total_steps, 1.0),
+            )
+
+        campaign_name = str(manifest.get("source_campaign", {}).get("name") or target_dir.name)
+        return CampaignDatabase(name=campaign_name, root=target_dir, db_path=db_destination)
+    finally:
+        shutil.rmtree(temp_dir, ignore_errors=True)
 
 
 def apply_direct_copy(
