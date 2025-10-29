@@ -1854,20 +1854,24 @@ class MainWindow(ctk.CTk):
             try:
                 result = worker(update)
             except PermissionError as exc:
-                self.after(0, lambda: handle_error("Permission Denied", str(exc)))
+                detail = str(exc)
+                self.after(0, lambda detail=detail: handle_error("Permission Denied", detail))
                 return
             except ManifestError as exc:
-                self.after(0, lambda: handle_error("Invalid Backup", str(exc)))
+                detail = str(exc)
+                self.after(0, lambda detail=detail: handle_error("Invalid Backup", detail))
                 return
             except BackupError as exc:
-                self.after(0, lambda: handle_error("Backup Error", str(exc)))
+                detail = str(exc)
+                self.after(0, lambda detail=detail: handle_error("Backup Error", detail))
                 return
             except Exception as exc:
                 log_exception(
                     f"Unexpected error during {title}: {exc}",
                     func_name="main_window.MainWindow._run_progress_task",
                 )
-                self.after(0, lambda: handle_error("Unexpected Error", str(exc)))
+                detail = str(exc)
+                self.after(0, lambda detail=detail: handle_error("Unexpected Error", detail))
                 return
 
             self.after(0, lambda: on_success(result))
