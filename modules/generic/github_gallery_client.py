@@ -52,6 +52,15 @@ class GalleryBundleSummary:
     def display_title(self) -> str:
         return self.release_name or self.tag or self.asset_name
 
+    @property
+    def is_full_campaign(self) -> bool:
+        metadata = self.metadata if isinstance(self.metadata, dict) else {}
+        mode = str(metadata.get("bundle_mode") or "").lower()
+        if mode == "full_campaign":
+            return True
+        database_meta = metadata.get("database")
+        return isinstance(database_meta, dict) and bool(database_meta)
+
 
 class GithubGalleryClient:
     """Client that wraps GitHub's release API for bundle distribution."""
@@ -426,7 +435,14 @@ class GithubGalleryClient:
             "source_campaign": manifest.get("source_campaign") or {},
             "bundle_version": manifest.get("version"),
             "asset_count": len(manifest.get("assets") or []),
+            "bundle_mode": manifest.get("bundle_mode") or "asset_bundle",
         }
+        database_entry = manifest.get("database")
+        if isinstance(database_entry, dict):
+            metadata["database"] = {
+                "file_name": str(database_entry.get("file_name") or ""),
+                "size": int(database_entry.get("size") or 0),
+            }
         return metadata
 
 

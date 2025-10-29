@@ -2,11 +2,13 @@
 
 from __future__ import annotations
 
+import json
 import copy
 import re
 import shutil
 import tempfile
 import threading
+import zipfile
 from contextlib import contextmanager
 from pathlib import Path
 from typing import Callable, Dict, List, Optional
@@ -24,6 +26,7 @@ from modules.generic.cross_campaign_asset_service import (
     detect_duplicates,
     discover_databases_in_directory,
     export_bundle,
+    install_full_campaign_bundle,
     get_active_campaign,
     list_sibling_campaigns,
     load_entities,
@@ -389,7 +392,13 @@ class CrossCampaignAssetLibraryWindow(ctk.CTkToplevel):
             return
 
         def worker(callback):
-            return export_bundle(Path(destination), self.selected_campaign, selections, progress_callback=callback)
+            return export_bundle(
+                Path(destination),
+                self.selected_campaign,
+                selections,
+                include_database=False,
+                progress_callback=callback,
+            )
 
         def detail(manifest: dict) -> str:
             lines = [f"Saved to: {manifest.get('archive_path')}"]
@@ -411,6 +420,7 @@ class CrossCampaignAssetLibraryWindow(ctk.CTkToplevel):
             return
 
         selections = self._gather_selected_records()
+        publishing_full_campaign = False
         if not selections:
             if not messagebox.askyesno(
                 "Publish Entire Campaign",
@@ -424,6 +434,7 @@ class CrossCampaignAssetLibraryWindow(ctk.CTkToplevel):
                     "The selected campaign does not contain any exportable assets.",
                 )
                 return
+            publishing_full_campaign = True
 
         default_title = self.selected_campaign.name or "Campaign Bundle"
         title = simpledialog.askstring(
@@ -456,7 +467,13 @@ class CrossCampaignAssetLibraryWindow(ctk.CTkToplevel):
 
         def worker(callback):
             try:
-                manifest = export_bundle(archive_path, self.selected_campaign, selections, progress_callback=callback)
+                manifest = export_bundle(
+                    archive_path,
+                    self.selected_campaign,
+                    selections,
+                    include_database=publishing_full_campaign,
+                    progress_callback=callback,
+                )
                 return self.gallery_client.publish_bundle(
                     archive_path,
                     manifest,
@@ -564,6 +581,9 @@ class CrossCampaignAssetLibraryWindow(ctk.CTkToplevel):
         )
 
     def _start_import_from_bundle(self, bundle_path: Path, *, cleanup: Optional[Callable[[], None]] = None):
+        if self._maybe_install_full_campaign(None, bundle_path, cleanup=cleanup):
+            return
+
         target_campaign = self.active_campaign
 
         def analyze_worker(_callback):
@@ -725,9 +745,121 @@ class CrossCampaignAssetLibraryWindow(ctk.CTkToplevel):
                 raise
 
         def handle_success(path: Path):
-            self._start_import_from_bundle(path, cleanup=lambda: shutil.rmtree(temp_dir, ignore_errors=True))
+            cleanup = lambda: shutil.rmtree(temp_dir, ignore_errors=True)
+            if self._maybe_install_full_campaign(bundle, path, cleanup=cleanup):
+                return
+            self._start_import_from_bundle(path, cleanup=cleanup)
 
         self._run_progress_task("Downloading Bundle", worker, None, None, on_success=handle_success)
+
+    def _maybe_install_full_campaign(
+        self,
+        bundle: Optional[GalleryBundleSummary],
+        archive_path: Path,
+        *,
+        cleanup: Optional[Callable[[], None]] = None,
+    ) -> bool:
+        """Return True if the bundle was handled as a full campaign or the operation was cancelled."""
+
+        manifest = None
+        try:
+            with zipfile.ZipFile(archive_path, "r") as zf:
+                with zf.open("manifest.json") as handle:
+                    manifest = json.load(handle)
+        except KeyError:
+            return False
+        except Exception as exc:
+            log_warning(
+                f"Unable to inspect bundle manifest for full campaign detection: {exc}",
+                func_name="modules.generic.cross_campaign_asset_library._maybe_install_full_campaign",
+            )
+            return False
+
+        database_entry = manifest.get("database") if isinstance(manifest, dict) else None
+        if not isinstance(database_entry, dict):
+            return False
+
+        default_name = Path(archive_path).stem
+        if bundle:
+            default_name = (
+                bundle.source_campaign
+                or manifest.get("source_campaign", {}).get("name")
+                or bundle.display_title
+                or default_name
+            )
+        else:
+            default_name = manifest.get("source_campaign", {}).get("name") or default_name
+        folder_name = simpledialog.askstring(
+            "Install Campaign",
+            "Enter a folder name for the downloaded campaign:",
+            parent=self,
+            initialvalue=default_name,
+        )
+        if folder_name is None:
+            if cleanup:
+                cleanup()
+            return True
+
+        folder_name = folder_name.strip()
+        if not folder_name:
+            messagebox.showwarning("Invalid Name", "Enter a non-empty folder name for the campaign.")
+            if cleanup:
+                cleanup()
+            return True
+
+        parent_dir = self.active_campaign.root.parent if self.active_campaign else Path(ConfigHelper.get_campaign_dir()).resolve()
+        if not parent_dir.exists():
+            parent_dir = self.active_campaign.root if self.active_campaign else Path(ConfigHelper.get_campaign_dir()).resolve()
+        target_dir = (parent_dir / folder_name).resolve()
+
+        if target_dir.exists():
+            if not messagebox.askyesno(
+                "Replace Campaign",
+                "A campaign with that name already exists.\n\nDo you want to replace it?",
+            ):
+                if cleanup:
+                    cleanup()
+                return True
+            try:
+                shutil.rmtree(target_dir)
+            except Exception as exc:
+                messagebox.showerror(
+                    "Unable to Replace Campaign",
+                    f"Failed to remove the existing campaign directory.\n\n{exc}",
+                )
+                if cleanup:
+                    cleanup()
+                return True
+
+        def worker(callback):
+            try:
+                return install_full_campaign_bundle(archive_path, target_dir, progress_callback=callback)
+            finally:
+                if cleanup:
+                    cleanup()
+
+        def on_success(campaign: CampaignDatabase):
+            messagebox.showinfo(
+                "Campaign Installed",
+                (
+                    f"Campaign '{campaign.name}' has been installed.\n"
+                    f"Location: {campaign.root}\n"
+                    f"Database: {campaign.db_path.name}"
+                ),
+            )
+            try:
+                self.refresh_campaign_list()
+            except Exception:
+                pass
+
+        self._run_progress_task(
+            "Installing Campaign",
+            worker,
+            None,
+            None,
+            on_success=on_success,
+        )
+        return True
 
     def _delete_gallery_bundle(self, bundle: GalleryBundleSummary):
         def worker(callback):
