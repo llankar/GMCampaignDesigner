@@ -694,6 +694,8 @@ def install_full_campaign_bundle(
         manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
 
         database_entry = manifest.get("database")
+        if isinstance(database_entry, str):
+            database_entry = {"relative_path": database_entry}
         if not isinstance(database_entry, dict):
             raise ValueError("Bundle does not contain a campaign database")
 
