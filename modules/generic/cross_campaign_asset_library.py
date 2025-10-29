@@ -2,13 +2,11 @@
 
 from __future__ import annotations
 
-import json
 import copy
 import re
 import shutil
 import tempfile
 import threading
-import zipfile
 from contextlib import contextmanager
 from pathlib import Path
 from typing import Callable, Dict, List, Optional
@@ -581,9 +579,6 @@ class CrossCampaignAssetLibraryWindow(ctk.CTkToplevel):
         )
 
     def _start_import_from_bundle(self, bundle_path: Path, *, cleanup: Optional[Callable[[], None]] = None):
-        if self._maybe_install_full_campaign(None, bundle_path, cleanup=cleanup):
-            return
-
         target_campaign = self.active_campaign
 
         def analyze_worker(_callback):
@@ -729,7 +724,7 @@ class CrossCampaignAssetLibraryWindow(ctk.CTkToplevel):
             except Exception:
                 pass
 
-    def _download_gallery_bundle(self, bundle: GalleryBundleSummary):
+    def _download_gallery_bundle(self, bundle: GalleryBundleSummary, *, install_full_campaign: bool = False):
         temp_dir = Path(tempfile.mkdtemp(prefix="gallery_download_"))
         asset_name = bundle.asset_name or (bundle.tag or "bundle")
         asset_name = Path(asset_name).name
@@ -746,49 +741,21 @@ class CrossCampaignAssetLibraryWindow(ctk.CTkToplevel):
 
         def handle_success(path: Path):
             cleanup = lambda: shutil.rmtree(temp_dir, ignore_errors=True)
-            if self._maybe_install_full_campaign(bundle, path, cleanup=cleanup):
+            if install_full_campaign:
+                self._install_full_campaign_from_archive(bundle, path, cleanup=cleanup)
                 return
             self._start_import_from_bundle(path, cleanup=cleanup)
 
         self._run_progress_task("Downloading Bundle", worker, None, None, on_success=handle_success)
 
-    def _maybe_install_full_campaign(
+    def _install_full_campaign_from_archive(
         self,
         bundle: Optional[GalleryBundleSummary],
         archive_path: Path,
         *,
         cleanup: Optional[Callable[[], None]] = None,
-    ) -> bool:
-        """Return True if the bundle was handled as a full campaign or the operation was cancelled."""
-
-        manifest = None
-        try:
-            with zipfile.ZipFile(archive_path, "r") as zf:
-                with zf.open("manifest.json") as handle:
-                    manifest = json.load(handle)
-        except KeyError:
-            return False
-        except Exception as exc:
-            log_warning(
-                f"Unable to inspect bundle manifest for full campaign detection: {exc}",
-                func_name="modules.generic.cross_campaign_asset_library._maybe_install_full_campaign",
-            )
-            return False
-
-        database_entry = manifest.get("database") if isinstance(manifest, dict) else None
-        if not isinstance(database_entry, dict):
-            return False
-
-        default_name = Path(archive_path).stem
-        if bundle:
-            default_name = (
-                bundle.source_campaign
-                or manifest.get("source_campaign", {}).get("name")
-                or bundle.display_title
-                or default_name
-            )
-        else:
-            default_name = manifest.get("source_campaign", {}).get("name") or default_name
+    ) -> None:
+        default_name = bundle.source_campaign or bundle.display_title or Path(archive_path).stem
         folder_name = simpledialog.askstring(
             "Install Campaign",
             "Enter a folder name for the downloaded campaign:",
@@ -798,18 +765,26 @@ class CrossCampaignAssetLibraryWindow(ctk.CTkToplevel):
         if folder_name is None:
             if cleanup:
                 cleanup()
-            return True
+            return
 
         folder_name = folder_name.strip()
         if not folder_name:
             messagebox.showwarning("Invalid Name", "Enter a non-empty folder name for the campaign.")
             if cleanup:
                 cleanup()
-            return True
+            return
 
-        parent_dir = self.active_campaign.root.parent if self.active_campaign else Path(ConfigHelper.get_campaign_dir()).resolve()
+        parent_dir = (
+            self.active_campaign.root.parent
+            if self.active_campaign
+            else Path(ConfigHelper.get_campaign_dir()).resolve()
+        )
         if not parent_dir.exists():
-            parent_dir = self.active_campaign.root if self.active_campaign else Path(ConfigHelper.get_campaign_dir()).resolve()
+            parent_dir = (
+                self.active_campaign.root
+                if self.active_campaign
+                else Path(ConfigHelper.get_campaign_dir()).resolve()
+            )
         target_dir = (parent_dir / folder_name).resolve()
 
         if target_dir.exists():
@@ -819,7 +794,7 @@ class CrossCampaignAssetLibraryWindow(ctk.CTkToplevel):
             ):
                 if cleanup:
                     cleanup()
-                return True
+                return
             try:
                 shutil.rmtree(target_dir)
             except Exception as exc:
@@ -829,7 +804,7 @@ class CrossCampaignAssetLibraryWindow(ctk.CTkToplevel):
                 )
                 if cleanup:
                     cleanup()
-                return True
+                return
 
         def worker(callback):
             try:
@@ -859,7 +834,6 @@ class CrossCampaignAssetLibraryWindow(ctk.CTkToplevel):
             None,
             on_success=on_success,
         )
-        return True
 
     def _delete_gallery_bundle(self, bundle: GalleryBundleSummary):
         def worker(callback):
@@ -1039,14 +1013,16 @@ class OnlineGalleryDialog(ctk.CTkToplevel):
 
         button_bar = ctk.CTkFrame(self)
         button_bar.grid(row=1, column=0, columnspan=3, sticky="ew", padx=10, pady=(10, 10))
-        button_bar.grid_columnconfigure((0, 1, 2), weight=1)
+        button_bar.grid_columnconfigure((0, 1, 2, 3), weight=1)
 
         self.refresh_btn = ctk.CTkButton(button_bar, text="Refresh", command=self.refresh)
         self.refresh_btn.grid(row=0, column=0, padx=6, pady=6, sticky="ew")
         self.download_btn = ctk.CTkButton(button_bar, text="Download & Import…", command=self._download_selected)
         self.download_btn.grid(row=0, column=1, padx=6, pady=6, sticky="ew")
+        self.install_btn = ctk.CTkButton(button_bar, text="Download & Install Campaign…", command=self._install_selected)
+        self.install_btn.grid(row=0, column=2, padx=6, pady=6, sticky="ew")
         self.delete_btn = ctk.CTkButton(button_bar, text="Delete from GitHub…", command=self._delete_selected)
-        self.delete_btn.grid(row=0, column=2, padx=6, pady=6, sticky="ew")
+        self.delete_btn.grid(row=0, column=3, padx=6, pady=6, sticky="ew")
         if not self.client.can_publish:
             self.delete_btn.configure(state="disabled")
 
@@ -1147,6 +1123,13 @@ class OnlineGalleryDialog(ctk.CTkToplevel):
             messagebox.showinfo("No Selection", "Select a bundle to download.")
             return
         self.parent_window._download_gallery_bundle(bundle)
+
+    def _install_selected(self):
+        bundle = self._current_selection()
+        if not bundle:
+            messagebox.showinfo("No Selection", "Select a bundle to install.")
+            return
+        self.parent_window._download_gallery_bundle(bundle, install_full_campaign=True)
 
     def _delete_selected(self):
         if not self.client.can_publish:
