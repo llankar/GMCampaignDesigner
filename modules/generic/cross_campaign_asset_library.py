@@ -933,7 +933,12 @@ class CrossCampaignAssetLibraryWindow(ctk.CTkToplevel):
 
         def handle_error(exc: Exception):
             close()
-            messagebox.showerror("Operation Failed", str(exc))
+            details = str(exc).strip()
+            if details:
+                message = f"{exc.__class__.__name__}: {details}"
+            else:
+                message = repr(exc)
+            messagebox.showerror("Operation Failed", message)
 
         def run():
             try:

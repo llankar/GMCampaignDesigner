@@ -432,10 +432,11 @@ def export_bundle(
                     "modified_at": datetime.utcfromtimestamp(stat.st_mtime).isoformat() + "Z",
                 }
             except Exception as exc:
-                log_warning(
+                log_exception(
                     f"Unable to include campaign database in bundle: {exc}",
                     func_name="modules.generic.cross_campaign_asset_service.export_bundle",
                 )
+                raise
         _call_progress(progress_callback, "Writing bundle archive...", 0.8)
         archive_path = temp_root / "manifest.json"
         archive_path.write_text(json.dumps(manifest, indent=2, ensure_ascii=False), encoding="utf-8")
