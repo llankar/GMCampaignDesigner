@@ -943,7 +943,7 @@ class CrossCampaignAssetLibraryWindow(ctk.CTkToplevel):
                     f"Cross-campaign asset task failed: {exc}",
                     func_name="modules.generic.cross_campaign_asset_library._run_progress_task",
                 )
-                self.after(0, lambda: handle_error(exc))
+                self.after(0, lambda exc=exc: handle_error(exc))
                 return
             self.after(0, lambda: handle_success(result))
 
@@ -1046,7 +1046,7 @@ class OnlineGalleryDialog(ctk.CTkToplevel):
             try:
                 bundles = self.client.list_bundles()
             except Exception as exc:
-                self.after(0, lambda: self._handle_error(exc))
+                self.after(0, lambda exc=exc: self._handle_error(exc))
                 return
             self.after(0, lambda: self._populate(bundles))
 
