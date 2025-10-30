@@ -1,6 +1,7 @@
 import os
 import json
 import copy
+import math
 import re
 import webbrowser
 import threading
@@ -21,7 +22,13 @@ from modules.maps.views.toolbar_view import (
     _update_fog_button_states,
 )
 from modules.maps.views.canvas_view import _build_canvas, _on_delete_key
-from modules.maps.services.fog_manager import _set_fog, clear_fog, reset_fog, on_paint
+from modules.maps.services.fog_manager import (
+    _set_fog,
+    clear_fog,
+    reset_fog,
+    on_paint,
+    apply_fog_rectangle,
+)
 # Removed direct imports from token_manager, as methods are now part of this controller or generic
 # from modules.maps.services.token_manager import add_token, _on_token_press, _on_token_move, _on_token_release, _copy_token, _paste_token, _show_token_menu, _resize_token_dialog, _change_token_border_color, _delete_token, _persist_tokens
 from modules.maps.services.token_manager import (
@@ -187,7 +194,10 @@ class DisplayMapController:
         self.fs_mask_id    = None
         self.fog_history = []
         self._fog_action_active = False
-        
+        self._fog_rect_start_world = None
+        self._fog_rect_preview_id = None
+        self._fog_rect_fs_preview_id = None
+
         self._maps = {m["Name"]: m for m in maps_wrapper.load_items()}
         self.select_map()
 
@@ -2499,7 +2509,15 @@ class DisplayMapController:
                 }
                 self.tokens.append(new_shape); self._update_canvas_images(); self._persist_tokens()
                 return # New shape created, done with this click.
-            if self.fog_mode not in ("add", "rem"):
+            if self.fog_mode in ("add_rect", "rem_rect"):
+                self._clear_fog_rectangle_preview()
+                start_world_x = (event.x - self.pan_x) / self.zoom
+                start_world_y = (event.y - self.pan_y) / self.zoom
+                self._fog_rect_start_world = (start_world_x, start_world_y)
+                if not self._fog_action_active:
+                    self._push_fog_history()
+                    self._fog_action_active = True
+            elif self.fog_mode not in ("add", "rem"):
                 self._start_drag_selection(event, existing_selection=existing_selection)
         # The following elif was part of a previous attempt and seems to be a leftover,
         # as item click handling is done by _on_item_press.
@@ -2518,7 +2536,10 @@ class DisplayMapController:
             if abs(dx) > 5 or abs(dy) > 5: self.canvas.after_cancel(self._marker_after_id); self._marker_after_id = None
         if self._drag_select_start:
             self._update_drag_selection(event)
-        self.on_paint(event)
+        if self.fog_mode in ("add", "rem"):
+            self.on_paint(event)
+        elif self.fog_mode in ("add_rect", "rem_rect") and self._fog_rect_start_world is not None:
+            self._update_fog_rectangle_preview(event)
 
     def _on_mouse_up(self, event):
         self._finalize_drag_selection(event)
@@ -2531,15 +2552,155 @@ class DisplayMapController:
             self._marker_anim_after_id = None
         if self._marker_id: self.canvas.delete(self._marker_id); self._marker_id = None
         if self.fs_canvas and self._fs_marker_id: self.fs_canvas.delete(self._fs_marker_id); self._fs_marker_id = None
+        if (
+            self.fog_mode in ("add_rect", "rem_rect")
+            and self._fog_rect_start_world is not None
+            and self.mask_img is not None
+        ):
+            end_world_x = (event.x - self.pan_x) / self.zoom
+            end_world_y = (event.y - self.pan_y) / self.zoom
+            start_world_x, start_world_y = self._fog_rect_start_world
+
+            left = math.floor(min(start_world_x, end_world_x))
+            right = math.ceil(max(start_world_x, end_world_x))
+            top = math.floor(min(start_world_y, end_world_y))
+            bottom = math.ceil(max(start_world_y, end_world_y))
+
+            width, height = self.mask_img.size
+            if width > 0 and height > 0:
+                left = int(max(0, min(width - 1, left)))
+                right = int(max(0, min(width - 1, right)))
+                top = int(max(0, min(height - 1, top)))
+                bottom = int(max(0, min(height - 1, bottom)))
+
+                if right < left:
+                    left, right = right, left
+                if bottom < top:
+                    top, bottom = bottom, top
+
+                if right == left and width > 1:
+                    right = min(width - 1, right + 1)
+                if bottom == top and height > 1:
+                    bottom = min(height - 1, bottom + 1)
+
+                apply_fog_rectangle(self, (left, top, right, bottom), self.fog_mode)
+
+        self._fog_rect_start_world = None
         if self._fog_action_active:
-            self._fog_action_active = False; self.canvas.delete("fog_preview")
+            self._fog_action_active = False
+            self._clear_fog_rectangle_preview()
             if self.base_img and self.mask_img:
                 w, h = self.base_img.size; sw, sh = int(w*self.zoom), int(h*self.zoom)
                 if sw > 0 and sh > 0:
                     mask_resized = self.mask_img.resize((sw, sh), resample=Image.LANCZOS)
                     self.mask_tk = ImageTk.PhotoImage(mask_resized)
                     if self.mask_id: self.canvas.itemconfig(self.mask_id, image=self.mask_tk); self.canvas.coords(self.mask_id, self.pan_x, self.pan_y)
-        
+                    fs_canvas = getattr(self, "fs_canvas", None)
+                    if fs_canvas:
+                        try:
+                            if fs_canvas.winfo_exists():
+                                self._update_fullscreen_map()
+                        except tk.TclError:
+                            pass
+
+    def _update_fog_rectangle_preview(self, event):
+        if self._fog_rect_start_world is None or self.zoom == 0:
+            return
+
+        canvas = getattr(self, "canvas", None)
+        if not canvas:
+            return
+
+        start_world_x, start_world_y = self._fog_rect_start_world
+        end_world_x = (event.x - self.pan_x) / self.zoom
+        end_world_y = (event.y - self.pan_y) / self.zoom
+
+        left = min(start_world_x, end_world_x)
+        right = max(start_world_x, end_world_x)
+        top = min(start_world_y, end_world_y)
+        bottom = max(start_world_y, end_world_y)
+
+        screen_left = self.pan_x + left * self.zoom
+        screen_top = self.pan_y + top * self.zoom
+        screen_right = self.pan_x + right * self.zoom
+        screen_bottom = self.pan_y + bottom * self.zoom
+
+        outline_color = "#d7263d" if self.fog_mode == "add_rect" else "#00a2ff"
+
+        try:
+            if self._fog_rect_preview_id and canvas.type(self._fog_rect_preview_id):
+                canvas.coords(self._fog_rect_preview_id, screen_left, screen_top, screen_right, screen_bottom)
+                canvas.itemconfig(self._fog_rect_preview_id, outline=outline_color)
+            else:
+                self._fog_rect_preview_id = canvas.create_rectangle(
+                    screen_left,
+                    screen_top,
+                    screen_right,
+                    screen_bottom,
+                    outline=outline_color,
+                    width=2,
+                    dash=(6, 4),
+                    fill="",
+                    tags=("fog_preview",),
+                )
+            canvas.tag_raise(self._fog_rect_preview_id)
+        except tk.TclError:
+            self._fog_rect_preview_id = None
+
+        fs_canvas = getattr(self, "fs_canvas", None)
+        if fs_canvas:
+            try:
+                if not fs_canvas.winfo_exists():
+                    fs_canvas = None
+            except tk.TclError:
+                fs_canvas = None
+
+        if fs_canvas:
+            try:
+                if self._fog_rect_fs_preview_id and fs_canvas.type(self._fog_rect_fs_preview_id):
+                    fs_canvas.coords(
+                        self._fog_rect_fs_preview_id,
+                        screen_left,
+                        screen_top,
+                        screen_right,
+                        screen_bottom,
+                    )
+                    fs_canvas.itemconfig(self._fog_rect_fs_preview_id, outline=outline_color)
+                else:
+                    self._fog_rect_fs_preview_id = fs_canvas.create_rectangle(
+                        screen_left,
+                        screen_top,
+                        screen_right,
+                        screen_bottom,
+                        outline=outline_color,
+                        width=2,
+                        dash=(6, 4),
+                        fill="",
+                        tags=("fog_preview",),
+                    )
+                fs_canvas.tag_raise(self._fog_rect_fs_preview_id)
+            except tk.TclError:
+                self._fog_rect_fs_preview_id = None
+
+    def _clear_fog_rectangle_preview(self):
+        canvas = getattr(self, "canvas", None)
+        if canvas:
+            try:
+                canvas.delete("fog_preview")
+            except tk.TclError:
+                pass
+
+        fs_canvas = getattr(self, "fs_canvas", None)
+        if fs_canvas:
+            try:
+                if fs_canvas.winfo_exists():
+                    fs_canvas.delete("fog_preview")
+            except tk.TclError:
+                pass
+
+        self._fog_rect_preview_id = None
+        self._fog_rect_fs_preview_id = None
+
     def _perform_zoom(self, final: bool):
         resample = Image.LANCZOS if final else self._fast_resample; self._update_canvas_images(resample=resample)
 

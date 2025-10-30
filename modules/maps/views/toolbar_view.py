@@ -71,6 +71,24 @@ def _build_toolbar(self):
     rem_fog_container.pack(side="left")
     self._fog_buttons["rem"] = getattr(rem_fog_container, "button", None)
 
+    add_rect_container = create_icon_button(
+        toolbar,
+        icons["add"],
+        "Add Fog Rectangle",
+        command=lambda: self._set_fog("add_rect")
+    )
+    add_rect_container.pack(side="left")
+    self._fog_buttons["add_rect"] = getattr(add_rect_container, "button", None)
+
+    rem_rect_container = create_icon_button(
+        toolbar,
+        icons["rem"],
+        "Remove Fog Rectangle",
+        command=lambda: self._set_fog("rem_rect")
+    )
+    rem_rect_container.pack(side="left")
+    self._fog_buttons["rem_rect"] = getattr(rem_rect_container, "button", None)
+
     create_icon_button(toolbar, icons["clear"], "Clear Fog",   command=self.clear_fog).pack(side="left")
     create_icon_button(toolbar, icons["reset"], "Reset Fog",   command=self.reset_fog).pack(side="left")
     create_icon_button(toolbar, icons["save"],  "Save Map",    command=self.save_map).pack(side="left")
