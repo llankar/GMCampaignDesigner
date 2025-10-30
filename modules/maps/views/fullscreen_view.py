@@ -26,7 +26,14 @@ def open_fullscreen(self):
 
 def _update_fullscreen_map(self):
     """Mirror the GM canvas into the fullscreen window."""
-    if not self.fs_canvas or not self.base_img:
+    fs_canvas = getattr(self, "fs_canvas", None)
+    if not fs_canvas or not self.base_img:
+        return
+
+    try:
+        if not fs_canvas.winfo_exists():
+            return
+    except tk.TclError:
         return
 
     # Same logic as above but on fs_canvas

@@ -3048,8 +3048,13 @@ class DisplayMapController:
                     )
             setattr(self, "_pending_render_debug_dump", None)
         self._update_selection_indicators()
-        if self.fs_canvas:
-            self._update_fullscreen_map()
+        fs_canvas = getattr(self, "fs_canvas", None)
+        if fs_canvas:
+            try:
+                if fs_canvas.winfo_exists():
+                    self._update_fullscreen_map()
+            except tk.TclError:
+                pass
         if getattr(self, '_web_server_thread', None):
             self._update_web_display_map()
 
