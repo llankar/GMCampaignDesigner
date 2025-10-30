@@ -1,8 +1,12 @@
 {
   "fields": [
-      {"name": "Name", "type": "text"},
-      {"name": "Description", "type": "longtext"},
-      {"name": "Secrets", "type": "longtext"},
-      {"name": "Portrait", "type": "text"}
+    {"name": "Name", "type": "text"},
+    {"name": "Description", "type": "longtext"},
+    {"name": "Stats", "type": "longtext"},
+    {"name": "Secrets", "type": "longtext"},
+    {"name": "Portrait", "type": "text"},
+    {"name": "Category", "type": "text"}
+  ],
+  "custom_fields": [
   ]
 }

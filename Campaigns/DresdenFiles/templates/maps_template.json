@@ -1,13 +1,16 @@
 {
   "fields": [
-      {"name": "Name", "type": "text"},
-      {"name": "Description", "type": "longtext"},
-      {"name": "Image", "type": "text"},
-      { "name": "FogMaskPath",  "type": "text"},
-      { "name": "Tokens",  "type": "text"},
-      { "name": "token_size",  "type": "int"},
-      { "name": "pan_x",      "type": "float"},
-      { "name": "pan_y",      "type": "float"},
-      { "name": "zoom",       "type": "float"}
+    {"name": "Name", "type": "text"},
+    {"name": "Description", "type": "longtext"},
+    {"name": "Image", "type": "text"},
+    {"name": "FogMaskPath", "type": "text"},
+    {"name": "Tokens", "type": "text"},
+    {"name": "token_size", "type": "int"},
+    {"name": "pan_x", "type": "float"},
+    {"name": "pan_y", "type": "float"},
+    {"name": "zoom", "type": "float"},
+    {"name": "hover_font_size", "type": "int"}
+  ],
+  "custom_fields": [
   ]
 }

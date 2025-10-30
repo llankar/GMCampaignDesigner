@@ -1,14 +1,16 @@
 {
   "fields": [
-      {"name": "Title", "type": "text"},
-      {"name": "Summary", "type": "longtext"},
-      {"name": "Secrets", "type": "longtext"},
-      {"name": "Scenes", "type": "list_longtext"},
-      {"name": "Places", "type": "list", "linked_type": "Places"},
-      {"name": "NPCs", "type": "list", "linked_type": "NPCs"},
-      {"name": "Creatures", "type": "list", "linked_type": "Creatures"},
-      {"name": "Factions", "type": "list", "linked_type": "Factions"},
-      {"name": "Objects", "type": "list", "linked_type": "Objects"}
-      
+    {"name": "Title", "type": "text"},
+    {"name": "Summary", "type": "longtext"},
+    {"name": "Secrets", "type": "longtext"},
+    {"name": "Scenes", "type": "list_longtext"},
+    {"name": "Places", "type": "list", "linked_type": "Places"},
+    {"name": "NPCs", "type": "list", "linked_type": "NPCs"},
+    {"name": "Creatures", "type": "list", "linked_type": "Creatures"},
+    {"name": "Factions", "type": "list", "linked_type": "Factions"},
+    {"name": "Objects", "type": "list", "linked_type": "Objects"},
+    {"name": "Books", "type": "list", "linked_type": "Books"}
+  ],
+  "custom_fields": [
   ]
 }

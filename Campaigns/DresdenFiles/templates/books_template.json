@@ -1,0 +1,16 @@
+{
+  "fields": [
+    {"name": "Title", "type": "text"},
+    {"name": "Subject", "type": "text"},
+    {"name": "Game", "type": "text"},
+    {"name": "Folder", "type": "text"},
+    {"name": "Tags", "type": "list"},
+    {"name": "PageCount", "type": "int"},
+    {"name": "Notes", "type": "longtext"},
+    {"name": "Attachment", "type": "file", "storage_subdir": "books"},
+    {"name": "ExtractedText", "type": "longtext"},
+    {"name": "ExtractedPages", "type": "list"}
+  ],
+  "custom_fields": [
+  ]
+}
