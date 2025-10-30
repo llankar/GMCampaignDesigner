@@ -3,9 +3,14 @@ from modules.helpers.logging_helper import log_module_import
 
 log_module_import(__name__)
 
+_BRUSH_FOG_MODES = {"add", "rem"}
+_RECTANGLE_FOG_MODES = {"add_rect", "rem_rect"}
+_ALL_FOG_MODES = _BRUSH_FOG_MODES | _RECTANGLE_FOG_MODES
+
+
 def _set_fog(self, mode):
-    """Toggle the active fog brush mode between add/remove/none."""
-    if mode not in ("add", "rem"):
+    """Toggle the active fog tool between brush/rectangle add/remove modes."""
+    if mode not in _ALL_FOG_MODES:
         new_mode = None
     else:
         current = getattr(self, "fog_mode", None)
@@ -16,6 +21,46 @@ def _set_fog(self, mode):
     updater = getattr(self, "_update_fog_button_states", None)
     if callable(updater):
         updater()
+
+    if new_mode not in _RECTANGLE_FOG_MODES:
+        reset_preview = getattr(self, "_clear_fog_rectangle_preview", None)
+        if callable(reset_preview):
+            reset_preview()
+        if hasattr(self, "_fog_rect_start_world"):
+            self._fog_rect_start_world = None
+
+
+def apply_fog_rectangle(self, bounds, mode):
+    """Fill a rectangular fog region directly onto the mask image."""
+    if mode not in _RECTANGLE_FOG_MODES:
+        return
+
+    if not self.mask_img:
+        return
+
+    if not bounds or len(bounds) != 4:
+        return
+
+    left, top, right, bottom = bounds
+
+    if left > right:
+        left, right = right, left
+    if top > bottom:
+        top, bottom = bottom, top
+
+    width, height = self.mask_img.size
+
+    if right < 0 or bottom < 0 or left >= width or top >= height:
+        return
+
+    left = max(0, min(width - 1, left))
+    right = max(0, min(width - 1, right))
+    top = max(0, min(height - 1, top))
+    bottom = max(0, min(height - 1, bottom))
+
+    draw = ImageDraw.Draw(self.mask_img)
+    draw_color = (0, 0, 0, 128) if mode == "add_rect" else (0, 0, 0, 0)
+    draw.rectangle((left, top, right, bottom), fill=draw_color)
 
 def clear_fog(self):
     self.mask_img = Image.new("RGBA", self.base_img.size, (0,0,0,0))
@@ -28,7 +73,7 @@ def reset_fog(self):
 def on_paint(self, event):
     """Paint or erase fog using a square brush of size self.brush_size,
        with semi-transparent black (alpha=128) for fog."""
-    if self.fog_mode not in ("add", "rem"):
+    if self.fog_mode not in _BRUSH_FOG_MODES:
         return
     if any('drag_data' in t for t in self.tokens):
         return
