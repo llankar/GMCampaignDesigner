@@ -387,7 +387,14 @@ class MainWindow(ctk.CTk):
                 except Exception:
                     pass
             self.sidebar_frame = ctk.CTkFrame(self.main_frame, width=220)
-            self.sidebar_frame.pack(side="left", fill="y", padx=5, pady=5)
+            pack_kwargs = {"side": "left", "fill": "y", "padx": 5, "pady": 5}
+            if force and hasattr(self, "content_frame"):
+                try:
+                    if self.content_frame.winfo_manager() == "pack":
+                        pack_kwargs["before"] = self.content_frame
+                except Exception:
+                    pass
+            self.sidebar_frame.pack(**pack_kwargs)
             self.sidebar_frame.pack_propagate(False)
             self.sidebar_inner = ctk.CTkFrame(self.sidebar_frame, fg_color="transparent")
             self.sidebar_inner.pack(fill="both", expand=True, padx=5, pady=5)
