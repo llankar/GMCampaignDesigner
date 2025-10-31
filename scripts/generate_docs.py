@@ -961,7 +961,7 @@ def build_user_manual(shots, menu_data, py_files):
             'Data & System',
             'Switch between campaign databases and configure global integrations.',
             [
-                '<b>Change Data Storage</b>: Choose which SQLite campaign file to work with.',
+                '<b>Change Data Storage</b>: Open the database manager to select, create, or browse for campaign files.',
                 '<b>Set SwarmUI Path</b>: Point the portrait generator at your SwarmUI installation.',
                 '<b>Customize Fields</b>: Open the custom field editor (see Editor Tools).',
             ],
@@ -1010,7 +1010,7 @@ def build_user_manual(shots, menu_data, py_files):
     parts.append(section('Getting Started',
         "<ul>"
         "<li>Launch the app: <code>python main_window.py</code>.</li>"
-        "<li>Select or create a campaign database from <b>Data & System &rarr; Change Data Storage</b>.</li>"
+        "<li>Open <b>Data & System &rarr; Change Data Storage</b> to launch the database manager and choose or create a campaign.</li>"
         "<li>Populate PCs, NPCs, Creatures, Places, Objects, Informations, Clues, and Maps.</li>"
         "</ul>" + img('main_window', 'Main window overview')
     ))
