@@ -2097,10 +2097,17 @@ class WorldMapWindow(ctk.CTkToplevel):
         super().__init__(master)
         self.title("World Map")
         try:
-            self.geometry("1920X1080+0+0")
+            # Ensure the world map window opens at the top-left corner (0, 0)
+            # while also applying the preferred default size.
+            self.geometry("1920x1080+0+0")
             self.minsize(1920, 1080)
         except Exception:
-            pass
+            try:
+                # If setting both size and position fails (e.g., on some window
+                # managers), at least force the window position to (0, 0).
+                self.geometry("+0+0")
+            except Exception:
+                pass
         self.configure(fg_color="#0C0F1A")
 
         # Install the panel
