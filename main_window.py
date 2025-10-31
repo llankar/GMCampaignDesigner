@@ -59,6 +59,7 @@ from modules.ui.tooltip import ToolTip
 from modules.ui.icon_button import create_icon_button
 from modules.ui.portrait_importer import PortraitImporter
 from modules.ui.system_selector_dialog import CampaignSystemSelectorDialog
+from modules.ui.database_manager_dialog import DatabaseManagerDialog
 
 from modules.generic.generic_list_view import GenericListView
 from modules.generic.generic_model_wrapper import GenericModelWrapper
@@ -142,6 +143,7 @@ class MainWindow(ctk.CTk):
         self._asset_library_window = None
         self._busy_modal = None
         self._system_selector_dialog = None
+        self._database_manager_dialog = None
         self._update_thread = None
         root = self.winfo_toplevel()
         root.bind_all("<Control-f>", self._on_ctrl_f)
@@ -2102,57 +2104,50 @@ class MainWindow(ctk.CTk):
             messagebox.showerror("Error", f"Failed to open Scenario Builder:\n{exc}")
 
     def change_database_storage(self):
-        # 1) Pick or create .db
-        # Ensure we start file dialogs in the Campaigns directory under the app directory
-        try:
-            # If packaged (e.g., PyInstaller), use the executable directory; else use this file's directory
-            app_dir = os.path.dirname(sys.executable) if getattr(sys, 'frozen', False) else os.path.dirname(os.path.abspath(__file__))
-        except Exception:
-            app_dir = os.getcwd()
-        campaigns_dir = os.path.join(app_dir, "Campaigns")
-        os.makedirs(campaigns_dir, exist_ok=True)
+        current_path = ConfigHelper.get("Database", "path", fallback="") or None
 
-        choice = messagebox.askquestion(
-            "Change Database",
-            "Do you want to open an existing database file?"
+        if self._database_manager_dialog is not None:
+            try:
+                self._database_manager_dialog.lift()
+                self._database_manager_dialog.focus_force()
+                return
+            except Exception:
+                self._database_manager_dialog = None
+
+        def _on_selected(path: str, is_new: bool) -> None:
+            self._database_manager_dialog = None
+            self._apply_database_selection(path, is_new)
+
+        def _on_cancelled() -> None:
+            self._database_manager_dialog = None
+
+        dialog = DatabaseManagerDialog(
+            self,
+            current_path=current_path,
+            on_selected=_on_selected,
+            on_cancelled=_on_cancelled,
         )
-        if choice == "yes":
-            new_db_path = filedialog.askopenfilename(
-                title="Select Database",
-                initialdir=campaigns_dir,
-                filetypes=[("SQLite DB Files", "*.db"), ("All Files", "*.*")]
-            )
-        else:
-            # Ask for a campaign/database name, create a subdirectory under Campaigns,
-            # and place the new DB file inside that subdirectory.
-            while True:
-                name = simpledialog.askstring("New Campaign", "Enter campaign name:", parent=self)
-                if name is None:
-                    new_db_path = None
-                    break
-                safe = self._sanitize_campaign_name(name)
-                if not safe:
-                    messagebox.showwarning("Invalid Name", "Please enter a valid campaign name.")
-                    continue
-                target_dir = os.path.join(campaigns_dir, safe)
-                try:
-                    os.makedirs(target_dir, exist_ok=True)
-                except Exception as e:
-                    messagebox.showerror("Error", f"Failed to create folder:\n{e}")
-                    continue
-                new_db_path = os.path.join(target_dir, f"{safe}.db")
-                break
+        self._database_manager_dialog = dialog
+
+    def _apply_database_selection(self, new_db_path: str, is_new_db: bool) -> None:
         if not new_db_path:
             return
 
-        # 2) Persist to config so get_connection()/init_db() will pick it up
-        ConfigHelper.set("Database", "path", new_db_path)
+        normalized_path = os.path.abspath(os.path.normpath(new_db_path))
+        try:
+            os.makedirs(os.path.dirname(normalized_path), exist_ok=True)
+        except Exception:
+            log_exception(
+                f"Failed to prepare campaign directory for {normalized_path}",
+                func_name="MainWindow._apply_database_selection",
+            )
 
-        # 3) If new DB, seed campaign-local templates from defaults
-        is_new_db = (choice != "yes")
+        ConfigHelper.set("Database", "path", normalized_path)
+
         if is_new_db:
             try:
                 from shutil import copyfile
+
                 entities = (
                     "pcs",
                     "npcs",
@@ -2166,33 +2161,32 @@ class MainWindow(ctk.CTk):
                     "maps",
                     "books",
                 )
-                camp_dir = os.path.abspath(os.path.dirname(new_db_path))
+                camp_dir = os.path.abspath(os.path.dirname(normalized_path))
                 tpl_dir = os.path.join(camp_dir, "templates")
                 os.makedirs(tpl_dir, exist_ok=True)
-                for e in entities:
-                    src = os.path.join("modules", e, f"{e}_template.json")
-                    dst = os.path.join(tpl_dir, f"{e}_template.json")
+                for entity in entities:
+                    src = os.path.join("modules", entity, f"{entity}_template.json")
+                    dst = os.path.join(tpl_dir, f"{entity}_template.json")
                     try:
                         if not os.path.exists(dst):
                             copyfile(src, dst)
                     except Exception:
                         pass
             except Exception:
-                pass
+                log_exception(
+                    "Failed to seed default templates for new campaign.",
+                    func_name="MainWindow._apply_database_selection",
+                )
 
-        # 4) Ensure the database (including campaign metadata tables) is initialized
         initialize_db()
-
         self._reload_active_campaign_system()
 
-        # 5) Open a fresh connection and create all tables based on JSON templates
-        conn = sqlite3.connect(new_db_path)
+        conn = sqlite3.connect(normalized_path)
         cursor = conn.cursor()
 
         for entity in load_entity_definitions().keys():
             ensure_entity_schema(entity)
 
-        # 6) Re‑create the graph viewer tables
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS nodes (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -2228,19 +2222,15 @@ class MainWindow(ctk.CTk):
         conn.commit()
         conn.close()
 
-        # 7) Re‑initialise your in‑memory wrappers & update the label
-        #    (and run any schema‐migrations if you still need them)
         self.refresh_entities()
 
-        db_name = os.path.splitext(os.path.basename(new_db_path))[0]
+        db_name = os.path.splitext(os.path.basename(normalized_path))[0]
         self.db_name_label.configure(text=db_name)
-        # Update tooltip text to reflect new full path
         try:
-            full_path = os.path.abspath(new_db_path)
-            if getattr(self, 'db_tooltip', None) is None:
+            full_path = os.path.abspath(normalized_path)
+            if getattr(self, "db_tooltip", None) is None:
                 self.db_tooltip = ToolTip(self.db_name_label, full_path)
             else:
-                # Update text on existing tooltip
                 self.db_tooltip.text = full_path
         except Exception:
             self.db_tooltip = None
