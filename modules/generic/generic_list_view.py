@@ -1585,9 +1585,15 @@ class GenericListView(ctk.CTkFrame):
         window = ctk.CTkToplevel(self)
         title = item.get("Title", item.get("Name", "Scenario"))
         window.title(f"Scenario: {title}")
-        
+
         window.geometry("1920x1080+0+0")
-        view = GMScreenView(window, scenario_item=item)
+        layout_manager = GMScreenLayoutManager()
+        view = GMScreenView(
+            window,
+            scenario_item=item,
+            initial_layout=None,
+            layout_manager=layout_manager,
+        )
         view.pack(fill="both", expand=True)
 
     def add_item(self):
