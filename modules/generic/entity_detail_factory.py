@@ -768,6 +768,9 @@ def insert_list_longtext(parent, header, items, open_entity_callback=None, entit
         button_text = f"▶ Scene {idx}"
         if title_clean:
             button_text += f" – {title_clean}"
+        note_title = f"Scene {idx}"
+        if title_clean:
+            note_title += f" – {title_clean}"
 
         scene_key = _build_scene_key(idx, scene_dict)
 
@@ -824,7 +827,14 @@ def insert_list_longtext(parent, header, items, open_entity_callback=None, entit
         if gm_view_ref:
             btn.pack(fill="x", expand=True, padx=(0, 4))
             if hasattr(gm_view_ref, "register_scene_widget") and check_var is not None:
-                gm_view_ref.register_scene_widget(scene_key, check_var, checkbox, display_label=button_text)
+                gm_view_ref.register_scene_widget(
+                    scene_key,
+                    check_var,
+                    checkbox,
+                    display_label=button_text,
+                    description=body_text,
+                    note_title=note_title,
+                )
 
             def _on_check(key=scene_key):
                 if gm_view_ref and hasattr(gm_view_ref, "set_active_scene"):

@@ -58,6 +58,7 @@ class GMScreenView(ctk.CTkFrame):
         self.note_widget = None
         self._context_menu = None
         self._state_loaded = False
+        self._scene_metadata = {}
 
         self._load_persisted_state()
 
@@ -681,9 +682,19 @@ class GMScreenView(ctk.CTkFrame):
     def reset_scene_widgets(self):
         self._scene_vars = {}
         self._scene_order = []
+        self._scene_metadata = {}
 
-    def register_scene_widget(self, scene_key, var, checkbox, display_label=None):
-        self._scene_vars[scene_key] = (var, checkbox, display_label)
+    def register_scene_widget(self, scene_key, var, checkbox, display_label=None, description=None, note_title=None):
+        self._scene_vars[scene_key] = {
+            "var": var,
+            "checkbox": checkbox,
+            "display_label": display_label,
+        }
+        self._scene_metadata[scene_key] = {
+            "display_label": display_label,
+            "description": description,
+            "note_title": note_title,
+        }
         if scene_key not in self._scene_order:
             self._scene_order.append(scene_key)
         self._scene_completion_state.setdefault(scene_key, bool(var.get()))
@@ -701,28 +712,32 @@ class GMScreenView(ctk.CTkFrame):
             checkbox.bind("<Control-Button-1>", self._show_context_menu)
 
     def _on_scene_var_change(self, scene_key):
-        var_tuple = self._scene_vars.get(scene_key)
-        if not var_tuple:
+        var_info = self._scene_vars.get(scene_key)
+        if not var_info:
             return
-        var = var_tuple[0]
+        var = var_info.get("var")
         self._scene_completion_state[scene_key] = bool(var.get())
         self._persist_scene_state()
+        if bool(var.get()):
+            self._append_scene_to_notes(scene_key)
 
     def get_scene_completion(self, scene_key):
         return self._scene_completion_state.get(scene_key, False)
 
     def _set_scene_var(self, scene_key, value):
-        var_tuple = self._scene_vars.get(scene_key)
-        if not var_tuple:
+        var_info = self._scene_vars.get(scene_key)
+        if not var_info:
             self._scene_completion_state[scene_key] = bool(value)
             return
-        var = var_tuple[0]
+        var = var_info.get("var")
         if bool(var.get()) == bool(value):
             self._scene_completion_state[scene_key] = bool(value)
             self._persist_scene_state()
             return
         var.set(bool(value))
         self._scene_completion_state[scene_key] = bool(value)
+        if bool(value):
+            self._append_scene_to_notes(scene_key)
 
     def set_active_scene(self, scene_key):
         self._active_scene_key = scene_key
@@ -768,6 +783,36 @@ class GMScreenView(ctk.CTkFrame):
 
     def get_note_text(self):
         return self._note_cache
+
+    def _append_scene_to_notes(self, scene_key):
+        metadata = self._scene_metadata.get(scene_key) or {}
+        description = (metadata.get("description") or "").strip()
+        if not description:
+            return
+        title = metadata.get("note_title") or metadata.get("display_label") or scene_key
+        title = str(title).strip()
+        entry_lines = []
+        if title:
+            entry_lines.append(title if title.endswith(":") else f"{title}:")
+        entry_lines.append(description)
+        entry_text = "\n".join(entry_lines).strip()
+        if not entry_text:
+            return
+
+        if self.note_widget:
+            existing = self.note_widget.get("1.0", "end-1c").strip()
+        else:
+            existing = self._note_cache.strip()
+
+        prefix = "\n\n" if existing else ""
+
+        if self.note_widget:
+            self.note_widget.insert("end", f"{prefix}{entry_text}")
+            self.note_widget.see("end")
+            self._update_note_cache()
+        else:
+            self._note_cache = f"{existing}{prefix}{entry_text}".strip()
+            self._persist_scene_state()
 
     def _show_context_menu(self, event):
         if not self._context_menu:
