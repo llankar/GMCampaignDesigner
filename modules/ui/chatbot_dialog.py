@@ -4,6 +4,7 @@ from __future__ import annotations
 import os
 from contextlib import contextmanager
 from dataclasses import dataclass, field
+from collections.abc import Mapping as MappingABC
 from typing import Any, Iterable, Mapping, Sequence
 import bisect
 import tkinter as tk
@@ -755,7 +756,7 @@ class ChatbotDialog(ctk.CTkToplevel):
         name_field_overrides: Mapping[str, str] | None = None,
         note_field_candidates: Iterable[str] | None = None,
         title: str = "Campaign Chatbot",
-        geometry: str = "1600x900+0+0",
+        geometry: str = "1920x1080+0+0",
     ) -> None:
         super().__init__(master)
         self.title(title)
@@ -951,6 +952,7 @@ class ChatbotDialog(ctk.CTkToplevel):
         self._underline_font = ctk.CTkFont(family=family, size=13, underline=True)
 
         text_theme = self._derive_text_theme()
+        self._notes_theme = text_theme
         self.notes_box = ctk.CTkTextbox(
             notes_frame,
             wrap="word",
@@ -974,6 +976,8 @@ class ChatbotDialog(ctk.CTkToplevel):
             pady=8,
         )
         widget_config = widget.configure()
+        if "inactiveselectbackground" in widget_config:
+            widget.configure(inactiveselectbackground=text_theme["sel_bg"])
         disabled_config: dict[str, object] = {}
         if "disabledbackground" in widget_config:
             disabled_config["disabledbackground"] = text_theme["bg"]
@@ -1052,6 +1056,8 @@ class ChatbotDialog(ctk.CTkToplevel):
         widget.bind("<<Cut>>", self._suppress_note_edit)
         widget.bind("<<Paste>>", self._suppress_note_edit)
         widget.bind("<<Clear>>", self._suppress_note_edit)
+        widget.bind("<Button-2>", self._suppress_note_edit, add="+")
+        widget.bind("<Shift-Insert>", self._suppress_note_edit, add="+")
         widget.bind("<Key>", self._handle_notes_keypress, add="+")
         widget.bind("<Control-a>", self._select_all_notes, add="+")
         widget.bind("<Control-A>", self._select_all_notes, add="+")
@@ -1545,9 +1551,24 @@ class ChatbotDialog(ctk.CTkToplevel):
         except Exception:
             pass
         self._notes_readonly = state != "normal"
-        if not self._notes_readonly and self._notes_widget is not None:
+        if self._notes_widget is not None:
             try:
                 self._notes_widget.configure(state="normal")
+                theme = getattr(self, "_notes_theme", None)
+                if isinstance(theme, MappingABC):
+                    select_kwargs: dict[str, Any] = {}
+                    if "sel_bg" in theme:
+                        select_kwargs["selectbackground"] = theme["sel_bg"]
+                    if "fg" in theme:
+                        select_kwargs["selectforeground"] = theme["fg"]
+                    if select_kwargs:
+                        self._notes_widget.configure(**select_kwargs)
+                    widget_config = self._notes_widget.configure()
+                    if (
+                        "inactiveselectbackground" in widget_config
+                        and "sel_bg" in theme
+                    ):
+                        self._notes_widget.configure(inactiveselectbackground=theme["sel_bg"])
             except Exception:
                 pass
         log_debug(
