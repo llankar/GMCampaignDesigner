@@ -13,6 +13,7 @@ from tkinter import filedialog, messagebox, ttk, Menu
 from PIL import Image, ImageTk
 import textwrap
 import html
+from collections.abc import Mapping
 
 try:  # Optional rich-text renderer for detail panel content
     from tkhtmlview import HTMLLabel  # type: ignore
@@ -905,7 +906,16 @@ class ScenarioGraphEditor(ctk.CTkFrame):
         if not text:
             return ["No scene notes provided."], False
 
-        normalized = str(text).replace("\r", "\n")
+        if isinstance(text, Mapping):
+            candidate = text.get("text")
+            if isinstance(candidate, str) and candidate.strip():
+                text = candidate
+            else:
+                text = candidate or ""
+        elif hasattr(text, "text") and isinstance(getattr(text, "text"), str):
+            text = getattr(text, "text")
+
+        normalized = str(text or "").replace("\r", "\n")
 
         def canonical_key(fragment: str) -> str:
             cleaned = re.sub(r"\s+", " ", fragment or "").strip()
