@@ -782,7 +782,8 @@ class ChatbotDialog(ctk.CTkToplevel):
         self._notes_widget: tk.Text | None = None
         self._item_cache: dict[str, list[Mapping[str, Any]]] = {}
         self._search_cache: dict[str, list[str]] = {}
-        self._books_only_var = tk.BooleanVar(self, False)
+        self._source_filter_vars: dict[str, tk.BooleanVar] = {}
+        self._notes_readonly: bool = True
         self._active_query: str = ""
         self._match_ranges: list[tuple[str, str]] = []
         self._active_match_index: int = -1
@@ -810,33 +811,53 @@ class ChatbotDialog(ctk.CTkToplevel):
         self.columnconfigure(0, weight=1)
         self.rowconfigure(2, weight=1)
 
-        header = ctk.CTkFrame(self)
+        header = ctk.CTkFrame(
+            self,
+            corner_radius=12,
+            fg_color=("#f2f2f5", "#1f1f24"),
+        )
         header.grid(row=0, column=0, sticky="ew", padx=12, pady=(12, 6))
         header.grid_columnconfigure(1, weight=1)
         header.grid_columnconfigure(2, weight=0)
 
-        title_label = ctk.CTkLabel(header, text="Ask the Campaign", font=("Segoe UI", 18, "bold"))
-        title_label.grid(row=0, column=0, columnspan=3, sticky="w", pady=(4, 10))
+        title_label = ctk.CTkLabel(
+            header,
+            text="Ask the Campaign",
+            font=("Segoe UI", 20, "bold"),
+        )
+        title_label.grid(row=0, column=0, columnspan=3, sticky="w", pady=(6, 2))
 
-        prompt_label = ctk.CTkLabel(header, text="Search by name or keyword to reveal matching notes.")
+        prompt_label = ctk.CTkLabel(
+            header,
+            text="Search across your lore library with filters, highlights, and quick navigation.",
+            font=("Segoe UI", 13, "italic"),
+            text_color=("#3a3a40", "#e1e1e6"),
+        )
         prompt_label.grid(row=1, column=0, columnspan=3, sticky="w")
 
-        ctk.CTkLabel(header, text="Query:").grid(row=2, column=0, sticky="w", pady=(12, 0))
-        self.query_entry = ctk.CTkEntry(header, placeholder_text="e.g. cult, hidden door, plot hook")
-        self.query_entry.grid(row=2, column=1, sticky="ew", padx=(8, 0), pady=(12, 0))
+        query_frame = ctk.CTkFrame(header, fg_color="transparent")
+        query_frame.grid(row=2, column=0, columnspan=3, sticky="ew", pady=(14, 0))
+        query_frame.grid_columnconfigure(1, weight=1)
+
+        ctk.CTkLabel(query_frame, text="Query:").grid(row=0, column=0, sticky="w")
+        self.query_entry = ctk.CTkEntry(
+            query_frame,
+            placeholder_text="e.g. cult, hidden door, plot hook",
+        )
+        self.query_entry.grid(row=0, column=1, sticky="ew", padx=(8, 0))
         self.query_entry.bind("<Return>", self._on_query_submit)
         self.query_entry.bind("<KP_Enter>", self._on_query_submit)
         self.query_entry.bind("<Down>", self._focus_results)
 
         self.search_button = ctk.CTkButton(
-            header,
+            query_frame,
             text="Search",
             command=self._on_query_submit,
         )
-        self.search_button.grid(row=2, column=2, padx=(8, 0), pady=(12, 0), sticky="ew")
+        self.search_button.grid(row=0, column=2, padx=(8, 0), sticky="ew")
 
-        nav_frame = ctk.CTkFrame(header)
-        nav_frame.grid(row=3, column=0, columnspan=3, sticky="ew", pady=(10, 0))
+        nav_frame = ctk.CTkFrame(header, fg_color="transparent")
+        nav_frame.grid(row=3, column=0, columnspan=3, sticky="ew", pady=(16, 0))
         nav_frame.grid_columnconfigure(0, weight=1)
         nav_frame.grid_columnconfigure(1, weight=1)
         self._prev_match_button = ctk.CTkButton(
@@ -859,15 +880,14 @@ class ChatbotDialog(ctk.CTkToplevel):
         )
         self._excerpt_status_label.grid(row=1, column=0, columnspan=2, sticky="w", pady=(6, 0))
 
-        self.books_only_checkbox = ctk.CTkCheckBox(
-            header,
-            text="Show only books",
-            variable=self._books_only_var,
-            command=self._on_scope_changed,
-        )
-        self.books_only_checkbox.grid(row=4, column=0, columnspan=3, sticky="w", pady=(8, 0))
+        self._build_source_filter_controls(header)
 
-        results_frame = ctk.CTkFrame(self)
+        results_frame = ctk.CTkFrame(
+            self,
+            corner_radius=12,
+            border_width=1,
+            border_color=("#d0d0d5", "#2a2a33"),
+        )
         results_frame.grid(row=1, column=0, sticky="nsew", padx=12, pady=(0, 8))
         results_frame.rowconfigure(1, weight=1)
         results_frame.columnconfigure(0, weight=1)
@@ -885,6 +905,8 @@ class ChatbotDialog(ctk.CTkToplevel):
             highlightbackground=list_theme["bg"],
             selectbackground=list_theme["sel_bg"],
             selectforeground=list_theme["fg"],
+            relief="flat",
+            borderwidth=0,
         )
         self.result_list.grid(row=1, column=0, sticky="nsew")
         self.result_list.bind("<<ListboxSelect>>", self._display_selected_note)
@@ -892,6 +914,10 @@ class ChatbotDialog(ctk.CTkToplevel):
         self.result_list.bind("<KP_Enter>", self._on_submit)
         self.result_list.bind("<Double-Button-1>", self._on_submit)
         self.result_list.bind("<Up>", self._maybe_focus_query)
+
+        scrollbar = ctk.CTkScrollbar(results_frame, command=self.result_list.yview)
+        scrollbar.grid(row=1, column=1, sticky="nsw", padx=(6, 6))
+        self.result_list.configure(yscrollcommand=scrollbar.set)
 
         self.selection_label = ctk.CTkLabel(
             results_frame,
@@ -902,7 +928,12 @@ class ChatbotDialog(ctk.CTkToplevel):
         )
         self.selection_label.grid(row=2, column=0, sticky="ew", pady=(10, 4))
 
-        notes_frame = ctk.CTkFrame(self)
+        notes_frame = ctk.CTkFrame(
+            self,
+            corner_radius=12,
+            border_width=1,
+            border_color=("#d0d0d5", "#2a2a33"),
+        )
         notes_frame.grid(row=2, column=0, sticky="nsew", padx=12, pady=(0, 12))
         notes_frame.rowconfigure(1, weight=1)
         notes_frame.columnconfigure(0, weight=1)
@@ -952,6 +983,7 @@ class ChatbotDialog(ctk.CTkToplevel):
             widget.configure(**disabled_config)
         self._notes_widget = widget
         self._set_notes_state("disabled")
+        self._configure_notes_interaction()
 
         widget.tag_configure("section_title", font=self._section_font, spacing3=8)
         widget.tag_configure("field_label", font=self._field_font)
@@ -977,6 +1009,101 @@ class ChatbotDialog(ctk.CTkToplevel):
         self.bind("<Shift-KP_Enter>", self._on_prev_match)
 
         self._update_navigation_state()
+
+    def _build_source_filter_controls(self, parent: ctk.CTkFrame) -> None:
+        filter_frame = ctk.CTkFrame(
+            parent,
+            corner_radius=10,
+            fg_color=("#ffffff", "#18181c"),
+        )
+        filter_frame.grid(row=4, column=0, columnspan=3, sticky="ew", pady=(16, 4))
+        filter_frame.grid_columnconfigure(1, weight=1)
+
+        ctk.CTkLabel(
+            filter_frame,
+            text="Sources",
+            font=("Segoe UI", 14, "bold"),
+        ).grid(row=0, column=0, sticky="nw", padx=(12, 8), pady=(10, 0))
+
+        toggle_container = ctk.CTkFrame(filter_frame, fg_color="transparent")
+        toggle_container.grid(row=0, column=1, sticky="ew", padx=(0, 12), pady=(6, 6))
+        for column in range(4):
+            toggle_container.grid_columnconfigure(column, weight=1)
+
+        for index, entity_type in enumerate(self._wrappers.keys()):
+            var = tk.BooleanVar(self, True)
+            self._source_filter_vars[entity_type] = var
+            row, column = divmod(index, 4)
+            switch = ctk.CTkSwitch(
+                toggle_container,
+                text=entity_type,
+                variable=var,
+                command=self._on_scope_changed,
+                onvalue=True,
+                offvalue=False,
+            )
+            switch.grid(row=row, column=column, sticky="w", padx=6, pady=4)
+
+    def _configure_notes_interaction(self) -> None:
+        widget = self._notes_widget
+        if widget is None:
+            return
+        widget.configure(cursor="ibeam")
+        widget.bind("<<Cut>>", self._suppress_note_edit)
+        widget.bind("<<Paste>>", self._suppress_note_edit)
+        widget.bind("<<Clear>>", self._suppress_note_edit)
+        widget.bind("<Key>", self._handle_notes_keypress, add="+")
+        widget.bind("<Control-a>", self._select_all_notes, add="+")
+        widget.bind("<Control-A>", self._select_all_notes, add="+")
+
+    def _suppress_note_edit(self, _event=None):
+        if self._notes_readonly:
+            return "break"
+        return None
+
+    def _handle_notes_keypress(self, event: tk.Event) -> str | None:
+        widget = self._notes_widget
+        if widget is None:
+            return None
+        keysym = getattr(event, "keysym", "")
+        char = getattr(event, "char", "")
+        ctrl = bool(getattr(event, "state", 0) & 0x4)
+        lowered = keysym.lower()
+        if ctrl and lowered == "c":
+            widget.event_generate("<<Copy>>")
+            return "break"
+        if ctrl and lowered == "a":
+            self._select_all_notes()
+            return "break"
+        if not self._notes_readonly:
+            return None
+        navigation_keys = {
+            "left",
+            "right",
+            "up",
+            "down",
+            "home",
+            "end",
+            "next",
+            "prior",
+        }
+        if lowered in navigation_keys:
+            return None
+        if keysym in {"BackSpace", "Delete"}:
+            return "break"
+        if not char:
+            return None
+        if ctrl:
+            return None
+        return "break"
+
+    def _select_all_notes(self, _event=None):
+        widget = self._notes_widget
+        if widget is None:
+            return "break"
+        widget.tag_add("sel", "1.0", tk.END)
+        widget.mark_set("insert", "1.0")
+        return "break"
 
     # ------------------------------------------------------------------
     # Event handlers
@@ -1038,10 +1165,27 @@ class ChatbotDialog(ctk.CTkToplevel):
             self._render_text(RichTextValue("No data sources are available for the chatbot."))
             return
 
-        limit_to_books = bool(self._books_only_var.get()) if hasattr(self, "_books_only_var") else False
+        active_sources: set[str] | None = None
+        if self._source_filter_vars:
+            active_sources = {
+                name for name, var in self._source_filter_vars.items() if bool(var.get())
+            }
+            readable_sources = ", ".join(sorted(active_sources)) if active_sources else "<none>"
+            log_debug(
+                f"ChatbotDialog._populate - Active sources: {readable_sources}",
+                func_name="ChatbotDialog._populate",
+            )
+            if not active_sources:
+                self._render_text(
+                    RichTextValue(
+                        "Enable at least one data source from the filters above to see results."
+                    )
+                )
+                self.selection_label.configure(text="")
+                return
 
         for entity_type, wrapper in self._wrappers.items():
-            if limit_to_books and entity_type != "Books":
+            if active_sources is not None and entity_type not in active_sources:
                 continue
             if entity_type not in self._item_cache:
                 try:
@@ -1400,9 +1544,10 @@ class ChatbotDialog(ctk.CTkToplevel):
             self.notes_box.configure(state=state)
         except Exception:
             pass
-        if self._notes_widget is not None:
+        self._notes_readonly = state != "normal"
+        if not self._notes_readonly and self._notes_widget is not None:
             try:
-                self._notes_widget.configure(state=state)
+                self._notes_widget.configure(state="normal")
             except Exception:
                 pass
         log_debug(
