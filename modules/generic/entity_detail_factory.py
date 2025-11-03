@@ -903,7 +903,7 @@ def create_scenario_detail_frame(entity_type, scenario_item, master, open_entity
     # ——— HEADER ———
     CTkLabel(
         frame,
-        text=format_longtext(scenario_item.get("Summary", "")),
+        text=format_multiline_text(scenario_item.get("Summary", "")),
         font=("Arial", 16),
         wraplength=1620,
         justify="left"
@@ -973,7 +973,7 @@ def create_scenario_detail_frame(entity_type, scenario_item, master, open_entity
     .pack(anchor="w", pady=(0, 5))
     CTkLabel(
         frame,
-        text=format_longtext(scenario_item.get("Secrets", "")),
+        text=format_multiline_text(scenario_item.get("Secrets", "")),
         font=("Arial", 16),
         wraplength=1620,
         justify="left"
