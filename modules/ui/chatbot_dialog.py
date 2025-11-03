@@ -7,6 +7,7 @@ from dataclasses import dataclass, field
 from collections.abc import Mapping as MappingABC
 from typing import Any, Iterable, Mapping, Sequence
 import bisect
+import json
 import tkinter as tk
 
 import customtkinter as ctk
@@ -425,6 +426,25 @@ def _normalize_value(value: Any) -> RichTextValue | None:
                 func_name="ChatbotDialog._normalize_value",
             )
             return None
+        if stripped.startswith("{") and "\"text\"" in stripped:
+            try:
+                parsed = json.loads(stripped)
+            except Exception:
+                log_debug(
+                    "ChatbotDialog._normalize_value - Failed to parse JSON string; treating as plain text",
+                    func_name="ChatbotDialog._normalize_value",
+                )
+            else:
+                if isinstance(parsed, MappingABC) and "text" in parsed:
+                    normalized = _from_rtf_json(parsed)
+                    text = (normalized.text or "").strip()
+                    if text.lower() in _EMPTY_STRING_MARKERS:
+                        log_debug(
+                            "ChatbotDialog._normalize_value - Parsed JSON string matched empty marker; returning None",
+                            func_name="ChatbotDialog._normalize_value",
+                        )
+                        return None
+                    return normalized
         return RichTextValue(value.replace("\r\n", "\n").replace("\r", "\n"))
     if isinstance(value, Mapping):
         if "text" in value:
@@ -903,6 +923,7 @@ class ChatbotDialog(ctk.CTkToplevel):
             activestyle="none",
             bg=list_theme["bg"],
             fg=list_theme["fg"],
+            exportselection=False,
             highlightbackground=list_theme["bg"],
             selectbackground=list_theme["sel_bg"],
             selectforeground=list_theme["fg"],
@@ -967,6 +988,7 @@ class ChatbotDialog(ctk.CTkToplevel):
             font=self._body_font,
             bg=text_theme["bg"],
             fg=text_theme["fg"],
+            exportselection=False,
             insertbackground=text_theme["fg"],
             selectbackground=text_theme["sel_bg"],
             selectforeground=text_theme["fg"],
