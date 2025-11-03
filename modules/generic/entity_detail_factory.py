@@ -2,7 +2,11 @@ import os
 import customtkinter as ctk
 from PIL import Image
 from customtkinter import CTkLabel, CTkImage, CTkTextbox
-from modules.helpers.text_helpers import format_longtext, format_multiline_text
+from modules.helpers.text_helpers import (
+    deserialize_possible_json,
+    format_longtext,
+    format_multiline_text,
+)
 from modules.helpers.template_loader import load_template
 from modules.generic.generic_model_wrapper import GenericModelWrapper
 from tkinter import Toplevel, messagebox
@@ -553,44 +557,80 @@ def insert_list_longtext(parent, header, items, open_entity_callback=None, entit
     ctk.CTkLabel(parent, text=f"{header}:", font=("Arial", 16, "bold")) \
         .pack(anchor="w", padx=10, pady=(10, 2))
 
+    def _flatten_strings(value):
+        parsed = deserialize_possible_json(value)
+        if isinstance(parsed, dict):
+            for key in ("text", "Text", "value", "Value", "name", "Name"):
+                if key in parsed:
+                    return _flatten_strings(parsed[key])
+            results = []
+            for item in parsed.values():
+                results.extend(_flatten_strings(item))
+            return results
+        if isinstance(parsed, (list, tuple, set)):
+            results = []
+            for item in parsed:
+                results.extend(_flatten_strings(item))
+            return results
+        if parsed is None:
+            return []
+        text = str(parsed).strip()
+        return [text] if text else []
+
     def _coerce_names(value):
-        if value is None:
-            return []
-        if isinstance(value, list):
-            return [str(v).strip() for v in value if str(v).strip()]
-        if isinstance(value, (set, tuple)):
-            return [str(v).strip() for v in value if str(v).strip()]
-        text = str(value).strip()
-        if not text:
-            return []
-        parts = [part.strip() for part in text.split(",") if part.strip()]
-        return parts or [text]
+        names = []
+        for entry in _flatten_strings(value):
+            parts = [part.strip() for part in entry.split(",") if part.strip()]
+            names.extend(parts or [entry])
+        return names
 
     def _coerce_links(value):
         links = []
         if value is None:
             return links
-        if isinstance(value, list):
-            for item in value:
+        parsed = deserialize_possible_json(value)
+        if isinstance(parsed, list):
+            for item in parsed:
                 links.extend(_coerce_links(item))
             return links
-        if isinstance(value, dict):
+        if isinstance(parsed, dict):
+            payload = {k: deserialize_possible_json(v) for k, v in parsed.items()}
             target = None
-            text = None
+            text_val = None
             for key in ("Target", "target", "Scene", "scene", "Next", "next", "Id", "id", "Reference", "reference"):
-                if key in value:
-                    target = value[key]
+                if key in payload:
+                    target = payload[key]
                     break
             for key in ("Text", "text", "Label", "label", "Description", "description", "Choice", "choice"):
-                if key in value:
-                    text = value[key]
+                if key in payload:
+                    text_val = payload[key]
                     break
-            links.append({"target": target, "text": text})
+
+            if isinstance(target, (int, float)):
+                target_display = int(target)
+            else:
+                target_options = _flatten_strings(target)
+                if target_options:
+                    target_display = target_options[0]
+                elif target is not None:
+                    target_display = str(target)
+                else:
+                    target_display = None
+
+            text_options = _flatten_strings(text_val)
+            if text_options:
+                text_display = text_options[0]
+            elif isinstance(text_val, (int, float)):
+                text_display = str(text_val)
+            else:
+                text_display = str(text_val or "")
+
+            links.append({"target": target_display, "text": text_display})
             return links
-        if isinstance(value, (int, float)):
-            links.append({"target": int(value), "text": ""})
+        if isinstance(parsed, (int, float)):
+            links.append({"target": int(parsed), "text": ""})
             return links
-        text_val = str(value).strip()
+        text_val = str(parsed).strip()
         if text_val:
             links.append({"target": text_val, "text": text_val})
         return links
@@ -613,18 +653,33 @@ def insert_list_longtext(parent, header, items, open_entity_callback=None, entit
         return str(index)
 
     for idx, entry in enumerate(items, start=1):
-        scene_dict = entry if isinstance(entry, dict) else {"Text": entry}
+        parsed_entry = deserialize_possible_json(entry)
+        if isinstance(parsed_entry, dict):
+            scene_dict = {key: deserialize_possible_json(val) for key, val in parsed_entry.items()}
+        elif isinstance(parsed_entry, (list, tuple, set)):
+            scene_dict = {"Text": list(parsed_entry)}
+        else:
+            scene_dict = {"Text": parsed_entry}
+
         text_payload = scene_dict.get("Text") or scene_dict.get("text") or ""
+        text_payload = deserialize_possible_json(text_payload)
         if isinstance(text_payload, dict):
-            body_text = text_payload.get("text", "")
-        elif isinstance(text_payload, list):
-            body_text = "\n".join(str(v) for v in text_payload if v)
+            nested_text = deserialize_possible_json(text_payload.get("text") or text_payload.get("Text") or "")
+            if isinstance(nested_text, (list, tuple, set)):
+                body_text = "\n".join(str(v).strip() for v in nested_text if str(v).strip())
+            else:
+                body_text = str(nested_text or "")
+        elif isinstance(text_payload, (list, tuple, set)):
+            body_text = "\n".join(str(v).strip() for v in text_payload if str(v).strip())
         else:
             body_text = str(text_payload or "")
         body_text = format_multiline_text(body_text, max_length=2000)
 
         title_value = scene_dict.get("Title") or scene_dict.get("Scene") or ""
-        title_clean = str(title_value).strip()
+        title_candidates = _flatten_strings(title_value)
+        title_clean = title_candidates[0] if title_candidates else ""
+        if title_clean:
+            scene_dict["Title"] = title_clean
 
         npc_names = _coerce_names(scene_dict.get("NPCs"))
         creature_names = _coerce_names(scene_dict.get("Creatures"))

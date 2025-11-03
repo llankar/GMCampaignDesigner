@@ -25,7 +25,7 @@ from modules.generic.generic_model_wrapper import GenericModelWrapper
 from modules.generic.generic_editor_window import GenericEditorWindow
 from modules.generic.generic_list_selection_view import GenericListSelectionView
 from modules.helpers.config_helper import ConfigHelper
-from modules.helpers.text_helpers import format_longtext
+from modules.helpers.text_helpers import deserialize_possible_json, format_longtext
 from modules.ui.image_viewer import show_portrait
 from modules.helpers.template_loader import load_template
 from modules.audio.entity_audio import (
@@ -906,14 +906,25 @@ class ScenarioGraphEditor(ctk.CTkFrame):
         if not text:
             return ["No scene notes provided."], False
 
+        text = deserialize_possible_json(text)
+
         if isinstance(text, Mapping):
-            candidate = text.get("text")
+            candidate = text.get("text") or text.get("Text")
+            candidate = deserialize_possible_json(candidate)
             if isinstance(candidate, str) and candidate.strip():
                 text = candidate
+            elif isinstance(candidate, (list, tuple, set)):
+                text = "\n".join(str(v).strip() for v in candidate if str(v).strip())
             else:
-                text = candidate or ""
+                text = str(candidate or "")
         elif hasattr(text, "text") and isinstance(getattr(text, "text"), str):
             text = getattr(text, "text")
+        elif isinstance(text, (list, tuple, set)):
+            text = "\n".join(str(v).strip() for v in text if str(v).strip())
+
+        text = deserialize_possible_json(text)
+        if isinstance(text, (list, tuple, set)):
+            text = "\n".join(str(v).strip() for v in text if str(v).strip())
 
         normalized = str(text or "").replace("\r", "\n")
 

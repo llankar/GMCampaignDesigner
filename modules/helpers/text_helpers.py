@@ -1,4 +1,6 @@
+import ast
 import html
+import json
 import re
 from modules.helpers.logging_helper import log_module_import
 
@@ -31,6 +33,40 @@ def format_multiline_text(data, max_length=30000):
     if len(text) > max_length:
         return text[:max_length] + "…"
     return text
+
+
+def deserialize_possible_json(value):
+    """Attempt to deserialize a JSON or Python literal string.
+
+    Many data fields in the campaign database store longform content as
+    serialized dictionaries (e.g. ``{"text": ..., "formatting": ...}``).
+    Depending on the import path this data may arrive either as proper JSON or
+    as the string representation of a Python dict that uses single quotes.  To
+    keep the UI code simple we normalize these payloads here.
+
+    If ``value`` is a string that looks like JSON we first try ``json.loads``.
+    When that fails we fall back to ``ast.literal_eval`` which safely handles
+    Python literals (lists, dicts, numbers, strings).  If deserialization is not
+    possible we simply return the original value so the caller can treat it as a
+    plain string.
+    """
+
+    if not isinstance(value, str):
+        return value
+
+    text = value.strip()
+    if not text:
+        return value
+
+    try:
+        return json.loads(text)
+    except (json.JSONDecodeError, TypeError, ValueError):
+        pass
+
+    try:
+        return ast.literal_eval(text)
+    except (ValueError, SyntaxError):
+        return value
 
 def rtf_to_html(rtf):
     """
