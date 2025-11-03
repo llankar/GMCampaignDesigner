@@ -999,6 +999,14 @@ def create_scenario_detail_frame(entity_type, scenario_item, master, open_entity
                 command=add_timestamp,
                 width=140,
             ).pack(side="left", padx=(0, 6))
+        open_editor = getattr(gm_view_instance, "open_note_editor", None)
+        if callable(open_editor):
+            ctk.CTkButton(
+                toolbar,
+                text="Edit Notes",
+                command=open_editor,
+                width=140,
+            ).pack(side="left", padx=(0, 6))
 
         note_box = CTkTextbox(notes_section, wrap="word", height=160)
         note_box.pack(fill="both", expand=True)
