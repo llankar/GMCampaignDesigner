@@ -748,7 +748,7 @@ class AudioBarWindow(ctk.CTkToplevel):
             self.update_idletasks()
             if self._is_collapsed:
                 target = self._collapse_button or self
-                width = max(80, int(target.winfo_reqwidth() + 16))
+                width = max(40, int(target.winfo_reqwidth() + 8))
                 height_source = target
             else:
                 width = self.winfo_screenwidth()
