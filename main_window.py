@@ -1,4 +1,4 @@
-import os
+﻿import os
 import sys
 import json
 import sqlite3
@@ -797,8 +797,6 @@ class MainWindow(ctk.CTk):
             ("import_portraits", "Import Portraits from Folder", self.import_portraits_from_directory),
             ("map_tool", "Map Tool", self.map_tool),
             ("sound_manager", "Sound & Music Manager", self.open_sound_manager),
-            ("audio_controls", "Audio Controls Bar", self.open_audio_bar),
-            ("dice_bar", "Dice Bar", self.open_dice_bar),
             ("dice_roller", "Open Dice Roller", self.open_dice_roller),
         ]
 

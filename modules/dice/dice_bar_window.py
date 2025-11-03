@@ -89,7 +89,7 @@ class DiceBarWindow(ctk.CTkToplevel):
         collapse_button = ctk.CTkButton(
             bar,
             text="◀",
-            width=32,
+            width=16,
             fg_color=tokens.get("button_fg"),
             command=self._toggle_collapsed,
         )
