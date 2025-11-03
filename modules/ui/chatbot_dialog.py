@@ -1,6 +1,7 @@
 """Campaign chatbot dialog with rich text rendering for entity notes."""
 from __future__ import annotations
 
+import ast
 import os
 from contextlib import contextmanager
 from dataclasses import dataclass, field
@@ -109,6 +110,26 @@ def _from_rtf_json(value: Mapping[str, Any]) -> RichTextValue:
     text = normalized.get("text", "")
     fmt = normalized.get("formatting", {})
     return RichTextValue(str(text or ""), _coerce_formatting(fmt))
+
+
+def _parse_structured_text(raw: str) -> Any | None:
+    """Best-effort parsing for structured text serialized as JSON or Python literals."""
+
+    if not raw:
+        return None
+    first = raw[0]
+    if first not in "[{":
+        return None
+
+    try:
+        return json.loads(raw)
+    except Exception:
+        pass
+
+    try:
+        return ast.literal_eval(raw)
+    except Exception:
+        return None
 
 
 def _apply_line_prefix(value: RichTextValue, first_prefix: str, later_prefix: str | None = None) -> RichTextValue:
@@ -447,26 +468,12 @@ def _normalize_value(value: Any) -> RichTextValue | None:
                 func_name="ChatbotDialog._normalize_value",
             )
             return None
-        lowered_stripped = stripped.lower()
-        if stripped.startswith("{") and "\"text\"" in lowered_stripped:
-            try:
-                parsed = json.loads(stripped)
-            except Exception:
-                log_debug(
-                    "ChatbotDialog._normalize_value - Failed to parse JSON string; treating as plain text",
-                    func_name="ChatbotDialog._normalize_value",
-                )
-            else:
-                if isinstance(parsed, MappingABC) and any(str(key).lower() == "text" for key in parsed.keys()):
-                    normalized = _from_rtf_json(parsed)
-                    text = (normalized.text or "").strip()
-                    if text.lower() in _EMPTY_STRING_MARKERS:
-                        log_debug(
-                            "ChatbotDialog._normalize_value - Parsed JSON string matched empty marker; returning None",
-                            func_name="ChatbotDialog._normalize_value",
-                        )
-                        return None
-                    return normalized
+        parsed = _parse_structured_text(stripped)
+        if parsed is not None:
+            normalized = _normalize_value(parsed)
+            if normalized is None:
+                return None
+            return normalized
         return RichTextValue(value.replace("\r\n", "\n").replace("\r", "\n"))
     if isinstance(value, Mapping):
         if any(str(key).lower() == "text" for key in value.keys()):
