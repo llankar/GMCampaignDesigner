@@ -143,3 +143,14 @@ def test_summarize_scene_text_handles_rich_text_value():
 
     assert not truncated
     assert lines[0].startswith("A bold plan")
+
+
+def test_summarize_scene_text_parses_python_literal_payload():
+    editor = _make_editor()
+
+    raw_value = "{'text': 'Investigate the well before dawn.', 'formatting': {'bold': []}}"
+
+    lines, truncated = editor._summarize_scene_text(raw_value)
+
+    assert not truncated
+    assert any("Investigate the well" in line for line in lines)
