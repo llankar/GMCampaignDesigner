@@ -1,5 +1,6 @@
 import ast
 import json
+import re
 from PIL import Image
 from tkinter import messagebox, colorchooser
 import os
@@ -10,7 +11,7 @@ import tkinter.simpledialog as sd
 import tkinter as tk
 import threading
 import time
-from typing import Any, Tuple
+from typing import Any, List, Optional, Tuple
 from modules.helpers.logging_helper import log_info, log_module_import
 
 log_module_import(__name__)
@@ -63,6 +64,118 @@ def _deserialize_tokens_field(raw_tokens: Any) -> Tuple[list, type]:
                 pass
         return [], str
     return [], type(raw_tokens)
+
+
+def _normalize_longtext_to_text(value: Any) -> str:
+    """Normalize various long-text representations to plain text."""
+    if value is None:
+        return ""
+    if isinstance(value, str):
+        text = value.strip()
+        if not text:
+            return ""
+        if text.startswith("{") or text.startswith("["):
+            try:
+                parsed = json.loads(text)
+                normalized = _normalize_longtext_to_text(parsed)
+                if normalized:
+                    return normalized
+            except (json.JSONDecodeError, TypeError):
+                pass
+            try:
+                parsed = ast.literal_eval(text)
+                normalized = _normalize_longtext_to_text(parsed)
+                if normalized:
+                    return normalized
+            except (ValueError, SyntaxError):
+                pass
+        return text
+    if isinstance(value, dict):
+        candidate = value.get("text")
+        normalized = _normalize_longtext_to_text(candidate)
+        if normalized:
+            return normalized
+        parts = []
+        for item in value.values():
+            part = _normalize_longtext_to_text(item)
+            if part:
+                parts.append(part)
+        return "\n".join(parts)
+    if isinstance(value, (list, tuple, set)):
+        parts = [_normalize_longtext_to_text(item) for item in value]
+        return "\n".join([part for part in parts if part])
+    return str(value)
+
+
+_HP_LABEL_PATTERNS = {
+    "HP": re.compile(r"\bHP\b", re.IGNORECASE),
+    "PV": re.compile(r"\bPV\b", re.IGNORECASE),
+}
+
+
+def _extract_first_integer(segment: str) -> Optional[int]:
+    """Return the first integer not part of a dice expression in *segment*."""
+
+    def _previous_non_space(idx: int) -> str:
+        for pos in range(idx - 1, -1, -1):
+            ch = segment[pos]
+            if not ch.isspace():
+                return ch
+        return ""
+
+    def _next_non_space(idx: int) -> str:
+        length = len(segment)
+        for pos in range(idx, length):
+            ch = segment[pos]
+            if not ch.isspace():
+                return ch
+        return ""
+
+    for match in re.finditer(r"\d+", segment):
+        start, end = match.span()
+        prev_ch = _previous_non_space(start)
+        next_ch = _next_non_space(end)
+        if prev_ch.lower() == "d" or next_ch.lower() == "d":
+            continue
+        if prev_ch in {"+", "-", "*", "/", "×", "x", "X"}:
+            continue
+        try:
+            return int(match.group())
+        except ValueError:
+            continue
+    return None
+
+
+def _extract_entity_hp_value(entity_type: str, entity_record: Any) -> Optional[int]:
+    """Inspect *entity_record* and return an HP value if available."""
+    if not isinstance(entity_record, dict):
+        return None
+
+    prioritized_fields: Tuple[str, ...]
+    entity_type_normalized = str(entity_type or "").strip()
+    if entity_type_normalized in ("Creature", "PC"):
+        prioritized_fields = ("Stats", "Traits")
+    elif entity_type_normalized == "NPC":
+        prioritized_fields = ("Traits", "Stats")
+    else:
+        prioritized_fields = ("Stats", "Traits")
+
+    texts: List[str] = []
+    for field in prioritized_fields:
+        raw_value = entity_record.get(field)
+        normalized = _normalize_longtext_to_text(raw_value)
+        if normalized:
+            texts.append(normalized)
+
+    for label in ("HP", "PV"):
+        pattern = _HP_LABEL_PATTERNS[label]
+        for text in texts:
+            for match in pattern.finditer(text):
+                segment = text[match.end(): match.end() + 200]
+                value = _extract_first_integer(segment)
+                if value is not None:
+                    return value
+    return None
 
 
 def normalize_existing_token_paths(maps_wrapper) -> bool:
@@ -147,6 +260,10 @@ def add_token(self, path, entity_type, entity_name, entity_record=None):
     xw_center = (cw/2 - self.pan_x) / self.zoom
     yw_center = (ch/2 - self.pan_y) / self.zoom
 
+    record = entity_record or {}
+    extracted_hp = _extract_entity_hp_value(entity_type, record)
+    default_hp = extracted_hp if extracted_hp is not None else 10
+
     token = {
         "type":         "token",
         "entity_type":  entity_type,
@@ -157,8 +274,9 @@ def add_token(self, path, entity_type, entity_name, entity_record=None):
         "pil_image":    pil_img,
         "position":     (xw_center, yw_center),
         "border_color": "#0000ff",
-        "entity_record": entity_record or {},
-        "hp": 10,
+        "entity_record": record,
+        "hp": default_hp,
+        "max_hp": default_hp,
         "hp_label_id": None,
         "hp_entry": None,
         "hp_entry_id": None,
