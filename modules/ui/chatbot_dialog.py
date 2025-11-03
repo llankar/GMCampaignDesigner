@@ -84,7 +84,28 @@ def _coerce_formatting(data: Mapping[str, Any]) -> dict[str, list[tuple[int, int
 
 
 def _from_rtf_json(value: Mapping[str, Any]) -> RichTextValue:
-    normalized = normalize_rtf_json(value)
+    text_key: str | None = None
+    fmt_key: str | None = None
+    for key in value.keys():
+        lowered = str(key).lower()
+        if lowered == "text" and text_key is None:
+            text_key = key  # preserve the original key casing
+        elif lowered == "formatting" and fmt_key is None:
+            fmt_key = key
+
+    candidate: Mapping[str, Any]
+    if text_key is None:
+        candidate = value
+    else:
+        formatting_value: Any = value.get(fmt_key, {}) if fmt_key is not None else {}
+        if not isinstance(formatting_value, MappingABC):
+            formatting_value = {}
+        candidate = {
+            "text": value.get(text_key, ""),
+            "formatting": formatting_value,
+        }
+
+    normalized = normalize_rtf_json(candidate)
     text = normalized.get("text", "")
     fmt = normalized.get("formatting", {})
     return RichTextValue(str(text or ""), _coerce_formatting(fmt))
@@ -426,7 +447,8 @@ def _normalize_value(value: Any) -> RichTextValue | None:
                 func_name="ChatbotDialog._normalize_value",
             )
             return None
-        if stripped.startswith("{") and "\"text\"" in stripped:
+        lowered_stripped = stripped.lower()
+        if stripped.startswith("{") and "\"text\"" in lowered_stripped:
             try:
                 parsed = json.loads(stripped)
             except Exception:
@@ -435,7 +457,7 @@ def _normalize_value(value: Any) -> RichTextValue | None:
                     func_name="ChatbotDialog._normalize_value",
                 )
             else:
-                if isinstance(parsed, MappingABC) and "text" in parsed:
+                if isinstance(parsed, MappingABC) and any(str(key).lower() == "text" for key in parsed.keys()):
                     normalized = _from_rtf_json(parsed)
                     text = (normalized.text or "").strip()
                     if text.lower() in _EMPTY_STRING_MARKERS:
@@ -447,7 +469,7 @@ def _normalize_value(value: Any) -> RichTextValue | None:
                     return normalized
         return RichTextValue(value.replace("\r\n", "\n").replace("\r", "\n"))
     if isinstance(value, Mapping):
-        if "text" in value:
+        if any(str(key).lower() == "text" for key in value.keys()):
             normalized = _from_rtf_json(value)
             text = (normalized.text or "").strip()
             if text.lower() in _EMPTY_STRING_MARKERS:
@@ -1881,7 +1903,7 @@ class ChatbotDialog(ctk.CTkToplevel):
 
         bg = _resolve(raw_bg, "#2b2b2b" if appearance == "Dark" else "#f6f6f6")
         fg = _resolve(raw_fg, "#f5f5f5" if appearance == "Dark" else "#121212")
-        sel_bg = "#3a3a3a" if appearance == "Dark" else "#d9d9d9"
+        sel_bg = "#4a6cf7" if appearance == "Dark" else "#b8ccff"
         if fg.lower() == bg.lower():
             fg = "#f5f5f5" if appearance == "Dark" else "#121212"
         return {"bg": bg, "fg": fg, "sel_bg": sel_bg}
