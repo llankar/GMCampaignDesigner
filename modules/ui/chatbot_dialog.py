@@ -1530,16 +1530,40 @@ class ChatbotDialog(ctk.CTkToplevel):
         sections: list[tuple[str, list[tuple[str, RichTextValue]]]] = []
         used: set[str] = set()
 
+        case_insensitive_keys: dict[str, str] = {}
+        for key in record.keys():
+            if not isinstance(key, str):
+                continue
+            lowered = key.casefold()
+            case_insensitive_keys.setdefault(lowered, key)
+
+        def resolve_field(field_name: str) -> tuple[str, Any] | None:
+            if field_name in record:
+                return field_name, record.get(field_name)
+            lowered = field_name.casefold()
+            actual_key = case_insensitive_keys.get(lowered)
+            if actual_key is None:
+                return None
+            return actual_key, record.get(actual_key)
+
         for title, field_names in self._section_layout(entity_type):
             entries: list[tuple[str, RichTextValue]] = []
             for field in field_names:
-                if field in used:
+                resolved = resolve_field(field)
+                if resolved is None:
+                    log_debug(
+                        f"ChatbotDialog._collate_sections - Field {field} missing from record",
+                        func_name="ChatbotDialog._collate_sections",
+                    )
+                    continue
+                actual_key, value = resolved
+                if actual_key in used:
                     log_debug(
                         f"ChatbotDialog._collate_sections - Skipping duplicate field {field}",
                         func_name="ChatbotDialog._collate_sections",
                     )
                     continue
-                normalized = _normalize_value(record.get(field))
+                normalized = _normalize_value(value)
                 if not normalized or not normalized.has_content():
                     log_debug(
                         f"ChatbotDialog._collate_sections - Field {field} had no usable content",
@@ -1551,7 +1575,7 @@ class ChatbotDialog(ctk.CTkToplevel):
                     func_name="ChatbotDialog._collate_sections",
                 )
                 entries.append((field, normalized.cleaned()))
-                used.add(field)
+                used.add(actual_key)
             if entries:
                 sections.append((title, entries))
                 log_debug(
