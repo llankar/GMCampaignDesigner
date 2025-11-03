@@ -56,6 +56,7 @@ class GMScreenView(ctk.CTkFrame):
         self._active_scene_key = None
         self._note_cache = ""
         self.note_widget = None
+        self._note_editor_window = None
         self._context_menu = None
         self._state_loaded = False
         self._scene_metadata = {}
@@ -765,6 +766,140 @@ class GMScreenView(ctk.CTkFrame):
         self.note_widget.insert("end", f"{prefix}[{timestamp}] ")
         self.note_widget.see("end")
         self._update_note_cache()
+
+    def open_note_editor(self):
+        if self._note_editor_window and self._note_editor_window.winfo_exists():
+            try:
+                self._note_editor_window.lift()
+                self._note_editor_window.focus_force()
+            except Exception:
+                pass
+            return
+
+        if self.note_widget:
+            try:
+                self._note_cache = self.note_widget.get("1.0", "end-1c")
+            except Exception:
+                pass
+
+        try:
+            host = self.winfo_toplevel()
+        except Exception:
+            host = None
+
+        editor_parent = host or self
+        editor = ctk.CTkToplevel(editor_parent)
+        editor.title("Edit GM Notes")
+
+        if host is not None:
+            try:
+                editor.transient(host)
+            except Exception:
+                pass
+
+        try:
+            editor.grab_set()
+        except Exception:
+            pass
+
+        try:
+            editor.attributes("-topmost", True)
+        except Exception:
+            pass
+
+        try:
+            editor.attributes("-fullscreen", True)
+        except Exception:
+            try:
+                editor.state("zoomed")
+            except Exception:
+                try:
+                    width = editor.winfo_screenwidth()
+                    height = editor.winfo_screenheight()
+                    editor.geometry(f"{width}x{height}+0+0")
+                except Exception:
+                    pass
+
+        container = ctk.CTkFrame(editor, fg_color="transparent")
+        container.pack(fill="both", expand=True)
+
+        toolbar = ctk.CTkFrame(container, fg_color="transparent")
+        toolbar.pack(fill="x", padx=20, pady=(20, 10))
+
+        ctk.CTkLabel(
+            toolbar,
+            text="Edit GM Notes",
+            font=("Arial", 20, "bold"),
+        ).pack(side="left")
+
+        text_box = ctk.CTkTextbox(container, wrap="word")
+        text_box.pack(fill="both", expand=True, padx=20, pady=(0, 20))
+        text_box.insert("1.0", self._note_cache)
+
+        def save_and_close(event=None):
+            note_text = text_box.get("1.0", "end-1c")
+            self._apply_note_editor_changes(note_text)
+            self._close_note_editor_window()
+            return "break"
+
+        def cancel_and_close(event=None):
+            self._close_note_editor_window()
+            return "break"
+
+        ctk.CTkButton(
+            toolbar,
+            text="Save & Close",
+            command=save_and_close,
+            width=150,
+        ).pack(side="right", padx=(10, 0))
+
+        ctk.CTkButton(
+            toolbar,
+            text="Cancel",
+            command=cancel_and_close,
+            width=120,
+        ).pack(side="right")
+
+        try:
+            editor.protocol("WM_DELETE_WINDOW", save_and_close)
+        except Exception:
+            pass
+
+        editor.bind("<Escape>", cancel_and_close)
+        editor.after(10, text_box.focus_force)
+
+        self._note_editor_window = editor
+
+    def _apply_note_editor_changes(self, new_text):
+        self._note_cache = new_text
+        widget = self.note_widget
+        widget_exists = False
+        if widget is not None:
+            try:
+                widget_exists = bool(int(widget.winfo_exists()))
+            except Exception:
+                widget_exists = False
+
+        if widget_exists:
+            widget.delete("1.0", "end")
+            if new_text:
+                widget.insert("1.0", new_text)
+            self._update_note_cache()
+        else:
+            self._persist_scene_state()
+
+    def _close_note_editor_window(self, event=None):
+        window = getattr(self, "_note_editor_window", None)
+        if window is not None:
+            try:
+                window.grab_release()
+            except Exception:
+                pass
+            try:
+                window.destroy()
+            except Exception:
+                pass
+        self._note_editor_window = None
 
     def _update_note_cache(self, event=None):
         if self.note_widget:
