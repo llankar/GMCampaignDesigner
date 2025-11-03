@@ -85,15 +85,34 @@ def _coerce_formatting(data: Mapping[str, Any]) -> dict[str, list[tuple[int, int
 
 
 def _from_rtf_json(value: Mapping[str, Any]) -> RichTextValue:
+    """Coerce a mapping that represents an RTF-JSON payload into RichTextValue.
+
+    Supports common shapes found in the DB:
+    - {"text": str, "formatting": {...}}
+    - {"Text": str|dict, "formatting": {...}} (key casing varies)
+    - {"Text": {"text": str, "formatting": {...}}} (nested payload)
+
+    The last form appears for some Scenes rows; we unwrap it so the UI
+    displays the inner text instead of a Python dict representation.
+    """
+
     text_key: str | None = None
     fmt_key: str | None = None
     for key in value.keys():
         lowered = str(key).lower()
         if lowered == "text" and text_key is None:
-            text_key = key  # preserve the original key casing
+            text_key = key  # preserve original casing for retrieval
         elif lowered == "formatting" and fmt_key is None:
             fmt_key = key
 
+    # If we have a 'text'/'Text' key and its value is itself a mapping that
+    # looks like an RTF-JSON payload, unwrap it recursively.
+    if text_key is not None:
+        raw_text_value = value.get(text_key, "")
+        if isinstance(raw_text_value, MappingABC):
+            return _from_rtf_json(raw_text_value)
+
+    # Assemble a canonical candidate mapping for normalization.
     candidate: Mapping[str, Any]
     if text_key is None:
         candidate = value
@@ -101,10 +120,7 @@ def _from_rtf_json(value: Mapping[str, Any]) -> RichTextValue:
         formatting_value: Any = value.get(fmt_key, {}) if fmt_key is not None else {}
         if not isinstance(formatting_value, MappingABC):
             formatting_value = {}
-        candidate = {
-            "text": value.get(text_key, ""),
-            "formatting": formatting_value,
-        }
+        candidate = {"text": value.get(text_key, ""), "formatting": formatting_value}
 
     normalized = normalize_rtf_json(candidate)
     text = normalized.get("text", "")
@@ -476,6 +492,7 @@ def _normalize_value(value: Any) -> RichTextValue | None:
             return normalized
         return RichTextValue(value.replace("\r\n", "\n").replace("\r", "\n"))
     if isinstance(value, Mapping):
+        # Common case: RTF-JSON payload with a text key (any casing)
         if any(str(key).lower() == "text" for key in value.keys()):
             normalized = _from_rtf_json(value)
             text = (normalized.text or "").strip()
@@ -486,6 +503,35 @@ def _normalize_value(value: Any) -> RichTextValue | None:
                 )
                 return None
             return normalized
+
+        # Container case (e.g. {"Scenes": [...]}) — focus the primary list
+        for key in value.keys():
+            if str(key).lower() == "scenes":
+                inner = value.get(key)
+                normalized = _normalize_value(inner)
+                if normalized and normalized.has_content():
+                    return normalized
+
+        # Fallback: some objects store their body under other common fields
+        preferred_keys = (
+            "summary",
+            "description",
+            "body",
+            "notes",
+            "gist",
+            "content",
+            "overview",
+            "background",
+        )
+        lowered_map = {str(k).lower(): k for k in value.keys()}
+        for lk in preferred_keys:
+            actual = lowered_map.get(lk)
+            if actual is None:
+                continue
+            inner = value.get(actual)
+            normalized = _normalize_value(inner)
+            if normalized and normalized.has_content():
+                return normalized
         parts: list[str] = []
         for key, val in value.items():
             if val in (None, ""):
