@@ -56,6 +56,7 @@ class DiceBarWindow(ctk.CTkToplevel):
 
         self._supported_faces: Tuple[int, ...] = tuple()
         self._last_system_default: str = ""
+        self._last_roll_options: Tuple[bool, bool] = (False, False)
         self._preset_frame: ctk.CTkFrame | None = None
 
         self._result_normal_font = ctk.CTkFont(size=16)
@@ -269,6 +270,13 @@ class DiceBarWindow(ctk.CTkToplevel):
         if initial or not current or current == self._last_system_default:
             self.formula_var.set(default_formula)
         self._last_system_default = default_formula
+
+        roll_options = dice_preferences.get_default_roll_options()
+        defaults = (bool(roll_options.get("explode")), bool(roll_options.get("separate")))
+        if initial or defaults != self._last_roll_options:
+            self.exploding_var.set(defaults[0])
+            self.separate_var.set(defaults[1])
+        self._last_roll_options = defaults
 
     def _rebuild_preset_buttons(self) -> None:
         frame = self._preset_frame
