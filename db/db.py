@@ -1,4 +1,5 @@
 # db.py
+import json
 import sqlite3
 import os
 import re
@@ -122,22 +123,22 @@ _DEFAULT_SYSTEMS: List[Dict[str, Optional[str]]] = [
         "slug": "d20",
         "label": "D20 System",
         "default_formula": "1d20",
-        "supported_faces_json": "[4,6,8,10,12,20]",
+        "supported_faces_json": json.dumps([4, 6, 8, 10, 12, 20]),
         "analyzer_config_json": None,
     },
     {
         "slug": "2d20",
         "label": "2d20 System",
         "default_formula": "2d20kh1",
-        "supported_faces_json": "[20]",
-        "analyzer_config_json": None,
+        "supported_faces_json": json.dumps([20]),
+        "analyzer_config_json": json.dumps({"dice": {"separate": True}}),
     },
     {
         "slug": "savage_fate",
         "label": "Savage Fate",
-        "default_formula": "1dF + 1d6",
-        "supported_faces_json": '["F",4,6,8,10,12]',
-        "analyzer_config_json": None,
+        "default_formula": "1d6 + 1d6",
+        "supported_faces_json": json.dumps([4, 6, 8, 10, 12]),
+        "analyzer_config_json": json.dumps({"dice": {"explode": True, "separate": True}}),
     },
 ]
 

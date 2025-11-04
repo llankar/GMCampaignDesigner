@@ -248,6 +248,7 @@ class DiceRollerWindow(ctk.CTkToplevel):
         self.formula_var = ctk.StringVar(value="")
         self.exploding_var = ctk.BooleanVar(value=False)
         self.separate_var = ctk.BooleanVar(value=False)
+        self._last_roll_options: Tuple[bool, bool] = (False, False)
 
         self._build_layout()
         self.refresh_system_settings(initial=True)
@@ -285,6 +286,13 @@ class DiceRollerWindow(ctk.CTkToplevel):
         default_formula = dice_preferences.get_rollable_default_formula()
         if initial or not self.formula_var.get().strip():
             self.formula_var.set(default_formula)
+
+        roll_options = dice_preferences.get_default_roll_options()
+        defaults = (bool(roll_options.get("explode")), bool(roll_options.get("separate")))
+        if initial or defaults != self._last_roll_options:
+            self.exploding_var.set(defaults[0])
+            self.separate_var.set(defaults[1])
+        self._last_roll_options = defaults
 
     # -----------------
     # Layout & UI setup

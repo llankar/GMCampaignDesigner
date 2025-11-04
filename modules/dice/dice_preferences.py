@@ -77,11 +77,32 @@ def get_rollable_default_formula() -> str:
 
     raw_default = get_default_formula()
     sanitized = re.sub(r"\bmod\b", "0", raw_default, flags=re.IGNORECASE)
+    sanitized = re.sub(r"(\d+)d[fF]\b", r"\1d6", sanitized)
+    sanitized = re.sub(r"\bd[fF]\b", "1d6", sanitized)
     canonical = canonicalize_formula(sanitized)
     if canonical:
         return canonical
     fallback = canonicalize_formula("1d20")
     return fallback or "1d20"
+
+
+def _dice_roll_config() -> Mapping[str, Any]:
+    config = system_config.get_current_system_config()
+    if not config:
+        return {}
+    raw = config.analyzer_config.get("dice")
+    if isinstance(raw, Mapping):
+        return raw
+    return {}
+
+
+def get_default_roll_options() -> Mapping[str, bool]:
+    """Return the default roll option flags for the active system."""
+
+    config = _dice_roll_config()
+    explode = bool(config.get("explode", False))
+    separate = bool(config.get("separate", False))
+    return {"explode": explode, "separate": separate}
 
 
 def _attack_roll_config() -> Mapping[str, Any]:
@@ -206,6 +227,7 @@ __all__ = [
     "get_default_formula",
     "canonicalize_formula",
     "get_rollable_default_formula",
+    "get_default_roll_options",
     "make_attack_roll_formula",
     "get_difficulty_definitions",
 ]
