@@ -75,6 +75,20 @@ def canonicalize_formula(formula: str | None) -> str | None:
 def get_rollable_default_formula() -> str:
     """Return a dice formula that is safe to roll for the current system."""
 
+    config = system_config.get_current_system_config()
+    forced_defaults = {
+        "d20": "1d20",
+        "2d20": "2d20",
+        "savage_fate": "d6",
+    }
+    if config:
+        forced = forced_defaults.get(config.slug.lower())
+        if forced:
+            canonical = canonicalize_formula(forced)
+            if canonical:
+                return canonical
+            return forced
+
     raw_default = get_default_formula()
     sanitized = re.sub(r"\bmod\b", "0", raw_default, flags=re.IGNORECASE)
     sanitized = re.sub(r"(\d+)d[fF]\b", r"\1d6", sanitized)

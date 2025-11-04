@@ -1,7 +1,8 @@
+from contextlib import closing
+
 import os
 import sqlite3
 import time
-from contextlib import closing
 
 import pytest
 
@@ -40,7 +41,19 @@ def campaign_db(monkeypatch, tmp_path):
 
 
 @pytest.mark.usefixtures("campaign_db")
-def test_rollable_default_formula_replaces_fate_die(campaign_db):
+def test_rollable_default_formula_uses_system_overrides():
+    set_current_system("d20")
+    assert dice_preferences.get_rollable_default_formula() == "1d20"
+
+    set_current_system("2d20")
+    assert dice_preferences.get_rollable_default_formula() == "2d20"
+
+    set_current_system("savage_fate")
+    assert dice_preferences.get_rollable_default_formula() == "1d6"
+
+
+@pytest.mark.usefixtures("campaign_db")
+def test_rollable_default_formula_ignores_configured_variants(campaign_db):
     with closing(sqlite3.connect(str(campaign_db))) as conn:
         conn.execute(
             "UPDATE campaign_systems SET default_formula = ? WHERE slug = ?",
@@ -53,7 +66,7 @@ def test_rollable_default_formula_replaces_fate_die(campaign_db):
 
     set_current_system("savage_fate")
 
-    assert dice_preferences.get_rollable_default_formula() == "2d6"
+    assert dice_preferences.get_rollable_default_formula() == "1d6"
 
 
 @pytest.mark.usefixtures("campaign_db")
