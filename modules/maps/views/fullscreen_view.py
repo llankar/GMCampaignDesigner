@@ -27,7 +27,8 @@ def open_fullscreen(self):
 def _update_fullscreen_map(self):
     """Mirror the GM canvas into the fullscreen window."""
     fs_canvas = getattr(self, "fs_canvas", None)
-    if not fs_canvas or not self.base_img:
+    base = getattr(self, '_video_current_frame_pil', None) or getattr(self, 'base_img', None)
+    if not fs_canvas or not base:
         return
 
     try:
@@ -37,11 +38,11 @@ def _update_fullscreen_map(self):
         return
 
     # Same logic as above but on fs_canvas
-    w, h = self.base_img.size
+    w, h = base.size
     sw, sh = int(w*self.zoom), int(h*self.zoom)
     x0, y0 = self.pan_x, self.pan_y
 
-    base_resized = self.base_img.resize((sw,sh), resample=Image.LANCZOS)
+    base_resized = base.resize((sw,sh), resample=Image.LANCZOS)
     self.fs_base_tk = ImageTk.PhotoImage(base_resized)
     if self.fs_base_id:
         self.fs_canvas.itemconfig(self.fs_base_id, image=self.fs_base_tk)

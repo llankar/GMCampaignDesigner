@@ -6,6 +6,10 @@ from functools import lru_cache
 import tkinter as tk
 import customtkinter as ctk
 from PIL import Image, ImageTk, ImageDraw
+from modules.ui.video_background import (
+    CanvasVideoBackgroundPlayer,
+    is_video_path,
+)
 from modules.helpers.config_helper import ConfigHelper
 from modules.helpers.template_loader import load_template
 from modules.generic.generic_list_selection_view import GenericListSelectionView
@@ -185,6 +189,15 @@ def _on_display_map(self, entity_type, map_name): # entity_type here is the map'
         except Exception:
             self.hover_font = ctk.CTkFont(size=self.hover_font_size)
 
+    # Stop any existing video background
+    try:
+        existing_player = getattr(self, "_video_bg_player", None)
+        if existing_player:
+            existing_player.stop()
+    except Exception:
+        pass
+    setattr(self, "_video_bg_player", None)
+
     # 2) Tear down any existing UI & build toolbar + canvas
     # Reset any canvas/image bookkeeping so the new canvas does not try to
     # reuse stale ids from a previously opened map (which can happen when
@@ -207,17 +220,39 @@ def _on_display_map(self, entity_type, map_name): # entity_type here is the map'
     self._build_toolbar()
     self._build_canvas()
 
-    # 3) Load base image + fog mask
+    # 3) Load base image + fog mask (supports static image or video)
     image_path = (item.get("Image", "") or "").strip()
     full_image_path = _resolve_campaign_path(image_path)
-    try:
-        self.base_img = Image.open(full_image_path).convert("RGBA")
-    except (FileNotFoundError, OSError):
-        messagebox.showerror(
-            "Map Image Missing",
-            f"The map image for '{map_name}' could not be found."
-        )
-        self.base_img = Image.new("RGBA", (1280, 720), (0, 0, 0, 255))
+    self._video_current_frame_pil = None
+    if full_image_path and os.path.isfile(full_image_path) and is_video_path(full_image_path):
+        try:
+            player = CanvasVideoBackgroundPlayer(self, full_image_path)
+            self._video_bg_player = player
+            vw, vh = player.size
+            if vw <= 0 or vh <= 0:
+                vw, vh = 1280, 720
+            # Create a placeholder so dimensions are available to rest of pipeline
+            self.base_img = Image.new("RGBA", (vw, vh), (0, 0, 0, 255))
+        except Exception:
+            # Fallback to static load if video init fails
+            try:
+                self.base_img = Image.open(full_image_path).convert("RGBA")
+            except Exception:
+                messagebox.showerror(
+                    "Map Image Missing",
+                    f"The map image for '{map_name}' could not be found."
+                )
+                self.base_img = Image.new("RGBA", (1280, 720), (0, 0, 0, 255))
+            self._video_bg_player = None
+    else:
+        try:
+            self.base_img = Image.open(full_image_path).convert("RGBA")
+        except (FileNotFoundError, OSError):
+            messagebox.showerror(
+                "Map Image Missing",
+                f"The map image for '{map_name}' could not be found."
+            )
+            self.base_img = Image.new("RGBA", (1280, 720), (0, 0, 0, 255))
     mask_path = (item.get("FogMaskPath") or "").strip()
     full_mask_path = _resolve_campaign_path(mask_path) if mask_path else ""
     if mask_path and os.path.isfile(full_mask_path):
@@ -259,6 +294,13 @@ def _on_display_map(self, entity_type, map_name): # entity_type here is the map'
         f"Restored persisted view state: zoom={self.zoom}, pan=({self.pan_x}, {self.pan_y}).",
         func_name="map_selector._on_display_map",
     )
+
+    # Start video playback after canvas and state are ready
+    try:
+        if getattr(self, "_video_bg_player", None):
+            self._video_bg_player.start()
+    except Exception:
+        pass
 
     # 4) Clear out any old tokens from both canvases
     removed_items = len(getattr(self, "tokens", []))

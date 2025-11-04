@@ -1,7 +1,8 @@
 import io
 import threading
 import logging
-from flask import Flask, send_file
+import time
+from flask import Flask, Response
 from werkzeug.serving import make_server
 from PIL import Image, ImageDraw
 from modules.helpers.config_helper import ConfigHelper
@@ -20,50 +21,128 @@ def open_web_display(self, port=None):
     self._web_port = port
 
     controller = self
+    # Polling interval for clients, in milliseconds (lower = smoother, higher = less CPU)
+    try:
+        self._web_refresh_ms = int(ConfigHelper.get("MapServer", "map_refresh_ms", fallback=200))
+    except Exception:
+        self._web_refresh_ms = 200
+    # Whether to use MJPEG streaming instead of polling PNGs
+    try:
+        use_mjpeg_raw = str(ConfigHelper.get("MapServer", "use_mjpeg", fallback="1") or "")
+        self._web_use_mjpeg = use_mjpeg_raw.strip().lower() in ("1", "true", "yes", "y", "on")
+    except Exception:
+        self._web_use_mjpeg = True
 
     @self._web_app.route('/')
     def index():
         # Basic HTML page that reloads the map image periodically so
         # changes on the GM side appear without requiring a manual refresh.
-        return """
+        use_mjpeg = bool(getattr(controller, '_web_use_mjpeg', True))
+        img_src = '/stream.mjpg' if use_mjpeg else '/map.png?ts=0'
+        refresh_script = "" if use_mjpeg else f"""
+        <script>
+            document.addEventListener('DOMContentLoaded', () => {{
+                const REFRESH_MS = {int(getattr(controller, '_web_refresh_ms', 200))};
+                const img = document.getElementById('mapImage');
+                function scheduleNext() {{ setTimeout(reloadImage, REFRESH_MS); }}
+                function reloadImage() {{ img.src = '/map.png?ts=' + Date.now(); }}
+                img.onload = scheduleNext;
+                img.onerror = scheduleNext;
+                setTimeout(reloadImage, REFRESH_MS);
+            }});
+        </script>
+        """
+        return f"""
         <!DOCTYPE html>
         <html>
         <head>
         <meta charset='utf-8'>
         <title>Map Display</title>
         <style>
-            body { margin: 0; }
-            img { max-width: 100%; height: auto; }
+            body {{ margin: 0; }}
+            img {{ max-width: 100%; height: auto; }}
         </style>
-        <script>
-            function reloadImage() {
-                const img = document.getElementById('mapImage');
-                img.src = '/map.png?ts=' + Date.now();
-            }
-            setInterval(reloadImage, 1000);
-        </script>
+        {refresh_script}
         </head>
         <body>
-        <img id='mapImage' src='/map.png?ts=0'>
+        <img id='mapImage' src='{img_src}'>
         </body>
         </html>
         """
 
     @self._web_app.route('/map.png')
     def map_png():
+        # Rebuild the composited image for each request so movement and fog
+        # changes are reflected immediately.
         controller._update_web_display_map()
         data = getattr(controller, '_web_image_bytes', None)
         if not data:
             return ('No map image', 404)
-        buf = io.BytesIO(data)
-        resp = send_file(buf, mimetype='image/png', max_age=0)
-        resp.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
-        resp.headers['Pragma'] = 'no-cache'
-        resp.headers['Expires'] = '0'
-        return resp
+        return Response(
+            data,
+            mimetype='image/png',
+            headers={
+                'Cache-Control': 'no-cache, no-store, must-revalidate',
+                'Pragma': 'no-cache',
+                'Expires': '0',
+            },
+        )
+
+    @self._web_app.route('/stream.mjpg')
+    def stream_mjpeg():
+        boundary = 'frame'
+        interval = max(1, int(getattr(controller, '_web_refresh_ms', 200))) / 1000.0
+
+        def frame_bytes():
+            # Compose a JPEG-encoded frame from the current map state
+            img = _render_map_image(controller)
+            if img is None:
+                return None
+            if img.mode != 'RGB':
+                try:
+                    img = img.convert('RGB')
+                except Exception:
+                    pass
+            buf = io.BytesIO()
+            try:
+                img.save(buf, format='JPEG', quality=80)
+                return buf.getvalue()
+            finally:
+                buf.close()
+
+        def generate():
+            while True:
+                data = frame_bytes()
+                if data is None:
+                    time.sleep(interval)
+                    continue
+                # multipart/x-mixed-replace chunk
+                yield (b"--" + boundary.encode('ascii') + b"\r\n"
+                       b"Content-Type: image/jpeg\r\n"
+                       b"Content-Length: " + str(len(data)).encode('ascii') + b"\r\n\r\n" + data + b"\r\n")
+                time.sleep(interval)
+
+        return Response(generate(), mimetype=f'multipart/x-mixed-replace; boundary={boundary}')
 
     def run_app():
-        self._web_server = make_server('0.0.0.0', port, self._web_app, threaded=True)
+        try:
+            import logging as _logging
+            # Suppress werkzeug request logs
+            _logging.getLogger('werkzeug').setLevel(_logging.ERROR)
+            try:
+                self._web_app.logger.setLevel(_logging.ERROR)
+            except Exception:
+                pass
+        except Exception:
+            pass
+        try:
+            from werkzeug.serving import WSGIRequestHandler as _WSGIRequestHandler
+            class _QuietHandler(_WSGIRequestHandler):
+                def log(self, type, message, *args):
+                    pass
+            self._web_server = make_server('0.0.0.0', port, self._web_app, threaded=True, request_handler=_QuietHandler)
+        except Exception:
+            self._web_server = make_server('0.0.0.0', port, self._web_app, threaded=True)
         self._web_server.serve_forever()
 
     self._web_server_thread = threading.Thread(target=run_app, daemon=True)
@@ -71,16 +150,21 @@ def open_web_display(self, port=None):
 
 
 def _render_map_image(self):
-    if not self.base_img:
+    base = getattr(self, '_video_current_frame_pil', None) or getattr(self, 'base_img', None)
+    if not base:
         return None
-    w, h = self.base_img.size
+    try:
+        base = base.copy()
+    except Exception:
+        pass
+    w, h = base.size
     sw, sh = int(w * self.zoom), int(h * self.zoom)
     x0, y0 = int(self.pan_x), int(self.pan_y)
     min_x, min_y = min(0, x0), min(0, y0)
     max_x, max_y = max(sw, x0 + sw), max(sh, y0 + sh)
     width, height = max_x - min_x, max_y - min_y
     img = Image.new('RGBA', (width, height), (0, 0, 0, 255))
-    base_resized = self.base_img.resize((sw, sh), Image.LANCZOS)
+    base_resized = base.resize((sw, sh), Image.LANCZOS)
     img.paste(base_resized, (x0 - min_x, y0 - min_y))
 
     draw = ImageDraw.Draw(img)

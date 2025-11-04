@@ -2747,10 +2747,12 @@ class DisplayMapController:
             self._remove_resize_handles()
 
 
-        w, h = self.base_img.size; sw, sh = int(w*self.zoom), int(h*self.zoom)
+        # Choose current base source (video frame if available)
+        base_source = getattr(self, "_video_current_frame_pil", None) or self.base_img
+        w, h = base_source.size; sw, sh = int(w*self.zoom), int(h*self.zoom)
         if sw <= 0 or sh <= 0: return 
         x0, y0 = self.pan_x, self.pan_y
-        base_resized = self.base_img.resize((sw,sh), resample=resample); self.base_tk = ImageTk.PhotoImage(base_resized)
+        base_resized = base_source.resize((sw,sh), resample=resample); self.base_tk = ImageTk.PhotoImage(base_resized)
         if self.base_id: self.canvas.itemconfig(self.base_id, image=self.base_tk); self.canvas.coords(self.base_id, x0, y0)
         else: self.base_id = self.canvas.create_image(x0, y0, image=self.base_tk, anchor='nw')
         if self.mask_img:
@@ -4135,7 +4137,13 @@ class DisplayMapController:
         entry = ctk.CTkEntry(self.canvas, width=50); entry.insert(0, str(token.get("max_hp", 0)))
         entry_id = self.canvas.create_window(x, y, window=entry, anchor="center")
         token["max_hp_entry_widget"] = entry; token["max_hp_entry_widget_id"] = entry_id
-        entry.focus_set(); entry.select_range(0, tk.END)
+        # Ensure focus + selection for immediate overwrite
+        try: entry.focus_set(); entry.select_range(0, tk.END)
+        except Exception: pass
+        try: self.canvas.after(10, lambda e=entry: (e.focus_set(), e.select_range(0, tk.END)))
+        except Exception: pass
+        try: entry.bind("<FocusIn>", lambda e: e.widget.select_range(0, tk.END))
+        except Exception: pass
         entry.bind("<Return>", lambda e: self._on_max_hp_entry_commit(e, token))
 
     def _on_max_hp_entry_commit(self, event, token):
@@ -4173,7 +4181,15 @@ class DisplayMapController:
         entry_id = self.canvas.create_window(x, y, window=entry, anchor="center")
         self.canvas.lift(entry_id); self.canvas.update_idletasks()
         token["hp_entry_widget"] = entry; token["hp_entry_widget_id"] = entry_id
-        entry.focus_set(); entry.select_range(0, tk.END)
+        # Ensure focus lands on the entry and current value is selected for immediate typing
+        try: entry.focus_set(); entry.select_range(0, tk.END)
+        except Exception: pass
+        # Reinforce after the widget is mapped to handle focus races
+        try: self.canvas.after(10, lambda e=entry: (e.focus_set(), e.select_range(0, tk.END)))
+        except Exception: pass
+        # If focus changes later, keep selection to allow direct +/- input
+        try: entry.bind("<FocusIn>", lambda e: e.widget.select_range(0, tk.END))
+        except Exception: pass
         entry.bind("<Return>", lambda e: self._on_hp_entry_commit(e, token))
 
     def _on_hp_entry_commit(self, event, token):
