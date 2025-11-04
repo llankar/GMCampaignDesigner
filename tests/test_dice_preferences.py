@@ -71,6 +71,11 @@ def test_rollable_default_formula_ignores_configured_variants(campaign_db):
 
 @pytest.mark.usefixtures("campaign_db")
 def test_default_roll_options_respect_system_config(campaign_db):
+    set_current_system("d20")
+    options = dice_preferences.get_default_roll_options()
+    assert options["separate"] is False
+    assert options["explode"] is False
+
     set_current_system("2d20")
     options = dice_preferences.get_default_roll_options()
     assert options["separate"] is True
