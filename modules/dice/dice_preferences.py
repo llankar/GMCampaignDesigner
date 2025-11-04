@@ -113,9 +113,23 @@ def _dice_roll_config() -> Mapping[str, Any]:
 def get_default_roll_options() -> Mapping[str, bool]:
     """Return the default roll option flags for the active system."""
 
-    config = _dice_roll_config()
-    explode = bool(config.get("explode", False))
-    separate = bool(config.get("separate", False))
+    config = system_config.get_current_system_config()
+    dice_config: Mapping[str, Any] = {}
+    if config:
+        raw = config.analyzer_config.get("dice")
+        if isinstance(raw, Mapping):
+            dice_config = raw
+
+    slug = (config.slug or "").lower() if config else ""
+    fallbacks: Mapping[str, Mapping[str, bool]] = {
+        "d20": {},
+        "2d20": {"separate": True},
+        "savage_fate": {"explode": True, "separate": True},
+    }
+    fallback = fallbacks.get(slug, {})
+
+    explode = bool(dice_config.get("explode", fallback.get("explode", False)))
+    separate = bool(dice_config.get("separate", fallback.get("separate", False)))
     return {"explode": explode, "separate": separate}
 
 
