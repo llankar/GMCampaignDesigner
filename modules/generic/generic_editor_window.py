@@ -1910,9 +1910,11 @@ class GenericEditorWindow(ctk.CTkToplevel):
     
     def select_image(self):
         file_path = filedialog.askopenfilename(
-            title="Select Image",
+            title="Select Image or Video",
             filetypes=[
+                ("Images & Videos", "*.png;*.jpg;*.jpeg;*.gif;*.bmp;*.webp;*.mp4;*.webm;*.mov;*.mkv;*.avi;*.m4v"),
                 ("Image Files", "*.png;*.jpg;*.jpeg;*.gif;*.bmp;*.webp"),
+                ("Video Files", "*.mp4;*.webm;*.mov;*.mkv;*.avi;*.m4v"),
                 ("PNG Files", "*.png"),
                 ("JPEG Files", "*.jpg;*.jpeg"),
                 ("GIF Files", "*.gif"),
