@@ -27,6 +27,26 @@ class TextSegment:
     emphasize: bool = False
 
 
+@dataclass(frozen=True)
+class ResultChip:
+    """Visual token representing one portion of a dice roll breakdown."""
+
+    title: str
+    detail: str
+    total: str
+    highlight: bool = False
+
+
+@dataclass(frozen=True)
+class FormattedRoll:
+    """Container for the textual and visual representation of a roll."""
+
+    segments: List[TextSegment]
+    total_text: str
+    header: str
+    chips: List[ResultChip]
+
+
 class DiceBarWindow(ctk.CTkToplevel):
     """Compact dice roller that mirrors the behaviour of the full window."""
 
@@ -61,6 +81,9 @@ class DiceBarWindow(ctk.CTkToplevel):
 
         self._result_normal_font = ctk.CTkFont(size=16)
         self._result_emphasis_font = ctk.CTkFont(size=18, weight="bold")
+        self._result_header_font = ctk.CTkFont(size=13, weight="bold")
+        self._result_detail_font = ctk.CTkFont(size=14)
+        self._chip_total_font = ctk.CTkFont(size=18, weight="bold")
 
         self._build_ui()
         self.refresh_system_settings(initial=True)
@@ -232,9 +255,13 @@ class DiceBarWindow(ctk.CTkToplevel):
         canonical = result.canonical()
         self.formula_var.set(canonical)
 
-        segments, total_text = self._format_roll_output(result, separate)
-        self._display_segments(segments)
-        self._set_total_text(total_text)
+        formatted = self._format_roll_output(result, separate)
+        self._display_segments(
+            formatted.segments,
+            header=formatted.header,
+            chips=formatted.chips,
+        )
+        self._set_total_text(formatted.total_text)
 
     def _append_die(self, faces: int) -> None:
         fragment = f"1d{faces}"
@@ -302,15 +329,18 @@ class DiceBarWindow(ctk.CTkToplevel):
 
     def _format_roll_output(
         self, result: dice_engine.RollResult, separate: bool
-    ) -> tuple[List[TextSegment], str]:
+    ) -> FormattedRoll:
         canonical = result.canonical()
         modifier = result.modifier
         total = result.total
 
+        header = f"{canonical} →" if canonical else "Last Roll"
         segments: List[TextSegment] = []
         if canonical:
             canonical_text = f"{canonical} -> "
             segments.append(TextSegment(canonical_text))
+
+        chips: List[ResultChip] = []
 
         if separate:
             parts: List[List[TextSegment]] = []
@@ -325,31 +355,72 @@ class DiceBarWindow(ctk.CTkToplevel):
                 parts.append(
                     [TextSegment(prefix), TextSegment(str(chain.total), emphasize=True)]
                 )
+                chips.append(
+                    ResultChip(
+                        title=label,
+                        detail=values or "—",
+                        total=str(chain.total),
+                        highlight=True,
+                    )
+                )
             if modifier:
-                parts.append([TextSegment(f"mod {modifier:+d}")])
+                mod_text = f"mod {modifier:+d}"
+                parts.append([TextSegment(mod_text)])
+                chips.append(
+                    ResultChip(
+                        title="Modifier",
+                        detail="Adjustment",
+                        total=f"{modifier:+d}",
+                        highlight=False,
+                    )
+                )
             breakdown_segments = self._join_parts(parts)
             segments.extend(breakdown_segments)
             if not breakdown_segments:
                 segments.append(TextSegment("0", emphasize=True))
-            total_text = f"{total}"
-            return segments, total_text
+            if not chips:
+                chips.append(
+                    ResultChip(title="Result", detail="—", total=str(total), highlight=True)
+                )
+            return FormattedRoll(segments=segments, total_text=f"{total}", header=header, chips=chips)
 
         parts: List[List[TextSegment]] = []
         for summary in result.face_summaries:
             values = summary.display_values
-            if not values:
-                continue
-            prefix = f"{summary.base_count}d{summary.faces}:[{', '.join(values)}] "
+            detail = ", ".join(values) if values else "—"
+            if values:
+                prefix = f"{summary.base_count}d{summary.faces}:[{', '.join(values)}] "
+            else:
+                prefix = f"{summary.base_count}d{summary.faces} "
             parts.append(
                 [TextSegment(prefix), TextSegment(str(summary.total), emphasize=True)]
             )
+            chips.append(
+                ResultChip(
+                    title=f"{summary.base_count}d{summary.faces}",
+                    detail=detail,
+                    total=str(summary.total),
+                    highlight=True,
+                )
+            )
         if modifier:
-            parts.append([TextSegment(f"mod {modifier:+d}")])
+            mod_text = f"mod {modifier:+d}"
+            parts.append([TextSegment(mod_text)])
+            chips.append(
+                ResultChip(
+                    title="Modifier",
+                    detail="Adjustment",
+                    total=f"{modifier:+d}",
+                    highlight=False,
+                )
+            )
         breakdown_segments = self._join_parts(parts)
         segments.extend(breakdown_segments)
         if not breakdown_segments:
             segments.append(TextSegment("0", emphasize=True))
-        return segments, f"{total}"
+        if not chips:
+            chips.append(ResultChip(title="Result", detail="—", total=str(total), highlight=True))
+        return FormattedRoll(segments=segments, total_text=f"{total}", header=header, chips=chips)
 
     def _join_parts(self, parts: List[List[TextSegment]]) -> List[TextSegment]:
         segments: List[TextSegment] = []
@@ -458,7 +529,13 @@ class DiceBarWindow(ctk.CTkToplevel):
     def _on_close(self) -> None:
         self.destroy()
 
-    def _display_segments(self, segments: List[TextSegment]) -> None:
+    def _display_segments(
+        self,
+        segments: List[TextSegment],
+        *,
+        header: str | None = None,
+        chips: List[ResultChip] | None = None,
+    ) -> None:
         self.result_var.set("".join(segment.text for segment in segments))
 
         container = self._result_container
@@ -468,23 +545,107 @@ class DiceBarWindow(ctk.CTkToplevel):
         for child in container.winfo_children():
             child.destroy()
 
+        container.grid_columnconfigure(0, weight=1)
+        for index in range(3):
+            container.grid_rowconfigure(index, weight=0)
+
+        if chips:
+            tokens = theme_manager.get_tokens()
+            base_color = tokens.get("panel_alt_bg", "#132133")
+            accent_color = tokens.get("accent_button_fg", "#2d3a57")
+            accent_border = tokens.get("accent_button_hover", accent_color)
+            border_color = tokens.get("button_border", "#1f2a3d")
+            muted_text = "#9fb2ce"
+
+            row = 0
+            if header:
+                header_label = ctk.CTkLabel(
+                    container,
+                    text=header,
+                    font=self._result_header_font,
+                    text_color=muted_text,
+                    anchor="w",
+                    justify="left",
+                )
+                header_label.grid(row=row, column=0, sticky="w", pady=(0, 4))
+                self._register_drag_target(header_label)
+                row += 1
+
+            chips_frame = ctk.CTkFrame(container, fg_color="transparent")
+            chips_frame.grid(row=row, column=0, sticky="w")
+            self._register_drag_target(chips_frame)
+
+            for index, chip in enumerate(chips):
+                fg_color = accent_color if chip.highlight else base_color
+                chip_border = accent_border if chip.highlight else border_color
+                card = ctk.CTkFrame(
+                    chips_frame,
+                    corner_radius=10,
+                    fg_color=fg_color,
+                    border_width=1,
+                    border_color=chip_border,
+                )
+                card.pack(side="left", padx=(0 if index == 0 else 8, 0), pady=4)
+                self._register_drag_target(card)
+
+                title_color = "#eef4ff" if chip.highlight else muted_text
+                detail_color = "#f7faff" if chip.highlight else "#d3dced"
+                total_color = "#ffffff" if chip.highlight else "#f1f5ff"
+
+                title_label = ctk.CTkLabel(
+                    card,
+                    text=chip.title.upper(),
+                    font=self._result_header_font,
+                    text_color=title_color,
+                    anchor="w",
+                    justify="left",
+                )
+                title_label.pack(anchor="w", padx=14, pady=(10, 2))
+                self._register_drag_target(title_label)
+
+                detail_text = chip.detail.strip() or "—"
+                detail_label = ctk.CTkLabel(
+                    card,
+                    text=detail_text,
+                    font=self._result_detail_font,
+                    text_color=detail_color,
+                    anchor="w",
+                    justify="left",
+                )
+                detail_label.pack(anchor="w", padx=14)
+                self._register_drag_target(detail_label)
+
+                total_label = ctk.CTkLabel(
+                    card,
+                    text=f"= {chip.total}",
+                    font=self._chip_total_font,
+                    text_color=total_color,
+                    anchor="w",
+                    justify="left",
+                )
+                total_label.pack(anchor="w", padx=14, pady=(6, 10))
+                self._register_drag_target(total_label)
+            return
+
         if not segments:
             return
 
-        for column, segment in enumerate(segments):
+        row_frame = ctk.CTkFrame(container, fg_color="transparent")
+        row_frame.grid(row=0, column=0, sticky="w")
+        self._register_drag_target(row_frame)
+
+        for index, segment in enumerate(segments):
             if not segment.text:
                 continue
             label = ctk.CTkLabel(
-                container,
+                row_frame,
                 text=segment.text,
                 font=self._result_emphasis_font if segment.emphasize else self._result_normal_font,
                 anchor="w",
                 justify="left",
             )
-            label.grid(row=0, column=column, sticky="w")
+            label.pack(side="left", padx=(0 if index == 0 else 4, 0))
             self._register_drag_target(label)
-
-        container.grid_columnconfigure(len(segments), weight=1)
 
     def _register_drag_target(self, widget: tk.Widget) -> None:
         widget.bind("<ButtonPress-1>", self._on_drag_start)
