@@ -655,22 +655,26 @@ class DiceBarWindow(ctk.CTkToplevel):
         if not segments:
             return
 
-        row_frame = ctk.CTkFrame(container, fg_color="transparent")
-        row_frame.grid(row=0, column=0, sticky="w")
-        self._register_drag_target(row_frame)
+        existing_columns, _ = container.grid_size()
+        for column in range(existing_columns):
+            container.grid_columnconfigure(column, weight=0)
 
-        for index, segment in enumerate(segments):
+        column_index = 0
+        for segment in segments:
             if not segment.text:
                 continue
             label = ctk.CTkLabel(
-                row_frame,
+                container,
                 text=segment.text,
                 font=self._result_emphasis_font if segment.emphasize else self._result_normal_font,
                 anchor="w",
                 justify="left",
             )
-            label.pack(side="left", padx=(0 if index == 0 else 4, 0))
+            label.grid(row=0, column=column_index, padx=(0 if column_index == 0 else 4, 0), sticky="w")
             self._register_drag_target(label)
+            column_index += 1
+
+        container.grid_columnconfigure(column_index, weight=1)
 
         self.after_idle(self._apply_geometry)
 
