@@ -1801,11 +1801,15 @@ class DisplayMapController:
         try:
             if dice_window is not None and TextSegmentCls is not None:
                 try:
-                    segments, total_text = dice_window._format_roll_output(result, separate)
+                    formatted = dice_window._format_roll_output(result, separate)
                     prefix = TextSegmentCls(f"{display_label} – {descriptor_with_notes}: ")
                     dice_window.formula_var.set(result.canonical())
-                    dice_window._display_segments([prefix, *segments])
-                    dice_window._set_total_text(total_text)
+                    dice_window._display_segments(
+                        [prefix, *formatted.segments],
+                        header=formatted.header,
+                        chips=formatted.chips,
+                    )
+                    dice_window._set_total_text(formatted.total_text)
                     dice_window.show()
                     return
                 except Exception as exc:
