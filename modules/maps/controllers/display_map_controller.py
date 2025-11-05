@@ -1507,23 +1507,40 @@ class DisplayMapController:
 
     def _resolve_dice_bar_window(self) -> "DiceBarWindow | None":
         candidates: list[object] = []
+        seen: set[object] = set()
+
+        def _register_candidate(obj):
+            if obj is None or obj in seen:
+                return
+            seen.add(obj)
+            candidates.append(obj)
+
+        def _register_widget_chain(widget):
+            current = widget
+            while current is not None and current not in seen:
+                _register_candidate(current)
+                current = getattr(current, "master", None)
 
         root_app = getattr(self, "_root_app", None)
         if root_app is not None:
-            candidates.append(root_app)
+            _register_widget_chain(root_app)
 
         parent = getattr(self, "parent", None)
-        toplevel = None
         if parent is not None:
+            _register_widget_chain(parent)
             try:
                 toplevel = parent.winfo_toplevel()
             except Exception:
                 toplevel = None
+            else:
+                _register_widget_chain(toplevel)
+        else:
+            toplevel = None
 
-        main_app = getattr(toplevel, "master", None) if toplevel is not None else None
-        for candidate in (main_app, toplevel):
-            if candidate is not None and candidate not in candidates:
-                candidates.append(candidate)
+        if toplevel is not None:
+            main_app = getattr(toplevel, "master", None)
+            if main_app is not None:
+                _register_widget_chain(main_app)
 
         for candidate in candidates:
             open_method = getattr(candidate, "open_dice_bar", None)
