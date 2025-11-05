@@ -140,7 +140,7 @@ class DiceBarWindow(ctk.CTkToplevel):
         self._content_frame = content
 
         entry = ctk.CTkEntry(content, textvariable=self.formula_var, width=200, height=30)
-        entry.grid(row=0, column=0, padx=(4, 6), pady=4, sticky="ew")
+        entry.grid(row=0, column=0, padx=(4, 6), pady=4, sticky="new")
         entry.bind("<Return>", lambda _event: self.roll())
         self._formula_entry = entry
 
@@ -150,7 +150,7 @@ class DiceBarWindow(ctk.CTkToplevel):
             variable=self.exploding_var,
             checkbox_height=18,
         )
-        explode_box.grid(row=0, column=1, padx=4, pady=4, sticky="w")
+        explode_box.grid(row=0, column=1, padx=4, pady=4, sticky="nw")
 
         separate_box = ctk.CTkCheckBox(
             content,
@@ -158,7 +158,7 @@ class DiceBarWindow(ctk.CTkToplevel):
             variable=self.separate_var,
             checkbox_height=18,
         )
-        separate_box.grid(row=0, column=2, padx=4, pady=4, sticky="w")
+        separate_box.grid(row=0, column=2, padx=4, pady=4, sticky="nw")
 
         roll_button = ctk.CTkButton(
             content,
@@ -170,7 +170,7 @@ class DiceBarWindow(ctk.CTkToplevel):
             hover_color="#23865a",
             font=("Segoe UI", 14, "bold"),
         )
-        roll_button.grid(row=0, column=3, padx=4, pady=4, sticky="ew")
+        roll_button.grid(row=0, column=3, padx=4, pady=4, sticky="new")
 
         clear_button = ctk.CTkButton(
             content,
@@ -179,14 +179,14 @@ class DiceBarWindow(ctk.CTkToplevel):
             height=32,
             command=self._clear_formula,
         )
-        clear_button.grid(row=0, column=4, padx=4, pady=4, sticky="ew")
+        clear_button.grid(row=0, column=4, padx=4, pady=4, sticky="new")
 
         preset_frame = ctk.CTkFrame(content, fg_color="transparent")
-        preset_frame.grid(row=0, column=5, padx=(6, 4), pady=4, sticky="w")
+        preset_frame.grid(row=0, column=5, padx=(6, 4), pady=4, sticky="nw")
         self._preset_frame = preset_frame
 
         result_frame = ctk.CTkFrame(content, fg_color="transparent")
-        result_frame.grid(row=0, column=6, padx=(6, 4), pady=4, sticky="ew")
+        result_frame.grid(row=0, column=6, padx=(6, 4), pady=4, sticky="new")
         result_frame.grid_columnconfigure(0, weight=1)
         result_frame.grid_columnconfigure(1, weight=0)
 
@@ -197,7 +197,7 @@ class DiceBarWindow(ctk.CTkToplevel):
         self._result_container = result_container
 
         total_container = ctk.CTkFrame(result_frame, fg_color="transparent")
-        total_container.grid(row=0, column=1, padx=(8, 0), sticky="e")
+        total_container.grid(row=0, column=1, padx=(8, 0), sticky="ne")
         total_container.grid_columnconfigure(0, weight=0)
         total_container.grid_columnconfigure(1, weight=0)
         self._register_drag_target(total_container)
@@ -206,10 +206,10 @@ class DiceBarWindow(ctk.CTkToplevel):
             total_container,
             text="Total",
             font=self._result_normal_font,
-            anchor="e",
+            anchor="ne",
             justify="right",
         )
-        total_prefix.grid(row=0, column=0, padx=(0, 6), sticky="e")
+        total_prefix.grid(row=0, column=0, padx=(0, 6), sticky="ne")
         self._register_drag_target(total_prefix)
         self._total_prefix_label = total_prefix
 
@@ -217,19 +217,16 @@ class DiceBarWindow(ctk.CTkToplevel):
             total_container,
             textvariable=self.total_var,
             font=self._result_emphasis_font,
-            anchor="e",
+            anchor="ne",
             justify="right",
         )
-        total_label.grid(row=0, column=1, sticky="e")
+        total_label.grid(row=0, column=1, sticky="ne")
         self._register_drag_target(total_label)
         self._total_label = total_label
 
         self._set_total_text(self.total_var.get())
 
         self._display_segments([TextSegment(self.result_var.get())])
-
-        close_button = ctk.CTkButton(content, text="✕", width=32, height=30, command=self._on_close)
-        close_button.grid(row=0, column=7, padx=(4, 8), pady=4, sticky="e")
 
         self._update_collapse_button()
 
@@ -553,35 +550,29 @@ class DiceBarWindow(ctk.CTkToplevel):
     def _on_close(self) -> None:
         self.destroy()
 
-    def _display_segments(
-        self,
-        segments: List[TextSegment],
-        *,
-        header: str | None = None,
-        chips: List[ResultChip] | None = None,
-    ) -> None:
+    def _display_segments(self, segments: List[TextSegment], *,
+                      header: str | None = None,
+                      chips: List[ResultChip] | None = None) -> None:
         self.result_var.set("".join(segment.text for segment in segments))
-
         container = self._result_container
         if container is None:
             return
 
+        # Clear existing children
         for child in container.winfo_children():
             child.destroy()
 
-        container.grid_columnconfigure(0, weight=1)
-        for index in range(3):
-            container.grid_rowconfigure(index, weight=0)
-
+        # One‑line chip display
         if chips:
             tokens = theme_manager.get_tokens()
-            base_color = tokens.get("panel_alt_bg", "#132133")
+            base_color   = tokens.get("panel_alt_bg", "#132133")
             accent_color = tokens.get("accent_button_fg", "#2d3a57")
             accent_border = tokens.get("accent_button_hover", accent_color)
-            border_color = tokens.get("button_border", "#1f2a3d")
-            muted_text = "#9fb2ce"
+            border_color  = tokens.get("button_border", "#1f2a3d")
+            muted_text    = "#9fb2ce"
 
-            row = 0
+            # Put header (if any) and chips in the same row
+            col = 0
             if header:
                 header_label = ctk.CTkLabel(
                     container,
@@ -591,67 +582,55 @@ class DiceBarWindow(ctk.CTkToplevel):
                     anchor="w",
                     justify="left",
                 )
-                header_label.grid(row=row, column=0, sticky="w", pady=(0, 4))
+                header_label.grid(row=0, column=col, sticky="nw", padx=(0, 8), pady=0)
                 self._register_drag_target(header_label)
-                row += 1
+                col += 1
 
             chips_frame = ctk.CTkFrame(container, fg_color="transparent")
-            chips_frame.grid(row=row, column=0, sticky="w")
+            chips_frame.grid(row=0, column=col, sticky="nw", pady=0)
             self._register_drag_target(chips_frame)
 
-            for index, chip in enumerate(chips):
-                fg_color = accent_color if chip.highlight else base_color
-                chip_border = accent_border if chip.highlight else border_color
-                card = ctk.CTkFrame(
+            # Build disabled buttons as chips (one line)
+            import tkinter.font as tkfont
+            measure_font = tkfont.nametofont(self._result_detail_font.name)
+
+            for idx, chip in enumerate(chips):
+                detail_text = (chip.detail or "—").strip()
+                chip_text   = f"{chip.title.upper()}: {detail_text} = {chip.total}"
+
+                # compute natural width so the button fits its text nicely
+                btn_w = measure_font.measure(chip_text) + 28   # text + inner padding
+
+                fg = accent_color if chip.highlight else base_color
+                bd = accent_border if chip.highlight else border_color
+                txt = "#ffffff" if chip.highlight else "#d3dced"
+
+                btn = ctk.CTkButton(
                     chips_frame,
-                    corner_radius=10,
-                    fg_color=fg_color,
-                    border_width=1,
-                    border_color=chip_border,
-                )
-                card.pack(side="left", padx=(0 if index == 0 else 8, 0), pady=4)
-                self._register_drag_target(card)
-
-                title_color = "#eef4ff" if chip.highlight else muted_text
-                detail_color = "#f7faff" if chip.highlight else "#d3dced"
-                total_color = "#ffffff" if chip.highlight else "#f1f5ff"
-
-                title_label = ctk.CTkLabel(
-                    card,
-                    text=chip.title.upper(),
-                    font=self._result_header_font,
-                    text_color=title_color,
-                    anchor="w",
-                    justify="left",
-                )
-                title_label.pack(anchor="w", padx=14, pady=(10, 2))
-                self._register_drag_target(title_label)
-
-                detail_text = chip.detail.strip() or "—"
-                detail_label = ctk.CTkLabel(
-                    card,
-                    text=detail_text,
+                    text=chip_text,
                     font=self._result_detail_font,
-                    text_color=detail_color,
-                    anchor="w",
-                    justify="left",
+                    state="disabled",                # <- disabled “chip”
+                    width=btn_w,
+                    height=30,
+                    corner_radius=10,
+                    fg_color=fg,
+                    hover_color=fg,                  # no hover effect when disabled anyway
+                    border_color=bd,
+                    border_width=1,
+                    text_color=txt,                  # for enabled fallback
+                    text_color_disabled=txt,         # <- keep same color when disabled
+                    command=None,
+                    cursor="arrow",                  # avoid “hand” cursor look
                 )
-                detail_label.pack(anchor="w", padx=14)
-                self._register_drag_target(detail_label)
+                # keep everything on the same top line
+                btn.pack(side="left", anchor="n", padx=(0 if idx == 0 else 8, 0), pady=0)
+                self._register_drag_target(btn)
 
-                total_label = ctk.CTkLabel(
-                    card,
-                    text=f"= {chip.total}",
-                    font=self._chip_total_font,
-                    text_color=total_color,
-                    anchor="w",
-                    justify="left",
-                )
-                total_label.pack(anchor="w", padx=14, pady=(6, 10))
-                self._register_drag_target(total_label)
+            # keep geometry tight
+            self._expanded_height_hint = None
             self.after_idle(self._apply_geometry)
             return
-
+   
         if not segments:
             return
 
@@ -667,10 +646,10 @@ class DiceBarWindow(ctk.CTkToplevel):
                 container,
                 text=segment.text,
                 font=self._result_emphasis_font if segment.emphasize else self._result_normal_font,
-                anchor="w",
+                anchor="nw",
                 justify="left",
             )
-            label.grid(row=0, column=column_index, padx=(0 if column_index == 0 else 4, 0), sticky="w")
+            label.grid(row=0, column=column_index, padx=(0 if column_index == 0 else 4, 0), sticky="nw")
             self._register_drag_target(label)
             column_index += 1
 
