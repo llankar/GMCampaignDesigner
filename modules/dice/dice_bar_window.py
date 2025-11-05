@@ -74,6 +74,9 @@ class DiceBarWindow(ctk.CTkToplevel):
         self._total_label: ctk.CTkLabel | None = None
         self._total_prefix_label: ctk.CTkLabel | None = None
 
+        self._expanded_height_hint: int | None = None
+        self._collapsed_height_hint: int | None = None
+
         self._supported_faces: Tuple[int, ...] = tuple()
         self._last_system_default: str = ""
         self._last_roll_options: Tuple[bool, bool] = (False, False)
@@ -87,7 +90,9 @@ class DiceBarWindow(ctk.CTkToplevel):
 
         self._build_ui()
         self.refresh_system_settings(initial=True)
+        self._capture_height_hint(collapsed=False)
         self._set_collapsed(True)
+        self._capture_height_hint(collapsed=True)
         self._apply_geometry()
 
         self.bind("<Escape>", lambda _event: self._on_close())
@@ -451,10 +456,29 @@ class DiceBarWindow(ctk.CTkToplevel):
                 target = self._collapse_button or self
                 width = max(40, int(target.winfo_reqwidth() + 8))
                 height_source = target
+                if self._collapsed_height_hint is None and height_source is not None:
+                    try:
+                        measured = int(height_source.winfo_reqheight() or 0)
+                    except Exception:
+                        measured = 0
+                    if measured:
+                        self._collapsed_height_hint = measured
             else:
                 width = self.winfo_screenwidth()
                 height_source = self._bar_frame or self
-            base_height = height_source.winfo_reqheight() if height_source else 36
+                if self._expanded_height_hint is None and height_source is not None:
+                    try:
+                        measured = int(height_source.winfo_reqheight() or 0)
+                    except Exception:
+                        measured = 0
+                    if measured:
+                        self._expanded_height_hint = measured
+            if self._is_collapsed:
+                base_height = self._collapsed_height_hint
+            else:
+                base_height = self._expanded_height_hint
+            if not base_height:
+                base_height = height_source.winfo_reqheight() if height_source else 36
             height = max(36, int(base_height + HEIGHT_PADDING))
             screen_height = self.winfo_screenheight()
             y = screen_height - height
@@ -660,4 +684,22 @@ class DiceBarWindow(ctk.CTkToplevel):
         prefix = self._total_prefix_label
         if prefix is not None:
             prefix.configure(text="Total" if text else "")
+
+    def _capture_height_hint(self, *, collapsed: bool) -> None:
+        try:
+            self.update_idletasks()
+            if collapsed:
+                target = self._collapse_button or self
+                if target is not None:
+                    measured = int(target.winfo_reqheight() or 0)
+                    if measured:
+                        self._collapsed_height_hint = measured
+            else:
+                source = self._bar_frame or self
+                if source is not None:
+                    measured = int(source.winfo_reqheight() or 0)
+                    if measured:
+                        self._expanded_height_hint = measured
+        except Exception:
+            pass
 
