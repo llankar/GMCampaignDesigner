@@ -625,6 +625,7 @@ class DiceBarWindow(ctk.CTkToplevel):
                 )
                 total_label.pack(anchor="w", padx=14, pady=(6, 10))
                 self._register_drag_target(total_label)
+            self.after_idle(self._apply_geometry)
             return
 
         if not segments:
@@ -646,6 +647,8 @@ class DiceBarWindow(ctk.CTkToplevel):
             )
             label.pack(side="left", padx=(0 if index == 0 else 4, 0))
             self._register_drag_target(label)
+
+        self.after_idle(self._apply_geometry)
 
     def _register_drag_target(self, widget: tk.Widget) -> None:
         widget.bind("<ButtonPress-1>", self._on_drag_start)
