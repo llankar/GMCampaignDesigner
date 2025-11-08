@@ -302,6 +302,18 @@ class GenericEditorWindow(ctk.CTkToplevel):
     def __init__(self, master, item, template, model_wrapper, creation_mode=False):
         super().__init__(master)
         self.item = item
+        # ``FogMaskPath`` and the token metadata are intentionally hidden from the
+        # editor UI, but they must be preserved when the record is written back
+        # to the database.  If we omit them from the INSERT/REPLACE statement the
+        # corresponding columns are reset to NULL, which destroys the saved fog
+        # state in Map Tool.  Capture the current values so ``save()`` can
+        # restore them even though there is no visible widget for those fields.
+        hidden_fields = {"FogMaskPath", "Tokens", "token_size"}
+        self._preserved_hidden_fields = {}
+        if isinstance(item, dict):
+            for field_name in hidden_fields:
+                if field_name in item:
+                    self._preserved_hidden_fields[field_name] = item[field_name]
         self.template = template
         self.saved = False
         self.model_wrapper = model_wrapper
@@ -1442,6 +1454,16 @@ class GenericEditorWindow(ctk.CTkToplevel):
                 self.item[field_name] = True if widget[1].get() == "True" else False
             else:
                 self.item[field_name] = widget.get()
+
+        # Re-apply hidden values that are not exposed in the editor UI.  Without
+        # this the dictionary we hand to ``GenericModelWrapper`` is missing those
+        # keys, so SQLite writes NULL into the columns and the fog-of-war mask is
+        # lost the next time the map loads.
+        for field_name, value in getattr(self, "_preserved_hidden_fields", {}).items():
+            if field_name not in self.item:
+                self.item[field_name] = value
+            elif value not in (None, "") and self.item[field_name] in (None, ""):
+                self.item[field_name] = value
         self.saved = True
         self.destroy()
 
