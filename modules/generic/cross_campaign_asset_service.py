@@ -63,6 +63,7 @@ class BundleAnalysis:
     temp_dir: Path
     duplicates: Dict[str, List[str]]
     database: Optional[dict] = None
+    world_maps: Optional[Dict[str, dict]] = None
 
 
 def _resolve_active_campaign() -> CampaignDatabase:
@@ -225,6 +226,120 @@ def _campaign_join(campaign_dir: Path, path_value: str) -> Path:
     return (campaign_dir / normalized).resolve()
 
 
+def _resolve_campaign_dir(campaign_dir: Optional[Path]) -> Path:
+    base_dir = ConfigHelper.get_campaign_dir() or ""
+    base_path = Path(base_dir).resolve() if base_dir else Path.cwd()
+
+    if campaign_dir is None:
+        return base_path
+
+    candidate = Path(campaign_dir)
+    if not candidate.is_absolute():
+        candidate = (base_path / candidate).resolve()
+    return candidate
+
+
+def _world_map_store_path(campaign_dir: Optional[Path]) -> Path:
+    root = _resolve_campaign_dir(campaign_dir)
+    return (root / "world_maps" / "world_map_data.json").resolve()
+
+
+def load_world_map_store(campaign_dir: Optional[Path]) -> Dict[str, dict]:
+    path = _world_map_store_path(campaign_dir)
+    if not path.exists():
+        return {}
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except Exception as exc:
+        log_warning(
+            f"Failed to load world map store at {path}: {exc}",
+            func_name="modules.generic.cross_campaign_asset_service.load_world_map_store",
+        )
+        return {}
+
+    maps = payload.get("maps") if isinstance(payload, dict) else payload
+    return maps if isinstance(maps, dict) else {}
+
+
+def save_world_map_store(campaign_dir: Optional[Path], maps: Dict[str, dict]) -> None:
+    path = _world_map_store_path(campaign_dir)
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        payload = {"maps": maps}
+        path.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
+    except Exception as exc:
+        log_warning(
+            f"Failed to save world map store at {path}: {exc}",
+            func_name="modules.generic.cross_campaign_asset_service.save_world_map_store",
+        )
+
+
+def _collect_world_map_entries(records: Iterable[dict], campaign_dir: Path) -> Dict[str, dict]:
+    store = load_world_map_store(campaign_dir)
+    if not store:
+        return {}
+
+    collected: Dict[str, dict] = {}
+    for record in records:
+        key = _determine_record_key(record)
+        entry = store.get(key)
+        if not isinstance(entry, dict):
+            continue
+        collected[key] = copy.deepcopy(entry)
+    return collected
+
+
+def _rewrite_world_map_entries(
+    entries: Dict[str, dict], replacements: Dict[str, str]
+) -> Dict[str, dict]:
+    rewritten: Dict[str, dict] = {}
+    for name, entry in entries.items():
+        if not isinstance(entry, dict):
+            continue
+        updated = copy.deepcopy(entry)
+        image_path = updated.get("image")
+        if isinstance(image_path, str) and image_path in replacements:
+            updated["image"] = replacements[image_path]
+
+        tokens = updated.get("tokens")
+        if isinstance(tokens, list):
+            for token in tokens:
+                if not isinstance(token, dict):
+                    continue
+                for field in ("portrait_path", "image_path", "token_image", "video_path"):
+                    value = token.get(field)
+                    if isinstance(value, str) and value in replacements:
+                        token[field] = replacements[value]
+
+        rewritten[name] = updated
+    return rewritten
+
+
+def _merge_world_map_entries(target_dir: Path, entries: Dict[str, dict]) -> None:
+    if not entries:
+        return
+
+    store = load_world_map_store(target_dir)
+    merged = {key: copy.deepcopy(value) for key, value in store.items()}
+
+    changed = False
+    for name, entry in entries.items():
+        if not isinstance(entry, dict):
+            continue
+        existing = merged.get(name, {})
+        combined = copy.deepcopy(existing)
+        combined.update(copy.deepcopy(entry))
+        if combined != existing:
+            merged[name] = combined
+            changed = True
+        elif name not in merged:
+            merged[name] = copy.deepcopy(entry)
+            changed = True
+
+    if changed:
+        save_world_map_store(target_dir, merged)
+
+
 def _collect_map_assets(record: dict, campaign_dir: Path) -> Iterable[AssetReference]:
     key = _determine_record_key(record)
     image = (record.get("Image") or "").strip()
@@ -378,6 +493,8 @@ def export_bundle(
 
     assets_lookup: Dict[str, Path] = {}
 
+    bundled_world_maps: Dict[str, dict] = {}
+
     try:
         (temp_root / "data").mkdir(parents=True, exist_ok=True)
         for entity_type, records in selected_records.items():
@@ -415,6 +532,18 @@ def export_bundle(
                         "bundle_path": bundle_path.as_posix(),
                     }
                 )
+
+            if entity_type == "maps":
+                bundled_world_maps.update(_collect_world_map_entries(records, source_campaign.root))
+
+        if bundled_world_maps:
+            world_map_path = temp_root / "data" / "world_maps.json"
+            with world_map_path.open("w", encoding="utf-8") as fh:
+                json.dump({"maps": bundled_world_maps}, fh, indent=2, ensure_ascii=False)
+            manifest["world_maps"] = {
+                "count": len(bundled_world_maps),
+                "data_path": "data/world_maps.json",
+            }
 
         if include_database:
             try:
@@ -528,6 +657,24 @@ def analyze_bundle(bundle_path: Path, target_db: Path) -> BundleAnalysis:
         if not isinstance(database_entry, dict):
             database_entry = None
 
+        world_maps_manifest = manifest.get("world_maps")
+        world_maps: Dict[str, dict] = {}
+        if isinstance(world_maps_manifest, dict):
+            data_file = world_maps_manifest.get("data_path") or world_maps_manifest.get("path")
+            if data_file:
+                file_path = temp_dir / data_file
+                if file_path.exists():
+                    try:
+                        payload = json.loads(file_path.read_text(encoding="utf-8"))
+                        maps = payload.get("maps") if isinstance(payload, dict) else payload
+                        if isinstance(maps, dict):
+                            world_maps = maps
+                    except json.JSONDecodeError as exc:
+                        log_exception(
+                            f"Failed to parse world map data {data_file}: {exc}",
+                            func_name="modules.generic.cross_campaign_asset_service.analyze_bundle",
+                        )
+
         return BundleAnalysis(
             manifest=manifest,
             data_by_type=data_by_type,
@@ -535,6 +682,7 @@ def analyze_bundle(bundle_path: Path, target_db: Path) -> BundleAnalysis:
             temp_dir=temp_dir,
             duplicates=duplicates,
             database=database_entry,
+            world_maps=world_maps or None,
         )
     except Exception:
         shutil.rmtree(temp_dir, ignore_errors=True)
@@ -666,6 +814,10 @@ def apply_import(
                     summary["imported"] += 1
 
             save_entities(entity_type, target_campaign.db_path, list(merged.values()), replace=False)
+
+        if analysis.world_maps:
+            rewritten_world_maps = _rewrite_world_map_entries(analysis.world_maps, replacements)
+            _merge_world_map_entries(target_campaign.root, rewritten_world_maps)
     finally:
         shutil.rmtree(analysis.temp_dir, ignore_errors=True)
 
@@ -779,6 +931,11 @@ def apply_direct_copy(
     for entity_type, records in selected_records.items():
         asset_refs.extend(collect_assets(entity_type, records, source_campaign.root))
 
+    world_map_entries: Dict[str, dict] = {}
+    map_records = selected_records.get("maps")
+    if map_records:
+        world_map_entries = _collect_world_map_entries(map_records, source_campaign.root)
+
     total_assets = len(asset_refs) or 1
     for index, asset in enumerate(asset_refs, start=1):
         original = asset.original_path
@@ -820,6 +977,10 @@ def apply_direct_copy(
                 summary["imported"] += 1
 
         save_entities(entity_type, target_campaign.db_path, list(merged.values()), replace=False)
+
+    if world_map_entries:
+        rewritten_world_maps = _rewrite_world_map_entries(world_map_entries, replacements)
+        _merge_world_map_entries(target_campaign.root, rewritten_world_maps)
 
     _call_progress(progress_callback, "Copy complete", 1.0)
     return summary
