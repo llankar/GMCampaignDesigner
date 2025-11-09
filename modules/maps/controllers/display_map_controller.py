@@ -5,6 +5,7 @@ import math
 import re
 import webbrowser
 import threading
+import io
 from pathlib import Path
 from tkinter import colorchooser, filedialog, messagebox
 import tkinter as tk
@@ -193,6 +194,7 @@ class DisplayMapController:
         self.fs_base_id    = None
         self.fs_mask_id    = None
         self.fog_history = []
+        self._fog_history_bytes = 0
         self._fog_action_active = False
         self._fog_rect_start_world = None
         self._fog_rect_preview_id = None
@@ -2267,13 +2269,54 @@ class DisplayMapController:
         return "break"
 
     def _push_fog_history(self):
-        if self.mask_img is not None:
-            MAX_UNDO = 20; self.fog_history.append(self.mask_img.copy())
-            if len(self.fog_history) > MAX_UNDO: self.fog_history.pop(0)
-    
+        if self.mask_img is None:
+            return
+
+        buffer = io.BytesIO()
+        try:
+            self.mask_img.save(buffer, format="PNG")
+        except Exception as exc:
+            log_warning(f"Failed to snapshot fog history: {exc}")
+            return
+
+        payload = buffer.getvalue()
+        if not payload:
+            return
+
+        self.fog_history.append(payload)
+        self._fog_history_bytes += len(payload)
+
+        max_budget = self._fog_history_budget_bytes()
+        while self.fog_history and self._fog_history_bytes > max_budget:
+            dropped = self.fog_history.pop(0)
+            self._fog_history_bytes -= len(dropped)
+
+    def _fog_history_budget_bytes(self):
+        if self.mask_img is None:
+            return 0
+
+        pixel_count = max(1, self.mask_img.width * self.mask_img.height)
+        min_budget = 4 * 1024 * 1024  # 4 MiB minimum history budget
+        max_budget = 24 * 1024 * 1024  # cap history to 24 MiB overall
+        estimated = pixel_count  # approximate PNG size scaling with pixels
+        return max(min_budget, min(max_budget, estimated))
+
     def undo_fog(self, event=None):
-        if not self.fog_history: return
-        self.mask_img = self.fog_history.pop(); self._update_canvas_images()
+        if not self.fog_history:
+            return
+
+        payload = self.fog_history.pop()
+        self._fog_history_bytes -= len(payload)
+        self._fog_history_bytes = max(0, self._fog_history_bytes)
+
+        try:
+            with Image.open(io.BytesIO(payload)) as restored:
+                self.mask_img = restored.convert("RGBA")
+        except Exception as exc:
+            log_warning(f"Failed to restore fog history: {exc}")
+            return
+
+        self._update_canvas_images()
     
     # _bind_token is now _bind_item_events
 
