@@ -724,7 +724,10 @@ def insert_list_longtext(parent, header, items, open_entity_callback=None, entit
                 )
                 chip.pack(side="left", padx=4, pady=2)
                 if allow_entity_open:
-                    chip.bind("<Button-1>", lambda e, t=label_text, n=name: open_entity_callback(t, n))
+                    chip.bind(
+                        "<Button-1>",
+                        lambda _event=None, t=label_text, n=name: open_entity_callback(t, n)
+                    )
 
         _make_entity_section(npc_names, "NPCs")
         _make_entity_section(creature_names, "Creatures")
