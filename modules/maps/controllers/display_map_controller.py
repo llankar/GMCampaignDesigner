@@ -120,6 +120,7 @@ class DisplayMapController:
         self.base_id     = None
         self.mask_id     = None
         self._zoom_after_id = None
+        self._zoom_final_after_id = None
         self._fast_resample = Image.BILINEAR
         self.zoom        = 1.0
         self.pan_x       = 0
@@ -2766,6 +2767,8 @@ class DisplayMapController:
         self._fog_rect_fs_preview_id = None
 
     def _perform_zoom(self, final: bool):
+        attr = "_zoom_final_after_id" if final else "_zoom_after_id"
+        setattr(self, attr, None)
         resample = Image.LANCZOS if final else self._fast_resample; self._update_canvas_images(resample=resample)
 
     def _update_canvas_images(self, resample=Image.LANCZOS):
@@ -4230,7 +4233,15 @@ class DisplayMapController:
     def _on_hp_double_click(self, event, token):
         for attr in ("_zoom_after_id", "_zoom_final_after_id"):
             zid = getattr(self, attr, None)
-            if zid: self.canvas.after_cancel(zid); setattr(self, attr, None)
+            if not zid:
+                setattr(self, attr, None)
+                continue
+            try:
+                self.canvas.after_cancel(zid)
+            except tk.TclError:
+                pass
+            finally:
+                setattr(self, attr, None)
         if "hp_entry_widget" in token:
             self.canvas.delete(token["hp_entry_widget_id"])
             if hasattr(token["hp_entry_widget"], 'destroy'): token["hp_entry_widget"].destroy()
@@ -4283,10 +4294,27 @@ class DisplayMapController:
         delta = event.delta / 120; zoom_factor = 1 + (ZOOM_STEP * delta if ZOOM_STEP > 0 else 0.1 * delta)
         self.zoom = max(MIN_ZOOM, min(MAX_ZOOM, self.zoom * zoom_factor))
         self.pan_x = event.x - xw*self.zoom; self.pan_y = event.y - yw*self.zoom
-        if self._zoom_after_id: self.canvas.after_cancel(self._zoom_after_id)
+        zid = getattr(self, "_zoom_after_id", None)
+        if zid:
+            try:
+                self.canvas.after_cancel(zid)
+            except tk.TclError:
+                pass
+            finally:
+                self._zoom_after_id = None
+        else:
+            self._zoom_after_id = None
         self._zoom_after_id = self.canvas.after(50, lambda: self._perform_zoom(final=False))
-        if hasattr(self, '_zoom_final_after_id') and self._zoom_final_after_id:
-            self.canvas.after_cancel(self._zoom_final_after_id)
+        final_zid = getattr(self, "_zoom_final_after_id", None)
+        if final_zid:
+            try:
+                self.canvas.after_cancel(final_zid)
+            except tk.TclError:
+                pass
+            finally:
+                self._zoom_final_after_id = None
+        else:
+            self._zoom_final_after_id = None
         self._zoom_final_after_id = self.canvas.after(300, lambda: self._perform_zoom(final=True))
 
     def save_map(self):
