@@ -103,6 +103,11 @@ class WebAIClient(BaseAIClient):
             "[data-testid='conversation-turn-text-box'] textarea",
             "textarea[data-id]",
             "textarea[name]",
+            "textarea[placeholder]",
+            "textarea[aria-label]",
+            "div[data-placeholder]",
+            "div[data-testid='textbox']",
+            "div[data-testid='prompt-textarea']",
         ]
         selectors: list[str] = []
         seen: set[str] = set()
@@ -124,18 +129,83 @@ class WebAIClient(BaseAIClient):
         per_selector_timeout = max(1000, int((wait_seconds * 1000) / max(1, len(selectors))))
 
         last_exc: Exception | None = None
-        for cycle in range(2):
-            for selector in selectors:
+        def _element_is_interactable(element) -> bool:
+            try:
+                element.scroll_into_view_if_needed(timeout=1000)
+            except Exception:
+                pass
+            checks = (
+                getattr(element, "is_enabled", None),
+                getattr(element, "is_editable", None),
+                getattr(element, "is_visible", None),
+            )
+            results: list[bool] = []
+            for check in checks:
+                if check is None:
+                    continue
                 try:
-                    element = page.wait_for_selector(
-                        selector,
-                        timeout=per_selector_timeout,
-                        state="visible",
-                    )
-                    if element:
-                        return element
+                    value = bool(check())
+                except Exception:
+                    continue
+                results.append(value)
+            if any(results):
+                return True
+            try:
+                # Fallback: editable inputs normally expose a "tagName"
+                tag_name = str(
+                    element.evaluate("el => (el.tagName || '').toLowerCase()")
+                )
+                content_editable = str(
+                    element.get_attribute("contenteditable") or ""
+                ).lower()
+                if tag_name in {"textarea", "input"}:
+                    return True
+                if content_editable in {"", "true"}:
+                    return True
+            except Exception:
+                pass
+            return False
+
+        def _try_selector(frame, selector: str):
+            nonlocal last_exc
+            locator = frame.locator(selector)
+            try:
+                locator.wait_for(state="visible", timeout=per_selector_timeout)
+            except Exception as exc:  # noqa: PERF203 - wide compatibility
+                last_exc = exc
+            try:
+                element = locator.element_handle(timeout=500)
+            except Exception as exc:
+                last_exc = exc
+                element = None
+            if element is None:
+                try:
+                    locator.wait_for(state="attached", timeout=per_selector_timeout)
+                    element = locator.element_handle(timeout=500)
                 except Exception as exc:
                     last_exc = exc
+                    element = None
+            if element and _element_is_interactable(element):
+                return element
+            return None
+
+        def _iter_frames():
+            try:
+                return [page, *page.frames]
+            except Exception:
+                return [page]
+
+        for cycle in range(2):
+            frames = _iter_frames()
+            for selector in selectors:
+                for frame in frames:
+                    try:
+                        element = _try_selector(frame, selector)
+                    except Exception as exc:  # pragma: no cover - defensive
+                        last_exc = exc
+                        element = None
+                    if element:
+                        return element
             if cycle == 0:
                 try:
                     page.reload(wait_until="load", timeout=self.timeout_seconds * 1000)
