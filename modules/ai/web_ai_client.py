@@ -104,7 +104,21 @@ class WebAIClient(BaseAIClient):
             "textarea[data-id]",
             "textarea[name]",
         ]
-        selectors = self.prompt_selectors or default_selectors
+        selectors: list[str] = []
+        seen: set[str] = set()
+
+        def _append_unique(candidate: str):
+            normalized = candidate.strip()
+            if not normalized or normalized in seen:
+                return
+            selectors.append(normalized)
+            seen.add(normalized)
+
+        for selector in self.prompt_selectors:
+            _append_unique(selector)
+
+        for selector in default_selectors:
+            _append_unique(selector)
 
         # Avoid punishing users for listing many selectors by splitting the timeout
         per_selector_timeout = max(1000, int((wait_seconds * 1000) / max(1, len(selectors))))
