@@ -95,29 +95,45 @@ class WebAIClient(BaseAIClient):
         return [p for p in parts if p]
 
     def _locate_prompt_field(self, page, wait_seconds: int):
-        selectors = self.prompt_selectors or ["textarea"]
+        default_selectors = [
+            "textarea",
+            "form textarea",
+            "div[contenteditable='true']",
+            "div[role='textbox']",
+            "[data-testid='conversation-turn-text-box'] textarea",
+            "textarea[data-id]",
+            "textarea[name]",
+        ]
+        selectors = self.prompt_selectors or default_selectors
+
+        # Avoid punishing users for listing many selectors by splitting the timeout
+        per_selector_timeout = max(1000, int((wait_seconds * 1000) / max(1, len(selectors))))
+
         last_exc: Exception | None = None
-        for selector in selectors:
-            try:
-                return page.wait_for_selector(
-                    selector, timeout=wait_seconds * 1000, state="visible"
-                )
-            except Exception as exc:
-                last_exc = exc
-        try:
-            page.reload(wait_until="load", timeout=self.timeout_seconds * 1000)
-        except Exception:
-            pass
-        for selector in selectors:
-            try:
-                return page.wait_for_selector(
-                    selector, timeout=wait_seconds * 1000, state="visible"
-                )
-            except Exception as exc:
-                last_exc = exc
+        for cycle in range(2):
+            for selector in selectors:
+                try:
+                    element = page.wait_for_selector(
+                        selector,
+                        timeout=per_selector_timeout,
+                        state="visible",
+                    )
+                    if element:
+                        return element
+                except Exception as exc:
+                    last_exc = exc
+            if cycle == 0:
+                try:
+                    page.reload(wait_until="load", timeout=self.timeout_seconds * 1000)
+                except Exception:
+                    pass
+
         if last_exc is None:
             last_exc = RuntimeError("Prompt field not found on the AI web page")
-        raise RuntimeError("Prompt field not found on the AI web page") from last_exc
+        raise RuntimeError(
+            "Prompt field not found on the AI web page. Tried selectors: "
+            + ", ".join(selectors)
+        ) from last_exc
 
     def _ensure_dependencies(self):
         if self._playwright is not None:
