@@ -128,6 +128,8 @@ class WebAIClient(BaseAIClient):
         # Avoid punishing users for listing many selectors by splitting the timeout
         per_selector_timeout = max(1000, int((wait_seconds * 1000) / max(1, len(selectors))))
 
+        deadline = time.monotonic() + wait_seconds
+
         last_exc: Exception | None = None
         def _element_is_interactable(element) -> bool:
             try:
@@ -166,22 +168,23 @@ class WebAIClient(BaseAIClient):
                 pass
             return False
 
-        def _try_selector(frame, selector: str):
+        def _try_selector(frame, selector: str, timeout_ms: int):
             nonlocal last_exc
             locator = frame.locator(selector)
+            handle_timeout = max(1, min(500, timeout_ms))
             try:
-                locator.wait_for(state="visible", timeout=per_selector_timeout)
+                locator.wait_for(state="visible", timeout=timeout_ms)
             except Exception as exc:  # noqa: PERF203 - wide compatibility
                 last_exc = exc
             try:
-                element = locator.element_handle(timeout=500)
+                element = locator.element_handle(timeout=handle_timeout)
             except Exception as exc:
                 last_exc = exc
                 element = None
             if element is None:
                 try:
-                    locator.wait_for(state="attached", timeout=per_selector_timeout)
-                    element = locator.element_handle(timeout=500)
+                    locator.wait_for(state="attached", timeout=timeout_ms)
+                    element = locator.element_handle(timeout=handle_timeout)
                 except Exception as exc:
                     last_exc = exc
                     element = None
@@ -195,20 +198,38 @@ class WebAIClient(BaseAIClient):
             except Exception:
                 return [page]
 
+        def _remaining_ms_or_raise() -> int:
+            remaining_ms = int((deadline - time.monotonic()) * 1000)
+            if remaining_ms <= 0:
+                if last_exc is None:
+                    last_exc = TimeoutError(
+                        "Timed out waiting for prompt field on the AI web page"
+                    )
+                raise RuntimeError(
+                    "Timed out waiting for prompt field on the AI web page"
+                ) from last_exc
+            return remaining_ms
+
         for cycle in range(2):
             frames = _iter_frames()
             for selector in selectors:
                 for frame in frames:
+                    remaining_ms = _remaining_ms_or_raise()
+                    timeout_ms = max(1, min(per_selector_timeout, remaining_ms))
                     try:
-                        element = _try_selector(frame, selector)
+                        element = _try_selector(frame, selector, timeout_ms)
                     except Exception as exc:  # pragma: no cover - defensive
                         last_exc = exc
                         element = None
                     if element:
                         return element
             if cycle == 0:
+                remaining_ms = _remaining_ms_or_raise()
                 try:
-                    page.reload(wait_until="load", timeout=self.timeout_seconds * 1000)
+                    page.reload(
+                        wait_until="load",
+                        timeout=max(1, min(self.timeout_seconds * 1000, remaining_ms)),
+                    )
                 except Exception:
                     pass
 
