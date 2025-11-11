@@ -3,7 +3,7 @@ import json
 import customtkinter as ctk
 from tkinter import messagebox
 
-from modules.ai.local_ai_client import LocalAIClient
+from modules.ai.factory import create_ai_client
 from modules.generic.generic_model_wrapper import GenericModelWrapper
 from modules.helpers.logging_helper import log_module_import
 
@@ -50,7 +50,7 @@ class AuthoringWizardView(ctk.CTkFrame):
         self.places = GenericModelWrapper("places")
         self.factions = GenericModelWrapper("factions")
         self.infos = GenericModelWrapper("informations")
-        self.ai = LocalAIClient()
+        self.ai = create_ai_client()
         # Keep last generated structured data so we can save/check while
         # displaying a human-friendly text view in the UI.
         self._last_npc_data = None
