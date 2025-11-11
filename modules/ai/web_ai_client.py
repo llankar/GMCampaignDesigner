@@ -27,8 +27,12 @@ class WebAIClient(BaseAIClient):
             ConfigHelper.get("AI", "web_conversation_url", fallback=self.base_url)
             or self.base_url
         )
-        self.prompt_selector = ConfigHelper.get(
-            "AI", "web_prompt_selector", fallback="textarea"
+        self.prompt_selectors = self._parse_selector_list(
+            ConfigHelper.get(
+                "AI",
+                "web_prompt_selector",
+                fallback="textarea||div[contenteditable='true']",
+            )
         )
         self.submit_selector = ConfigHelper.get("AI", "web_submit_selector", fallback="")
         self.submit_keys = self._parse_keys(
@@ -79,6 +83,41 @@ class WebAIClient(BaseAIClient):
             return int(str(raw).strip())
         except Exception:
             return default
+
+    @staticmethod
+    def _parse_selector_list(raw: str | Sequence[str] | None) -> list[str]:
+        if not raw:
+            return []
+        if isinstance(raw, str):
+            parts = [item.strip() for item in raw.split("||")]
+        else:
+            parts = [str(item).strip() for item in raw]
+        return [p for p in parts if p]
+
+    def _locate_prompt_field(self, page, wait_seconds: int):
+        selectors = self.prompt_selectors or ["textarea"]
+        last_exc: Exception | None = None
+        for selector in selectors:
+            try:
+                return page.wait_for_selector(
+                    selector, timeout=wait_seconds * 1000, state="visible"
+                )
+            except Exception as exc:
+                last_exc = exc
+        try:
+            page.reload(wait_until="load", timeout=self.timeout_seconds * 1000)
+        except Exception:
+            pass
+        for selector in selectors:
+            try:
+                return page.wait_for_selector(
+                    selector, timeout=wait_seconds * 1000, state="visible"
+                )
+            except Exception as exc:
+                last_exc = exc
+        if last_exc is None:
+            last_exc = RuntimeError("Prompt field not found on the AI web page")
+        raise RuntimeError("Prompt field not found on the AI web page") from last_exc
 
     def _ensure_dependencies(self):
         if self._playwright is not None:
@@ -231,12 +270,7 @@ class WebAIClient(BaseAIClient):
                 wait_seconds = max(1, int(wait_seconds))
             except Exception:
                 wait_seconds = self.timeout_seconds
-            try:
-                field = page.wait_for_selector(
-                    self.prompt_selector, timeout=wait_seconds * 1000
-                )
-            except Exception as exc:
-                raise RuntimeError("Prompt field not found on the AI web page") from exc
+            field = self._locate_prompt_field(page, wait_seconds)
 
             baseline = self._count_responses(page)
 
