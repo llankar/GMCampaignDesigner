@@ -1,15 +1,21 @@
-import requests
+from __future__ import annotations
+
 import json
+import os
 import platform
 import subprocess
 import tempfile
-import os
+from typing import Mapping, Sequence
+
+import requests
+
+from modules.ai.base_client import BaseAIClient
 from modules.helpers.config_helper import ConfigHelper
 from modules.helpers.logging_helper import log_module_import
 
 log_module_import(__name__)
 
-class LocalAIClient:
+class LocalAIClient(BaseAIClient):
     """
     Minimal OpenAI-compatible chat client for local models (e.g., gpt-oss,
     LM Studio, Ollama OpenAI adapter, text-gen webui proxy).
@@ -253,26 +259,21 @@ class LocalAIClient:
         except Exception as e:
             raise RuntimeError(f"Could not parse PowerShell JSON: {e}. Raw: {out[:500]}")
 
-    def chat(self, messages, model=None, temperature=None, max_tokens=None, timeout=600):
+    def chat(
+        self,
+        messages: Sequence[Mapping[str, str]] | str,
+        model: str | None = None,
+        temperature: float | None = None,
+        max_tokens: int | None = None,
+        timeout: int = 600,
+    ):
         """
         Send a chat completion request and return the assistant's text.
 
         messages: list[{role, content}] per OpenAI API
         """
         # Build a single prompt string from chat-style messages
-        def _to_prompt(msgs):
-            if isinstance(msgs, str):
-                return msgs
-            parts = []
-            for m in msgs or []:
-                role = m.get("role", "user")
-                content = m.get("content", "")
-                parts.append(f"{role.capitalize()}: {content}")
-            # End with Assistant: to hint completion
-            parts.append("Assistant:")
-            return "\n".join(parts).strip()
-
-        prompt_text = _to_prompt(messages)
+        prompt_text = BaseAIClient.format_messages(messages)
 
         # Target Ollama/text-gen style endpoint as per template
         # e.g. http://127.0.0.1:11434/api/generate

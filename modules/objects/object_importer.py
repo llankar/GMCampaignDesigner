@@ -6,7 +6,7 @@ from tkinter import messagebox, filedialog
 
 from modules.helpers.text_helpers import ai_text_to_rtf_json
 from modules.generic.generic_model_wrapper import GenericModelWrapper
-from modules.ai.local_ai_client import LocalAIClient
+from modules.ai.factory import create_ai_client
 from modules.helpers.logging_helper import (
     log_function,
     log_info,
@@ -387,7 +387,7 @@ class ObjectImportWindow(ctk.CTkToplevel):
             func_name="ObjectImportWindow._ai_extract_and_import",
         )
         self._set_status("Contacting AI...")
-        client = LocalAIClient()
+        client = create_ai_client()
 
         wrapper = GenericModelWrapper("objects")
         existing = wrapper.load_items()

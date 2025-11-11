@@ -7,6 +7,7 @@ from tkinter import filedialog, messagebox, simpledialog
 import customtkinter as ctk
 from typing import Any
 
+from modules.ai.factory import create_ai_client
 from modules.ai.local_ai_client import LocalAIClient
 from modules.audio.audio_library import AUDIO_EXTENSIONS
 from modules.audio.audio_controller import AudioController, get_audio_controller
@@ -753,7 +754,7 @@ class SoundManagerWindow(ctk.CTkToplevel):
         )
 
     def _invoke_ai_sort(self, audio_files: list[dict[str, str]]) -> dict[str, list[str]]:
-        client = LocalAIClient()
+        client = create_ai_client()
         payload = [
             {
                 "relative_path": entry["relative"],

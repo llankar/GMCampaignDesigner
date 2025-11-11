@@ -6,7 +6,7 @@ from tkinter import messagebox, filedialog
 import threading
 from modules.helpers.text_helpers import format_longtext, ai_text_to_rtf_json
 from modules.generic.generic_model_wrapper import GenericModelWrapper
-from modules.ai.local_ai_client import LocalAIClient
+from modules.ai.factory import create_ai_client
 from modules.helpers.logging_helper import (
     log_function,
     log_info,
@@ -394,7 +394,7 @@ class ScenarioImportWindow(ctk.CTkToplevel):
             if len(stats_examples) >= 3:
                 break
 
-        client = LocalAIClient()
+        client = create_ai_client()
 
         # -------- Phase 1: Outline --------
         outline_schema = {

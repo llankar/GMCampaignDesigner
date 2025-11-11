@@ -20,6 +20,7 @@ import random
 from modules.helpers.text_helpers import format_longtext
 from modules.helpers.text_helpers import ai_text_to_rtf_json
 from modules.helpers.dice_markup import parse_inline_actions
+from modules.ai.factory import create_ai_client
 from modules.ai.local_ai_client import LocalAIClient
 import json
 import ast
@@ -408,7 +409,7 @@ class GenericEditorWindow(ctk.CTkToplevel):
 
     def _get_ai(self):
         if self._ai_client is None:
-            self._ai_client = LocalAIClient()
+            self._ai_client = create_ai_client()
         return self._ai_client
     def _make_richtext_editor(self, parent, initial_text, hide_toolbar=True, max_lines=None):
         """

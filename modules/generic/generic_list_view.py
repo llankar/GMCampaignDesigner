@@ -26,6 +26,7 @@ from modules.audio.entity_audio import (
 from modules.scenarios.gm_screen_view import GMScreenView
 from modules.scenarios.gm_layout_manager import GMScreenLayoutManager
 from modules.ai.authoring_wizard import AuthoringWizardView
+from modules.ai.factory import create_ai_client
 from modules.ai.local_ai_client import LocalAIClient
 import shutil
 from modules.helpers.template_loader import load_template
@@ -2061,7 +2062,7 @@ class GenericListView(ctk.CTkFrame):
             f"Requesting AI categorization for {len(payload)} objects",
             func_name="GenericListView._request_ai_category_assignments",
         )
-        client = LocalAIClient()
+        client = create_ai_client()
         allowed_text = ", ".join(OBJECT_CATEGORY_ALLOWED)
         existing_text = ", ".join(existing_categories) if existing_categories else "None"
         objects_json = json.dumps(payload, ensure_ascii=False, indent=2)
