@@ -5,6 +5,7 @@ import os
 import sys
 import subprocess
 import threading
+from collections import OrderedDict
 import customtkinter as ctk
 import tkinter as tk
 import tkinter.font as tkfont
@@ -225,6 +226,12 @@ class GenericListView(ctk.CTkFrame):
             if "Excerpts" not in self.columns:
                 self.columns.append("Excerpts")
 
+        self._link_column = "_links"
+        self._tree_columns = list(self.columns) + [self._link_column]
+        self._linked_rows = {}
+        self._link_targets = {}
+        self._link_children = {}
+
         # --- Column configuration ---
         self.column_section = f"ColumnSettings_{self.model_wrapper.entity_type}"
         self._load_column_settings()
@@ -332,7 +339,7 @@ class GenericListView(ctk.CTkFrame):
 
         self.tree = ttk.Treeview(
             self.tree_frame,
-            columns=self.columns,
+            columns=self._tree_columns,
             show="tree headings",
             selectmode="extended",
             style="Custom.Treeview"
@@ -349,6 +356,15 @@ class GenericListView(ctk.CTkFrame):
             self.tree.heading(col, text=col,
                             command=lambda c=col: self.sort_column(c))
             self.tree.column(col, width=150, anchor="w")
+
+        self.tree.heading(self._link_column, text="")
+        self.tree.column(
+            self._link_column,
+            width=30,
+            minwidth=24,
+            anchor="center",
+            stretch=False,
+        )
 
         self._apply_column_settings()
 
@@ -467,6 +483,9 @@ class GenericListView(ctk.CTkFrame):
         self.tree.delete(*self.tree.get_children())
         self._last_tree_selection = set()
         self._cell_texts.clear()
+        self._linked_rows.clear()
+        self._link_targets.clear()
+        self._link_children.clear()
         self._base_to_iids = {}
         self.batch_index = 0
         total_items = len(self.filtered_items)
@@ -801,10 +820,19 @@ class GenericListView(ctk.CTkFrame):
         self._save_column_settings()
 
     def on_tree_click(self, event):
+        column = self._normalize_column_id(self.tree.identify_column(event.x))
+        row = self.tree.identify_row(event.y)
+        if column == self._link_column and row:
+            if self._linked_rows.get(row):
+                self.tree.selection_set(row)
+                self.tree.focus(row)
+                self._toggle_linked_rows(row)
+            self.dragging_iid = None
+            return
         if self.group_column or self.filtered_items != self.items:
             self.dragging_iid = None
             return
-        self.dragging_iid = self.tree.identify_row(event.y)
+        self.dragging_iid = row
         self.start_index = self.tree.index(self.dragging_iid) if self.dragging_iid else None
 
     def on_tree_drag(self, event):
@@ -915,11 +943,15 @@ class GenericListView(ctk.CTkFrame):
             base_id = sanitize_id(raw or f"item_{int(time.time()*1000)}").lower()
             iid = unique_iid(self.tree, base_id)
             name_text = self._format_cell("#0", item.get(self.unique_field, ""), iid)
-            vals = tuple(
+            linked = self._collect_linked_entities(item)
+            self._linked_rows[iid] = linked
+            self._link_children.pop(iid, None)
+            vals = [
                 self._format_cell(c, self._get_display_value(item, c), iid) for c in self.columns
-            )
+            ]
+            vals.append("+" if linked else "")
             try:
-                self.tree.insert("", "end", iid=iid, text=name_text, values=vals)
+                self.tree.insert("", "end", iid=iid, text=name_text, values=tuple(vals))
                 color = self.row_colors.get(base_id)
                 if color:
                     self.tree.item(iid, tags=(f"color_{color}",))
@@ -950,7 +982,14 @@ class GenericListView(ctk.CTkFrame):
         for group_val in sorted(grouped.keys()):
             base_group_id = sanitize_id(f"group_{group_val}")
             group_id = unique_iid(self.tree, base_group_id)
-            self.tree.insert("", "end", iid=group_id, text=group_val, open=False)
+            self.tree.insert(
+                "",
+                "end",
+                iid=group_id,
+                text=group_val,
+                values=self._blank_row_values(),
+                open=False,
+            )
             for item in grouped[group_val]:
                 raw = item.get(self.unique_field, "")
                 if isinstance(raw, dict):
@@ -958,11 +997,15 @@ class GenericListView(ctk.CTkFrame):
                 base_iid = sanitize_id(raw or f"item_{int(time.time()*1000)}").lower()
                 iid = unique_iid(self.tree, base_iid)
                 name_text = self._format_cell("#0", item.get(self.unique_field, ""), iid)
-                vals = tuple(
+                linked = self._collect_linked_entities(item)
+                self._linked_rows[iid] = linked
+                self._link_children.pop(iid, None)
+                vals = [
                     self._format_cell(c, self._get_display_value(item, c), iid) for c in self.columns
-                )
+                ]
+                vals.append("+" if linked else "")
                 try:
-                    self.tree.insert(group_id, "end", iid=iid, text=name_text, values=vals)
+                    self.tree.insert(group_id, "end", iid=iid, text=name_text, values=tuple(vals))
                     color = self.row_colors.get(base_iid)
                     if color:
                         self.tree.item(iid, tags=(f"color_{color}",))
@@ -972,6 +1015,199 @@ class GenericListView(ctk.CTkFrame):
                 except Exception as e:
                     print("[ERROR] inserting item:", e, iid, vals)
         self._update_tree_selection_tags()
+
+    def _collect_linked_entities(self, item):
+        result = OrderedDict()
+        fields = self.template.get("fields", []) if isinstance(self.template, dict) else []
+        if not isinstance(fields, list):
+            return result
+
+        label_to_slug = {label: slug for slug, label in ENTITY_DISPLAY_LABELS.items()}
+        normalized_labels = {label.lower(): slug for label, slug in label_to_slug.items()}
+
+        for field in fields:
+            if not isinstance(field, dict):
+                continue
+            field_type = str(field.get("type", "")).strip().lower()
+            if field_type not in {"list", "list_longtext"}:
+                continue
+
+            linked_label = str(field.get("linked_type", "")).strip()
+            field_label = str(field.get("label") or field.get("name") or "").strip()
+
+            slug = None
+            if linked_label:
+                candidate = linked_label.lower()
+                if candidate in ENTITY_DISPLAY_LABELS:
+                    slug = candidate
+                else:
+                    slug = label_to_slug.get(linked_label) or normalized_labels.get(candidate)
+                    if not slug:
+                        slug = candidate
+            elif field_label:
+                slug = label_to_slug.get(field_label) or normalized_labels.get(field_label.lower())
+                if not slug and field_label:
+                    slug = field_label.replace(" ", "_").lower()
+
+            if not slug:
+                continue
+
+            slug = slug.lower()
+
+            values = item.get(field.get("name")) if isinstance(item, dict) else None
+            if not isinstance(values, (list, tuple)):
+                continue
+
+            was_existing = slug in result
+            collected = result.setdefault(slug, [])
+            initial_len = len(collected)
+            seen = {str(existing).casefold() for existing in collected if isinstance(existing, str)}
+            for entry in values:
+                name = None
+                if isinstance(entry, dict):
+                    for key in ("Name", "name", "Title", "title", "Target", "target", "Text", "text", "value", "Value"):
+                        value = entry.get(key)
+                        if value:
+                            name = value
+                            break
+                    if name is None and len(entry) == 1:
+                        try:
+                            name = next(iter(entry.values()))
+                        except StopIteration:
+                            name = None
+                else:
+                    name = entry
+
+                name = self.clean_value(name)
+                if not name:
+                    continue
+                key = name.casefold()
+                if key in seen:
+                    continue
+                seen.add(key)
+                collected.append(name)
+
+            if not was_existing and len(collected) == initial_len:
+                result.pop(slug, None)
+
+        return result
+
+    def _display_label_for_slug(self, slug):
+        if not slug:
+            return ""
+        if slug in ENTITY_DISPLAY_LABELS:
+            return ENTITY_DISPLAY_LABELS[slug]
+        slug_lower = str(slug).lower()
+        for key, label in ENTITY_DISPLAY_LABELS.items():
+            if key.lower() == slug_lower or label.lower() == slug_lower:
+                return label
+        return str(slug).replace("_", " ").title()
+
+    def _blank_row_values(self):
+        return tuple("" for _ in self.columns) + ("",)
+
+    def _toggle_linked_rows(self, parent_iid):
+        groups = self._linked_rows.get(parent_iid)
+        if not groups:
+            return
+        if parent_iid in self._link_children:
+            self._collapse_linked_rows(parent_iid)
+        else:
+            self._expand_linked_rows(parent_iid, groups)
+
+    def _expand_linked_rows(self, parent_iid, groups):
+        headers = []
+        name_nodes = []
+        self.tree.item(parent_iid, open=True)
+        for slug, names in groups.items():
+            if not names:
+                continue
+            header_base = sanitize_id(f"{parent_iid}_{slug}_group") or f"{parent_iid}_{slug}_group"
+            header_iid = unique_iid(self.tree, header_base)
+            header_label = self._display_label_for_slug(slug)
+            self.tree.insert(parent_iid, "end", iid=header_iid, text=header_label, values=self._blank_row_values())
+            self.tree.item(header_iid, open=True)
+            headers.append(header_iid)
+            for name in names:
+                name_base = sanitize_id(f"{parent_iid}_{slug}_{name}") or f"{parent_iid}_{slug}_{int(time.time()*1000)}"
+                name_iid = unique_iid(self.tree, name_base)
+                self.tree.insert(header_iid, "end", iid=name_iid, text=name, values=self._blank_row_values())
+                self._link_targets[name_iid] = (slug, name)
+                name_nodes.append(name_iid)
+        if headers:
+            self._link_children[parent_iid] = {"headers": headers, "names": name_nodes}
+            self.tree.set(parent_iid, self._link_column, "–")
+
+    def _collapse_linked_rows(self, parent_iid):
+        info = self._link_children.pop(parent_iid, None)
+        if not info:
+            return
+        for name_iid in info.get("names", []):
+            self._link_targets.pop(name_iid, None)
+        for header_iid in info.get("headers", []):
+            if self.tree.exists(header_iid):
+                self.tree.delete(header_iid)
+        self.tree.set(parent_iid, self._link_column, "+")
+
+    def _open_link_target(self, iid):
+        target = self._link_targets.get(iid)
+        if not target:
+            return
+        slug, name = target
+        try:
+            wrapper = GenericModelWrapper(slug)
+        except Exception as exc:
+            messagebox.showerror("Open Linked Entity", f"Unable to prepare editor for '{slug}': {exc}")
+            return
+        try:
+            template = load_template(slug)
+        except Exception as exc:
+            messagebox.showerror("Open Linked Entity", f"Unable to load template for '{slug}': {exc}")
+            return
+        try:
+            items = wrapper.load_items()
+        except Exception as exc:
+            messagebox.showerror("Open Linked Entity", f"Unable to load '{slug}' entries: {exc}")
+            return
+
+        key_field = "Title" if slug in {"scenarios", "books"} else "Name"
+        target_item = None
+        for record in items:
+            if str(record.get(key_field, "")) == name:
+                target_item = record
+                break
+
+        if not target_item:
+            display_label = self._display_label_for_slug(slug) or slug
+            messagebox.showerror(
+                "Open Linked Entity",
+                f"Could not find '{name}' in {display_label}.",
+            )
+            return
+
+        editor = GenericEditorWindow(
+            self.master,
+            target_item,
+            template,
+            wrapper,
+            creation_mode=False,
+        )
+        self.master.wait_window(editor)
+
+        if getattr(editor, "saved", False):
+            try:
+                wrapper.save_items(items)
+            except Exception as exc:
+                messagebox.showerror("Open Linked Entity", f"Failed to save changes: {exc}")
+                return
+            if slug == self.model_wrapper.entity_type:
+                self.items = self.model_wrapper.load_items()
+                current_query = self.search_var.get() if hasattr(self, "search_var") else ""
+                if current_query:
+                    self.filter_items(current_query)
+                else:
+                    self.filtered_items = list(self.items)
+                    self.refresh_list()
 
     def clean_value(self, val):
         if val is None:
@@ -1338,7 +1574,7 @@ class GenericListView(ctk.CTkFrame):
     def _format_cell(self, column_id, value, iid=None):
         """Prepare a value for display in the tree, truncating if needed."""
         text = self.clean_value(value)
-        if iid is not None:
+        if iid is not None and column_id != self._link_column:
             self._cell_texts[(iid, column_id)] = text
         return self._truncate_text(text, column_id)
 
@@ -1402,6 +1638,9 @@ class GenericListView(ctk.CTkFrame):
         # Ensure the identified row becomes the active selection for consistent focus behaviour
         self.tree.selection_set(iid)
         self.tree.focus(iid)
+        if iid in self._link_targets:
+            self._open_link_target(iid)
+            return
         item, _ = self._find_item_by_iid(iid)
         if item:
             modifiers = getattr(event, "state", 0)
@@ -2854,6 +3093,8 @@ class GenericListView(ctk.CTkFrame):
             except tk.TclError:
                 continue
         display = [c for c in self.column_order if c not in self.hidden_columns]
+        if self._link_column not in display:
+            display = display + [self._link_column]
         self.tree["displaycolumns"] = display
 
     def _save_column_settings(self):
