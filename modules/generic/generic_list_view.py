@@ -1033,6 +1033,12 @@ class GenericListView(ctk.CTkFrame):
             if field_type not in {"list", "list_longtext"}:
                 continue
 
+            if field_type == "list_longtext" and not field.get("linked_type"):
+                # Long-text lists without an explicit linked type (e.g. scenario scenes)
+                # represent inline content rather than linked entities. These should not
+                # appear as expandable rows in the tree view.
+                continue
+
             linked_label = str(field.get("linked_type", "")).strip()
             field_label = str(field.get("label") or field.get("name") or "").strip()
 
