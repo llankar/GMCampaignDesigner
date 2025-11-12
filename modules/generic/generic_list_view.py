@@ -6,6 +6,7 @@ import sys
 import subprocess
 import threading
 from collections import OrderedDict
+import ast
 import customtkinter as ctk
 import tkinter as tk
 import tkinter.font as tkfont
@@ -1054,8 +1055,37 @@ class GenericListView(ctk.CTkFrame):
 
             slug = slug.lower()
 
-            values = item.get(field.get("name")) if isinstance(item, dict) else None
-            if not isinstance(values, (list, tuple)):
+            raw_values = item.get(field.get("name")) if isinstance(item, dict) else None
+            values = []
+            if isinstance(raw_values, (list, tuple)):
+                values = list(raw_values)
+            elif isinstance(raw_values, str):
+                stripped = raw_values.strip()
+                if stripped:
+                    parsed = None
+                    if stripped.startswith(("[", "{", '"')):
+                        try:
+                            parsed = json.loads(stripped)
+                        except Exception:
+                            try:
+                                parsed = ast.literal_eval(stripped)
+                            except Exception:
+                                parsed = None
+                    if isinstance(parsed, (list, tuple)):
+                        values = list(parsed)
+                    elif isinstance(parsed, dict):
+                        values = [parsed]
+                    elif isinstance(parsed, str):
+                        values = [parsed]
+                    elif parsed is not None:
+                        values = [parsed]
+                    if not values:
+                        parts = [p.strip() for p in re.split(r"[\n;,]+", stripped) if p.strip()]
+                        values = parts
+            elif raw_values is not None:
+                values = [raw_values]
+
+            if not values:
                 continue
 
             was_existing = slug in result
