@@ -228,7 +228,7 @@ class GenericListView(ctk.CTkFrame):
                 self.columns.append("Excerpts")
 
         self._link_column = "_links"
-        self._tree_columns = list(self.columns) + [self._link_column]
+        self._tree_columns = [self._link_column] + list(self.columns)
         self._linked_rows = {}
         self._link_targets = {}
         self._link_children = {}
@@ -947,10 +947,10 @@ class GenericListView(ctk.CTkFrame):
             linked = self._collect_linked_entities(item)
             self._linked_rows[iid] = linked
             self._link_children.pop(iid, None)
-            vals = [
+            vals = ["+" if linked else ""]
+            vals.extend(
                 self._format_cell(c, self._get_display_value(item, c), iid) for c in self.columns
-            ]
-            vals.append("+" if linked else "")
+            )
             try:
                 self.tree.insert("", "end", iid=iid, text=name_text, values=tuple(vals))
                 color = self.row_colors.get(base_id)
@@ -1001,10 +1001,10 @@ class GenericListView(ctk.CTkFrame):
                 linked = self._collect_linked_entities(item)
                 self._linked_rows[iid] = linked
                 self._link_children.pop(iid, None)
-                vals = [
+                vals = ["+" if linked else ""]
+                vals.extend(
                     self._format_cell(c, self._get_display_value(item, c), iid) for c in self.columns
-                ]
-                vals.append("+" if linked else "")
+                )
                 try:
                     self.tree.insert(group_id, "end", iid=iid, text=name_text, values=tuple(vals))
                     color = self.row_colors.get(base_iid)
@@ -1134,7 +1134,7 @@ class GenericListView(ctk.CTkFrame):
         return str(slug).replace("_", " ").title()
 
     def _blank_row_values(self):
-        return tuple("" for _ in self.columns) + ("",)
+        return ("",) + tuple("" for _ in self.columns)
 
     def _toggle_linked_rows(self, parent_iid):
         groups = self._linked_rows.get(parent_iid)
@@ -3125,6 +3125,7 @@ class GenericListView(ctk.CTkFrame):
         display = [c for c in self.column_order if c not in self.hidden_columns]
         if self._link_column not in display:
             display = display + [self._link_column]
+        display = [self._link_column] + [c for c in display if c != self._link_column]
         self.tree["displaycolumns"] = display
 
     def _save_column_settings(self):
