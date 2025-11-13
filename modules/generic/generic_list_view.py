@@ -1115,31 +1115,64 @@ class GenericListView(ctk.CTkFrame):
             was_existing = slug in result
             collected = result.setdefault(slug, [])
             initial_len = len(collected)
-            seen = {str(existing).casefold() for existing in collected if isinstance(existing, str)}
+            seen = set()
+            for existing in collected:
+                if isinstance(existing, dict):
+                    key_value = existing.get("display") or ""
+                else:
+                    key_value = existing
+                if not isinstance(key_value, str):
+                    key_value = str(key_value)
+                if key_value:
+                    seen.add(key_value.casefold())
             for entry in values:
-                name = None
+                display_name = self.clean_value(entry)
+                if not display_name:
+                    continue
+                display_key = display_name.casefold()
+                if display_key in seen:
+                    continue
+
+                lookup_candidates = []
                 if isinstance(entry, dict):
-                    for key in ("Name", "name", "Title", "title", "Target", "target", "Text", "text", "value", "Value"):
+                    for key in (
+                        "Name",
+                        "name",
+                        "Title",
+                        "title",
+                        "Target",
+                        "target",
+                        "Text",
+                        "text",
+                        "value",
+                        "Value",
+                    ):
                         value = entry.get(key)
                         if value:
-                            name = value
-                            break
-                    if name is None and len(entry) == 1:
+                            lookup_candidates.append(value)
+                    if not lookup_candidates and len(entry) == 1:
                         try:
-                            name = next(iter(entry.values()))
+                            lookup_candidates.append(next(iter(entry.values())))
                         except StopIteration:
-                            name = None
+                            pass
                 else:
-                    name = entry
+                    lookup_candidates.append(entry)
 
-                name = self.clean_value(name)
-                if not name:
-                    continue
-                key = name.casefold()
-                if key in seen:
-                    continue
-                seen.add(key)
-                collected.append(name)
+                lookup_candidates.append(display_name)
+                lookup_values = []
+                lookup_seen = set()
+                for candidate in lookup_candidates:
+                    cleaned = self.clean_value(candidate)
+                    if not cleaned:
+                        continue
+                    normalized = cleaned.casefold()
+                    if normalized in lookup_seen:
+                        continue
+                    lookup_seen.add(normalized)
+                    lookup_values.append(cleaned)
+
+                collected.append({"display": display_name, "lookups": lookup_values})
+                seen.add(display_key)
 
             if not was_existing and len(collected) == initial_len:
                 result.pop(slug, None)
@@ -1185,11 +1218,43 @@ class GenericListView(ctk.CTkFrame):
             self.tree.insert(parent_iid, "end", iid=header_iid, text=header_label, values=self._blank_row_values())
             self.tree.item(header_iid, open=True)
             headers.append(header_iid)
-            for name in names:
-                name_base = sanitize_id(f"{parent_iid}_{slug}_{name}") or f"{parent_iid}_{slug}_{int(time.time()*1000)}"
+            for entry in names:
+                if isinstance(entry, dict):
+                    display_name = (
+                        entry.get("display")
+                        or entry.get("name")
+                        or entry.get("title")
+                        or ""
+                    )
+                else:
+                    display_name = entry
+
+                if not isinstance(display_name, str):
+                    display_name = str(display_name)
+                display_name = display_name.strip()
+                if not display_name:
+                    display_name = "Unnamed"
+
+                name_base = (
+                    sanitize_id(f"{parent_iid}_{slug}_{display_name}")
+                    or f"{parent_iid}_{slug}_{int(time.time()*1000)}"
+                )
                 name_iid = unique_iid(self.tree, name_base)
-                self.tree.insert(header_iid, "end", iid=name_iid, text=name, values=self._blank_row_values())
-                self._link_targets[name_iid] = (slug, name)
+                self.tree.insert(
+                    header_iid,
+                    "end",
+                    iid=name_iid,
+                    text=display_name,
+                    values=self._blank_row_values(),
+                )
+                if isinstance(entry, dict):
+                    lookup_payload = dict(entry)
+                    lookup_payload.setdefault("display", display_name)
+                    if not lookup_payload.get("lookups"):
+                        lookup_payload["lookups"] = [display_name]
+                else:
+                    lookup_payload = {"display": display_name, "lookups": [display_name]}
+                self._link_targets[name_iid] = (slug, lookup_payload)
                 name_nodes.append(name_iid)
         if headers:
             self._link_children[parent_iid] = {"headers": headers, "names": name_nodes}
@@ -1220,7 +1285,66 @@ class GenericListView(ctk.CTkFrame):
         target = self._link_targets.get(iid)
         if not target:
             return
-        slug, name = target
+        slug, payload = target
+        display_name = ""
+        lookup_values = []
+        if isinstance(payload, dict):
+            display_name = (
+                payload.get("display")
+                or payload.get("name")
+                or payload.get("title")
+                or ""
+            )
+            raw_lookups = payload.get("lookups")
+            if isinstance(raw_lookups, (list, tuple, set)):
+                lookup_values.extend(raw_lookups)
+            elif isinstance(raw_lookups, str):
+                lookup_values.append(raw_lookups)
+            elif raw_lookups is not None:
+                lookup_values.append(raw_lookups)
+            for key in (
+                "Name",
+                "name",
+                "Title",
+                "title",
+                "Target",
+                "target",
+                "Text",
+                "text",
+                "value",
+                "Value",
+            ):
+                if key in payload:
+                    lookup_values.append(payload.get(key))
+        else:
+            display_name = str(payload)
+            lookup_values.append(payload)
+
+        if not display_name:
+            for candidate in lookup_values:
+                candidate_str = self.clean_value(candidate)
+                if candidate_str:
+                    display_name = candidate_str
+                    break
+
+        normalized_lookups = set()
+        for candidate in lookup_values:
+            candidate_str = self.clean_value(candidate)
+            if not candidate_str:
+                continue
+            normalized = candidate_str.casefold()
+            if normalized in normalized_lookups:
+                continue
+            normalized_lookups.add(normalized)
+
+        if not normalized_lookups and display_name:
+            display_candidate = self.clean_value(display_name)
+            if display_candidate:
+                normalized_lookups.add(display_candidate.casefold())
+
+        if not normalized_lookups:
+            return
+
         try:
             wrapper = GenericModelWrapper(slug)
         except Exception as exc:
@@ -1239,7 +1363,6 @@ class GenericListView(ctk.CTkFrame):
 
         key_field = "Title" if slug in {"scenarios", "books"} else "Name"
         target_item = None
-        lookup_key = name.casefold()
         for record in items:
             raw_value = record.get(key_field, "")
             candidates = []
@@ -1258,16 +1381,25 @@ class GenericListView(ctk.CTkFrame):
                     "value",
                     "Value",
                 ):
-                    candidates.append(str(raw_value.get(key, "")))
+                    candidates.append(raw_value.get(key, ""))
+                if len(raw_value) == 1:
+                    try:
+                        candidates.append(next(iter(raw_value.values())))
+                    except StopIteration:
+                        pass
+                candidates.append(raw_value)
             else:
-                candidates.append(str(raw_value))
+                candidates.append(raw_value)
 
             cleaned_candidate = self.clean_value(raw_value)
             if cleaned_candidate:
-                candidates.append(str(cleaned_candidate))
+                candidates.append(cleaned_candidate)
 
             for candidate in candidates:
-                if candidate and candidate.casefold() == lookup_key:
+                candidate_str = self.clean_value(candidate)
+                if not candidate_str:
+                    continue
+                if candidate_str.casefold() in normalized_lookups:
                     target_item = record
                     break
             if target_item:
@@ -1277,7 +1409,7 @@ class GenericListView(ctk.CTkFrame):
             display_label = self._display_label_for_slug(slug) or slug
             messagebox.showerror(
                 "Open Linked Entity",
-                f"Could not find '{name}' in {display_label}.",
+                f"Could not find '{display_name}' in {display_label}.",
             )
             return
 
