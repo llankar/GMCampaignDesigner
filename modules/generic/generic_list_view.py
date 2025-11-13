@@ -227,8 +227,8 @@ class GenericListView(ctk.CTkFrame):
             if "Excerpts" not in self.columns:
                 self.columns.append("Excerpts")
 
-        self._link_column = "_links"
-        self._tree_columns = [self._link_column] + list(self.columns)
+        self._link_column = None
+        self._tree_columns = list(self.columns)
         self._linked_rows = {}
         self._link_targets = {}
         self._link_children = {}
@@ -361,14 +361,15 @@ class GenericListView(ctk.CTkFrame):
                             command=lambda c=col: self.sort_column(c))
             self.tree.column(col, width=150, anchor="w")
 
-        self.tree.heading(self._link_column, text="")
-        self.tree.column(
-            self._link_column,
-            width=30,
-            minwidth=24,
-            anchor="center",
-            stretch=False,
-        )
+        if self._link_column:
+            self.tree.heading(self._link_column, text="")
+            self.tree.column(
+                self._link_column,
+                width=30,
+                minwidth=24,
+                anchor="center",
+                stretch=False,
+            )
 
         self._apply_column_settings()
 
@@ -828,7 +829,7 @@ class GenericListView(ctk.CTkFrame):
     def on_tree_click(self, event):
         column = self._normalize_column_id(self.tree.identify_column(event.x))
         row = self.tree.identify_row(event.y)
-        if column == self._link_column and row:
+        if self._link_column and column == self._link_column and row:
             if self._linked_rows.get(row):
                 self.tree.selection_set(row)
                 self.tree.focus(row)
@@ -958,7 +959,9 @@ class GenericListView(ctk.CTkFrame):
             self._link_children.pop(iid, None)
             self._auto_expanded_rows.discard(iid)
             self._pinned_linked_rows.discard(iid)
-            vals = ["+" if linked else ""]
+            vals = []
+            if self._link_column:
+                vals.append("+" if linked else "")
             vals.extend(
                 self._format_cell(c, self._get_display_value(item, c), iid) for c in self.columns
             )
@@ -1014,7 +1017,9 @@ class GenericListView(ctk.CTkFrame):
                 self._link_children.pop(iid, None)
                 self._auto_expanded_rows.discard(iid)
                 self._pinned_linked_rows.discard(iid)
-                vals = ["+" if linked else ""]
+                vals = []
+                if self._link_column:
+                    vals.append("+" if linked else "")
                 vals.extend(
                     self._format_cell(c, self._get_display_value(item, c), iid) for c in self.columns
                 )
@@ -1153,7 +1158,10 @@ class GenericListView(ctk.CTkFrame):
         return str(slug).replace("_", " ").title()
 
     def _blank_row_values(self):
-        return ("",) + tuple("" for _ in self.columns)
+        values = tuple("" for _ in self.columns)
+        if self._link_column:
+            return ("",) + values
+        return values
 
     def _toggle_linked_rows(self, parent_iid):
         groups = self._linked_rows.get(parent_iid)
@@ -1185,7 +1193,8 @@ class GenericListView(ctk.CTkFrame):
                 name_nodes.append(name_iid)
         if headers:
             self._link_children[parent_iid] = {"headers": headers, "names": name_nodes}
-            self.tree.set(parent_iid, self._link_column, "–")
+            if self._link_column:
+                self.tree.set(parent_iid, self._link_column, "–")
             if auto:
                 self._auto_expanded_rows.add(parent_iid)
                 self._pinned_linked_rows.discard(parent_iid)
@@ -1202,7 +1211,8 @@ class GenericListView(ctk.CTkFrame):
         for header_iid in info.get("headers", []):
             if self.tree.exists(header_iid):
                 self.tree.delete(header_iid)
-        self.tree.set(parent_iid, self._link_column, "+")
+        if self._link_column:
+            self.tree.set(parent_iid, self._link_column, "+")
         self._auto_expanded_rows.discard(parent_iid)
         self._pinned_linked_rows.discard(parent_iid)
 
@@ -1631,7 +1641,7 @@ class GenericListView(ctk.CTkFrame):
     def _format_cell(self, column_id, value, iid=None):
         """Prepare a value for display in the tree, truncating if needed."""
         text = self.clean_value(value)
-        if iid is not None and column_id != self._link_column:
+        if iid is not None and column_id != "#0" and column_id != self._link_column:
             self._cell_texts[(iid, column_id)] = text
         return self._truncate_text(text, column_id)
 
@@ -2796,7 +2806,15 @@ class GenericListView(ctk.CTkFrame):
             focus_iid = self.tree.focus()
             if focus_iid not in current_selection:
                 self.tree.focus(current_selection[0])
-        if not self._link_toggle_in_progress:
+        multi_select = len(current_selection) > 1
+        if multi_select and current_selection:
+            first_iid = current_selection[0]
+            if (
+                first_iid in self._auto_expanded_rows
+                and first_iid not in self._pinned_linked_rows
+            ):
+                self._collapse_linked_rows(first_iid)
+        if not self._link_toggle_in_progress and not multi_select:
             for iid in newly_selected:
                 if iid in self._link_children:
                     continue
@@ -3164,9 +3182,10 @@ class GenericListView(ctk.CTkFrame):
             except tk.TclError:
                 continue
         display = [c for c in self.column_order if c not in self.hidden_columns]
-        if self._link_column not in display:
-            display = display + [self._link_column]
-        display = [self._link_column] + [c for c in display if c != self._link_column]
+        if self._link_column:
+            if self._link_column not in display:
+                display = display + [self._link_column]
+            display = [self._link_column] + [c for c in display if c != self._link_column]
         self.tree["displaycolumns"] = display
 
     def _save_column_settings(self):
