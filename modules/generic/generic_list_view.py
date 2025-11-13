@@ -234,6 +234,8 @@ class GenericListView(ctk.CTkFrame):
         self._link_children = {}
         self._auto_expanded_rows = set()
         self._pinned_linked_rows = set()
+        # Remember last row under pointer to make double-click robust
+        self._last_pointer_row = None
         self._link_toggle_in_progress = False
 
         # --- Column configuration ---
@@ -829,6 +831,8 @@ class GenericListView(ctk.CTkFrame):
     def on_tree_click(self, event):
         column = self._normalize_column_id(self.tree.identify_column(event.x))
         row = self.tree.identify_row(event.y)
+        # Track pointer row for double-click targeting independent of selection
+        self._last_pointer_row = row
         if self._link_column and column == self._link_column and row:
             if self._linked_rows.get(row):
                 self.tree.selection_set(row)
@@ -838,6 +842,11 @@ class GenericListView(ctk.CTkFrame):
                     self._toggle_linked_rows(row)
                 finally:
                     self._link_toggle_in_progress = False
+            self.dragging_iid = None
+            return
+        # Prevent drag operations on non-root rows (e.g., linked headers/names)
+        # so clicking a sub-entity does not move it to the top level.
+        if row and self.tree.parent(row) != "":
             self.dragging_iid = None
             return
         if self.group_column or self.filtered_items != self.items:
@@ -855,10 +864,19 @@ class GenericListView(ctk.CTkFrame):
         if self.group_column or self.filtered_items != self.items:
             self.dragging_iid = None
             return
+        # Do not allow dragging of non-root rows (linked children/headers)
+        if self.tree.parent(self.dragging_iid) != "":
+            self.dragging_iid = None
+            return
         target_iid = self.tree.identify_row(event.y)
         if not target_iid:
             target_index = len(self.tree.get_children()) - 1
         else:
+            # Normalize target to its root ancestor to keep moves within top level
+            parent = self.tree.parent(target_iid)
+            while parent != "":
+                target_iid = parent
+                parent = self.tree.parent(target_iid)
             target_index = self.tree.index(target_iid)
         if target_index > self.start_index:
             target_index -= 1
@@ -1855,19 +1873,20 @@ class GenericListView(ctk.CTkFrame):
         self.refresh_list()
 
     def on_double_click(self, event):
-        # Use the row under the mouse to avoid stale focus
-        iid = self.tree.identify_row(event.y)
+        # Resolve target strictly from pointer position to avoid stale selection
+        click_iid = self.tree.identify_row(event.y)
+        iid = click_iid or self._last_pointer_row
         if not iid:
-            # Fallback to the active selection or current focus
+            # Fallback to selection/focus only as last resort
             selection = self.tree.selection()
             iid = selection[0] if selection else self.tree.focus()
         if not iid:
             return
-        # Ensure the identified row becomes the active selection for consistent focus behaviour
-        self.tree.selection_set(iid)
-        self.tree.focus(iid)
+        # Do not force selection changes here; it can interfere with child targeting
         if iid in self._link_targets:
             self._open_link_target(iid)
+            # Clear pointer snapshot after handling
+            self._last_pointer_row = None
             return
         item, _ = self._find_item_by_iid(iid)
         if item:
@@ -1879,6 +1898,8 @@ class GenericListView(ctk.CTkFrame):
                 self.open_book(item)
             else:
                 self._edit_item(item)
+        # Clear pointer snapshot after handling
+        self._last_pointer_row = None
 
     def on_right_click(self, event):
         region = self.tree.identify("region", event.x, event.y)
@@ -2957,6 +2978,14 @@ class GenericListView(ctk.CTkFrame):
         selection_set = {iid for iid in current_selection}
         newly_selected = selection_set - previous_selection
         deselected = previous_selection - selection_set
+        # If a linked child/header is selected, avoid auto-collapsing its parent.
+        parents_with_selected_children = set()
+        if selection_set and self._link_children:
+            for parent_iid, info in self._link_children.items():
+                names = set(info.get("names", []))
+                headers = set(info.get("headers", []))
+                if names.intersection(selection_set) or headers.intersection(selection_set):
+                    parents_with_selected_children.add(parent_iid)
         selected = set()
         for iid in current_selection:
             _, base_id = self._find_item_by_iid(iid)
@@ -2973,6 +3002,7 @@ class GenericListView(ctk.CTkFrame):
             if (
                 first_iid in self._auto_expanded_rows
                 and first_iid not in self._pinned_linked_rows
+                and first_iid not in parents_with_selected_children
             ):
                 self._collapse_linked_rows(first_iid)
         if not self._link_toggle_in_progress and not multi_select:
@@ -2983,7 +3013,11 @@ class GenericListView(ctk.CTkFrame):
                 if groups:
                     self._expand_linked_rows(iid, groups, auto=True)
         for iid in deselected:
-            if iid in self._auto_expanded_rows and iid not in self._pinned_linked_rows:
+            if (
+                iid in self._auto_expanded_rows
+                and iid not in self._pinned_linked_rows
+                and iid not in parents_with_selected_children
+            ):
                 self._collapse_linked_rows(iid)
         self._update_tree_selection_tags(current_selection)
         self._update_bulk_controls()
