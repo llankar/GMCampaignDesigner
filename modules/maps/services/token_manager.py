@@ -112,6 +112,12 @@ _HP_LABEL_PATTERNS = {
     "PV": re.compile(r"\bPV\b", re.IGNORECASE),
 }
 
+_DEFENSE_LABEL_PATTERNS = {
+    "DEF": re.compile(r"\bDEF(?:ENSE)?\b", re.IGNORECASE),
+    "AC": re.compile(r"\bAC\b", re.IGNORECASE),
+    "Armor Class": re.compile(r"\bArmor\s*Class\b", re.IGNORECASE),
+}
+
 
 def _extract_first_integer(segment: str) -> Optional[int]:
     """Return the first integer not part of a dice expression in *segment*."""
@@ -175,6 +181,41 @@ def _extract_entity_hp_value(entity_type: str, entity_record: Any) -> Optional[i
                 value = _extract_first_integer(segment)
                 if value is not None:
                     return value
+    return None
+
+
+def _extract_entity_defense_value(
+    entity_type: str,
+    entity_record: Any,
+) -> Optional[tuple[str, int]]:
+    """Inspect *entity_record* and return a defense label/value pair if available."""
+
+    if not isinstance(entity_record, dict):
+        return None
+
+    prioritized_fields: Tuple[str, ...]
+    entity_type_normalized = str(entity_type or "").strip()
+    if entity_type_normalized in ("Creature", "PC"):
+        prioritized_fields = ("Stats", "Traits")
+    elif entity_type_normalized == "NPC":
+        prioritized_fields = ("Traits", "Stats")
+    else:
+        prioritized_fields = ("Stats", "Traits")
+
+    texts: List[str] = []
+    for field in prioritized_fields:
+        raw_value = entity_record.get(field)
+        normalized = _normalize_longtext_to_text(raw_value)
+        if normalized:
+            texts.append(normalized)
+
+    for label, pattern in _DEFENSE_LABEL_PATTERNS.items():
+        for text in texts:
+            for match in pattern.finditer(text):
+                segment = text[match.end(): match.end() + 200]
+                value = _extract_first_integer(segment)
+                if value is not None:
+                    return label, value
     return None
 
 
@@ -263,6 +304,11 @@ def add_token(self, path, entity_type, entity_name, entity_record=None):
     record = entity_record or {}
     extracted_hp = _extract_entity_hp_value(entity_type, record)
     default_hp = extracted_hp if extracted_hp is not None else 10
+    defense_info = _extract_entity_defense_value(entity_type, record)
+    if defense_info:
+        defense_label, defense_value = defense_info
+    else:
+        defense_label, defense_value = "", None
 
     token = {
         "type":         "token",
@@ -277,6 +323,8 @@ def add_token(self, path, entity_type, entity_name, entity_record=None):
         "entity_record": record,
         "hp": default_hp,
         "max_hp": default_hp,
+        "defense_value": defense_value,
+        "defense_label": defense_label,
         "hp_label_id": None,
         "hp_entry": None,
         "hp_entry_id": None,
@@ -316,6 +364,10 @@ def _on_token_move(self, event, token):
         cid, tid = token["hp_canvas_ids"]
         self.canvas.move(cid, dx, dy)
         self.canvas.move(tid, dx, dy)
+    if "defense_canvas_ids" in token:
+        for cid in token["defense_canvas_ids"]:
+            if cid:
+                self.canvas.move(cid, dx, dy)
     token["position"] = ((sx - self.pan_x)/self.zoom, (sy - self.pan_y)/self.zoom)
 
 def _on_token_release(self, event, token):
@@ -484,6 +536,11 @@ def _delete_token(self, token):
             self.canvas.delete(cid)
         del token["hp_canvas_ids"]
 
+    if "defense_canvas_ids" in token:
+        for cid in token["defense_canvas_ids"]:
+            self.canvas.delete(cid)
+        del token["defense_canvas_ids"]
+
     # 4) Any inline HP edit entry
     if "hp_entry_widget_id" in token:
         self.canvas.delete(token["hp_entry_widget_id"])
@@ -586,6 +643,8 @@ def _persist_tokens(self):
                     "size":           t.get("size", self.token_size),
                     "hp":             t.get("hp", 10),
                     "max_hp":         t.get("max_hp", 10),
+                    "defense_value": t.get("defense_value"),
+                    "defense_label": t.get("defense_label", ""),
                     "border_color":   t.get("border_color", "#0000ff"),
                 })
             elif item_type in ["rectangle", "oval"]:
