@@ -1239,9 +1239,38 @@ class GenericListView(ctk.CTkFrame):
 
         key_field = "Title" if slug in {"scenarios", "books"} else "Name"
         target_item = None
+        lookup_key = name.casefold()
         for record in items:
-            if str(record.get(key_field, "")) == name:
-                target_item = record
+            raw_value = record.get(key_field, "")
+            candidates = []
+            if isinstance(raw_value, dict):
+                for key in (
+                    "Name",
+                    "name",
+                    "Title",
+                    "title",
+                    "Target",
+                    "target",
+                    "Text",
+                    "text",
+                    "label",
+                    "Label",
+                    "value",
+                    "Value",
+                ):
+                    candidates.append(str(raw_value.get(key, "")))
+            else:
+                candidates.append(str(raw_value))
+
+            cleaned_candidate = self.clean_value(raw_value)
+            if cleaned_candidate:
+                candidates.append(str(cleaned_candidate))
+
+            for candidate in candidates:
+                if candidate and candidate.casefold() == lookup_key:
+                    target_item = record
+                    break
+            if target_item:
                 break
 
         if not target_item:
