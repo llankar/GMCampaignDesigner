@@ -39,6 +39,7 @@ from modules.maps.services.token_manager import (
     _resolve_campaign_path,
     _campaign_relative_path,
     normalize_existing_token_paths,
+    _extract_entity_defense_value,
 )  # Keep this if it's used by other token_manager functions not moved
 from modules.maps.views.fullscreen_view import open_fullscreen, _update_fullscreen_map
 from modules.maps.views.web_display_view import open_web_display, _update_web_display_map, close_web_display
@@ -555,6 +556,8 @@ class DisplayMapController:
             extra = []
             if item.get("hp_canvas_ids"):
                 extra.extend([cid for cid in item["hp_canvas_ids"] if cid])
+            if item.get("defense_canvas_ids"):
+                extra.extend([cid for cid in item["defense_canvas_ids"] if cid])
             if item.get("name_id"):
                 extra.append(item.get("name_id"))
             preferred_ids.extend(extra)
@@ -1566,6 +1569,15 @@ class DisplayMapController:
         record = token.get("entity_record") or {}
         entity_type = token.get("entity_type")
 
+        defense_label = str(token.get("defense_label") or "").strip()
+        defense_value = token.get("defense_value")
+        if defense_value is None:
+            defense_info = _extract_entity_defense_value(entity_type, record)
+            if defense_info:
+                defense_label, defense_value = defense_info
+                token["defense_label"] = defense_label
+                token["defense_value"] = defense_value
+
         raw_stats_value = ""
         if entity_type in ("Creature", "PC"):
             raw_stats_value = record.get("Stats", "")
@@ -1594,6 +1606,14 @@ class DisplayMapController:
             display_stats_text = str(display_stats_text or "")
         if not display_stats_text.strip():
             display_stats_text = "(No details available)"
+
+        if defense_value is not None:
+            label = defense_label or "Defense"
+            header_line = f"{label}: {defense_value}"
+            if display_stats_text:
+                display_stats_text = f"{header_line}\n\n{display_stats_text}"
+            else:
+                display_stats_text = header_line
         return display_stats_text
 
     @staticmethod
@@ -2492,6 +2512,10 @@ class DisplayMapController:
                         for hp_cid in item["hp_canvas_ids"]:
                             if hp_cid:
                                 self.canvas.move(hp_cid, dx, dy)
+                    if item.get("defense_canvas_ids"):
+                        for def_cid in item["defense_canvas_ids"]:
+                            if def_cid:
+                                self.canvas.move(def_cid, dx, dy)
                     if item.get("hover_bbox"):
                         x1, y1, x2, y2 = item["hover_bbox"]
                         item["hover_bbox"] = (x1 + dx, y1 + dy, x2 + dx, y2 + dy)
@@ -2881,6 +2905,48 @@ class DisplayMapController:
                         cid, tid = item["hp_canvas_ids"]
                         self.canvas.coords(cid, cx, cy, cx + circle_diam, cy + circle_diam); self.canvas.itemconfig(cid, fill=hp_color)
                         self.canvas.coords(tid, cx + circle_diam // 2, cy + circle_diam // 2); self.canvas.itemconfig(tid, text=str(hp))
+                    defense_value = item.get("defense_value")
+                    if defense_value is None:
+                        defense_info = _extract_entity_defense_value(item.get("entity_type"), item.get("entity_record"))
+                        if defense_info:
+                            defense_label, defense_value = defense_info
+                            item["defense_label"] = defense_label
+                            item["defense_value"] = defense_value
+                    defense_color = "#2563eb"
+                    defense_coords = (sx - 4, sy - 4)
+                    if defense_value is not None:
+                        dcx, dcy = defense_coords
+                        if item.get("defense_canvas_ids"):
+                            dcid, dtid = item["defense_canvas_ids"]
+                            if dcid:
+                                self.canvas.coords(dcid, dcx, dcy, dcx + circle_diam, dcy + circle_diam)
+                                self.canvas.itemconfig(dcid, fill=defense_color)
+                            if dtid:
+                                self.canvas.coords(dtid, dcx + circle_diam // 2, dcy + circle_diam // 2)
+                                self.canvas.itemconfig(dtid, text=str(defense_value))
+                        else:
+                            dcid = self.canvas.create_oval(
+                                dcx,
+                                dcy,
+                                dcx + circle_diam,
+                                dcy + circle_diam,
+                                fill=defense_color,
+                                outline="black",
+                                width=1,
+                            )
+                            dtid = self.canvas.create_text(
+                                dcx + circle_diam // 2,
+                                dcy + circle_diam // 2,
+                                text=str(defense_value),
+                                font=("Arial", max(10, circle_diam // 2), "bold"),
+                                fill="white",
+                            )
+                            item["defense_canvas_ids"] = (dcid, dtid)
+                    elif item.get("defense_canvas_ids"):
+                        for dcid in item["defense_canvas_ids"]:
+                            if dcid:
+                                self.canvas.delete(dcid)
+                        item.pop("defense_canvas_ids", None)
                     name_id = item.get('name_id')
                     if name_id: tx = sx + nw/2; ty = sy + nh + 2; self.canvas.coords(name_id, tx, ty); self.canvas.itemconfig(name_id, text=item.get('entity_id', ''))
                     item['hover_bbox'] = (sx - 3, sy - 3, sx + nw + 3, sy + nh + 3)
@@ -2900,6 +2966,38 @@ class DisplayMapController:
                     for item_id_hp in (cid, tid):
                         self.canvas.tag_bind(item_id_hp, "<Double-Button-1>", lambda e, t=item: self._on_hp_double_click(e, t))
                         self.canvas.tag_bind(item_id_hp, "<Button-3>", lambda e, t=item: self._on_max_hp_menu_click(e, t))
+                    defense_value = item.get("defense_value")
+                    if defense_value is None:
+                        defense_info = _extract_entity_defense_value(item.get("entity_type"), item.get("entity_record"))
+                        if defense_info:
+                            defense_label, defense_value = defense_info
+                            item["defense_label"] = defense_label
+                            item["defense_value"] = defense_value
+                    defense_color = "#2563eb"
+                    if defense_value is not None:
+                        dcx, dcy = sx - 4, sy - 4
+                        dcid = self.canvas.create_oval(
+                            dcx,
+                            dcy,
+                            dcx + circle_diam,
+                            dcy + circle_diam,
+                            fill=defense_color,
+                            outline="black",
+                            width=1,
+                        )
+                        dtid = self.canvas.create_text(
+                            dcx + circle_diam // 2,
+                            dcy + circle_diam // 2,
+                            text=str(defense_value),
+                            font=("Arial", max(10, circle_diam // 2), "bold"),
+                            fill="white",
+                        )
+                        item["defense_canvas_ids"] = (dcid, dtid)
+                    elif item.get("defense_canvas_ids"):
+                        for dcid in item["defense_canvas_ids"]:
+                            if dcid:
+                                self.canvas.delete(dcid)
+                        item.pop("defense_canvas_ids", None)
                     item.update({'canvas_ids': (b_id, i_id), 'name_id': name_id})
                     self._bind_item_events(item)
                     item['hover_bbox'] = (sx - 3, sy - 3, sx + nw + 3, sy + nh + 3)
@@ -3405,6 +3503,14 @@ class DisplayMapController:
                         continue
                     try:
                         self.canvas.move(hp_cid, dx, dy)
+                    except tk.TclError:
+                        continue
+            if item.get("defense_canvas_ids"):
+                for def_cid in item["defense_canvas_ids"]:
+                    if not def_cid:
+                        continue
+                    try:
+                        self.canvas.move(def_cid, dx, dy)
                     except tk.TclError:
                         continue
             main_id = item.get("canvas_ids", (None,))[0]
@@ -3936,6 +4042,7 @@ class DisplayMapController:
             "entity_record",
             "canvas_ids",
             "hp_canvas_ids",
+            "defense_canvas_ids",
             "name_id",
             "hp_entry_widget",
             "hp_entry_widget_id",
@@ -4094,6 +4201,9 @@ class DisplayMapController:
             if item_to_delete.get("hp_canvas_ids"):
                 for hp_cid in item_to_delete["hp_canvas_ids"]:
                     if hp_cid: self.canvas.delete(hp_cid)
+            if item_to_delete.get("defense_canvas_ids"):
+                for def_cid in item_to_delete["defense_canvas_ids"]:
+                    if def_cid: self.canvas.delete(def_cid)
             popup = item_to_delete.get("hover_popup")
             if popup and popup.winfo_exists():
                 popup.destroy()
@@ -4158,6 +4268,9 @@ class DisplayMapController:
                 if item.get('hp_canvas_ids'):
                     for hp_cid_lift in item['hp_canvas_ids']:
                         if hp_cid_lift: self.canvas.lift(hp_cid_lift)
+                if item.get('defense_canvas_ids'):
+                    for def_cid_lift in item['defense_canvas_ids']:
+                        if def_cid_lift: self.canvas.lift(def_cid_lift)
             elif item.get("type") == "marker":
                 popup = item.get("description_popup")
                 if popup and popup.winfo_exists():
@@ -4180,6 +4293,8 @@ class DisplayMapController:
                     canvas_ids_to_manage.append(item['name_id'])
                 if item.get('hp_canvas_ids'):
                     canvas_ids_to_manage.extend(hp_id for hp_id in item['hp_canvas_ids'] if hp_id)
+                if item.get('defense_canvas_ids'):
+                    canvas_ids_to_manage.extend(def_id for def_id in item['defense_canvas_ids'] if def_id)
                 # Token hover popups are separate toplevel windows and managed outside the canvas stacking order.
             # Marker popups are separate toplevel windows and are not managed via canvas stacking.
 
