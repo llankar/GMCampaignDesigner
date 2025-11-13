@@ -336,13 +336,16 @@ class GenericEditorWindow(ctk.CTkToplevel):
 
         # --- Reorder fields so that "Portrait" comes first ---
         fields = self.template["fields"]
+        name_field = None
         portrait_field = None
         image_field = None
         audio_field = None
         other_fields = []
         for field in fields:
             name = field.get("name")
-            if name == "Portrait":
+            if name == "Name":
+                name_field = field
+            elif name == "Portrait":
                 portrait_field = field
             elif name == "Image":
                 image_field = field
@@ -350,6 +353,8 @@ class GenericEditorWindow(ctk.CTkToplevel):
                 audio_field = field
             else:
                 other_fields.append(field)
+        if name_field:
+            self._render_standard_field(name_field)
         if portrait_field:
             ctk.CTkLabel(self.scroll_frame, text=portrait_field["name"]).pack(pady=(5, 0), anchor="w")
             self.create_portrait_field(portrait_field)
@@ -361,29 +366,7 @@ class GenericEditorWindow(ctk.CTkToplevel):
             self.create_audio_field(audio_field)
 
         for field in other_fields:
-            field_name = str(field.get("name", ""))
-            field_type = str(field.get("type", "")).lower()
-
-            if field_name in {"FogMaskPath", "Tokens", "token_size"}:
-                continue
-            if field_name == "Image":
-                continue
-            ctk.CTkLabel(self.scroll_frame, text=field_name).pack(pady=(5, 0), anchor="w")
-            if field_type == "list_longtext":
-                self.create_dynamic_longtext_list(field)
-            elif field_type == "longtext":
-                self.create_longtext_field(field)
-            elif field_name in ["NPCs", "Places", "Factions", "Objects", "Creatures", "PCs"] or \
-                 (field_type == "list" and field.get("linked_type")):
-                self.create_dynamic_combobox_list(field)
-            elif field_type == "boolean":
-                self.create_boolean_field(field)
-            elif field_type == "audio" or field_name.lower() == "audio":
-                self.create_audio_field(field)
-            elif field_type == "file":
-                self.create_file_field(field)
-            else:
-                self.create_text_entry(field)
+            self._render_standard_field(field)
                 
 
         self.create_action_bar()
@@ -410,6 +393,33 @@ class GenericEditorWindow(ctk.CTkToplevel):
         if self._ai_client is None:
             self._ai_client = LocalAIClient()
         return self._ai_client
+
+    def _render_standard_field(self, field):
+        field_name = str(field.get("name", ""))
+        field_type = str(field.get("type", "")).lower()
+
+        if field_name in {"FogMaskPath", "Tokens", "token_size"}:
+            return
+        if field_name == "Image":
+            return
+
+        ctk.CTkLabel(self.scroll_frame, text=field_name).pack(pady=(5, 0), anchor="w")
+
+        if field_type == "list_longtext":
+            self.create_dynamic_longtext_list(field)
+        elif field_type == "longtext":
+            self.create_longtext_field(field)
+        elif field_name in ["NPCs", "Places", "Factions", "Objects", "Creatures", "PCs"] or \
+             (field_type == "list" and field.get("linked_type")):
+            self.create_dynamic_combobox_list(field)
+        elif field_type == "boolean":
+            self.create_boolean_field(field)
+        elif field_type == "audio" or field_name.lower() == "audio":
+            self.create_audio_field(field)
+        elif field_type == "file":
+            self.create_file_field(field)
+        else:
+            self.create_text_entry(field)
     def _make_richtext_editor(self, parent, initial_text, hide_toolbar=True, max_lines=None):
         """
         Shared initialization for any RichTextEditor-based field.
