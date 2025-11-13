@@ -232,6 +232,9 @@ class GenericListView(ctk.CTkFrame):
         self._linked_rows = {}
         self._link_targets = {}
         self._link_children = {}
+        self._auto_expanded_rows = set()
+        self._pinned_linked_rows = set()
+        self._link_toggle_in_progress = False
 
         # --- Column configuration ---
         self.column_section = f"ColumnSettings_{self.model_wrapper.entity_type}"
@@ -487,6 +490,8 @@ class GenericListView(ctk.CTkFrame):
         self._linked_rows.clear()
         self._link_targets.clear()
         self._link_children.clear()
+        self._auto_expanded_rows.clear()
+        self._pinned_linked_rows.clear()
         self._base_to_iids = {}
         self.batch_index = 0
         total_items = len(self.filtered_items)
@@ -827,7 +832,11 @@ class GenericListView(ctk.CTkFrame):
             if self._linked_rows.get(row):
                 self.tree.selection_set(row)
                 self.tree.focus(row)
-                self._toggle_linked_rows(row)
+                self._link_toggle_in_progress = True
+                try:
+                    self._toggle_linked_rows(row)
+                finally:
+                    self._link_toggle_in_progress = False
             self.dragging_iid = None
             return
         if self.group_column or self.filtered_items != self.items:
@@ -947,6 +956,8 @@ class GenericListView(ctk.CTkFrame):
             linked = self._collect_linked_entities(item)
             self._linked_rows[iid] = linked
             self._link_children.pop(iid, None)
+            self._auto_expanded_rows.discard(iid)
+            self._pinned_linked_rows.discard(iid)
             vals = ["+" if linked else ""]
             vals.extend(
                 self._format_cell(c, self._get_display_value(item, c), iid) for c in self.columns
@@ -1001,6 +1012,8 @@ class GenericListView(ctk.CTkFrame):
                 linked = self._collect_linked_entities(item)
                 self._linked_rows[iid] = linked
                 self._link_children.pop(iid, None)
+                self._auto_expanded_rows.discard(iid)
+                self._pinned_linked_rows.discard(iid)
                 vals = ["+" if linked else ""]
                 vals.extend(
                     self._format_cell(c, self._get_display_value(item, c), iid) for c in self.columns
@@ -1151,7 +1164,7 @@ class GenericListView(ctk.CTkFrame):
         else:
             self._expand_linked_rows(parent_iid, groups)
 
-    def _expand_linked_rows(self, parent_iid, groups):
+    def _expand_linked_rows(self, parent_iid, groups, *, auto=False):
         headers = []
         name_nodes = []
         self.tree.item(parent_iid, open=True)
@@ -1173,6 +1186,12 @@ class GenericListView(ctk.CTkFrame):
         if headers:
             self._link_children[parent_iid] = {"headers": headers, "names": name_nodes}
             self.tree.set(parent_iid, self._link_column, "–")
+            if auto:
+                self._auto_expanded_rows.add(parent_iid)
+                self._pinned_linked_rows.discard(parent_iid)
+            else:
+                self._pinned_linked_rows.add(parent_iid)
+                self._auto_expanded_rows.discard(parent_iid)
 
     def _collapse_linked_rows(self, parent_iid):
         info = self._link_children.pop(parent_iid, None)
@@ -1184,6 +1203,8 @@ class GenericListView(ctk.CTkFrame):
             if self.tree.exists(header_iid):
                 self.tree.delete(header_iid)
         self.tree.set(parent_iid, self._link_column, "+")
+        self._auto_expanded_rows.discard(parent_iid)
+        self._pinned_linked_rows.discard(parent_iid)
 
     def _open_link_target(self, iid):
         target = self._link_targets.get(iid)
@@ -2760,8 +2781,12 @@ class GenericListView(ctk.CTkFrame):
     def _on_tree_selection_changed(self, _event=None):
         if self._suppress_tree_select_event:
             return
-        selected = set()
+        previous_selection = set(self._last_tree_selection)
         current_selection = self.tree.selection()
+        selection_set = {iid for iid in current_selection}
+        newly_selected = selection_set - previous_selection
+        deselected = previous_selection - selection_set
+        selected = set()
         for iid in current_selection:
             _, base_id = self._find_item_by_iid(iid)
             if base_id:
@@ -2771,6 +2796,16 @@ class GenericListView(ctk.CTkFrame):
             focus_iid = self.tree.focus()
             if focus_iid not in current_selection:
                 self.tree.focus(current_selection[0])
+        if not self._link_toggle_in_progress:
+            for iid in newly_selected:
+                if iid in self._link_children:
+                    continue
+                groups = self._linked_rows.get(iid)
+                if groups:
+                    self._expand_linked_rows(iid, groups, auto=True)
+        for iid in deselected:
+            if iid in self._auto_expanded_rows and iid not in self._pinned_linked_rows:
+                self._collapse_linked_rows(iid)
         self._update_tree_selection_tags(current_selection)
         self._update_bulk_controls()
         self._refresh_grid_selection()
