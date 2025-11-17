@@ -422,6 +422,9 @@ def _copy_token(self, event=None):
         "border_color": t.get("border_color", "#0000ff"),
         "hp":           t.get("hp", 10),        # ← copy current HP
         "max_hp":       t.get("max_hp", 10),    # ← copy maximum HP
+        "defense_value": t.get("defense_value"),
+        "defense_label": t.get("defense_label", ""),
+        "entity_record": copy.deepcopy(t.get("entity_record")) if t.get("entity_record") else None,
     }
 
 def _paste_token(self, event=None):
@@ -439,6 +442,14 @@ def _paste_token(self, event=None):
     size = int(c["size"])
     pil_img = source_img.resize((size, size), Image.LANCZOS)
 
+    entity_record = copy.deepcopy(c.get("entity_record")) if c.get("entity_record") else {}
+    defense_value = c.get("defense_value")
+    defense_label = c.get("defense_label", "")
+    if defense_value is None and entity_record:
+        defense_info = _extract_entity_defense_value(c.get("entity_type"), entity_record)
+        if defense_info:
+            defense_label, defense_value = defense_info
+
     # Clone all relevant fields into a new token dict
     token = {
         "type":         "token",
@@ -453,6 +464,9 @@ def _paste_token(self, event=None):
         "drag_data":    {},
         "hp":           c["hp"],      # ← restore current HP
         "max_hp":       c["max_hp"],  # ← restore max HP
+        "defense_value": defense_value,
+        "defense_label": defense_label,
+        "entity_record": entity_record,
     }
 
     # Add it to your tokens list, then persist & re-draw everything
