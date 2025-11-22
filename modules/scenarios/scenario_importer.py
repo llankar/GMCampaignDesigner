@@ -15,6 +15,7 @@ from modules.helpers.logging_helper import (
     log_module_import,
 )
 from modules.helpers.pdf_review_dialog import PDFReviewDialog
+from modules.scenarios.processing.chunking import summarize_chunks
 
 log_module_import(__name__)
 
@@ -414,6 +415,27 @@ class ScenarioImportWindow(ctk.CTkToplevel):
 
         client = LocalAIClient()
 
+        # -------- Pre-processing: chunking & summarization --------
+        self._set_status("Summarizing source text chunks...")
+        stitched_summary, chunk_metadata = summarize_chunks(
+            raw_text,
+            client,
+            source_label or "Unknown",
+            max_tokens=900,
+        )
+        if stitched_summary:
+            compressed_context = (
+                "Chunked summaries with token ranges (for traceability):\n" + stitched_summary
+            )
+        else:
+            compressed_context = raw_text[:50000]
+        chunk_range_hint = "\n".join(
+            [
+                f"- {entry['label']} tokens {entry['start_token']}-{entry['end_token']}"
+                for entry in chunk_metadata
+            ]
+        )
+
         # -------- Phase 1: Outline --------
         outline_schema = {
             "Title": "text",
@@ -426,9 +448,12 @@ class ScenarioImportWindow(ctk.CTkToplevel):
             "You are an assistant that extracts a high-level scenario outline from RPG source text.\n"
             "Return STRICT JSON only, no prose.\n\n"
             f"Source: {source_label}\n"
+            "Use the provided chunk summaries (with token ranges) as your evidence.\n"
+            "If uncertain, prefer omitting details over inventing them.\n\n"
+            f"Chunk map:\n{chunk_range_hint or 'No chunk metadata available.'}\n\n"
             "JSON schema:\n" + json.dumps(outline_schema, ensure_ascii=False, indent=2) + "\n\n"
             "Notes: Use only info from the text. If uncertain, omit.\n"
-            "Now outline this text:\n" + raw_text[:50000]
+            "Now outline this text (summaries stitched from the source):\n" + compressed_context
         )
         outline_raw = client.chat([
             {"role": "system", "content": "Extract concise scenario outlines as strict JSON."},
@@ -450,7 +475,9 @@ class ScenarioImportWindow(ctk.CTkToplevel):
             "- Avoid rules jargon.\n"
             "Return PLAIN TEXT only.\n\n"
             f"Title: {title}\n"
-            "Current summary:\n" + (summary_draft or "")
+            f"Chunk map for traceability:\n{chunk_range_hint or 'No chunk metadata available.'}\n\n"
+            "Current summary (from outline):\n" + (summary_draft or "") + "\n\n"
+            "Reference context (stitched summaries):\n" + compressed_context
         )
         summary_expanded = client.chat([
             {"role": "system", "content": "You write compelling GM-facing RPG summaries. Return plain text."},
@@ -470,7 +497,8 @@ class ScenarioImportWindow(ctk.CTkToplevel):
             "Return STRICT JSON only with this schema:\n" + json.dumps(scenes_schema, ensure_ascii=False, indent=2) + "\n\n"
             f"Title: {title}\n"
             "Outline scenes:\n" + json.dumps(outline_scenes, ensure_ascii=False, indent=2) + "\n\n"
-            "Source excerpt (may be truncated):\n" + raw_text[:50000]
+            f"Chunk map for traceability:\n{chunk_range_hint or 'No chunk metadata available.'}\n\n"
+            "Source context (summarized chunks):\n" + compressed_context
         )
         scenes_raw = client.chat([
             {"role": "system", "content": "Expand scene stubs into detailed, game-usable scenes as strict JSON."},
@@ -508,7 +536,8 @@ class ScenarioImportWindow(ctk.CTkToplevel):
             "If stats are present (even from other systems), convert into concise creature 'Stats' similar to examples. Do not invent facts.\n\n"
             "Schema:\n" + json.dumps(entities_schema, ensure_ascii=False, indent=2) + "\n\n"
             "Examples of desired 'Stats' formatting from the active DB:\n" + json.dumps(stats_examples, ensure_ascii=False, indent=2) + "\n\n"
-            "Text to analyze (may be truncated):\n" + raw_text[:50000]
+            f"Chunk map for traceability:\n{chunk_range_hint or 'No chunk metadata available.'}\n\n"
+            "Text to analyze (summarized chunks):\n" + compressed_context
         )
         entities_raw = client.chat([
             {"role": "system", "content": "Extract structured entities (NPCs, creatures, places, factions) as strict JSON."},
