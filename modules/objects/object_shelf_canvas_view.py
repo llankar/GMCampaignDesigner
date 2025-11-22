@@ -324,48 +324,55 @@ class ObjectShelfView:
     def _update_detail_body_height(self, max_panel_height: int = 150, min_body_height: int = 40):
         """Adjust detail scroll area height based on content, capping total panel height.
 
-        The overall detail panel should not exceed `max_panel_height`.
-        We compute available height for the scrollable body by subtracting the
-        header height and known paddings, then clamp the body height to that.
+        The overall detail panel should not exceed ``max_panel_height``. We compute
+        available height for the scrollable body by subtracting the header height
+        and known paddings, then clamp the body height to that. The scrollable
+        frame itself is resized so it doesn't reserve unnecessary empty space.
         """
         body = getattr(self, "_detail_body", None)
         if not body or not body.winfo_exists():
             return
+
+        inner = getattr(body, "_scrollable_frame", None)
+        if inner and inner.winfo_exists():
+            inner.update_idletasks()
+            desired_content = inner.winfo_reqheight()
+        else:
+            body.update_idletasks()
+            desired_content = body.winfo_reqheight()
+
+        header = getattr(self, "_detail_header", None)
+        header_h = 0
+        header_pad = 10  # from header.pack(pady=(6,4))
+        if header and header.winfo_exists():
+            header.update_idletasks()
+            header_h = max(header.winfo_height(), header.winfo_reqheight())
+
+        body_pad_bottom = 4  # from body.pack(pady=(0,4))
+        available_for_body = max_panel_height - (header_h + header_pad + body_pad_bottom)
+        available_for_body = max(min_body_height, available_for_body)
+
+        # When the body hasn't been laid out yet (width/height ~ 0), force-start
+        # at the cap to avoid a visible grow-from-thin flicker.
+        if body.winfo_width() <= 1 or body.winfo_height() <= 1:
+            desired = int(available_for_body)
+        else:
+            desired = int(min(desired_content, available_for_body))
+
+        # Apply the computed height directly to the scrollable frame so it
+        # shrinks to match content instead of keeping the default tall request.
         try:
-            inner = getattr(body, "_scrollable_frame", None)
-            if inner and inner.winfo_exists():
-                inner.update_idletasks()
-                desired_content = inner.winfo_reqheight()
-            else:
-                body.update_idletasks()
-                desired_content = body.winfo_reqheight()
-
-            header = getattr(self, "_detail_header", None)
-            header_h = 0
-            header_pad = 10  # from header.pack(pady=(6,4))
-            if header and header.winfo_exists():
-                header.update_idletasks()
-                header_h = max(header.winfo_height(), header.winfo_reqheight())
-
-            body_pad_bottom = 4  # from body.pack(pady=(0,4))
-            available_for_body = max_panel_height - (header_h + header_pad + body_pad_bottom)
-            available_for_body = max(min_body_height, available_for_body)
-
-            # When the body hasn't been laid out yet (width/height ~ 0),
-            # force-start at the cap to avoid a visible grow-from-thin flicker.
-            if body.winfo_width() <= 1 or body.winfo_height() <= 1:
-                desired = int(available_for_body)
-            else:
-                desired = int(min(desired_content, available_for_body))
-            current = int(getattr(body, "_desired_height", 0) or 0)
-            # Optionally, set panel height explicitly to enforce the cap
-            panel = getattr(self, "_detail_panel", None)
-            if panel and panel.winfo_exists():
-                total = min(150,header_h + header_pad + desired + body_pad_bottom)
-                panel.configure(height=total)
+            body.configure(height=desired)
         except Exception:
+            pass
+        body._desired_height = desired
+
+        panel = getattr(self, "_detail_panel", None)
+        if panel and panel.winfo_exists():
+            total = header_h + header_pad + desired + body_pad_bottom
+            total = min(max_panel_height, max(total, header_h + header_pad + body_pad_bottom))
             try:
-                body.configure(height=total)
+                panel.configure(height=total)
             except Exception:
                 pass
 
