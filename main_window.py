@@ -155,6 +155,7 @@ class MainWindow(ctk.CTk):
         self.after(200, self.open_dice_bar)
         self.after(400, self.open_audio_bar)
         self.after(600, lambda: self._queue_update_check(force=True))
+        self.after(800, self._auto_open_gm_screen_if_available)
 
     def open_ai_settings(self):
         log_info("Opening AI settings dialog", func_name="main_window.MainWindow.open_ai_settings")
@@ -845,6 +846,31 @@ class MainWindow(ctk.CTk):
         self.banner_visible = False
         self.current_open_view = None
 
+    def _prime_content_frames_for_gm_screen(self):
+        """Normalize banner/content grid so GM Screen layout starts in a known state."""
+        try:
+            self.content_frame.grid_rowconfigure(0, weight=0)
+            self.content_frame.grid_rowconfigure(1, weight=1)
+            self.content_frame.grid_columnconfigure(0, weight=1)
+        except Exception:
+            pass
+
+        try:
+            self.banner_frame.grid(row=0, column=0, sticky="ew")
+        except Exception:
+            pass
+
+        try:
+            self.inner_content_frame.grid(row=1, column=0, sticky="nsew")
+        except Exception:
+            pass
+
+        self.banner_visible = True
+        try:
+            self.banner_toggle_btn.configure(text="▲")
+        except Exception:
+            pass
+
     def _toggle_banner(self):
         # GM Screen mode: reposition content and toggle banner without recreating views
         if getattr(self, "_gm_mode", False):
@@ -1499,15 +1525,46 @@ class MainWindow(ctk.CTk):
 
         messagebox.showinfo("Success", f"{len(items)} {display_label} loaded successfully!")
 
-    def open_gm_screen(self):
+    def _auto_open_gm_screen_if_available(self):
+        """Post-initialization hook to open the GM screen if scenarios exist."""
+        scenario_wrapper = self.entity_wrappers.get("scenarios") or GenericModelWrapper("scenarios")
+        self.entity_wrappers.setdefault("scenarios", scenario_wrapper)
+
+        try:
+            scenarios = scenario_wrapper.load_items()
+        except Exception as exc:
+            log_exception(
+                f"Failed to load scenarios for initial GM Screen: {exc}",
+                func_name="main_window.MainWindow._auto_open_gm_screen_if_available",
+            )
+            return
+
+        if not scenarios:
+            log_info(
+                "Skipping automatic GM Screen launch because no scenarios exist",
+                func_name="main_window.MainWindow._auto_open_gm_screen_if_available",
+            )
+            return
+
+        self._prime_content_frames_for_gm_screen()
+        self.open_gm_screen(show_empty_message=False)
+
+    def open_gm_screen(self, *, show_empty_message=True):
         # 1) Clear any existing content
         self.clear_current_content()
         self._gm_mode = True
         # 2) Load all scenarios
-        scenario_wrapper = GenericModelWrapper("scenarios")
+        scenario_wrapper = self.entity_wrappers.get("scenarios") or GenericModelWrapper("scenarios")
+        self.entity_wrappers.setdefault("scenarios", scenario_wrapper)
         scenarios = scenario_wrapper.load_items()
         if not scenarios:
-            messagebox.showwarning("No Scenarios", "No scenarios available.")
+            if show_empty_message:
+                messagebox.showwarning("No Scenarios", "No scenarios available.")
+            else:
+                log_info(
+                    "Skipped opening GM Screen because no scenarios are available",
+                    func_name="main_window.MainWindow.open_gm_screen",
+                )
             return
 
         layout_manager = GMScreenLayoutManager()
