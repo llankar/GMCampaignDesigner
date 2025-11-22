@@ -1365,8 +1365,9 @@ class ObjectShelfView:
         wrap_labels: List[ctk.CTkLabel] = []
         for label_text, text, is_stats in spec_data:
             wrapper = ctk.CTkFrame(parent, fg_color="#161616", corner_radius=10)
-            pad_x = 12 if not is_stats else 10
-            pad_y = (6, 12) if not is_stats else (4, 10)
+            dense_spacing = bool(is_stats)
+            pad_x = 10 if dense_spacing else 12
+            pad_y = (3, 8) if dense_spacing else (5, 10)
             wrapper.pack(fill="x", padx=pad_x, pady=pad_y)
             title = ctk.CTkLabel(
                 wrapper,
@@ -1374,7 +1375,9 @@ class ObjectShelfView:
                 font=self._fonts["spec_title"],
                 anchor="w",
             )
-            title.pack(fill="x", padx=12, pady=(10, 4))
+            title_pad_x = 10 if dense_spacing else 12
+            title_pad_y = (8, 3) if dense_spacing else (10, 4)
+            title.pack(fill="x", padx=title_pad_x, pady=title_pad_y)
             body = ctk.CTkLabel(
                 wrapper,
                 text=text,
@@ -1383,11 +1386,13 @@ class ObjectShelfView:
                 wraplength=780,
                 anchor="w",
             )
-            body.pack(fill="x", padx=12, pady=(0, 12))
+            body_pad_x = 10 if dense_spacing else 12
+            body_pad_y = (0, 8) if dense_spacing else (0, 10)
+            body.pack(fill="x", padx=body_pad_x, pady=body_pad_y)
             wrap_labels.append(body)
 
         def _update_wrap(_event=None, labels=wrap_labels, widget=parent):
-            width = max(320, widget.winfo_width() - 40)
+            width = max(280, widget.winfo_width() - 20)
             for label in labels:
                 if label and label.winfo_exists():
                     label.configure(wraplength=width)
