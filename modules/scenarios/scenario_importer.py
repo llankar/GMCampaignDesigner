@@ -7,6 +7,8 @@ import threading
 from modules.helpers.text_helpers import format_longtext, ai_text_to_rtf_json
 from modules.generic.generic_model_wrapper import GenericModelWrapper
 from modules.ai.local_ai_client import LocalAIClient
+from modules.helpers.importing.merge_helper import merge_with_confirmation
+from modules.helpers.importing.pdf_hash_tracker import PDFHashTracker
 from modules.helpers.logging_helper import (
     log_function,
     log_info,
@@ -223,10 +225,25 @@ def import_formatted_scenario(text):
     existing_places = places_wrapper.load_items()
     existing_npcs = npcs_wrapper.load_items()
     
-    combined_scenarios = existing_scenarios + [scenario_entity]
-    combined_places = existing_places + locations
-    combined_npcs = existing_npcs + npcs
-    
+    combined_scenarios = merge_with_confirmation(
+        existing_scenarios,
+        [scenario_entity],
+        key_field="Title",
+        entity_label="scenarios",
+    )
+    combined_places = merge_with_confirmation(
+        existing_places,
+        locations,
+        key_field="Name",
+        entity_label="places",
+    )
+    combined_npcs = merge_with_confirmation(
+        existing_npcs,
+        npcs,
+        key_field="Name",
+        entity_label="NPCs",
+    )
+
     scenario_wrapper.save_items(combined_scenarios)
     places_wrapper.save_items(combined_places)
     npcs_wrapper.save_items(combined_npcs)
@@ -298,8 +315,34 @@ class ScenarioImportWindow(ctk.CTkToplevel):
             )
             if not pdf_path:
                 return
+
+            pdf_hash = None
+            previous_record = None
+            try:
+                pdf_hash = PDFHashTracker.compute_hash(pdf_path)
+                previous_record = PDFHashTracker.get_record(pdf_hash)
+                if previous_record:
+                    imported_when = previous_record.get("timestamp", "an earlier session")
+                    imported_from = previous_record.get("path", pdf_path)
+                    should_continue = messagebox.askyesno(
+                        "PDF Already Imported",
+                        "This PDF appears to have been imported before.\n\n"
+                        f"Source: {imported_from}\n"
+                        f"When: {imported_when}\n\n"
+                        "Import it again?",
+                    )
+                    if not should_continue:
+                        self._set_status("Import cancelled (duplicate PDF).")
+                        return
+            except Exception as exc:
+                log_warning(
+                    f"Unable to check PDF hash: {exc}",
+                    func_name="ScenarioImportWindow.import_pdf_via_ai",
+                )
+
             self._set_status("Preparing import...")
             self._busy(True)
+
             def worker():
                 try:
                     self._set_status("Extracting PDF text...")
@@ -311,11 +354,14 @@ class ScenarioImportWindow(ctk.CTkToplevel):
                     if not selected_text:
                         return
                     self._ai_extract_and_import(selected_text, source_label=os.path.basename(pdf_path))
+                    if pdf_hash:
+                        PDFHashTracker.record_import(pdf_hash, pdf_path)
                 except Exception as e:
                     self._error("AI PDF Import Error", str(e))
                 finally:
                     self._busy(False)
                     self._set_status("Idle")
+
             threading.Thread(target=worker, daemon=True).start()
         except Exception as e:
             messagebox.showerror("AI PDF Import Error", str(e))
@@ -567,7 +613,13 @@ class ScenarioImportWindow(ctk.CTkToplevel):
             "Factions": [f.get("Name", "") for f in entities.get("factions", []) if isinstance(f, dict)],
             "Objects": []
         }
-        scenarios_wrapper.save_items(current_scenarios + [scenario_item])
+        merged_scenarios = merge_with_confirmation(
+            current_scenarios,
+            [scenario_item],
+            key_field="Title",
+            entity_label="scenarios",
+        )
+        scenarios_wrapper.save_items(merged_scenarios)
 
         # NPCs
         self._set_status("Merging NPCs into database...")
@@ -594,7 +646,13 @@ class ScenarioImportWindow(ctk.CTkToplevel):
                     "Portrait": n.get("Portrait", "")
                 }
                 new_items.append(item)
-            npcs_wrapper.save_items(current_items + new_items)
+            merged_npcs = merge_with_confirmation(
+                current_items,
+                new_items,
+                key_field="Name",
+                entity_label="NPCs",
+            )
+            npcs_wrapper.save_items(merged_npcs)
 
         # Creatures
         self._set_status("Merging creatures into database...")
@@ -637,7 +695,13 @@ class ScenarioImportWindow(ctk.CTkToplevel):
                     "Portrait": p.get("Portrait", "")
                 }
                 new_items.append(item)
-            places_wrapper.save_items(current_items + new_items)
+            merged_places = merge_with_confirmation(
+                current_items,
+                new_items,
+                key_field="Name",
+                entity_label="places",
+            )
+            places_wrapper.save_items(merged_places)
 
         messagebox.showinfo("Imported", "AI multi-phase import completed and merged into the database.")
         self._set_status("Import complete.")
