@@ -141,6 +141,30 @@ class ObjectShelfView:
         # Simple throttling for redraw
         self._pending_redraw: Optional[str] = None
 
+    # ----- Helpers -------------------------------------------------------
+    def _extract_description(self, raw_desc) -> Tuple[str, Optional[str]]:
+        """Return a trimmed plain description and optional HTML version."""
+
+        html_text = None
+        if isinstance(raw_desc, dict):
+            plain_text = (format_multiline_text(raw_desc) or "").strip()
+            if plain_text and HTMLLabel is not None:
+                try:
+                    html_text = rtf_to_html(raw_desc)
+                except Exception:
+                    html_text = None
+        else:
+            plain_text = str(raw_desc or "").strip()
+        return plain_text, html_text
+
+    def _is_description_widget(self, widget) -> bool:
+        return widget in {
+            self._detail_desc,
+            self._detail_html_label,
+            self._fixed_desc,
+            self._fixed_html_label,
+        }
+
     # ----- Public API ----------------------------------------------------
     def is_available(self) -> bool:
         return getattr(self.host.model_wrapper, "entity_type", None) == "objects"
@@ -809,37 +833,43 @@ class ObjectShelfView:
 
         # Description: prefer HTML if available
         raw_desc = item.get("Description") or item.get("description") or item.get("Text") or item.get("text") or ""
+        plain_desc, html_desc = self._extract_description(raw_desc)
         self._fixed_html_label = None
         self._fixed_desc = None
-        if isinstance(raw_desc, dict) and HTMLLabel is not None:
-            try:
-                html_text = rtf_to_html(raw_desc)
-                hl = HTMLLabel(self._fixed_body, html=html_text, background="#171717", foreground="#F0F0F0")
-                hl.pack(fill="x", padx=10, pady=(4, 8))
-                self._fixed_html_label = hl
-            except Exception:
-                pass
-        if self._fixed_html_label is None:
-            # Plain label that wraps to container width
-            lbl = ctk.CTkLabel(
-                self._fixed_body,
-                text=(format_multiline_text(raw_desc) if isinstance(raw_desc, dict) else str(raw_desc)),
-                anchor="w",
-                justify="left",
-                font=("Segoe UI", 12),
-            )
-            lbl.pack(fill="x", padx=10, pady=(4, 8))
-            def _wrap(_e=None, l=lbl, p=self._fixed_body):
+        if plain_desc:
+            if html_desc and HTMLLabel is not None:
                 try:
-                    l.configure(wraplength=max(100, p.winfo_width() - 40))
+                    hl = HTMLLabel(
+                        self._fixed_body,
+                        html=html_desc,
+                        background="#171717",
+                        foreground="#F0F0F0",
+                    )
+                    hl.pack(fill="x", padx=10, pady=(4, 8))
+                    self._fixed_html_label = hl
                 except Exception:
                     pass
-            try:
-                self._fixed_body.bind("<Configure>", _wrap, add=True)
-                self._fixed_body.after_idle(_wrap)
-            except Exception:
-                _wrap()
-            self._fixed_desc = lbl
+            if self._fixed_html_label is None:
+                # Plain label that wraps to container width
+                lbl = ctk.CTkLabel(
+                    self._fixed_body,
+                    text=plain_desc,
+                    anchor="w",
+                    justify="left",
+                    font=("Segoe UI", 12),
+                )
+                lbl.pack(fill="x", padx=10, pady=(4, 8))
+                def _wrap(_e=None, l=lbl, p=self._fixed_body):
+                    try:
+                        l.configure(wraplength=max(100, p.winfo_width() - 40))
+                    except Exception:
+                        pass
+                try:
+                    self._fixed_body.bind("<Configure>", _wrap, add=True)
+                    self._fixed_body.after_idle(_wrap)
+                except Exception:
+                    _wrap()
+                self._fixed_desc = lbl
 
         # Optional stats (reusing existing renderer but targeting fixed body)
         try:
@@ -963,52 +993,39 @@ class ObjectShelfView:
         self._detail_meta.configure(text=category)
         # Description: support RTF-JSON -> HTML if possible
         raw_desc = item.get("Description") or item.get("description") or item.get("Text") or item.get("text") or ""
-        if isinstance(raw_desc, dict):
-            html_text = rtf_to_html(raw_desc)
-            if self._detail_html_label is not None:
+        plain_desc, html_desc = self._extract_description(raw_desc)
+
+        def _pack_if_needed(widget, **opts):
+            if widget and widget.winfo_manager() != "pack":
+                widget.pack(**opts)
+
+        if self._detail_html_label is not None:
+            if html_desc:
                 try:
-                    self._detail_html_label.set_html(html_text)
+                    self._detail_html_label.set_html(html_desc)
+                    _pack_if_needed(self._detail_html_label, fill="x", padx=10, pady=(6, 8))
                 except Exception:
-                    plain = format_multiline_text(raw_desc)
-                    if self._detail_desc is None:
-                        self._detail_desc = ctk.CTkLabel(
-                            self._detail_body,
-                            text="",
-                            anchor="w",
-                            justify="left",
-                            font=("Segoe UI", 12),
-                        )
-                        self._detail_desc.pack(fill="x", padx=10, pady=(6, 8))
-                    self._detail_desc.configure(text=(plain or "(no description)"))
+                    self._detail_html_label.pack_forget()
             else:
-                plain = format_multiline_text(raw_desc)
-                if isinstance(self._detail_desc, ctk.CTkLabel):
-                    self._detail_desc.configure(text=(plain or "(no description)"))
-                else:
-                    # Fallback if a textbox exists from previous content
-                    try:
-                        self._detail_desc.configure(state="normal")
-                        self._detail_desc.delete("1.0", "end")
-                        self._detail_desc.insert("1.0", plain or "(no description)")
-                        self._detail_desc.configure(state="disabled")
-                    except Exception:
-                        pass
-        else:
-            text_val = str(raw_desc)
-            if self._detail_html_label is not None:
-                safe = text_val.replace("\n", "<br>")
-                self._detail_html_label.set_html(f"<p>{safe}</p>")
+                self._detail_html_label.pack_forget()
+
+        if isinstance(self._detail_desc, ctk.CTkLabel):
+            if plain_desc:
+                _pack_if_needed(self._detail_desc, fill="x", padx=10, pady=(6, 8))
+                self._detail_desc.configure(text=plain_desc)
             else:
-                if isinstance(self._detail_desc, ctk.CTkLabel):
-                    self._detail_desc.configure(text=(text_val or "(no description)"))
+                self._detail_desc.pack_forget()
+        elif self._detail_desc is not None:
+            try:
+                self._detail_desc.configure(state="normal")
+                self._detail_desc.delete("1.0", "end")
+                if plain_desc:
+                    self._detail_desc.insert("1.0", plain_desc)
                 else:
-                    try:
-                        self._detail_desc.configure(state="normal")
-                        self._detail_desc.delete("1.0", "end")
-                        self._detail_desc.insert("1.0", text_val or "(no description)")
-                        self._detail_desc.configure(state="disabled")
-                    except Exception:
-                        pass
+                    self._detail_desc.insert("1.0", "")
+                self._detail_desc.configure(state="disabled")
+            except Exception:
+                pass
         # Stats grid
         for child in list(self._detail_body.winfo_children()):
             # keep the textbox; it's already in children
@@ -1020,10 +1037,11 @@ class ObjectShelfView:
         self._update_detail_body_height()
 
     def _rebuild_stats(self, body: ctk.CTkScrollableFrame, item: dict):
-        # Remove any previous stat frames except the textbox
+        # Remove any previous stat frames, preserving description widgets when present
         kids = list(body.winfo_children())
-        # First child is the description textbox; clear the rest
-        for child in kids[1:]:
+        keep_description = bool(kids) and self._is_description_widget(kids[0])
+        start_idx = 1 if keep_description else 0
+        for child in kids[start_idx:]:
             child.destroy()
         # Optional longtext stats block
         stats_long = item.get("Stats") or item.get("stats") or item.get("Rules") or item.get("rules")
