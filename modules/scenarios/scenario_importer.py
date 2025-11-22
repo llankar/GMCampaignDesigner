@@ -14,6 +14,7 @@ from modules.helpers.logging_helper import (
     log_warning,
     log_module_import,
 )
+from modules.helpers.pdf_review_dialog import PDFReviewDialog
 
 log_module_import(__name__)
 
@@ -301,11 +302,14 @@ class ScenarioImportWindow(ctk.CTkToplevel):
             def worker():
                 try:
                     self._set_status("Extracting PDF text...")
-                    text = self._extract_pdf_text(pdf_path)
-                    if not text or len(text.strip()) < 50:
+                    pages = self._extract_pdf_text(pdf_path)
+                    if not pages or not any(page.strip() for page in pages):
                         self._warn("Empty PDF", "Could not extract meaningful text from the PDF.")
                         return
-                    self._ai_extract_and_import(text, source_label=os.path.basename(pdf_path))
+                    selected_text = self._review_extracted_pages(pages, os.path.basename(pdf_path))
+                    if not selected_text:
+                        return
+                    self._ai_extract_and_import(selected_text, source_label=os.path.basename(pdf_path))
                 except Exception as e:
                     self._error("AI PDF Import Error", str(e))
                 finally:
@@ -337,9 +341,8 @@ class ScenarioImportWindow(ctk.CTkToplevel):
             messagebox.showerror("AI Parse Error", str(e))
 
     # --- Helpers ---
-    def _extract_pdf_text(self, path: str) -> str:
+    def _extract_pdf_text(self, path: str) -> list[str]:
         """Attempt to extract text from PDF using available backends."""
-        # Try PyPDF2 / pypdf
         try:
             try:
                 import PyPDF2 as pypdf
@@ -353,9 +356,24 @@ class ScenarioImportWindow(ctk.CTkToplevel):
                         text.append(page.extract_text() or "")
                     except Exception:
                         continue
-            return "\n".join(text)
+            return text
         except Exception:
             pass
+
+    def _review_extracted_pages(self, pages: list[str], source_name: str) -> str | None:
+        selection: dict[str, str | None] = {"text": None}
+        event = threading.Event()
+
+        def _open_dialog():
+            dialog = PDFReviewDialog(self, pages, title=f"Review {source_name}")
+            self.wait_window(dialog)
+            chosen = dialog.selected_pages
+            selection["text"] = "\n".join(chosen) if chosen else None
+            event.set()
+
+        self.after(0, _open_dialog)
+        event.wait()
+        return selection["text"]
         
     def _ai_extract_and_import(self, raw_text: str, source_label: str = ""):
         log_info(f"Running AI extraction for {source_label or 'input'}", func_name="ScenarioImportWindow._ai_extract_and_import")

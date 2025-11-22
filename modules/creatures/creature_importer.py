@@ -14,6 +14,7 @@ from modules.helpers.logging_helper import (
     log_module_import,
     log_warning,
 )
+from modules.helpers.pdf_review_dialog import PDFReviewDialog
 
 log_module_import(__name__)
 
@@ -181,11 +182,14 @@ class CreatureImportWindow(ctk.CTkToplevel):
         def worker():
             try:
                 self._set_status("Extracting PDF text...")
-                text = self._extract_pdf_text(path)
-                if not text or len(text.strip()) < 50:
+                pages = self._extract_pdf_text(path)
+                if not pages or not any(page.strip() for page in pages):
                     self._warn("Empty PDF", "Could not extract meaningful text from the PDF.")
                     return
-                self._ai_extract_and_import(text, source_label=os.path.basename(path))
+                selected_text = self._review_extracted_pages(pages, os.path.basename(path))
+                if not selected_text:
+                    return
+                self._ai_extract_and_import(selected_text, source_label=os.path.basename(path))
             except Exception as exc:
                 self._error("AI Import Error", str(exc))
             finally:
@@ -215,7 +219,7 @@ class CreatureImportWindow(ctk.CTkToplevel):
         threading.Thread(target=worker, daemon=True).start()
 
     # --- Internal helpers -------------------------------------------------
-    def _extract_pdf_text(self, path: str) -> str:
+    def _extract_pdf_text(self, path: str) -> list[str]:
         try:
             try:
                 import PyPDF2 as pypdf  # type: ignore
@@ -229,10 +233,28 @@ class CreatureImportWindow(ctk.CTkToplevel):
                         chunks.append(page.extract_text() or "")
                     except Exception:
                         continue
-            return "\n".join(chunks)
+            return chunks
         except Exception as exc:
-            log_warning(f"PDF extraction failed: {exc}", func_name="CreatureImportWindow._extract_pdf_text")
+            log_warning(
+                f"PDF extraction failed: {exc}",
+                func_name="CreatureImportWindow._extract_pdf_text",
+            )
             raise
+
+    def _review_extracted_pages(self, pages: list[str], source_name: str) -> str | None:
+        selection: dict[str, str | None] = {"text": None}
+        event = threading.Event()
+
+        def _open_dialog():
+            dialog = PDFReviewDialog(self, pages, title=f"Review {source_name}")
+            self.wait_window(dialog)
+            chosen = dialog.selected_pages
+            selection["text"] = "\n".join(chosen) if chosen else None
+            event.set()
+
+        self.after(0, _open_dialog)
+        event.wait()
+        return selection["text"]
 
     def _ai_extract_and_import(self, raw_text: str, source_label: str = ""):
         log_info(f"Running creature AI import for {source_label or 'input'}", func_name="CreatureImportWindow._ai_extract_and_import")

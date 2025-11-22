@@ -14,6 +14,7 @@ from modules.helpers.logging_helper import (
     log_module_import,
     log_warning,
 )
+from modules.helpers.pdf_review_dialog import PDFReviewDialog
 
 log_module_import(__name__)
 
@@ -279,16 +280,19 @@ class ObjectImportWindow(ctk.CTkToplevel):
                 if not pages or not any(page.strip() for page in pages):
                     self._warn("Empty PDF", "Could not extract meaningful text from the PDF.")
                     return
+                reviewed_pages = self._review_extracted_pages(pages, os.path.basename(path))
+                if not reviewed_pages:
+                    return
                 combined_objects = []
                 total_imported = 0
                 failed_chunks = []
                 basename = os.path.basename(path)
-                for index in range(0, len(pages), 4):
-                    chunk_text = "\n".join(pages[index : index + 4]).strip()
+                for index in range(0, len(reviewed_pages), 4):
+                    chunk_text = "\n".join(reviewed_pages[index : index + 4]).strip()
                     if not chunk_text:
                         continue
                     start_page = index + 1
-                    end_page = min(index + 2, len(pages))
+                    end_page = min(index + 2, len(reviewed_pages))
                     label = f"{basename} p{start_page}-{end_page}"
                     self._set_status(f"Processing {label}...")
                     try:
@@ -380,6 +384,20 @@ class ObjectImportWindow(ctk.CTkToplevel):
         except Exception as exc:
             log_warning(f"PDF extraction failed: {exc}", func_name="ObjectImportWindow._extract_pdf_text")
             raise
+
+    def _review_extracted_pages(self, pages: list[str], source_name: str) -> list[str] | None:
+        selection: dict[str, list[str] | None] = {"pages": None}
+        event = threading.Event()
+
+        def _open_dialog():
+            dialog = PDFReviewDialog(self, pages, title=f"Review {source_name}")
+            self.wait_window(dialog)
+            selection["pages"] = dialog.selected_pages
+            event.set()
+
+        self.after(0, _open_dialog)
+        event.wait()
+        return selection["pages"]
 
     def _ai_extract_and_import(self, raw_text: str, source_label: str = "", *, update_text: bool = True):
         log_info(
