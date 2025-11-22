@@ -1308,7 +1308,7 @@ class ObjectShelfView:
             border_width=1,
             border_color="#2f2f2f",
         )
-        overlay.place(relx=0.5, rely=0.02, anchor="n", relwidth=0.96, relheight=0.96)
+        overlay.place(relx=0.5, rely=0.01, anchor="n", relwidth=1, relheight=1)
         overlay.lift()
         title_bar = ctk.CTkFrame(
             overlay,
@@ -1317,7 +1317,7 @@ class ObjectShelfView:
             border_width=1,
             border_color="#2c2c2c",
         )
-        title_bar.pack(fill="x", padx=12, pady=(12, 8))
+        title_bar.pack(fill="x", padx=6, pady=(8, 6))
         name_label = ctk.CTkLabel(
             title_bar,
             text=display.get("name_text", ""),
@@ -1343,7 +1343,7 @@ class ObjectShelfView:
             justify="left",
             anchor="w",
         )
-        summary_label.pack(fill="x", padx=20, pady=(0, 6))
+        summary_label.pack(fill="x", padx=10, pady=(0, 4))
 
         content = ctk.CTkScrollableFrame(
             overlay,
