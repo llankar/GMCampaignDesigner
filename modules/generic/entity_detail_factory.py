@@ -1154,7 +1154,12 @@ def create_entity_detail_frame(entity_type, entity, master, open_entity_callback
 
     edit_btn = ctk.CTkButton(
         button_bar,
-        text="Edit",
+        text="✏",  # icon-only to save space
+        width=32,
+        height=32,
+        corner_radius=8,
+        fg_color="#3A3A3A",
+        hover_color="#4A4A4A",
         command=lambda et=entity_type, en=entity: EditWindow(
             content_frame,
             en,
@@ -1162,10 +1167,11 @@ def create_entity_detail_frame(entity_type, entity, master, open_entity_callback
             wrappers[et],
             creation_mode=False,
             on_save=rebuild_frame
-        )
+        ),
     )
 
-    edit_btn.pack(side="right", padx=10, pady=6)
+    ToolTip(edit_btn, "Edit")
+    edit_btn.pack(side="right", padx=(6, 2), pady=6)
 
     # This local cache is used for portrait images (if any).
     content_frame.portrait_images = {}
