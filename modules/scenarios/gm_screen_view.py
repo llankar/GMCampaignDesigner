@@ -149,19 +149,12 @@ class GMScreenView(ctk.CTkFrame):
         self.tab_bar.bind("<Configure>", lambda e: self.tab_bar_canvas.configure(
             scrollregion=self.tab_bar_canvas.bbox("all")))
 
-        # The plus button stays on the right side of the container
+        # The plus button stays on the right side of the container and hosts the add menu
         self.add_button = ctk.CTkButton(
             self.tab_bar,
             text="+",
             width=40,
             command=self.add_new_tab
-        )
-
-        self.add_dropdown_button = ctk.CTkButton(
-            self.tab_bar,
-            text="▾",
-            width=24,
-            command=self.add_new_tab,
         )
         
         self.random_button = ctk.CTkButton(
@@ -172,7 +165,6 @@ class GMScreenView(ctk.CTkFrame):
         )
         self.random_button.pack(side="left", padx=2, pady=5)
         self.add_button.pack(side="left", padx=2, pady=5)
-        self.add_dropdown_button.pack(side="left", padx=(0, 5), pady=5)
 
         self._add_menu_options = [
             "World Map",
@@ -1871,7 +1863,7 @@ class GMScreenView(ctk.CTkFrame):
         self._show_add_menu()
 
     def _show_add_menu(self):
-        button = self.add_dropdown_button if getattr(self, "add_dropdown_button", None) else self.add_button
+        button = self.add_button
         x = button.winfo_rootx()
         y = button.winfo_rooty() + button.winfo_height()
         try:
