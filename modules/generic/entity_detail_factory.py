@@ -7,6 +7,7 @@ from modules.helpers.text_helpers import (
     format_longtext,
     format_multiline_text,
 )
+from modules.helpers.rtf_rendering import render_rtf_to_text_widget
 from modules.helpers.template_loader import load_template
 from modules.generic.generic_model_wrapper import GenericModelWrapper
 from tkinter import Toplevel, messagebox
@@ -121,38 +122,15 @@ def insert_text(parent, header, content):
     label = ctk.CTkLabel(parent, text=f"{header}:", font=("Arial", 16, "bold"))
     label.pack(anchor="w", padx=10)
     box = ctk.CTkTextbox(parent, wrap="word", height=40)
-    # Ensure content is a plain string.
-    if isinstance(content, dict):
-        content = content.get("text", "")
-    elif isinstance(content, list):
-        content = " ".join(map(str, content))
-    else:
-        content = str(content)
-    # For debugging, you can verify:
-    # print("DEBUG: content =", repr(content))
-
-    # Override the insert method to bypass the CTkTextbox wrapper.
-    box.insert = box._textbox.insert
-    # Now use box.insert normally.
-    box.insert("1.0", content)
-
-    box.configure(state="disabled")
+    render_rtf_to_text_widget(box, content)
     box.pack(fill="x", padx=10, pady=5)
 
 @log_function
 def insert_longtext(parent, header, content):
     ctk.CTkLabel(parent, text=f"{header}:", font=("Arial", 16, "bold")).pack(anchor="w", padx=10)
 
-    # Convert to string and format
-    if isinstance(content, dict):
-        text = content.get("text", "")
-    else:
-        text = str(content)
-    formatted_text = format_multiline_text(text, max_length=2000)
-
     box = CTkTextbox(parent, wrap="word")
-    box.insert = box._textbox.insert
-    box.insert("1.0", formatted_text)
+    render_rtf_to_text_widget(box, content)
     box.pack(fill="x", padx=10, pady=5)
 
     # Resize after layout
