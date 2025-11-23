@@ -143,7 +143,12 @@ class GenericListSelectionView(ctk.CTkFrame):
             raw_val = item.get(self.unique_field, "")
             if isinstance(raw_val, dict):
                 raw_val = raw_val.get("text", "")
-            iid = self.sanitize_id(raw_val or f"item_{int(time.time()*1000)}")
+            base_id = self.sanitize_id(raw_val or f"item_{int(time.time()*1000)}")
+            iid = base_id
+            suffix = 1
+            while iid in self.item_by_id:
+                iid = f"{base_id}_{suffix}"
+                suffix += 1
 
             # For the extra columns, if the value is a dict, show just the "text"
             def get_display_value(val):
