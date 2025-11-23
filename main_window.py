@@ -913,6 +913,28 @@ class MainWindow(ctk.CTk):
 
         self._animate_sidebar_width(target_width, on_complete=finalize)
 
+    def _is_pointer_exiting_sidebar_right(self, event) -> bool:
+        """Return True when the pointer leaves the sidebar moving toward the content area."""
+        widget = getattr(event, "widget", None)
+        if widget is None:
+            return False
+
+        try:
+            widget_width = widget.winfo_width()
+            widget_root_x = widget.winfo_rootx()
+        except Exception:
+            return False
+
+        relative_x = getattr(event, "x", None)
+        if relative_x is not None and relative_x >= widget_width:
+            return True
+
+        root_x = getattr(event, "x_root", None)
+        if root_x is not None and widget_root_x is not None:
+            return root_x >= widget_root_x + widget_width
+
+        return False
+
     def _collapse_sidebar(self, _event=None, immediate: bool = False):
         frame = getattr(self, "sidebar_frame", None)
         if frame is None or not frame.winfo_exists():
@@ -920,6 +942,10 @@ class MainWindow(ctk.CTk):
         self._cancel_sidebar_animation()
         if self._sidebar_collapsed:
             return
+
+        if _event is not None and not immediate:
+            if not self._is_pointer_exiting_sidebar_right(_event):
+                return
 
         def finalize():
             try:
