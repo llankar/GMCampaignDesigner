@@ -123,6 +123,10 @@ class MainWindow(ctk.CTk):
         position_window_at_top(self)
         self.set_window_icon()
         self.create_layout()
+        self.sidebar_default_width = 220
+        self._sidebar_collapsed = False
+        self._sidebar_animating = False
+        self._sidebar_pack_kwargs = None
         self.entity_definitions = load_entity_definitions()
         self.entity_wrappers = {}
         self.load_icons()
@@ -381,13 +385,14 @@ class MainWindow(ctk.CTk):
         first_time = not hasattr(self, "sidebar_frame") or force
 
         if first_time:
+            self._ensure_sidebar_hotspot()
             # If forcing a rebuild, drop the existing sidebar completely
             if force and hasattr(self, "sidebar_frame"):
                 try:
                     self.sidebar_frame.destroy()
                 except Exception:
                     pass
-            self.sidebar_frame = ctk.CTkFrame(self.main_frame, width=220)
+            self.sidebar_frame = ctk.CTkFrame(self.main_frame, width=self.sidebar_default_width)
             pack_kwargs = {"side": "left", "fill": "y", "padx": 5, "pady": 5}
             if force and hasattr(self, "content_frame"):
                 try:
@@ -395,8 +400,11 @@ class MainWindow(ctk.CTk):
                         pack_kwargs["before"] = self.content_frame
                 except Exception:
                     pass
+            if getattr(self, "sidebar_hotspot", None) is not None:
+                pack_kwargs.setdefault("after", self.sidebar_hotspot)
             self.sidebar_frame.pack(**pack_kwargs)
             self.sidebar_frame.pack_propagate(False)
+            self._sidebar_pack_kwargs = pack_kwargs
             self.sidebar_inner = ctk.CTkFrame(self.sidebar_frame, fg_color="transparent")
             self.sidebar_inner.pack(fill="both", expand=True, padx=5, pady=5)
 
@@ -538,9 +546,13 @@ class MainWindow(ctk.CTk):
             for child in self.sidebar_sections_container.winfo_children():
                 child.destroy()
 
+        self._bind_sidebar_hover_events()
         self.update_sidebar_metadata()
 
         self.create_accordion_sidebar()
+
+        if self._sidebar_collapsed:
+            self._collapse_sidebar(immediate=True)
 
 
     def update_sidebar_metadata(self):
@@ -816,6 +828,119 @@ class MainWindow(ctk.CTk):
                 except Exception:
                     pass
                 break
+
+    def _ensure_sidebar_hotspot(self):
+        if getattr(self, "sidebar_hotspot", None) is not None:
+            return
+        self.sidebar_hotspot = ctk.CTkFrame(self.main_frame, width=8, fg_color="transparent")
+        self.sidebar_hotspot.pack(side="left", fill="y")
+        try:
+            self.sidebar_hotspot.bind("<Enter>", self._restore_sidebar)
+        except Exception:
+            pass
+
+    def _bind_sidebar_hover_events(self):
+        frame = getattr(self, "sidebar_frame", None)
+        if frame is None:
+            return
+        try:
+            frame.bind("<Enter>", self._restore_sidebar)
+            frame.bind("<Leave>", self._collapse_sidebar)
+        except Exception:
+            pass
+
+    def _animate_sidebar_width(self, target_width: int, on_complete=None):
+        frame = getattr(self, "sidebar_frame", None)
+        if frame is None or not frame.winfo_exists():
+            self._sidebar_animating = False
+            return
+
+        try:
+            current_width = int(frame.cget("width"))
+        except Exception:
+            current_width = target_width
+
+        if current_width == target_width:
+            self._sidebar_animating = False
+            if callable(on_complete):
+                on_complete()
+            return
+
+        self._sidebar_animating = True
+        step = 20 if target_width > current_width else -20
+        next_width = current_width + step
+
+        if (step > 0 and next_width > target_width) or (step < 0 and next_width < target_width):
+            next_width = target_width
+
+        try:
+            frame.configure(width=next_width)
+        except Exception:
+            self._sidebar_animating = False
+            if callable(on_complete):
+                on_complete()
+            return
+
+        if next_width != target_width:
+            self.after(10, lambda: self._animate_sidebar_width(target_width, on_complete))
+            return
+
+        self._sidebar_animating = False
+        if callable(on_complete):
+            on_complete()
+
+    def _restore_sidebar(self, _event=None):
+        frame = getattr(self, "sidebar_frame", None)
+        if frame is None or not frame.winfo_exists():
+            return
+        if self._sidebar_animating:
+            return
+
+        if not frame.winfo_manager():
+            if self._sidebar_pack_kwargs is None:
+                self._sidebar_pack_kwargs = {"side": "left", "fill": "y", "padx": 5, "pady": 5}
+                if getattr(self, "sidebar_hotspot", None) is not None:
+                    self._sidebar_pack_kwargs["after"] = self.sidebar_hotspot
+            try:
+                frame.configure(width=0)
+                frame.pack(**self._sidebar_pack_kwargs)
+                frame.pack_propagate(False)
+            except Exception:
+                return
+
+        target_width = self.sidebar_default_width
+
+        def finalize():
+            self._sidebar_collapsed = False
+            try:
+                frame.configure(width=target_width)
+            except Exception:
+                pass
+
+        self._animate_sidebar_width(target_width, on_complete=finalize)
+
+    def _collapse_sidebar(self, _event=None, immediate: bool = False):
+        frame = getattr(self, "sidebar_frame", None)
+        if frame is None or not frame.winfo_exists():
+            return
+        if self._sidebar_animating:
+            return
+        if self._sidebar_collapsed:
+            return
+
+        def finalize():
+            try:
+                frame.pack_forget()
+            except Exception:
+                pass
+            self._sidebar_collapsed = True
+            self._sidebar_animating = False
+
+        if immediate:
+            finalize()
+            return
+
+        self._animate_sidebar_width(0, on_complete=finalize)
 
     def create_content_area(self):
         self.content_frame = ctk.CTkFrame(self.main_frame)
