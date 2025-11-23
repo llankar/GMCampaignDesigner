@@ -127,13 +127,16 @@ class GMScreenView(ctk.CTkFrame):
         self.tab_bar_canvas = ctk.CTkCanvas(self.tab_bar_container, height=40, highlightthickness=0, bg="#2B2B2B")
         self.tab_bar_canvas.pack(side="top", fill="x", expand=True)
 
-        # Horizontal scrollbar at the bottom
+        # Horizontal scrollbar at the bottom alongside layout status
+        self.tab_bar_bottom = ctk.CTkFrame(self.tab_bar_container)
+        self.tab_bar_bottom.pack(side="bottom", fill="x")
+
         self.h_scrollbar = ctk.CTkScrollbar(
-            self.tab_bar_container,
+            self.tab_bar_bottom,
             orientation="horizontal",
             command=self.tab_bar_canvas.xview
         )
-        self.h_scrollbar.pack(side="bottom", fill="x")
+        self.h_scrollbar.pack(side="left", fill="x", expand=True)
 
         # The actual frame that holds the tab buttons
         self.tab_bar = ctk.CTkFrame(self.tab_bar_canvas, height=40)
@@ -188,32 +191,14 @@ class GMScreenView(ctk.CTkFrame):
             "NPC Graph",
             "PC Graph",
             "Scenario Graph Editor",
+            "separator",
+            ("Save Layout", self._prompt_save_layout),
+            ("Load Layout", self._open_load_layout_dialog),
+            ("Open Chatbot", self.open_chatbot),
         ]
         self._add_menu = self._build_add_menu()
-
-        # Layout control bar for persistence actions
-        self.layout_toolbar = ctk.CTkFrame(self)
-        self.layout_toolbar.pack(fill="x", padx=10, pady=(0, 5))
-        self.save_layout_button = ctk.CTkButton(
-            self.layout_toolbar,
-            text="Save Layout",
-            command=self._prompt_save_layout,
-        )
-        self.save_layout_button.pack(side="left", padx=(0, 5), pady=5)
-        self.load_layout_button = ctk.CTkButton(
-            self.layout_toolbar,
-            text="Load Layout",
-            command=self._open_load_layout_dialog,
-        )
-        self.load_layout_button.pack(side="left", pady=5)
-        self.chatbot_button = ctk.CTkButton(
-            self.layout_toolbar,
-            text="Chatbot",
-            command=self.open_chatbot,
-        )
-        self.chatbot_button.pack(side="left", padx=(5, 5), pady=5)
-        self.layout_status_label = ctk.CTkLabel(self.layout_toolbar, text="")
-        self.layout_status_label.pack(side="right", pady=5)
+        self.layout_status_label = ctk.CTkLabel(self.tab_bar_bottom, text="")
+        self.layout_status_label.pack(side="right", padx=8, pady=5)
 
         # Main content area for scenario details
         self.content_area = ctk.CTkScrollableFrame(self)
@@ -257,6 +242,13 @@ class GMScreenView(ctk.CTkFrame):
     def _build_add_menu(self):
         menu = tk.Menu(self, tearoff=0)
         for option in self._add_menu_options:
+            if option == "separator":
+                menu.add_separator()
+                continue
+            if isinstance(option, tuple):
+                label, command = option
+                menu.add_command(label=label, command=command)
+                continue
             menu.add_command(label=option, command=lambda o=option: self.open_selection_window(o))
         return menu
 
