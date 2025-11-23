@@ -871,36 +871,13 @@ class MainWindow(ctk.CTk):
         # Cancel any pending animation callbacks before starting a fresh one
         self._cancel_sidebar_animation()
 
+        # Immediately set the target width to remove the animation effect
         try:
-            current_width = int(frame.cget("width"))
-        except Exception:
-            current_width = target_width
-
-        if current_width == target_width:
-            self._sidebar_animating = False
-            if callable(on_complete):
-                on_complete()
-            return
-
-        self._sidebar_animating = True
-        step_size = 40 if target_width > current_width else -40
-        next_width = current_width + step_size
-
-        if (step_size > 0 and next_width > target_width) or (step_size < 0 and next_width < target_width):
-            next_width = target_width
-
-        try:
-            frame.configure(width=next_width)
+            frame.configure(width=target_width)
         except Exception:
             self._sidebar_animating = False
             if callable(on_complete):
                 on_complete()
-            return
-
-        if next_width != target_width:
-            self._sidebar_animation_job = self.after(
-                6, lambda: self._animate_sidebar_width(target_width, on_complete)
-            )
             return
 
         self._sidebar_animating = False
