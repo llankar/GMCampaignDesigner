@@ -899,8 +899,10 @@ def create_scenario_detail_frame(entity_type, scenario_item, master, open_entity
     frame = ctk.CTkFrame(master)
     frame.pack(fill="both", expand=True, padx=20, pady=10)
     gm_view_instance = getattr(open_entity_callback, "__self__", None)
+    toolbar = ctk.CTkFrame(frame, fg_color="transparent")
+    toolbar.pack(anchor="ne", padx=4, pady=(4, 6))
     edit_btn = ctk.CTkButton(
-        frame,
+        toolbar,
         text="Edit",
         command=lambda et=entity_type, en=scenario_item: EditWindow(
             frame,
@@ -911,7 +913,7 @@ def create_scenario_detail_frame(entity_type, scenario_item, master, open_entity
             on_save=rebuild_frame
         )
     )
-    edit_btn.pack(anchor="ne", padx=10, pady=(0, 10))
+    edit_btn.pack(side="right")
     def rebuild_frame(updated_item):
         # 1) Destroy the old frame
         frame.destroy()
@@ -1114,8 +1116,8 @@ def create_entity_detail_frame(entity_type, entity, master, open_entity_callback
         gm_view.tabs[tab_name]["content_frame"] = new_frame
         
 
-    button_bar = ctk.CTkFrame(content_frame)
-    button_bar.pack(fill="x", pady=(0, 10))
+    toolbar = ctk.CTkFrame(content_frame, fg_color="transparent")
+    toolbar.pack(anchor="ne", pady=(4, 6), padx=4)
 
     audio_value = get_entity_audio_value(entity)
     entity_label = entity.get("Name") or entity.get("Title") or entity_type[:-1]
@@ -1138,22 +1140,22 @@ def create_entity_detail_frame(entity_type, entity, master, open_entity_callback
 
     if audio_value:
         audio_label = ctk.CTkLabel(
-            button_bar,
+            toolbar,
             text=_audio_display_name(audio_value),
             cursor="hand2",
         )
 
         def _show_audio_menu(event) -> None:
-            menu = tk.Menu(button_bar, tearoff=0)
+            menu = tk.Menu(toolbar, tearoff=0)
             menu.add_command(label="Play Audio", command=_play_audio_from_menu)
             menu.add_command(label="Stop Audio", command=stop_entity_audio)
             menu.tk_popup(event.x_root, event.y_root)
 
         audio_label.bind("<Button-3>", _show_audio_menu)
-        audio_label.pack(side="right", padx=(0, 6), pady=6)
+        audio_label.pack(side="right", padx=(0, 6))
 
     edit_btn = ctk.CTkButton(
-        button_bar,
+        toolbar,
         text="Edit",
         command=lambda et=entity_type, en=entity: EditWindow(
             content_frame,
@@ -1165,7 +1167,7 @@ def create_entity_detail_frame(entity_type, entity, master, open_entity_callback
         )
     )
 
-    edit_btn.pack(side="right", padx=10, pady=6)
+    edit_btn.pack(side="right", padx=(6, 0))
 
     # This local cache is used for portrait images (if any).
     content_frame.portrait_images = {}
