@@ -914,32 +914,30 @@ class MainWindow(ctk.CTk):
         self._animate_sidebar_width(target_width, on_complete=finalize)
 
     def _is_pointer_exiting_sidebar_right(self, event) -> bool:
-        """Return False only when the pointer clearly heads back toward the hotspot (left)."""
-        widget = getattr(event, "widget", None)
-        if widget is None:
+        """Return True only when the pointer exits to the right of the sidebar frame."""
+        frame = getattr(self, "sidebar_frame", None)
+        if frame is None or not frame.winfo_exists():
+            return True
+
+        # Allow explicit collapses (no event) to proceed
+        if event is None:
             return True
 
         try:
-            widget_width = widget.winfo_width()
-            widget_root_x = widget.winfo_rootx()
+            frame_left = frame.winfo_rootx()
+            frame_right = frame_left + frame.winfo_width()
         except Exception:
             return True
 
-        relative_x = getattr(event, "x", None)
-        if relative_x is not None:
-            if relative_x < 0:
-                return False
-            if relative_x >= widget_width:
-                return True
-
         root_x = getattr(event, "x_root", None)
-        if root_x is not None:
-            if root_x < widget_root_x:
-                return False
-            if root_x >= widget_root_x + widget_width:
-                return True
+        if root_x is None:
+            return False
 
-        return True
+        if root_x >= frame_right:
+            return True
+
+        # Pointer is still over or to the left of the sidebar; do not collapse yet
+        return False
 
     def _collapse_sidebar(self, _event=None, immediate: bool = False):
         frame = getattr(self, "sidebar_frame", None)
