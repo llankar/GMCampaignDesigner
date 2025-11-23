@@ -7,6 +7,7 @@ from tkinter import filedialog, messagebox
 from PIL import Image
 from functools import partial
 from modules.generic.generic_model_wrapper import GenericModelWrapper
+from modules.generic.generic_editor_window import GenericEditorWindow
 from modules.helpers.template_loader import load_template as load_entity_template
 from modules.helpers.text_helpers import format_multiline_text
 from customtkinter import CTkLabel, CTkImage
@@ -1041,26 +1042,76 @@ class GMScreenView(ctk.CTkFrame):
             return None
         return tab_info.get("content_frame")
 
-    def _get_active_entity_edit_handler(self):
-        frame = self._get_active_entity_frame()
-        if frame is None:
+    def _get_active_entity_meta(self):
+        if not self.current_tab:
             return None
-        handler = getattr(frame, "edit_entity", None)
-        return handler if callable(handler) else None
+        tab_info = self.tabs.get(self.current_tab, {})
+        meta = tab_info.get("meta") or {}
+        return meta if meta.get("kind") == "entity" else None
 
     def _edit_current_entity(self):
-        handler = self._get_active_entity_edit_handler()
-        if not handler:
+        meta = self._get_active_entity_meta()
+        if not meta:
+            return
+        entity_type = meta.get("entity_type")
+        entity_name = meta.get("entity_name")
+        if not entity_type or not entity_name:
+            return
+        wrapper = self.wrappers.get(entity_type)
+        template = self.templates.get(entity_type)
+        if wrapper is None or template is None:
+            return
+        key_field = "Title" if entity_type in {"Scenarios", "Books", "Informations"} else "Name"
+        items = wrapper.load_items()
+        item = next((i for i in items if i.get(key_field) == entity_name), None)
+        if not item:
+            messagebox.showerror("Edit Entity", f"Unable to locate {entity_type[:-1]} '{entity_name}'.")
             return
         try:
-            handler()
-        except Exception as exc:
-            messagebox.showerror("Edit Entity", f"Unable to open editor: {exc}")
+            master_widget = self.winfo_toplevel()
+        except Exception:
+            master_widget = self
+        editor = GenericEditorWindow(
+            master_widget,
+            item,
+            template,
+            wrapper,
+            creation_mode=False,
+        )
+        try:
+            master_widget.wait_window(editor)
+        except Exception:
+            editor.wait_window()
+        if getattr(editor, "saved", False):
+            wrapper.save_items(items)
+            tab_info = self.tabs.get(self.current_tab, {})
+            old_frame = tab_info.get("content_frame")
+            try:
+                if old_frame is not None:
+                    old_frame.destroy()
+            except Exception:
+                pass
+            refreshed = create_entity_detail_frame(
+                entity_type,
+                item,
+                master=self.content_area,
+                open_entity_callback=self.open_entity_tab,
+            )
+            tab_info["content_frame"] = refreshed
+            tab_info["factory"] = lambda master: create_entity_detail_frame(
+                entity_type,
+                item,
+                master=master,
+                open_entity_callback=self.open_entity_tab,
+            )
+            tab_info.setdefault("meta", {})["entity_name"] = item.get(key_field, entity_name)
+            self._register_context_menu_region(refreshed)
+            self.show_tab(self.current_tab)
 
     def _show_context_menu(self, event):
         if not self._context_menu:
             return
-        edit_available = self._get_active_entity_edit_handler() is not None
+        edit_available = self._get_active_entity_meta() is not None
         try:
             self._context_menu.entryconfig(
                 self._edit_menu_label,
