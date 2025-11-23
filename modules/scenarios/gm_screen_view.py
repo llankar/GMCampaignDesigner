@@ -237,26 +237,6 @@ class GMScreenView(ctk.CTkFrame):
         for child in widget.winfo_children():
             self._register_context_menu_region(child)
 
-        # Example usage: create the first tab from the scenario_item
-        scenario_name = scenario_item.get("Title", "Unnamed Scenario")
-        frame = create_entity_detail_frame("Scenarios", scenario_item, master=self.content_area, open_entity_callback=self.open_entity_tab)
-        
-        # Make sure the frame can get focus so the binding works
-        self.focus_set()
-        self.add_tab(
-            scenario_name,
-            frame,
-            content_factory=lambda master: create_entity_detail_frame("Scenarios", scenario_item, master=master, open_entity_callback=self.open_entity_tab),
-            layout_meta={
-                "kind": "entity",
-                "entity_type": "Scenarios",
-                "entity_name": scenario_name,
-            },
-        )
-
-        # Apply either the caller-specified layout or the scenario default
-        self.after(100, self._apply_initial_layout)
-
     # -- Runtime sizing helpers -------------------------------------------------
     def _sync_fullbleed_now(self, container: ctk.CTkFrame | None):
         if not container or not container.winfo_exists():
