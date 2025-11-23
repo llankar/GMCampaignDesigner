@@ -899,19 +899,6 @@ def create_scenario_detail_frame(entity_type, scenario_item, master, open_entity
     frame = ctk.CTkFrame(master)
     frame.pack(fill="both", expand=True, padx=20, pady=10)
     gm_view_instance = getattr(open_entity_callback, "__self__", None)
-    edit_btn = ctk.CTkButton(
-        frame,
-        text="Edit",
-        command=lambda et=entity_type, en=scenario_item: EditWindow(
-            frame,
-            en,
-            load_template(et.lower()),
-            wrappers[et],
-            creation_mode=False,
-            on_save=rebuild_frame
-        )
-    )
-    edit_btn.pack(anchor="ne", padx=10, pady=(0, 10))
     def rebuild_frame(updated_item):
         # 1) Destroy the old frame
         frame.destroy()
@@ -934,6 +921,21 @@ def create_scenario_detail_frame(entity_type, scenario_item, master, open_entity
             tab_name = updated_item.get(key_field)
             if tab_name in gm_view.tabs:
                 gm_view.tabs[tab_name]["content_frame"] = new_frame
+
+    def _edit_entity():
+        EditWindow(
+            frame,
+            scenario_item,
+            load_template(entity_type.lower()),
+            wrappers[entity_type],
+            creation_mode=False,
+            on_save=rebuild_frame,
+        )
+
+    frame.edit_entity = _edit_entity
+    if gm_view_instance is not None:
+        frame.bind("<Button-3>", gm_view_instance._show_context_menu)
+        frame.bind("<Control-Button-1>", gm_view_instance._show_context_menu)
         
     ttk.Separator(frame, orient="horizontal").pack(fill="x", pady=1)
     # ——— HEADER ———
@@ -1084,12 +1086,10 @@ def create_entity_detail_frame(entity_type, entity, master, open_entity_callback
             open_entity_callback
         )
 
-    # Create a scrollable container instead of a plain frame.
-    
     # Create the actual content frame inside the scrollable container.
     content_frame = ctk.CTkFrame(master)
     content_frame.pack(fill="both", expand=True, padx=10, pady=10)
-    # — Add an “Edit” button so GMs can open the generic editor for this entity —
+    gm_view_instance = getattr(open_entity_callback, "__self__", None)
 
     # rebuild_frame will clear & re-populate this same content_frame
     def rebuild_frame(updated_item):
@@ -1107,11 +1107,28 @@ def create_entity_detail_frame(entity_type, entity, master, open_entity_callback
 
         # 3) Update the GM-view’s tabs dict so show_tab() refers to the new widget
         #    open_entity_callback is bound to the GMScreenView instance
-        gm_view = open_entity_callback.__self__
-        # pick the right key—"Title" for scenarios, else "Name"
-        key_field = "Title" if entity_type == "Scenarios" else "Name"
-        tab_name = updated_item.get(key_field)
-        gm_view.tabs[tab_name]["content_frame"] = new_frame
+        gm_view = getattr(open_entity_callback, "__self__", None)
+        if gm_view is not None:
+            # pick the right key—"Title" for scenarios, else "Name"
+            key_field = "Title" if entity_type == "Scenarios" else "Name"
+            tab_name = updated_item.get(key_field)
+            if tab_name in gm_view.tabs:
+                gm_view.tabs[tab_name]["content_frame"] = new_frame
+
+    def _edit_entity():
+        EditWindow(
+            content_frame,
+            entity,
+            load_template(entity_type.lower()),
+            wrappers[entity_type],
+            creation_mode=False,
+            on_save=rebuild_frame,
+        )
+
+    content_frame.edit_entity = _edit_entity
+    if gm_view_instance is not None:
+        content_frame.bind("<Button-3>", gm_view_instance._show_context_menu)
+        content_frame.bind("<Control-Button-1>", gm_view_instance._show_context_menu)
         
 
     button_bar = ctk.CTkFrame(content_frame)
@@ -1151,21 +1168,6 @@ def create_entity_detail_frame(entity_type, entity, master, open_entity_callback
 
         audio_label.bind("<Button-3>", _show_audio_menu)
         audio_label.pack(side="right", padx=(0, 6), pady=6)
-
-    edit_btn = ctk.CTkButton(
-        button_bar,
-        text="Edit",
-        command=lambda et=entity_type, en=entity: EditWindow(
-            content_frame,
-            en,
-            load_template(et.lower()),
-            wrappers[et],
-            creation_mode=False,
-            on_save=rebuild_frame
-        )
-    )
-
-    edit_btn.pack(side="right", padx=10, pady=6)
 
     # This local cache is used for portrait images (if any).
     content_frame.portrait_images = {}

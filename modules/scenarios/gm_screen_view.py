@@ -58,6 +58,7 @@ class GMScreenView(ctk.CTkFrame):
         self.note_widget = None
         self._note_editor_window = None
         self._context_menu = None
+        self._edit_menu_label = "Edit Entity"
         self._state_loaded = False
         self._scene_metadata = {}
 
@@ -689,6 +690,12 @@ class GMScreenView(ctk.CTkFrame):
             label="Add Timestamped Note",
             command=self.add_timestamped_note,
         )
+        self._context_menu.add_separator()
+        self._context_menu.add_command(
+            label=self._edit_menu_label,
+            command=self._edit_current_entity,
+            state="disabled",
+        )
 
         targets = [self, self.content_area, getattr(self.content_area, "_scrollable_frame", None)]
         for widget in targets:
@@ -966,9 +973,42 @@ class GMScreenView(ctk.CTkFrame):
             self._note_cache = f"{existing}{prefix}{entry_text}".strip()
             self._persist_scene_state()
 
+    def _get_active_entity_frame(self):
+        if not self.current_tab:
+            return None
+        tab_info = self.tabs.get(self.current_tab, {})
+        meta = tab_info.get("meta") or {}
+        if meta.get("kind") != "entity":
+            return None
+        return tab_info.get("content_frame")
+
+    def _get_active_entity_edit_handler(self):
+        frame = self._get_active_entity_frame()
+        if frame is None:
+            return None
+        handler = getattr(frame, "edit_entity", None)
+        return handler if callable(handler) else None
+
+    def _edit_current_entity(self):
+        handler = self._get_active_entity_edit_handler()
+        if not handler:
+            return
+        try:
+            handler()
+        except Exception as exc:
+            messagebox.showerror("Edit Entity", f"Unable to open editor: {exc}")
+
     def _show_context_menu(self, event):
         if not self._context_menu:
             return
+        edit_available = self._get_active_entity_edit_handler() is not None
+        try:
+            self._context_menu.entryconfig(
+                self._edit_menu_label,
+                state="normal" if edit_available else "disabled",
+            )
+        except Exception:
+            pass
         try:
             self._context_menu.tk_popup(event.x_root, event.y_root)
         finally:
