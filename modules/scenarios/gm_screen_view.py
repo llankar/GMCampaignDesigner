@@ -201,7 +201,11 @@ class GMScreenView(ctk.CTkFrame):
     def _ensure_context_bindtag(self):
         if getattr(self, "_context_bind_tag", None):
             return
-        self._context_bind_tag = f"{self._w}_context"
+        # Tk class tags must not look like widget paths (which start with a dot),
+        # so sanitize the name to avoid "bad window path" errors when binding
+        # after the widget hierarchy changes.
+        safe_tag = f"{self.winfo_class()}_{self.winfo_id()}_context".replace(".", "_")
+        self._context_bind_tag = safe_tag
         self.bind_class(self._context_bind_tag, "<Button-3>", self._show_context_menu)
         self.bind_class(self._context_bind_tag, "<Control-Button-1>", self._show_context_menu)
 
