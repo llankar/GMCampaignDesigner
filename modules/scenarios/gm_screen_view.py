@@ -198,6 +198,10 @@ class GMScreenView(ctk.CTkFrame):
         self.content_area.pack(fill="both", expand=True)
         self._initialize_context_menu()
 
+        # Populate the initial view once widgets are ready so the default scenario
+        # (or its saved layout) is visible without requiring manual tab creation.
+        self.after_idle(self._populate_initial_tabs)
+
     def _ensure_context_bindtag(self):
         if getattr(self, "_context_bind_tag", None):
             return
@@ -692,6 +696,43 @@ class GMScreenView(ctk.CTkFrame):
         if not layout_name:
             return
         self.load_layout(layout_name, silent=True)
+
+    def _populate_initial_tabs(self):
+        """Show the default scenario details or its saved layout on first render."""
+        try:
+            self._apply_initial_layout()
+        except Exception as exc:
+            log_warning(
+                f"Failed to apply initial GM screen layout: {exc}",
+                func_name="GMScreenView._populate_initial_tabs",
+            )
+
+        if not self.tabs:
+            scenario_name = self.scenario.get("Title") or self.scenario.get("Name") or "Scenario"
+            frame = create_entity_detail_frame(
+                "Scenarios",
+                self.scenario,
+                master=self.content_area,
+                open_entity_callback=self.open_entity_tab,
+            )
+            self.add_tab(
+                scenario_name,
+                frame,
+                content_factory=lambda master: create_entity_detail_frame(
+                    "Scenarios",
+                    self.scenario,
+                    master=master,
+                    open_entity_callback=self.open_entity_tab,
+                ),
+                layout_meta={
+                    "kind": "entity",
+                    "entity_type": "Scenarios",
+                    "entity_name": scenario_name,
+                },
+            )
+        elif self.tab_order and self.current_tab is None:
+            # Ensure a restored layout actually displays something.
+            self.show_tab(self.tab_order[0])
 
     def _initialize_context_menu(self):
         if self._context_menu is not None:
