@@ -198,6 +198,41 @@ class GMScreenView(ctk.CTkFrame):
         self.content_area.pack(fill="both", expand=True)
         self._initialize_context_menu()
 
+    def _ensure_context_bindtag(self):
+        if getattr(self, "_context_bind_tag", None):
+            return
+        self._context_bind_tag = f"{self._w}_context"
+        self.bind_class(self._context_bind_tag, "<Button-3>", self._show_context_menu)
+        self.bind_class(self._context_bind_tag, "<Control-Button-1>", self._show_context_menu)
+
+    def _register_context_menu_region(self, widget):
+        if widget is None:
+            return
+        self._ensure_context_bindtag()
+        try:
+            tags = list(widget.bindtags())
+        except Exception:
+            return
+
+        if self._context_bind_tag not in tags:
+            if "all" in tags:
+                tags.insert(tags.index("all"), self._context_bind_tag)
+            else:
+                tags.append(self._context_bind_tag)
+            try:
+                widget.bindtags(tuple(tags))
+            except Exception:
+                pass
+
+        try:
+            widget.bind("<Button-3>", self._show_context_menu, add="+")
+            widget.bind("<Control-Button-1>", self._show_context_menu, add="+")
+        except Exception:
+            pass
+
+        for child in widget.winfo_children():
+            self._register_context_menu_region(child)
+
         # Example usage: create the first tab from the scenario_item
         scenario_name = scenario_item.get("Title", "Unnamed Scenario")
         frame = create_entity_detail_frame("Scenarios", scenario_item, master=self.content_area, open_entity_callback=self.open_entity_tab)
@@ -638,6 +673,8 @@ class GMScreenView(ctk.CTkFrame):
             "meta": layout_meta or {},
         }
 
+        self._register_context_menu_region(content_frame)
+
         content_frame.pack_forget()
         self.show_tab(name)
         # 1) append to order list
@@ -699,10 +736,7 @@ class GMScreenView(ctk.CTkFrame):
 
         targets = [self, self.content_area, getattr(self.content_area, "_scrollable_frame", None)]
         for widget in targets:
-            if widget is None:
-                continue
-            widget.bind("<Button-3>", self._show_context_menu)
-            widget.bind("<Control-Button-1>", self._show_context_menu)
+            self._register_context_menu_region(widget)
 
     def reset_scene_widgets(self):
         self._scene_vars = {}
@@ -2075,6 +2109,7 @@ class GMScreenView(ctk.CTkFrame):
         if master is None:
             master = self.content_area
         frame = ctk.CTkFrame(master)
+        self._register_context_menu_region(frame)
         template = self.templates[entity_type]
         if (entity_type == "NPCs" or entity_type == "PCs" or entity_type == "Creatures" ) and "Portrait" in entity and os.path.exists(entity["Portrait"]):
             img = Image.open(entity["Portrait"])

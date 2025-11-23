@@ -1127,8 +1127,12 @@ def create_entity_detail_frame(entity_type, entity, master, open_entity_callback
 
     content_frame.edit_entity = _edit_entity
     if gm_view_instance is not None:
-        content_frame.bind("<Button-3>", gm_view_instance._show_context_menu)
-        content_frame.bind("<Control-Button-1>", gm_view_instance._show_context_menu)
+        register_context = getattr(gm_view_instance, "_register_context_menu_region", None)
+        if callable(register_context):
+            register_context(content_frame)
+        else:
+            content_frame.bind("<Button-3>", gm_view_instance._show_context_menu)
+            content_frame.bind("<Control-Button-1>", gm_view_instance._show_context_menu)
         
 
     button_bar = ctk.CTkFrame(content_frame)
