@@ -288,7 +288,7 @@ class SceneFlowViewerFrame(ScenarioGraphEditor):
         if cw <= 1 or ch <= 1:
             return
 
-        bbox = canvas.bbox("all")
+        bbox = self._content_bbox()
         if not bbox:
             return
         content_w = max(1, bbox[2] - bbox[0])
@@ -313,11 +313,25 @@ class SceneFlowViewerFrame(ScenarioGraphEditor):
             self.canvas_scale = scale
             self.draw_graph()
             canvas.update_idletasks()
-            bbox = canvas.bbox("all") or bbox
+            bbox = self._content_bbox() or bbox
+
+        # Restrict the scrollregion to the visible content instead of the
+        # background grid to avoid zooming out to the entire tiled canvas.
+        padding = 80
+        scroll_region = (
+            bbox[0] - padding,
+            bbox[1] - padding,
+            bbox[2] + padding,
+            bbox[3] + padding,
+        )
+        try:
+            canvas.configure(scrollregion=scroll_region)
+        except Exception:
+            scroll_region = bbox
 
         # Center the view within the scrollregion
         try:
-            sx0, sy0, sx1, sy1 = canvas.bbox("all")
+            sx0, sy0, sx1, sy1 = scroll_region
         except Exception:
             return
         width_r = max(1, sx1 - sx0)
@@ -339,6 +353,26 @@ class SceneFlowViewerFrame(ScenarioGraphEditor):
         else:
             canvas.yview_moveto(0.0)
         self._fit_initialized = True
+
+    def _content_bbox(self):
+        """Return the bounding box for rendered graph content only."""
+
+        canvas = getattr(self, "canvas", None)
+        if not canvas:
+            return None
+
+        for tags in (("node", "link"), ("node",), ("link",)):
+            try:
+                bbox = canvas.bbox(*tags)
+                if bbox:
+                    return bbox
+            except Exception:
+                continue
+
+        try:
+            return canvas.bbox("all")
+        except Exception:
+            return None
 
     def _on_layout_resize(self, _event=None) -> None:
         """Keep the canvas height matched to available space under the toolbar."""
