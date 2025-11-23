@@ -1060,11 +1060,24 @@ def EditWindow(self, item, template, model_wrapper, creation_mode=False, on_save
         target = model_wrapper.load_item_by_key(key_value, key_field=key_field)
     if target is None:
         target = dict(item)
+    # Prefer to parent the editor to the top-level window rather than the
+    # immediate frame.  When a context menu invokes "Edit Entity" from inside
+    # the GM Screen, the direct frame master can be a scrollable container,
+    # which makes the modal grab freeze the UI.  Using the nearest toplevel
+    # keeps the dialog responsive and avoids partial renders.
+    try:
+        master_widget = self.winfo_toplevel()
+    except Exception:
+        master_widget = self
+
     editor = GenericEditorWindow(
-        self, target, template,
+        master_widget, target, template,
         model_wrapper, creation_mode
     )
-    self.master.wait_window(editor)
+    try:
+        master_widget.wait_window(editor)
+    except Exception:
+        editor.wait_window()
     if getattr(editor, "saved", False):
         model_wrapper.save_item(target, key_field=key_field)
         # let the detail frame know it should refresh itself
