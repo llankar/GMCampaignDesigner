@@ -153,6 +153,13 @@ class GMScreenView(ctk.CTkFrame):
             width=40,
             command=self.add_new_tab
         )
+
+        self.add_dropdown_button = ctk.CTkButton(
+            self.tab_bar,
+            text="▾",
+            width=24,
+            command=self.add_new_tab,
+        )
         
         self.random_button = ctk.CTkButton(
             self.tab_bar,
@@ -162,7 +169,27 @@ class GMScreenView(ctk.CTkFrame):
         )
         self.random_button.pack(side="left", padx=2, pady=5)
         self.add_button.pack(side="left", padx=2, pady=5)
-        self.random_button.pack(side="left", padx=2, pady=5)
+        self.add_dropdown_button.pack(side="left", padx=(0, 5), pady=5)
+
+        self._add_menu_options = [
+            "World Map",
+            "Map Tool",
+            "Scene Flow",
+            "Loot Generator",
+            "Factions",
+            "Places",
+            "NPCs",
+            "PCs",
+            "Creatures",
+            "Scenarios",
+            "Clues",
+            "Informations",
+            "Note Tab",
+            "NPC Graph",
+            "PC Graph",
+            "Scenario Graph Editor",
+        ]
+        self._add_menu = self._build_add_menu()
 
         # Layout control bar for persistence actions
         self.layout_toolbar = ctk.CTkFrame(self)
@@ -226,6 +253,12 @@ class GMScreenView(ctk.CTkFrame):
             container.configure(width=w, height=h)
         except Exception:
             pass
+
+    def _build_add_menu(self):
+        menu = tk.Menu(self, tearoff=0)
+        for option in self._add_menu_options:
+            menu.add_command(label=option, command=lambda o=option: self.open_selection_window(o))
+        return menu
 
 
     def _load_map_records(self):
@@ -1843,28 +1876,21 @@ class GMScreenView(ctk.CTkFrame):
 
     def add_new_tab(self):
         log_info("Opening entity selection for new tab", func_name="GMScreenView.add_new_tab")
-        # Include tools and viewers as first-class choices
-        options = [
-            "World Map",
-            "Map Tool",
-            "Scene Flow",
-            "Loot Generator",
-            "Factions", "Places", "NPCs", "PCs", "Creatures", "Scenarios", "Clues", "Informations",
-            "Note Tab", "NPC Graph", "PC Graph", "Scenario Graph Editor",
-        ]
-        popup = ctk.CTkToplevel(self)
-        popup.title("Create New Tab")
-        popup.geometry("300x800")
-        popup.transient(self.winfo_toplevel())
-        popup.grab_set()
-        popup.focus_force()
-        for option in options:
-            ctk.CTkButton(popup, text=option,
-                        command=lambda o=option: self.open_selection_window(o, popup)).pack(pady=2)
+        self._show_add_menu()
 
-    def open_selection_window(self, entity_type, popup):
+    def _show_add_menu(self):
+        button = self.add_dropdown_button if getattr(self, "add_dropdown_button", None) else self.add_button
+        x = button.winfo_rootx()
+        y = button.winfo_rooty() + button.winfo_height()
+        try:
+            self._add_menu.tk_popup(x, y)
+        finally:
+            self._add_menu.grab_release()
+
+    def open_selection_window(self, entity_type, popup=None):
         log_info(f"Opening selection window for {entity_type}", func_name="GMScreenView.open_selection_window")
-        popup.destroy()
+        if popup:
+            popup.destroy()
         if entity_type == "Note Tab":
             self.add_tab(
                 f"Note {len(self.tabs) + 1}",
