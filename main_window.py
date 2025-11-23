@@ -126,6 +126,7 @@ class MainWindow(ctk.CTk):
         self.sidebar_default_width = 220
         self._sidebar_collapsed = False
         self._sidebar_animating = False
+        self._sidebar_animation_job = None
         self._sidebar_pack_kwargs = None
         self.entity_definitions = load_entity_definitions()
         self.entity_wrappers = {}
@@ -846,14 +847,29 @@ class MainWindow(ctk.CTk):
         try:
             frame.bind("<Enter>", self._restore_sidebar)
             frame.bind("<Leave>", self._collapse_sidebar)
+            if getattr(self, "sidebar_inner", None) is not None:
+                self.sidebar_inner.bind("<Enter>", self._restore_sidebar)
+                self.sidebar_inner.bind("<Leave>", self._collapse_sidebar)
         except Exception:
             pass
+
+    def _cancel_sidebar_animation(self):
+        if self._sidebar_animation_job is not None:
+            try:
+                self.after_cancel(self._sidebar_animation_job)
+            except Exception:
+                pass
+        self._sidebar_animation_job = None
+        self._sidebar_animating = False
 
     def _animate_sidebar_width(self, target_width: int, on_complete=None):
         frame = getattr(self, "sidebar_frame", None)
         if frame is None or not frame.winfo_exists():
             self._sidebar_animating = False
             return
+
+        # Cancel any pending animation callbacks before starting a fresh one
+        self._cancel_sidebar_animation()
 
         try:
             current_width = int(frame.cget("width"))
@@ -867,10 +883,10 @@ class MainWindow(ctk.CTk):
             return
 
         self._sidebar_animating = True
-        step = 20 if target_width > current_width else -20
-        next_width = current_width + step
+        step_size = 40 if target_width > current_width else -40
+        next_width = current_width + step_size
 
-        if (step > 0 and next_width > target_width) or (step < 0 and next_width < target_width):
+        if (step_size > 0 and next_width > target_width) or (step_size < 0 and next_width < target_width):
             next_width = target_width
 
         try:
@@ -882,7 +898,9 @@ class MainWindow(ctk.CTk):
             return
 
         if next_width != target_width:
-            self.after(10, lambda: self._animate_sidebar_width(target_width, on_complete))
+            self._sidebar_animation_job = self.after(
+                6, lambda: self._animate_sidebar_width(target_width, on_complete)
+            )
             return
 
         self._sidebar_animating = False
@@ -893,8 +911,7 @@ class MainWindow(ctk.CTk):
         frame = getattr(self, "sidebar_frame", None)
         if frame is None or not frame.winfo_exists():
             return
-        if self._sidebar_animating:
-            return
+        self._cancel_sidebar_animation()
 
         if not frame.winfo_manager():
             if self._sidebar_pack_kwargs is None:
@@ -923,8 +940,7 @@ class MainWindow(ctk.CTk):
         frame = getattr(self, "sidebar_frame", None)
         if frame is None or not frame.winfo_exists():
             return
-        if self._sidebar_animating:
-            return
+        self._cancel_sidebar_animation()
         if self._sidebar_collapsed:
             return
 
