@@ -59,6 +59,7 @@ class GMScreenView(ctk.CTkFrame):
         self.note_widget = None
         self._note_editor_window = None
         self._context_menu = None
+        self._context_dismiss_bindings = []
         self._edit_menu_label = "Edit Entity"
         self._state_loaded = False
         self._scene_metadata = {}
@@ -1052,6 +1053,7 @@ class GMScreenView(ctk.CTkFrame):
     def _dismiss_context_menu(self):
         if not self._context_menu:
             return
+        self._remove_context_menu_dismissal()
         try:
             self._context_menu.unpost()
         except Exception:
@@ -1060,6 +1062,33 @@ class GMScreenView(ctk.CTkFrame):
             self._context_menu.grab_release()
         except Exception:
             pass
+
+    def _bind_context_menu_dismissal(self):
+        self._remove_context_menu_dismissal()
+        targets = [self._context_menu]
+        try:
+            top_level = self.winfo_toplevel()
+        except Exception:
+            top_level = None
+        if top_level is not None:
+            targets.append(top_level)
+
+        for widget in filter(None, targets):
+            for sequence in ("<Escape>", "<FocusOut>", "<ButtonRelease-1>"):
+                try:
+                    bind_id = widget.bind(sequence, lambda e: self._dismiss_context_menu(), add="+")
+                    if bind_id:
+                        self._context_dismiss_bindings.append((widget, sequence, bind_id))
+                except Exception:
+                    pass
+
+    def _remove_context_menu_dismissal(self):
+        for widget, sequence, bind_id in self._context_dismiss_bindings:
+            try:
+                widget.unbind(sequence, bind_id)
+            except Exception:
+                pass
+        self._context_dismiss_bindings = []
 
     def _edit_current_entity(self):
         meta = self._get_active_entity_meta()
@@ -1153,6 +1182,7 @@ class GMScreenView(ctk.CTkFrame):
         except Exception:
             pass
         try:
+            self._bind_context_menu_dismissal()
             self._context_menu.tk_popup(event.x_root, event.y_root)
         finally:
             self._context_menu.grab_release()
