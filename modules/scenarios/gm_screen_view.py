@@ -1092,18 +1092,16 @@ class GMScreenView(ctk.CTkFrame):
 
     def _edit_current_entity(self):
         meta = self._get_active_entity_meta()
-        # Defer both the dismissal and the editor launch until the next idle
-        # cycle. When the command is invoked directly from the context menu Tk
-        # keeps the menu grab active for the duration of the callback, which can
-        # leave the menu visible (and focus-blocking) while the editor window is
-        # created. Scheduling everything for idle guarantees the menu unposts
-        # before constructing the editor.
-        def _dismiss_and_open():
-            self._dismiss_context_menu()
-            if meta:
-                self._open_entity_editor(dict(meta))
+        # Dismiss the context menu immediately so it cannot retain a grab while
+        # the editor window is being created. Tk keeps the menu active for the
+        # duration of the callback that is invoked from the menu item, which can
+        # leave the menu visible (and focus-blocking) unless it is explicitly
+        # unposted first. The actual editor launch is still deferred to the next
+        # idle cycle to keep construction timing unchanged.
+        self._dismiss_context_menu()
 
-        self.after_idle(_dismiss_and_open)
+        if meta:
+            self.after_idle(lambda: self._open_entity_editor(dict(meta)))
 
     def _open_entity_editor(self, meta):
         entity_type = meta.get("entity_type")
