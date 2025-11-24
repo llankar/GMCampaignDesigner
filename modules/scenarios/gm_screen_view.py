@@ -652,9 +652,9 @@ class GMScreenView(ctk.CTkFrame):
         )
 
         for w in draggable_widgets:
-            w.bind("<Button-1>",        lambda e, n=name: self._on_tab_press(e, n))
-            w.bind("<B1-Motion>",       lambda e, n=name: self._on_tab_motion(e, n))
-            w.bind("<ButtonRelease-1>", lambda e, n=name: self._on_tab_release(e, n))
+            w.bind("<Button-1>",        lambda e=None, n=name: self._on_tab_press(e, n))
+            w.bind("<B1-Motion>",       lambda e=None, n=name: self._on_tab_motion(e, n))
+            w.bind("<ButtonRelease-1>", lambda e=None, n=name: self._on_tab_release(e, n))
 
         self.reposition_add_button()
         # Ensure the new content is stretched to full viewport size
@@ -1382,6 +1382,8 @@ class GMScreenView(ctk.CTkFrame):
         self.open_entity_tab(entity_type, entity_name)
 
     def _on_tab_press(self, event, name):
+        if event is None:
+            return
         # 1) Make sure winfo_x/y are up-to-date
         self.tab_bar.update_idletasks()
 
@@ -1403,6 +1405,8 @@ class GMScreenView(ctk.CTkFrame):
         self.tabs[name]["button_frame"].lift()
 
     def _on_tab_motion(self, event, name):
+        if event is None:
+            return
         frame = self.tabs[name]["button_frame"]
         rel_x = event.x_root - self.tab_bar.winfo_rootx() - frame.winfo_width() // 2
 
@@ -1444,6 +1448,8 @@ class GMScreenView(ctk.CTkFrame):
         self.tab_order.insert(new, name)
 
     def _on_tab_release(self, event, name):
+        if event is None:
+            return
         # snap all headers back into pack()
         for tn in self.tab_order:
             f = self.tabs[tn]["button_frame"]
