@@ -1133,9 +1133,6 @@ def create_entity_detail_frame(entity_type, entity, master, open_entity_callback
         content_frame.bind("<Control-Button-1>", gm_view_instance._show_context_menu)
         
 
-    button_bar = ctk.CTkFrame(content_frame)
-    button_bar.pack(fill="x", pady=(0, 10))
-
     audio_value = get_entity_audio_value(entity)
     entity_label = entity.get("Name") or entity.get("Title") or entity_type[:-1]
 
@@ -1156,6 +1153,9 @@ def create_entity_detail_frame(entity_type, entity, master, open_entity_callback
             messagebox.showwarning("Audio", "Unable to play the associated audio track.")
 
     if audio_value:
+        button_bar = ctk.CTkFrame(content_frame)
+        button_bar.pack(fill="x", pady=(0, 10))
+
         audio_label = ctk.CTkLabel(
             button_bar,
             text=_audio_display_name(audio_value),
