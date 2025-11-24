@@ -1049,10 +1049,33 @@ class GMScreenView(ctk.CTkFrame):
         meta = tab_info.get("meta") or {}
         return meta if meta.get("kind") == "entity" else None
 
+    def _dismiss_context_menu(self):
+        if not self._context_menu:
+            return
+        try:
+            self._context_menu.unpost()
+        except Exception:
+            pass
+        try:
+            self._context_menu.grab_release()
+        except Exception:
+            pass
+
     def _edit_current_entity(self):
         meta = self._get_active_entity_meta()
         if not meta:
+            self._dismiss_context_menu()
             return
+
+        # Defer the actual editor launch until after the menu is closed. When the
+        # edit action is invoked directly from the context menu Tk keeps the menu
+        # grab active long enough to show an empty, blocking toplevel.  Explicitly
+        # unposting the menu and scheduling the editor on the next idle cycle
+        # prevents the blank modal and keeps the GM Screen responsive.
+        self._dismiss_context_menu()
+        self.after_idle(lambda m=dict(meta): self._open_entity_editor(m))
+
+    def _open_entity_editor(self, meta):
         entity_type = meta.get("entity_type")
         entity_name = meta.get("entity_name")
         if not entity_type or not entity_name:
