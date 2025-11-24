@@ -1057,6 +1057,16 @@ class GMScreenView(ctk.CTkFrame):
         entity_name = meta.get("entity_name")
         if not entity_type or not entity_name:
             return
+        active_frame = self._get_active_entity_frame()
+        edit_handler = getattr(active_frame, "edit_entity", None) if active_frame else None
+        if callable(edit_handler):
+            previous_frame = active_frame
+            edit_handler()
+            tab_info = self.tabs.get(self.current_tab, {})
+            refreshed_frame = tab_info.get("content_frame") or previous_frame
+            self._register_context_menu_region(refreshed_frame)
+            self.show_tab(self.current_tab)
+            return
         wrapper = self.wrappers.get(entity_type)
         template = self.templates.get(entity_type)
         if wrapper is None or template is None:
