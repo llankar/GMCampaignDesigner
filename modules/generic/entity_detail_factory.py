@@ -94,6 +94,8 @@ wrappers = {
     "Objects": GenericModelWrapper("objects"),
     "Creatures": GenericModelWrapper("creatures"),
     "PCs": GenericModelWrapper("pcs"),
+    "Clues": GenericModelWrapper("clues"),
+    "Informations": GenericModelWrapper("informations"),
     "Books": GenericModelWrapper("books"),
 }
 
