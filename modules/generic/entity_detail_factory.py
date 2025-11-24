@@ -88,6 +88,8 @@ def _attach_portrait_tooltip(widget, entity_type, data):
 
 wrappers = {
     "Scenarios": GenericModelWrapper("scenarios"),
+    "Informations": GenericModelWrapper("informations"),
+    "Clues": GenericModelWrapper("clues"),
     "Places": GenericModelWrapper("places"),
     "NPCs": GenericModelWrapper("npcs"),
     "Factions": GenericModelWrapper("factions"),
