@@ -103,6 +103,8 @@ class WorldMapPanel(ctk.CTkFrame):
         self._seed_world_maps()
         self.map_names = sorted(self.world_maps.keys())
 
+        self._default_map_name: str | None = None
+
         self.current_map_name: str | None = None
         self.current_world_map: dict | None = None
         self.map_stack: list[str] = []
@@ -142,8 +144,12 @@ class WorldMapPanel(ctk.CTkFrame):
 
         if self.map_names:
             self.map_selector.configure(values=self.map_names)
-            self.map_selector.set(self.map_names[0])
-            self.load_map(self.map_names[0], push_history=False)
+            initial_map = self._resolve_initial_map()
+            if initial_map:
+                self.map_selector.set(initial_map)
+                self.load_map(initial_map, push_history=False)
+            else:
+                self._show_empty_state()
         else:
             self._show_empty_state()
 
@@ -161,23 +167,58 @@ class WorldMapPanel(ctk.CTkFrame):
         left_group = ctk.CTkFrame(toolbar, fg_color="transparent")
         left_group.pack(side="left", padx=8, pady=8)
 
-        ctk.CTkLabel(left_group, text="Map:", font=("Segoe UI", 14, "bold")).pack(side="left", padx=(4, 6))
+        selector_row = ctk.CTkFrame(left_group, fg_color="transparent")
+        selector_row.pack(side="top", fill="x")
+
+        ctk.CTkLabel(selector_row, text="Map:", font=("Segoe UI", 14, "bold")).pack(side="left", padx=(4, 6))
         self.map_selector = ctk.CTkOptionMenu(
-            left_group,
+            selector_row,
             values=self.map_names,
             command=self._on_map_selected,
             width=240,
         )
         self.map_selector.pack(side="left", padx=(0, 12))
 
+        self.set_default_button = ctk.CTkButton(
+            selector_row,
+            text="Set as default",
+            width=140,
+            command=self._set_default_map,
+        )
+        self.set_default_button.pack(side="left", padx=(0, 12))
+
         self.back_button = ctk.CTkButton(
-            left_group,
+            selector_row,
             text="Back",
             width=120,
             command=self.navigate_back,
             state=ctk.DISABLED,
         )
         self.back_button.pack(side="left", padx=(0, 12))
+
+        self.map_default_help = ctk.CTkLabel(
+            left_group,
+            text=textwrap.dedent(
+                """
+                Tip: Select a map and click "Set as default" to open it automatically next time.
+                Choose another map and click the button again to update it, or remove the
+                default_map entry from settings.ini if you prefer not to auto-load a map.
+                """
+            ).strip(),
+            font=("Segoe UI", 11),
+            justify="left",
+            wraplength=360,
+        )
+        self.map_default_help.pack(anchor="w", padx=(4, 6), pady=(6, 0))
+
+        self.map_default_status = ctk.CTkLabel(
+            left_group,
+            text="",
+            font=("Segoe UI", 11, "italic"),
+            justify="left",
+            wraplength=360,
+        )
+        self.map_default_status.pack(anchor="w", padx=(4, 6))
 
         entity_group = ctk.CTkFrame(toolbar, fg_color="transparent")
         entity_group.pack(side="left", padx=8, pady=8)
@@ -462,6 +503,50 @@ class WorldMapPanel(ctk.CTkFrame):
         self.current_world_map = None
         self._update_map_tool_button_state()
 
+    def _resolve_initial_map(self) -> str | None:
+        preferred_default = self._load_default_map_name()
+        if preferred_default and preferred_default in self.map_names:
+            return preferred_default
+
+        if not self.map_names:
+            return None
+
+        fallback_map = self.map_names[0]
+        if preferred_default:
+            self._persist_default_map(fallback_map)
+        return fallback_map
+
+    def _load_default_map_name(self) -> str | None:
+        preferred = None
+        cfg = ConfigHelper.load_campaign_config()
+        try:
+            if cfg and cfg.has_section("WorldMap") and cfg.has_option("WorldMap", "default_map"):
+                preferred = cfg.get("WorldMap", "default_map")
+        except Exception:
+            preferred = None
+
+        preferred = preferred or ConfigHelper.get("WorldMap", "default_map", fallback=None)
+        self._default_map_name = preferred or None
+        return self._default_map_name
+
+    def _persist_default_map(self, map_name: str | None) -> None:
+        self._default_map_name = map_name or None
+        ConfigHelper.set(
+            "WorldMap",
+            "default_map",
+            map_name or "",
+            file_path=ConfigHelper.get_campaign_settings_path(),
+        )
+        if hasattr(self, "map_default_status"):
+            if map_name:
+                self.map_default_status.configure(
+                    text=f'"{map_name}" will open automatically when you return to this campaign.'
+                )
+            else:
+                self.map_default_status.configure(
+                    text="Default map cleared. The first available map will be used instead."
+                )
+
     # ------------------------------------------------------------------
     # Map navigation
     # ------------------------------------------------------------------
@@ -470,6 +555,22 @@ class WorldMapPanel(ctk.CTkFrame):
             return
         if selected and selected != self.current_map_name:
             self.load_map(selected)
+
+    def _set_default_map(self) -> None:
+        if not hasattr(self, "map_selector"):
+            return
+        selection = self.map_selector.get()
+        if not selection:
+            return
+        if selection not in self.map_names:
+            messagebox.showwarning(
+                "Default Map",
+                "Select a valid map before saving it as your default.",
+                parent=self,
+            )
+            return
+
+        self._persist_default_map(selection)
 
     def load_map(self, map_name: str, *, push_history: bool = True) -> None:
         log_info(f"Loading world map '{map_name}'", func_name="WorldMapWindow.load_map")
