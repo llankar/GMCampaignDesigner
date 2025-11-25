@@ -196,30 +196,6 @@ class WorldMapPanel(ctk.CTkFrame):
         )
         self.back_button.pack(side="left", padx=(0, 12))
 
-        self.map_default_help = ctk.CTkLabel(
-            left_group,
-            text=textwrap.dedent(
-                """
-                Tip: Select a map and click "Set as default" to open it automatically next time.
-                Choose another map and click the button again to update it, or remove the
-                default_map entry from settings.ini if you prefer not to auto-load a map.
-                """
-            ).strip(),
-            font=("Segoe UI", 11),
-            justify="left",
-            wraplength=360,
-        )
-        self.map_default_help.pack(anchor="w", padx=(4, 6), pady=(6, 0))
-
-        self.map_default_status = ctk.CTkLabel(
-            left_group,
-            text="",
-            font=("Segoe UI", 11, "italic"),
-            justify="left",
-            wraplength=360,
-        )
-        self.map_default_status.pack(anchor="w", padx=(4, 6))
-
         entity_group = ctk.CTkFrame(toolbar, fg_color="transparent")
         entity_group.pack(side="left", padx=8, pady=8)
 
