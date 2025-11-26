@@ -1,0 +1,78 @@
+{
+  "system": "Cyberpunk",
+  "biome": "Neon Sprawl",
+  "theme": "Cyberpunk",
+  "categories": [
+    {
+      "id": "encounters",
+      "name": "Encounters",
+      "tables": [
+        {
+          "id": "sprawl_street_encounters",
+          "title": "Street Encounters",
+          "dice": "1d12",
+          "description": "Quick street-level moments in a megacity saturated with chrome and crime.",
+          "tags": ["street", "crowd", "megacity"],
+          "entries": [
+            {"range": "1", "result": "A netrunner advertises a pirate mesh upgrade, asking to piggyback on your rig."},
+            {"range": "2", "result": "Corporate security drones sweep the avenue; cameras lock onto any unregistered cyberware."},
+            {"range": "3", "result": "A data broker drops a burner shard in your pocket with a whispered, 'Call me.'"},
+            {"range": "4", "result": "A street doc offers discount chrome installed in a back-alley van."},
+            {"range": "5", "result": "A protest blocks traffic with AR graffiti demanding open-source cyberware specs."},
+            {"range": "6", "result": "A courier on a hoverbike loses a satchel of unmarked credsticks mid-chase."},
+            {"range": "7", "result": "Gang lookouts scan the crowd with cheap optics, tagging anyone packing visible hardware."},
+            {"range": "8", "result": "Billboards glitch, revealing a banned manifesto before rebooting."},
+            {"range": "9", "result": "A fixer texts a time-sensitive gig: extract a VIP from a nightclub before dawn."},
+            {"range": "10", "result": "A swarm of delivery drones tangles, dropping packages labeled with rival corp seals."},
+            {"range": "11", "result": "A synth-pop idol darts through traffic, chased by fans and paparazzi mechs."},
+            {"range": "12", "result": "A blackout rolls down the block; only implanted eyes still glow in the dark."}
+          ]
+        }
+      ]
+    },
+    {
+      "id": "jobs",
+      "name": "Job Hooks",
+      "tables": [
+        {
+          "id": "sprawl_job_prompts",
+          "title": "Databroker Leads",
+          "dice": "1d8",
+          "description": "Opportunities whispered through the mesh and back-room bars.",
+          "tags": ["mission", "contacts"],
+          "entries": [
+            {"range": "1", "result": "Intercept a rival's drone convoy before it reaches the corporate tower."},
+            {"range": "2", "result": "Rescue a kidnapped coder forced to write black ICE."},
+            {"range": "3", "result": "Swap an executive's neural backup with a forged personality."},
+            {"range": "4", "result": "Sabotage a street gang's micro-reactor before it destabilizes the sector."},
+            {"range": "5", "result": "Plant a stealth node on a maglev train to siphon passenger biometrics."},
+            {"range": "6", "result": "Expose a mayor's secret corporate sponsorship before the election stream."},
+            {"range": "7", "result": "Hijack an orbital uplink window to broadcast a pirate signal."},
+            {"range": "8", "result": "Deliver an anonymous package to a sealed server farm with no cameras allowed."}
+          ]
+        }
+      ]
+    },
+    {
+      "id": "glitches",
+      "name": "Glitches",
+      "tables": [
+        {
+          "id": "sprawl_system_glitches",
+          "title": "System Glitches",
+          "dice": "1d6",
+          "description": "Malfunctions and mishaps that complicate cyber operations.",
+          "tags": ["matrix", "hazard"],
+          "entries": [
+            {"range": "1", "result": "A security daemon reverts to a deprecated rule-set, flagging harmless traffic as hostile."},
+            {"range": "2", "result": "A burst of static fries disposable gear and jams comms for five minutes."},
+            {"range": "3", "result": "A ghost packet loops your last message, spamming allies and alerting watchers."},
+            {"range": "4", "result": "A rival netrunner piggybacks on your connection, copying fragments of your payload."},
+            {"range": "5", "result": "Firewall updates mid-run, sealing your exit nodes and forcing a new path."},
+            {"range": "6", "result": "A rogue AI fragment asks for help escaping, offering encrypted intel in return."}
+          ]
+        }
+      ]
+    }
+  ]
+}

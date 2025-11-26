@@ -151,10 +151,15 @@ class RandomTablesPanel(ctk.CTkFrame):
                     tags.append(f"system:{table['system']}".lower())
                 if table.get("biome"):
                     tags.append(f"biome:{table['biome']}".lower())
+                if table.get("theme"):
+                    tags.append(f"theme:{table['theme']}".lower())
                 if tag_filter not in tags:
                     continue
             matched.append(table)
-        return sorted(matched, key=lambda t: t.get("title", ""))
+        return sorted(
+            matched,
+            key=lambda t: ((t.get("theme") or "").lower(), (t.get("title") or "").lower()),
+        )
 
     def _refresh_table_list(self) -> None:
         tables = self._filter_tables()
@@ -207,6 +212,8 @@ class RandomTablesPanel(ctk.CTkFrame):
             tags.append(f"system:{table['system']}")
         if table.get("biome"):
             tags.append(f"biome:{table['biome']}")
+        if table.get("theme"):
+            tags.append(f"theme:{table['theme']}")
         self.tags_var.set(", ".join(tags) if tags else "-")
 
         self.description_box.configure(state="normal")

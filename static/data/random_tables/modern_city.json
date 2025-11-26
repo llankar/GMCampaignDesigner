@@ -1,0 +1,76 @@
+{
+  "system": "Modern Mystery",
+  "biome": "City",
+  "theme": "Modern",
+  "categories": [
+    {
+      "id": "encounters",
+      "name": "Encounters",
+      "tables": [
+        {
+          "id": "modern_city_sights",
+          "title": "City Street Moments",
+          "dice": "1d10",
+          "description": "Slice-of-life moments that can become clues or distractions.",
+          "tags": ["urban", "daytime"],
+          "entries": [
+            {"range": "1", "result": "A food-truck vendor overhears a heated argument about missing lab samples."},
+            {"range": "2", "result": "A cyclist narrowly avoids a delivery van, dropping a parcel stamped FRAGILE."},
+            {"range": "3", "result": "City maintenance workers open a manhole, revealing an unexpected warm draft."},
+            {"range": "4", "result": "Tourists snap photos of a mural that changed overnight with cryptic symbols."},
+            {"range": "5", "result": "A street preacher shouts about an impending blackout at tonight's exact time."},
+            {"range": "6", "result": "A lost child holds a smart toy that keeps repeating a GPS coordinate."},
+            {"range": "7", "result": "A free Wi‑Fi hotspot pops up briefly; connecting reveals a hidden directory."},
+            {"range": "8", "result": "A parade rehearsal reroutes traffic, giving cover for suspicious vans."},
+            {"range": "9", "result": "A friendly dog appears with a collar cam still recording."},
+            {"range": "10", "result": "A police scanner crackles with a BOLO that matches an ally's vehicle."}
+          ]
+        }
+      ]
+    },
+    {
+      "id": "investigation",
+      "name": "Investigation Seeds",
+      "tables": [
+        {
+          "id": "modern_case_threads",
+          "title": "Case Threads",
+          "dice": "1d8",
+          "description": "Hooks that lead into corporate espionage, missing persons, or crime thrillers.",
+          "tags": ["mystery", "hook"],
+          "entries": [
+            {"range": "1", "result": "A whistleblower asks for an escort to a news station before releasing documents."},
+            {"range": "2", "result": "A biotech startup reports break-ins, but nothing appears stolen—yet prototypes fail."},
+            {"range": "3", "result": "A social media influencer vanishes mid-stream; viewers saw a masked figure."},
+            {"range": "4", "result": "A politician's aide leaks that their boss is meeting unknown donors on a ferry."},
+            {"range": "5", "result": "A cold case box resurfaces with fresh fingerprints from someone recently deceased."},
+            {"range": "6", "result": "Security footage shows a suspect standing next to themselves at the same timestamp."},
+            {"range": "7", "result": "A beloved local statue disappears overnight, replaced by a 3D-printed replica."},
+            {"range": "8", "result": "An underground fight club posts a bounty for anyone who can hack their bracket."}
+          ]
+        }
+      ]
+    },
+    {
+      "id": "complications",
+      "name": "Complications",
+      "tables": [
+        {
+          "id": "modern_complications",
+          "title": "Scene Complications",
+          "dice": "1d6",
+          "description": "Twists to raise stakes during modern chases or interrogations.",
+          "tags": ["tension", "twist"],
+          "entries": [
+            {"range": "1", "result": "A sudden downpour floods the streets and knocks out rooftop snipers' visibility."},
+            {"range": "2", "result": "Power goes out in the block, forcing reliance on backup flashlights and radios."},
+            {"range": "3", "result": "A fire alarm triggers sprinklers, soaking evidence and electronics."},
+            {"range": "4", "result": "A crowd gathers and begins filming, making subtle moves impossible."},
+            {"range": "5", "result": "A police patrol arrives early, demanding permits and IDs from everyone."},
+            {"range": "6", "result": "Traffic snarls into gridlock, trapping vehicles in a slow-moving knot."}
+          ]
+        }
+      ]
+    }
+  ]
+}

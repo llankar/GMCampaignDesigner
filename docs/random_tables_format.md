@@ -8,6 +8,7 @@ Each file uses the same shape:
 {
   "system": "Fantasy 5e",          // Optional: system or ruleset the tables belong to
   "biome": "Forest",               // Optional: biome/locale shared by contained tables
+  "theme": "Fantasy",               // Optional: broader genre for sorting and filtering
   "categories": [
     {
       "id": "encounters",         // Machine-friendly id; falls back to name if omitted
@@ -52,4 +53,4 @@ print(loader.get_table("5e_forest_patrols"))
 ```
 
 ### Shipping samples
-The repository includes seed data under `static/data/random_tables/` and a merged fallback at `static/data/random_tables.json`. These cover encounters, inspirations, and environmental events for fantasy forests, dungeons, and orbital stations so GMs can roll immediately.
+The repository includes seed data under `static/data/random_tables/` and a merged fallback at `static/data/random_tables.json`. These cover encounters, inspirations, and environmental events for fantasy forests, dungeons, orbital stations, and genre packs like cyberpunk sprawls, modern cities, sci-fi colonies, and haunted locales so GMs can roll immediately.
