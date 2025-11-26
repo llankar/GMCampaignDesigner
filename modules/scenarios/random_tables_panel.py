@@ -21,6 +21,8 @@ log_module_import(__name__)
 class RandomTablesPanel(ctk.CTkFrame):
     """Panel to browse and roll structured random tables."""
 
+    _instances: List["RandomTablesPanel"] = []
+
     def __init__(self, master=None, data_path: Optional[str] = None, initial_state: Optional[Dict] = None, **kwargs):
         super().__init__(master, **kwargs)
         self.columnconfigure(0, weight=1)
@@ -34,6 +36,9 @@ class RandomTablesPanel(ctk.CTkFrame):
         self._table_index: List[str] = []
         self.selected_table_id: Optional[str] = None
         self.history: List[str] = []
+
+        if self not in self._instances:
+            self._instances.append(self)
 
         self._load_tables()
         self._build_ui()
@@ -288,6 +293,29 @@ class RandomTablesPanel(ctk.CTkFrame):
         self._refresh_table_list()
         for line in state.get("history") or []:
             self._append_history(line)
+
+    # ------------------------------------------------------------------
+    def reload_tables(self) -> None:
+        state = self.get_state()
+        self.loader = RandomTableLoader(self.data_path)
+        self._load_tables()
+        self.apply_state(state)
+
+    def destroy(self):
+        try:
+            if self in self._instances:
+                self._instances.remove(self)
+        except Exception:
+            pass
+        super().destroy()
+
+    @classmethod
+    def refresh_all(cls) -> None:
+        for panel in list(cls._instances):
+            try:
+                panel.reload_tables()
+            except Exception as exc:
+                log_exception(exc, func_name="RandomTablesPanel.refresh_all")
 
     def roll_random_table(self) -> Optional[dict]:
         if not self.tables:
