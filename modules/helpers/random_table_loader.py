@@ -54,13 +54,14 @@ class RandomTableLoader:
                 continue
             system = self._coerce_str(data.get("system"))
             biome = self._coerce_str(data.get("biome"))
+            theme = self._coerce_str(data.get("theme"))
 
             for raw_category in data.get("categories") or []:
                 cat_id = self._coerce_id(raw_category.get("id") or raw_category.get("name") or f"category_{len(self.categories)+1}")
                 category = self._get_or_create_category(cat_id, raw_category.get("name"))
 
                 for raw_table in raw_category.get("tables") or []:
-                    normalized = self._normalize_table(raw_table, category["id"], system, biome, source)
+                    normalized = self._normalize_table(raw_table, category["id"], system, biome, theme, source)
                     if not normalized:
                         continue
                     if normalized["id"] in self.tables:
@@ -114,7 +115,7 @@ class RandomTableLoader:
         return category
 
     def _normalize_table(
-        self, table: dict, category_id: str, system: Optional[str], biome: Optional[str], source: str
+        self, table: dict, category_id: str, system: Optional[str], biome: Optional[str], theme: Optional[str], source: str
     ) -> Optional[dict]:
         title = self._coerce_str(table.get("title") or table.get("name"))
         table_id = self._coerce_id(table.get("id") or title or f"table_{len(self.tables)+1}")
@@ -139,6 +140,7 @@ class RandomTableLoader:
             "category": category_id,
             "system": self._coerce_str(table.get("system") or system),
             "biome": self._coerce_str(table.get("biome") or biome),
+            "theme": self._coerce_str(table.get("theme") or theme),
             "source": source,
         }
 

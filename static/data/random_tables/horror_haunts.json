@@ -1,0 +1,78 @@
+{
+  "system": "Horror",
+  "biome": "Haunted Grounds",
+  "theme": "Horror",
+  "categories": [
+    {
+      "id": "encounters",
+      "name": "Encounters",
+      "tables": [
+        {
+          "id": "haunted_encounters",
+          "title": "Haunting Moments",
+          "dice": "1d12",
+          "description": "Creeping encounters for haunted manors, graveyards, or cursed towns.",
+          "tags": ["supernatural", "haunted"],
+          "entries": [
+            {"range": "1", "result": "Footsteps echo from the ceiling while dust falls from unmapped rafters."},
+            {"range": "2", "result": "A mirror fogs over to reveal writing in a hand you recognize."},
+            {"range": "3", "result": "Portrait eyes follow the group; one canvas slowly turns to face the wall."},
+            {"range": "4", "result": "A music box plays without winding, its tune changing tempo with the party's heartbeat."},
+            {"range": "5", "result": "Fresh flowers appear on a long-abandoned grave."},
+            {"range": "6", "result": "A chill wind extinguishes lights, revealing footprints that lead nowhere."},
+            {"range": "7", "result": "A child hums behind a locked door; opening it reveals only silence."},
+            {"range": "8", "result": "An unseen hand rearranges objects into a warning word."},
+            {"range": "9", "result": "A whisper offers a bargain if someone steps into the dark cellar alone."},
+            {"range": "10", "result": "A cracked bell rings once, and nearby insects fall dead instantly."},
+            {"range": "11", "result": "A shadow lags behind its owner, waving to someone unseen."},
+            {"range": "12", "result": "A ghostly procession crosses the hall, reenacting the house's last night."}
+          ]
+        }
+      ]
+    },
+    {
+      "id": "mysteries",
+      "name": "Mysteries",
+      "tables": [
+        {
+          "id": "haunted_revelations",
+          "title": "Revelations",
+          "dice": "1d8",
+          "description": "Clues that point to curses, restless spirits, or forgotten crimes.",
+          "tags": ["mystery", "occult"],
+          "entries": [
+            {"range": "1", "result": "A family tree shows a branch carefully burned away; the missing name appears in blood later."},
+            {"range": "2", "result": "Diary pages reveal the house was moved from its original foundation overnight."},
+            {"range": "3", "result": "Local records insist the town never existed on any official map."},
+            {"range": "4", "result": "An antique key opens every door but also whispers secrets when held to the ear."},
+            {"range": "5", "result": "The well water briefly runs crimson during each midnight."},
+            {"range": "6", "result": "Someone replaced church candles with vertebrae carved into spirals."},
+            {"range": "7", "result": "A sealed room contains a mural predicting the party's arrival in detail."},
+            {"range": "8", "result": "A ledger lists debts owed to the dead, with one line still blank."}
+          ]
+        }
+      ]
+    },
+    {
+      "id": "escalations",
+      "name": "Escalations",
+      "tables": [
+        {
+          "id": "haunted_escalations",
+          "title": "Escalating Terrors",
+          "dice": "1d6",
+          "description": "Raise the stakes when investigators linger too long.",
+          "tags": ["terror", "clock"],
+          "entries": [
+            {"range": "1", "result": "A cursed sigil brands itself faintly onto an investigator's skin."},
+            {"range": "2", "result": "All clocks stop at the same time; each hour afterwards invites a stronger apparition."},
+            {"range": "3", "result": "Doors refuse to stay open, slamming shut behind the party."},
+            {"range": "4", "result": "A friendly NPC begins speaking in two voices that argue with one another."},
+            {"range": "5", "result": "Shadows lengthen, becoming difficult terrain as they clutch at ankles."},
+            {"range": "6", "result": "The domain seals; escape now requires banishing the spirit or breaking the curse."}
+          ]
+        }
+      ]
+    }
+  ]
+}

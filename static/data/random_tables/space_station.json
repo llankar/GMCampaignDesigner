@@ -1,6 +1,7 @@
 {
   "system": "Space Opera",
   "biome": "Orbital Station",
+  "theme": "Sci-Fi",
   "categories": [
     {
       "id": "encounters",

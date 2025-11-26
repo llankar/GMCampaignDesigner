@@ -1,6 +1,7 @@
 {
   "system": "Fantasy 5e",
   "biome": "Dungeon",
+  "theme": "Fantasy",
   "categories": [
     {
       "id": "encounters",

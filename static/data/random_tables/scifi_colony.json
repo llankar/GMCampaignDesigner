@@ -1,0 +1,78 @@
+{
+  "system": "Space Opera",
+  "biome": "Frontier Colony",
+  "theme": "Sci-Fi",
+  "categories": [
+    {
+      "id": "encounters",
+      "name": "Encounters",
+      "tables": [
+        {
+          "id": "colony_outskirts",
+          "title": "Frontier Outskirts",
+          "dice": "1d12",
+          "description": "Moments on the edge of a young colony struggling to thrive.",
+          "tags": ["frontier", "settlement"],
+          "entries": [
+            {"range": "1", "result": "Terraforming towers vent steam, cloaking a group of saboteurs."},
+            {"range": "2", "result": "A rover limps back with cracked solar panels and no crew inside."},
+            {"range": "3", "result": "Survey drones map an unmarked ruin now emitting power readings."},
+            {"range": "4", "result": "Colonists argue over water rations as a supply ship reports delays."},
+            {"range": "5", "result": "A dust storm reveals buried cargo pods with military stencils."},
+            {"range": "6", "result": "A local guide begs for help retrieving family stuck in a sinkhole."},
+            {"range": "7", "result": "A herd of bio-engineered livestock stampedes after a sonic boom."},
+            {"range": "8", "result": "An outpost beacon transmits coordinates that don't match any map."},
+            {"range": "9", "result": "Miners return early, claiming they saw reflections moving in solid rock."},
+            {"range": "10", "result": "An orbital shuttle makes an emergency landing trailing black smoke."},
+            {"range": "11", "result": "A prospector offers a strange crystal that hums near powered gear."},
+            {"range": "12", "result": "A security officer requests backup; sensors show something massive approaching."}
+          ]
+        }
+      ]
+    },
+    {
+      "id": "mysteries",
+      "name": "Mysteries",
+      "tables": [
+        {
+          "id": "colony_mystery_hooks",
+          "title": "Colony Mysteries",
+          "dice": "1d8",
+          "description": "Hooks for scientific intrigue, alien ruins, or political sabotage.",
+          "tags": ["mystery", "science"],
+          "entries": [
+            {"range": "1", "result": "A scientist vanishes after claiming to decode alien lattice patterns."},
+            {"range": "2", "result": "Power cores drain overnight only in habitats facing the sunrise."},
+            {"range": "3", "result": "An agricultural AI starts rerouting drones to build something in the canyons."},
+            {"range": "4", "result": "A delegate from orbit pressures the governor to hide an impact crater."},
+            {"range": "5", "result": "Geophones record rhythmic tremors that line up with starship departures."},
+            {"range": "6", "result": "A metallic monolith appears outside the perimeter fence, perfectly smooth."},
+            {"range": "7", "result": "Encrypted messages broadcast from deep desert coordinates no one claimed."},
+            {"range": "8", "result": "An old Earth relic is found intact, broadcasting an outdated distress call."}
+          ]
+        }
+      ]
+    },
+    {
+      "id": "hazards",
+      "name": "Hazards",
+      "tables": [
+        {
+          "id": "colony_hazards",
+          "title": "Environmental Hazards",
+          "dice": "1d6",
+          "description": "Complications that make frontier missions tense and costly.",
+          "tags": ["hazard", "frontier"],
+          "entries": [
+            {"range": "1", "result": "Dust devils infused with static discharge short out exposed electronics."},
+            {"range": "2", "result": "A solar flare forces everyone indoors; exterior drones go offline."},
+            {"range": "3", "result": "Localized gravity glitches in an uncharted valley disorient vehicles."},
+            {"range": "4", "result": "A fungal bloom releases spores that corrode metal surfaces."},
+            {"range": "5", "result": "Magnetic storms distort compasses and ping unexploded munitions."},
+            {"range": "6", "result": "An ice pocket collapses, revealing sub-surface tunnels flooding with meltwater."}
+          ]
+        }
+      ]
+    }
+  ]
+}
