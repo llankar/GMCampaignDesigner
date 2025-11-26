@@ -1,0 +1,124 @@
+{
+  "system": "Horror",
+  "biome": "Haunted Locales",
+  "theme": "Horror",
+  "categories": [
+    {
+      "id": "omens",
+      "name": "Eerie Omens",
+      "tables": [
+        {
+          "id": "haunt_eerie_omens",
+          "title": "Whispers in the Dark",
+          "dice": "1d8",
+          "description": "Subtle warnings that something malign is near.",
+          "tags": ["omen", "atmosphere"],
+          "entries": [
+            {"range": "1", "result": "Candles bend toward the party as if reaching for warmth."},
+            {"range": "2", "result": "Reflections lag a heartbeat behind their owners' movements."},
+            {"range": "3", "result": "Footsteps echo twice, once ahead and once behind."},
+            {"range": "4", "result": "A child's laughter comes from inside a sealed wardrobe."},
+            {"range": "5", "result": "Shadows stretch upward, pointing toward the ceiling."},
+            {"range": "6", "result": "All metal grows ice-cold and draws faintly toward a single wall."},
+            {"range": "7", "result": "Portrait eyes now look at the door no matter where viewers stand."},
+            {"range": "8", "result": "A clock chimes thirteen times; no clock is present."}
+          ]
+        }
+      ]
+    },
+    {
+      "id": "haunted_objects",
+      "name": "Haunted Objects",
+      "tables": [
+        {
+          "id": "haunt_possessions",
+          "title": "Possessed Relics",
+          "dice": "1d10",
+          "description": "Items with histories that refuse to stay quiet.",
+          "tags": ["object", "curse"],
+          "entries": [
+            {"range": "1", "result": "A cracked mirror that shows a stranger standing behind the viewer."},
+            {"range": "2", "result": "A music box that plays only when the room is empty."},
+            {"range": "3", "result": "A diary that fills with ash-smudged handwriting whenever a lie is spoken nearby."},
+            {"range": "4", "result": "A lantern that burns with green flame but casts no heat."},
+            {"range": "5", "result": "A ring that tightens painfully when danger approaches."},
+            {"range": "6", "result": "A child's toy soldier that marches toward hidden passageways."},
+            {"range": "7", "result": "A photograph that slowly develops new figures in the background."},
+            {"range": "8", "result": "A teacup that rattles violently when placed near consecrated ground."},
+            {"range": "9", "result": "A bell with no clapper that rings when spirits answer questions."},
+            {"range": "10", "result": "A veil that hides the wearer's face from mirrors but not from spirits."}
+          ]
+        }
+      ]
+    },
+    {
+      "id": "events",
+      "name": "Macabre Events",
+      "tables": [
+        {
+          "id": "haunt_macabre_events",
+          "title": "Horrific Happenings",
+          "dice": "1d10",
+          "description": "Grim events that interrupt investigations or rituals.",
+          "tags": ["event", "horror"],
+          "entries": [
+            {"range": "1", "result": "Blood drips upward from floorboards and pools on the ceiling."},
+            {"range": "2", "result": "A hidden choir hums a dirge that only one party member hears."},
+            {"range": "3", "result": "All doors slam shut and locks rust over in seconds."},
+            {"range": "4", "result": "A cold wind extinguishes flames and carries whispers asking for names."},
+            {"range": "5", "result": "A ghost reenacts their final moments, ignoring attempts to interrupt."},
+            {"range": "6", "result": "A swarm of moths forms a silhouette pointing toward a forgotten room."},
+            {"range": "7", "result": "A staircase stretches endlessly until someone recites a remembered prayer."},
+            {"range": "8", "result": "A corpse puppet repeats everything spoken in the room with delay."},
+            {"range": "9", "result": "Fingers scratch from the inside of a wall, leaving bloody grooves."},
+            {"range": "10", "result": "Windows show a different season outside, with a figure beckoning."}
+          ]
+        }
+      ]
+    },
+    {
+      "id": "investigation",
+      "name": "Investigation Obstacles",
+      "tables": [
+        {
+          "id": "haunt_investigation_obstacles",
+          "title": "Obstacles and Clues",
+          "dice": "1d6",
+          "description": "Twists that complicate ghost hunts or occult research.",
+          "tags": ["clue", "obstacle"],
+          "entries": [
+            {"range": "1", "result": "Research notes combust unless read aloud by multiple people."},
+            {"range": "2", "result": "The only witness now speaks in riddles that rhyme with the spirit's name."},
+            {"range": "3", "result": "Protective sigils smear into nonsense unless refreshed with fresh blood."},
+            {"range": "4", "result": "The haunting jumps between objects when direct light touches the original focus."},
+            {"range": "5", "result": "A local priest forbids entry unless given proof the spirits deserve rest."},
+            {"range": "6", "result": "Time slips: clocks rewind five minutes every time a door opens."}
+          ]
+        }
+      ]
+    },
+    {
+      "id": "resolutions",
+      "name": "Ritual Resolutions",
+      "tables": [
+        {
+          "id": "haunt_ritual_resolutions",
+          "title": "Ways to End the Haunting",
+          "dice": "1d8",
+          "description": "Methods that can lay spirits to rest or unleash worse things.",
+          "tags": ["resolution", "ritual"],
+          "entries": [
+            {"range": "1", "result": "Bury a cherished heirloom beneath the threshold before dawn."},
+            {"range": "2", "result": "Invite the spirit to share a meal cooked from an old family recipe."},
+            {"range": "3", "result": "Break every mirror in the building while reciting their name backward."},
+            {"range": "4", "result": "Ring the silent bell at midnight while all witnesses hold hands."},
+            {"range": "5", "result": "Rebuild a destroyed piece of furniture exactly as it was."},
+            {"range": "6", "result": "Carry the remains to flowing water and let the current decide their fate."},
+            {"range": "7", "result": "Perform a lullaby taught by the oldest resident of the village."},
+            {"range": "8", "result": "Place salt lines in a perfect circle around the property and leave for a night."}
+          ]
+        }
+      ]
+    }
+  ]
+}

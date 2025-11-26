@@ -1,0 +1,128 @@
+{
+  "system": "Fantasy 5e",
+  "biome": "Forest",
+  "theme": "Fantasy",
+  "categories": [
+    {
+      "id": "tavern_rumors",
+      "name": "Tavern Rumors",
+      "tables": [
+        {
+          "id": "forest_tavern_rumors",
+          "title": "Alehouse Whispers",
+          "dice": "1d10",
+          "description": "Gossip and hooks overheard in woodland waystations.",
+          "tags": ["rumor", "hook"],
+          "entries": [
+            {"range": "1", "result": "A ranger swears the moonlight reveals floating ruins above the treeline."},
+            {"range": "2", "result": "A merchant lost a cart wheel yet arrived on time; unseen hands pushed them."},
+            {"range": "3", "result": "A hunter claims a stag bowed to them and spoke of a debt owed."},
+            {"range": "4", "result": "A druid circle sealed a grove and posted a sign: 'Sleepers at work.'"},
+            {"range": "5", "result": "A bard's new song includes verses no one remembers teaching them."},
+            {"range": "6", "result": "A tax collector vanished after confiscating a satchel of acorns."},
+            {"range": "7", "result": "A child returned from the woods with bark-textured skin that fades by dawn."},
+            {"range": "8", "result": "An old map stains change color depending on who holds it."},
+            {"range": "9", "result": "Campfires near the river burn blue and leave no ash."},
+            {"range": "10", "result": "Someone bought every horseshoe in town claiming 'the king returns tonight.'"}
+          ]
+        }
+      ]
+    },
+    {
+      "id": "travel",
+      "name": "Travel Color",
+      "tables": [
+        {
+          "id": "forest_travel_color",
+          "title": "Roadside Details",
+          "dice": "1d12",
+          "description": "Little scenes that make forest journeys feel alive.",
+          "tags": ["travel", "atmosphere"],
+          "entries": [
+            {"range": "1", "result": "Glow-worms form guiding lines across the path, vanishing when spoken to."},
+            {"range": "2", "result": "A fallen tree is carved with names of travelers and one fresh warning."},
+            {"range": "3", "result": "An abandoned picnic still warm, with no footprints leaving."},
+            {"range": "4", "result": "A flock of ravens fly backward above the canopy before scattering."},
+            {"range": "5", "result": "A mossy arch of stones hums when metal passes underneath."},
+            {"range": "6", "result": "A stream runs uphill beside the road for several yards."},
+            {"range": "7", "result": "A traveling theater rehearses in the clearing, props fashioned from leaves."},
+            {"range": "8", "result": "A patrol of elven scouts watch silently from high branches."},
+            {"range": "9", "result": "Sweet-smelling pollen drifts; mounts grow drowsy unless roused."},
+            {"range": "10", "result": "A carved wooden sign rotates on its own to point toward hidden trails."},
+            {"range": "11", "result": "A stone with an embedded sword appears different for each viewer."},
+            {"range": "12", "result": "A chorus of frogs croaks in time with the party's footsteps."}
+          ]
+        }
+      ]
+    },
+    {
+      "id": "rewards",
+      "name": "Minor Rewards",
+      "tables": [
+        {
+          "id": "forest_minor_rewards",
+          "title": "Forest Boons",
+          "dice": "1d8",
+          "description": "Small treasures or blessings gained from woodland allies.",
+          "tags": ["reward", "magic"],
+          "entries": [
+            {"range": "1", "result": "A vial of dew that purifies any liquid it touches."},
+            {"range": "2", "result": "A charm of braided vine granting whispers with birds for an hour."},
+            {"range": "3", "result": "A pouch of acorns that, when planted, grow into temporary cover overnight."},
+            {"range": "4", "result": "A leaf pressed with a faerie's signature, redeemable for a single safe passage."},
+            {"range": "5", "result": "A sprig that glows near poisonous plants or beasts."},
+            {"range": "6", "result": "A flask of sap that stiffens into resin, patching armor cracks instantly."},
+            {"range": "7", "result": "A tiny carved owl that hoots when lies are spoken within ten paces."},
+            {"range": "8", "result": "A rolled birch bark map showing a shortcut known only to local sprites."}
+          ]
+        }
+      ]
+    },
+    {
+      "id": "encounters",
+      "name": "Forest Encounters",
+      "tables": [
+        {
+          "id": "forest_encounter_spice",
+          "title": "Unexpected Company",
+          "dice": "1d10",
+          "description": "Quick interactions to spice up woodland travel.",
+          "tags": ["encounter", "forest"],
+          "entries": [
+            {"range": "1", "result": "A band of goblins practicing music ask for an honest critique."},
+            {"range": "2", "result": "A dryad seeks help relocating a trapped bear without harming loggers."},
+            {"range": "3", "result": "A knight-errant duels their own shadow at dusk."},
+            {"range": "4", "result": "A swarm of animated leaves forms shapes that mimic the party."},
+            {"range": "5", "result": "An herbalist offers healing poultices in exchange for escort to the next village."},
+            {"range": "6", "result": "A caravan of mushroomfolk request directions to the nearest underground entrance."},
+            {"range": "7", "result": "A wounded griffon guards a nest of eggs and values medical aid over combat."},
+            {"range": "8", "result": "A troupe of acrobatic squirrels demands tolls of shiny objects."},
+            {"range": "9", "result": "An elven archivist catalogs tree rings for prophecy and begs for protection."},
+            {"range": "10", "result": "A ghostly hunting party rides through, ignoring all until someone blocks their path."}
+          ]
+        }
+      ]
+    },
+    {
+      "id": "mysteries",
+      "name": "Forest Mysteries",
+      "tables": [
+        {
+          "id": "forest_weird_mysteries",
+          "title": "Strange Phenomena",
+          "dice": "1d6",
+          "description": "Unsettling sights hinting at deeper magic.",
+          "tags": ["mystery", "weird"],
+          "entries": [
+            {"range": "1", "result": "Trees swap places overnight yet roots remain intact."},
+            {"range": "2", "result": "Rain falls upward into hovering clouds that drift south."},
+            {"range": "3", "result": "Stone statues of animals rearrange themselves when unobserved."},
+            {"range": "4", "result": "A circle of mushrooms rings with chimes when lies are spoken nearby."},
+            {"range": "5", "result": "An abandoned camp is covered in frost despite the summer heat."},
+            {"range": "6", "result": "A waterfall spills into the sky, revealing a hidden crescent moon behind it."}
+          ]
+        }
+      ]
+    }
+  ]
+}
