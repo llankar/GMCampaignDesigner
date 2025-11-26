@@ -1,0 +1,30 @@
+{
+  "system": "Modern Mystery",
+  "biome": "City",
+  "theme": "Modern",
+  "categories": [
+    {
+      "id": "legwork",
+      "name": "Legwork",
+      "tables": [
+        {
+          "id": "modern_legwork_findings",
+          "title": "Legwork Findings",
+          "dice": "1d8",
+          "description": "Phone taps, stakeouts, and hallway gossip that move investigations forward.",
+          "tags": ["investigation", "hook"],
+          "entries": [
+            {"range": "1", "result": "A neighbor keeps seeing the victim visit a rooftop apiary at odd hours."},
+            {"range": "2", "result": "A rideshare log shows the same driver circling the block before pickup."},
+            {"range": "3", "result": "Security cam catches someone swapping badge lanyards in a lobby alcove."},
+            {"range": "4", "result": "A barista recognizes a suspect by an unusual tattoo of a subway map."},
+            {"range": "5", "result": "A courier delivered an unmarked package to the wrong suite and filmed the recipient."},
+            {"range": "6", "result": "Building maintenance reports a stuck elevator that paused at a hidden service floor."},
+            {"range": "7", "result": "A late-night talk-radio caller shares coordinates for a rumored dead drop."},
+            {"range": "8", "result": "A parking attendant admits a classic car was stored for cash, no questions asked."}
+          ]
+        }
+      ]
+    }
+  ]
+}

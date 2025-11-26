@@ -1,0 +1,34 @@
+{
+  "system": "Space Opera",
+  "biome": "Deep Space",
+  "theme": "Sci-Fi",
+  "categories": [
+    {
+      "id": "derelicts",
+      "name": "Derelicts",
+      "tables": [
+        {
+          "id": "derelict_starship_events",
+          "title": "Derelict Starship Events",
+          "dice": "1d12",
+          "description": "Creeping discoveries while exploring powerless vessels between the stars.",
+          "tags": ["derelict", "exploration"],
+          "entries": [
+            {"range": "1", "result": "Frozen coffee floats in beads across the galley as gravity flickers."},
+            {"range": "2", "result": "An SOS repeats in a dead language, then switches to a crew member's voice."},
+            {"range": "3", "result": "A maintenance bot still patrols, dutifully welding shut any opened hatch."},
+            {"range": "4", "result": "Cargo crates pulse with faint light, synchronized to approaching footsteps."},
+            {"range": "5", "result": "The ship's map shows corridors that do not physically exist."},
+            {"range": "6", "result": "A cryo pod cycles open, revealing only frost and a missing occupant."},
+            {"range": "7", "result": "Gravity reverses for a moment, slamming loose tools toward the ceiling."},
+            {"range": "8", "result": "An AI core speaks in riddles, demanding a passphrase that references starlore."},
+            {"range": "9", "result": "Footprints appear in dust ahead, leading to an airlock with no exterior scorch."},
+            {"range": "10", "result": "A fungal growth feeds on coolant, releasing hallucinogenic spores."},
+            {"range": "11", "result": "Weapon lockers are open, weapons untouched, ammo neatly stacked elsewhere."},
+            {"range": "12", "result": "A data crystal contains the last captain's confession and coordinates."}
+          ]
+        }
+      ]
+    }
+  ]
+}

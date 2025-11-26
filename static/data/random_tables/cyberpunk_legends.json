@@ -1,0 +1,32 @@
+{
+  "system": "Cyberpunk",
+  "biome": "Neon Sprawl",
+  "theme": "Cyberpunk",
+  "categories": [
+    {
+      "id": "rumors",
+      "name": "Rumors",
+      "tables": [
+        {
+          "id": "sprawl_nightlife_rumors",
+          "title": "Nightlife Rumors",
+          "dice": "1d10",
+          "description": "Bar chatter and club gossip that kick off quick runs or complications.",
+          "tags": ["hook", "club", "street"],
+          "entries": [
+            {"range": "1", "result": "A pop-up speakeasy is really a corp sting for unlicensed cyberware."},
+            {"range": "2", "result": "A bartender swears a ghost AI reroutes tips to dissident charities."},
+            {"range": "3", "result": "VIP booths are empty because a silent auction for stolen blackboxes moved locations."},
+            {"range": "4", "result": "A chromed-out courier lost a data bead during a dance-off challenge."},
+            {"range": "5", "result": "A joygirl offers a credstick engraved with coordinates outside the city dome."},
+            {"range": "6", "result": "Bouncers confiscate smart-weapons; someone never reclaimed a prototype pistol."},
+            {"range": "7", "result": "The house DJ mixes in a numbers station signal when execs arrive."},
+            {"range": "8", "result": "A hush-hush holo backroom hosts an illegal brainprint swap tonight."},
+            {"range": "9", "result": "A tired rockerboy needs escorts after insulting a gang's anthem."},
+            {"range": "10", "result": "Rumor spreads that a blackout rolling toward downtown hides a stealth convoy."}
+          ]
+        }
+      ]
+    }
+  ]
+}

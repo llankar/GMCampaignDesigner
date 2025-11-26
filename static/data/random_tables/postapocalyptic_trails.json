@@ -1,0 +1,30 @@
+{
+  "system": "Wasteland Survival",
+  "biome": "Ruined Highway",
+  "theme": "Post-Apocalyptic",
+  "categories": [
+    {
+      "id": "travel",
+      "name": "Travel",
+      "tables": [
+        {
+          "id": "wasteland_route_complications",
+          "title": "Route Complications",
+          "dice": "1d8",
+          "description": "Roadside snags and opportunities when caravans brave the wastes.",
+          "tags": ["travel", "hazard"],
+          "entries": [
+            {"range": "1", "result": "A rusted bridge moans under weight; a truck bed gives way revealing cargo."},
+            {"range": "2", "result": "Storm sirens blare as acidic rain clouds roll in faster than forecast."},
+            {"range": "3", "result": "A rival convoy demands a toll of batteries to pass without a chase."},
+            {"range": "4", "result": "A patch of glowing moss hints at radiation ahead or a leaking reactor."},
+            {"range": "5", "result": "An abandoned radio tower still functions, broadcasting coordinates to shelter."},
+            {"range": "6", "result": "Bandit caltrops shred tires; a side route through crumbling suburbia beckons."},
+            {"range": "7", "result": "A mechanical scavenger offers trade: clean water for scrap circuitry."},
+            {"range": "8", "result": "A dust devil reveals a buried bunker hatch sealed with a biometric lock."}
+          ]
+        }
+      ]
+    }
+  ]
+}
