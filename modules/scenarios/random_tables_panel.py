@@ -54,23 +54,37 @@ class RandomTablesPanel(ctk.CTkFrame):
         self.tables = data.get("tables") or {}
         self._table_index = list(self.tables.keys())
 
+    def _available_categories(self) -> List[str]:
+        return ["All"] + [cat.get("name") for cat in self.categories]
+
+    def _available_styles(self) -> List[str]:
+        styles = sorted({t.get("theme") for t in self.tables.values() if t.get("theme")})
+        return ["All"] + styles
+
     # ------------------------------------------------------------------
     def _build_ui(self) -> None:
         filter_bar = ctk.CTkFrame(self)
         filter_bar.grid(row=0, column=0, sticky="ew", padx=8, pady=(8, 4))
-        filter_bar.columnconfigure(2, weight=1)
+        filter_bar.columnconfigure(5, weight=1)
 
         ctk.CTkLabel(filter_bar, text="Category:").grid(row=0, column=0, padx=(4, 6), sticky="w")
-        categories = ["All"] + [cat.get("name") for cat in self.categories]
+        categories = self._available_categories()
         self.category_var = ctk.StringVar(value=categories[0] if categories else "All")
-        ctk.CTkOptionMenu(filter_bar, variable=self.category_var, values=categories, command=self._on_category_change).grid(
-            row=0, column=1, sticky="w", padx=(0, 10)
+        self.category_menu = ctk.CTkOptionMenu(
+            filter_bar, variable=self.category_var, values=categories, command=self._on_category_change
         )
+        self.category_menu.grid(row=0, column=1, sticky="w", padx=(0, 10))
 
-        ctk.CTkLabel(filter_bar, text="Tag filter:").grid(row=0, column=2, sticky="w")
+        ctk.CTkLabel(filter_bar, text="Style:").grid(row=0, column=2, sticky="w")
+        styles = self._available_styles()
+        self.style_var = ctk.StringVar(value=styles[0] if styles else "All")
+        self.style_menu = ctk.CTkOptionMenu(filter_bar, variable=self.style_var, values=styles, command=self._on_style_change)
+        self.style_menu.grid(row=0, column=3, sticky="w", padx=(0, 10))
+
+        ctk.CTkLabel(filter_bar, text="Tag filter:").grid(row=0, column=4, sticky="w")
         self.tag_var = ctk.StringVar()
         tag_entry = ctk.CTkEntry(filter_bar, textvariable=self.tag_var, placeholder_text="optional tag")
-        tag_entry.grid(row=0, column=3, sticky="ew", padx=(6, 4))
+        tag_entry.grid(row=0, column=5, sticky="ew", padx=(6, 4))
         tag_entry.bind("<KeyRelease>", lambda _e: self._refresh_table_list())
 
         list_container = ctk.CTkFrame(self)
@@ -135,6 +149,7 @@ class RandomTablesPanel(ctk.CTkFrame):
     def _filter_tables(self) -> List[dict]:
         tag_filter = (self.tag_var.get() or "").strip().lower()
         category_label = (self.category_var.get() or "All").strip()
+        style_label = (self.style_var.get() or "All").strip()
         selected_category = None
         for cat in self.categories:
             if cat.get("name") == category_label:
@@ -144,6 +159,8 @@ class RandomTablesPanel(ctk.CTkFrame):
         matched: List[dict] = []
         for table in self.tables.values():
             if selected_category and table.get("category") != selected_category:
+                continue
+            if style_label and style_label != "All" and (table.get("theme") or "") != style_label:
                 continue
             if tag_filter:
                 tags = [t.lower() for t in table.get("tags") or []]
@@ -181,6 +198,21 @@ class RandomTablesPanel(ctk.CTkFrame):
 
     def _on_category_change(self, *_args):
         self._refresh_table_list()
+
+    def _on_style_change(self, *_args):
+        self._refresh_table_list()
+
+    def _update_filter_values(self) -> None:
+        if hasattr(self, "category_menu"):
+            categories = self._available_categories()
+            self.category_menu.configure(values=categories)
+            if self.category_var.get() not in categories:
+                self.category_var.set(categories[0] if categories else "All")
+        if hasattr(self, "style_menu"):
+            styles = self._available_styles()
+            self.style_menu.configure(values=styles)
+            if self.style_var.get() not in styles:
+                self.style_var.set(styles[0] if styles else "All")
 
     def _on_table_select(self):
         selection = self.table_list.curselection()
@@ -282,6 +314,7 @@ class RandomTablesPanel(ctk.CTkFrame):
         return {
             "selected_table": self.selected_table_id,
             "category": self.category_var.get() if hasattr(self, "category_var") else None,
+            "style": self.style_var.get() if hasattr(self, "style_var") else None,
             "tag": self.tag_var.get() if hasattr(self, "tag_var") else None,
             "history": list(self.history),
         }
@@ -293,6 +326,9 @@ class RandomTablesPanel(ctk.CTkFrame):
         category = state.get("category")
         if category and hasattr(self, "category_var"):
             self.category_var.set(category)
+        style = state.get("style")
+        if style and hasattr(self, "style_var"):
+            self.style_var.set(style)
         tag = state.get("tag")
         if tag and hasattr(self, "tag_var"):
             self.tag_var.set(tag)
@@ -306,6 +342,7 @@ class RandomTablesPanel(ctk.CTkFrame):
         state = self.get_state()
         self.loader = RandomTableLoader(self.data_path)
         self._load_tables()
+        self._update_filter_values()
         self.apply_state(state)
 
     def destroy(self):

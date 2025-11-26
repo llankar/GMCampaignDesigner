@@ -1,0 +1,32 @@
+{
+  "system": "Haunted Tales",
+  "biome": "Isolated Town",
+  "theme": "Horror",
+  "categories": [
+    {
+      "id": "omens",
+      "name": "Omens",
+      "tables": [
+        {
+          "id": "horror_ominous_signs",
+          "title": "Ominous Signs",
+          "dice": "1d10",
+          "description": "Strange happenings that warn the group the veil is thin tonight.",
+          "tags": ["atmosphere", "warning"],
+          "entries": [
+            {"range": "1", "result": "All photographs on a phone gain a shadowy figure in the background."},
+            {"range": "2", "result": "A church bell rings once at midnight despite the tower being empty."},
+            {"range": "3", "result": "Window frost forms runes that melt away when written down."},
+            {"range": "4", "result": "Dogs refuse to bark; instead they stare at the same corner of the room."},
+            {"range": "5", "result": "Candles burn with inverted flames that point toward an unseen presence."},
+            {"range": "6", "result": "A mirror fogs over and reveals a room that is not behind the glass."},
+            {"range": "7", "result": "Radio static repeats the party's last whispered sentence."},
+            {"range": "8", "result": "Footsteps circle the house though no tracks appear in the dust outside."},
+            {"range": "9", "result": "A family portrait has shifted expressions toward subtle dread."},
+            {"range": "10", "result": "A lone raven pecks a Morse warning before flying into the chimney."}
+          ]
+        }
+      ]
+    }
+  ]
+}
