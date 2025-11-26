@@ -23,6 +23,7 @@ class RandomTableEditorDialog(ctk.CTkToplevel):
         self.title("Random Table Editor")
         self.geometry("760x600")
         self.table = table or {}
+        self.table_source = self.table.get("source")
         self.loader = RandomTableLoader(RandomTableLoader.default_data_path())
         self.categories = self.loader.load().get("categories") or []
 
@@ -210,8 +211,18 @@ class RandomTableEditorDialog(ctk.CTkToplevel):
             "category": self._slugify(metadata["category"]),
         }
 
+        if self.table.get("theme"):
+            table_data["theme"] = self.table.get("theme")
+
         try:
-            target_path = self._persist_table(table_data, metadata["category"], metadata.get("system"), metadata.get("biome"))
+            target_path = self._persist_table(
+                table_data,
+                metadata["category"],
+                metadata.get("system"),
+                metadata.get("biome"),
+                source_path=self.table_source,
+                theme=self.table.get("theme"),
+            )
             messagebox.showinfo("Random Table", f"Table saved to {target_path}")
             RandomTablesPanel.refresh_all()
             self.destroy()
@@ -220,34 +231,20 @@ class RandomTableEditorDialog(ctk.CTkToplevel):
             messagebox.showerror("Random Table", f"Unable to save table: {exc}")
 
     # ------------------------------------------------------------------
-    def _persist_table(self, table_data: dict, category_name: str, system: Optional[str], biome: Optional[str]) -> str:
-        base_path = RandomTableLoader.default_data_path()
-        campaign_dir = os.path.join(ConfigHelper.get_campaign_dir(), "static", "data", "random_tables")
-        campaign_file = os.path.join(ConfigHelper.get_campaign_dir(), "static", "data", "random_tables.json")
+    def _persist_table(
+        self,
+        table_data: dict,
+        category_name: str,
+        system: Optional[str],
+        biome: Optional[str],
+        *,
+        source_path: Optional[str] = None,
+        theme: Optional[str] = None,
+    ) -> str:
+        base_path = self._resolve_base_path()
+        target_file = self._resolve_target_file(base_path, source_path)
+        data = self._load_existing_tables(target_file)
 
-        if os.path.isdir(campaign_dir):
-            base_path = campaign_dir
-        elif os.path.exists(campaign_file):
-            base_path = campaign_file
-
-        if os.path.isdir(base_path):
-            os.makedirs(base_path, exist_ok=True)
-            target_file = os.path.join(base_path, "campaign_custom_tables.json")
-        else:
-            target_file = base_path
-            os.makedirs(os.path.dirname(target_file) or ".", exist_ok=True)
-
-        data = {"categories": []}
-        if os.path.exists(target_file):
-            try:
-                with open(target_file, "r", encoding="utf-8") as handle:
-                    loaded = json.load(handle)
-                if isinstance(loaded, dict):
-                    data = loaded
-            except Exception:
-                log_exception("Failed to read existing random tables file", func_name="RandomTableEditorDialog._persist_table")
-
-        data.setdefault("categories", [])
         cat_id = self._slugify(category_name)
         category = next((c for c in data["categories"] if c.get("id") == cat_id), None)
         if category is None:
@@ -269,11 +266,49 @@ class RandomTableEditorDialog(ctk.CTkToplevel):
             data["system"] = system
         if biome:
             data["biome"] = biome
+        if theme:
+            data["theme"] = theme
 
         with open(target_file, "w", encoding="utf-8") as handle:
             json.dump(data, handle, indent=2, ensure_ascii=False)
 
         return target_file
+
+    def _resolve_base_path(self) -> str:
+        base_path = RandomTableLoader.default_data_path()
+        campaign_dir = os.path.join(ConfigHelper.get_campaign_dir(), "static", "data", "random_tables")
+        campaign_file = os.path.join(ConfigHelper.get_campaign_dir(), "static", "data", "random_tables.json")
+
+        if os.path.isdir(campaign_dir):
+            base_path = campaign_dir
+        elif os.path.exists(campaign_file):
+            base_path = campaign_file
+
+        return base_path
+
+    def _resolve_target_file(self, base_path: str, source_path: Optional[str]) -> str:
+        if source_path and os.path.exists(source_path):
+            os.makedirs(os.path.dirname(source_path) or ".", exist_ok=True)
+            return source_path
+        if os.path.isdir(base_path):
+            os.makedirs(base_path, exist_ok=True)
+            return os.path.join(base_path, "campaign_custom_tables.json")
+        os.makedirs(os.path.dirname(base_path) or ".", exist_ok=True)
+        return base_path
+
+    def _load_existing_tables(self, target_file: str) -> dict:
+        data = {"categories": []}
+        if os.path.exists(target_file):
+            try:
+                with open(target_file, "r", encoding="utf-8") as handle:
+                    loaded = json.load(handle)
+                if isinstance(loaded, dict):
+                    data = loaded
+            except Exception:
+                log_exception("Failed to read existing random tables file", func_name="RandomTableEditorDialog._persist_table")
+
+        data.setdefault("categories", [])
+        return data
 
 
 __all__ = ["RandomTableEditorDialog"]

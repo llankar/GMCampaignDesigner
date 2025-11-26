@@ -1,0 +1,214 @@
+{
+  "system": "Wasteland Survival",
+  "theme": "Post-Apocalyptic",
+  "categories": [
+    {
+      "id": "settlements",
+      "name": "Settlements",
+      "tables": [
+        {
+          "id": "makeshift_market",
+          "title": "Makeshift Market Vendors",
+          "dice": "1d10",
+          "description": "Who is trading at a ramshackle market built from welded street signs?",
+          "tags": ["settlement", "trade"],
+          "entries": [
+            {"range": "1", "result": "Mutated farmer selling drought-proof tubers wrapped in foil."},
+            {"range": "2", "result": "Scrapper pair trading copper wiring and rare earth dust by the gram."},
+            {"range": "3", "result": "Charismatic raider offloading confiscated ammo belts at a markup."},
+            {"range": "4", "result": "Nomad caravan elder swapping handmade filter masks for stories."},
+            {"range": "5", "result": "Children with a pet rad-ferret trading rumors for sweetened tea."},
+            {"range": "6", "result": "Traveling medic bartering antibiotics for pre-war magazines."},
+            {"range": "7", "result": "Tinkerer displaying drone parts and offering quick repairs."},
+            {"range": "8", "result": "Cult emissary distributing glowsticks blessed by their reactor idol."},
+            {"range": "9", "result": "Deserter guard exchanging access codes for an escort out of town."},
+            {"range": "10", "result": "Archivist selling data chips that might still hold music playlists."}
+          ]
+        },
+        {
+          "id": "bunker_services",
+          "title": "Bunker Services",
+          "dice": "1d10",
+          "description": "What services does an underground bunker outpost offer today?",
+          "tags": ["settlement", "support"],
+          "entries": [
+            {"range": "1", "result": "Radiation cleansing shower that strips grime and germs alike."},
+            {"range": "2", "result": "Bullet casting station run by a gruff machinist."},
+            {"range": "3", "result": "Decontamination vault to store volatile salvage overnight."},
+            {"range": "4", "result": "Communications hub patching into aging satellite nets."},
+            {"range": "5", "result": "Hydroponic garden with crisp greens and ration-friendly recipes."},
+            {"range": "6", "result": "Training room with padded walls and makeshift sparring gear."},
+            {"range": "7", "result": "Gene-screening clinic identifying plague carriers at the gate."},
+            {"range": "8", "result": "Safe bunk rentals guarded by recycled security drones."},
+            {"range": "9", "result": "Jury-rigged vehicle elevator for quick repairs under fire."},
+            {"range": "10", "result": "Quiet archive full of salvaged maps and rationed power for copies."}
+          ]
+        },
+        {
+          "id": "faction_attention",
+          "title": "Faction Attention",
+          "dice": "1d10",
+          "description": "Which power bloc notices the party's movements?",
+          "tags": ["faction", "tension"],
+          "entries": [
+            {"range": "1", "result": "Relic hunters request a cut of any tech lifted from nearby ruins."},
+            {"range": "2", "result": "Water barons send a measured envoy with strict trade rules."},
+            {"range": "3", "result": "Mutant conclave quietly tails the crew to gauge intentions."},
+            {"range": "4", "result": "Radio-free collective invites cooperation against raiders."},
+            {"range": "5", "result": "Sky-scavenger kite gang circles above, marking targets with paint."},
+            {"range": "6", "result": "Corporate remnant agent offers obsolete but sturdy credentials."},
+            {"range": "7", "result": "Road reavers block an overpass, demanding tolls in fuel."},
+            {"range": "8", "result": "Warden drones broadcast a curfew and scan everyone twice."},
+            {"range": "9", "result": "Traveling preachers denounce hoarding and seek donations."},
+            {"range": "10", "result": "Antenna array reactivates, drawing every scav crew in range."}
+          ]
+        }
+      ]
+    },
+    {
+      "id": "hazards",
+      "name": "Hazards",
+      "tables": [
+        {
+          "id": "wasteland_weather",
+          "title": "Wasteland Weather Surprises",
+          "dice": "1d10",
+          "description": "Sudden atmospheric twists that complicate travel.",
+          "tags": ["hazard", "weather"],
+          "entries": [
+            {"range": "1", "result": "Superheated gusts warp metal tools and blister exposed skin."},
+            {"range": "2", "result": "Electrostatic fog makes hair stand and radios crackle nonstop."},
+            {"range": "3", "result": "Ashfall reduces visibility to arm's length and clogs filters."},
+            {"range": "4", "result": "Icy needle rain that preserves corpses and batteries alike."},
+            {"range": "5", "result": "Glowing auroras trigger faulty electronics to boot in loops."},
+            {"range": "6", "result": "Sudden stillness before a microburst tosses light gear skyward."},
+            {"range": "7", "result": "Dust devils full of bone shards chase anything that moves."},
+            {"range": "8", "result": "Pressure dip whistles through cracked towers, masking footsteps."},
+            {"range": "9", "result": "Brief clean air pocket allows an hour without masks."},
+            {"range": "10", "result": "Phosphor rain paints trails visible to anyone with optics."}
+          ]
+        },
+        {
+          "id": "ruined_transit_snags",
+          "title": "Ruined Transit Snags",
+          "dice": "1d10",
+          "description": "Delays and dangers along shattered highways and rails.",
+          "tags": ["hazard", "travel"],
+          "entries": [
+            {"range": "1", "result": "Collapsed overpass funnels vehicles into a narrow killbox."},
+            {"range": "2", "result": "Mag-rail cars fused together block the path, humming softly."},
+            {"range": "3", "result": "Sinkhole reveals a half-buried commuter shuttle with supplies."},
+            {"range": "4", "result": "Automated toll booth still fires stun rounds at unpaid drivers."},
+            {"range": "5", "result": "Charred convoy wreckage attracts hungry carrion birds."},
+            {"range": "6", "result": "Signal jammers blanket the area, breaking maps and comms."},
+            {"range": "7", "result": "Detour leads through a maze of shipping containers stacked high."},
+            {"range": "8", "result": "Flooded underpass hides razor wire submerged in oily water."},
+            {"range": "9", "result": "Rail-mounted scavenger gang speeds past, tossing caltrops."},
+            {"range": "10", "result": "An intact charging station promises power but draws lightning."}
+          ]
+        },
+        {
+          "id": "radiation_signs",
+          "title": "Radiation Warning Signs",
+          "dice": "1d10",
+          "description": "Subtle or blatant clues that an area is hot.",
+          "tags": ["hazard", "radiation"],
+          "entries": [
+            {"range": "1", "result": "Melted glass puddles glitter beside warped streetlights."},
+            {"range": "2", "result": "Geiger counter ticks even when switched off and packed away."},
+            {"range": "3", "result": "Two-headed crows perch silently, watching travelers."},
+            {"range": "4", "result": "Road paint glows faintly at night like a toxic runway."},
+            {"range": "5", "result": "Rust-free tools lie abandoned, as if freshly placed."},
+            {"range": "6", "result": "Wind carries metallic taste that sticks to teeth."},
+            {"range": "7", "result": "Ivy grows in perfect spirals up concrete supports."},
+            {"range": "8", "result": "Warning signs in multiple languages have been recently replaced."},
+            {"range": "9", "result": "A feral dog glows under UV light before vanishing into reeds."},
+            {"range": "10", "result": "Concrete barriers painted with fresh lead-based sealant."}
+          ]
+        }
+      ]
+    },
+    {
+      "id": "discoveries",
+      "name": "Discoveries",
+      "tables": [
+        {
+          "id": "salvage_caches",
+          "title": "Hidden Salvage Caches",
+          "dice": "1d10",
+          "description": "What stash do the survivors unearth under debris?",
+          "tags": ["loot", "cache"],
+          "entries": [
+            {"range": "1", "result": "Ammo tins sealed with wax and labeled in faded marker."},
+            {"range": "2", "result": "Water purifier tablets packed alongside brittle notebooks."},
+            {"range": "3", "result": "Hand-crank generator wrapped in tarp and copper mesh."},
+            {"range": "4", "result": "Old-world spices vacuum-sealed and still pungent."},
+            {"range": "5", "result": "Stacked plastic bins of medical gauze and bone saws."},
+            {"range": "6", "result": "Ancient hard drives with partial maps of underground lines."},
+            {"range": "7", "result": "Sealed crate of glowflares stamped with military warnings."},
+            {"range": "8", "result": "Cracked but functional solar lanterns with extra cells."},
+            {"range": "9", "result": "Case of vintage comics worth favors to collectors."},
+            {"range": "10", "result": "Prototype rebreather mask that hums when exposed to dust."}
+          ]
+        },
+        {
+          "id": "ancient_tech",
+          "title": "Ancient Tech Oddities",
+          "dice": "1d10",
+          "description": "What pre-fall device or fragment surfaces?",
+          "tags": ["technology", "mystery"],
+          "entries": [
+            {"range": "1", "result": "Personal AI core begging for a firmware patch."},
+            {"range": "2", "result": "Collapsible solar sail wrapped in heat-resistant cloth."},
+            {"range": "3", "result": "Hologram projector stuck on a looping family message."},
+            {"range": "4", "result": "Self-sealing medical foam canister with a half charge."},
+            {"range": "5", "result": "Smart-lens glasses that overlay outdated city data."},
+            {"range": "6", "result": "Portable desalination straw with a cracked display."},
+            {"range": "7", "result": "Wristband that records vitals and loudly broadcasts them."},
+            {"range": "8", "result": "Cube battery that trickle-charges when spun."},
+            {"range": "9", "result": "Prototype shotgun that magnetizes scrap into slugs."},
+            {"range": "10", "result": "Encrypted drive labeled simply: 'Restart'."}
+          ]
+        },
+        {
+          "id": "weird_cult_signs",
+          "title": "Weird Cult Signs",
+          "dice": "1d10",
+          "description": "Symbols and omens left by wasteland cults.",
+          "tags": ["cult", "mystery"],
+          "entries": [
+            {"range": "1", "result": "Pyramid of car batteries wired to a singing speaker."},
+            {"range": "2", "result": "Bone windchimes tuned to a single unsettling note."},
+            {"range": "3", "result": "Tar-coated graffiti of an eye over a burning city."},
+            {"range": "4", "result": "Spiral of ration tins leading to a buried reliquary."},
+            {"range": "5", "result": "Melted polymer idols fused with glass beads."},
+            {"range": "6", "result": "Stacked televisions showing static except at midnight."},
+            {"range": "7", "result": "Chalk line encircling a safe zone no cultist crosses."},
+            {"range": "8", "result": "Perfume-scented incense that masks radiation smell."},
+            {"range": "9", "result": "Scattered teeth arranged like coordinates on a map."},
+            {"range": "10", "result": "An abandoned sermon printed on flexible solar film."}
+          ]
+        },
+        {
+          "id": "roadside_messages",
+          "title": "Roadside Messages",
+          "dice": "1d10",
+          "description": "Handmade signs and broadcasts left for travelers.",
+          "tags": ["travel", "hook"],
+          "entries": [
+            {"range": "1", "result": "Painted arrow promising clean water two miles east."},
+            {"range": "2", "result": "Looping radio broadcast warning of spores ahead."},
+            {"range": "3", "result": "Flapping banner that reads 'DON'T STOP. THEY LISTEN.'"},
+            {"range": "4", "result": "Charcoal map scratched into asphalt showing a safe route."},
+            {"range": "5", "result": "Spray-painted plea: 'Trade doctor for transport'."},
+            {"range": "6", "result": "Triangulation marks showing sniper nests already cleared."},
+            {"range": "7", "result": "Stack of rocks with a coded message in bottle caps."},
+            {"range": "8", "result": "Drone-recorded hologram offering salvage bounties."},
+            {"range": "9", "result": "Fresh tire ruts and chalk indicating a hidden garage."},
+            {"range": "10", "result": "A melody whistled through pipes signaling a safehouse nearby."}
+          ]
+        }
+      ]
+    }
+  ]
+}
