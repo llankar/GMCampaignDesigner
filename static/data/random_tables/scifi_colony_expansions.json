@@ -1,0 +1,126 @@
+{
+  "system": "Space Opera",
+  "biome": "Frontier Colony",
+  "theme": "Sci-Fi",
+  "categories": [
+    {
+      "id": "spaceport",
+      "name": "Spaceport Life",
+      "tables": [
+        {
+          "id": "colony_spaceport_events",
+          "title": "Dockside Events",
+          "dice": "1d12",
+          "description": "What happens as ships come and go from the frontier hub.",
+          "tags": ["spaceport", "encounter"],
+          "entries": [
+            {"range": "1", "result": "A freighter captain auctions unused cargo space for discreet packages."},
+            {"range": "2", "result": "An inspector waves a radiation wand wildly, panicking passengers."},
+            {"range": "3", "result": "Dockworkers strike briefly when loader mechs lock up simultaneously."},
+            {"range": "4", "result": "A shuttle limps in with scorch marks, refusing to explain the chase."},
+            {"range": "5", "result": "An alien pilgrim distributes glowing seedlings that hum near starship engines."},
+            {"range": "6", "result": "Customs officers deploy sniffers for contraband biotech and find something alive."},
+            {"range": "7", "result": "A merchant guild offers hazard pay for an escort through a meteor swarm."},
+            {"range": "8", "result": "A famous racer lands unexpectedly, drawing crowds and illegal betting."},
+            {"range": "9", "result": "Dock sirens blare after someone broadcasts an unauthorized distress call."},
+            {"range": "10", "result": "A diplomatic courier requests help swapping hull plates to avoid recognition."},
+            {"range": "11", "result": "A cargo container bursts open, revealing dormant stasis pods."},
+            {"range": "12", "result": "A meteorite souvenir stand suddenly magnetizes every nearby tool."}
+          ]
+        }
+      ]
+    },
+    {
+      "id": "xenotech",
+      "name": "Xenotech Finds",
+      "tables": [
+        {
+          "id": "colony_xenotech_treasures",
+          "title": "Unearthed Artifacts",
+          "dice": "1d10",
+          "description": "Curious relics from beyond human science.",
+          "tags": ["artifact", "mystery"],
+          "entries": [
+            {"range": "1", "result": "A translucent cube that refracts sound, distorting voices in its presence."},
+            {"range": "2", "result": "A ring of flexible metal that hums near strong emotions."},
+            {"range": "3", "result": "A scroll of living fibers that rearranges its symbols every hour."},
+            {"range": "4", "result": "A palm-sized orb that projects gravitational lensing when warmed."},
+            {"range": "5", "result": "A crystalline lattice that stores a single spoken sentence indefinitely."},
+            {"range": "6", "result": "A vial of liquid that crawls uphill when exposed to starlight."},
+            {"range": "7", "result": "A mask that overlays holographic constellations onto the wearer's vision."},
+            {"range": "8", "result": "A tablet that only boots when held with exactly three other beings."},
+            {"range": "9", "result": "A shard that pulls magnetic north toward an uncharted sector."},
+            {"range": "10", "result": "A broken drone wing etched with fractal maps of subterranean tunnels."}
+          ]
+        }
+      ]
+    },
+    {
+      "id": "crew",
+      "name": "Crew Drama",
+      "tables": [
+        {
+          "id": "colony_crew_tensions",
+          "title": "Crew Tensions",
+          "dice": "1d8",
+          "description": "Interpersonal friction aboard ships or in tight habitats.",
+          "tags": ["npc", "drama"],
+          "entries": [
+            {"range": "1", "result": "Two engineers argue over whether to sell spare parts to pirates for rent money."},
+            {"range": "2", "result": "A medic hides contraband samples in the galley freezer to avoid lab audits."},
+            {"range": "3", "result": "A pilot fears someone tampered with their neural link and refuses to launch."},
+            {"range": "4", "result": "A steward secretly broadcasts a soap opera starring the crew using helmet cams."},
+            {"range": "5", "result": "A navigator wants to divert course to check on a distress ping from family."},
+            {"range": "6", "result": "The quartermaster's ledger shows supplies missing only on even-numbered days."},
+            {"range": "7", "result": "A botanist's experimental pollen causes unexpected allergic outbursts."},
+            {"range": "8", "result": "A rookie marine boasts about selling mission intel to afford debt payments."}
+          ]
+        }
+      ]
+    },
+    {
+      "id": "starship",
+      "name": "Starship Glitches",
+      "tables": [
+        {
+          "id": "colony_starship_glitches",
+          "title": "Glitches in Transit",
+          "dice": "1d6",
+          "description": "Technical surprises that complicate travel scenes.",
+          "tags": ["starship", "hazard"],
+          "entries": [
+            {"range": "1", "result": "Jump capacitors charge unevenly, forcing a tense manual synchronization."},
+            {"range": "2", "result": "A guidance AI overlays ancient star charts on modern nav data."},
+            {"range": "3", "result": "Inertial dampeners hiccup mid-maneuver, tossing cargo and crew."},
+            {"range": "4", "result": "Life-support filters clog with shimmering dust that resists scanners."},
+            {"range": "5", "result": "A coolant leak crystalizes in microgravity, forming blades near conduits."},
+            {"range": "6", "result": "Auxiliary thrusters fire in a repeating rhythm like a coded message."}
+          ]
+        }
+      ]
+    },
+    {
+      "id": "signals",
+      "name": "Distant Signals",
+      "tables": [
+        {
+          "id": "colony_radio_signals",
+          "title": "Uncanny Transmissions",
+          "dice": "1d8",
+          "description": "Broadcasts and pings that hint at larger plots.",
+          "tags": ["signal", "mystery"],
+          "entries": [
+            {"range": "1", "result": "A repeating SOS encoded in an extinct dialect, growing stronger nightly."},
+            {"range": "2", "result": "A beacon sends coordinates that align with no known orbital path."},
+            {"range": "3", "result": "A weather buoy transmits lullabies mixed with navigation data."},
+            {"range": "4", "result": "An encrypted transmission uses outdated military ciphers from two factions."},
+            {"range": "5", "result": "A sensor net keeps detecting a ship that is always just behind the horizon."},
+            {"range": "6", "result": "A survey probe returns with its memory wiped except for a single star map."},
+            {"range": "7", "result": "Two satellites broadcast contradictory descriptions of the same planet."},
+            {"range": "8", "result": "An old pirate song plays over comms whenever the crew discusses coordinates."}
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,128 @@
+{
+  "system": "Cyberpunk",
+  "biome": "Neon Sprawl",
+  "theme": "Cyberpunk",
+  "categories": [
+    {
+      "id": "rumors",
+      "name": "Street Rumors",
+      "tables": [
+        {
+          "id": "sprawl_rumor_stream",
+          "title": "Mesh Chatter",
+          "dice": "1d10",
+          "description": "Gossip pulsing through message boards, barbacks, and ride-share drivers.",
+          "tags": ["rumor", "hook"],
+          "entries": [
+            {"range": "1", "result": "A courier vanished while hauling a prototype biochip coded to reject corporate firmware."},
+            {"range": "2", "result": "Someone painted over a corp billboard with coordinates; drones keep cleaning it and it reappears nightly."},
+            {"range": "3", "result": "A gang lieutenant woke up missing cyberarms they never purchased, with serials filed off."},
+            {"range": "4", "result": "A laundromat's loyalty app has a hidden chatroom filled with insider trading tips."},
+            {"range": "5", "result": "A netradio DJ claims to broadcast from a moving train no scanner can tag."},
+            {"range": "6", "result": "A rogue AI trades rare music files for samples of people's dreams."},
+            {"range": "7", "result": "A neighborhood grid node pings ""emergency"" every dusk but no responders show."},
+            {"range": "8", "result": "A synthfood brand supposedly hides sedatives in batches bound for one district."},
+            {"range": "9", "result": "Old subway tunnels reopened; graffiti there matches encrypted corp project names."},
+            {"range": "10", "result": "Someone is paying edgerunners in art NFTs that unlock physical caches in vending machines."}
+          ]
+        }
+      ]
+    },
+    {
+      "id": "district_color",
+      "name": "District Color",
+      "tables": [
+        {
+          "id": "sprawl_district_flavor",
+          "title": "District Vignettes",
+          "dice": "1d12",
+          "description": "Sensory snapshots that define each block and its quirks.",
+          "tags": ["atmosphere", "urban"],
+          "entries": [
+            {"range": "1", "result": "Laundry drones zip between buildings while neon tarps turn alleys into color-splashed canyons."},
+            {"range": "2", "result": "A monorail passes overhead, casting rolling shadows across street murals of forgotten activists."},
+            {"range": "3", "result": "Vape clouds mix with incense from a micro-temple built in an abandoned ATM kiosk."},
+            {"range": "4", "result": "A street doc's tent glows surgical blue under a freeway overpass."},
+            {"range": "5", "result": "AR mascots from competing stores glitch-fight midair, tossing pixel sparks."},
+            {"range": "6", "result": "Residents string solar lanterns from fire escapes to guide delivery drones."},
+            {"range": "7", "result": "An open-air VR parlor spills laughter as players dodge invisible obstacles."},
+            {"range": "8", "result": "Dumpster-diving kids race hacked smart-bikes through an alley obstacle course."},
+            {"range": "9", "result": "An abandoned corporate lobby is now a night market of soldering irons and synth-spice."},
+            {"range": "10", "result": "Holo-billboards sync to the beat from a rooftop DJ, advertising crews dancing below."},
+            {"range": "11", "result": "Power cables hang low enough to spark against passing trucks, drawing cheers when they flare."},
+            {"range": "12", "result": "A shrine of broken cyberlimbs honors victims of a recent crackdown."}
+          ]
+        }
+      ]
+    },
+    {
+      "id": "black_market",
+      "name": "Black Market Finds",
+      "tables": [
+        {
+          "id": "sprawl_black_market",
+          "title": "Underground Vendors",
+          "dice": "1d10",
+          "description": "Merchandise and favors available if you know who to ask.",
+          "tags": ["gear", "contacts"],
+          "entries": [
+            {"range": "1", "result": "A street tailor who weaves ballistic fibers into any jacket while you wait."},
+            {"range": "2", "result": "A gene-hacker selling temporary scent profiles that spoof biometric locks."},
+            {"range": "3", "result": "A weaponsmith offering EMP flechettes salvaged from naval stockpiles."},
+            {"range": "4", "result": "A drone chop-shop swapping serial plates and providing fake flight plans."},
+            {"range": "5", "result": "A medtech delivering black-market stim patches with unpredictable side effects."},
+            {"range": "6", "result": "A codec dealer who rents one-time-use encryption suites for heists."},
+            {"range": "7", "result": "A retired corp hacker selling access to a forgotten maintenance subnet."},
+            {"range": "8", "result": "A smuggler trading in pre-crash music players that are immune to modern tracking."},
+            {"range": "9", "result": "A fixer with maps of sewer drones and their nightly routes."},
+            {"range": "10", "result": "A cybervet who fits animal companions with stealth modding for courier jobs."}
+          ]
+        }
+      ]
+    },
+    {
+      "id": "corporate",
+      "name": "Corporate Pressure",
+      "tables": [
+        {
+          "id": "sprawl_corp_response",
+          "title": "Corporate Countermeasures",
+          "dice": "1d8",
+          "description": "How megacorps respond when operations are threatened.",
+          "tags": ["corporate", "escalation"],
+          "entries": [
+            {"range": "1", "result": "Deploys a polite liaison offering a contract buyout—sign now or else."},
+            {"range": "2", "result": "Floods the block with branded pop-up clinics to mine health data."},
+            {"range": "3", "result": "Hijacks local news feeds to spin the crew as dangerous hackers."},
+            {"range": "4", "result": "Sends a clean-up team with nonlethal foam rounds and drones recording everything."},
+            {"range": "5", "result": "Offers double pay to any rival crew willing to disrupt the job."},
+            {"range": "6", "result": "Triggers a micro-blackout to reboot all public sensors and wipe feeds."},
+            {"range": "7", "result": "Activates sleeper agents within a local gang to shift alliances."},
+            {"range": "8", "result": "Locks down transit nodes, forcing evac through monitored skyways."}
+          ]
+        }
+      ]
+    },
+    {
+      "id": "matrix",
+      "name": "Matrix Intrusions",
+      "tables": [
+        {
+          "id": "sprawl_matrix_intrusions",
+          "title": "Intrusion Side-Effects",
+          "dice": "1d6",
+          "description": "Digital weirdness that bleeds into the physical during deep dives.",
+          "tags": ["matrix", "weird"],
+          "entries": [
+            {"range": "1", "result": "AR overlays desynchronize, showing two conflicting realities at once."},
+            {"range": "2", "result": "The runner's voice modulates with autotune echoes when lying."},
+            {"range": "3", "result": "Nearby vending machines spit out obsolete coins stamped with deleted corp logos."},
+            {"range": "4", "result": "Streetlights pulse in Morse code matching the target server's heartbeat."},
+            {"range": "5", "result": "A phantom alert keeps pinging a squad of corporate security two blocks away."},
+            {"range": "6", "result": "A ghost avatar appears in reflective surfaces, gesturing toward a hidden exit node."}
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,124 @@
+{
+  "system": "Modern Mystery",
+  "biome": "City",
+  "theme": "Modern",
+  "categories": [
+    {
+      "id": "landmarks",
+      "name": "Urban Landmarks",
+      "tables": [
+        {
+          "id": "modern_city_landmarks",
+          "title": "Landmark Snapshots",
+          "dice": "1d10",
+          "description": "Memorable places that can anchor scenes or clues.",
+          "tags": ["urban", "location"],
+          "entries": [
+            {"range": "1", "result": "A skybridge botanical garden filled with orchids and hidden security cameras."},
+            {"range": "2", "result": "A waterfront pier converted into a pop-up art gallery of controversial installations."},
+            {"range": "3", "result": "A half-finished skyscraper wrapped in tarps where parkour groups practice at night."},
+            {"range": "4", "result": "An underground speakeasy accessed through a laundromat's broken dryer door."},
+            {"range": "5", "result": "A micro-museum of vintage electronics curated by a retired radio operator."},
+            {"range": "6", "result": "A rooftop urban farm buzzing with drones and guarded by territorial geese."},
+            {"range": "7", "result": "A decommissioned subway platform hosting nightly food stalls after trains stop."},
+            {"range": "8", "result": "A courthouse plaza featuring a sculpture that casts different shadows every hour."},
+            {"range": "9", "result": "A shipping container village offering short-term offices and hidden meeting rooms."},
+            {"range": "10", "result": "A community center with an unused panic shelter sealed behind fresh paint."}
+          ]
+        }
+      ]
+    },
+    {
+      "id": "media",
+      "name": "Media Headlines",
+      "tables": [
+        {
+          "id": "modern_media_flash",
+          "title": "Breaking News", 
+          "dice": "1d8",
+          "description": "Headlines that can redirect attention or provide misdirection.",
+          "tags": ["news", "complication"],
+          "entries": [
+            {"range": "1", "result": "City council votes on emergency surveillance funding after overnight fires."},
+            {"range": "2", "result": "Anonymous source leaks traffic camera footage showing a mysterious van."},
+            {"range": "3", "result": "Celebrity chef collapses live on air, sparking food contamination fears."},
+            {"range": "4", "result": "Rolling blackout leaves several wards dark; radio nets light up with rumors."},
+            {"range": "5", "result": "Amateur livestream captures odd lights above the harbor before cutting out."},
+            {"range": "6", "result": "Museum staff report an empty display case with no broken locks."},
+            {"range": "7", "result": "Charity gala evacuated due to an unclaimed briefcase; security footage missing."},
+            {"range": "8", "result": "Health department issues alert about counterfeit pharmaceuticals."}
+          ]
+        }
+      ]
+    },
+    {
+      "id": "police_pressure",
+      "name": "Police Pressure",
+      "tables": [
+        {
+          "id": "modern_police_pressure",
+          "title": "Law Enforcement Moves",
+          "dice": "1d6",
+          "description": "Actions taken by police or private security that reshape a scene.",
+          "tags": ["law", "escalation"],
+          "entries": [
+            {"range": "1", "result": "A task force sets up a mobile command van and perimeter cameras."},
+            {"range": "2", "result": "Detectives quietly circulate a list of persons of interest to patrol units."},
+            {"range": "3", "result": "Undercover officers blend with the crowd, looking for a specific tattoo."},
+            {"range": "4", "result": "A helicopter spotlight sweeps alleys while loudspeakers order dispersal."},
+            {"range": "5", "result": "A cybercrime analyst requests devices for on-the-spot data imaging."},
+            {"range": "6", "result": "A K9 unit arrives, and handlers warn they will search vehicles next."}
+          ]
+        }
+      ]
+    },
+    {
+      "id": "witnesses",
+      "name": "Civilian Witnesses",
+      "tables": [
+        {
+          "id": "modern_witness_profiles",
+          "title": "Witness Profiles",
+          "dice": "1d10",
+          "description": "People with partial information, odd habits, and possible motives.",
+          "tags": ["npc", "clue"],
+          "entries": [
+            {"range": "1", "result": "A night-shift janitor who collected discarded visitor badges as souvenirs."},
+            {"range": "2", "result": "A taxi driver who records every ride for a true-crime podcast."},
+            {"range": "3", "result": "A graffiti artist who tags only near government buildings and noticed extra patrols."},
+            {"range": "4", "result": "A dog walker whose smart collar app logs precise routes and timestamps."},
+            {"range": "5", "result": "A street magician who saw reflections in a window that didn't match reality."},
+            {"range": "6", "result": "A food delivery cyclist whose insulated bag hides a jammer and camera."},
+            {"range": "7", "result": "A retiree who documents city birds and caught unusual drone behavior."},
+            {"range": "8", "result": "A radio scanner hobbyist with recordings of encrypted bursts at odd hours."},
+            {"range": "9", "result": "A university student researching architecture who sketched a hidden door."},
+            {"range": "10", "result": "A street preacher who claims the city's statues whisper after midnight."}
+          ]
+        }
+      ]
+    },
+    {
+      "id": "evidence",
+      "name": "Evidence Finds",
+      "tables": [
+        {
+          "id": "modern_evidence_clues",
+          "title": "Field Clues",
+          "dice": "1d8",
+          "description": "Physical traces that can pivot an investigation.",
+          "tags": ["clue", "investigation"],
+          "entries": [
+            {"range": "1", "result": "A burner phone containing only map pins along the river."},
+            {"range": "2", "result": "A torn invitation to a gala with a hand-sketched seating chart."},
+            {"range": "3", "result": "Boot prints with traces of stage blood and glitter."},
+            {"range": "4", "result": "A keycard that still smells of chlorine and faint ozone."},
+            {"range": "5", "result": "Receipts for industrial-strength batteries purchased in bulk."},
+            {"range": "6", "result": "A hidden camera disguised as a car freshener with one image remaining."},
+            {"range": "7", "result": "A set of folded maps with routes highlighted to avoid CCTV coverage."},
+            {"range": "8", "result": "A soil sample bag labeled with GPS coordinates that don't exist on maps."}
+          ]
+        }
+      ]
+    }
+  ]
+}
