@@ -72,6 +72,7 @@ from modules.scenarios.scenario_importer import ScenarioImportWindow
 from modules.objects.object_importer import ObjectImportWindow
 from modules.scenarios.scenario_generator_view import ScenarioGeneratorView
 from modules.scenarios.scenario_builder_wizard import ScenarioBuilderWizard
+from modules.scenarios.random_tables_editor import RandomTableEditorDialog
 from modules.generic.export_for_foundry import preview_and_export_foundry
 from modules.generic.cross_campaign_asset_library import CrossCampaignAssetLibraryWindow
 from modules.helpers import text_helpers, dice_markup
@@ -794,6 +795,7 @@ class MainWindow(ctk.CTk):
             ("pc_graph", "Open PC Graph Editor", self.open_pc_graph_editor),
             ("faction_graph", "Open Factions Graph Editor", self.open_faction_graph_editor),
             ("scenario_graph", "Open Scenario Graph Editor", self.open_scenario_graph_editor),
+            ("create_random_table", "Create Random Table", self.open_random_table_editor),
             ("scene_flow_viewer", "Open Scene Flow Viewer", self.open_scene_flow_viewer),
             ("world_map", "Open World Map", self.open_world_map),
         ]
@@ -2355,6 +2357,18 @@ class MainWindow(ctk.CTk):
                 func_name="main_window.MainWindow.open_scenario_builder",
             )
             messagebox.showerror("Error", f"Failed to open Scenario Builder:\n{exc}")
+
+    def open_random_table_editor(self):
+        try:
+            dialog = RandomTableEditorDialog(self)
+            dialog.grab_set()
+            dialog.focus_force()
+        except Exception as exc:
+            log_exception(
+                f"Failed to open Random Table Editor: {exc}",
+                func_name="main_window.MainWindow.open_random_table_editor",
+            )
+            messagebox.showerror("Random Tables", f"Unable to open editor:\n{exc}")
 
     def change_database_storage(self):
         current_path = ConfigHelper.get("Database", "path", fallback="") or None
