@@ -186,6 +186,44 @@ def _extract_section_heading(page: fitz.Page) -> Optional[str]:
     return heading_line or None
 
 
+def _extract_paragraph_labels(page: fitz.Page) -> Dict[int, str]:
+    """Map image xrefs to the nearest preceding paragraph label on the page."""
+
+    try:
+        raw = page.get_text("rawdict") or {}
+    except Exception:  # pragma: no cover - defensive fallback for malformed PDFs
+        return {}
+
+    paragraphs: list[str] = []
+    labels: Dict[int, str] = {}
+
+    for block in raw.get("blocks", []):
+        block_type = block.get("type")
+        if block_type == 0:  # text block
+            lines = block.get("lines") or []
+            text_parts: list[str] = []
+            for line in lines:
+                spans = line.get("spans") or []
+                for span in spans:
+                    text_parts.append(span.get("text", ""))
+
+            paragraph_text = "".join(text_parts).strip()
+            if paragraph_text:
+                paragraphs.append(paragraph_text)
+
+        elif block_type == 1:  # image block
+            xref = block.get("xref") or block.get("number")
+            if xref is None:
+                continue
+
+            if paragraphs:
+                paragraph_label = paragraphs[-1].splitlines()[0].strip()
+                if paragraph_label:
+                    labels[int(xref)] = paragraph_label
+
+    return labels
+
+
 def extract_images_with_names(
     attachment_path: str, *, campaign_dir: str | None = None
 ) -> List[Dict[str, object]]:
@@ -193,9 +231,10 @@ def extract_images_with_names(
     Extract embedded images from a PDF and save them with descriptive filenames.
 
     Images are written to ``assets/books/images`` beneath the campaign directory
-    using a filename derived from the XObject name when available, otherwise from
-    the current page's heading text. A page/sequence suffix is appended to keep
-    names unique. The function returns metadata for each exported image.
+    using a filename derived from the nearest paragraph label when possible,
+    otherwise from the XObject name or the current page's heading text. A
+    page/sequence suffix is appended to keep names unique. The function returns
+    metadata for each exported image.
     """
 
     pdf_path = _resolve_pdf_path(attachment_path, campaign_dir)
@@ -214,6 +253,7 @@ def extract_images_with_names(
         for page_index in range(document.page_count):
             page = document.load_page(page_index)
             section_heading = _extract_section_heading(page)
+            paragraph_labels = _extract_paragraph_labels(page)
             images = page.get_images(full=True)
 
             if not images:
@@ -231,7 +271,12 @@ def extract_images_with_names(
                     if isinstance(original_name, bytes):
                         original_name = original_name.decode(errors="ignore")
 
-                base_name: Optional[str] = _sanitize_filename(original_name) if original_name else None
+                paragraph_label = paragraph_labels.get(xref)
+                base_name: Optional[str] = None
+                if paragraph_label:
+                    base_name = _sanitize_filename(paragraph_label)
+                if not base_name and original_name:
+                    base_name = _sanitize_filename(original_name)
                 if not base_name and section_heading:
                     base_name = _sanitize_filename(section_heading)
                 if not base_name:
@@ -252,6 +297,7 @@ def extract_images_with_names(
                 entry = {
                     "path": relative_path,
                     "page": page_index + 1,
+                    "paragraph": paragraph_label,
                     "section": section_heading,
                     "original_name": original_name,
                     "sequence": image_position,
