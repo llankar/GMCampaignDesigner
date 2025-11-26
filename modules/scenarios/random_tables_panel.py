@@ -1,5 +1,3 @@
-import json
-import os
 from datetime import datetime
 from typing import Dict, List, Optional
 
@@ -8,7 +6,7 @@ import tkinter as tk
 from tkinter import messagebox
 
 from modules.dice import dice_engine
-from modules.helpers.config_helper import ConfigHelper
+from modules.helpers.random_table_loader import RandomTableLoader
 from modules.helpers.logging_helper import (
     log_exception,
     log_info,
@@ -30,6 +28,7 @@ class RandomTablesPanel(ctk.CTkFrame):
         self.rowconfigure(3, weight=2)
 
         self.data_path = data_path or self._default_data_path()
+        self.loader = RandomTableLoader(self.data_path)
         self.tables: Dict[str, dict] = {}
         self.categories: List[dict] = []
         self._table_index: List[str] = []
@@ -42,82 +41,13 @@ class RandomTablesPanel(ctk.CTkFrame):
 
     # ------------------------------------------------------------------
     def _default_data_path(self) -> str:
-        local_path = os.path.join(os.path.dirname(__file__), "..", "..", "static", "data", "random_tables.json")
-        campaign_path = os.path.join(ConfigHelper.get_campaign_dir(), "static", "data", "random_tables.json")
-        return local_path if os.path.exists(local_path) else campaign_path
+        return RandomTableLoader.default_data_path()
 
     def _load_tables(self) -> None:
-        if not os.path.exists(self.data_path):
-            log_info(
-                f"Random tables file missing at {self.data_path}",
-                func_name="RandomTablesPanel._load_tables",
-            )
-            return
-        try:
-            with open(self.data_path, "r", encoding="utf-8") as handle:
-                data = json.load(handle) or {}
-        except Exception as exc:  # pragma: no cover - file errors shown to GM
-            log_exception(exc, func_name="RandomTablesPanel._load_tables")
-            messagebox.showerror("Random Tables", "Unable to read random_tables.json.")
-            return
-
-        categories = data.get("categories") or []
-        self.categories = []
-        self.tables = {}
-        for category in categories:
-            cat_id = str(category.get("id") or "").strip() or category.get("name") or "category"
-            entry = {
-                "id": cat_id,
-                "name": category.get("name") or cat_id.title(),
-                "tables": [],
-            }
-            for table in category.get("tables") or []:
-                t_id = str(table.get("id") or table.get("title") or f"table_{len(self.tables)+1}").strip()
-                normalized = {
-                    "id": t_id,
-                    "title": table.get("title") or t_id.title(),
-                    "dice": table.get("dice") or "1d20",
-                    "entries": self._normalize_entries(table.get("entries") or []),
-                    "description": table.get("description", ""),
-                    "tags": [str(tag) for tag in (table.get("tags") or [])],
-                    "category": entry["id"],
-                }
-                self.tables[t_id] = normalized
-                entry["tables"].append(normalized)
-            self.categories.append(entry)
+        data = self.loader.load()
+        self.categories = data.get("categories") or []
+        self.tables = data.get("tables") or {}
         self._table_index = list(self.tables.keys())
-
-    def _normalize_entries(self, entries: List[dict]) -> List[dict]:
-        normalized: List[dict] = []
-        for idx, raw in enumerate(entries, start=1):
-            result = str(raw.get("result") or raw.get("text") or f"Entry {idx}")
-            rng = raw.get("range")
-            if rng is None and "min" in raw and "max" in raw:
-                rng = f"{raw.get('min')}-{raw.get('max')}"
-            min_val, max_val = self._parse_range(str(rng) if rng is not None else str(idx))
-            normalized.append(
-                {
-                    "min": min_val,
-                    "max": max_val,
-                    "result": result,
-                    "tags": [str(tag) for tag in (raw.get("tags") or [])],
-                }
-            )
-        return normalized
-
-    def _parse_range(self, range_text: str) -> tuple[int, int]:
-        text = (range_text or "").strip()
-        if "-" in text:
-            start, end = text.split("-", 1)
-            try:
-                return int(start), int(end)
-            except ValueError:
-                return 1, 1
-        try:
-            value = int(text)
-            return value, value
-        except ValueError:
-            return 1, 1
 
     # ------------------------------------------------------------------
     def _build_ui(self) -> None:
@@ -212,6 +142,10 @@ class RandomTablesPanel(ctk.CTkFrame):
                 continue
             if tag_filter:
                 tags = [t.lower() for t in table.get("tags") or []]
+                if table.get("system"):
+                    tags.append(f"system:{table['system']}".lower())
+                if table.get("biome"):
+                    tags.append(f"biome:{table['biome']}".lower())
                 if tag_filter not in tags:
                     continue
             matched.append(table)
@@ -263,7 +197,11 @@ class RandomTablesPanel(ctk.CTkFrame):
             return
 
         self.dice_var.set(table.get("dice", "-"))
-        tags = table.get("tags") or []
+        tags = list(table.get("tags") or [])
+        if table.get("system"):
+            tags.append(f"system:{table['system']}")
+        if table.get("biome"):
+            tags.append(f"biome:{table['biome']}")
         self.tags_var.set(", ".join(tags) if tags else "-")
 
         self.description_box.configure(state="normal")

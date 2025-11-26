@@ -1,0 +1,75 @@
+{
+  "system": "Space Opera",
+  "biome": "Orbital Station",
+  "categories": [
+    {
+      "id": "encounters",
+      "name": "Encounters",
+      "tables": [
+        {
+          "id": "space_station_concourse",
+          "title": "Concourse Encounters",
+          "dice": "1d12",
+          "description": "Crowded station situations between docking bays and markets.",
+          "tags": ["station", "social"],
+          "entries": [
+            {"range": "1", "result": "Security drones scan for fugitives; one pings on a crew member."},
+            {"range": "2", "result": "A rival captain taunts the crew with a better cargo contract."},
+            {"range": "3-4", "result": "A courier collapses, dropping a datachip marked urgent."},
+            {"range": "5", "result": "A pop-up market offers prototype gear with questionable licenses."},
+            {"range": "6-7", "result": "A protest blocks access to the docks, chanting anti-corp slogans."},
+            {"range": "8", "result": "A maintenance worker begs escort to the reactor after sabotage threats."},
+            {"range": "9", "result": "A smuggler discreetly offers passage for stowaways the crew knows."},
+            {"range": "10", "result": "Docking clamps glitch, risking damage unless someone overrides controls."},
+            {"range": "11", "result": "A celebrity explorer signs autographs and invites the crew to a gala."},
+            {"range": "12", "result": "Station lockdown initiates; shutters slam down until the threat is found."}
+          ]
+        }
+      ]
+    },
+    {
+      "id": "inspirations",
+      "name": "Inspirations",
+      "tables": [
+        {
+          "id": "space_station_prompts",
+          "title": "Station Sparks",
+          "dice": "1d8",
+          "description": "Quick prompts to color downtime aboard the habitat.",
+          "tags": ["station", "roleplay"],
+          "entries": [
+            {"range": "1", "result": "Artificial dawn glitches; half the station stays dim for hours."},
+            {"range": "2", "result": "An old war mural lights up, showing ships the crew doesn't recognize."},
+            {"range": "3", "result": "A vendor sells freeze-dried snacks named after the crew's ship."},
+            {"range": "4", "result": "Gravity cycling to 0.3g sparks impromptu microgravity performances."},
+            {"range": "5", "result": "A holo-news ticker scrolls rumors about the crew's last mission."},
+            {"range": "6", "result": "A child asks for help finding a missing maintenance bot."},
+            {"range": "7", "result": "A veteran salvager tells a ghost story about the unused docking ring."},
+            {"range": "8", "result": "A sun flare paints the viewport copper, delaying faster-than-light lanes."}
+          ]
+        }
+      ]
+    },
+    {
+      "id": "environmental_events",
+      "name": "Environmental Events",
+      "tables": [
+        {
+          "id": "space_station_glitches",
+          "title": "Station Glitches",
+          "dice": "1d6",
+          "description": "Malfunctions that add tension or urgency.",
+          "tags": ["hazard", "station"],
+          "entries": [
+            {"range": "1", "result": "Atmospheric processors hiccup, dropping oxygen levels for ten minutes."},
+            {"range": "2", "result": "Gravity plating pulses, flinging unsecured objects across the deck."},
+            {"range": "3", "result": "Thermal alarms scream as coolant leaks into maintenance tunnels."},
+            {"range": "4", "result": "Docking guidance failures threaten to collide two shuttles."},
+            {"range": "5", "result": "Holo-projectors overlay outdated security zones, confusing navigation."},
+            {"range": "6", "result": "An unscheduled reactor purge forces a timed evacuation of central modules."}
+          ]
+        }
+      ]
+    }
+  ]
+}

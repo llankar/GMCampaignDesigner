@@ -1,0 +1,75 @@
+{
+  "system": "Fantasy 5e",
+  "biome": "Dungeon",
+  "categories": [
+    {
+      "id": "encounters",
+      "name": "Encounters",
+      "tables": [
+        {
+          "id": "5e_dungeon_crossroads",
+          "title": "Dungeon Crossroads",
+          "dice": "1d10",
+          "description": "Moments that make corridors feel alive.",
+          "tags": ["dungeon", "exploration"],
+          "entries": [
+            {"range": "1", "result": "A sliding wall resets the map, revealing an unfamiliar passage."},
+            {"range": "2", "result": "Animated armor demands a password last spoken centuries ago."},
+            {"range": "3", "result": "Torchlight flickers as a rival delve party flees an unseen threat."},
+            {"range": "4", "result": "A spectral scribe offers guidance in exchange for a written secret."},
+            {"range": "5", "result": "A heavy portcullis crashes down, splitting the party in two."},
+            {"range": "6", "result": "A pool reflects the next room instead of the current hallway."},
+            {"range": "7", "result": "A mimic disguised as a rope bridge tests cautious explorers."},
+            {"range": "8", "result": "Echoes of drums rise; the denizens rally to defend their lair."},
+            {"range": "9", "result": "A prisoner begs release, promising a secret shortcut."},
+            {"range": "10", "result": "A shrine mural animates to quiz the heroes on local legends."}
+          ]
+        }
+      ]
+    },
+    {
+      "id": "inspirations",
+      "name": "Inspirations",
+      "tables": [
+        {
+          "id": "5e_dungeon_inspirations",
+          "title": "Dungeon Atmosphere Prompts",
+          "dice": "1d8",
+          "description": "Flavor to set tone between combats.",
+          "tags": ["dungeon", "tone"],
+          "entries": [
+            {"range": "1", "result": "Moss grows in the outline of a vanished door."},
+            {"range": "2", "result": "Faint singing echoes, resolving into the party's marching tune."},
+            {"range": "3", "result": "Dust falls as something massive shifts overhead."},
+            {"range": "4", "result": "Carved names of past delvers glow briefly when touched."},
+            {"range": "5", "result": "A cold breeze carries the smell of rain—impossible this deep."},
+            {"range": "6", "result": "Skeletons arranged as though dining silently at a stone table."},
+            {"range": "7", "result": "Whispers try to finish each hero's sentences."},
+            {"range": "8", "result": "A rusted bell rings once, then crumbles into dust."}
+          ]
+        }
+      ]
+    },
+    {
+      "id": "environmental_events",
+      "name": "Environmental Events",
+      "tables": [
+        {
+          "id": "5e_dungeon_hazards",
+          "title": "Underground Hazards",
+          "dice": "1d6",
+          "description": "Low-prep hazards to mix into dungeon movement.",
+          "tags": ["hazard", "dungeon"],
+          "entries": [
+            {"range": "1", "result": "Poison gas seeps from cracks; holding breath is required to proceed."},
+            {"range": "2", "result": "Flooded stairs demand Athletics checks or falling prone."},
+            {"range": "3", "result": "Sonic resonances disorient; spoken commands echo as thunderclaps."},
+            {"range": "4", "result": "A magic null zone suppresses spells for the next two rooms."},
+            {"range": "5", "result": "An unstable ceiling sheds debris whenever loud noises occur."},
+            {"range": "6", "result": "A rotating hallway realigns destination doors each hour."}
+          ]
+        }
+      ]
+    }
+  ]
+}
