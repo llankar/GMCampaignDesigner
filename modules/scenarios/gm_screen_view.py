@@ -33,6 +33,7 @@ from modules.ui.chatbot_dialog import (
     _DEFAULT_NAME_FIELD_OVERRIDES as CHATBOT_NAME_OVERRIDES,
 )
 from modules.objects.loot_generator_panel import LootGeneratorPanel
+from modules.scenarios.random_tables_panel import RandomTablesPanel
 
 log_module_import(__name__)
 
@@ -172,6 +173,7 @@ class GMScreenView(ctk.CTkFrame):
             "Map Tool",
             "Scene Flow",
             "Loot Generator",
+            "Random Tables",
             "Factions",
             "Places",
             "NPCs",
@@ -1070,6 +1072,12 @@ class GMScreenView(ctk.CTkFrame):
                     meta["scenario_title"] = title
                 else:
                     meta.pop("scenario_title", None)
+            elif meta.get("kind") == "random_tables":
+                frame = tab_info.get("content_frame")
+                if frame is not None and hasattr(frame, "get_state"):
+                    meta["state"] = frame.get_state()
+                else:
+                    meta.pop("state", None)
             layout_tabs.append(meta)
         return {
             "scenario": self.scenario_name,
@@ -1290,6 +1298,8 @@ class GMScreenView(ctk.CTkFrame):
             self.open_scene_flow_tab(scenario_title=scen, title=title or (f"Scene Flow: {scen}" if scen else "Scene Flow"))
         elif kind == "loot_generator":
             self.open_loot_generator_tab(title=title or "Loot Generator")
+        elif kind == "random_tables":
+            self.open_random_tables_tab(title=title or "Random Tables", initial_state=tab_def.get("state"))
         else:
             raise ValueError(f"Unsupported tab kind '{kind}'")
 
@@ -1742,6 +1752,27 @@ class GMScreenView(ctk.CTkFrame):
             layout_meta={"kind": "loot_generator"},
         )
 
+    def open_random_tables_tab(self, title=None, initial_state=None):
+        """Open the random tables panel inside the GM screen."""
+
+        tab_name = title or "Random Tables"
+        panel = RandomTablesPanel(self.content_area, initial_state=initial_state)
+
+        def factory(master, tab_ref=tab_name):
+            state = None
+            info = self.tabs.get(tab_ref)
+            frame = info.get("content_frame") if info else None
+            if frame is not None and hasattr(frame, "get_state"):
+                state = frame.get_state()
+            return RandomTablesPanel(master, initial_state=state)
+
+        self.add_tab(
+            tab_name,
+            panel,
+            content_factory=factory,
+            layout_meta={"kind": "random_tables", "state": panel.get_state()},
+        )
+
 
     def reattach_tab(self, name):
         log_info(f"Reattaching tab: {name}", func_name="GMScreenView.reattach_tab")
@@ -1852,20 +1883,51 @@ class GMScreenView(ctk.CTkFrame):
         """Pick a random NPC, Creature, Object, Information or Clue and open it.
         """
         types = ["NPCs", "Creatures", "Objects", "Informations", "Clues"]
-        etype = random.choice(types)
-        wrapper = self.wrappers.get(etype)
-        if not wrapper:
+        random.shuffle(types)
+
+        for etype in types:
+            wrapper = self.wrappers.get(etype)
+            if not wrapper:
+                continue
+            items = wrapper.load_items()
+            if not items:
+                continue
+
+            key = "Title" if etype in ("Scenarios", "Informations") else "Name"
+            choice = random.choice(items)
+            name = choice.get(key)
+            if name:
+                self.open_entity_tab(etype, name)
+                return
+
+        panel, tab_name = self._get_or_open_random_tables_panel()
+        if not panel:
+            messagebox.showinfo("Random Choice", "No entities or random tables are available to roll.")
             return
-        items = wrapper.load_items()
-        if not items:
-            messagebox.showinfo("Random Entity", f"No items found for {etype}.")
-            return
-        # decide which key to use
-        key = "Title" if etype in ("Scenarios", "Informations") else "Name"
-        choice = random.choice(items)
-        name = choice.get(key)
-        # open it in a new tab
-        self.open_entity_tab(etype, name)
+
+        result = panel.roll_random_table()
+        if result:
+            self.show_tab(tab_name)
+            messagebox.showinfo(
+                "Random Tables",
+                f"{result.get('table')} ({result.get('roll')}): {result.get('result')}",
+            )
+
+    def _get_or_open_random_tables_panel(self):
+        for name, tab in self.tabs.items():
+            meta = tab.get("meta") or {}
+            if meta.get("kind") != "random_tables":
+                continue
+            frame = tab.get("content_frame")
+            if frame is None and tab.get("factory"):
+                frame = tab["factory"](self.content_area)
+                tab["content_frame"] = frame
+            return frame, name
+
+        self.open_random_tables_tab()
+        name = self.tab_order[-1] if self.tab_order else None
+        frame = self.tabs.get(name, {}).get("content_frame") if name else None
+        return frame, name
 
     def show_tab(self, name):
         log_info(f"Showing tab: {name}", func_name="GMScreenView.show_tab")
@@ -1940,6 +2002,9 @@ class GMScreenView(ctk.CTkFrame):
             return
         elif entity_type == "Loot Generator":
             self.open_loot_generator_tab()
+            return
+        elif entity_type == "Random Tables":
+            self.open_random_tables_tab()
             return
         elif entity_type == "NPC Graph":
             if getattr(self, "_rich_host", None) is None or not self._rich_host.winfo_exists():
