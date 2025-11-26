@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import re
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Sequence, Tuple
 
 import fitz  # PyMuPDF
 from PIL import Image
@@ -187,55 +187,155 @@ def _extract_section_heading(page: fitz.Page) -> Optional[str]:
 
 
 def _extract_paragraph_labels(page: fitz.Page) -> Dict[int, str]:
-    """Map image xrefs to the nearest paragraph label on the page."""
+    """Map image xrefs to the nearest paragraph label on the page using geometry."""
 
     try:
         raw = page.get_text("rawdict") or {}
     except Exception:  # pragma: no cover - defensive fallback for malformed PDFs
         return {}
 
-    paragraphs: list[str] = []
-    labels: Dict[int, str] = {}
     blocks = raw.get("blocks", [])
+    text_blocks = _collect_text_blocks(blocks)
+    image_blocks = _collect_image_blocks(blocks)
 
-    def _collect_text(block: dict) -> str:
-        lines = block.get("lines") or []
-        text_parts: list[str] = []
-        for line in lines:
-            spans = line.get("spans") or []
-            for span in spans:
-                text_parts.append(span.get("text", ""))
-        return "".join(text_parts).strip()
+    if not image_blocks:
+        return {}
 
-    for index, block in enumerate(blocks):
-        block_type = block.get("type")
-        if block_type == 0:  # text block
-            paragraph_text = _collect_text(block)
-            if paragraph_text:
-                paragraphs.append(paragraph_text)
+    labeled_blocks = _label_image_blocks(image_blocks, text_blocks)
+    image_info = page.get_image_info(xrefs=True)
 
-        elif block_type == 1:  # image block
-            xref = block.get("xref") or block.get("number")
-            if xref is None:
-                continue
+    labels: Dict[int, str] = {}
+    for info in image_info:
+        bbox = info.get("bbox") or ()
+        xref = info.get("xref")
+        if xref is None or len(bbox) != 4:
+            continue
 
-            paragraph_label: Optional[str] = None
-            if paragraphs:
-                paragraph_label = paragraphs[-1].splitlines()[0].strip()
+        match_index = _match_image_to_block(tuple(bbox), image_blocks)
+        if match_index is None:
+            continue
 
-            if not paragraph_label:
-                for lookahead in blocks[index + 1 :]:
-                    if lookahead.get("type") != 0:
-                        continue
-                    candidate = _collect_text(lookahead)
-                    if candidate:
-                        paragraph_label = candidate.splitlines()[0].strip()
-                        break
-
-            if paragraph_label:
-                labels[int(xref)] = paragraph_label
+        paragraph_label = labeled_blocks.get(match_index)
+        if paragraph_label:
+            labels[int(xref)] = paragraph_label
 
     return labels
+
+
+def _collect_text(block: dict) -> str:
+    lines = block.get("lines") or []
+    text_parts: list[str] = []
+    for line in lines:
+        spans = line.get("spans") or []
+        for span in spans:
+            text_parts.append(span.get("text", ""))
+    return "".join(text_parts).strip()
+
+
+def _collect_text_blocks(blocks: Sequence[dict]) -> List[Tuple[Tuple[float, float, float, float], str]]:
+    collected: List[Tuple[Tuple[float, float, float, float], str]] = []
+    for block in blocks:
+        if block.get("type") != 0:
+            continue
+        bbox = block.get("bbox") or ()
+        if len(bbox) != 4:
+            continue
+        paragraph_text = _collect_text(block)
+        if paragraph_text:
+            collected.append((tuple(bbox), paragraph_text))
+    return collected
+
+
+def _collect_image_blocks(blocks: Sequence[dict]) -> List[Tuple[float, float, float, float]]:
+    collected: List[Tuple[float, float, float, float]] = []
+    for block in blocks:
+        if block.get("type") != 1:
+            continue
+        bbox = block.get("bbox") or ()
+        if len(bbox) != 4:
+            continue
+        collected.append(tuple(bbox))
+    return collected
+
+
+def _label_image_blocks(
+    image_blocks: Sequence[Tuple[float, float, float, float]],
+    text_blocks: Sequence[Tuple[Tuple[float, float, float, float], str]],
+) -> Dict[int, str]:
+    labels: Dict[int, str] = {}
+
+    for index, image_bbox in enumerate(image_blocks):
+        nearest_text = _find_nearest_text(image_bbox, text_blocks)
+        if not nearest_text:
+            continue
+
+        _, paragraph_text = nearest_text
+        paragraph_label = paragraph_text.splitlines()[0].strip()
+        if paragraph_label:
+            labels[index] = paragraph_label
+
+    return labels
+
+
+def _find_nearest_text(
+    image_bbox: Tuple[float, float, float, float],
+    text_blocks: Sequence[Tuple[Tuple[float, float, float, float], str]],
+) -> Optional[Tuple[Tuple[float, float, float, float], str]]:
+    """Return the closest text block to an image by bounding box proximity."""
+
+    best_candidate: Optional[Tuple[Tuple[float, float, float, float], str]] = None
+    best_score: Optional[float] = None
+
+    for text_bbox, text in text_blocks:
+        score = _bbox_distance(image_bbox, text_bbox)
+        if best_score is None or score < best_score:
+            best_score = score
+            best_candidate = (text_bbox, text)
+
+    return best_candidate
+
+
+def _bbox_distance(
+    box_a: Tuple[float, float, float, float], box_b: Tuple[float, float, float, float]
+) -> float:
+    """Calculate a simple distance metric between two bounding boxes."""
+
+    ax0, ay0, ax1, ay1 = box_a
+    bx0, by0, bx1, by1 = box_b
+
+    horizontal_gap = max(bx0 - ax1, ax0 - bx1, 0)
+    vertical_gap = max(by0 - ay1, ay0 - by1, 0)
+
+    overlap_penalty = 0.0
+    if horizontal_gap == 0 and vertical_gap == 0:
+        ax_center, ay_center = _bbox_center(box_a)
+        bx_center, by_center = _bbox_center(box_b)
+        overlap_penalty = abs(ax_center - bx_center) + abs(ay_center - by_center)
+
+    return horizontal_gap + vertical_gap + overlap_penalty
+
+
+def _bbox_center(box: Tuple[float, float, float, float]) -> Tuple[float, float]:
+    x0, y0, x1, y1 = box
+    return ((x0 + x1) / 2.0, (y0 + y1) / 2.0)
+
+
+def _match_image_to_block(
+    bbox: Tuple[float, float, float, float],
+    image_blocks: Sequence[Tuple[float, float, float, float]],
+) -> Optional[int]:
+    """Find the image block that best matches a given bbox from ``get_image_info``."""
+
+    best_index: Optional[int] = None
+    best_score: Optional[float] = None
+
+    for index, block_bbox in enumerate(image_blocks):
+        score = _bbox_distance(bbox, block_bbox)
+        if best_score is None or score < best_score:
+            best_score = score
+            best_index = index
+
+    return best_index
 
 
 def extract_images_with_names(
