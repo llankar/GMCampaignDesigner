@@ -187,7 +187,7 @@ def _extract_section_heading(page: fitz.Page) -> Optional[str]:
 
 
 def _extract_paragraph_labels(page: fitz.Page) -> Dict[int, str]:
-    """Map image xrefs to the nearest preceding paragraph label on the page."""
+    """Map image xrefs to the nearest paragraph label on the page."""
 
     try:
         raw = page.get_text("rawdict") or {}
@@ -196,18 +196,21 @@ def _extract_paragraph_labels(page: fitz.Page) -> Dict[int, str]:
 
     paragraphs: list[str] = []
     labels: Dict[int, str] = {}
+    blocks = raw.get("blocks", [])
 
-    for block in raw.get("blocks", []):
+    def _collect_text(block: dict) -> str:
+        lines = block.get("lines") or []
+        text_parts: list[str] = []
+        for line in lines:
+            spans = line.get("spans") or []
+            for span in spans:
+                text_parts.append(span.get("text", ""))
+        return "".join(text_parts).strip()
+
+    for index, block in enumerate(blocks):
         block_type = block.get("type")
         if block_type == 0:  # text block
-            lines = block.get("lines") or []
-            text_parts: list[str] = []
-            for line in lines:
-                spans = line.get("spans") or []
-                for span in spans:
-                    text_parts.append(span.get("text", ""))
-
-            paragraph_text = "".join(text_parts).strip()
+            paragraph_text = _collect_text(block)
             if paragraph_text:
                 paragraphs.append(paragraph_text)
 
@@ -216,10 +219,21 @@ def _extract_paragraph_labels(page: fitz.Page) -> Dict[int, str]:
             if xref is None:
                 continue
 
+            paragraph_label: Optional[str] = None
             if paragraphs:
                 paragraph_label = paragraphs[-1].splitlines()[0].strip()
-                if paragraph_label:
-                    labels[int(xref)] = paragraph_label
+
+            if not paragraph_label:
+                for lookahead in blocks[index + 1 :]:
+                    if lookahead.get("type") != 0:
+                        continue
+                    candidate = _collect_text(lookahead)
+                    if candidate:
+                        paragraph_label = candidate.splitlines()[0].strip()
+                        break
+
+            if paragraph_label:
+                labels[int(xref)] = paragraph_label
 
     return labels
 
