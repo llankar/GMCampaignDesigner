@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from pathlib import Path
 import tkinter as tk
 from tkinter import messagebox
 
@@ -9,7 +10,11 @@ import customtkinter as ctk
 import fitz
 from PIL import ImageTk
 
-from modules.books.pdf_processing import open_document, render_pdf_page_to_image
+from modules.books.pdf_processing import (
+    extract_images_with_names,
+    open_document,
+    render_pdf_page_to_image,
+)
 from modules.helpers.config_helper import ConfigHelper
 from modules.helpers.logging_helper import (
     log_debug,
@@ -105,6 +110,14 @@ class BookViewer(ctk.CTkToplevel):
 
         self.zoom_label = ctk.CTkLabel(controls, text=self._format_zoom_label())
         self.zoom_label.pack(side="left", padx=10)
+
+        extract_btn = ctk.CTkButton(
+            controls,
+            text="Extract Images",
+            width=140,
+            command=self._extract_current_images,
+        )
+        extract_btn.pack(side="left", padx=(0, 10))
 
         search_frame = ctk.CTkFrame(self)
         search_frame.pack(fill="x", padx=10, pady=(0, 10))
@@ -489,6 +502,39 @@ class BookViewer(ctk.CTkToplevel):
         self.zoom = new_zoom
         log_info(f"Adjusting zoom to {self.zoom:.2f}", func_name="BookViewer.adjust_zoom")
         self._render_current_page()
+
+    # ------------------------------------------------------------------
+    # Asset extraction
+    # ------------------------------------------------------------------
+
+    def _extract_current_images(self):
+        if not self.attachment:
+            messagebox.showwarning("Book Viewer", "This book does not have an attachment to process.")
+            return
+
+        try:
+            results = extract_images_with_names(self.attachment, campaign_dir=self.campaign_dir)
+        except Exception as exc:  # pragma: no cover - defensive catch
+            log_warning(
+                f"Failed to extract images: {exc}",
+                func_name="BookViewer._extract_current_images",
+            )
+            messagebox.showerror("Book Viewer", f"Unable to extract images:\n{exc}")
+            return
+
+        total = len(results)
+        if not total:
+            messagebox.showinfo("Book Viewer", "No images were found in this PDF.")
+            return
+
+        destination = Path(results[0].get("path", "")).parent.as_posix() if results else "assets/books/images"
+        log_info(
+            f"Extracted {total} image(s) to '{destination}'.",
+            func_name="BookViewer._extract_current_images",
+        )
+        messagebox.showinfo(
+            "Book Viewer", f"Extracted {total} image(s) to '{destination}'."
+        )
 
     # ------------------------------------------------------------------
     # Search helpers
