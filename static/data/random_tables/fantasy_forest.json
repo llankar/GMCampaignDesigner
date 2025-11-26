@@ -1,0 +1,74 @@
+{
+  "system": "Fantasy 5e",
+  "biome": "Forest",
+  "categories": [
+    {
+      "id": "encounters",
+      "name": "Encounters",
+      "tables": [
+        {
+          "id": "5e_forest_patrols",
+          "title": "Frontier Patrols",
+          "dice": "1d12",
+          "description": "Travel complications and allies along woodland trade roads.",
+          "tags": ["travel", "road", "forest"],
+          "entries": [
+            {"range": "1", "result": "A disoriented rider mistakes the party for bandits and draws steel."},
+            {"range": "2", "result": "A druid circle requests help relocating a trapped owlbear cub."},
+            {"range": "3-4", "result": "A caravan of refugees seeks safe escort away from recent raids."},
+            {"range": "5", "result": "A wounded scout delivers a warning: hobgoblin forces march at dusk."},
+            {"range": "6-7", "result": "A fey court messenger offers a bargain to bypass their glade."},
+            {"range": "8", "result": "A toll bridge is held by mercenaries with dubious paperwork."},
+            {"range": "9-10", "result": "A rival adventuring party shares rumors of a haunted milestone."},
+            {"range": "11", "result": "A bandit ambush triggers as an uprooted tree crashes down."},
+            {"range": "12", "result": "A ranger patrol salutes the party and provides fresh trail rations."}
+          ]
+        }
+      ]
+    },
+    {
+      "id": "inspirations",
+      "name": "Inspirations",
+      "tables": [
+        {
+          "id": "5e_forest_whispers",
+          "title": "Forest Whispers",
+          "dice": "1d8",
+          "description": "Quiet prompts to spark roleplay while camping in ancient woods.",
+          "tags": ["quiet", "camp", "forest"],
+          "entries": [
+            {"range": "1", "result": "Distant drums thrum beneath the earth, syncing with a hero's heartbeat."},
+            {"range": "2", "result": "A tree scar forms the party crest, fresh sap glistening like ink."},
+            {"range": "3", "result": "Owls repeat the last thing each hero said, but out of order."},
+            {"range": "4", "result": "An emerald fox leaves a trail of glowing pawprints circling the camp."},
+            {"range": "5", "result": "A dream of roots and rivers leaves someone waking with wet boots."},
+            {"range": "6", "result": "A broken arrow tied with silver thread points toward unseen ruins."},
+            {"range": "7", "result": "Motes of light hover over anyone who lies, revealing secrets at dawn."},
+            {"range": "8", "result": "A lullaby drifts through the leaves in a language none remember learning."}
+          ]
+        }
+      ]
+    },
+    {
+      "id": "environmental_events",
+      "name": "Environmental Events",
+      "tables": [
+        {
+          "id": "5e_forest_weather",
+          "title": "Deepwood Weather Turns",
+          "dice": "1d6",
+          "description": "Quick swings in forest weather and terrain hazards.",
+          "tags": ["weather", "forest"],
+          "entries": [
+            {"range": "1", "result": "A choking pollen cloud imposes disadvantage on speech-based checks."},
+            {"range": "2", "result": "Sudden downpour floods low paths, adding hours to travel time."},
+            {"range": "3", "result": "Biting insects swarm; exposed creatures must rest in smoke or nets."},
+            {"range": "4", "result": "Moonlit auroras grant advantage to Wisdom (Perception) checks until dawn."},
+            {"range": "5", "result": "A landslide blocks the trail, revealing a buried stone archway."},
+            {"range": "6", "result": "Unseasonal frost coats the canopy; tracks are easy to follow for a mile."}
+          ]
+        }
+      ]
+    }
+  ]
+}

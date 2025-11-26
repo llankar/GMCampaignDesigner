@@ -5,36 +5,185 @@
       "name": "Encounters",
       "tables": [
         {
-          "id": "roadside_events",
-          "title": "Roadside Events",
+          "id": "5e_forest_patrols",
+          "title": "Frontier Patrols",
           "dice": "1d12",
-          "description": "Situational events to drop on the road between destinations.",
-          "tags": ["travel", "low-threat"],
+          "system": "Fantasy 5e",
+          "biome": "Forest",
+          "description": "Travel complications and allies along woodland trade roads.",
+          "tags": ["travel", "road", "forest"],
           "entries": [
-            {"range": "1-2", "result": "Abandoned cart with fresh tracks leading into the underbrush."},
-            {"range": "3", "result": "A wounded messenger collapses, clutching a sealed scroll."},
-            {"range": "4-5", "result": "Weather turns suddenly: sleet and harsh wind slow the party."},
-            {"range": "6", "result": "A caravan requests an escort through a rumored bandit stretch."},
-            {"range": "7-8", "result": "Travelers share rumors about a cursed milestone up ahead."},
-            {"range": "9", "result": "A patrol demands proof of travel rights and searches for contraband."},
-            {"range": "10-11", "result": "A collapsed bridge forces a detour across precarious stepping stones."},
-            {"range": "12", "result": "An injured giant boar charges wildly across the road."}
+            {"range": "1", "result": "A disoriented rider mistakes the party for bandits and draws steel."},
+            {"range": "2", "result": "A druid circle requests help relocating a trapped owlbear cub."},
+            {"range": "3-4", "result": "A caravan of refugees seeks safe escort away from recent raids."},
+            {"range": "5", "result": "A wounded scout delivers a warning: hobgoblin forces march at dusk."},
+            {"range": "6-7", "result": "A fey court messenger offers a bargain to bypass their glade."},
+            {"range": "8", "result": "A toll bridge is held by mercenaries with dubious paperwork."},
+            {"range": "9-10", "result": "A rival adventuring party shares rumors of a haunted milestone."},
+            {"range": "11", "result": "A bandit ambush triggers as an uprooted tree crashes down."},
+            {"range": "12", "result": "A ranger patrol salutes the party and provides fresh trail rations."}
           ]
         },
         {
-          "id": "urban_complications",
-          "title": "Urban Complications",
+          "id": "5e_dungeon_crossroads",
+          "title": "Dungeon Crossroads",
           "dice": "1d10",
-          "description": "Twists that complicate city downtime or errands.",
-          "tags": ["city"],
+          "system": "Fantasy 5e",
+          "biome": "Dungeon",
+          "description": "Moments that make corridors feel alive.",
+          "tags": ["dungeon", "exploration"],
           "entries": [
-            {"range": "1", "result": "A pickpocket succeeds; the stolen purse contains a mysterious key."},
-            {"range": "2", "result": "A street preacher denounces the party, drawing a curious crowd."},
-            {"range": "3-4", "result": "Guild enforcers mistake the party for debtors and demand payment."},
-            {"range": "5", "result": "Someone swaps packages—opening it reveals volatile alchemical vials."},
-            {"range": "6-7", "result": "A sudden curfew shutters shops; only back-alley dealers remain."},
-            {"range": "8", "result": "A noble’s retainer offers work, but insists on secrecy and speed."},
-            {"range": "9-10", "result": "Two rival factions fight openly in the street, endangering bystanders."}
+            {"range": "1", "result": "A sliding wall resets the map, revealing an unfamiliar passage."},
+            {"range": "2", "result": "Animated armor demands a password last spoken centuries ago."},
+            {"range": "3", "result": "Torchlight flickers as a rival delve party flees an unseen threat."},
+            {"range": "4", "result": "A spectral scribe offers guidance in exchange for a written secret."},
+            {"range": "5", "result": "A heavy portcullis crashes down, splitting the party in two."},
+            {"range": "6", "result": "A pool reflects the next room instead of the current hallway."},
+            {"range": "7", "result": "A mimic disguised as a rope bridge tests cautious explorers."},
+            {"range": "8", "result": "Echoes of drums rise; the denizens rally to defend their lair."},
+            {"range": "9", "result": "A prisoner begs release, promising a secret shortcut."},
+            {"range": "10", "result": "A shrine mural animates to quiz the heroes on local legends."}
+          ]
+        },
+        {
+          "id": "space_station_concourse",
+          "title": "Concourse Encounters",
+          "dice": "1d12",
+          "system": "Space Opera",
+          "biome": "Orbital Station",
+          "description": "Crowded station situations between docking bays and markets.",
+          "tags": ["station", "social"],
+          "entries": [
+            {"range": "1", "result": "Security drones scan for fugitives; one pings on a crew member."},
+            {"range": "2", "result": "A rival captain taunts the crew with a better cargo contract."},
+            {"range": "3-4", "result": "A courier collapses, dropping a datachip marked urgent."},
+            {"range": "5", "result": "A pop-up market offers prototype gear with questionable licenses."},
+            {"range": "6-7", "result": "A protest blocks access to the docks, chanting anti-corp slogans."},
+            {"range": "8", "result": "A maintenance worker begs escort to the reactor after sabotage threats."},
+            {"range": "9", "result": "A smuggler discreetly offers passage for stowaways the crew knows."},
+            {"range": "10", "result": "Docking clamps glitch, risking damage unless someone overrides controls."},
+            {"range": "11", "result": "A celebrity explorer signs autographs and invites the crew to a gala."},
+            {"range": "12", "result": "Station lockdown initiates; shutters slam down until the threat is found."}
+          ]
+        }
+      ]
+    },
+    {
+      "id": "inspirations",
+      "name": "Inspirations",
+      "tables": [
+        {
+          "id": "5e_forest_whispers",
+          "title": "Forest Whispers",
+          "dice": "1d8",
+          "system": "Fantasy 5e",
+          "biome": "Forest",
+          "description": "Quiet prompts to spark roleplay while camping in ancient woods.",
+          "tags": ["quiet", "camp", "forest"],
+          "entries": [
+            {"range": "1", "result": "Distant drums thrum beneath the earth, syncing with a hero's heartbeat."},
+            {"range": "2", "result": "A tree scar forms the party crest, fresh sap glistening like ink."},
+            {"range": "3", "result": "Owls repeat the last thing each hero said, but out of order."},
+            {"range": "4", "result": "An emerald fox leaves a trail of glowing pawprints circling the camp."},
+            {"range": "5", "result": "A dream of roots and rivers leaves someone waking with wet boots."},
+            {"range": "6", "result": "A broken arrow tied with silver thread points toward unseen ruins."},
+            {"range": "7", "result": "Motes of light hover over anyone who lies, revealing secrets at dawn."},
+            {"range": "8", "result": "A lullaby drifts through the leaves in a language none remember learning."}
+          ]
+        },
+        {
+          "id": "5e_dungeon_inspirations",
+          "title": "Dungeon Atmosphere Prompts",
+          "dice": "1d8",
+          "system": "Fantasy 5e",
+          "biome": "Dungeon",
+          "description": "Flavor to set tone between combats.",
+          "tags": ["dungeon", "tone"],
+          "entries": [
+            {"range": "1", "result": "Moss grows in the outline of a vanished door."},
+            {"range": "2", "result": "Faint singing echoes, resolving into the party's marching tune."},
+            {"range": "3", "result": "Dust falls as something massive shifts overhead."},
+            {"range": "4", "result": "Carved names of past delvers glow briefly when touched."},
+            {"range": "5", "result": "A cold breeze carries the smell of rain—impossible this deep."},
+            {"range": "6", "result": "Skeletons arranged as though dining silently at a stone table."},
+            {"range": "7", "result": "Whispers try to finish each hero's sentences."},
+            {"range": "8", "result": "A rusted bell rings once, then crumbles into dust."}
+          ]
+        },
+        {
+          "id": "space_station_prompts",
+          "title": "Station Sparks",
+          "dice": "1d8",
+          "system": "Space Opera",
+          "biome": "Orbital Station",
+          "description": "Quick prompts to color downtime aboard the habitat.",
+          "tags": ["station", "roleplay"],
+          "entries": [
+            {"range": "1", "result": "Artificial dawn glitches; half the station stays dim for hours."},
+            {"range": "2", "result": "An old war mural lights up, showing ships the crew doesn't recognize."},
+            {"range": "3", "result": "A vendor sells freeze-dried snacks named after the crew's ship."},
+            {"range": "4", "result": "Gravity cycling to 0.3g sparks impromptu microgravity performances."},
+            {"range": "5", "result": "A holo-news ticker scrolls rumors about the crew's last mission."},
+            {"range": "6", "result": "A child asks for help finding a missing maintenance bot."},
+            {"range": "7", "result": "A veteran salvager tells a ghost story about the unused docking ring."},
+            {"range": "8", "result": "A sun flare paints the viewport copper, delaying faster-than-light lanes."}
+          ]
+        }
+      ]
+    },
+    {
+      "id": "environmental_events",
+      "name": "Environmental Events",
+      "tables": [
+        {
+          "id": "5e_forest_weather",
+          "title": "Deepwood Weather Turns",
+          "dice": "1d6",
+          "system": "Fantasy 5e",
+          "biome": "Forest",
+          "description": "Quick swings in forest weather and terrain hazards.",
+          "tags": ["weather", "forest"],
+          "entries": [
+            {"range": "1", "result": "A choking pollen cloud imposes disadvantage on speech-based checks."},
+            {"range": "2", "result": "Sudden downpour floods low paths, adding hours to travel time."},
+            {"range": "3", "result": "Biting insects swarm; exposed creatures must rest in smoke or nets."},
+            {"range": "4", "result": "Moonlit auroras grant advantage to Wisdom (Perception) checks until dawn."},
+            {"range": "5", "result": "A landslide blocks the trail, revealing a buried stone archway."},
+            {"range": "6", "result": "Unseasonal frost coats the canopy; tracks are easy to follow for a mile."}
+          ]
+        },
+        {
+          "id": "5e_dungeon_hazards",
+          "title": "Underground Hazards",
+          "dice": "1d6",
+          "system": "Fantasy 5e",
+          "biome": "Dungeon",
+          "description": "Low-prep hazards to mix into dungeon movement.",
+          "tags": ["hazard", "dungeon"],
+          "entries": [
+            {"range": "1", "result": "Poison gas seeps from cracks; holding breath is required to proceed."},
+            {"range": "2", "result": "Flooded stairs demand Athletics checks or falling prone."},
+            {"range": "3", "result": "Sonic resonances disorient; spoken commands echo as thunderclaps."},
+            {"range": "4", "result": "A magic null zone suppresses spells for the next two rooms."},
+            {"range": "5", "result": "An unstable ceiling sheds debris whenever loud noises occur."},
+            {"range": "6", "result": "A rotating hallway realigns destination doors each hour."}
+          ]
+        },
+        {
+          "id": "space_station_glitches",
+          "title": "Station Glitches",
+          "dice": "1d6",
+          "system": "Space Opera",
+          "biome": "Orbital Station",
+          "description": "Malfunctions that add tension or urgency.",
+          "tags": ["hazard", "station"],
+          "entries": [
+            {"range": "1", "result": "Atmospheric processors hiccup, dropping oxygen levels for ten minutes."},
+            {"range": "2", "result": "Gravity plating pulses, flinging unsecured objects across the deck."},
+            {"range": "3", "result": "Thermal alarms scream as coolant leaks into maintenance tunnels."},
+            {"range": "4", "result": "Docking guidance failures threaten to collide two shuttles."},
+            {"range": "5", "result": "Holo-projectors overlay outdated security zones, confusing navigation."},
+            {"range": "6", "result": "An unscheduled reactor purge forces a timed evacuation of central modules."}
           ]
         }
       ]
@@ -48,6 +197,7 @@
           "title": "Mysterious Missives",
           "dice": "1d8",
           "description": "Letters, notes, and rumors that kick off a session.",
+          "tags": ["generic", "any"],
           "entries": [
             {"range": "1", "result": "A letter arrives from the future warning of tonight’s betrayal."},
             {"range": "2", "result": "A sealed package bears the party crest but no sender."},
@@ -57,60 +207,6 @@
             {"range": "6", "result": "A coded flyer promises power to anyone who attends a midnight auction."},
             {"range": "7", "result": "A rival leaves a taunting invitation to settle matters in an abandoned mill."},
             {"range": "8", "result": "An unsigned note pleads for help and includes a single scorched scale."}
-          ]
-        },
-        {
-          "id": "job_board",
-          "title": "Job Board",
-          "dice": "1d6",
-          "description": "Quick prompts for patrons and odd jobs.",
-          "tags": ["downtime", "patrons"],
-          "entries": [
-            {"range": "1", "result": "Guard a freight wagon rumored to carry cursed antiques."},
-            {"range": "2", "result": "Retrieve a runaway homunculus before it reaches the alchemist’s rival."},
-            {"range": "3", "result": "Find the source of haunting sounds inside the old bell tower."},
-            {"range": "4", "result": "Escort a scholar to map ruins recently unearthed by floods."},
-            {"range": "5", "result": "Shut down an illegal gambling den skimming from the thieves’ guild."},
-            {"range": "6", "result": "Deliver a wedding gift that is actually a sealed extradimensional vault."}
-          ]
-        }
-      ]
-    },
-    {
-      "id": "twists",
-      "name": "Twists & Complications",
-      "tables": [
-        {
-          "id": "ritual_mishaps",
-          "title": "Ritual Mishaps",
-          "dice": "1d8",
-          "description": "When magic backfires, the fallout lingers.",
-          "tags": ["arcane"],
-          "entries": [
-            {"range": "1", "result": "Uncontrolled spectral echoes replay the ritual every hour."},
-            {"range": "2", "result": "All flames within a mile burn cold blue until the tear is sealed."},
-            {"range": "3", "result": "Gravity weakens sporadically, turning debris and rivals airborne."},
-            {"range": "4", "result": "A trapped elemental bargains for release and names its captor."},
-            {"range": "5", "result": "Anyone speaking a spell’s name loses their voice for a minute."},
-            {"range": "6", "result": "A rival ritualist hijacks the energies to empower their own scheme."},
-            {"range": "7", "result": "Summoned creatures cannot be dismissed and seek new allegiances."},
-            {"range": "8", "result": "The veil thins; whispers from beyond suggest an unexpected patron."}
-          ]
-        },
-        {
-          "id": "unexpected_allies",
-          "title": "Unexpected Allies",
-          "dice": "1d10",
-          "description": "Allies arrive—but they have agendas of their own.",
-          "entries": [
-            {"range": "1", "result": "A disgraced knight offers aid in exchange for restoring their honor."},
-            {"range": "2", "result": "An informant from a rival faction trades intel for safe passage."},
-            {"range": "3-4", "result": "A reformed cultist shares rituals that can undo their old order."},
-            {"range": "5", "result": "A spirit bound to a relic agrees to help if the relic is freed."},
-            {"range": "6", "result": "A clever street gang will assist for control of one neighborhood."},
-            {"range": "7-8", "result": "A monster hunter joins the party—until their quarry is slain."},
-            {"range": "9", "result": "A diplomatic envoy steps in but demands the party owe a favor."},
-            {"range": "10", "result": "A rival adventuring party offers truce to face a greater threat."}
           ]
         }
       ]
