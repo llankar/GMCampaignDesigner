@@ -284,6 +284,7 @@ class MainWindow(ctk.CTk):
             "sound_manager": "sound_manager_icon.png",
             "audio_controls": "sound_manager_icon.png",
             "scene_flow_viewer": "scenes_flow_icon.png",
+            "create_random_table"   : "random_table_icon.png",
         }
 
         # Entity-specific icons come from metadata; keep base ones separate.
