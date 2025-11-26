@@ -1,0 +1,119 @@
+{
+  "categories": [
+    {
+      "id": "encounters",
+      "name": "Encounters",
+      "tables": [
+        {
+          "id": "roadside_events",
+          "title": "Roadside Events",
+          "dice": "1d12",
+          "description": "Situational events to drop on the road between destinations.",
+          "tags": ["travel", "low-threat"],
+          "entries": [
+            {"range": "1-2", "result": "Abandoned cart with fresh tracks leading into the underbrush."},
+            {"range": "3", "result": "A wounded messenger collapses, clutching a sealed scroll."},
+            {"range": "4-5", "result": "Weather turns suddenly: sleet and harsh wind slow the party."},
+            {"range": "6", "result": "A caravan requests an escort through a rumored bandit stretch."},
+            {"range": "7-8", "result": "Travelers share rumors about a cursed milestone up ahead."},
+            {"range": "9", "result": "A patrol demands proof of travel rights and searches for contraband."},
+            {"range": "10-11", "result": "A collapsed bridge forces a detour across precarious stepping stones."},
+            {"range": "12", "result": "An injured giant boar charges wildly across the road."}
+          ]
+        },
+        {
+          "id": "urban_complications",
+          "title": "Urban Complications",
+          "dice": "1d10",
+          "description": "Twists that complicate city downtime or errands.",
+          "tags": ["city"],
+          "entries": [
+            {"range": "1", "result": "A pickpocket succeeds; the stolen purse contains a mysterious key."},
+            {"range": "2", "result": "A street preacher denounces the party, drawing a curious crowd."},
+            {"range": "3-4", "result": "Guild enforcers mistake the party for debtors and demand payment."},
+            {"range": "5", "result": "Someone swaps packages—opening it reveals volatile alchemical vials."},
+            {"range": "6-7", "result": "A sudden curfew shutters shops; only back-alley dealers remain."},
+            {"range": "8", "result": "A noble’s retainer offers work, but insists on secrecy and speed."},
+            {"range": "9-10", "result": "Two rival factions fight openly in the street, endangering bystanders."}
+          ]
+        }
+      ]
+    },
+    {
+      "id": "hooks",
+      "name": "Adventure Hooks",
+      "tables": [
+        {
+          "id": "mysterious_missives",
+          "title": "Mysterious Missives",
+          "dice": "1d8",
+          "description": "Letters, notes, and rumors that kick off a session.",
+          "entries": [
+            {"range": "1", "result": "A letter arrives from the future warning of tonight’s betrayal."},
+            {"range": "2", "result": "A sealed package bears the party crest but no sender."},
+            {"range": "3", "result": "A dream is followed by a map drawn in morning dew on the window."},
+            {"range": "4", "result": "A courier collapses, revealing a message addressed to the wrong heroes."},
+            {"range": "5", "result": "Town criers spread word of a bounty that mentions each hero by name."},
+            {"range": "6", "result": "A coded flyer promises power to anyone who attends a midnight auction."},
+            {"range": "7", "result": "A rival leaves a taunting invitation to settle matters in an abandoned mill."},
+            {"range": "8", "result": "An unsigned note pleads for help and includes a single scorched scale."}
+          ]
+        },
+        {
+          "id": "job_board",
+          "title": "Job Board",
+          "dice": "1d6",
+          "description": "Quick prompts for patrons and odd jobs.",
+          "tags": ["downtime", "patrons"],
+          "entries": [
+            {"range": "1", "result": "Guard a freight wagon rumored to carry cursed antiques."},
+            {"range": "2", "result": "Retrieve a runaway homunculus before it reaches the alchemist’s rival."},
+            {"range": "3", "result": "Find the source of haunting sounds inside the old bell tower."},
+            {"range": "4", "result": "Escort a scholar to map ruins recently unearthed by floods."},
+            {"range": "5", "result": "Shut down an illegal gambling den skimming from the thieves’ guild."},
+            {"range": "6", "result": "Deliver a wedding gift that is actually a sealed extradimensional vault."}
+          ]
+        }
+      ]
+    },
+    {
+      "id": "twists",
+      "name": "Twists & Complications",
+      "tables": [
+        {
+          "id": "ritual_mishaps",
+          "title": "Ritual Mishaps",
+          "dice": "1d8",
+          "description": "When magic backfires, the fallout lingers.",
+          "tags": ["arcane"],
+          "entries": [
+            {"range": "1", "result": "Uncontrolled spectral echoes replay the ritual every hour."},
+            {"range": "2", "result": "All flames within a mile burn cold blue until the tear is sealed."},
+            {"range": "3", "result": "Gravity weakens sporadically, turning debris and rivals airborne."},
+            {"range": "4", "result": "A trapped elemental bargains for release and names its captor."},
+            {"range": "5", "result": "Anyone speaking a spell’s name loses their voice for a minute."},
+            {"range": "6", "result": "A rival ritualist hijacks the energies to empower their own scheme."},
+            {"range": "7", "result": "Summoned creatures cannot be dismissed and seek new allegiances."},
+            {"range": "8", "result": "The veil thins; whispers from beyond suggest an unexpected patron."}
+          ]
+        },
+        {
+          "id": "unexpected_allies",
+          "title": "Unexpected Allies",
+          "dice": "1d10",
+          "description": "Allies arrive—but they have agendas of their own.",
+          "entries": [
+            {"range": "1", "result": "A disgraced knight offers aid in exchange for restoring their honor."},
+            {"range": "2", "result": "An informant from a rival faction trades intel for safe passage."},
+            {"range": "3-4", "result": "A reformed cultist shares rituals that can undo their old order."},
+            {"range": "5", "result": "A spirit bound to a relic agrees to help if the relic is freed."},
+            {"range": "6", "result": "A clever street gang will assist for control of one neighborhood."},
+            {"range": "7-8", "result": "A monster hunter joins the party—until their quarry is slain."},
+            {"range": "9", "result": "A diplomatic envoy steps in but demands the party owe a favor."},
+            {"range": "10", "result": "A rival adventuring party offers truce to face a greater threat."}
+          ]
+        }
+      ]
+    }
+  ]
+}
