@@ -1,9 +1,14 @@
-"""PDF helper functions for rendering and extracting content."""
+"""PDF helper functions for rendering and extracting content.
+
+The helpers in this module centralise common PDF tasks such as rendering pages,
+extracting ranges, and pulling embedded images for reuse inside campaigns.
+"""
 
 from __future__ import annotations
 
+import re
 from pathlib import Path
-from typing import Dict
+from typing import Dict, List, Optional
 
 import fitz  # PyMuPDF
 from PIL import Image
@@ -146,4 +151,123 @@ def export_pdf_page_range(
         "filename": candidate.name,
         "total_pages": total_pages,
     }
+
+
+def _sanitize_filename(component: str) -> str:
+    """Return a filesystem-safe fragment derived from ``component``."""
+
+    cleaned = re.sub(r"[^A-Za-z0-9._-]+", "_", component).strip("._-")
+    return cleaned or "image"
+
+
+def _extract_section_heading(page: fitz.Page) -> Optional[str]:
+    """Attempt to extract a representative heading from the top of the page."""
+
+    # Prefer block-level text to avoid headers/footers being stitched together.
+    try:
+        blocks = page.get_text("blocks") or []
+    except Exception:  # pragma: no cover - PyMuPDF can raise for malformed text
+        blocks = []
+
+    for block in sorted(blocks, key=lambda b: (b[1], b[0])):
+        text = (block[4] or "").strip()
+        if text:
+            heading_line = text.splitlines()[0].strip()
+            if heading_line:
+                return heading_line
+
+    # Fallback to raw text extraction if no block text is available.
+    try:
+        raw_text = page.get_text("text") or ""
+    except Exception:  # pragma: no cover
+        raw_text = ""
+
+    heading_line = raw_text.strip().splitlines()[0] if raw_text.strip() else ""
+    return heading_line or None
+
+
+def extract_images_with_names(
+    attachment_path: str, *, campaign_dir: str | None = None
+) -> List[Dict[str, object]]:
+    """
+    Extract embedded images from a PDF and save them with descriptive filenames.
+
+    Images are written to ``assets/books/images`` beneath the campaign directory
+    using a filename derived from the XObject name when available, otherwise from
+    the current page's heading text. A page/sequence suffix is appended to keep
+    names unique. The function returns metadata for each exported image.
+    """
+
+    pdf_path = _resolve_pdf_path(attachment_path, campaign_dir)
+    campaign_root = _resolve_campaign_dir(campaign_dir)
+    image_dir = campaign_root / "assets" / "books" / "images"
+    image_dir.mkdir(parents=True, exist_ok=True)
+
+    document = open_document(attachment_path, campaign_dir=campaign_dir)
+    metadata: List[Dict[str, object]] = []
+    log_info(
+        f"Extracting images from '{pdf_path.name}' into '{image_dir.relative_to(campaign_root)}'.",
+        func_name="pdf_processing.extract_images_with_names",
+    )
+
+    try:
+        for page_index in range(document.page_count):
+            page = document.load_page(page_index)
+            section_heading = _extract_section_heading(page)
+            images = page.get_images(full=True)
+
+            if not images:
+                log_debug(
+                    f"No images found on page {page_index + 1}.",
+                    func_name="pdf_processing.extract_images_with_names",
+                )
+                continue
+
+            for image_position, image_info in enumerate(images, start=1):
+                xref = image_info[0]
+                original_name = None
+                if len(image_info) > 7 and image_info[7]:
+                    original_name = image_info[7]
+                    if isinstance(original_name, bytes):
+                        original_name = original_name.decode(errors="ignore")
+
+                base_name: Optional[str] = _sanitize_filename(original_name) if original_name else None
+                if not base_name and section_heading:
+                    base_name = _sanitize_filename(section_heading)
+                if not base_name:
+                    base_name = f"page{page_index + 1:04d}_img{image_position:02d}"
+
+                candidate = image_dir / f"{base_name}.png"
+                counter = 1
+                while candidate.exists():
+                    candidate = image_dir / f"{base_name}_{counter}.png"
+                    counter += 1
+
+                pixmap = fitz.Pixmap(document, xref)
+                if pixmap.n >= 5:  # Convert CMYK or other colorspaces to RGB
+                    pixmap = fitz.Pixmap(fitz.csRGB, pixmap)
+                pixmap.save(candidate)
+
+                relative_path = candidate.relative_to(campaign_root).as_posix()
+                entry = {
+                    "path": relative_path,
+                    "page": page_index + 1,
+                    "section": section_heading,
+                    "original_name": original_name,
+                    "sequence": image_position,
+                }
+                metadata.append(entry)
+                log_info(
+                    f"Saved image from page {page_index + 1} as '{relative_path}'.",
+                    func_name="pdf_processing.extract_images_with_names",
+                )
+
+    finally:
+        document.close()
+
+    log_debug(
+        f"Extracted {len(metadata)} image(s) from '{pdf_path.name}'.",
+        func_name="pdf_processing.extract_images_with_names",
+    )
+    return metadata
 
