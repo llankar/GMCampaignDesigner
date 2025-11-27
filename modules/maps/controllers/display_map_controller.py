@@ -159,8 +159,15 @@ class DisplayMapController:
             self.whiteboard_width = float(ConfigHelper.get("Drawing", "whiteboard_width", fallback=4))
         except Exception:
             self.whiteboard_width = 4.0
+        try:
+            self.whiteboard_eraser_radius = float(ConfigHelper.get("Drawing", "whiteboard_eraser_radius", fallback=8))
+        except Exception:
+            self.whiteboard_eraser_radius = 8.0
         self._active_whiteboard_points = []
         self._whiteboard_preview_id = None
+        self._eraser_active = False
+        self._eraser_dirty = False
+        self._eraser_repaint_scheduled = False
 
         self._panning      = False
         self._last_mouse   = (0, 0)
@@ -2566,10 +2573,27 @@ class DisplayMapController:
             if tag.endswith("_handle"): # e.g., "se_handle"
                 handle_type = tag.split('_')[0]
                 break
-        
+
         if handle_type and self._graphical_edit_mode_item and self.selected_token == self._graphical_edit_mode_item:
             self._on_resize_handle_press(event, handle_type)
             return # A handle was pressed, resize logic takes over
+
+        if self.drawing_mode == "eraser":
+            world_x = (event.x - self.pan_x) / self.zoom
+            world_y = (event.y - self.pan_y) / self.zoom
+            self._eraser_active = True
+            if self._erase_whiteboard_at(world_x, world_y):
+                self._mark_eraser_dirty()
+            self._hide_all_token_hovers()
+            self._hide_all_marker_descriptions()
+            if self._marker_after_id:
+                try:
+                    self.canvas.after_cancel(self._marker_after_id)
+                except Exception:
+                    pass
+                self._marker_after_id = None
+            self._marker_start = None
+            return
 
         # If not clicking a handle, determine if clicking an item or empty space
         current_ids = self.canvas.find_withtag("current")
@@ -2646,6 +2670,12 @@ class DisplayMapController:
         if self._marker_after_id and self._marker_start:
             dx = event.x - self._marker_start[0]; dy = event.y - self._marker_start[1]
             if abs(dx) > 5 or abs(dy) > 5: self.canvas.after_cancel(self._marker_after_id); self._marker_after_id = None
+        if self.drawing_mode == "eraser" and self._eraser_active:
+            world_x = (event.x - self.pan_x) / self.zoom
+            world_y = (event.y - self.pan_y) / self.zoom
+            if self._erase_whiteboard_at(world_x, world_y):
+                self._mark_eraser_dirty()
+            return
         if self.drawing_mode == "whiteboard" and self._active_whiteboard_points:
             world_x = (event.x - self.pan_x) / self.zoom
             world_y = (event.y - self.pan_y) / self.zoom
@@ -2664,6 +2694,12 @@ class DisplayMapController:
             self._update_fog_rectangle_preview(event)
 
     def _on_mouse_up(self, event):
+        if self.drawing_mode == "eraser":
+            if self._eraser_active and self._eraser_dirty:
+                self._commit_eraser_changes()
+            self._eraser_active = False
+            self._eraser_dirty = False
+            return
         if self.drawing_mode == "whiteboard" and self._active_whiteboard_points:
             self._finalize_whiteboard_stroke()
             return
@@ -2795,6 +2831,97 @@ class DisplayMapController:
         self.tokens.append(stroke)
         self._update_canvas_images(resample=self._fast_resample)
         self._persist_tokens()
+
+    def _mark_eraser_dirty(self):
+        self._eraser_dirty = True
+        if not self._eraser_repaint_scheduled:
+            self._eraser_repaint_scheduled = True
+            try:
+                self.parent.after(0, self._perform_eraser_repaint)
+            except Exception:
+                self._perform_eraser_repaint()
+
+    def _perform_eraser_repaint(self):
+        self._eraser_repaint_scheduled = False
+        try:
+            self._update_canvas_images(resample=self._fast_resample)
+        except Exception:
+            pass
+
+    def _point_to_segment_distance(self, point, start, end):
+        px, py = point
+        x1, y1 = start
+        x2, y2 = end
+        dx = x2 - x1
+        dy = y2 - y1
+        if dx == 0 and dy == 0:
+            return math.hypot(px - x1, py - y1)
+        t = ((px - x1) * dx + (py - y1) * dy) / (dx * dx + dy * dy)
+        t = max(0.0, min(1.0, t))
+        proj_x = x1 + t * dx
+        proj_y = y1 + t * dy
+        return math.hypot(px - proj_x, py - proj_y)
+
+    def _polyline_hits_point(self, points, point, radius):
+        if len(points) < 2:
+            return False
+        for start, end in zip(points, points[1:]):
+            if self._point_to_segment_distance(point, start, end) <= radius:
+                return True
+        return False
+
+    def _erase_whiteboard_at(self, world_x: float, world_y: float) -> bool:
+        canvas = getattr(self, "canvas", None)
+        changed = False
+        remaining_tokens = []
+        radius = float(getattr(self, "whiteboard_eraser_radius", 8.0))
+        target_point = (world_x, world_y)
+        for item in self.tokens:
+            if item.get("type") != "whiteboard":
+                remaining_tokens.append(item)
+                continue
+            points = item.get("points") or []
+            if len(points) < 2:
+                remaining_tokens.append(item)
+                continue
+            effective_radius = radius + float(item.get("width", 0)) / 2.0
+            if not self._polyline_hits_point(points, target_point, effective_radius):
+                remaining_tokens.append(item)
+                continue
+            for cid in item.get("canvas_ids") or []:
+                if canvas:
+                    try:
+                        canvas.delete(cid)
+                    except tk.TclError:
+                        pass
+            if item is self.selected_token:
+                self.selected_token = None
+            if item in self.selected_items:
+                try:
+                    self.selected_items.remove(item)
+                except ValueError:
+                    pass
+            changed = True
+        if changed:
+            self.tokens = remaining_tokens
+        return changed
+
+    def _commit_eraser_changes(self):
+        try:
+            self._update_canvas_images(resample=self._fast_resample)
+        except Exception:
+            pass
+        self._persist_tokens()
+        try:
+            if getattr(self, 'fs', None) and self.fs.winfo_exists() and getattr(self, 'fs_canvas', None):
+                self.parent.after(0, self._update_fullscreen_map)
+        except tk.TclError:
+            pass
+        try:
+            if getattr(self, '_web_server_thread', None):
+                self.parent.after(0, self._update_web_display_map)
+        except Exception:
+            pass
 
     def _update_fog_rectangle_preview(self, event):
         if self._fog_rect_start_world is None or self.zoom == 0:
@@ -4621,9 +4748,19 @@ class DisplayMapController:
     def _on_drawing_tool_change(self, selected_tool: str):
         self.drawing_mode = selected_tool.lower()
         print(f"Drawing mode changed to: {self.drawing_mode}")
+        menu = getattr(self, "drawing_tool_menu", None)
+        if menu:
+            try:
+                if menu.get() != selected_tool:
+                    menu.set(selected_tool)
+            except tk.TclError:
+                pass
         if self.drawing_mode != "whiteboard":
             self._clear_whiteboard_preview()
             self._active_whiteboard_points = []
+        if self.drawing_mode != "eraser":
+            self._eraser_active = False
+            self._eraser_dirty = False
         self._update_shape_controls_visibility()
 
     def _on_shape_fill_mode_change(self, selected_mode: str):
@@ -4668,9 +4805,24 @@ class DisplayMapController:
             except tk.TclError:
                 pass
 
+    def _on_eraser_radius_change(self, value):
+        try:
+            radius = float(value)
+        except Exception:
+            return
+        self.whiteboard_eraser_radius = max(2.0, min(40.0, radius))
+        ConfigHelper.set("Drawing", "whiteboard_eraser_radius", self.whiteboard_eraser_radius)
+        label = getattr(self, "eraser_radius_value_label", None)
+        if label:
+            try:
+                label.configure(text=str(int(round(self.whiteboard_eraser_radius))))
+            except tk.TclError:
+                pass
+
     def _update_shape_controls_visibility(self):
         shape_tool_active = self.drawing_mode in ["rectangle", "oval"]
         whiteboard_active = self.drawing_mode == "whiteboard"
+        eraser_active = self.drawing_mode == "eraser"
         try:
             shape_fill_label = getattr(self, 'shape_fill_label', None)
             shape_fill_mode_menu = getattr(self, 'shape_fill_mode_menu', None)
@@ -4679,6 +4831,8 @@ class DisplayMapController:
             whiteboard_color_button = getattr(self, "whiteboard_color_button", None)
             whiteboard_width_slider = getattr(self, "whiteboard_width_slider", None)
             whiteboard_controls_frame = getattr(self, "whiteboard_controls_frame", None)
+            eraser_controls_frame = getattr(self, "eraser_controls_frame", None)
+            eraser_slider = getattr(self, "whiteboard_eraser_slider", None)
             if shape_tool_active:
                 # Unpack all first to ensure a clean state and avoid issues with 'before'
                 if shape_fill_label: shape_fill_label.pack_forget()
@@ -4693,6 +4847,13 @@ class DisplayMapController:
                         pass
                 if whiteboard_controls_frame:
                     whiteboard_controls_frame.pack_forget()
+                if eraser_slider:
+                    try:
+                        eraser_slider.master.pack_forget()
+                    except Exception:
+                        pass
+                if eraser_controls_frame:
+                    eraser_controls_frame.pack_forget()
 
                 # Repack in desired order without 'before'
                 if shape_fill_label: shape_fill_label.pack(side="left", padx=(10,2), pady=8)
@@ -4712,6 +4873,33 @@ class DisplayMapController:
                         whiteboard_width_slider.master.pack(side="left", padx=(0, 6), pady=6)
                     except Exception:
                         pass
+                if eraser_slider:
+                    try:
+                        eraser_slider.master.pack_forget()
+                    except Exception:
+                        pass
+                if eraser_controls_frame:
+                    eraser_controls_frame.pack_forget()
+            elif eraser_active:
+                if shape_fill_label: shape_fill_label.pack_forget()
+                if shape_fill_mode_menu: shape_fill_mode_menu.pack_forget()
+                if shape_fill_color_button: shape_fill_color_button.pack_forget()
+                if shape_border_color_button: shape_border_color_button.pack_forget()
+                if whiteboard_color_button: whiteboard_color_button.pack_forget()
+                if whiteboard_width_slider:
+                    try:
+                        whiteboard_width_slider.master.pack_forget()
+                    except Exception:
+                        pass
+                if whiteboard_controls_frame:
+                    whiteboard_controls_frame.pack_forget()
+                if eraser_controls_frame:
+                    eraser_controls_frame.pack(side="left", padx=(8, 2), pady=4)
+                if eraser_slider:
+                    try:
+                        eraser_slider.master.pack(side="left", padx=(0, 6), pady=6)
+                    except Exception:
+                        pass
             else:
                 if shape_fill_label: shape_fill_label.pack_forget()
                 if shape_fill_mode_menu: shape_fill_mode_menu.pack_forget()
@@ -4725,6 +4913,13 @@ class DisplayMapController:
                         pass
                 if whiteboard_controls_frame:
                     whiteboard_controls_frame.pack_forget()
+                if eraser_slider:
+                    try:
+                        eraser_slider.master.pack_forget()
+                    except Exception:
+                        pass
+                if eraser_controls_frame:
+                    eraser_controls_frame.pack_forget()
         except AttributeError as e: print(f"Toolbar component not found for visibility update: {e}")
         except tk.TclError as e: print(f"TclError updating shape control visibility: {e}")
 

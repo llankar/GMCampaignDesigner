@@ -192,7 +192,7 @@ def _build_toolbar(self):
     # --- Drawing Tool Selector ---
     tool_label = ctk.CTkLabel(drawing_section, text="Active Tool:")
     tool_label.pack(side="left", padx=(10,2), pady=8)
-    drawing_tools = ["Token", "Rectangle", "Oval", "Whiteboard"]
+    drawing_tools = ["Token", "Rectangle", "Oval", "Whiteboard", "Eraser"]
     self.drawing_tool_menu = ctk.CTkOptionMenu(
         drawing_section,
         values=drawing_tools,
@@ -202,6 +202,13 @@ def _build_toolbar(self):
     # Ensure self.drawing_mode is initialized in DisplayMapController before this
     self.drawing_tool_menu.set(self.drawing_mode.capitalize() if hasattr(self, 'drawing_mode') else "Token")
     self.drawing_tool_menu.pack(side="left", padx=5, pady=8)
+
+    create_icon_button(
+        drawing_section,
+        icons["rem"],
+        "Whiteboard Eraser",
+        command=lambda: self._on_drawing_tool_change("Eraser"),
+    ).pack(side="left", padx=2)
 
     whiteboard_controls = ctk.CTkFrame(drawing_section, fg_color="transparent")
     whiteboard_controls.pack(side="left", padx=(8, 2), pady=4)
@@ -236,6 +243,28 @@ def _build_toolbar(self):
     width_value_label = ctk.CTkLabel(width_container, text=str(int(current_width)))
     width_value_label.pack(side="left", padx=(6, 0))
     self.whiteboard_width_value_label = width_value_label
+
+    eraser_controls = ctk.CTkFrame(drawing_section, fg_color="transparent")
+    eraser_controls.pack(side="left", padx=(8, 2), pady=4)
+    self.eraser_controls_frame = eraser_controls
+
+    eraser_width_container = ctk.CTkFrame(eraser_controls, fg_color="transparent")
+    eraser_width_container.pack(side="left", padx=(0, 6), pady=6)
+    eraser_label = ctk.CTkLabel(eraser_width_container, text="Eraser Radius")
+    eraser_label.pack(side="left", padx=(0, 4))
+    self.whiteboard_eraser_slider = ctk.CTkSlider(
+        eraser_width_container,
+        from_=2,
+        to=40,
+        number_of_steps=38,
+        command=self._on_eraser_radius_change,
+        width=120,
+    )
+    eraser_width = float(getattr(self, "whiteboard_eraser_radius", 8))
+    self.whiteboard_eraser_slider.set(eraser_width)
+    eraser_value_label = ctk.CTkLabel(eraser_width_container, text=str(int(eraser_width)))
+    eraser_value_label.pack(side="left", padx=(6, 0))
+    self.eraser_radius_value_label = eraser_value_label
 
     # --- Shape Fill Mode Selector (conditionally visible) ---
     self.shape_fill_label = ctk.CTkLabel(drawing_section, text="Shape Fill:")
