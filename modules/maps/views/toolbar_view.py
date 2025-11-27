@@ -203,13 +203,6 @@ def _build_toolbar(self):
     self.drawing_tool_menu.set(self.drawing_mode.capitalize() if hasattr(self, 'drawing_mode') else "Token")
     self.drawing_tool_menu.pack(side="left", padx=5, pady=8)
 
-    create_icon_button(
-        drawing_section,
-        icons["rem"],
-        "Whiteboard Eraser",
-        command=lambda: self._on_drawing_tool_change("Eraser"),
-    ).pack(side="left", padx=2)
-
     whiteboard_controls = ctk.CTkFrame(drawing_section, fg_color="transparent")
     whiteboard_controls.pack(side="left", padx=(8, 2), pady=4)
     self.whiteboard_controls_frame = whiteboard_controls
