@@ -38,7 +38,21 @@ def _build_toolbar(self):
         
     }
 
+    # Utility to build labeled sections inside the scrollable toolbar
+    def _create_section(parent, title):
+        section = ctk.CTkFrame(parent)
+        section.pack(side="left", padx=6, pady=6, fill="y")
+        label = ctk.CTkLabel(section, text=title, anchor="w")
+        label.pack(side="top", anchor="w", padx=6, pady=(4, 2))
+        content = ctk.CTkFrame(section, fg_color="transparent")
+        content.pack(side="top", padx=6, pady=(0, 4))
+        return content
+
+    dropdown_width = 100
+
     # Fog controls
+    fog_section = _create_section(toolbar, "Fog")
+
     self._fog_button_default_style = {
         "fg_color": "#0077CC",
         "hover_color": "#005fa3",
@@ -54,7 +68,7 @@ def _build_toolbar(self):
     self._fog_buttons = {}
 
     add_fog_container = create_icon_button(
-        toolbar,
+        fog_section,
         icons["add"],
         "Add Fog",
         command=lambda: self._set_fog("add")
@@ -63,7 +77,7 @@ def _build_toolbar(self):
     self._fog_buttons["add"] = getattr(add_fog_container, "button", None)
 
     rem_fog_container = create_icon_button(
-        toolbar,
+        fog_section,
         icons["rem"],
         "Remove Fog",
         command=lambda: self._set_fog("rem")
@@ -72,7 +86,7 @@ def _build_toolbar(self):
     self._fog_buttons["rem"] = getattr(rem_fog_container, "button", None)
 
     add_rect_container = create_icon_button(
-        toolbar,
+        fog_section,
         icons["add"],
         "Add Fog Rectangle",
         command=lambda: self._set_fog("add_rect")
@@ -81,7 +95,7 @@ def _build_toolbar(self):
     self._fog_buttons["add_rect"] = getattr(add_rect_container, "button", None)
 
     rem_rect_container = create_icon_button(
-        toolbar,
+        fog_section,
         icons["rem"],
         "Remove Fog Rectangle",
         command=lambda: self._set_fog("rem_rect")
@@ -89,32 +103,14 @@ def _build_toolbar(self):
     rem_rect_container.pack(side="left")
     self._fog_buttons["rem_rect"] = getattr(rem_rect_container, "button", None)
 
-    create_icon_button(toolbar, icons["clear"], "Clear Fog",   command=self.clear_fog).pack(side="left")
-    create_icon_button(toolbar, icons["reset"], "Reset Fog",   command=self.reset_fog).pack(side="left")
-    create_icon_button(toolbar, icons["save"],  "Save Map",    command=self.save_map).pack(side="left")
+    create_icon_button(fog_section, icons["clear"], "Clear Fog",   command=self.clear_fog).pack(side="left")
+    create_icon_button(fog_section, icons["reset"], "Reset Fog",   command=self.reset_fog).pack(side="left")
 
-    # Token controls and fullscreen before the brush size
-    create_icon_button(toolbar, icons["creat"], "Add Creature", command=lambda: self.open_entity_picker("Creature"))\
-        .pack(side="left", padx=2)
-    create_icon_button(toolbar, icons["npc"],   "Add NPC",      command=lambda: self.open_entity_picker("NPC"))\
-        .pack(side="left", padx=2)
-    create_icon_button(toolbar, icons["pc"], "Add PC", command=lambda: self.open_entity_picker("PC")) \
-        .pack(side="left", padx=2)
-    create_icon_button(toolbar, icons["marker"], "Add Marker", command=self.add_marker)\
-        .pack(side="left", padx=2)
-    create_icon_button(toolbar, icons["fs"],    "Fullscreen",   command=self.open_fullscreen)\
-        .pack(side="left", padx=2)
-    create_icon_button(toolbar, icons["fs"],    "Web Display",   command=self.open_web_display)\
-        .pack(side="left", padx=2)
-    create_icon_button(toolbar, icons["chatbot"],    "Chatbot",   command=self.open_chatbot_assistant)\
-        .pack(side="left", padx=2)
-    # Brush shape selector (for fog)
-    shape_label = ctk.CTkLabel(toolbar, text="Fog Shape:") # Clarified label
+    shape_label = ctk.CTkLabel(fog_section, text="Fog Shape:") # Clarified label
     shape_label.pack(side="left", padx=(10,2), pady=8)
-    dropdown_width = 100
 
     self.shape_menu = ctk.CTkOptionMenu(
-        toolbar,
+        fog_section,
         values=["Rectangle", "Circle"],
         command=self._on_brush_shape_change, # This is for fog brush shape
         width=dropdown_width,
@@ -122,8 +118,7 @@ def _build_toolbar(self):
     self.shape_menu.set("Rectangle") # Default fog brush shape
     self.shape_menu.pack(side="left", padx=5, pady=8)
 
-    # Brush‐size control in dark mode (for fog)
-    size_label = ctk.CTkLabel(toolbar, text="Fog Brush Size:") # Clarified label
+    size_label = ctk.CTkLabel(fog_section, text="Fog Brush Size:") # Clarified label
     size_label.pack(side="left", padx=(2,2), pady=8)
 
     brush_size_options = list(getattr(self, "brush_size_options", list(range(4, 129, 4))))
@@ -134,7 +129,7 @@ def _build_toolbar(self):
     self.brush_size_options = list(brush_size_options)
     brush_size_values = [str(size) for size in self.brush_size_options]
     self.brush_size_menu = ctk.CTkOptionMenu(
-        toolbar,
+        fog_section,
         values=brush_size_values,
         command=self._on_brush_size_change, # This is for fog brush size
         width=dropdown_width,
@@ -146,8 +141,19 @@ def _build_toolbar(self):
     self.parent.bind("[", lambda e: self._change_brush(-4))
     self.parent.bind("]", lambda e: self._change_brush(+4))
 
-    # Token‐size control
-    token_size_label = ctk.CTkLabel(toolbar, text="Token Size:") # Renamed label variable
+    # Token controls and sizing
+    token_section = _create_section(toolbar, "Tokens")
+
+    create_icon_button(token_section, icons["creat"], "Add Creature", command=lambda: self.open_entity_picker("Creature"))\
+        .pack(side="left", padx=2)
+    create_icon_button(token_section, icons["npc"],   "Add NPC",      command=lambda: self.open_entity_picker("NPC"))\
+        .pack(side="left", padx=2)
+    create_icon_button(token_section, icons["pc"], "Add PC", command=lambda: self.open_entity_picker("PC")) \
+        .pack(side="left", padx=2)
+    create_icon_button(token_section, icons["marker"], "Add Marker", command=self.add_marker)\
+        .pack(side="left", padx=2)
+
+    token_size_label = ctk.CTkLabel(token_section, text="Token Size:") # Renamed label variable
     token_size_label.pack(side="left", padx=(10,2), pady=8)
 
     token_size_options = list(getattr(self, "token_size_options", list(range(16, 129, 8))))
@@ -158,16 +164,69 @@ def _build_toolbar(self):
     self.token_size_options = list(token_size_options)
     token_size_values = [str(size) for size in self.token_size_options]
     self.token_size_menu = ctk.CTkOptionMenu(
-        toolbar,
+        token_section,
         values=token_size_values,
         command=self._on_token_size_change,
         width=dropdown_width,
     )
     self.token_size_menu.set(str(current_token_size))
     self.token_size_menu.pack(side="left", padx=5, pady=8)
-    
-    # Info card font size selector
-    hover_font_label = ctk.CTkLabel(toolbar, text="Info Card Font Size:")
+
+    # Drawing / whiteboard controls
+    drawing_section = _create_section(toolbar, "Drawing / Whiteboard")
+
+    tool_label = ctk.CTkLabel(drawing_section, text="Active Tool:")
+    tool_label.pack(side="left", padx=(2,2), pady=8)
+    self.drawing_tool_menu = ctk.CTkOptionMenu(
+        drawing_section,
+        values=["Token", "Rectangle", "Oval"],
+        command=self._on_drawing_tool_change, # To be created in DisplayMapController
+        width=dropdown_width,
+    )
+    # Ensure self.drawing_mode is initialized in DisplayMapController before this
+    self.drawing_tool_menu.set(self.drawing_mode.capitalize() if hasattr(self, 'drawing_mode') else "Token")
+    self.drawing_tool_menu.pack(side="left", padx=5, pady=8)
+
+    self.shape_fill_label = ctk.CTkLabel(drawing_section, text="Shape Fill:")
+    # Packed by _update_shape_controls_visibility
+    self.shape_fill_mode_menu = ctk.CTkOptionMenu(
+        drawing_section,
+        values=["Filled", "Border Only"],
+        command=self._on_shape_fill_mode_change, # To be created in DisplayMapController
+        width=dropdown_width,
+    )
+    # Ensure self.shape_is_filled is initialized
+    self.shape_fill_mode_menu.set("Filled" if hasattr(self, 'shape_is_filled') and self.shape_is_filled else "Border Only")
+    # Packed by _update_shape_controls_visibility
+
+    self.shape_fill_color_button = ctk.CTkButton(
+        drawing_section,
+        text="Fill Color",
+        width=80,
+        command=self._on_pick_shape_fill_color # To be created in DisplayMapController
+    )
+    # Packed by _update_shape_controls_visibility
+
+    self.shape_border_color_button = ctk.CTkButton(
+        drawing_section,
+        text="Border Color",
+        width=100,
+        command=self._on_pick_shape_border_color # To be created in DisplayMapController
+    )
+    # Packed by _update_shape_controls_visibility
+
+    # Display and utilities
+    display_section = _create_section(toolbar, "Display")
+
+    create_icon_button(display_section, icons["save"],  "Save Map",    command=self.save_map).pack(side="left")
+    create_icon_button(display_section, icons["fs"],    "Fullscreen",   command=self.open_fullscreen)\
+        .pack(side="left", padx=2)
+    create_icon_button(display_section, icons["fs"],    "Web Display",   command=self.open_web_display)\
+        .pack(side="left", padx=2)
+    create_icon_button(display_section, icons["chatbot"],    "Chatbot",   command=self.open_chatbot_assistant)\
+        .pack(side="left", padx=2)
+
+    hover_font_label = ctk.CTkLabel(display_section, text="Info Card Font Size:")
     hover_font_label.pack(side="left", padx=(10,2), pady=8)
 
     font_sizes = getattr(self, "hover_font_size_options", [10, 12, 14, 16, 18, 20, 24, 28, 32])
@@ -177,7 +236,7 @@ def _build_toolbar(self):
     self.hover_font_size_options = list(font_sizes)
     font_size_values = [str(size) for size in self.hover_font_size_options]
     self.hover_font_size_menu = ctk.CTkOptionMenu(
-        toolbar,
+        display_section,
         values=font_size_values,
         command=self._on_hover_font_size_change,
         width=dropdown_width,
@@ -185,15 +244,14 @@ def _build_toolbar(self):
     self.hover_font_size_menu.set(str(current_hover_size))
     self.hover_font_size_menu.pack(side="left", padx=5, pady=8)
 
-    # --- Fit Mode selector ---
-    fit_label = ctk.CTkLabel(toolbar, text="Fit:")
+    fit_label = ctk.CTkLabel(display_section, text="Fit:")
     fit_label.pack(side="left", padx=(14,2), pady=8)
     fit_values = ["Contain", "Width", "Height"]
     current_fit = getattr(self, "fit_mode", "Contain")
     if current_fit not in fit_values:
         current_fit = "Contain"
     self.fit_mode_menu = ctk.CTkOptionMenu(
-        toolbar,
+        display_section,
         values=fit_values,
         command=getattr(self, "_on_fit_mode_change", None) or (lambda _v: None),
         width=dropdown_width,
@@ -201,49 +259,6 @@ def _build_toolbar(self):
     self.fit_mode_menu.set(current_fit)
     self.fit_mode_menu.pack(side="left", padx=5, pady=8)
 
-    # --- Drawing Tool Selector ---
-    tool_label = ctk.CTkLabel(toolbar, text="Active Tool:")
-    tool_label.pack(side="left", padx=(20,2), pady=8)
-    self.drawing_tool_menu = ctk.CTkOptionMenu(
-        toolbar,
-        values=["Token", "Rectangle", "Oval"],
-        command=self._on_drawing_tool_change, # To be created in DisplayMapController
-        width=dropdown_width,
-    )
-    # Ensure self.drawing_mode is initialized in DisplayMapController before this
-    self.drawing_tool_menu.set(self.drawing_mode.capitalize() if hasattr(self, 'drawing_mode') else "Token")
-    self.drawing_tool_menu.pack(side="left", padx=5, pady=8)
-
-    # --- Shape Fill Mode Selector (conditionally visible) ---
-    self.shape_fill_label = ctk.CTkLabel(toolbar, text="Shape Fill:")
-    # Packed by _update_shape_controls_visibility
-    self.shape_fill_mode_menu = ctk.CTkOptionMenu(
-        toolbar,
-        values=["Filled", "Border Only"],
-        command=self._on_shape_fill_mode_change, # To be created in DisplayMapController
-        width=dropdown_width,
-    )
-    # Ensure self.shape_is_filled is initialized
-    self.shape_fill_mode_menu.set("Filled" if hasattr(self, 'shape_is_filled') and self.shape_is_filled else "Border Only")
-    # Packed by _update_shape_controls_visibility
-
-    # --- Shape Color Pickers (conditionally visible) ---
-    self.shape_fill_color_button = ctk.CTkButton(
-        toolbar,
-        text="Fill Color",
-        width=80,
-        command=self._on_pick_shape_fill_color # To be created in DisplayMapController
-    )
-    # Packed by _update_shape_controls_visibility
-
-    self.shape_border_color_button = ctk.CTkButton(
-        toolbar,
-        text="Border Color",
-        width=100,
-        command=self._on_pick_shape_border_color # To be created in DisplayMapController
-    )
-    # Packed by _update_shape_controls_visibility
-    
     # Initial visibility update for shape controls (call method on self)
     if hasattr(self, '_update_shape_controls_visibility'):
         self._update_shape_controls_visibility()
