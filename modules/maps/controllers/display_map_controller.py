@@ -2894,6 +2894,13 @@ class DisplayMapController:
                         canvas.delete(cid)
                     except tk.TclError:
                         pass
+            fs_canvas = getattr(self, "fs_canvas", None)
+            for fs_cid in item.get("fs_canvas_ids") or []:
+                if fs_canvas:
+                    try:
+                        fs_canvas.delete(fs_cid)
+                    except tk.TclError:
+                        pass
             if item is self.selected_token:
                 self.selected_token = None
             if item in self.selected_items:
