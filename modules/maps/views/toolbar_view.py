@@ -1,6 +1,6 @@
 import tkinter as tk
 import customtkinter as ctk
-from modules.ui.icon_button import create_icon_button
+from modules.ui.icon_dropdown import IconDropdown
 from modules.helpers.logging_helper import log_module_import
 
 log_module_import(__name__)
@@ -28,8 +28,8 @@ def _build_toolbar(self):
             section,
             text=f"{title} ▼",
             command=_toggle,
-            width=120,
-            height=48,
+            width=92,
+            height=32,
         )
         toggle_button.pack(side="left", padx=(0, 6), pady=4)
         return content_frame
@@ -84,44 +84,19 @@ def _build_toolbar(self):
     }
     self._fog_buttons = {}
 
-    add_fog_container = create_icon_button(
-        fog_section,
-        icons["add"],
-        "Add Fog",
-        command=lambda: self._set_fog("add")
-    )
-    add_fog_container.pack(side="left")
-    self._fog_buttons["add"] = getattr(add_fog_container, "button", None)
+    fog_actions = [
+        {"key": "add", "icon": icons["add"], "tooltip": "Add Fog", "command": lambda: self._set_fog("add")},
+        {"key": "rem", "icon": icons["rem"], "tooltip": "Remove Fog", "command": lambda: self._set_fog("rem")},
+        {"key": "add_rect", "icon": icons["add"], "tooltip": "Add Fog Rectangle", "command": lambda: self._set_fog("add_rect")},
+        {"key": "rem_rect", "icon": icons["rem"], "tooltip": "Remove Fog Rectangle", "command": lambda: self._set_fog("rem_rect")},
+        {"key": "clear", "icon": icons["clear"], "tooltip": "Clear Fog", "command": self.clear_fog},
+        {"key": "reset", "icon": icons["reset"], "tooltip": "Reset Fog", "command": self.reset_fog},
+    ]
 
-    rem_fog_container = create_icon_button(
-        fog_section,
-        icons["rem"],
-        "Remove Fog",
-        command=lambda: self._set_fog("rem")
-    )
-    rem_fog_container.pack(side="left")
-    self._fog_buttons["rem"] = getattr(rem_fog_container, "button", None)
-
-    add_rect_container = create_icon_button(
-        fog_section,
-        icons["add"],
-        "Add Fog Rectangle",
-        command=lambda: self._set_fog("add_rect")
-    )
-    add_rect_container.pack(side="left")
-    self._fog_buttons["add_rect"] = getattr(add_rect_container, "button", None)
-
-    rem_rect_container = create_icon_button(
-        fog_section,
-        icons["rem"],
-        "Remove Fog Rectangle",
-        command=lambda: self._set_fog("rem_rect")
-    )
-    rem_rect_container.pack(side="left")
-    self._fog_buttons["rem_rect"] = getattr(rem_rect_container, "button", None)
-
-    create_icon_button(fog_section, icons["clear"], "Clear Fog",   command=self.clear_fog).pack(side="left")
-    create_icon_button(fog_section, icons["reset"], "Reset Fog",   command=self.reset_fog).pack(side="left")
+    fog_dropdown = IconDropdown(fog_section, fog_actions, default_key="add")
+    fog_dropdown.pack(side="left")
+    self._fog_buttons.update(fog_dropdown.option_buttons)
+    self._fog_dropdown = fog_dropdown
 
     shape_label = ctk.CTkLabel(fog_section, text="Fog Shape:") # Clarified label
     shape_label.pack(side="left", padx=(10,2), pady=8)
@@ -160,14 +135,13 @@ def _build_toolbar(self):
 
     # Token controls and fullscreen before the brush size
     token_section = _create_collapsible_section(toolbar, "Tokens")
-    create_icon_button(token_section, icons["creat"], "Add Creature", command=lambda: self.open_entity_picker("Creature"))\
-        .pack(side="left", padx=2)
-    create_icon_button(token_section, icons["npc"],   "Add NPC",      command=lambda: self.open_entity_picker("NPC"))\
-        .pack(side="left", padx=2)
-    create_icon_button(token_section, icons["pc"], "Add PC", command=lambda: self.open_entity_picker("PC")) \
-        .pack(side="left", padx=2)
-    create_icon_button(token_section, icons["marker"], "Add Marker", command=self.add_marker)\
-        .pack(side="left", padx=2)
+    token_actions = [
+        {"key": "creature", "icon": icons["creat"], "tooltip": "Add Creature", "command": lambda: self.open_entity_picker("Creature")},
+        {"key": "npc", "icon": icons["npc"], "tooltip": "Add NPC", "command": lambda: self.open_entity_picker("NPC")},
+        {"key": "pc", "icon": icons["pc"], "tooltip": "Add PC", "command": lambda: self.open_entity_picker("PC")},
+        {"key": "marker", "icon": icons["marker"], "tooltip": "Add Marker", "command": self.add_marker},
+    ]
+    IconDropdown(token_section, token_actions, default_key="npc").pack(side="left", padx=2)
 
     token_size_label = ctk.CTkLabel(token_section, text="Token Size:") # Renamed label variable
     token_size_label.pack(side="left", padx=(10,2), pady=8)
@@ -290,13 +264,13 @@ def _build_toolbar(self):
     # Packed by _update_shape_controls_visibility
 
     display_section = _create_collapsible_section(toolbar, "Display")
-    create_icon_button(display_section, icons["save"],  "Save Map",    command=self.save_map).pack(side="left")
-    create_icon_button(display_section, icons["fs"],    "Fullscreen",   command=self.open_fullscreen)\
-        .pack(side="left", padx=2)
-    create_icon_button(display_section, icons["fs"],    "Web Display",   command=self.open_web_display)\
-        .pack(side="left", padx=2)
-    create_icon_button(display_section, icons["chatbot"],    "Chatbot",   command=self.open_chatbot_assistant)\
-        .pack(side="left", padx=2)
+    display_actions = [
+        {"key": "save", "icon": icons["save"], "tooltip": "Save Map", "command": self.save_map},
+        {"key": "fullscreen", "icon": icons["fs"], "tooltip": "Fullscreen", "command": self.open_fullscreen},
+        {"key": "web", "icon": icons["fs"], "tooltip": "Web Display", "command": self.open_web_display},
+        {"key": "chatbot", "icon": icons["chatbot"], "tooltip": "Chatbot", "command": self.open_chatbot_assistant},
+    ]
+    IconDropdown(display_section, display_actions, default_key="save").pack(side="left")
 
     hover_font_label = ctk.CTkLabel(display_section, text="Info Card Font Size:")
     hover_font_label.pack(side="left", padx=(10,2), pady=8)
@@ -415,6 +389,10 @@ def _update_fog_button_states(self):
         except tk.TclError:
             # If the button has been destroyed, ignore the update.
             continue
+
+    dropdown = getattr(self, "_fog_dropdown", None)
+    if dropdown:
+        dropdown.set_active(active_mode, active_style=active_style, default_style=default_style)
 
 # Placeholder for new callbacks in DisplayMapController - these will be defined there.
 # def _on_drawing_tool_change(self, selected_tool):
