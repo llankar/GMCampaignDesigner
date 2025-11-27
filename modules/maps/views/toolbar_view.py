@@ -217,21 +217,8 @@ def _build_toolbar(self):
 
     eraser_width_container = ctk.CTkFrame(eraser_controls, fg_color="transparent")
     eraser_width_container.pack(side="left", padx=(0, 6), pady=6)
-    eraser_label = ctk.CTkLabel(eraser_width_container, text="Eraser Radius")
-    eraser_label.pack(side="left", padx=(0, 4))
-    self.whiteboard_eraser_slider = ctk.CTkSlider(
-        eraser_width_container,
-        from_=2,
-        to=40,
-        number_of_steps=38,
-        command=self._on_eraser_radius_change,
-        width=120,
-    )
-    eraser_width = float(getattr(self, "whiteboard_eraser_radius", 8))
-    self.whiteboard_eraser_slider.set(eraser_width)
-    eraser_value_label = ctk.CTkLabel(eraser_width_container, text=str(int(eraser_width)))
-    eraser_value_label.pack(side="left", padx=(6, 0))
-    self.eraser_radius_value_label = eraser_value_label
+    eraser_width = float(8)
+    
 
     # --- Shape Fill Mode Selector (conditionally visible) ---
     self.shape_fill_label = ctk.CTkLabel(drawing_section, text="Shape Fill:")
