@@ -491,6 +491,17 @@ def _on_display_map(self, entity_type, map_name): # entity_type here is the map'
                 "width": item_data["width"],
                 "height": item_data["height"],
             })
+        elif item_type_from_rec == "whiteboard":
+            points = rec.get("points", [])
+            item_data.update({
+                "points": points,
+                "color": rec.get("color", "#FF0000"),
+                "width": rec.get("width", 4),
+                "canvas_ids": (),
+            })
+            entry_summary.update({
+                "points": len(points),
+            })
         elif item_type_from_rec == "marker":
             item_data.update({
                 "text": rec.get("text", "New Marker"),

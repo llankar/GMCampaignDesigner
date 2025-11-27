@@ -670,6 +670,12 @@ def _persist_tokens(self):
                     "height":         t.get("height", 50),
                     "border_color":   t.get("border_color", "#000000"),
                 })
+            elif item_type == "whiteboard":
+                item_data.update({
+                    "points":        t.get("points", []),
+                    "color":         t.get("color", "#FF0000"),
+                    "width":         t.get("width", 4),
+                })
             elif item_type == "marker":
                 entry_widget = t.get("entry_widget")
                 if entry_widget and entry_widget.winfo_exists():
