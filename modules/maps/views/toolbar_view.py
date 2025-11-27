@@ -188,7 +188,7 @@ def _build_toolbar(self):
     self.token_size_menu.set(str(current_token_size))
     _pack_control(self.token_size_menu, trailing=4)
 
-    drawing_section = _create_collapsible_section(toolbar, "Drawing / Whiteboard")
+    drawing_section = _create_collapsible_section(toolbar, "Drawings")
     # --- Drawing Tool Selector ---
     tool_label = ctk.CTkLabel(drawing_section, text="Active Tool:")
     _pack_control(tool_label, leading=8, trailing=4)
