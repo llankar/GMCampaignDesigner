@@ -135,7 +135,7 @@ def _build_toolbar(self):
     self.shape_menu.set("Rectangle") # Default fog brush shape
     _pack_control(self.shape_menu, trailing=4)
 
-    size_label = ctk.CTkLabel(fog_section, text="Fog Brush Size:") # Clarified label
+    size_label = ctk.CTkLabel(fog_section, text="Brush Size") # Clarified label
     _pack_control(size_label, leading=4, trailing=4)
 
     brush_size_options = list(getattr(self, "brush_size_options", list(range(4, 129, 4))))
@@ -169,7 +169,7 @@ def _build_toolbar(self):
     token_dropdown = IconDropdown(token_section, token_actions, default_key="npc")
     _pack_control(token_dropdown, trailing=4)
 
-    token_size_label = ctk.CTkLabel(token_section, text="Token Size:") # Renamed label variable
+    token_size_label = ctk.CTkLabel(token_section, text="Size") # Renamed label variable
     _pack_control(token_size_label, leading=8, trailing=4)
 
     token_size_options = list(getattr(self, "token_size_options", list(range(16, 129, 8))))
@@ -190,7 +190,7 @@ def _build_toolbar(self):
 
     drawing_section = _create_collapsible_section(toolbar, "Drawings")
     # --- Drawing Tool Selector ---
-    tool_label = ctk.CTkLabel(drawing_section, text="Active Tool:")
+    tool_label = ctk.CTkLabel(drawing_section, text="Tool")
     _pack_control(tool_label, leading=8, trailing=4)
     drawing_tools = ["Token", "Rectangle", "Oval", "Whiteboard", "Eraser"]
     self.drawing_tool_menu = ctk.CTkOptionMenu(
@@ -286,7 +286,7 @@ def _build_toolbar(self):
     display_dropdown = IconDropdown(display_section, display_actions, default_key="save")
     _pack_control(display_dropdown, trailing=4)
 
-    hover_font_label = ctk.CTkLabel(display_section, text="Info Card Font Size:")
+    hover_font_label = ctk.CTkLabel(display_section, text="Font Size")
     _pack_control(hover_font_label, leading=8, trailing=4)
 
     font_sizes = getattr(self, "hover_font_size_options", [10, 12, 14, 16, 18, 20, 24, 28, 32])
