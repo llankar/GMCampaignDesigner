@@ -10,6 +10,7 @@ from tkinter import messagebox
 from modules.helpers.config_helper import ConfigHelper
 from modules.helpers.random_table_loader import RandomTableLoader
 from modules.helpers.logging_helper import log_exception, log_module_import
+from modules.scenarios.dialogs.random_table_import_dialog import RandomTableImportDialog
 from modules.scenarios.random_tables_panel import RandomTablesPanel
 
 log_module_import(__name__)
@@ -83,6 +84,7 @@ class RandomTableEditorDialog(ctk.CTkToplevel):
         entries_header.pack(fill="x")
         ctk.CTkLabel(entries_header, text="Entries").pack(side="left")
         ctk.CTkButton(entries_header, text="Add Entry", command=self._add_entry_row).pack(side="right")
+        ctk.CTkButton(entries_header, text="Import Text", command=self._open_import_dialog).pack(side="right", padx=(0, 6))
 
         self.entries_frame = ctk.CTkScrollableFrame(container, height=320)
         self.entries_frame.pack(fill="both", expand=True, pady=(4, 8))
@@ -95,11 +97,17 @@ class RandomTableEditorDialog(ctk.CTkToplevel):
         ctk.CTkButton(actions, text="Cancel", command=self.destroy).pack(side="right")
 
     def _populate_entries(self, entries: List[dict]):
+        self._clear_entry_rows()
         if not entries:
             self._add_entry_row()
             return
         for entry in entries:
             self._add_entry_row(entry)
+
+    def _clear_entry_rows(self):
+        for row in self.entry_rows:
+            row["frame"].destroy()
+        self.entry_rows.clear()
 
     def _add_entry_row(self, data: Optional[dict] = None):
         row = len(self.entry_rows)
@@ -126,6 +134,14 @@ class RandomTableEditorDialog(ctk.CTkToplevel):
                 frame.destroy()
                 del self.entry_rows[idx]
                 break
+
+    def _open_import_dialog(self):
+        dialog = RandomTableImportDialog(self)
+        self.wait_window(dialog)
+        imported_entries = getattr(dialog, "result_entries", None)
+        if not imported_entries:
+            return
+        self._populate_entries(imported_entries)
 
     # ------------------------------------------------------------------
     def _resolve_category_name(self, cat_id: Optional[str]) -> str:
