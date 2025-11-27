@@ -30,15 +30,6 @@ def _build_toolbar(self):
         section.pack(side="left", padx=(0, 12), pady=2, fill="y")
 
         toggle_state = tk.BooleanVar(value=True)
-        content_frame = ctk.CTkFrame(
-            section,
-            fg_color="#101010",
-            border_width=1,
-            border_color="#404040",
-            corner_radius=8,
-        )
-        content_frame.pack(side="left", fill="y", padx=(0, 4), pady=(2, 2))
-
         def _toggle():
             if toggle_state.get():
                 content_frame.pack_forget()
@@ -57,6 +48,15 @@ def _build_toolbar(self):
             height=32,
         )
         toggle_button.pack(side="left", padx=(0, 6), pady=4)
+
+        content_frame = ctk.CTkFrame(
+            section,
+            fg_color="#101010",
+            border_width=1,
+            border_color="#404040",
+            corner_radius=8,
+        )
+        content_frame.pack(side="left", fill="y", padx=(0, 4), pady=(2, 2))
         return content_frame
 
     # Main toolbar container that fills the width and holds the scrollable area
