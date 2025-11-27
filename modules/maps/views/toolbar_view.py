@@ -7,15 +7,12 @@ log_module_import(__name__)
 
 def _build_toolbar(self):
     def _create_collapsible_section(parent, title):
-        section = ctk.CTkFrame(parent)
+        section = ctk.CTkFrame(parent, fg_color="transparent")
         section.pack(side="left", padx=6, pady=2, fill="y")
 
-        header = ctk.CTkFrame(section)
-        header.pack(fill="x")
-
         toggle_state = tk.BooleanVar(value=True)
-        content_frame = ctk.CTkFrame(section)
-        content_frame.pack(side="top", fill="both", expand=True, pady=(2, 0))
+        content_frame = ctk.CTkFrame(section, fg_color="transparent")
+        content_frame.pack(side="left", fill="y")
 
         def _toggle():
             if toggle_state.get():
@@ -23,18 +20,18 @@ def _build_toolbar(self):
                 toggle_state.set(False)
                 toggle_button.configure(text=f"{title} ▶")
             else:
-                content_frame.pack(side="top", fill="both", expand=True, pady=(2, 0))
+                content_frame.pack(side="left", fill="y")
                 toggle_state.set(True)
                 toggle_button.configure(text=f"{title} ▼")
 
         toggle_button = ctk.CTkButton(
-            header,
+            section,
             text=f"{title} ▼",
             command=_toggle,
             width=120,
-            height=26,
+            height=48,
         )
-        toggle_button.pack(side="left", padx=4, pady=4)
+        toggle_button.pack(side="left", padx=(0, 6), pady=4)
         return content_frame
 
     # Main toolbar container that fills the width and holds the scrollable area
