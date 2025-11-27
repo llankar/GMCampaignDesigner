@@ -1,0 +1,1464 @@
+{
+  "system": "GM Gems",
+  "theme": "System-Neutral Fantasy",
+  "categories": [
+    {
+      "id": "urban_experience",
+      "name": "Chapter One - The Urban Experience",
+      "tables": [
+        {
+          "id": "alchemical_mishaps",
+          "title": "Alchemical Mishaps",
+          "dice": "d100",
+          "description": "Unusual and entertaining side effects from failed alchemy, potion mishaps, and unstable concoctions.",
+          "tags": [
+            "alchemy",
+            "mishaps",
+            "lab",
+            "potion"
+          ],
+          "entries": [
+            {
+              "range": "1",
+              "result": "An attempt to create dust of dimensional anchoring opens an irresistible vortex to the Plane of Irony."
+            },
+            {
+              "range": "2",
+              "result": "A potion evaporates, and the expanding cloud of golden mist turns all gold within 20 feet to flesh."
+            },
+            {
+              "range": "3",
+              "result": "Vines spring from a flask and grow uncontrollably. All within 15 feet become entangled and become 1 year younger."
+            },
+            {
+              "range": "4",
+              "result": "The alchemical admixture bubbles then desiccates, leaving behind gray pebbles. All creatures within 10 feet become two years older."
+            },
+            {
+              "range": "5",
+              "result": "An explosion of noxious green fumes causes anyone within 10 feet to vomit out a single randomly determined potion. Players may collect the spew for later use."
+            },
+            {
+              "range": "6",
+              "result": "All metal lab equipment corrodes, as if under attack by an invisible rust monster."
+            },
+            {
+              "range": "7",
+              "result": "A potion’s material components sizzle and pop, leaving behind a chalky ioun stone that reduces body weight by 50 percent."
+            },
+            {
+              "range": "8",
+              "result": "A spilt snifter of brandy sullies a powdered magic ruby. When used as a material component, the ruby gives rise to a smoky void that, once dissipated, leaves behind a forever drunken homunculus."
+            },
+            {
+              "range": "9",
+              "result": "Glowing blue vapors permeate the room, locate the single weakest magic item, and strip it of its powers."
+            },
+            {
+              "range": "10",
+              "result": "The alchemist’s hand pulses with a violet glow and begins to hum. The emanations escalate to unbearable extremes of light and sound. The effect appears permanent."
+            },
+            {
+              "range": "11",
+              "result": "A small animal or wizard’s familiar drinks several potions, grows to Gargantuan size, and stays that way for 3d6 hours."
+            },
+            {
+              "range": "12",
+              "result": "Old potions left out in the open spontaneously transform into tiny oozes. Select the ooze type randomly."
+            },
+            {
+              "range": "13",
+              "result": "An absentminded wizard’s assistant mislabels a number of potion bottles."
+            },
+            {
+              "range": "14",
+              "result": "An unstable potion reacts like a carbonated beverage whenever it is shaken vigorously, such as in the middle of combat."
+            },
+            {
+              "range": "15",
+              "result": "Once uncorked, an old and unstable potion produces a random animal, as if it were a bag of tricks. The potion itself is undrinkable."
+            },
+            {
+              "range": "16",
+              "result": "The potion produces the opposite of the intended effect."
+            },
+            {
+              "range": "17",
+              "result": "The potion bottle turns out to be cracked and empty."
+            },
+            {
+              "range": "18",
+              "result": "In addition to its normal effects, a sample of sovereign glue produces an effect similar to dimensional anchor."
+            },
+            {
+              "range": "19",
+              "result": "During a fight, a jostled tanglefoot bag explodes on the hero carrying it."
+            },
+            {
+              "range": "20",
+              "result": "A vial of universal solvent unexpectedly becomes a permanent, but diminutive stationary gate to a random plane."
+            },
+            {
+              "range": "21",
+              "result": "The potion bottle contains a small bit of parchment. Invent the message most likely to send your heroes on a wild goose chase."
+            },
+            {
+              "range": "22",
+              "result": "After it is used, a vial of magical oil attracts felines as if the user were of the same species and in heat."
+            },
+            {
+              "range": "23",
+              "result": "The potion bottle screams when uncorked."
+            },
+            {
+              "range": "24",
+              "result": "When activated, a malfunctioning sunrod flickers briefly, and then dies out."
+            },
+            {
+              "range": "25",
+              "result": "In the wake of a thunderstone detonation, the area is permanently silenced."
+            },
+            {
+              "range": "26",
+              "result": "An overpowered thunderstone produces a gust of wind spell."
+            },
+            {
+              "range": "27",
+              "result": "An ill-made tanglefoot bag has moldered into green slime."
+            },
+            {
+              "range": "28",
+              "result": "Alchemist’s fire was improperly mixed with matter from the Elemental Plane of Air. The fire burns cold."
+            },
+            {
+              "range": "29",
+              "result": "The person to the character’s left just drank what he thought was a cure light wounds potion, but was, in fact, an elixir of love."
+            },
+            {
+              "range": "30",
+              "result": "A curious-looking puddle of nearby chemicals acts like a mirror of opposition."
+            },
+            {
+              "range": "31",
+              "result": "A dagger of alchemical silver hides a cold iron core."
+            },
+            {
+              "range": "32",
+              "result": "Imbiber’s skin is dyed a random color, and won’t wash off!"
+            },
+            {
+              "range": "33",
+              "result": "The character’s skin thickens abnormally. (T emporarily gains a +2 natural armor bonus, but receives a –1 penalty to Dexterity.)"
+            },
+            {
+              "range": "34",
+              "result": "Potion causes hair to fall out."
+            },
+            {
+              "range": "35",
+              "result": "The imbiber’s hair lengthens."
+            },
+            {
+              "range": "36",
+              "result": "The imbiber’s hair shortens."
+            },
+            {
+              "range": "37",
+              "result": "A limb becomes abnormally long."
+            },
+            {
+              "range": "38",
+              "result": "A limb becomes abnormally short. d% Alchemical Mishap"
+            },
+            {
+              "range": "39",
+              "result": "The character’s fingernails lengthen. (T emporarily gains a 1d6 natural claw attack.)"
+            },
+            {
+              "range": "40",
+              "result": "The potion causes the character’s skin to dry and crack. It is extremely painful to do anything with her hands. (–1 penalty to all Dexterity-based skills and it requires a Concentration check to cast spells with somatic components.)"
+            },
+            {
+              "range": "41",
+              "result": "The concoction dyes the character’s hair a random color, which won’t wash out!"
+            },
+            {
+              "range": "42",
+              "result": "When the character opens the flask, a viscous liquid bubbles over the lip. It has the properties of sovereign glue and permanently bonds to anything it touches."
+            },
+            {
+              "range": "43",
+              "result": "A burst of foul stench momentarily clouds the lab, and everyone inside smells like rotten mutton for 1d4 hours."
+            },
+            {
+              "range": "44",
+              "result": "A bottle of highly reactive chemicals spontaneously combusts, setting a shelf on fire."
+            },
+            {
+              "range": "45",
+              "result": "A slow leaking gas makes everyone in the lab sleepy."
+            },
+            {
+              "range": "46",
+              "result": "A container of ashes is haunted by a ghost."
+            },
+            {
+              "range": "47",
+              "result": "The character is missing an entire box of highly volatile chemicals. Be careful where you sit or suffer 1d6 fire damage from the unexpected explosion."
+            },
+            {
+              "range": "48",
+              "result": "A group of pesky pixies keep rattling the alchemist’s windows, breaking his concentration. After which they flee, laughing hysterically."
+            },
+            {
+              "range": "49",
+              "result": "Half way through a concoction, the alchemist discovers there are missing pages in his recipe book. Pick another effect and—after 1d4 rounds—apply it to the unfinished brew."
+            },
+            {
+              "range": "50",
+              "result": "A collection of herbs has moldered into toxic fungus."
+            },
+            {
+              "range": "51",
+              "result": "A sudden change of pressure shatters all ceramic and glass items in the lab."
+            },
+            {
+              "range": "52",
+              "result": "A vaporous cloud disintegrates all leather items in a 20-foot radius. No save."
+            },
+            {
+              "range": "53",
+              "result": "T wo chemicals spill; creating a pheromone that attracts dozens of female rats."
+            },
+            {
+              "range": "54",
+              "result": "All the alchemist’s potions have the side effect of making the imbiber extremely thirsty."
+            },
+            {
+              "range": "55",
+              "result": "T ouching the concoction gives the character warts."
+            },
+            {
+              "range": "56",
+              "result": "The alchemist uses demon ichor as a secret ingredient, which corrupts good individuals exposed to it."
+            },
+            {
+              "range": "57",
+              "result": "A virulent liquid explodes, instantly crystallizing any living flesh within in a 10-foot radius."
+            },
+            {
+              "range": "58",
+              "result": "A blast of vapor oxidizes any iron in a 10-foot radius."
+            },
+            {
+              "range": "59",
+              "result": "After drinking a potion, the character belches up a Diminutive humanoid-looking construct that obeys the character’s command."
+            },
+            {
+              "range": "60",
+              "result": "A freezing cold gas erupts from a beaker and sinks to the floor. Anyone standing in it gets frost bite up to their ankles."
+            },
+            {
+              "range": "61",
+              "result": "Unbeknownst to the character, he has created a random potion. Roll secretly in the DMG."
+            },
+            {
+              "range": "62",
+              "result": "Amnesia. The alchemist loses 1d6 Craft (alchemy) skill points and forgets the nature of the last concoction she brewed."
+            },
+            {
+              "range": "63",
+              "result": "The alchemy lab equipment becomes a single and hostile Tiny, Small, or Medium animated object (GM’s choice)."
+            },
+            {
+              "range": "64",
+              "result": "The lab equipment becomes a single and hostile Medium, Large, or Huge animated object (GM’s choice)."
+            },
+            {
+              "range": "65",
+              "result": "The potion vial becomes a bottle of air."
+            },
+            {
+              "range": "66",
+              "result": "The potion vial becomes an eversmoking bottle."
+            },
+            {
+              "range": "67",
+              "result": "The alchemist’s hair turns to snakes that start biting him."
+            },
+            {
+              "range": "68",
+              "result": "The accident draws the attention of an ethereal filcher. It steals a random object and moves on."
+            },
+            {
+              "range": "69",
+              "result": "A flash of light and the alchemist is affected by permanency and a random spell from the list below (roll 1d8). The alchemist must also pay the XP cost. 1d8 Spell & XP Cost 1 Arcane sight 1,500 XP 2 Comprehend languages 500 XP 3 Darkvision 1,000 XP 4 Detect magic 500 XP 5 Read magic 500 XP 6 See invisibility 1,000 XP 7 Tongues 1,500 XP 8 Resistance 500 XP"
+            },
+            {
+              "range": "70",
+              "result": "A loud concussion and the alchemist is unable to speak for d100 hours."
+            },
+            {
+              "range": "71",
+              "result": "The alchemist becomes color blind and tone deaf."
+            },
+            {
+              "range": "72",
+              "result": "Alchemist’s hair transforms into dreadlocks."
+            },
+            {
+              "range": "73",
+              "result": "Alchemist’s alignment becomes lawful."
+            },
+            {
+              "range": "74",
+              "result": "Alchemist’s alignment becomes chaotic."
+            },
+            {
+              "range": "75",
+              "result": "The alchemist is granted the divine rank of 0. This rank is only recognized by gnomes, who worship him accordingly."
+            },
+            {
+              "range": "76",
+              "result": "The alchemist develops an unhealthy fear of potions (DC 10 Will save to open any bottle). 5 d% Alchemical Mishap"
+            },
+            {
+              "range": "77",
+              "result": "A huge pointy blue hat with big yellow stars appears on the alchemist’s head. The hat is an intelligent, neutrally aligned item: Int 12, Wis 10, Cha10, communicates by empathy, 30-foot vision and hearing, can use detect magic at will, Ego 4. Special Purpose: to be worn at all times. When not worn, the hat communicates feelings of deep sadness to the owner."
+            },
+            {
+              "range": "78",
+              "result": "For 1d6 days the alchemist secretes an oily, musk-like chemical that nearly every form of animal life finds offensive. The alchemist gains SA: Stench (Ex). All living creatures within 30 feet must succeed on a DC 13 Fortitude save or be sickened for 1d10 rounds. Creatures that successfully save cannot be affected by the same stench for 24 hours. A delay poison or neutralize poison spell removes the effect from the sickened creature. Creatures with immunity to poison are unaffected, and creatures resistant to poison receive their normal bonus to their saving throws."
+            },
+            {
+              "range": "79",
+              "result": "Alchemist spills the substance over his hands, which twist into hideous, unusable shapes."
+            },
+            {
+              "range": "80",
+              "result": "The alchemist splashes substance over body, which becomes transparent. The alchemist’s organs and bones are still visible, making him look like an undead monster."
+            },
+            {
+              "range": "81",
+              "result": "An alchemical substance evaporates in a cloud of effervescent bubbles. When the bubbles pop, they release flashes of bright light that daze anyone in the area."
+            },
+            {
+              "range": "82",
+              "result": "Alchemist inhales alchemical fumes and sets his nose hairs on fire! He takes 1d3 points of fire damage and loses all sense of smell for 1d4+1 days."
+            },
+            {
+              "range": "83",
+              "result": "A failed potion animates as a Small elemental and furiously attacks the closest creature."
+            },
+            {
+              "range": "84",
+              "result": "When exposed to air, the alchemical substance attracts a swarm of vicious wasps."
+            },
+            {
+              "range": "85",
+              "result": "The alchemical substance dries up into a ball of sweet, chewy material. Chewing the substance slowly releases the effects of the original concoction, which activates 1d6 rounds later."
+            },
+            {
+              "range": "86",
+              "result": "The substance implodes, destroying the container in which it is held. The glass fragments glow with ambient energy and can be added to the recipe to create a more powerful form of the original substance."
+            },
+            {
+              "range": "87",
+              "result": "The substance defies gravity and causes the container it is placed in to levitate several feet off the ground."
+            },
+            {
+              "range": "88",
+              "result": "A failed potion works normally, but anyone drinks it smells like rotting garbage until the potion wears off."
+            },
+            {
+              "range": "89",
+              "result": "The alchemist spills a substance over a nearby plant. The plant spontaneously grows to enormous size, destroying much of the lab."
+            },
+            {
+              "range": "90",
+              "result": "Alchemical fumes cause everyone within 20 feet to hiccup uncontrollably."
+            },
+            {
+              "range": "91",
+              "result": "A flask of alchemist’s fire is inert, but the liquid works as a potent lubricant and anyone struck is affected by an extended grease spell."
+            },
+            {
+              "range": "92",
+              "result": "A batch of thunderstones creates a loud pig-like squeal instead of the usual bang."
+            },
+            {
+              "range": "93",
+              "result": "A potion becomes intelligent and begs not to be drunk."
+            },
+            {
+              "range": "94",
+              "result": "Alchemical substance becomes incorporeal and can affect incorporeal, but not corporeal, creatures normally."
+            },
+            {
+              "range": "95",
+              "result": "An alchemical mixture spilled on the character’s feet creates a dimly glowing trail of footprints wherever he or she walks. The effect lasts for 1d4 days."
+            },
+            {
+              "range": "96",
+              "result": "A potion evaporates and reforms as a strangely colored cloud. The cloud unleashes the effects of the potion over a 20–foot area in the form of rain."
+            },
+            {
+              "range": "97",
+              "result": "The imbiber swallows the substance and his tongue falls out. It squirms as if alive and tries to escape."
+            },
+            {
+              "range": "98",
+              "result": "An unstable tanglefoot bag has a 50% chance of randomly detonating."
+            },
+            {
+              "range": "99",
+              "result": "An antitoxin works normally, but creatures drinking it become shortsighted for 1d6 hours."
+            },
+            {
+              "range": "100",
+              "result": "The alchemist explodes, but the potion works just fine."
+            }
+          ]
+        },
+        {
+          "id": "whats_in_those_pockets",
+          "title": "What's In Those Pockets?",
+          "dice": "d100",
+          "description": "Random pocket contents for pickpockets, search checks, and improvised loot.",
+          "tags": [
+            "urban",
+            "pockets",
+            "loot",
+            "pickpocket"
+          ],
+          "entries": [
+            {
+              "range": "1",
+              "result": "1d6 copper pieces in a dirty cloth purse."
+            },
+            {
+              "range": "2",
+              "result": "A ball of bat guano wrapped in wax paper."
+            },
+            {
+              "range": "3",
+              "result": "A thin dagger, with a bloodstain on the blade."
+            },
+            {
+              "range": "4",
+              "result": "An explicit love letter from a local aristocrat."
+            },
+            {
+              "range": "5",
+              "result": "Silver holy symbol of a deity of your choice."
+            },
+            {
+              "range": "6",
+              "result": "Single silver sling bullet with the name “Wolves Bane” etched into it."
+            },
+            {
+              "range": "7",
+              "result": "A white pearl worth 100 gold pieces."
+            },
+            {
+              "range": "8",
+              "result": "Multicolored wad of lint."
+            },
+            {
+              "range": "9",
+              "result": "A bell made from brass with ships engraved in it."
+            },
+            {
+              "range": "10",
+              "result": "Partially melted black candle."
+            },
+            {
+              "range": "11",
+              "result": "A prayer book with prayers dedicated to the deity of your choice."
+            },
+            {
+              "range": "12",
+              "result": "A darkwood whistle."
+            },
+            {
+              "range": "13",
+              "result": "Ball of sealing wax."
+            },
+            {
+              "range": "14",
+              "result": "Empty potion bottle."
+            },
+            {
+              "range": "15",
+              "result": "An unused potion (roll in the DMG or use one of the results from Alchemical Mishaps in Chapter One)."
+            },
+            {
+              "range": "16",
+              "result": "Cracked whetstone."
+            },
+            {
+              "range": "17",
+              "result": "A magic wand (roll in the DMG)."
+            },
+            {
+              "range": "18",
+              "result": "Identification papers."
+            },
+            {
+              "range": "19",
+              "result": "A folded and torn piece of paper containing a sketch of a strikingly beautiful woman."
+            },
+            {
+              "range": "20",
+              "result": "1d3 tindertwigs."
+            },
+            {
+              "range": "21",
+              "result": "Signet ring from a well-respected noble."
+            },
+            {
+              "range": "22",
+              "result": "A letter requesting the recipient meet an anonymous author to discuss an assassination."
+            },
+            {
+              "range": "23",
+              "result": "A cork that smells of cheap wine."
+            },
+            {
+              "range": "24",
+              "result": "Several pieces of string and a sewing needle."
+            },
+            {
+              "range": "25",
+              "result": "An ink pen made from a golden eagle feather."
+            },
+            {
+              "range": "26",
+              "result": "1d6 silver pieces in a leather purse with the NPC’s name stitched into it."
+            },
+            {
+              "range": "27",
+              "result": "A small, round mirror."
+            },
+            {
+              "range": "28",
+              "result": "A comb carved from a piece of pink coral."
+            },
+            {
+              "range": "29",
+              "result": "Lady’s hairbrush full of hair strands."
+            },
+            {
+              "range": "30",
+              "result": "An odoriferous piece of cod fish wrapped in paper."
+            },
+            {
+              "range": "31",
+              "result": "A folded up wanted poster containing a sketch and information about one of the party members."
+            },
+            {
+              "range": "32",
+              "result": "A pearl of power, 1st level."
+            },
+            {
+              "range": "33",
+              "result": "Vial of silversheen in a velvet drawstring pouch."
+            },
+            {
+              "range": "34",
+              "result": "A gray bag of tricks."
+            },
+            {
+              "range": "35",
+              "result": "A tree feather token."
+            },
+            {
+              "range": "36",
+              "result": "A small ring containing 3 curiously shaped keys."
+            },
+            {
+              "range": "37",
+              "result": "A bead of force."
+            },
+            {
+              "range": "38",
+              "result": "A sap made from oak with intricate carvings of angels and archons."
+            },
+            {
+              "range": "39",
+              "result": "1d6 gold pieces (loose coins)."
+            },
+            {
+              "range": "40",
+              "result": "A compass, with an etching on the back that reads, “For my lover, so you can always find your way home.”"
+            },
+            {
+              "range": "41",
+              "result": "A small topaz worth 25 gold pieces."
+            },
+            {
+              "range": "42",
+              "result": "Leaky bottle of red ink."
+            },
+            {
+              "range": "43",
+              "result": "A well-used sling."
+            },
+            {
+              "range": "44",
+              "result": "Cleaning rag made of rough wool."
+            },
+            {
+              "range": "45",
+              "result": "Used handkerchief made of silk. d% Result"
+            },
+            {
+              "range": "46",
+              "result": "A shuriken dipped in malyss root poison (roll a poison use check for the pickpocket)."
+            },
+            {
+              "range": "47",
+              "result": "Small ruby worth 100 gold pieces."
+            },
+            {
+              "range": "48",
+              "result": "A map of the city with 10 locations circled in red ink."
+            },
+            {
+              "range": "49",
+              "result": "A crusty piece of bread."
+            },
+            {
+              "range": "50",
+              "result": "Single human tooth. d% Result"
+            },
+            {
+              "range": "51",
+              "result": "Small vial of blood."
+            },
+            {
+              "range": "52",
+              "result": "A pair of pliers."
+            },
+            {
+              "range": "53",
+              "result": "A small knife of the sort used in leatherworking."
+            },
+            {
+              "range": "54",
+              "result": "Silk gloves."
+            },
+            {
+              "range": "55",
+              "result": "A wool hat."
+            },
+            {
+              "range": "56",
+              "result": "1d3 platinum pieces (loose coins)."
+            },
+            {
+              "range": "57",
+              "result": "A pouch containing 500 gold pieces worth of diamond dust."
+            },
+            {
+              "range": "58",
+              "result": "A live mouse."
+            },
+            {
+              "range": "59",
+              "result": "Flask of cheap whiskey."
+            },
+            {
+              "range": "60",
+              "result": "A wedge of cheese wrapped in cloth."
+            },
+            {
+              "range": "61",
+              "result": "A map of the area around the city with a particular path into the hills marked."
+            },
+            {
+              "range": "62",
+              "result": "Beef jerky."
+            },
+            {
+              "range": "63",
+              "result": "A wooden holy symbol of a deity of your choice."
+            },
+            {
+              "range": "64",
+              "result": "Flask of holy water."
+            },
+            {
+              "range": "65",
+              "result": "A crystal rod."
+            },
+            {
+              "range": "66",
+              "result": "A single smokestick."
+            },
+            {
+              "range": "67",
+              "result": "Flask of alchemist’s fire."
+            },
+            {
+              "range": "68",
+              "result": "Magnifying glass."
+            },
+            {
+              "range": "69",
+              "result": "A silver flute worth 100 gold pieces."
+            },
+            {
+              "range": "70",
+              "result": "Set of lock picks."
+            },
+            {
+              "range": "71",
+              "result": "A scarf."
+            },
+            {
+              "range": "72",
+              "result": "Moonstone worth 50 gold pieces."
+            },
+            {
+              "range": "73",
+              "result": "Flask of acid."
+            },
+            {
+              "range": "74",
+              "result": "Silver necklace worth 20 gold pieces inside a small, wrapped package."
+            },
+            {
+              "range": "75",
+              "result": "Brass knuckles."
+            },
+            {
+              "range": "76",
+              "result": "A receipt from the local butcher, indicating a large meat order will be ready for pickup at noon the next day."
+            },
+            {
+              "range": "77",
+              "result": "A silver thimble worth 10 gold pieces."
+            },
+            {
+              "range": "78",
+              "result": "Perfume bottle."
+            },
+            {
+              "range": "79",
+              "result": "A toy for a small child."
+            },
+            {
+              "range": "80",
+              "result": "A poisoned green apple."
+            },
+            {
+              "range": "81",
+              "result": "Directions to an address within the city."
+            },
+            {
+              "range": "82",
+              "result": "A paintbrush with an ivory handle and bristles made from lamia hair."
+            },
+            {
+              "range": "83",
+              "result": "A small jar containing several green pills."
+            },
+            {
+              "range": "84",
+              "result": "Shiny black/gray rock."
+            },
+            {
+              "range": "85",
+              "result": "Dice carved from bone."
+            },
+            {
+              "range": "86",
+              "result": "A small whittling knife and a half-completed scrimshaw."
+            },
+            {
+              "range": "87",
+              "result": "An empty syringe."
+            },
+            {
+              "range": "88",
+              "result": "Dried herbs."
+            },
+            {
+              "range": "89",
+              "result": "A bundle of wild flowers."
+            },
+            {
+              "range": "90",
+              "result": "T ongs used in metalworking."
+            },
+            {
+              "range": "91",
+              "result": "A novel with a bookmark one-third of the way through."
+            },
+            {
+              "range": "92",
+              "result": "A poster advertising a new inn, named the Grinning Lion, is hiring staff."
+            },
+            {
+              "range": "93",
+              "result": "A weight used in a merchant’s scale."
+            },
+            {
+              "range": "94",
+              "result": "Rag doll."
+            },
+            {
+              "range": "95",
+              "result": "A magnet."
+            },
+            {
+              "range": "96",
+              "result": "Bottle of black ink."
+            },
+            {
+              "range": "97",
+              "result": "A “thank you” note written in Gnomish."
+            },
+            {
+              "range": "98",
+              "result": "Scented bar of soap."
+            },
+            {
+              "range": "99",
+              "result": "A star sapphire worth 1,000 gold pieces."
+            },
+            {
+              "range": "100",
+              "result": "Pocket trap (see sidebar)."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "Chapter_One_-_The_Urban_Experience",
+      "name": "Chapter One - The Urban Experience",
+      "tables": [
+        {
+          "id": "alchemical_mishaps",
+          "title": "Alchemical Mishaps",
+          "dice": "d100",
+          "description": "Unusual and entertaining side effects from failed alchemy, potion mishaps, and unstable concoctions.",
+          "tags": [
+            "alchemy",
+            "mishaps",
+            "lab",
+            "potion"
+          ],
+          "entries": [
+            {
+              "min": 1,
+              "max": 1,
+              "result": "An attempt to create dust of dimensional anchoring opens an irresistible vortex to the Plane of Irony.",
+              "tags": []
+            },
+            {
+              "min": 2,
+              "max": 2,
+              "result": "A potion evaporates, and the expanding cloud of golden mist turns all gold within 20 feet to flesh.",
+              "tags": []
+            },
+            {
+              "min": 3,
+              "max": 3,
+              "result": "Vines spring from a flask and grow uncontrollably. All within 15 feet become entangled and become 1 year younger.",
+              "tags": []
+            },
+            {
+              "min": 4,
+              "max": 4,
+              "result": "The alchemical admixture bubbles then desiccates, leaving behind gray pebbles. All creatures within 10 feet become two years older.",
+              "tags": []
+            },
+            {
+              "min": 5,
+              "max": 5,
+              "result": "An explosion of noxious green fumes causes anyone within 10 feet to vomit out a single randomly determined potion. Players may collect the spew for later use.",
+              "tags": []
+            },
+            {
+              "min": 6,
+              "max": 6,
+              "result": "All metal lab equipment corrodes, as if under attack by an invisible rust monster.",
+              "tags": []
+            },
+            {
+              "min": 7,
+              "max": 7,
+              "result": "A potion’s material components sizzle and pop, leaving behind a chalky ioun stone that reduces body weight by 50 percent.",
+              "tags": []
+            },
+            {
+              "min": 8,
+              "max": 8,
+              "result": "A spilt snifter of brandy sullies a powdered magic ruby. When used as a material component, the ruby gives rise to a smoky void that, once dissipated, leaves behind a forever drunken homunculus.",
+              "tags": []
+            },
+            {
+              "min": 9,
+              "max": 9,
+              "result": "Glowing blue vapors permeate the room, locate the single weakest magic item, and strip it of its powers.",
+              "tags": []
+            },
+            {
+              "min": 10,
+              "max": 10,
+              "result": "The alchemist’s hand pulses with a violet glow and begins to hum. The emanations escalate to unbearable extremes of light and sound. The effect appears permanent.",
+              "tags": []
+            },
+            {
+              "min": 11,
+              "max": 11,
+              "result": "A small animal or wizard’s familiar drinks several potions, grows to Gargantuan size, and stays that way for 3d6 hours.",
+              "tags": []
+            },
+            {
+              "min": 12,
+              "max": 12,
+              "result": "Old potions left out in the open spontaneously transform into tiny oozes. Select the ooze type randomly.",
+              "tags": []
+            },
+            {
+              "min": 13,
+              "max": 13,
+              "result": "An absentminded wizard’s assistant mislabels a number of potion bottles.",
+              "tags": []
+            },
+            {
+              "min": 14,
+              "max": 14,
+              "result": "An unstable potion reacts like a carbonated beverage whenever it is shaken vigorously, such as in the middle of combat.",
+              "tags": []
+            },
+            {
+              "min": 15,
+              "max": 15,
+              "result": "Once uncorked, an old and unstable potion produces a random animal, as if it were a bag of tricks. The potion itself is undrinkable.",
+              "tags": []
+            },
+            {
+              "min": 16,
+              "max": 16,
+              "result": "The potion produces the opposite of the intended effect.",
+              "tags": []
+            },
+            {
+              "min": 17,
+              "max": 17,
+              "result": "The potion bottle turns out to be cracked and empty.",
+              "tags": []
+            },
+            {
+              "min": 18,
+              "max": 18,
+              "result": "In addition to its normal effects, a sample of sovereign glue produces an effect similar to dimensional anchor.",
+              "tags": []
+            },
+            {
+              "min": 19,
+              "max": 19,
+              "result": "During a fight, a jostled tanglefoot bag explodes on the hero carrying it.",
+              "tags": []
+            },
+            {
+              "min": 20,
+              "max": 20,
+              "result": "A vial of universal solvent unexpectedly becomes a permanent, but diminutive stationary gate to a random plane.",
+              "tags": []
+            },
+            {
+              "min": 21,
+              "max": 21,
+              "result": "The potion bottle contains a small bit of parchment. Invent the message most likely to send your heroes on a wild goose chase.",
+              "tags": []
+            },
+            {
+              "min": 22,
+              "max": 22,
+              "result": "After it is used, a vial of magical oil attracts felines as if the user were of the same species and in heat.",
+              "tags": []
+            },
+            {
+              "min": 23,
+              "max": 23,
+              "result": "The potion bottle screams when uncorked.",
+              "tags": []
+            },
+            {
+              "min": 24,
+              "max": 24,
+              "result": "When activated, a malfunctioning sunrod flickers briefly, and then dies out.",
+              "tags": []
+            },
+            {
+              "min": 25,
+              "max": 25,
+              "result": "In the wake of a thunderstone detonation, the area is permanently silenced.",
+              "tags": []
+            },
+            {
+              "min": 26,
+              "max": 26,
+              "result": "An overpowered thunderstone produces a gust of wind spell.",
+              "tags": []
+            },
+            {
+              "min": 27,
+              "max": 27,
+              "result": "An ill-made tanglefoot bag has moldered into green slime.",
+              "tags": []
+            },
+            {
+              "min": 28,
+              "max": 28,
+              "result": "Alchemist’s fire was improperly mixed with matter from the Elemental Plane of Air. The fire burns cold.",
+              "tags": []
+            },
+            {
+              "min": 29,
+              "max": 29,
+              "result": "The person to the character’s left just drank what he thought was a cure light wounds potion, but was, in fact, an elixir of love.",
+              "tags": []
+            },
+            {
+              "min": 30,
+              "max": 30,
+              "result": "A curious-looking puddle of nearby chemicals acts like a mirror of opposition.",
+              "tags": []
+            },
+            {
+              "min": 31,
+              "max": 31,
+              "result": "A dagger of alchemical silver hides a cold iron core.",
+              "tags": []
+            },
+            {
+              "min": 32,
+              "max": 32,
+              "result": "Imbiber’s skin is dyed a random color, and won’t wash off!",
+              "tags": []
+            },
+            {
+              "min": 33,
+              "max": 33,
+              "result": "The character’s skin thickens abnormally. (T emporarily gains a +2 natural armor bonus, but receives a –1 penalty to Dexterity.)",
+              "tags": []
+            },
+            {
+              "min": 34,
+              "max": 34,
+              "result": "Potion causes hair to fall out.",
+              "tags": []
+            },
+            {
+              "min": 35,
+              "max": 35,
+              "result": "The imbiber’s hair lengthens.",
+              "tags": []
+            },
+            {
+              "min": 36,
+              "max": 36,
+              "result": "The imbiber’s hair shortens.",
+              "tags": []
+            },
+            {
+              "min": 37,
+              "max": 37,
+              "result": "A limb becomes abnormally long.",
+              "tags": []
+            },
+            {
+              "min": 38,
+              "max": 38,
+              "result": "A limb becomes abnormally short. d% Alchemical Mishap",
+              "tags": []
+            },
+            {
+              "min": 39,
+              "max": 39,
+              "result": "The character’s fingernails lengthen. (T emporarily gains a 1d6 natural claw attack.)",
+              "tags": []
+            },
+            {
+              "min": 40,
+              "max": 40,
+              "result": "The potion causes the character’s skin to dry and crack. It is extremely painful to do anything with her hands. (–1 penalty to all Dexterity-based skills and it requires a Concentration check to cast spells with somatic components.)",
+              "tags": []
+            },
+            {
+              "min": 41,
+              "max": 41,
+              "result": "The concoction dyes the character’s hair a random color, which won’t wash out!",
+              "tags": []
+            },
+            {
+              "min": 42,
+              "max": 42,
+              "result": "When the character opens the flask, a viscous liquid bubbles over the lip. It has the properties of sovereign glue and permanently bonds to anything it touches.",
+              "tags": []
+            },
+            {
+              "min": 43,
+              "max": 43,
+              "result": "A burst of foul stench momentarily clouds the lab, and everyone inside smells like rotten mutton for 1d4 hours.",
+              "tags": []
+            },
+            {
+              "min": 44,
+              "max": 44,
+              "result": "A bottle of highly reactive chemicals spontaneously combusts, setting a shelf on fire.",
+              "tags": []
+            },
+            {
+              "min": 45,
+              "max": 45,
+              "result": "A slow leaking gas makes everyone in the lab sleepy.",
+              "tags": []
+            },
+            {
+              "min": 46,
+              "max": 46,
+              "result": "A container of ashes is haunted by a ghost.",
+              "tags": []
+            },
+            {
+              "min": 47,
+              "max": 47,
+              "result": "The character is missing an entire box of highly volatile chemicals. Be careful where you sit or suffer 1d6 fire damage from the unexpected explosion.",
+              "tags": []
+            },
+            {
+              "min": 48,
+              "max": 48,
+              "result": "A group of pesky pixies keep rattling the alchemist’s windows, breaking his concentration. After which they flee, laughing hysterically.",
+              "tags": []
+            },
+            {
+              "min": 49,
+              "max": 49,
+              "result": "Half way through a concoction, the alchemist discovers there are missing pages in his recipe book. Pick another effect and—after 1d4 rounds—apply it to the unfinished brew.",
+              "tags": []
+            },
+            {
+              "min": 50,
+              "max": 50,
+              "result": "A collection of herbs has moldered into toxic fungus.",
+              "tags": []
+            },
+            {
+              "min": 51,
+              "max": 51,
+              "result": "A sudden change of pressure shatters all ceramic and glass items in the lab.",
+              "tags": []
+            },
+            {
+              "min": 52,
+              "max": 52,
+              "result": "A vaporous cloud disintegrates all leather items in a 20-foot radius. No save.",
+              "tags": []
+            },
+            {
+              "min": 53,
+              "max": 53,
+              "result": "T wo chemicals spill; creating a pheromone that attracts dozens of female rats.",
+              "tags": []
+            },
+            {
+              "min": 54,
+              "max": 54,
+              "result": "All the alchemist’s potions have the side effect of making the imbiber extremely thirsty.",
+              "tags": []
+            },
+            {
+              "min": 55,
+              "max": 55,
+              "result": "T ouching the concoction gives the character warts.",
+              "tags": []
+            },
+            {
+              "min": 56,
+              "max": 56,
+              "result": "The alchemist uses demon ichor as a secret ingredient, which corrupts good individuals exposed to it.",
+              "tags": []
+            },
+            {
+              "min": 57,
+              "max": 57,
+              "result": "A virulent liquid explodes, instantly crystallizing any living flesh within in a 10-foot radius.",
+              "tags": []
+            },
+            {
+              "min": 58,
+              "max": 58,
+              "result": "A blast of vapor oxidizes any iron in a 10-foot radius.",
+              "tags": []
+            },
+            {
+              "min": 59,
+              "max": 59,
+              "result": "After drinking a potion, the character belches up a Diminutive humanoid-looking construct that obeys the character’s command.",
+              "tags": []
+            },
+            {
+              "min": 60,
+              "max": 60,
+              "result": "A freezing cold gas erupts from a beaker and sinks to the floor. Anyone standing in it gets frost bite up to their ankles.",
+              "tags": []
+            },
+            {
+              "min": 61,
+              "max": 61,
+              "result": "Unbeknownst to the character, he has created a random potion. Roll secretly in the DMG.",
+              "tags": []
+            },
+            {
+              "min": 62,
+              "max": 62,
+              "result": "Amnesia. The alchemist loses 1d6 Craft (alchemy) skill points and forgets the nature of the last concoction she brewed.",
+              "tags": []
+            },
+            {
+              "min": 63,
+              "max": 63,
+              "result": "The alchemy lab equipment becomes a single and hostile Tiny, Small, or Medium animated object (GM’s choice).",
+              "tags": []
+            },
+            {
+              "min": 64,
+              "max": 64,
+              "result": "The lab equipment becomes a single and hostile Medium, Large, or Huge animated object (GM’s choice).",
+              "tags": []
+            },
+            {
+              "min": 65,
+              "max": 65,
+              "result": "The potion vial becomes a bottle of air.",
+              "tags": []
+            },
+            {
+              "min": 66,
+              "max": 66,
+              "result": "The potion vial becomes an eversmoking bottle.",
+              "tags": []
+            },
+            {
+              "min": 67,
+              "max": 67,
+              "result": "The alchemist’s hair turns to snakes that start biting him.",
+              "tags": []
+            },
+            {
+              "min": 68,
+              "max": 68,
+              "result": "The accident draws the attention of an ethereal filcher. It steals a random object and moves on.",
+              "tags": []
+            },
+            {
+              "min": 69,
+              "max": 69,
+              "result": "A flash of light and the alchemist is affected by permanency and a random spell from the list below (roll 1d8). The alchemist must also pay the XP cost. 1d8 Spell & XP Cost 1 Arcane sight 1,500 XP 2 Comprehend languages 500 XP 3 Darkvision 1,000 XP 4 Detect magic 500 XP 5 Read magic 500 XP 6 See invisibility 1,000 XP 7 Tongues 1,500 XP 8 Resistance 500 XP",
+              "tags": []
+            },
+            {
+              "min": 70,
+              "max": 70,
+              "result": "A loud concussion and the alchemist is unable to speak for d100 hours.",
+              "tags": []
+            },
+            {
+              "min": 71,
+              "max": 71,
+              "result": "The alchemist becomes color blind and tone deaf.",
+              "tags": []
+            },
+            {
+              "min": 72,
+              "max": 72,
+              "result": "Alchemist’s hair transforms into dreadlocks.",
+              "tags": []
+            },
+            {
+              "min": 73,
+              "max": 73,
+              "result": "Alchemist’s alignment becomes lawful.",
+              "tags": []
+            },
+            {
+              "min": 74,
+              "max": 74,
+              "result": "Alchemist’s alignment becomes chaotic.",
+              "tags": []
+            },
+            {
+              "min": 75,
+              "max": 75,
+              "result": "The alchemist is granted the divine rank of 0. This rank is only recognized by gnomes, who worship him accordingly.",
+              "tags": []
+            },
+            {
+              "min": 76,
+              "max": 76,
+              "result": "The alchemist develops an unhealthy fear of potions (DC 10 Will save to open any bottle). 5 d% Alchemical Mishap",
+              "tags": []
+            },
+            {
+              "min": 77,
+              "max": 77,
+              "result": "A huge pointy blue hat with big yellow stars appears on the alchemist’s head. The hat is an intelligent, neutrally aligned item: Int 12, Wis 10, Cha10, communicates by empathy, 30-foot vision and hearing, can use detect magic at will, Ego 4. Special Purpose: to be worn at all times. When not worn, the hat communicates feelings of deep sadness to the owner.",
+              "tags": []
+            },
+            {
+              "min": 78,
+              "max": 78,
+              "result": "For 1d6 days the alchemist secretes an oily, musk-like chemical that nearly every form of animal life finds offensive. The alchemist gains SA: Stench (Ex). All living creatures within 30 feet must succeed on a DC 13 Fortitude save or be sickened for 1d10 rounds. Creatures that successfully save cannot be affected by the same stench for 24 hours. A delay poison or neutralize poison spell removes the effect from the sickened creature. Creatures with immunity to poison are unaffected, and creatures resistant to poison receive their normal bonus to their saving throws.",
+              "tags": []
+            },
+            {
+              "min": 79,
+              "max": 79,
+              "result": "Alchemist spills the substance over his hands, which twist into hideous, unusable shapes.",
+              "tags": []
+            },
+            {
+              "min": 80,
+              "max": 80,
+              "result": "The alchemist splashes substance over body, which becomes transparent. The alchemist’s organs and bones are still visible, making him look like an undead monster.",
+              "tags": []
+            },
+            {
+              "min": 81,
+              "max": 81,
+              "result": "An alchemical substance evaporates in a cloud of effervescent bubbles. When the bubbles pop, they release flashes of bright light that daze anyone in the area.",
+              "tags": []
+            },
+            {
+              "min": 82,
+              "max": 82,
+              "result": "Alchemist inhales alchemical fumes and sets his nose hairs on fire! He takes 1d3 points of fire damage and loses all sense of smell for 1d4+1 days.",
+              "tags": []
+            },
+            {
+              "min": 83,
+              "max": 83,
+              "result": "A failed potion animates as a Small elemental and furiously attacks the closest creature.",
+              "tags": []
+            },
+            {
+              "min": 84,
+              "max": 84,
+              "result": "When exposed to air, the alchemical substance attracts a swarm of vicious wasps.",
+              "tags": []
+            },
+            {
+              "min": 85,
+              "max": 85,
+              "result": "The alchemical substance dries up into a ball of sweet, chewy material. Chewing the substance slowly releases the effects of the original concoction, which activates 1d6 rounds later.",
+              "tags": []
+            },
+            {
+              "min": 86,
+              "max": 86,
+              "result": "The substance implodes, destroying the container in which it is held. The glass fragments glow with ambient energy and can be added to the recipe to create a more powerful form of the original substance.",
+              "tags": []
+            },
+            {
+              "min": 87,
+              "max": 87,
+              "result": "The substance defies gravity and causes the container it is placed in to levitate several feet off the ground.",
+              "tags": []
+            },
+            {
+              "min": 88,
+              "max": 88,
+              "result": "A failed potion works normally, but anyone drinks it smells like rotting garbage until the potion wears off.",
+              "tags": []
+            },
+            {
+              "min": 89,
+              "max": 89,
+              "result": "The alchemist spills a substance over a nearby plant. The plant spontaneously grows to enormous size, destroying much of the lab.",
+              "tags": []
+            },
+            {
+              "min": 90,
+              "max": 90,
+              "result": "Alchemical fumes cause everyone within 20 feet to hiccup uncontrollably.",
+              "tags": []
+            },
+            {
+              "min": 91,
+              "max": 91,
+              "result": "A flask of alchemist’s fire is inert, but the liquid works as a potent lubricant and anyone struck is affected by an extended grease spell.",
+              "tags": []
+            },
+            {
+              "min": 92,
+              "max": 92,
+              "result": "A batch of thunderstones creates a loud pig-like squeal instead of the usual bang.",
+              "tags": []
+            },
+            {
+              "min": 93,
+              "max": 93,
+              "result": "A potion becomes intelligent and begs not to be drunk.",
+              "tags": []
+            },
+            {
+              "min": 94,
+              "max": 94,
+              "result": "Alchemical substance becomes incorporeal and can affect incorporeal, but not corporeal, creatures normally.",
+              "tags": []
+            },
+            {
+              "min": 95,
+              "max": 95,
+              "result": "An alchemical mixture spilled on the character’s feet creates a dimly glowing trail of footprints wherever he or she walks. The effect lasts for 1d4 days.",
+              "tags": []
+            },
+            {
+              "min": 96,
+              "max": 96,
+              "result": "A potion evaporates and reforms as a strangely colored cloud. The cloud unleashes the effects of the potion over a 20–foot area in the form of rain.",
+              "tags": []
+            },
+            {
+              "min": 97,
+              "max": 97,
+              "result": "The imbiber swallows the substance and his tongue falls out. It squirms as if alive and tries to escape.",
+              "tags": []
+            },
+            {
+              "min": 98,
+              "max": 98,
+              "result": "An unstable tanglefoot bag has a 50% chance of randomly detonating.",
+              "tags": []
+            },
+            {
+              "min": 99,
+              "max": 99,
+              "result": "An antitoxin works normally, but creatures drinking it become shortsighted for 1d6 hours.",
+              "tags": []
+            },
+            {
+              "min": 100,
+              "max": 100,
+              "result": "The alchemist explodes, but the potion works just fine.",
+              "tags": []
+            }
+          ],
+          "system": "GM Gems",
+          "biome": "",
+          "category": "Chapter_One_-_The_Urban_Experience",
+          "theme": "System-Neutral Fantasy"
+        }
+      ]
+    }
+  ]
+}
