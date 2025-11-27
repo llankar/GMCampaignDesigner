@@ -192,15 +192,50 @@ def _build_toolbar(self):
     # --- Drawing Tool Selector ---
     tool_label = ctk.CTkLabel(drawing_section, text="Active Tool:")
     tool_label.pack(side="left", padx=(10,2), pady=8)
+    drawing_tools = ["Token", "Rectangle", "Oval", "Whiteboard"]
     self.drawing_tool_menu = ctk.CTkOptionMenu(
         drawing_section,
-        values=["Token", "Rectangle", "Oval"],
+        values=drawing_tools,
         command=self._on_drawing_tool_change, # To be created in DisplayMapController
         width=dropdown_width,
     )
     # Ensure self.drawing_mode is initialized in DisplayMapController before this
     self.drawing_tool_menu.set(self.drawing_mode.capitalize() if hasattr(self, 'drawing_mode') else "Token")
     self.drawing_tool_menu.pack(side="left", padx=5, pady=8)
+
+    whiteboard_controls = ctk.CTkFrame(drawing_section, fg_color="transparent")
+    whiteboard_controls.pack(side="left", padx=(8, 2), pady=4)
+    self.whiteboard_controls_frame = whiteboard_controls
+
+    self.whiteboard_color_button = ctk.CTkButton(
+        whiteboard_controls,
+        text="Ink Color",
+        width=90,
+        command=self._on_pick_whiteboard_color,
+    )
+    try:
+        self.whiteboard_color_button.configure(fg_color=getattr(self, "whiteboard_color", "#FF0000"))
+    except tk.TclError:
+        pass
+    self.whiteboard_color_button.pack(side="left", padx=(0, 6), pady=6)
+
+    width_container = ctk.CTkFrame(whiteboard_controls, fg_color="transparent")
+    width_container.pack(side="left", padx=(0, 6), pady=6)
+    width_label = ctk.CTkLabel(width_container, text="Width")
+    width_label.pack(side="left", padx=(0, 4))
+    self.whiteboard_width_slider = ctk.CTkSlider(
+        width_container,
+        from_=1,
+        to=20,
+        number_of_steps=19,
+        command=self._on_whiteboard_width_change,
+        width=120,
+    )
+    current_width = float(getattr(self, "whiteboard_width", 4))
+    self.whiteboard_width_slider.set(current_width)
+    width_value_label = ctk.CTkLabel(width_container, text=str(int(current_width)))
+    width_value_label.pack(side="left", padx=(6, 0))
+    self.whiteboard_width_value_label = width_value_label
 
     # --- Shape Fill Mode Selector (conditionally visible) ---
     self.shape_fill_label = ctk.CTkLabel(drawing_section, text="Shape Fill:")

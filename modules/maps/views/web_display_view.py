@@ -219,6 +219,16 @@ def _render_map_image(self):
                 draw.rectangle([sx, sy, sx + shape_w, sy + shape_h], fill=fill_color, outline=border_color, width=2)
             else:
                 draw.ellipse([sx, sy, sx + shape_w, sy + shape_h], fill=fill_color, outline=border_color, width=2)
+        elif item_type == 'whiteboard':
+            points = item.get('points') or []
+            if len(points) < 2:
+                continue
+            screen_points = []
+            for px, py in points:
+                screen_points.extend([sx + (px - xw) * self.zoom, sy + (py - yw) * self.zoom])
+            color = item.get('color', '#FF0000')
+            width = item.get('width', 4)
+            draw.line(screen_points, fill=color, width=int(max(1, width)), joint='curve')
 
     if self.mask_img:
         mask_copy = self.mask_img.copy()

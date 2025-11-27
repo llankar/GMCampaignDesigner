@@ -149,12 +149,19 @@ class DisplayMapController:
         self.fog_mode    = None
         self.tokens      = [] # List of all items (tokens and shapes)
         self._persist_lock = threading.Lock()
-        
+
         self.drawing_mode = "token"
         self.shape_is_filled = True
         self.current_shape_fill_color = "#CCCCCC"
         self.current_shape_border_color = "#000000"
-    
+        self.whiteboard_color = ConfigHelper.get("Drawing", "whiteboard_color", fallback="#FF0000")
+        try:
+            self.whiteboard_width = float(ConfigHelper.get("Drawing", "whiteboard_width", fallback=4))
+        except Exception:
+            self.whiteboard_width = 4.0
+        self._active_whiteboard_points = []
+        self._whiteboard_preview_id = None
+
         self._panning      = False
         self._last_mouse   = (0, 0)
         self._orig_pan     = (0, 0)
@@ -2587,6 +2594,22 @@ class DisplayMapController:
                 self._graphical_edit_mode_item = None
             existing_selection = list(self.selected_items)
 
+            if self.drawing_mode == "whiteboard":
+                world_x = (event.x - self.pan_x) / self.zoom
+                world_y = (event.y - self.pan_y) / self.zoom
+                self._active_whiteboard_points = [(world_x, world_y)]
+                self._hide_all_token_hovers()
+                self._hide_all_marker_descriptions()
+                self._clear_whiteboard_preview()
+                if self._marker_after_id:
+                    try:
+                        self.canvas.after_cancel(self._marker_after_id)
+                    except Exception:
+                        pass
+                self._marker_after_id = None
+                self._marker_start = None
+                return
+
             if self.drawing_mode in ["rectangle", "oval"]: # Create new shape if in drawing mode
                 # Create new shape - This block needs to be indented
                 world_x = (event.x - self.pan_x) / self.zoom; world_y = (event.y - self.pan_y) / self.zoom
@@ -2623,6 +2646,16 @@ class DisplayMapController:
         if self._marker_after_id and self._marker_start:
             dx = event.x - self._marker_start[0]; dy = event.y - self._marker_start[1]
             if abs(dx) > 5 or abs(dy) > 5: self.canvas.after_cancel(self._marker_after_id); self._marker_after_id = None
+        if self.drawing_mode == "whiteboard" and self._active_whiteboard_points:
+            world_x = (event.x - self.pan_x) / self.zoom
+            world_y = (event.y - self.pan_y) / self.zoom
+            last_point = self._active_whiteboard_points[-1]
+            dx = world_x - last_point[0]
+            dy = world_y - last_point[1]
+            if (dx * dx + dy * dy) >= 1.0:
+                self._active_whiteboard_points.append((world_x, world_y))
+                self._update_whiteboard_preview()
+            return
         if self._drag_select_start:
             self._update_drag_selection(event)
         if self.fog_mode in ("add", "rem"):
@@ -2631,6 +2664,9 @@ class DisplayMapController:
             self._update_fog_rectangle_preview(event)
 
     def _on_mouse_up(self, event):
+        if self.drawing_mode == "whiteboard" and self._active_whiteboard_points:
+            self._finalize_whiteboard_stroke()
+            return
         self._finalize_drag_selection(event)
         if self._marker_after_id: self.canvas.after_cancel(self._marker_after_id); self._marker_after_id = None
         if self._marker_anim_after_id:
@@ -2691,6 +2727,74 @@ class DisplayMapController:
                                 self._update_fullscreen_map()
                         except tk.TclError:
                             pass
+
+    def _clear_whiteboard_preview(self):
+        canvas = getattr(self, "canvas", None)
+        if canvas and self._whiteboard_preview_id:
+            try:
+                canvas.delete(self._whiteboard_preview_id)
+            except tk.TclError:
+                pass
+        self._whiteboard_preview_id = None
+
+    def _update_whiteboard_preview(self):
+        canvas = getattr(self, "canvas", None)
+        if not canvas or len(self._active_whiteboard_points) < 2:
+            return
+        screen_points = []
+        for xw, yw in self._active_whiteboard_points:
+            screen_points.extend([self.pan_x + xw * self.zoom, self.pan_y + yw * self.zoom])
+        try:
+            if self._whiteboard_preview_id and canvas.type(self._whiteboard_preview_id):
+                canvas.coords(self._whiteboard_preview_id, *screen_points)
+                canvas.itemconfig(self._whiteboard_preview_id, fill=self.whiteboard_color, width=self.whiteboard_width, smooth=True)
+            else:
+                self._whiteboard_preview_id = canvas.create_line(
+                    *screen_points,
+                    fill=self.whiteboard_color,
+                    width=self.whiteboard_width,
+                    smooth=True,
+                    capstyle="round",
+                    joinstyle="round",
+                    tags=("whiteboard_preview",),
+                )
+            canvas.tag_raise(self._whiteboard_preview_id)
+        except tk.TclError:
+            self._whiteboard_preview_id = None
+
+    def _simplify_polyline(self, points, tolerance=1.5):
+        if len(points) < 3:
+            return list(points)
+
+        def _distance(p1, p2):
+            dx = p1[0] - p2[0]
+            dy = p1[1] - p2[1]
+            return math.sqrt(dx * dx + dy * dy)
+
+        simplified = [points[0]]
+        for p in points[1:-1]:
+            if _distance(p, simplified[-1]) >= tolerance:
+                simplified.append(p)
+        simplified.append(points[-1])
+        return simplified
+
+    def _finalize_whiteboard_stroke(self):
+        points = self._simplify_polyline(self._active_whiteboard_points)
+        self._active_whiteboard_points = []
+        self._clear_whiteboard_preview()
+        if len(points) < 2:
+            return
+        stroke = {
+            "type": "whiteboard",
+            "points": points,
+            "color": self.whiteboard_color,
+            "width": self.whiteboard_width,
+            "position": points[0],
+            "canvas_ids": (),
+        }
+        self.tokens.append(stroke)
+        self._update_canvas_images(resample=self._fast_resample)
+        self._persist_tokens()
 
     def _update_fog_rectangle_preview(self, event):
         if self._fog_rect_start_world is None or self.zoom == 0:
@@ -3207,6 +3311,56 @@ class DisplayMapController:
                         "actual_screen": _primary_screen_from_coords(primary_coords) or (sx, sy),
                     })
                     debug_payload["rendered_items"].append(debug_entry)
+            elif item_type == "whiteboard":
+                points = item.get("points") or []
+                if not points or len(points) < 2:
+                    continue
+                screen_coords = []
+                for px, py in points:
+                    screen_coords.extend([self.pan_x + px * self.zoom, self.pan_y + py * self.zoom])
+                color = item.get("color", "#FF0000")
+                width = item.get("width", 4)
+                debug_entry = None
+                if debug_payload is not None:
+                    debug_entry = {
+                        "type": "whiteboard",
+                        "world_position": points[0],
+                        "expected_screen": (self.pan_x + points[0][0] * self.zoom, self.pan_y + points[0][1] * self.zoom),
+                        "points": len(points),
+                        "color": color,
+                        "width": width,
+                    }
+                if item.get("canvas_ids"):
+                    line_id = item["canvas_ids"][0]
+                    try:
+                        self.canvas.coords(line_id, *screen_coords)
+                        self.canvas.itemconfig(line_id, fill=color, width=width, smooth=True)
+                    except tk.TclError:
+                        item["canvas_ids"] = ()
+                        line_id = None
+                else:
+                    line_id = None
+                if not line_id:
+                    try:
+                        line_id = self.canvas.create_line(
+                            *screen_coords,
+                            fill=color,
+                            width=width,
+                            smooth=True,
+                            capstyle="round",
+                            joinstyle="round",
+                        )
+                        item["canvas_ids"] = (line_id,)
+                    except tk.TclError:
+                        item["canvas_ids"] = ()
+                if debug_entry is not None:
+                    debug_entry.update({
+                        "canvas_coords": {
+                            "polyline": _safe_canvas_coords(item.get("canvas_ids", (None,))[0]) if item.get("canvas_ids") else None,
+                        },
+                        "actual_screen": (screen_coords[0], screen_coords[1]) if screen_coords else debug_entry["expected_screen"],
+                    })
+                    debug_payload["rendered_items"].append(debug_entry)
         if debug_payload is not None:
             expected = debug_payload.get("expected_items", [])
             rendered = debug_payload.get("rendered_items", [])
@@ -3232,6 +3386,11 @@ class DisplayMapController:
                 if item_type == "marker":
                     return (item_type, entry.get("text"), entry.get("linked_map"))
                 if item_type in ("rectangle", "oval"):
+                    world = entry.get("world_position")
+                    if isinstance(world, (list, tuple)):
+                        world = tuple(world)
+                    return (item_type, world)
+                if item_type == "whiteboard":
                     world = entry.get("world_position")
                     if isinstance(world, (list, tuple)):
                         world = tuple(world)
@@ -3387,6 +3546,8 @@ class DisplayMapController:
             self._update_web_display_map()
 
     def _bind_item_events(self, item):
+        if item.get("type") == "whiteboard":
+            return
         if not item.get('canvas_ids'): return
         ids_to_bind = item['canvas_ids']
         existing_ids = set(self.canvas.find_all())
@@ -4460,6 +4621,9 @@ class DisplayMapController:
     def _on_drawing_tool_change(self, selected_tool: str):
         self.drawing_mode = selected_tool.lower()
         print(f"Drawing mode changed to: {self.drawing_mode}")
+        if self.drawing_mode != "whiteboard":
+            self._clear_whiteboard_preview()
+            self._active_whiteboard_points = []
         self._update_shape_controls_visibility()
 
     def _on_shape_fill_mode_change(self, selected_mode: str):
@@ -4478,30 +4642,89 @@ class DisplayMapController:
         result = colorchooser.askcolor(parent=self.canvas, color=self.current_shape_border_color, title="Choose Shape Border Color")
         if result and result[1]: self.current_shape_border_color = result[1]; print(f"Shape border color: {self.current_shape_border_color}")
 
+    def _on_pick_whiteboard_color(self):
+        current_color = getattr(self, "whiteboard_color", "#FF0000")
+        result = colorchooser.askcolor(parent=self.canvas, color=current_color, title="Choose Whiteboard Color")
+        if result and result[1]:
+            self.whiteboard_color = result[1]
+            ConfigHelper.set("Drawing", "whiteboard_color", self.whiteboard_color)
+            try:
+                if getattr(self, "whiteboard_color_button", None):
+                    self.whiteboard_color_button.configure(fg_color=self.whiteboard_color)
+            except tk.TclError:
+                pass
+
+    def _on_whiteboard_width_change(self, value):
+        try:
+            width_val = float(value)
+        except Exception:
+            return
+        self.whiteboard_width = max(1.0, min(20.0, width_val))
+        ConfigHelper.set("Drawing", "whiteboard_width", self.whiteboard_width)
+        label = getattr(self, "whiteboard_width_value_label", None)
+        if label:
+            try:
+                label.configure(text=str(int(round(self.whiteboard_width))))
+            except tk.TclError:
+                pass
+
     def _update_shape_controls_visibility(self):
         shape_tool_active = self.drawing_mode in ["rectangle", "oval"]
+        whiteboard_active = self.drawing_mode == "whiteboard"
         try:
             shape_fill_label = getattr(self, 'shape_fill_label', None)
             shape_fill_mode_menu = getattr(self, 'shape_fill_mode_menu', None)
             shape_fill_color_button = getattr(self, 'shape_fill_color_button', None)
             shape_border_color_button = getattr(self, 'shape_border_color_button', None)
+            whiteboard_color_button = getattr(self, "whiteboard_color_button", None)
+            whiteboard_width_slider = getattr(self, "whiteboard_width_slider", None)
+            whiteboard_controls_frame = getattr(self, "whiteboard_controls_frame", None)
             if shape_tool_active:
                 # Unpack all first to ensure a clean state and avoid issues with 'before'
                 if shape_fill_label: shape_fill_label.pack_forget()
                 if shape_fill_mode_menu: shape_fill_mode_menu.pack_forget()
                 if shape_fill_color_button: shape_fill_color_button.pack_forget()
                 if shape_border_color_button: shape_border_color_button.pack_forget()
+                if whiteboard_color_button: whiteboard_color_button.pack_forget()
+                if whiteboard_width_slider:
+                    try:
+                        whiteboard_width_slider.master.pack_forget()
+                    except Exception:
+                        pass
+                if whiteboard_controls_frame:
+                    whiteboard_controls_frame.pack_forget()
 
                 # Repack in desired order without 'before'
                 if shape_fill_label: shape_fill_label.pack(side="left", padx=(10,2), pady=8)
                 if shape_fill_mode_menu: shape_fill_mode_menu.pack(side="left", padx=5, pady=8)
                 if shape_fill_color_button: shape_fill_color_button.pack(side="left", padx=(10,2), pady=8)
                 if shape_border_color_button: shape_border_color_button.pack(side="left", padx=2, pady=8)
+            elif whiteboard_active:
+                if shape_fill_label: shape_fill_label.pack_forget()
+                if shape_fill_mode_menu: shape_fill_mode_menu.pack_forget()
+                if shape_fill_color_button: shape_fill_color_button.pack_forget()
+                if shape_border_color_button: shape_border_color_button.pack_forget()
+                if whiteboard_controls_frame:
+                    whiteboard_controls_frame.pack(side="left", padx=(8, 2), pady=4)
+                if whiteboard_color_button: whiteboard_color_button.pack(side="left", padx=(0, 6), pady=6)
+                if whiteboard_width_slider:
+                    try:
+                        whiteboard_width_slider.master.pack(side="left", padx=(0, 6), pady=6)
+                    except Exception:
+                        pass
             else:
                 if shape_fill_label: shape_fill_label.pack_forget()
                 if shape_fill_mode_menu: shape_fill_mode_menu.pack_forget()
                 if shape_fill_color_button: shape_fill_color_button.pack_forget()
                 if shape_border_color_button: shape_border_color_button.pack_forget()
+                if whiteboard_color_button: whiteboard_color_button.pack_forget()
+                if whiteboard_width_slider:
+                    try:
+                        whiteboard_width_slider.master.pack_forget()
+                    except Exception:
+                        pass
+                if whiteboard_controls_frame:
+                    whiteboard_controls_frame.pack_forget()
         except AttributeError as e: print(f"Toolbar component not found for visibility update: {e}")
         except tk.TclError as e: print(f"TclError updating shape control visibility: {e}")
 

@@ -161,7 +161,7 @@ def _update_fullscreen_map(self):
         elif item_type in ["rectangle", "oval"]:
             shape_width_unscaled = item.get("width", 50) # Default if missing
             shape_height_unscaled = item.get("height", 50) # Default if missing
-            
+
             shape_width = int(shape_width_unscaled * self.zoom)
             shape_height = int(shape_height_unscaled * self.zoom)
 
@@ -190,6 +190,37 @@ def _update_fullscreen_map(self):
                                                                fill=fill_color, outline=border_color, width=2)
                 if new_fs_shape_id:
                     item['fs_canvas_ids'] = (new_fs_shape_id,)
+        elif item_type == "whiteboard":
+            points = item.get("points") or []
+            if len(points) < 2:
+                continue
+            screen_points = []
+            for px, py in points:
+                screen_points.extend([self.pan_x + px * self.zoom, self.pan_y + py * self.zoom])
+            color = item.get("color", "#FF0000")
+            width = item.get("width", 4)
+            line_id = None
+            fs_ids = item.get("fs_canvas_ids") or ()
+            if fs_ids:
+                line_id = fs_ids[0]
+                try:
+                    self.fs_canvas.coords(line_id, *screen_points)
+                    self.fs_canvas.itemconfig(line_id, fill=color, width=width, smooth=True)
+                except tk.TclError:
+                    line_id = None
+            if not line_id:
+                try:
+                    line_id = self.fs_canvas.create_line(
+                        *screen_points,
+                        fill=color,
+                        width=width,
+                        smooth=True,
+                        capstyle="round",
+                        joinstyle="round",
+                    )
+                    item["fs_canvas_ids"] = (line_id,)
+                except tk.TclError:
+                    item["fs_canvas_ids"] = ()
     # Fog of War Mask (should be drawn last, on top of everything else)
     if self.mask_img: # Ensure mask_img exists
         try:
