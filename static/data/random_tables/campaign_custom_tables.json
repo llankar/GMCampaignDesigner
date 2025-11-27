@@ -1,0 +1,95 @@
+{
+  "categories": [
+    {
+      "id": "Complications",
+      "name": "Complications",
+      "tables": [
+        {
+          "id": "Urban_foot_chase",
+          "title": "Urban foot chase",
+          "dice": "1d20",
+          "description": "",
+          "tags": [],
+          "entries": [
+            {
+              "min": 1,
+              "max": 1,
+              "result": "You - spook a horse as you run by it and it lashes out  with a heavy kick. Make a DC 12 Dexterity saving  throw or take 8 (2d4 + 3) bludgeoning damage.",
+              "tags": []
+            },
+            {
+              "min": 2,
+              "max": 2,
+              "result": "The - load on a vehicule  full of liqudis  comes loose and  begins to roll down the street. Make a DC 11 Strength  (Athletics) or Dexterity (Acrobatics) check to avoid  the tumbling barrels. On a failed check, take 2 (1d4)  bludgeoning damage and fall prone.",
+              "tags": []
+            },
+            {
+              "min": 3,
+              "max": 3,
+              "result": "You - come across a crowded marketplace full of  people who block your path and bump into you  as you run. Make a DC 12 Strength (Athletics) or  Dexterity (Acrobatics) check. On a failed save, the  crowd counts as difficult terrain. Fail by 5 or more  and you are grappled.",
+              "tags": []
+            },
+            {
+              "min": 4,
+              "max": 4,
+              "result": "A - fried food vendor suddenly pushes their cart into  your path. Make a DC 13 Dexterity saving throw. On  a failed save, you get splashed with hot oil, suffering  4 (1d6 + 1) fire damage on this round and the next.",
+              "tags": []
+            },
+            {
+              "min": 5,
+              "max": 5,
+              "result": "Make - a DC 14 Wisdom (Perception) check. On a  success, you notice a large pile of ox dung directly  in your path. On a failure, you hit it at full speed,  slipping and falling prone.",
+              "tags": []
+            },
+            {
+              "min": 6,
+              "max": 6,
+              "result": "In - a wide square, a boisterous festival is in full  swing. A group of 12 goblins stand on each other’s  shoulders juggling sharp knives. Make a DC 14  Dexterity saving throw. On a failed save, you take 4  (1d8) slashing damage.",
+              "tags": []
+            },
+            {
+              "min": 7,
+              "max": 7,
+              "result": "A - group of street urchins tries to surround you.  Make a DC 12 Strength (Athletics) or Dexterity  (Acrobatics) check to push by them. On a failed  save, they count as 15 feet of difficult terrain. Fail  by 5 or more and they steal 16 (3d10) coins from  your purse.",
+              "tags": []
+            },
+            {
+              "min": 8,
+              "max": 8,
+              "result": "A - patrol of city guards, now very interested in  what you are doing, try to stop you. Make a DC  15 Strength (Athletics), Dexterity (Acrobatics) or  Charisma (Persuasion) check. On a failure, they  restrain you.",
+              "tags": []
+            },
+            {
+              "min": 9,
+              "max": 9,
+              "result": "You - round a corner right into a large cart selling  glass vases, cups and pitchers. Make a DC 14  Dexterity (Acrobatics) check. On a failure, you crash  through the cart, suffering 3 (1d4 + 1) piercing  damage and falling prone.",
+              "tags": []
+            },
+            {
+              "min": 10,
+              "max": 10,
+              "result": "A - choir of children precedes a large religious parade  that fills the streets in both directions. Make a DC 12  Strength (Athletics) or Dexterity (Acrobatics) check  to push your way through. On a failure, your path is  blocked for two rounds.",
+              "tags": []
+            },
+            {
+              "min": 11,
+              "max": 11,
+              "result": "Make - a DC 13 Wisdom (Perception) check. On a  successful check, you notice an open manhole  in your path. On a failure, you fall through into  the sewers and into fetid water, taking 3 (1d6)  bludgeoning damage. If you fall, make a DC 12  Constitution saving throw or become poisoned.",
+              "tags": []
+            },
+            {
+              "min": 12,
+              "max": 20,
+              "result": "No - complication",
+              "tags": []
+            }
+          ],
+          "system": "",
+          "biome": "All",
+          "category": "Complications"
+        }
+      ]
+    }
+  ],
+  "biome": "All"
+}

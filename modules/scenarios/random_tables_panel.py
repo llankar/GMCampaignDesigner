@@ -140,7 +140,7 @@ class RandomTablesPanel(ctk.CTkFrame):
         history_frame.columnconfigure(0, weight=1)
 
         ctk.CTkLabel(history_frame, text="History").grid(row=0, column=0, sticky="w")
-        self.history_box = ctk.CTkTextbox(history_frame, wrap="word", height=140)
+        self.history_box = ctk.CTkTextbox(history_frame, wrap="word", height=140, font=("Segoe UI", 14))
         self.history_box.grid(row=1, column=0, sticky="nsew")
         self.history_box.configure(state="disabled")
 

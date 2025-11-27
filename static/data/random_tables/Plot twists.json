@@ -1,0 +1,86 @@
+{
+  "system": "Generic",
+  "biome": "Any",
+  "theme": "RPG Plots",
+  "categories": [
+    {
+      "id": "twists",
+      "name": "RPG Plot Twists",
+      "tables": [
+        {
+          "id": "universal_plot_twists",
+          "title": "Nearly-Universal Plot Twists",
+          "dice": "1d16",
+          "description": "Generic plot twists you can layer onto almost any adventure framework.",
+          "tags": ["twist", "generic", "meta"],
+          "entries": [
+            {
+              "range": "1",
+              "result": "Forced alliance: the PCs must work with a rival, former enemy, or insufferable 'expert' they really don’t want on the team."
+            },
+            {
+              "range": "2",
+              "result": "Victims or villains?: those presented as helpless victims turn out to be the real bad guys, while the supposed villains are actually their targets or scapegoats."
+            },
+            {
+              "range": "3",
+              "result": "Help with strings attached: potential allies will only assist if the PCs first take care of the allies’ own problems, side quests, or political causes."
+            },
+            {
+              "range": "4",
+              "result": "Too close to home: the antagonist is someone the PCs know well—friend, mentor, lover, or family member—now working against them for complicated reasons."
+            },
+            {
+              "range": "5",
+              "result": "No bloodshed: success requires avoiding open violence or collateral damage; the group must win through stealth, diplomacy, or very careful, limited force."
+            },
+            {
+              "range": "6",
+              "result": "Stripped of gear: the PCs must solve the situation without their usual powers, equipment, contacts, or spells, relying on improvisation and basic tools."
+            },
+            {
+              "range": "7",
+              "result": "Recurring nemesis: the villain is not a one-shot foe but a long-term arch-enemy who escapes, returns, and keeps reshaping future adventures."
+            },
+            {
+              "range": "8",
+              "result": "Failed predecessors: another party already tried this mission and failed; their remains, logs, and equipment offer grim warnings and vital clues."
+            },
+            {
+              "range": "9",
+              "result": "Innocents in the crossfire: hostages, bystanders, or refugees are in immediate danger, forcing the PCs to protect them while still confronting the main threat."
+            },
+            {
+              "range": "10",
+              "result": "Cold open: the adventure starts with an ambush, disaster, or sudden crisis in the very first scene; the PCs are thrown straight into the action."
+            },
+            {
+              "range": "11",
+              "result": "Undercover: the party must pose as other people—or pretend to have very different loyalties and values—without blowing their cover."
+            },
+            {
+              "range": "12",
+              "result": "Hard choices: the PCs can’t save everyone or stop every evil; they must decide which goal, group, or ideal to prioritize and live with the consequences."
+            },
+            {
+              "range": "13",
+              "result": "Personal sacrifice: victory requires at least one PC to give up something important—wealth, status, safety, reputation, or some deeply personal asset."
+            },
+            {
+              "range": "14",
+              "result": "Small mission, big war: the heroes aren’t ending the whole catastrophe, only running a focused task like delivering supplies or extracting a single key person."
+            },
+            {
+              "range": "15",
+              "result": "Chosen or used: one PC is treated as a prophesied savior, rightful heir, divine avatar, or convenient patsy, making this group the only ones who can act."
+            },
+            {
+              "range": "16",
+              "result": "Rival party: another competent adventuring group is on the same job with different goals; sometimes they’re allies, sometimes competition, sometimes future enemies."
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

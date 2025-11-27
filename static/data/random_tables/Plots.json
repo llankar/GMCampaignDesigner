@@ -1,0 +1,158 @@
+{
+  "system": "Generic",
+  "biome": "Any",
+  "theme": "RPG Plots",
+  "categories": [
+    {
+      "id": "plots",
+      "name": "RPG Plots",
+      "tables": [
+        {
+          "id": "big_list_rpg_plots",
+          "title": "Big List of RPG Plots",
+          "dice": "1d34",
+          "description": "Random plot frameworks inspired by S. John Ross' 'Big List of RPG Plots', adapted into a generic table for any campaign.",
+          "tags": ["plot", "generic", "template"],
+          "entries": [
+            {
+              "range": "1",
+              "result": "Any Old Port in a Storm - PCs run from a larger threat and beg shelter in a handy safe place, only to discover that the haven itself hides a secret, danger, or supernatural problem they must confront before they can truly rest."
+            },
+            {
+              "range": "2",
+              "result": "Better Late Than Never - Villains have already pulled off a scheme and are escaping; the PCs learn just in time to chase them down before they reach safety such as a border, home base, or jump point, often using superior knowledge of routes or vehicles."
+            },
+            {
+              "range": "3",
+              "result": "Blackmail - An enemy uncovers leverage on the PCs or someone they care about and uses threats of exposure or harm to force them into distasteful jobs until they can break the hold, destroy the blackmail material, or turn the tables."
+            },
+            {
+              "range": "4",
+              "result": "Breaking and Entering - The mission is to infiltrate a dangerous location and bypass its defenses in order to retrieve, sabotage, or quietly replace a vital object, process, or person without triggering an alarm."
+            },
+            {
+              "range": "5",
+              "result": "Capture the Flag - PCs are ordered to seize or hold a key objective against opposition, juggling tactics, uncertain intelligence, and sometimes nearby innocents or fragile assets that must not be harmed."
+            },
+            {
+              "range": "6",
+              "result": "Clearing the Hex - There is a lair, region, or structure infested with dangerous beings; the PCs must systematically make it safe, often discovering that brute force is not enough and that understanding the threat is the real key."
+            },
+            {
+              "range": "7",
+              "result": "Delver's Delight - Treasure-hunters go after a fabled hoard in a ruin or other perilous site, confronting guardians and traps, only to find that the prize may be cursed, alive, claimed by others, or more trouble than it is worth."
+            },
+            {
+              "range": "8",
+              "result": "Don't Eat the Purple Ones - Stranded in an unfamiliar environment with limited resources, the PCs must secure food, water, and shelter long enough to repair, signal, or survive until rescue, often learning that some strange local feature is the key to getting out."
+            },
+            {
+              "range": "9",
+              "result": "Elementary, My Dear Watson - A crime or atrocity has occurred; the PCs investigate by protecting witnesses, gathering clues, and assembling proof before delivering justice themselves or convincing authorities to act."
+            },
+            {
+              "range": "10",
+              "result": "Escort Service - The PCs must escort a person or object through hostile territory to a destination while threats, ambushes, and the charge's own problems try to derail the journey."
+            },
+            {
+              "range": "11",
+              "result": "Good Housekeeping - Placed in charge of a domain, organization, or operation, inexperienced PCs must make it function and prosper while dealing with crises, resistance from those loyal to the old regime, and looming external threats."
+            },
+            {
+              "range": "12",
+              "result": "Help is on the Way - Someone, somewhere, cannot survive without outside help; the PCs mount a rescue into a disaster zone, siege, or other hazardous situation and then face the problem of escaping again with everyone alive."
+            },
+            {
+              "range": "13",
+              "result": "Hidden Base - While traveling, the PCs stumble across a hidden stronghold full of enemies preparing something awful and must warn allies, sabotage the site, or organize a defense using whatever local resources they can find."
+            },
+            {
+              "range": "14",
+              "result": "How Much For Just the Dingus? - In a contested area there is a unique prize everyone wants; rival groups race the PCs to locate, bargain for, steal, or recover it, each faction bringing its own agenda and methods."
+            },
+            {
+              "range": "15",
+              "result": "I Beg Your Pardon? - Without warning the PCs are targeted by attacks or threats they do not understand; they must survive, investigate motives, and discover what they possess or did that put them in someone's sights."
+            },
+            {
+              "range": "16",
+              "result": "Long or Short Fork When Dining on Elf? - PCs act as diplomats or traders to a culture with strange customs and incomplete etiquette notes, trying to secure an alliance or deal without committing a lethal faux pas, all while possible saboteurs work against them."
+            },
+            {
+              "range": "17",
+              "result": "Look, Don't Touch - The PCs are assigned to watch, follow, or observe a target or region without revealing themselves, but events may tempt or force them to intervene and risk blowing the operation."
+            },
+            {
+              "range": "18",
+              "result": "Manhunt - A person or group has vanished or run off and someone wants them back; the PCs track the missing, only to discover kidnappers, a dangerous fugitive, sympathetic motives, or a second adventure wrapped around the first."
+            },
+            {
+              "range": "19",
+              "result": "Missing Memories - One or more PCs wake up missing recent memories and already enmeshed in trouble; they must work out what they did, who they angered, and whether to undo or stand by their forgotten actions."
+            },
+            {
+              "range": "20",
+              "result": "Most Peculiar, Momma - Some bizarre, disruptive phenomenon is affecting an area—social unrest, weird weather, outages, or stranger things—and the PCs must trace the underlying cause and fix it, sometimes discovering they were part of the problem."
+            },
+            {
+              "range": "21",
+              "result": "No One Has Soiled the Bridge - The PCs are tasked with fortifying and defending a single crucial chokepoint or asset against impending attack, adjusting their plan when intelligence proves wrong and possibly confronting the enemy's understandable reasons for striking."
+            },
+            {
+              "range": "22",
+              "result": "Not in Kansas - Ordinary life is interrupted when the PCs are dumped into, or travel to, a wholly unfamiliar world or dimension; they must learn the rules, decide whether to help locals, and eventually find a route home."
+            },
+            {
+              "range": "23",
+              "result": "Ounces of Prevention - A villain or group is preparing a major harmful act; with only partial warning, the PCs must investigate, uncover the real plan, and stop it before it triggers, often while decoy plots distract them."
+            },
+            {
+              "range": "24",
+              "result": "Pandora's Box - Someone has meddled with forces beyond control, opening the way to waves of monsters, disasters, or escaped threats; the PCs must contain or return each outbreak before they can confront and seal the original source."
+            },
+            {
+              "range": "25",
+              "result": "Quest for the Sparkly Hoozits - Prophecy, crisis, or need points to a specific, hard-to-get 'thing'—artifact, formula, secret, or substance—and the PCs must research it, track it down, and claim or negotiate for it, often from current owners or rivals."
+            },
+            {
+              "range": "26",
+              "result": "Recent Ruins - A settlement, outpost, starship, or other site has recently been ruined; the PCs explore the wreckage to learn what happened and whether whatever caused the destruction still threatens others."
+            },
+            {
+              "range": "27",
+              "result": "Running the Gauntlet - To reach their goal, the PCs must pass through a dangerous stretch of territory whose hazards are impersonal and environmental; the place itself is the foe, unless it turns out those threats are actually messages or tests."
+            },
+            {
+              "range": "28",
+              "result": "Safari - The PCs join or are hired for a hunt to capture or kill a specific notable creature, dealing with its environment, its defenders, and its unexpected capabilities while the trail leads toward other secrets."
+            },
+            {
+              "range": "29",
+              "result": "Score One for the Home Team - The group takes part in a race, tournament, or other competition and tries to win—or at least stop the wrong side from winning—while rivals cheat, judges scheme, or the event becomes far deadlier than advertised."
+            },
+            {
+              "range": "30",
+              "result": "Stalag 23 - Captured or otherwise confined, the PCs must devise and execute an escape from a secure prison or camp, sometimes under a time limit, sometimes discovering that their incarceration itself is a test or undercover assignment gone wrong."
+            },
+            {
+              "range": "31",
+              "result": "Take Us to Memphis and Don't Slow Down - Enemy forces seize control of a vehicle or other moving conveyance the PCs are on; while the ordinary passengers panic or obstruct, the group has to decide which side to back and how to retake control amid secondary dangers."
+            },
+            {
+              "range": "32",
+              "result": "Troublemakers - Some person, group, or creature is stirring up trouble—raids, pollution, unrest, or political chaos—and the PCs go to where the problems originate to identify the real culprits and shut them down, often needing to take them alive or navigate murky morality."
+            },
+            {
+              "range": "33",
+              "result": "Uncharted Waters - The PCs are explorers entering previously unmapped territory; what begins as survey work turns into high-stakes conflict when the region itself proves lethal, immensely valuable, or jealously guarded by something that wants them gone or silent."
+            },
+            {
+              "range": "34",
+              "result": "We're On the Outside Looking In - Instead of being at the center of a classic plot, the PCs are on the periphery or receiving end: others are running the heist, invasion, or prophecy while the group must choose sides, mitigate damage, or survive being hunted, framed, or invaded themselves."
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
