@@ -12,8 +12,9 @@ def create_icon_button(parent, icon, tooltip_text, command):
     has_icon = icon is not None
     if has_icon:
         display_text = ""
-        width = 10
-        height = 10
+        # Give icon buttons enough room to display their artwork clearly
+        width = 52
+        height = 52
     else:
         display_text = tooltip_text if len(tooltip_text) <= 18 else tooltip_text[:17] + "..."
         width = 160
