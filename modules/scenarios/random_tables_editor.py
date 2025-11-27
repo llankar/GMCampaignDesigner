@@ -34,6 +34,7 @@ class RandomTableEditorDialog(ctk.CTkToplevel):
         self.tags_var = tk.StringVar(value=", ".join(self.table.get("tags", [])))
         self.system_var = tk.StringVar(value=self.table.get("system", ""))
         self.biome_var = tk.StringVar(value=self.table.get("biome", ""))
+        self.theme_var = tk.StringVar(value=self.table.get("theme", ""))
         self.table_id = self.table.get("id")
 
         self.entry_rows: List[dict] = []
@@ -54,6 +55,7 @@ class RandomTableEditorDialog(ctk.CTkToplevel):
         meta_frame.pack(fill="x", pady=(0, 10))
         meta_frame.columnconfigure(1, weight=1)
         meta_frame.columnconfigure(3, weight=1)
+        meta_frame.columnconfigure(5, weight=1)
 
         ctk.CTkLabel(meta_frame, text="Title:").grid(row=0, column=0, sticky="w", padx=(4, 6), pady=4)
         ctk.CTkEntry(meta_frame, textvariable=self.title_var).grid(row=0, column=1, sticky="ew", pady=4)
@@ -68,6 +70,9 @@ class RandomTableEditorDialog(ctk.CTkToplevel):
 
         ctk.CTkLabel(meta_frame, text="System:").grid(row=1, column=2, sticky="w", padx=(8, 6))
         ctk.CTkEntry(meta_frame, textvariable=self.system_var).grid(row=1, column=3, sticky="ew", pady=4)
+
+        ctk.CTkLabel(meta_frame, text="Theme:").grid(row=1, column=4, sticky="w", padx=(8, 6))
+        ctk.CTkEntry(meta_frame, textvariable=self.theme_var).grid(row=1, column=5, sticky="ew", pady=4)
 
         ctk.CTkLabel(meta_frame, text="Biome:").grid(row=2, column=0, sticky="w", padx=(4, 6), pady=4)
         ctk.CTkEntry(meta_frame, textvariable=self.biome_var).grid(row=2, column=1, sticky="ew", pady=4)
@@ -203,6 +208,7 @@ class RandomTableEditorDialog(ctk.CTkToplevel):
             "tags": self._parse_tags(self.tags_var.get()),
             "system": self.system_var.get().strip(),
             "biome": self.biome_var.get().strip(),
+            "theme": self.theme_var.get().strip(),
             "description": self.description_box.get("1.0", "end").strip(),
         }
 
@@ -215,6 +221,7 @@ class RandomTableEditorDialog(ctk.CTkToplevel):
             return
 
         table_id = self.table_id or self._slugify(metadata["title"])
+        theme_value = metadata.get("theme") or None
         table_data = {
             "id": table_id,
             "title": metadata["title"],
@@ -226,9 +233,8 @@ class RandomTableEditorDialog(ctk.CTkToplevel):
             "biome": metadata.get("biome"),
             "category": self._slugify(metadata["category"]),
         }
-
-        if self.table.get("theme"):
-            table_data["theme"] = self.table.get("theme")
+        if theme_value is not None:
+            table_data["theme"] = theme_value
 
         try:
             target_path = self._persist_table(
@@ -237,7 +243,7 @@ class RandomTableEditorDialog(ctk.CTkToplevel):
                 metadata.get("system"),
                 metadata.get("biome"),
                 source_path=self.table_source,
-                theme=self.table.get("theme"),
+                theme=theme_value,
             )
             messagebox.showinfo("Random Table", f"Table saved to {target_path}")
             RandomTablesPanel.refresh_all()
@@ -284,6 +290,8 @@ class RandomTableEditorDialog(ctk.CTkToplevel):
             data["biome"] = biome
         if theme:
             data["theme"] = theme
+        elif "theme" in data:
+            data.pop("theme")
 
         with open(target_file, "w", encoding="utf-8") as handle:
             json.dump(data, handle, indent=2, ensure_ascii=False)
