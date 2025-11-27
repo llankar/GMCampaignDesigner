@@ -6,13 +6,38 @@ from modules.helpers.logging_helper import log_module_import
 log_module_import(__name__)
 
 def _build_toolbar(self):
+    section_tracker = {"count": 0}
+    horizontal_spacing = 8
+    control_pady = 8
+
+    def _pack_control(widget, *, leading=0, trailing=None, pady=None):
+        padx = (leading, horizontal_spacing if trailing is None else trailing)
+        widget.pack(side="left", padx=padx, pady=control_pady if pady is None else pady)
+
     def _create_collapsible_section(parent, title):
+        if section_tracker["count"]:
+            separator = ctk.CTkFrame(
+                parent,
+                fg_color="#3a3a3a",
+                width=2,
+                corner_radius=2,
+            )
+            separator.pack(side="left", fill="y", padx=(4, 12), pady=(6, 6))
+
+        section_tracker["count"] += 1
+
         section = ctk.CTkFrame(parent, fg_color="transparent")
-        section.pack(side="left", padx=6, pady=2, fill="y")
+        section.pack(side="left", padx=(0, 12), pady=2, fill="y")
 
         toggle_state = tk.BooleanVar(value=True)
-        content_frame = ctk.CTkFrame(section, fg_color="transparent")
-        content_frame.pack(side="left", fill="y")
+        content_frame = ctk.CTkFrame(
+            section,
+            fg_color="#101010",
+            border_width=1,
+            border_color="#404040",
+            corner_radius=8,
+        )
+        content_frame.pack(side="left", fill="y", padx=(0, 4), pady=(2, 2))
 
         def _toggle():
             if toggle_state.get():
@@ -20,7 +45,7 @@ def _build_toolbar(self):
                 toggle_state.set(False)
                 toggle_button.configure(text=f"{title} ▶")
             else:
-                content_frame.pack(side="left", fill="y")
+                content_frame.pack(side="left", fill="y", padx=(0, 4), pady=(2, 2))
                 toggle_state.set(True)
                 toggle_button.configure(text=f"{title} ▼")
 
@@ -94,12 +119,12 @@ def _build_toolbar(self):
     ]
 
     fog_dropdown = IconDropdown(fog_section, fog_actions, default_key="add")
-    fog_dropdown.pack(side="left")
+    _pack_control(fog_dropdown, trailing=4)
     self._fog_buttons.update(fog_dropdown.option_buttons)
     self._fog_dropdown = fog_dropdown
 
     shape_label = ctk.CTkLabel(fog_section, text="Fog Shape:") # Clarified label
-    shape_label.pack(side="left", padx=(10,2), pady=8)
+    _pack_control(shape_label, leading=8, trailing=4)
 
     self.shape_menu = ctk.CTkOptionMenu(
         fog_section,
@@ -108,10 +133,10 @@ def _build_toolbar(self):
         width=dropdown_width,
     )
     self.shape_menu.set("Rectangle") # Default fog brush shape
-    self.shape_menu.pack(side="left", padx=5, pady=8)
+    _pack_control(self.shape_menu, trailing=4)
 
     size_label = ctk.CTkLabel(fog_section, text="Fog Brush Size:") # Clarified label
-    size_label.pack(side="left", padx=(2,2), pady=8)
+    _pack_control(size_label, leading=4, trailing=4)
 
     brush_size_options = list(getattr(self, "brush_size_options", list(range(4, 129, 4))))
     current_brush_size = int(getattr(self, "brush_size", brush_size_options[0] if brush_size_options else 32))
@@ -127,7 +152,7 @@ def _build_toolbar(self):
         width=dropdown_width,
     )
     self.brush_size_menu.set(str(current_brush_size))
-    self.brush_size_menu.pack(side="left", padx=0, pady=5)
+    _pack_control(self.brush_size_menu, leading=0, trailing=4, pady=6)
 
     # Key bindings for bracket adjustments (for fog brush)
     self.parent.bind("[", lambda e: self._change_brush(-4))
@@ -141,10 +166,11 @@ def _build_toolbar(self):
         {"key": "pc", "icon": icons["pc"], "tooltip": "Add PC", "command": lambda: self.open_entity_picker("PC")},
         {"key": "marker", "icon": icons["marker"], "tooltip": "Add Marker", "command": self.add_marker},
     ]
-    IconDropdown(token_section, token_actions, default_key="npc").pack(side="left", padx=2)
+    token_dropdown = IconDropdown(token_section, token_actions, default_key="npc")
+    _pack_control(token_dropdown, trailing=4)
 
     token_size_label = ctk.CTkLabel(token_section, text="Token Size:") # Renamed label variable
-    token_size_label.pack(side="left", padx=(10,2), pady=8)
+    _pack_control(token_size_label, leading=8, trailing=4)
 
     token_size_options = list(getattr(self, "token_size_options", list(range(16, 129, 8))))
     current_token_size = int(getattr(self, "token_size", token_size_options[0] if token_size_options else 48))
@@ -160,12 +186,12 @@ def _build_toolbar(self):
         width=dropdown_width,
     )
     self.token_size_menu.set(str(current_token_size))
-    self.token_size_menu.pack(side="left", padx=5, pady=8)
+    _pack_control(self.token_size_menu, trailing=4)
 
     drawing_section = _create_collapsible_section(toolbar, "Drawing / Whiteboard")
     # --- Drawing Tool Selector ---
     tool_label = ctk.CTkLabel(drawing_section, text="Active Tool:")
-    tool_label.pack(side="left", padx=(10,2), pady=8)
+    _pack_control(tool_label, leading=8, trailing=4)
     drawing_tools = ["Token", "Rectangle", "Oval", "Whiteboard", "Eraser"]
     self.drawing_tool_menu = ctk.CTkOptionMenu(
         drawing_section,
@@ -175,7 +201,7 @@ def _build_toolbar(self):
     )
     # Ensure self.drawing_mode is initialized in DisplayMapController before this
     self.drawing_tool_menu.set(self.drawing_mode.capitalize() if hasattr(self, 'drawing_mode') else "Token")
-    self.drawing_tool_menu.pack(side="left", padx=5, pady=8)
+    _pack_control(self.drawing_tool_menu, trailing=4)
 
     whiteboard_controls = ctk.CTkFrame(drawing_section, fg_color="transparent")
     whiteboard_controls.pack(side="left", padx=(8, 2), pady=4)
@@ -191,7 +217,7 @@ def _build_toolbar(self):
         self.whiteboard_color_button.configure(fg_color=getattr(self, "whiteboard_color", "#FF0000"))
     except tk.TclError:
         pass
-    self.whiteboard_color_button.pack(side="left", padx=(0, 6), pady=6)
+    _pack_control(self.whiteboard_color_button, leading=0, trailing=6, pady=6)
 
     width_container = ctk.CTkFrame(whiteboard_controls, fg_color="transparent")
     width_container.pack(side="left", padx=(0, 6), pady=6)
@@ -257,10 +283,11 @@ def _build_toolbar(self):
         {"key": "web", "icon": icons["fs"], "tooltip": "Web Display", "command": self.open_web_display},
         {"key": "chatbot", "icon": icons["chatbot"], "tooltip": "Chatbot", "command": self.open_chatbot_assistant},
     ]
-    IconDropdown(display_section, display_actions, default_key="save").pack(side="left")
+    display_dropdown = IconDropdown(display_section, display_actions, default_key="save")
+    _pack_control(display_dropdown, trailing=4)
 
     hover_font_label = ctk.CTkLabel(display_section, text="Info Card Font Size:")
-    hover_font_label.pack(side="left", padx=(10,2), pady=8)
+    _pack_control(hover_font_label, leading=8, trailing=4)
 
     font_sizes = getattr(self, "hover_font_size_options", [10, 12, 14, 16, 18, 20, 24, 28, 32])
     current_hover_size = getattr(self, "hover_font_size", 14)
@@ -275,11 +302,11 @@ def _build_toolbar(self):
         width=dropdown_width,
     )
     self.hover_font_size_menu.set(str(current_hover_size))
-    self.hover_font_size_menu.pack(side="left", padx=5, pady=8)
+    _pack_control(self.hover_font_size_menu, trailing=4)
 
     # --- Fit Mode selector ---
     fit_label = ctk.CTkLabel(display_section, text="Fit:")
-    fit_label.pack(side="left", padx=(14,2), pady=8)
+    _pack_control(fit_label, leading=12, trailing=4)
     fit_values = ["Contain", "Width", "Height"]
     current_fit = getattr(self, "fit_mode", "Contain")
     if current_fit not in fit_values:
@@ -291,7 +318,7 @@ def _build_toolbar(self):
         width=dropdown_width,
     )
     self.fit_mode_menu.set(current_fit)
-    self.fit_mode_menu.pack(side="left", padx=5, pady=8)
+    _pack_control(self.fit_mode_menu, trailing=4)
 
     # Initial visibility update for shape controls (call method on self)
     if hasattr(self, '_update_shape_controls_visibility'):
