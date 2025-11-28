@@ -49,12 +49,15 @@ def render_whiteboard_image(
                 flattened.extend([x, y])
             draw.line(flattened, fill=color, width=width_px, joint="curve")
         elif item_type == "text":
-            text = item.get("text", "")
+            text_value = item.get("text", "")
             pos = item.get("position") or (0, 0)
             color = item.get("color", DEFAULT_COLOR)
-            size_px = int(item.get("size", 24))
+            size_px = int(item.get("text_size", item.get("size", 24)))
             font = font_cache.pil_font(size_px)
-            draw.text(pos, text, fill=color, font=font)
+            try:
+                draw.text(pos, text_value, fill=color, font=font, anchor="lt")
+            except Exception:
+                draw.text(pos, text_value, fill=color, font=font)
 
     return img
 
