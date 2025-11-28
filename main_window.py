@@ -1137,6 +1137,13 @@ class MainWindow(ctk.CTk):
             # leave current_open_entity = None
 
             return  # end of graph‐mode toggle
+
+        if not self.current_open_entity:
+            log_warning(
+                "No entity is currently open; ignoring banner toggle",
+                func_name="main_window.MainWindow._toggle_banner",
+            )
+            return
         if self.banner_visible:
             # COLLAPSE BANNER
             if self.banner_frame.winfo_exists():
