@@ -7,6 +7,7 @@ from werkzeug.serving import make_server
 from PIL import Image, ImageDraw
 from modules.helpers.config_helper import ConfigHelper
 from modules.helpers.logging_helper import log_module_import
+from modules.maps.utils.text_items import TextFontCache
 
 log_module_import(__name__)
 
@@ -229,6 +230,19 @@ def _render_map_image(self):
             color = item.get('color', '#FF0000')
             width = item.get('width', 4)
             draw.line(screen_points, fill=color, width=int(max(1, width)), joint='curve')
+        elif item_type == 'text':
+            text_value = item.get('text', '')
+            color = item.get('color', '#FF0000')
+            size = int(item.get('text_size', getattr(self, 'text_size', 24)))
+            font_cache = getattr(self, '_text_font_cache', None)
+            if font_cache is None:
+                font_cache = TextFontCache()
+                setattr(self, '_text_font_cache', font_cache)
+            font = font_cache.pil_font(size)
+            try:
+                draw.text((sx, sy), text_value, fill=color, font=font, anchor='lt')
+            except Exception:
+                draw.text((sx, sy), text_value, fill=color, font=font)
 
     if self.mask_img:
         mask_copy = self.mask_img.copy()
