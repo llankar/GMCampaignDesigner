@@ -24,12 +24,17 @@ def _resolve_size(size: Tuple[int, int]) -> Tuple[int, int]:
         return DEFAULT_SIZE
 
 
-def render_whiteboard_image(items: List[Dict[str, Any]], size: Tuple[int, int] = DEFAULT_SIZE) -> Image.Image:
+def render_whiteboard_image(
+    items: List[Dict[str, Any]],
+    size: Tuple[int, int] = DEFAULT_SIZE,
+    *,
+    font_cache: TextFontCache | None = None,
+) -> Image.Image:
     width, height = _resolve_size(size)
     img = Image.new("RGB", (width, height), "white")
     draw = ImageDraw.Draw(img)
 
-    font_cache = TextFontCache()
+    font_cache = font_cache or TextFontCache()
 
     for item in items:
         item_type = item.get("type")
@@ -55,7 +60,7 @@ def render_whiteboard_image(items: List[Dict[str, Any]], size: Tuple[int, int] =
 
 
 def render_png_bytes(items: List[Dict[str, Any]], size: Tuple[int, int] = DEFAULT_SIZE) -> bytes:
-    img = render_whiteboard_image(items, size)
+    img = render_whiteboard_image(items, size, font_cache=None)
     buffer = io.BytesIO()
     try:
         img.save(buffer, format="PNG")

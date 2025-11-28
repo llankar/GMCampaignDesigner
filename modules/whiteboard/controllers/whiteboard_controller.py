@@ -9,7 +9,7 @@ from PIL import Image, ImageTk
 from screeninfo import get_monitors
 
 from modules.helpers.logging_helper import log_module_import, log_info, log_warning
-from modules.maps.utils.text_items import prompt_for_text, text_hit_test
+from modules.maps.utils.text_items import TextFontCache, prompt_for_text, text_hit_test
 from modules.whiteboard.services.whiteboard_storage import WhiteboardStorage, WhiteboardState
 from modules.whiteboard.utils.whiteboard_renderer import render_whiteboard_image
 from modules.whiteboard.views.web_whiteboard_view import (
@@ -40,6 +40,8 @@ class WhiteboardController:
         self._player_view_canvas = None
         self._player_view_image_id = None
         self._player_view_photo = None
+
+        self._font_cache = TextFontCache()
 
         self._dragging_text_item = None
         self._dragging_text_offset = (0.0, 0.0)
@@ -329,7 +331,7 @@ class WhiteboardController:
                     canvas_ids[0],
                     text=item.get("text", ""),
                     fill=item.get("color", self.ink_color),
-                    font=("Arial", font_size),
+                    font=self._font_cache.tk_font(font_size),
                 )
             except tk.TclError:
                 pass
@@ -417,13 +419,13 @@ class WhiteboardController:
                     pos[1],
                     text=item.get("text", ""),
                     fill=item.get("color", self.ink_color),
-                    font=("Arial", size),
+                    font=self._font_cache.tk_font(size),
                     anchor="nw",
                 )
                 item["canvas_ids"] = (text_id,)
 
     def _render_whiteboard_image(self):
-        return render_whiteboard_image(self.whiteboard_items, self.board_size)
+        return render_whiteboard_image(self.whiteboard_items, self.board_size, font_cache=self._font_cache)
 
     def _update_web_display_whiteboard(self):
         if not getattr(self, "_whiteboard_web_thread", None):

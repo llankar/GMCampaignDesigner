@@ -89,23 +89,31 @@ def create_text_item(text: str, position: tuple[float, float], *, color: str, si
 
 
 class TextFontCache:
-    """Cache for tkinter and PIL fonts keyed by size."""
+    """Cache for tkinter and PIL fonts keyed by size using a shared family."""
 
-    def __init__(self):
+    def __init__(self, family: str = "Arial"):
+        self._family = family or "Arial"
+        self._resolved_family = None
         self._tk_fonts: dict[int, ctk.CTkFont] = {}
         self._pil_fonts: dict[int, ImageFont.FreeTypeFont | ImageFont.ImageFont] = {}
 
     def tk_font(self, size: int) -> ctk.CTkFont:
         normalized = max(8, int(size))
         if normalized not in self._tk_fonts:
-            self._tk_fonts[normalized] = ctk.CTkFont(size=normalized)
+            font = ctk.CTkFont(family=self._family, size=normalized)
+            try:
+                self._resolved_family = font.actual().get("family") or self._family
+            except Exception:
+                self._resolved_family = self._family
+            self._tk_fonts[normalized] = font
         return self._tk_fonts[normalized]
 
     def pil_font(self, size: int) -> ImageFont.FreeTypeFont | ImageFont.ImageFont:
         normalized = max(8, int(size))
         if normalized not in self._pil_fonts:
             try:
-                self._pil_fonts[normalized] = ImageFont.truetype("DejaVuSans.ttf", normalized)
+                family = self._resolved_family or self._family
+                self._pil_fonts[normalized] = ImageFont.truetype(family, normalized)
             except Exception:
                 self._pil_fonts[normalized] = ImageFont.load_default()
         return self._pil_fonts[normalized]

@@ -90,7 +90,11 @@ def open_whiteboard_display(controller, port=None):
         interval = max(1, int(getattr(controller, "_whiteboard_refresh_ms", 200))) / 1000.0
 
         def frame_bytes():
-            img = render_whiteboard_image(controller.whiteboard_items, controller.board_size)
+            img = render_whiteboard_image(
+                controller.whiteboard_items,
+                controller.board_size,
+                font_cache=getattr(controller, "_font_cache", None),
+            )
             buf = io.BytesIO()
             try:
                 img.save(buf, format="JPEG", quality=85)
