@@ -58,6 +58,13 @@ CLIPBOARD_SKIP = object()
 from modules.helpers.text_helpers import format_longtext
 from modules.helpers.config_helper import ConfigHelper
 from modules.ui.image_viewer import show_portrait
+from modules.maps.utils.text_items import (
+    DEFAULT_TEXT_SIZES,
+    TextFontCache,
+    create_text_item,
+    prompt_for_text,
+    text_hit_test,
+)
 from modules.ui.video_player import play_video_on_second_screen
 from modules.ui.chatbot_dialog import (
     get_default_chatbot_wrappers,
@@ -145,6 +152,15 @@ class DisplayMapController:
         self.hover_font_size_options = [10, 12, 14, 16, 18, 20, 24, 28, 32]
         self.hover_font_size = 14
         self.hover_font = ctk.CTkFont(size=self.hover_font_size)
+        try:
+            self.text_size = int(ConfigHelper.get("Drawing", "text_size", fallback=24))
+        except Exception:
+            self.text_size = 24
+        self.text_size_options = list(DEFAULT_TEXT_SIZES)
+        if self.text_size not in self.text_size_options:
+            self.text_size_options.append(self.text_size)
+            self.text_size_options = sorted(set(self.text_size_options))
+        self._text_font_cache = TextFontCache()
         self.brush_shape = "rectangle"
         self.fog_mode    = None
         self.tokens      = [] # List of all items (tokens and shapes)
@@ -2634,6 +2650,12 @@ class DisplayMapController:
                 self._marker_start = None
                 return
 
+            if self.drawing_mode == "text":
+                world_x = (event.x - self.pan_x) / self.zoom
+                world_y = (event.y - self.pan_y) / self.zoom
+                self._create_text_at(world_x, world_y)
+                return
+
             if self.drawing_mode in ["rectangle", "oval"]: # Create new shape if in drawing mode
                 # Create new shape - This block needs to be indented
                 world_x = (event.x - self.pan_x) / self.zoom; world_y = (event.y - self.pan_y) / self.zoom
@@ -2832,6 +2854,20 @@ class DisplayMapController:
         self._update_canvas_images(resample=self._fast_resample)
         self._persist_tokens()
 
+    def _create_text_at(self, world_x: float, world_y: float):
+        text = prompt_for_text(self.canvas, title="Add Text", prompt="Enter text:")
+        if text is None:
+            return
+        text_item = create_text_item(
+            text,
+            (world_x, world_y),
+            color=self.whiteboard_color,
+            size=int(getattr(self, "text_size", 24)),
+        )
+        self.tokens.append(text_item)
+        self._update_canvas_images(resample=self._fast_resample)
+        self._persist_tokens()
+
     def _mark_eraser_dirty(self):
         self._eraser_dirty = True
         if not self._eraser_repaint_scheduled:
@@ -2876,7 +2912,33 @@ class DisplayMapController:
         remaining_tokens = []
         radius = float(getattr(self, "whiteboard_eraser_radius", 8.0))
         target_point = (world_x, world_y)
+        screen_point = (self.pan_x + world_x * self.zoom, self.pan_y + world_y * self.zoom)
+        radius_screen = radius * self.zoom
         for item in self.tokens:
+            if item.get("type") == "text":
+                if text_hit_test(canvas, item, screen_point=screen_point, radius=radius_screen, zoom=self.zoom, pan=(self.pan_x, self.pan_y)):
+                    for cid in item.get("canvas_ids") or []:
+                        if canvas:
+                            try:
+                                canvas.delete(cid)
+                            except tk.TclError:
+                                pass
+                    fs_canvas = getattr(self, "fs_canvas", None)
+                    for fs_cid in item.get("fs_canvas_ids") or []:
+                        if fs_canvas:
+                            try:
+                                fs_canvas.delete(fs_cid)
+                            except tk.TclError:
+                                pass
+                    changed = True
+                    if item is self.selected_token:
+                        self.selected_token = None
+                    if item in self.selected_items:
+                        try:
+                            self.selected_items.remove(item)
+                        except ValueError:
+                            pass
+                    continue
             if item.get("type") != "whiteboard":
                 remaining_tokens.append(item)
                 continue
@@ -3495,6 +3557,46 @@ class DisplayMapController:
                         "actual_screen": (screen_coords[0], screen_coords[1]) if screen_coords else debug_entry["expected_screen"],
                     })
                     debug_payload["rendered_items"].append(debug_entry)
+            elif item_type == "text":
+                text_value = item.get("text", "")
+                color = item.get("color", self.whiteboard_color)
+                size = int(item.get("text_size", getattr(self, "text_size", 24)))
+                font = self._text_font_cache.tk_font(size)
+                sx = int(self.pan_x + xw * self.zoom)
+                sy = int(self.pan_y + yw * self.zoom)
+                debug_entry = None
+                if debug_payload is not None:
+                    debug_entry = {
+                        "type": "text",
+                        "world_position": (xw, yw),
+                        "expected_screen": (sx, sy),
+                        "text": text_value,
+                        "color": color,
+                        "size": size,
+                    }
+                text_id = None
+                if item.get("canvas_ids"):
+                    text_id = item["canvas_ids"][0]
+                    try:
+                        self.canvas.coords(text_id, sx, sy)
+                        self.canvas.itemconfig(text_id, text=text_value, fill=color, font=font)
+                    except tk.TclError:
+                        text_id = None
+                if not text_id:
+                    try:
+                        text_id = self.canvas.create_text(sx, sy, text=text_value, fill=color, anchor="nw", font=font)
+                        item["canvas_ids"] = (text_id,)
+                        self._bind_item_events(item)
+                    except tk.TclError:
+                        item["canvas_ids"] = ()
+                if debug_entry is not None:
+                    debug_entry.update({
+                        "canvas_coords": {
+                            "text": _safe_canvas_coords(item.get("canvas_ids", (None,))[0]) if item.get("canvas_ids") else None,
+                        },
+                        "actual_screen": _primary_screen_from_coords(_safe_canvas_coords(text_id)) or (sx, sy),
+                    })
+                    debug_payload["rendered_items"].append(debug_entry)
         if debug_payload is not None:
             expected = debug_payload.get("expected_items", [])
             rendered = debug_payload.get("rendered_items", [])
@@ -3705,6 +3807,8 @@ class DisplayMapController:
                  self.canvas.tag_bind(cid, "<Double-Button-1>", lambda e, i=item: self._on_token_double_click(e, i))
             elif item_type == "marker":
                  self.canvas.tag_bind(cid, "<Double-Button-1>", lambda e, i=item: self._on_marker_double_click(e, i))
+            elif item_type == "text":
+                 self.canvas.tag_bind(cid, "<Double-Button-1>", lambda e, i=item: self._on_text_double_click(e, i))
             # elif item_type in ["rectangle", "oval"]:
             # No double-click for handles; triggered by menu now.
             pass
@@ -3858,6 +3962,16 @@ class DisplayMapController:
         if self._open_marker_linked_map(marker, silent=True):
             return "break"
         return None
+
+    def _on_text_double_click(self, event, text_item):
+        current_text = text_item.get("text", "")
+        updated = prompt_for_text(self.canvas, title="Edit Text", prompt="Update text:", initial=current_text)
+        if updated is None or updated == current_text:
+            return "break"
+        text_item["text"] = updated
+        self._update_canvas_images(resample=self._fast_resample)
+        self._persist_tokens()
+        return "break"
 
     def _on_item_right_click(self, event, item):
         if not self._ensure_selection_for_context_menu(item):
@@ -4812,6 +4926,25 @@ class DisplayMapController:
             except tk.TclError:
                 pass
 
+    def _on_text_size_change(self, value):
+        try:
+            size_val = int(value)
+        except Exception:
+            return
+        self.text_size = max(8, min(96, size_val))
+        ConfigHelper.set("Drawing", "text_size", self.text_size)
+        options = list(getattr(self, "text_size_options", []))
+        if self.text_size not in options:
+            options.append(self.text_size)
+            options = sorted(set(options))
+            self.text_size_options = list(options)
+            menu = getattr(self, "text_size_menu", None)
+            if menu:
+                try:
+                    menu.configure(values=[str(v) for v in options])
+                except tk.TclError:
+                    pass
+
     def _on_eraser_radius_change(self, value):
         try:
             radius = float(value)
@@ -4830,6 +4963,7 @@ class DisplayMapController:
         shape_tool_active = self.drawing_mode in ["rectangle", "oval"]
         whiteboard_active = self.drawing_mode == "whiteboard"
         eraser_active = self.drawing_mode == "eraser"
+        text_active = self.drawing_mode == "text"
         try:
             shape_fill_label = getattr(self, 'shape_fill_label', None)
             shape_fill_mode_menu = getattr(self, 'shape_fill_mode_menu', None)
@@ -4840,6 +4974,8 @@ class DisplayMapController:
             whiteboard_controls_frame = getattr(self, "whiteboard_controls_frame", None)
             eraser_controls_frame = getattr(self, "eraser_controls_frame", None)
             eraser_slider = getattr(self, "whiteboard_eraser_slider", None)
+            text_controls_frame = getattr(self, "text_controls_frame", None)
+            text_size_menu = getattr(self, "text_size_menu", None)
             if shape_tool_active:
                 # Unpack all first to ensure a clean state and avoid issues with 'before'
                 if shape_fill_label: shape_fill_label.pack_forget()
@@ -4854,6 +4990,13 @@ class DisplayMapController:
                         pass
                 if whiteboard_controls_frame:
                     whiteboard_controls_frame.pack_forget()
+                if text_size_menu:
+                    try:
+                        text_size_menu.master.pack_forget()
+                    except Exception:
+                        pass
+                if text_controls_frame:
+                    text_controls_frame.pack_forget()
                 if eraser_slider:
                     try:
                         eraser_slider.master.pack_forget()
@@ -4872,6 +5015,13 @@ class DisplayMapController:
                 if shape_fill_mode_menu: shape_fill_mode_menu.pack_forget()
                 if shape_fill_color_button: shape_fill_color_button.pack_forget()
                 if shape_border_color_button: shape_border_color_button.pack_forget()
+                if text_controls_frame:
+                    text_controls_frame.pack_forget()
+                if text_size_menu:
+                    try:
+                        text_size_menu.master.pack_forget()
+                    except Exception:
+                        pass
                 if whiteboard_controls_frame:
                     whiteboard_controls_frame.pack(side="left", padx=(8, 2), pady=4)
                 if whiteboard_color_button: whiteboard_color_button.pack(side="left", padx=(0, 6), pady=6)
@@ -4900,6 +5050,13 @@ class DisplayMapController:
                         pass
                 if whiteboard_controls_frame:
                     whiteboard_controls_frame.pack_forget()
+                if text_size_menu:
+                    try:
+                        text_size_menu.master.pack_forget()
+                    except Exception:
+                        pass
+                if text_controls_frame:
+                    text_controls_frame.pack_forget()
                 if eraser_controls_frame:
                     eraser_controls_frame.pack(side="left", padx=(8, 2), pady=4)
                 if eraser_slider:
@@ -4907,6 +5064,29 @@ class DisplayMapController:
                         eraser_slider.master.pack(side="left", padx=(0, 6), pady=6)
                     except Exception:
                         pass
+            elif text_active:
+                if shape_fill_label: shape_fill_label.pack_forget()
+                if shape_fill_mode_menu: shape_fill_mode_menu.pack_forget()
+                if shape_fill_color_button: shape_fill_color_button.pack_forget()
+                if shape_border_color_button: shape_border_color_button.pack_forget()
+                if whiteboard_controls_frame:
+                    whiteboard_controls_frame.pack_forget()
+                if eraser_slider:
+                    try:
+                        eraser_slider.master.pack_forget()
+                    except Exception:
+                        pass
+                if eraser_controls_frame:
+                    eraser_controls_frame.pack_forget()
+                if text_controls_frame:
+                    text_controls_frame.pack(side="left", padx=(8, 2), pady=4)
+                if text_size_menu:
+                    try:
+                        text_size_menu.master.pack(side="left", padx=(0, 6), pady=6)
+                    except Exception:
+                        pass
+                if whiteboard_color_button:
+                    whiteboard_color_button.pack(side="left", padx=(0, 6), pady=6)
             else:
                 if shape_fill_label: shape_fill_label.pack_forget()
                 if shape_fill_mode_menu: shape_fill_mode_menu.pack_forget()
@@ -4920,6 +5100,13 @@ class DisplayMapController:
                         pass
                 if whiteboard_controls_frame:
                     whiteboard_controls_frame.pack_forget()
+                if text_size_menu:
+                    try:
+                        text_size_menu.master.pack_forget()
+                    except Exception:
+                        pass
+                if text_controls_frame:
+                    text_controls_frame.pack_forget()
                 if eraser_slider:
                     try:
                         eraser_slider.master.pack_forget()

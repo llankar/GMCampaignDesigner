@@ -192,7 +192,7 @@ def _build_toolbar(self):
     # --- Drawing Tool Selector ---
     tool_label = ctk.CTkLabel(drawing_section, text="Tool")
     _pack_control(tool_label, leading=8, trailing=4)
-    drawing_tools = ["Token", "Rectangle", "Oval", "Whiteboard", "Eraser"]
+    drawing_tools = ["Token", "Rectangle", "Oval", "Text", "Whiteboard", "Eraser"]
     self.drawing_tool_menu = ctk.CTkOptionMenu(
         drawing_section,
         values=drawing_tools,
@@ -236,6 +236,25 @@ def _build_toolbar(self):
     width_value_label = ctk.CTkLabel(width_container, text=str(int(current_width)))
     width_value_label.pack(side="left", padx=(6, 0))
     self.whiteboard_width_value_label = width_value_label
+
+    text_controls = ctk.CTkFrame(drawing_section, fg_color="transparent")
+    text_controls.pack(side="left", padx=(8, 2), pady=4)
+    self.text_controls_frame = text_controls
+    text_size_label = ctk.CTkLabel(text_controls, text="Text Size")
+    text_size_label.pack(side="left", padx=(0, 4))
+    text_sizes = getattr(self, "text_size_options", [16, 20, 24, 32, 40])
+    current_text_size = int(getattr(self, "text_size", text_sizes[0] if text_sizes else 24))
+    if current_text_size not in text_sizes:
+        text_sizes = sorted(set(list(text_sizes) + [current_text_size]))
+    self.text_size_options = list(text_sizes)
+    self.text_size_menu = ctk.CTkOptionMenu(
+        text_controls,
+        values=[str(size) for size in self.text_size_options],
+        command=getattr(self, "_on_text_size_change", None) or (lambda _v: None),
+        width=dropdown_width,
+    )
+    self.text_size_menu.set(str(current_text_size))
+    self.text_size_menu.pack(side="left", padx=(0, 6), pady=6)
 
     eraser_controls = ctk.CTkFrame(drawing_section, fg_color="transparent")
     eraser_controls.pack(side="left", padx=(8, 2), pady=4)

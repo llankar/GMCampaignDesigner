@@ -2,6 +2,7 @@ import tkinter as tk
 from PIL import ImageTk, Image
 from screeninfo import get_monitors
 from modules.helpers.logging_helper import log_module_import
+from modules.maps.utils.text_items import TextFontCache
 
 log_module_import(__name__)
 
@@ -219,6 +220,30 @@ def _update_fullscreen_map(self):
                         joinstyle="round",
                     )
                     item["fs_canvas_ids"] = (line_id,)
+                except tk.TclError:
+                    item["fs_canvas_ids"] = ()
+        elif item_type == "text":
+            text_value = item.get("text", "")
+            color = item.get("color", "#FF0000")
+            size = int(item.get("text_size", getattr(self, "text_size", 24)))
+            font_cache = getattr(self, "_text_font_cache", None)
+            if font_cache is None:
+                font_cache = TextFontCache()
+                setattr(self, "_text_font_cache", font_cache)
+            font = font_cache.tk_font(size)
+            text_id = None
+            fs_ids = item.get("fs_canvas_ids") or ()
+            if fs_ids:
+                text_id = fs_ids[0]
+                try:
+                    self.fs_canvas.coords(text_id, sx, sy)
+                    self.fs_canvas.itemconfig(text_id, text=text_value, fill=color, font=font)
+                except tk.TclError:
+                    text_id = None
+            if not text_id:
+                try:
+                    text_id = self.fs_canvas.create_text(sx, sy, text=text_value, fill=color, anchor='nw', font=font)
+                    item["fs_canvas_ids"] = (text_id,)
                 except tk.TclError:
                     item["fs_canvas_ids"] = ()
     # Fog of War Mask (should be drawn last, on top of everything else)
