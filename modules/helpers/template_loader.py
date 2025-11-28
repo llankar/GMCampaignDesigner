@@ -178,6 +178,9 @@ def load_template(entity_name: str) -> dict:
     Built-in fields remain separate inside the file under "fields". User-added
     fields are persisted under "custom_fields" and merged at runtime for UI.
     """
+    if not entity_name:
+        raise ValueError("entity_name must be provided to load a template")
+
     data = _load_base_template(entity_name)
     base_fields = list(data.get("fields", []))
     existing_names = {str(f.get("name", "")).strip() for f in base_fields}
