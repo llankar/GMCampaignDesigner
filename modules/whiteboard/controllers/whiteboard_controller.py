@@ -517,20 +517,18 @@ class WhiteboardController:
         canvas.update_idletasks()
         cw = max(canvas.winfo_width(), 1)
         ch = max(canvas.winfo_height(), 1)
-        scale = min(cw / img.width, ch / img.height)
-        if scale <= 0:
-            return
-        if scale != 1:
-            target_size = (max(1, int(img.width * scale)), max(1, int(img.height * scale)))
-            img = img.resize(target_size, resample=Image.LANCZOS)
+        x_offset = max(0, (cw - img.width) // 2)
+        y_offset = max(0, (ch - img.height) // 2)
 
         photo = ImageTk.PhotoImage(img)
         self._player_view_photo = photo
         if self._player_view_image_id:
             canvas.itemconfig(self._player_view_image_id, image=photo)
-            canvas.coords(self._player_view_image_id, 0, 0)
+            canvas.coords(self._player_view_image_id, x_offset, y_offset)
         else:
-            self._player_view_image_id = canvas.create_image(0, 0, image=photo, anchor="nw")
+            self._player_view_image_id = canvas.create_image(
+                x_offset, y_offset, image=photo, anchor="nw"
+            )
 
     def close(self):
         self.close_player_view()
