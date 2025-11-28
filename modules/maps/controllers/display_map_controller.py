@@ -4909,6 +4909,8 @@ class DisplayMapController:
             try:
                 if getattr(self, "whiteboard_color_button", None):
                     self.whiteboard_color_button.configure(fg_color=self.whiteboard_color)
+                if getattr(self, "text_color_button", None):
+                    self.text_color_button.configure(fg_color=self.whiteboard_color)
             except tk.TclError:
                 pass
 

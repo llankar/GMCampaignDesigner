@@ -5,18 +5,67 @@ from PIL import ImageFont
 DEFAULT_TEXT_SIZES = [12, 14, 16, 18, 20, 24, 28, 32, 40, 48, 60]
 
 
-def prompt_for_text(parent: tk.Widget | None, *, title: str, prompt: str, initial: str = "") -> str | None:
-    """Display a simple dialog asking the user for text.
+class _MultilineTextDialog(ctk.CTkToplevel):
+    """A small reusable multi-line text input dialog."""
 
-    Returns the entered string or ``None`` if the dialog was cancelled or left blank.
-    """
-    try:
-        dialog = ctk.CTkInputDialog(text=prompt, title=title)
+    def __init__(self, parent: tk.Widget | None, *, title: str, prompt: str, initial: str = ""):
+        super().__init__(parent)
+        self.title(title)
+        self.result: str | None = None
+        self.geometry("520x320")
+        self.minsize(420, 260)
+        self.transient(parent)
+        self.grab_set()
+
+        self.columnconfigure(0, weight=1)
+        self.rowconfigure(1, weight=1)
+
+        prompt_label = ctk.CTkLabel(self, text=prompt, anchor="w", justify="left")
+        prompt_label.grid(row=0, column=0, padx=14, pady=(14, 8), sticky="ew")
+
+        self.textbox = ctk.CTkTextbox(self, wrap="word", width=480, height=180)
+        self.textbox.grid(row=1, column=0, padx=14, pady=(0, 10), sticky="nsew")
         if initial:
             try:
-                dialog._entry.insert(0, initial)  # type: ignore[attr-defined]
-            except Exception:
+                self.textbox.insert("1.0", initial)
+                self.textbox.edit_modified(False)
+            except tk.TclError:
                 pass
+        self.textbox.focus_set()
+
+        button_row = ctk.CTkFrame(self)
+        button_row.grid(row=2, column=0, padx=14, pady=(4, 14), sticky="e")
+
+        cancel_btn = ctk.CTkButton(button_row, text="Cancel", command=self._on_cancel, width=90)
+        cancel_btn.pack(side="right", padx=(6, 0))
+        ok_btn = ctk.CTkButton(button_row, text="Save", command=self._on_ok, width=90)
+        ok_btn.pack(side="right")
+
+        self.bind("<Escape>", lambda _e: self._on_cancel())
+        self.bind("<Control-Return>", lambda _e: self._on_ok())
+
+    def _on_ok(self):
+        try:
+            value = self.textbox.get("1.0", "end")
+        except tk.TclError:
+            value = ""
+        cleaned = value.strip()
+        self.result = cleaned if cleaned else None
+        self.destroy()
+
+    def _on_cancel(self):
+        self.result = None
+        self.destroy()
+
+    def get_input(self) -> str | None:
+        self.wait_window(self)
+        return self.result
+
+
+def prompt_for_text(parent: tk.Widget | None, *, title: str, prompt: str, initial: str = "") -> str | None:
+    """Display a dialog asking the user for text (multi-line aware)."""
+    try:
+        dialog = _MultilineTextDialog(parent, title=title, prompt=prompt, initial=initial)
         result = dialog.get_input()
     except Exception:
         from tkinter import simpledialog
