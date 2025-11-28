@@ -424,8 +424,13 @@ class WhiteboardController:
                 )
                 item["canvas_ids"] = (text_id,)
 
-    def _render_whiteboard_image(self):
-        return render_whiteboard_image(self.whiteboard_items, self.board_size, font_cache=self._font_cache)
+    def _render_whiteboard_image(self, *, include_text: bool = True):
+        return render_whiteboard_image(
+            self.whiteboard_items,
+            self.board_size,
+            font_cache=self._font_cache,
+            include_text=include_text,
+        )
 
     def _update_web_display_whiteboard(self):
         if not getattr(self, "_whiteboard_web_thread", None):
@@ -512,7 +517,7 @@ class WhiteboardController:
         if not canvas or not window or not window.winfo_exists():
             return
 
-        img = self._render_whiteboard_image()
+        img = self._render_whiteboard_image(include_text=False)
         if img is None:
             return
 
@@ -530,6 +535,25 @@ class WhiteboardController:
         else:
             self._player_view_image_id = canvas.create_image(
                 x_offset, y_offset, image=photo, anchor="nw"
+            )
+
+        # Render text using canvas primitives to mirror map second-screen behavior
+        canvas.delete("player_text")
+        for item in self.whiteboard_items:
+            if item.get("type") != "text":
+                continue
+            pos = item.get("position") or (0, 0)
+            size = int(item.get("text_size", item.get("size", self.text_size)))
+            color = item.get("color", self.ink_color)
+            font = self._font_cache.tk_font(size)
+            canvas.create_text(
+                x_offset + pos[0],
+                y_offset + pos[1],
+                text=item.get("text", ""),
+                fill=color,
+                font=font,
+                anchor="nw",
+                tags=("player_text",),
             )
 
     def close(self):

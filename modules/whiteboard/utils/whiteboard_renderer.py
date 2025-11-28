@@ -29,6 +29,7 @@ def render_whiteboard_image(
     size: Tuple[int, int] = DEFAULT_SIZE,
     *,
     font_cache: TextFontCache | None = None,
+    include_text: bool = True,
 ) -> Image.Image:
     width, height = _resolve_size(size)
     img = Image.new("RGB", (width, height), "white")
@@ -48,7 +49,7 @@ def render_whiteboard_image(
             for x, y in points:
                 flattened.extend([x, y])
             draw.line(flattened, fill=color, width=width_px, joint="curve")
-        elif item_type == "text":
+        elif item_type == "text" and include_text:
             text_value = item.get("text", "")
             pos = item.get("position") or (0, 0)
             color = item.get("color", DEFAULT_COLOR)
