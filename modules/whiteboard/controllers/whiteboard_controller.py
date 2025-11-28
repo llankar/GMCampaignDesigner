@@ -41,6 +41,9 @@ class WhiteboardController:
         self._player_view_image_id = None
         self._player_view_photo = None
 
+        self._dragging_text_item = None
+        self._dragging_text_offset = (0.0, 0.0)
+
         self.state: WhiteboardState = WhiteboardStorage.load_state()
         self.whiteboard_items: List[Dict] = list(self.state.items)
         self.board_size: Tuple[int, int] = tuple(self.state.size)
@@ -62,6 +65,7 @@ class WhiteboardController:
         self.canvas.bind("<ButtonPress-1>", self._on_mouse_down)
         self.canvas.bind("<B1-Motion>", self._on_mouse_move)
         self.canvas.bind("<ButtonRelease-1>", self._on_mouse_up)
+        self.canvas.bind("<Double-Button-1>", self._on_double_click)
         self.canvas.bind("<Configure>", self._on_canvas_resize)
 
     def _build_toolbar(self, toolbar: ctk.CTkFrame):
@@ -166,7 +170,11 @@ class WhiteboardController:
             self._active_points = [(event.x, event.y)]
             self._clear_preview()
         elif self.tool == "text":
-            self._create_text_at(event.x, event.y)
+            hit = self._find_text_item_at(event.x, event.y)
+            if hit:
+                self._start_text_drag(hit, event.x, event.y)
+            else:
+                self._create_text_at(event.x, event.y)
         elif self.tool == "eraser":
             self._eraser_active = True
             if self._erase_at(event.x, event.y):
@@ -180,6 +188,8 @@ class WhiteboardController:
             if (dx * dx + dy * dy) >= 1.0:
                 self._active_points.append((event.x, event.y))
                 self._update_preview()
+        elif self.tool == "text" and self._dragging_text_item:
+            self._update_text_drag(event.x, event.y)
         elif self.tool == "eraser" and self._eraser_active:
             if self._erase_at(event.x, event.y):
                 self._eraser_dirty = True
@@ -192,6 +202,24 @@ class WhiteboardController:
                 self._persist_state()
             self._eraser_active = False
             self._eraser_dirty = False
+        elif self.tool == "text" and self._dragging_text_item:
+            self._persist_state()
+            self._dragging_text_item = None
+            self._dragging_text_offset = (0.0, 0.0)
+
+    def _on_double_click(self, event):
+        if self.tool != "text":
+            return
+        hit = self._find_text_item_at(event.x, event.y)
+        if not hit:
+            return
+        current_text = hit.get("text", "")
+        updated = prompt_for_text(self.canvas, title="Edit Text", prompt="Update text:", initial=current_text)
+        if updated is None:
+            return
+        hit["text"] = updated
+        self._apply_text_update(hit)
+        self._persist_state()
 
     # ------------------------------------------------------------------
     # Drawing Helpers
@@ -262,9 +290,49 @@ class WhiteboardController:
             "text": text,
             "color": self.ink_color,
             "size": self.text_size,
+            "text_size": self.text_size,
         }
         self.whiteboard_items.append(entry)
         self._persist_state()
+
+    def _find_text_item_at(self, x: float, y: float, *, radius: float = 6.0):
+        for item in reversed(self.whiteboard_items):
+            if item.get("type") != "text":
+                continue
+            if text_hit_test(self.canvas, item, screen_point=(x, y), radius=radius, zoom=1.0, pan=(0, 0)):
+                return item
+        return None
+
+    def _start_text_drag(self, item: Dict, x: float, y: float):
+        position = item.get("position", (0.0, 0.0))
+        self._dragging_text_item = item
+        self._dragging_text_offset = (x - position[0], y - position[1])
+
+    def _update_text_drag(self, x: float, y: float):
+        item = self._dragging_text_item
+        if not item:
+            return
+        dx, dy = self._dragging_text_offset
+        new_pos = (x - dx, y - dy)
+        item["position"] = new_pos
+        self._apply_text_update(item)
+
+    def _apply_text_update(self, item: Dict):
+        canvas_ids = item.get("canvas_ids") or ()
+        if canvas_ids:
+            try:
+                position = item.get("position", (0, 0))
+                font_size = int(item.get("size", self.text_size))
+                item["text_size"] = font_size
+                self.canvas.coords(canvas_ids[0], *position)
+                self.canvas.itemconfig(
+                    canvas_ids[0],
+                    text=item.get("text", ""),
+                    fill=item.get("color", self.ink_color),
+                    font=("Arial", font_size),
+                )
+            except tk.TclError:
+                pass
 
     def _erase_at(self, x: float, y: float) -> bool:
         changed = False
@@ -342,12 +410,14 @@ class WhiteboardController:
                 item["canvas_ids"] = (line_id,)
             elif item.get("type") == "text":
                 pos = item.get("position") or (0, 0)
+                size = int(item.get("size", self.text_size))
+                item["text_size"] = size
                 text_id = self.canvas.create_text(
                     pos[0],
                     pos[1],
                     text=item.get("text", ""),
                     fill=item.get("color", self.ink_color),
-                    font=("Arial", int(item.get("size", self.text_size))),
+                    font=("Arial", size),
                     anchor="nw",
                 )
                 item["canvas_ids"] = (text_id,)
