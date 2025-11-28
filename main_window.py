@@ -78,6 +78,7 @@ from modules.generic.cross_campaign_asset_library import CrossCampaignAssetLibra
 from modules.helpers import text_helpers, dice_markup
 from db.db import initialize_db, ensure_entity_schema
 from modules.factions.faction_graph_editor import FactionGraphEditor
+from modules.whiteboard.controllers.whiteboard_controller import WhiteboardController
 from modules.pcs.display_pcs import display_pcs_in_banner
 from modules.generic.generic_list_selection_view import GenericListSelectionView
 from modules.maps.controllers.display_map_controller import DisplayMapController
@@ -278,6 +279,7 @@ class MainWindow(ctk.CTk):
             "import_objects_pdf": "import_icon.png",
             "export_foundry": "export_foundry_icon.png",
             "map_tool": "map_tool_icon.png",
+            "whiteboard": "map_tool_icon.png",
             "generate_scenario": "generate_scenario_icon.png",
             "dice_roller": "dice_roller_icon.png",
             "dice_bar": "dice_roller_icon.png",
@@ -813,6 +815,7 @@ class MainWindow(ctk.CTk):
             ("associate_portraits", "Associate NPC Portraits", self.associate_npc_portraits),
             ("import_portraits", "Import Portraits from Folder", self.import_portraits_from_directory),
             ("map_tool", "Map Tool", self.map_tool),
+            ("whiteboard", "Whiteboard", self.open_whiteboard),
             ("sound_manager", "Sound & Music Manager", self.open_sound_manager),
             ("dice_roller", "Open Dice Roller", self.open_dice_roller),
         ]
@@ -3155,6 +3158,44 @@ class MainWindow(ctk.CTk):
             return
         if event.widget is self.dice_roller_window:
             self.dice_roller_window = None
+
+    def open_whiteboard(self):
+        log_info("Opening Whiteboard", func_name="main_window.MainWindow.open_whiteboard")
+        existing = getattr(self, "_whiteboard_window", None)
+        if existing is not None and existing.winfo_exists():
+            existing.lift()
+            existing.focus_force()
+            existing.attributes("-topmost", True)
+            existing.after_idle(lambda: existing.attributes("-topmost", False))
+            return
+
+        top = ctk.CTkToplevel(self)
+        top.lift()
+        top.focus_force()
+        top.attributes("-topmost", True)
+        top.after_idle(lambda: top.attributes("-topmost", False))
+        top.title("Whiteboard")
+        top.geometry("1280x800+40+40")
+
+        board_frame = ctk.CTkFrame(top)
+        board_frame.pack(fill="both", expand=True)
+
+        self.whiteboard_controller = WhiteboardController(board_frame, root_app=self)
+
+        def _on_close():
+            try:
+                controller = getattr(self, "whiteboard_controller", None)
+                if controller:
+                    controller.close()
+            except Exception:
+                log_exception("Error while closing whiteboard", func_name="main_window.MainWindow.open_whiteboard")
+            finally:
+                self._whiteboard_window = None
+                self.whiteboard_controller = None
+                top.destroy()
+
+        top.protocol("WM_DELETE_WINDOW", _on_close)
+        self._whiteboard_window = top
 
     def map_tool(self, map_name=None):
         log_info(
