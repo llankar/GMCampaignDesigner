@@ -256,6 +256,18 @@ def _build_toolbar(self):
     self.text_size_menu.set(str(current_text_size))
     self.text_size_menu.pack(side="left", padx=(0, 6), pady=6)
 
+    self.text_color_button = ctk.CTkButton(
+        text_controls,
+        text="Text Color",
+        width=90,
+        command=self._on_pick_whiteboard_color,
+    )
+    try:
+        self.text_color_button.configure(fg_color=getattr(self, "whiteboard_color", "#FF0000"))
+    except tk.TclError:
+        pass
+    self.text_color_button.pack(side="left", padx=(0, 6), pady=6)
+
     eraser_controls = ctk.CTkFrame(drawing_section, fg_color="transparent")
     eraser_controls.pack(side="left", padx=(8, 2), pady=4)
     self.eraser_controls_frame = eraser_controls
