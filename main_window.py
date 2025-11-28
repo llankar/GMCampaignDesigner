@@ -152,6 +152,7 @@ class MainWindow(ctk.CTk):
         self._system_selector_dialog = None
         self._database_manager_dialog = None
         self._update_thread = None
+        self.whiteboard_controller = None
         root = self.winfo_toplevel()
         root.bind_all("<Control-f>", self._on_ctrl_f)
 
@@ -1540,6 +1541,7 @@ class MainWindow(ctk.CTk):
     # Methods Called by Icon Buttons (Event Handlers)
     # =============================================================
     def clear_current_content(self):
+        self._teardown_whiteboard_controller()
         # Always clear children of the inner content container
         try:
             for widget in self.inner_content_frame.winfo_children():
@@ -1570,6 +1572,17 @@ class MainWindow(ctk.CTk):
         # Leaving GM screen mode when clearing
         self._gm_mode = False
         self.current_gm_view = None
+
+    def _teardown_whiteboard_controller(self):
+        controller = getattr(self, "whiteboard_controller", None)
+        if controller is None:
+            return
+        try:
+            controller.close()
+        except Exception:
+            log_exception("Error while closing whiteboard", func_name="main_window.MainWindow._teardown_whiteboard_controller")
+        finally:
+            self.whiteboard_controller = None
 
     def move_current_view(self):
         """Move the current open view to the correct container based on banner state."""
@@ -3161,41 +3174,25 @@ class MainWindow(ctk.CTk):
 
     def open_whiteboard(self):
         log_info("Opening Whiteboard", func_name="main_window.MainWindow.open_whiteboard")
-        existing = getattr(self, "_whiteboard_window", None)
-        if existing is not None and existing.winfo_exists():
-            existing.lift()
-            existing.focus_force()
-            existing.attributes("-topmost", True)
-            existing.after_idle(lambda: existing.attributes("-topmost", False))
-            return
+        self.clear_current_content()
+        parent = self.get_content_container()
 
-        top = ctk.CTkToplevel(self)
-        top.lift()
-        top.focus_force()
-        top.attributes("-topmost", True)
-        top.after_idle(lambda: top.attributes("-topmost", False))
-        top.title("Whiteboard")
-        top.geometry("1280x800+40+40")
+        container = ctk.CTkFrame(parent)
+        container.grid(row=0, column=0, sticky="nsew")
+        parent.grid_rowconfigure(0, weight=1)
+        parent.grid_columnconfigure(0, weight=1)
 
-        board_frame = ctk.CTkFrame(top)
+        board_frame = ctk.CTkFrame(container)
         board_frame.pack(fill="both", expand=True)
 
         self.whiteboard_controller = WhiteboardController(board_frame, root_app=self)
 
-        def _on_close():
-            try:
-                controller = getattr(self, "whiteboard_controller", None)
-                if controller:
-                    controller.close()
-            except Exception:
-                log_exception("Error while closing whiteboard", func_name="main_window.MainWindow.open_whiteboard")
-            finally:
-                self._whiteboard_window = None
-                self.whiteboard_controller = None
-                top.destroy()
+        def _on_destroy(_event=None):
+            self._teardown_whiteboard_controller()
 
-        top.protocol("WM_DELETE_WINDOW", _on_close)
-        self._whiteboard_window = top
+        container.bind("<Destroy>", _on_destroy)
+        self.current_open_view = container
+        self.current_open_entity = None
 
     def map_tool(self, map_name=None):
         log_info(
