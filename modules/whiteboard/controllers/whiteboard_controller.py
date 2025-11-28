@@ -5,8 +5,10 @@ from tkinter import colorchooser
 from typing import List, Dict, Tuple
 
 import customtkinter as ctk
+from PIL import Image, ImageTk
+from screeninfo import get_monitors
 
-from modules.helpers.logging_helper import log_module_import, log_info
+from modules.helpers.logging_helper import log_module_import, log_info, log_warning
 from modules.maps.utils.text_items import prompt_for_text, text_hit_test
 from modules.whiteboard.services.whiteboard_storage import WhiteboardStorage, WhiteboardState
 from modules.whiteboard.utils.whiteboard_renderer import render_whiteboard_image
@@ -33,6 +35,11 @@ class WhiteboardController:
         self._preview_id = None
         self._eraser_active = False
         self._eraser_dirty = False
+
+        self._player_view_window = None
+        self._player_view_canvas = None
+        self._player_view_image_id = None
+        self._player_view_photo = None
 
         self.state: WhiteboardState = WhiteboardStorage.load_state()
         self.whiteboard_items: List[Dict] = list(self.state.items)
@@ -350,6 +357,7 @@ class WhiteboardController:
 
     def _update_web_display_whiteboard(self):
         if not getattr(self, "_whiteboard_web_thread", None):
+            self._update_player_view()
             return
         img = self._render_whiteboard_image()
         if img is None:
@@ -360,6 +368,7 @@ class WhiteboardController:
             self._whiteboard_image_bytes = buffer.getvalue()
         finally:
             buffer.close()
+        self._update_player_view()
 
     def clear_board(self):
         if not self.whiteboard_items:
@@ -372,12 +381,86 @@ class WhiteboardController:
     # Player View management
     # ------------------------------------------------------------------
     def open_player_view(self):
-        open_whiteboard_display(self)
+        monitors = get_monitors()
+        if not monitors:
+            log_warning("No monitors available for whiteboard player view", func_name="WhiteboardController.open_player_view")
+            return
+
+        existing = getattr(self, "_player_view_window", None)
+        if existing is not None and existing.winfo_exists():
+            existing.lift()
+            existing.focus_force()
+            self._update_player_view()
+            return
+
+        target = monitors[1] if len(monitors) > 1 else monitors[0]
+
+        win = ctk.CTkToplevel(self.parent)
+        win.title("Whiteboard Player View")
+        win.geometry(f"{target.width}x{target.height}+{target.x}+{target.y}")
+        win.lift(); win.focus_force(); win.attributes("-topmost", True); win.after_idle(lambda: win.attributes("-topmost", False))
+
+        canvas = tk.Canvas(win, bg="black", highlightthickness=0)
+        canvas.pack(fill="both", expand=True)
+
+        self._player_view_window = win
+        self._player_view_canvas = canvas
+        self._player_view_image_id = None
+        self._player_view_photo = None
+
+        def _on_resize(_event=None):
+            self._update_player_view()
+
+        def _on_close():
+            self.close_player_view()
+
+        win.bind("<Configure>", _on_resize)
+        win.protocol("WM_DELETE_WINDOW", _on_close)
+
         log_info("Opened player whiteboard view", func_name="WhiteboardController.open_player_view")
-        self._update_web_display_whiteboard()
+        self._update_player_view()
 
     def close_player_view(self):
         close_whiteboard_display(self)
+        window = getattr(self, "_player_view_window", None)
+        if window is not None:
+            try:
+                if window.winfo_exists():
+                    window.destroy()
+            except Exception:
+                pass
+        self._player_view_window = None
+        self._player_view_canvas = None
+        self._player_view_image_id = None
+        self._player_view_photo = None
+
+    def _update_player_view(self):
+        canvas = getattr(self, "_player_view_canvas", None)
+        window = getattr(self, "_player_view_window", None)
+        if not canvas or not window or not window.winfo_exists():
+            return
+
+        img = self._render_whiteboard_image()
+        if img is None:
+            return
+
+        canvas.update_idletasks()
+        cw = max(canvas.winfo_width(), 1)
+        ch = max(canvas.winfo_height(), 1)
+        scale = min(cw / img.width, ch / img.height)
+        if scale <= 0:
+            return
+        if scale != 1:
+            target_size = (max(1, int(img.width * scale)), max(1, int(img.height * scale)))
+            img = img.resize(target_size, resample=Image.LANCZOS)
+
+        photo = ImageTk.PhotoImage(img)
+        self._player_view_photo = photo
+        if self._player_view_image_id:
+            canvas.itemconfig(self._player_view_image_id, image=photo)
+            canvas.coords(self._player_view_image_id, 0, 0)
+        else:
+            self._player_view_image_id = canvas.create_image(0, 0, image=photo, anchor="nw")
 
     def close(self):
         self.close_player_view()
