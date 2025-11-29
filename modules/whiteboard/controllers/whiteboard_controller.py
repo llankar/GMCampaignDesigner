@@ -61,6 +61,8 @@ class WhiteboardController:
 
         self._dragging_text_item = None
         self._dragging_text_offset = (0.0, 0.0)
+        self._dragging_stamp_item = None
+        self._dragging_stamp_offset = (0.0, 0.0)
 
         self.state: WhiteboardState = WhiteboardStorage.load_state()
         self.whiteboard_items: List[Dict] = list(self.state.items)
@@ -494,7 +496,12 @@ class WhiteboardController:
             else:
                 self._create_text_at(event.x, event.y)
         elif self.tool == "stamp":
-            self._add_stamp_at(event.x, event.y)
+            hit = self._find_stamp_item_at(event.x, event.y)
+            if hit:
+                self._history.checkpoint(self.whiteboard_items)
+                self._start_stamp_drag(hit, event.x, event.y)
+            else:
+                self._add_stamp_at(event.x, event.y)
         elif self.tool == "eraser":
             self._eraser_active = True
             if self._erase_at(event.x, event.y):
@@ -512,6 +519,8 @@ class WhiteboardController:
                 self._update_preview()
         elif self.tool == "text" and self._dragging_text_item:
             self._update_text_drag(event.x, event.y)
+        elif self.tool == "stamp" and self._dragging_stamp_item:
+            self._update_stamp_drag(event.x, event.y)
         elif self.tool == "eraser" and self._eraser_active:
             if self._erase_at(event.x, event.y):
                 self._eraser_dirty = True
@@ -529,6 +538,10 @@ class WhiteboardController:
             self._persist_state()
             self._dragging_text_item = None
             self._dragging_text_offset = (0.0, 0.0)
+        elif self.tool == "stamp" and self._dragging_stamp_item:
+            self._persist_state()
+            self._dragging_stamp_item = None
+            self._dragging_stamp_offset = (0.0, 0.0)
 
     def _on_double_click(self, event):
         if self.tool != "text":
@@ -639,6 +652,21 @@ class WhiteboardController:
         self.whiteboard_items.append(stamp)
         self._persist_state()
 
+    def _find_stamp_item_at(self, x: float, y: float):
+        for item in reversed(self.whiteboard_items):
+            if item.get("type") != "stamp":
+                continue
+            layer = normalize_layer(item.get("layer"))
+            if layer == WhiteboardLayer.SHARED.value and not self.show_shared_layer:
+                continue
+            if layer == WhiteboardLayer.GM.value and not self.show_gm_layer:
+                continue
+            pos = item.get("position") or (0.0, 0.0)
+            size = float(item.get("size", self.stamp_size))
+            if pos[0] <= x <= pos[0] + size and pos[1] <= y <= pos[1] + size:
+                return item
+        return None
+
     def _find_text_item_at(self, x: float, y: float, *, radius: float = 6.0):
         for item in reversed(self.whiteboard_items):
             if item.get("type") != "text":
@@ -646,6 +674,31 @@ class WhiteboardController:
             if text_hit_test(self.canvas, item, screen_point=(x, y), radius=radius, zoom=1.0, pan=(0, 0)):
                 return item
         return None
+
+    def _start_stamp_drag(self, item: Dict, x: float, y: float):
+        position = item.get("position", (0.0, 0.0))
+        self._dragging_stamp_item = item
+        self._dragging_stamp_offset = (x - position[0], y - position[1])
+
+    def _update_stamp_drag(self, x: float, y: float):
+        item = self._dragging_stamp_item
+        if not item:
+            return
+        dx, dy = self._dragging_stamp_offset
+        new_pos = (x - dx, y - dy)
+        if self.snap_to_grid:
+            new_pos = self._snap_point(*new_pos)
+        item["position"] = new_pos
+        self._apply_stamp_update(item)
+
+    def _apply_stamp_update(self, item: Dict):
+        canvas_ids = item.get("canvas_ids") or ()
+        if canvas_ids:
+            try:
+                position = item.get("position", (0, 0))
+                self.canvas.coords(canvas_ids[0], *position)
+            except tk.TclError:
+                pass
 
     def _start_text_drag(self, item: Dict, x: float, y: float):
         position = item.get("position", (0.0, 0.0))
