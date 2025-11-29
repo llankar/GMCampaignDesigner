@@ -52,6 +52,11 @@ class WhiteboardController:
         self._grid_overlay = GridOverlay()
         self._history = WhiteboardHistory()
 
+        self.view_zoom: float = 1.0
+        self._min_zoom: float = 0.5
+        self._max_zoom: float = 3.0
+        self._view_pan: Tuple[float, float] = (0.0, 0.0)
+
         self._player_view_window = None
         self._player_view_canvas = None
         self._player_view_image_id = None
@@ -67,6 +72,7 @@ class WhiteboardController:
         self.state: WhiteboardState = WhiteboardStorage.load_state()
         self.whiteboard_items: List[Dict] = list(self.state.items)
         self.board_size: Tuple[int, int] = tuple(self.state.size)
+        self.view_zoom = max(self._min_zoom, min(self._max_zoom, float(getattr(self.state, "zoom", 1.0) or 1.0)))
 
         self.grid_enabled = bool(getattr(self.state, "grid_enabled", False))
         self.grid_size = int(getattr(self.state, "grid_size", 50) or 50)
@@ -82,6 +88,51 @@ class WhiteboardController:
 
         self._build_ui()
         self._history.reset(self.whiteboard_items)
+        self._redraw_canvas()
+        self._update_web_display_whiteboard()
+
+    # ------------------------------------------------------------------
+    # View Helpers
+    # ------------------------------------------------------------------
+    def _refresh_viewport(self):
+        if not getattr(self, "canvas", None):
+            return
+        try:
+            self.canvas.update_idletasks()
+        except Exception:
+            pass
+        canvas_width = max(1, int(self.canvas.winfo_width()))
+        canvas_height = max(1, int(self.canvas.winfo_height()))
+        content_width = float(self.board_size[0]) * float(self.view_zoom)
+        content_height = float(self.board_size[1]) * float(self.view_zoom)
+        self._view_pan = (
+            (canvas_width - content_width) / 2.0,
+            (canvas_height - content_height) / 2.0,
+        )
+        self.canvas.configure(
+            scrollregion=(
+                0,
+                0,
+                max(canvas_width, int(content_width)),
+                max(canvas_height, int(content_height)),
+            )
+        )
+
+    def _board_to_screen(self, x: float, y: float) -> Tuple[float, float]:
+        px, py = self._view_pan
+        return px + x * self.view_zoom, py + y * self.view_zoom
+
+    def _screen_to_board(self, x: float, y: float) -> Tuple[float, float]:
+        px, py = self._view_pan
+        return (x - px) / self.view_zoom, (y - py) / self.view_zoom
+
+    def _set_zoom(self, value: float):
+        clamped = max(self._min_zoom, min(self._max_zoom, float(value)))
+        if math.isclose(clamped, self.view_zoom, rel_tol=1e-3):
+            return
+        self.view_zoom = clamped
+        self.state.zoom = self.view_zoom
+        self._refresh_viewport()
         self._redraw_canvas()
         self._update_web_display_whiteboard()
 
@@ -153,6 +204,9 @@ class WhiteboardController:
         self.canvas.bind("<B1-Motion>", self._on_mouse_move)
         self.canvas.bind("<ButtonRelease-1>", self._on_mouse_up)
         self.canvas.bind("<Double-Button-1>", self._on_double_click)
+        self.canvas.bind("<MouseWheel>", self._on_mouse_wheel)
+        self.canvas.bind("<Button-4>", self._on_mouse_wheel)
+        self.canvas.bind("<Button-5>", self._on_mouse_wheel)
         self.canvas.bind("<Configure>", self._on_canvas_resize)
 
         def _resize_canvas(_event=None):
@@ -164,6 +218,7 @@ class WhiteboardController:
                 return
             new_height = max(1, parent_height - toolbar_height)
             self.canvas.configure(width=parent_width, height=new_height)
+            self._refresh_viewport()
 
         self.parent.bind("<Configure>", _resize_canvas, add="+")
         _resize_canvas()
@@ -479,50 +534,68 @@ class WhiteboardController:
 
     def _on_canvas_resize(self, event):
         new_size = (max(1, int(event.width)), max(1, int(event.height)))
+        self._refresh_viewport()
         if new_size != self.board_size:
             self.board_size = new_size
             self._persist_state(update_only=False)
+        else:
+            self._redraw_canvas()
+
+    def _on_mouse_wheel(self, event):
+        delta = 0
+        if hasattr(event, "delta") and event.delta:
+            delta = event.delta
+        elif getattr(event, "num", None) == 4:
+            delta = 120
+        elif getattr(event, "num", None) == 5:
+            delta = -120
+        if delta == 0:
+            return
+        step = 1.1 if delta > 0 else 0.9
+        self._set_zoom(self.view_zoom * step)
 
     def _on_mouse_down(self, event):
+        board_x, board_y = self._screen_to_board(event.x, event.y)
         if self.tool == "pen":
-            snapped = self._snap_point(event.x, event.y) if self.snap_to_grid else (event.x, event.y)
+            snapped = self._snap_point(board_x, board_y) if self.snap_to_grid else (board_x, board_y)
             self._active_points = [snapped]
             self._clear_preview()
         elif self.tool == "text":
-            hit = self._find_text_item_at(event.x, event.y)
+            hit = self._find_text_item_at(board_x, board_y)
             if hit:
                 self._history.checkpoint(self.whiteboard_items)
-                self._start_text_drag(hit, event.x, event.y)
+                self._start_text_drag(hit, board_x, board_y)
             else:
-                self._create_text_at(event.x, event.y)
+                self._create_text_at(board_x, board_y)
         elif self.tool == "stamp":
-            hit = self._find_stamp_item_at(event.x, event.y)
+            hit = self._find_stamp_item_at(board_x, board_y)
             if hit:
                 self._history.checkpoint(self.whiteboard_items)
-                self._start_stamp_drag(hit, event.x, event.y)
+                self._start_stamp_drag(hit, board_x, board_y)
             else:
-                self._add_stamp_at(event.x, event.y)
+                self._add_stamp_at(board_x, board_y)
         elif self.tool == "eraser":
             self._eraser_active = True
-            if self._erase_at(event.x, event.y):
+            if self._erase_at(board_x, board_y):
                 self._eraser_dirty = True
                 self._eraser_recorded = True
 
     def _on_mouse_move(self, event):
+        board_x, board_y = self._screen_to_board(event.x, event.y)
         if self.tool == "pen" and self._active_points:
             last = self._active_points[-1]
-            target_point = self._snap_point(event.x, event.y) if self.snap_to_grid else (event.x, event.y)
+            target_point = self._snap_point(board_x, board_y) if self.snap_to_grid else (board_x, board_y)
             dx = target_point[0] - last[0]
             dy = target_point[1] - last[1]
             if (dx * dx + dy * dy) >= 1.0:
                 self._active_points.append(target_point)
                 self._update_preview()
         elif self.tool == "text" and self._dragging_text_item:
-            self._update_text_drag(event.x, event.y)
+            self._update_text_drag(board_x, board_y)
         elif self.tool == "stamp" and self._dragging_stamp_item:
-            self._update_stamp_drag(event.x, event.y)
+            self._update_stamp_drag(board_x, board_y)
         elif self.tool == "eraser" and self._eraser_active:
-            if self._erase_at(event.x, event.y):
+            if self._erase_at(board_x, board_y):
                 self._eraser_dirty = True
 
     def _on_mouse_up(self, _event):
@@ -546,7 +619,8 @@ class WhiteboardController:
     def _on_double_click(self, event):
         if self.tool != "text":
             return
-        hit = self._find_text_item_at(event.x, event.y)
+        board_x, board_y = self._screen_to_board(event.x, event.y)
+        hit = self._find_text_item_at(board_x, board_y)
         if not hit:
             return
         current_text = hit.get("text", "")
@@ -566,15 +640,17 @@ class WhiteboardController:
             return
         flattened = []
         for x, y in self._active_points:
-            flattened.extend([x, y])
+            sx, sy = self._board_to_screen(x, y)
+            flattened.extend([sx, sy])
+        width = max(1.0, float(self.stroke_width) * float(self.view_zoom))
         if self._preview_id and self.canvas.type(self._preview_id):
             self.canvas.coords(self._preview_id, *flattened)
-            self.canvas.itemconfig(self._preview_id, fill=self.ink_color, width=self.stroke_width, smooth=True)
+            self.canvas.itemconfig(self._preview_id, fill=self.ink_color, width=width, smooth=True)
         else:
             self._preview_id = self.canvas.create_line(
                 *flattened,
                 fill=self.ink_color,
-                width=self.stroke_width,
+                width=width,
                 smooth=True,
                 capstyle="round",
                 joinstyle="round",
@@ -671,7 +747,8 @@ class WhiteboardController:
         for item in reversed(self.whiteboard_items):
             if item.get("type") != "text":
                 continue
-            if text_hit_test(self.canvas, item, screen_point=(x, y), radius=radius, zoom=1.0, pan=(0, 0)):
+            screen_point = self._board_to_screen(x, y)
+            if text_hit_test(self.canvas, item, screen_point=screen_point, radius=radius * self.view_zoom, zoom=self.view_zoom, pan=self._view_pan):
                 return item
         return None
 
@@ -696,7 +773,8 @@ class WhiteboardController:
         if canvas_ids:
             try:
                 position = item.get("position", (0, 0))
-                self.canvas.coords(canvas_ids[0], *position)
+                screen_pos = self._board_to_screen(*position)
+                self.canvas.coords(canvas_ids[0], *screen_pos)
             except tk.TclError:
                 pass
 
@@ -721,14 +799,16 @@ class WhiteboardController:
         if canvas_ids:
             try:
                 position = item.get("position", (0, 0))
+                screen_pos = self._board_to_screen(*position)
                 font_size = int(item.get("size", self.text_size))
                 item["text_size"] = font_size
-                self.canvas.coords(canvas_ids[0], *position)
+                scaled_font_size = max(1, int(font_size * self.view_zoom))
+                self.canvas.coords(canvas_ids[0], *screen_pos)
                 self.canvas.itemconfig(
                     canvas_ids[0],
                     text=item.get("text", ""),
                     fill=item.get("color", self.ink_color),
-                    font=self._font_cache.tk_font(font_size),
+                    font=self._font_cache.tk_font(scaled_font_size),
                 )
             except tk.TclError:
                 pass
@@ -749,8 +829,9 @@ class WhiteboardController:
         changed = False
         remaining = []
         point = (x, y)
+        screen_point = self._board_to_screen(x, y)
         radius = float(self.eraser_radius)
-        radius_screen = radius
+        radius_screen = radius * self.view_zoom
         for item in self.whiteboard_items:
             layer = normalize_layer(item.get("layer"))
             if layer == WhiteboardLayer.SHARED.value and not self.show_shared_layer:
@@ -761,7 +842,7 @@ class WhiteboardController:
                 continue
             item_type = item.get("type")
             if item_type == "text":
-                if text_hit_test(self.canvas, item, screen_point=point, radius=radius_screen, zoom=1.0, pan=(0, 0)):
+                if text_hit_test(self.canvas, item, screen_point=screen_point, radius=radius_screen, zoom=self.view_zoom, pan=self._view_pan):
                     changed = True
                     continue
             elif item_type == "stroke":
@@ -823,6 +904,7 @@ class WhiteboardController:
         self.state.active_layer = self.active_layer
         self.state.show_shared_layer = self.show_shared_layer
         self.state.show_gm_layer = self.show_gm_layer
+        self.state.zoom = self.view_zoom
         if not update_only:
             WhiteboardStorage.save_state(self.state)
         self._redraw_canvas()
@@ -841,9 +923,16 @@ class WhiteboardController:
             self._persist_state()
 
     def _redraw_canvas(self):
+        self._refresh_viewport()
         self.canvas.delete("all")
         if self.grid_enabled:
-            self._grid_overlay.draw_on_canvas(self.canvas, self.board_size, self.grid_size)
+            self._grid_overlay.draw_on_canvas(
+                self.canvas,
+                self.board_size,
+                self.grid_size,
+                zoom=self.view_zoom,
+                pan=self._view_pan,
+            )
         for item in self._iter_visible_items():
             if item.get("type") == "stroke":
                 points = item.get("points") or []
@@ -851,11 +940,13 @@ class WhiteboardController:
                     continue
                 flattened = []
                 for x, y in points:
-                    flattened.extend([x, y])
+                    sx, sy = self._board_to_screen(x, y)
+                    flattened.extend([sx, sy])
+                line_width = max(1.0, float(item.get("width", self.stroke_width)) * float(self.view_zoom))
                 line_id = self.canvas.create_line(
                     *flattened,
                     fill=item.get("color", self.ink_color),
-                    width=item.get("width", self.stroke_width),
+                    width=line_width,
                     smooth=True,
                     capstyle="round",
                     joinstyle="round",
@@ -865,12 +956,14 @@ class WhiteboardController:
                 pos = item.get("position") or (0, 0)
                 size = int(item.get("size", self.text_size))
                 item["text_size"] = size
+                screen_pos = self._board_to_screen(*pos)
+                scaled_size = max(1, int(size * self.view_zoom))
                 text_id = self.canvas.create_text(
-                    pos[0],
-                    pos[1],
+                    screen_pos[0],
+                    screen_pos[1],
                     text=item.get("text", ""),
                     fill=item.get("color", self.ink_color),
-                    font=self._font_cache.tk_font(size),
+                    font=self._font_cache.tk_font(scaled_size),
                     anchor="nw",
                 )
                 item["canvas_ids"] = (text_id,)
@@ -880,13 +973,17 @@ class WhiteboardController:
                     continue
                 pos = item.get("position") or (0, 0)
                 size = int(item.get("size", self.stamp_size))
+                scaled_size = max(1, int(size * self.view_zoom))
                 try:
-                    photo = load_tk_asset(asset_path, size)
-                    stamp_id = self.canvas.create_image(pos[0], pos[1], image=photo, anchor="nw")
+                    photo = load_tk_asset(asset_path, scaled_size)
+                    screen_pos = self._board_to_screen(*pos)
+                    stamp_id = self.canvas.create_image(screen_pos[0], screen_pos[1], image=photo, anchor="nw")
                     item["canvas_ids"] = (stamp_id,)
                     item["_image_ref"] = photo
                 except Exception:
                     continue
+        if self._active_points:
+            self._update_preview()
 
     def _render_whiteboard_image(self, *, include_text: bool = True, for_player: bool = False):
         visible_items = list(self._iter_visible_items(for_player=for_player))
@@ -898,6 +995,7 @@ class WhiteboardController:
             grid_enabled=self.grid_enabled,
             grid_size=self.grid_size,
             for_player=for_player,
+            zoom=self.view_zoom,
         )
 
     def _update_web_display_whiteboard(self):
@@ -1013,11 +1111,14 @@ class WhiteboardController:
                 continue
             pos = item.get("position") or (0, 0)
             size = int(item.get("text_size", item.get("size", self.text_size)))
+            scaled_size = max(1, int(size * self.view_zoom))
             color = item.get("color", self.ink_color)
-            font = self._font_cache.tk_font(size)
+            font = self._font_cache.tk_font(scaled_size)
+            screen_x = pos[0] * self.view_zoom
+            screen_y = pos[1] * self.view_zoom
             canvas.create_text(
-                x_offset + pos[0],
-                y_offset + pos[1],
+                x_offset + screen_x,
+                y_offset + screen_y,
                 text=item.get("text", ""),
                 fill=color,
                 font=font,

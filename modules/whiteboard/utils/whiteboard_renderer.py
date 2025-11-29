@@ -36,13 +36,20 @@ def render_whiteboard_image(
     grid_enabled: bool = False,
     grid_size: int = 50,
     for_player: bool = False,
+    zoom: float = 1.0,
 ) -> Image.Image:
     width, height = _resolve_size(size)
+    zoom = max(0.05, float(zoom))
+    screen_width = max(1, int(width * zoom))
+    screen_height = max(1, int(height * zoom))
     base_color = (255, 255, 255, 255)
-    img = Image.new("RGBA", (width, height), base_color)
+    img = Image.new("RGBA", (screen_width, screen_height), base_color)
     draw = ImageDraw.Draw(img)
 
     font_cache = font_cache or TextFontCache()
+
+    def _scale_point(point: Tuple[float, float]) -> Tuple[float, float]:
+        return point[0] * zoom, point[1] * zoom
 
     for item in items:
         if for_player and normalize_layer(item.get("layer")) == WhiteboardLayer.GM.value:
@@ -53,35 +60,37 @@ def render_whiteboard_image(
             if len(points) < 2:
                 continue
             color = item.get("color", DEFAULT_COLOR)
-            width_px = int(max(1, float(item.get("width", 4))))
+            width_px = int(max(1, float(item.get("width", 4)) * zoom))
             flattened = []
             for x, y in points:
-                flattened.extend([x, y])
+                sx, sy = _scale_point((x, y))
+                flattened.extend([sx, sy])
             draw.line(flattened, fill=color, width=width_px, joint="curve")
         elif item_type == "text" and include_text:
             text_value = item.get("text", "")
             pos = item.get("position") or (0, 0)
             color = item.get("color", DEFAULT_COLOR)
-            size_px = int(item.get("text_size", item.get("size", 24)))
+            size_px = int(max(1, float(item.get("text_size", item.get("size", 24))) * zoom))
             font = font_cache.pil_font(size_px)
             try:
-                draw.text(pos, text_value, fill=color, font=font, anchor="lt")
+                draw.text(_scale_point(pos), text_value, fill=color, font=font, anchor="lt")
             except Exception:
-                draw.text(pos, text_value, fill=color, font=font)
+                draw.text(_scale_point(pos), text_value, fill=color, font=font)
         elif item_type == "stamp":
             asset_path = item.get("asset")
             if not asset_path:
                 continue
             pos = item.get("position") or (0, 0)
-            size_px = int(item.get("size", 48))
+            size_px = int(max(1, float(item.get("size", 48)) * zoom))
             try:
                 stamp_img = load_pil_asset(asset_path, size_px)
-                img.alpha_composite(stamp_img, dest=(int(pos[0]), int(pos[1])))
+                sx, sy = _scale_point(pos)
+                img.alpha_composite(stamp_img, dest=(int(sx), int(sy)))
             except Exception:
                 continue
 
     if grid_enabled:
-        draw_grid_on_image(img, grid_size)
+        draw_grid_on_image(img, int(max(1, grid_size * zoom)))
 
     return img.convert("RGB")
 

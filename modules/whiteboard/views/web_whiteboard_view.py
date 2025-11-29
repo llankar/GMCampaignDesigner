@@ -97,6 +97,7 @@ def open_whiteboard_display(controller, port=None):
                     controller.whiteboard_items,
                     controller.board_size,
                     font_cache=getattr(controller, "_font_cache", None),
+                    zoom=getattr(controller, "view_zoom", 1.0),
                 )
             buf = io.BytesIO()
             try:
