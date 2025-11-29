@@ -298,8 +298,6 @@ class WhiteboardController:
             command=self._on_select_stamp_asset,
         )
         stamp_btn.pack(side="left", padx=(0, 4))
-        stamp_label = ctk.CTkLabel(stamp_frame, textvariable=self._stamp_label_var)
-        stamp_label.pack(side="left", padx=(0, 4))
         stamp_values = [24, 32, 40, 48, 64, 80, 96, 120, 144, 168, 196]
         if self.stamp_size not in stamp_values:
             stamp_values.append(int(self.stamp_size))
@@ -355,8 +353,7 @@ class WhiteboardController:
         )
         if selection:
             self.stamp_asset = selection
-            self._update_stamp_label()
-
+            
     def _on_width_change(self, value):
         try:
             self.stroke_width = max(1, float(value))
@@ -413,11 +410,6 @@ class WhiteboardController:
             self.stamp_size = max(16, int(float(value)))
         except Exception:
             self.stamp_size = 64
-
-    def _update_stamp_label(self):
-        if hasattr(self, "_stamp_label_var"):
-            label = os.path.basename(self.stamp_asset) if self.stamp_asset else "Choose Stamp"
-            self._stamp_label_var.set(label)
 
     def _on_canvas_resize(self, event):
         new_size = (max(1, int(event.width)), max(1, int(event.height)))
