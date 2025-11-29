@@ -1060,8 +1060,14 @@ class WhiteboardController:
         if self._active_points:
             self._update_preview()
 
-    def _render_whiteboard_image(self, *, include_text: bool = True, for_player: bool = False):
-        viewport_size = self._view_board_size()
+    def _render_whiteboard_image(
+        self,
+        *,
+        include_text: bool = True,
+        for_player: bool = False,
+        viewport_size: Tuple[int, int] | None = None,
+    ):
+        viewport_size = viewport_size or self._view_board_size()
         origin = self._current_view_origin()
         visible_items = [
             self._translate_item_for_view(item, origin)
@@ -1165,13 +1171,21 @@ class WhiteboardController:
         if not canvas or not window or not window.winfo_exists():
             return
 
-        img = self._render_whiteboard_image(include_text=False, for_player=True)
-        if img is None:
-            return
-
         canvas.update_idletasks()
         cw = max(canvas.winfo_width(), 1)
         ch = max(canvas.winfo_height(), 1)
+
+        viewport_size = (
+            max(1, int(cw / max(0.05, self.view_zoom))),
+            max(1, int(ch / max(0.05, self.view_zoom))),
+        )
+
+        img = self._render_whiteboard_image(
+            include_text=False, for_player=True, viewport_size=viewport_size
+        )
+        if img is None:
+            return
+
         base_x, base_y = self._compute_base_pan(cw, ch)
         x_offset = base_x + self._view_pan_offset[0]
         y_offset = base_y + self._view_pan_offset[1]
