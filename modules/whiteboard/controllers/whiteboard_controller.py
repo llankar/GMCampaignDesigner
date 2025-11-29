@@ -86,17 +86,30 @@ class WhiteboardController:
     # ------------------------------------------------------------------
     # UI Construction
     # ------------------------------------------------------------------
+    def _resolve_ctk_color(self, value):
+        if isinstance(value, tuple):
+            return value[1] if ctk.get_appearance_mode() == "Dark" and len(value) > 1 else value[0]
+        if isinstance(value, list):
+            if not value:
+                return None
+            return value[1] if ctk.get_appearance_mode() == "Dark" and len(value) > 1 else value[0]
+        if isinstance(value, str):
+            if " " in value:
+                parts = value.split()
+                if len(parts) >= 2:
+                    return parts[1] if ctk.get_appearance_mode() == "Dark" else parts[0]
+            return value
+        try:
+            return str(value)
+        except Exception:
+            return None
+
     def _build_ui(self):
         toolbar_container = ctk.CTkFrame(self.parent)
         toolbar_container.pack(fill="x", side="top", padx=6, pady=(2, 4))
 
         toolbar_canvas = tk.Canvas(toolbar_container, height=64, highlightthickness=0, bd=0)
-        container_fg = toolbar_container.cget("fg_color")
-        if isinstance(container_fg, tuple):
-            container_fg = container_fg[1] if ctk.get_appearance_mode() == "Dark" else container_fg[0]
-        elif isinstance(container_fg, str) and " " in container_fg:
-            light_color, dark_color, *_ = container_fg.split()
-            container_fg = dark_color if ctk.get_appearance_mode() == "Dark" else light_color
+        container_fg = self._resolve_ctk_color(toolbar_container.cget("fg_color"))
         if container_fg:
             toolbar_canvas.configure(bg=container_fg)
         scrollbar = ctk.CTkScrollbar(toolbar_container, orientation="horizontal", command=toolbar_canvas.xview)
