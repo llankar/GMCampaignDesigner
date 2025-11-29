@@ -115,30 +115,33 @@ class WhiteboardController:
         color_btn.pack(side="left", padx=(0, 8))
         self._color_button = color_btn
 
-        width_frame = ctk.CTkFrame(toolbar, fg_color="transparent")
-        width_frame.pack(side="left", padx=(0, 8))
-        width_label = ctk.CTkLabel(width_frame, text="Width")
-        width_label.pack(side="left", padx=(0, 4))
-        width_slider = ctk.CTkSlider(width_frame, from_=1, to=20, number_of_steps=19, command=self._on_width_change, width=140)
-        width_slider.set(self.stroke_width)
-        width_slider.pack(side="left")
-        self._width_slider = width_slider
-
-        eraser_frame = ctk.CTkFrame(toolbar, fg_color="transparent")
-        eraser_frame.pack(side="left", padx=(0, 8))
-        eraser_label = ctk.CTkLabel(eraser_frame, text="Eraser")
-        eraser_label.pack(side="left", padx=(0, 4))
-        eraser_slider = ctk.CTkSlider(
-            eraser_frame,
-            from_=4,
-            to=60,
-            number_of_steps=56,
-            command=self._on_eraser_change,
-            width=140,
+        width_values = [2, 4, 6, 8, 10, 12, 14, 16, 18, 20]
+        if self.stroke_width not in width_values:
+            width_values.append(int(self.stroke_width))
+            width_values = sorted(set(width_values))
+        width_menu = ctk.CTkOptionMenu(
+            toolbar,
+            values=[str(v) for v in width_values],
+            command=self._on_width_change,
+            width=90,
         )
-        eraser_slider.set(self.eraser_radius)
-        eraser_slider.pack(side="left")
-        self._eraser_slider = eraser_slider
+        width_menu.set(str(self.stroke_width))
+        width_menu.pack(side="left", padx=(0, 10))
+        self._width_menu = width_menu
+
+        eraser_values = [4, 6, 8, 10, 12, 14, 16, 20, 24, 28, 32, 40, 48, 56, 60]
+        if self.eraser_radius not in eraser_values:
+            eraser_values.append(int(self.eraser_radius))
+            eraser_values = sorted(set(eraser_values))
+        eraser_menu = ctk.CTkOptionMenu(
+            toolbar,
+            values=[str(v) for v in eraser_values],
+            command=self._on_eraser_change,
+            width=90,
+        )
+        eraser_menu.set(str(self.eraser_radius))
+        eraser_menu.pack(side="left", padx=(0, 10))
+        self._eraser_menu = eraser_menu
 
         text_size_label = ctk.CTkLabel(toolbar, text="Text Size")
         text_size_label.pack(side="left", padx=(6, 4))
@@ -188,10 +191,19 @@ class WhiteboardController:
         if self.grid_enabled:
             self._grid_toggle.select()
         self._grid_toggle.pack(side="left", padx=(0, 6))
-        grid_slider = ctk.CTkSlider(grid_frame, from_=10, to=200, number_of_steps=38, command=self._on_grid_size_change, width=120)
-        grid_slider.set(self.grid_size)
-        grid_slider.pack(side="left")
-        self._grid_slider = grid_slider
+        grid_values = list(range(20, 201, 20))
+        if self.grid_size not in grid_values:
+            grid_values.append(int(self.grid_size))
+            grid_values = sorted(set(grid_values))
+        grid_menu = ctk.CTkOptionMenu(
+            grid_frame,
+            values=[str(v) for v in grid_values],
+            command=self._on_grid_size_change,
+            width=90,
+        )
+        grid_menu.set(str(self.grid_size))
+        grid_menu.pack(side="left")
+        self._grid_menu = grid_menu
         self._snap_toggle = ctk.CTkCheckBox(grid_frame, text="Snap", command=self._on_toggle_snap)
         if self.snap_to_grid:
             self._snap_toggle.select()
@@ -211,17 +223,19 @@ class WhiteboardController:
         stamp_menu.set(asset_names[0])
         stamp_menu.pack(side="left", padx=(0, 6))
         self._stamp_menu = stamp_menu
-        stamp_slider = ctk.CTkSlider(
+        stamp_values = [24, 32, 40, 48, 64, 80, 96, 120, 144, 168, 196]
+        if self.stamp_size not in stamp_values:
+            stamp_values.append(int(self.stamp_size))
+            stamp_values = sorted(set(stamp_values))
+        stamp_size_menu = ctk.CTkOptionMenu(
             stamp_frame,
-            from_=24,
-            to=196,
-            number_of_steps=43,
+            values=[str(v) for v in stamp_values],
             command=self._on_stamp_size_change,
-            width=120,
+            width=100,
         )
-        stamp_slider.set(self.stamp_size)
-        stamp_slider.pack(side="left")
-        self._stamp_slider = stamp_slider
+        stamp_size_menu.set(str(self.stamp_size))
+        stamp_size_menu.pack(side="left")
+        self._stamp_size_menu = stamp_size_menu
 
         history_frame = ctk.CTkFrame(toolbar, fg_color="transparent")
         history_frame.pack(side="left", padx=(0, 8))
