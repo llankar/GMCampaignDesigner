@@ -1080,16 +1080,8 @@ class MainWindow(ctk.CTk):
                         self.banner_frame.grid_remove()
                     except Exception:
                         pass
-                if self.inner_content_frame.winfo_exists():
-                    try:
-                        self.inner_content_frame.grid_remove()
-                    except Exception:
-                        pass
                 try:
-                    self.current_open_view.grid_forget()
-                    self.current_open_view.grid(
-                        in_=self.content_frame, row=0, column=0, sticky="nsew"
-                    )
+                    self.inner_content_frame.grid(row=0, column=0, sticky="nsew")
                 except Exception:
                     pass
                 self.content_frame.grid_rowconfigure(0, weight=1)
@@ -1112,13 +1104,6 @@ class MainWindow(ctk.CTk):
                     display_pcs_in_banner(
                         self.banner_frame,
                         {pc["Name"]: pc for pc in self.pc_wrapper.load_items()}
-                    )
-                except Exception:
-                    pass
-                try:
-                    self.current_open_view.grid_forget()
-                    self.current_open_view.grid(
-                        in_=self.inner_content_frame, row=0, column=0, sticky="nsew"
                     )
                 except Exception:
                     pass
