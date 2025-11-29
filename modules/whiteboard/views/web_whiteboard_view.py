@@ -93,10 +93,16 @@ def open_whiteboard_display(controller, port=None):
             if hasattr(controller, "_render_whiteboard_image"):
                 img = controller._render_whiteboard_image()
             else:
+                origin = (0.0, 0.0)
+                try:
+                    origin = controller._current_view_origin()
+                except Exception:
+                    pass
                 img = render_whiteboard_image(
                     controller.whiteboard_items,
-                    controller.board_size,
+                    getattr(controller, "board_size", (1920, 1080)),
                     font_cache=getattr(controller, "_font_cache", None),
+                    grid_origin=origin,
                     zoom=getattr(controller, "view_zoom", 1.0),
                 )
             buf = io.BytesIO()

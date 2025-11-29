@@ -106,18 +106,19 @@ class WhiteboardController:
             self.canvas.update_idletasks()
         except Exception:
             pass
-        content_width = float(self.board_size[0]) * float(self.view_zoom)
-        content_height = float(self.board_size[1]) * float(self.view_zoom)
         canvas_width = max(1, int(self.canvas.winfo_width()))
         canvas_height = max(1, int(self.canvas.winfo_height()))
         self._base_pan = self._compute_base_pan(canvas_width, canvas_height)
         self._update_view_pan()
+        padded = 100000
+        content_width = max(canvas_width, int(float(self.board_size[0]) * float(self.view_zoom))) + padded * 2
+        content_height = max(canvas_height, int(float(self.board_size[1]) * float(self.view_zoom))) + padded * 2
         self.canvas.configure(
             scrollregion=(
-                0,
-                0,
-                max(canvas_width, int(content_width)),
-                max(canvas_height, int(content_height)),
+                -padded,
+                -padded,
+                content_width - padded,
+                content_height - padded,
             )
         )
 
@@ -157,6 +158,36 @@ class WhiteboardController:
             (canvas_width - content_width) / 2.0,
             (canvas_height - content_height) / 2.0,
         )
+
+    def _get_canvas_size(self) -> Tuple[int, int]:
+        if getattr(self, "canvas", None):
+            try:
+                return max(1, int(self.canvas.winfo_width())), max(1, int(self.canvas.winfo_height()))
+            except Exception:
+                pass
+        return max(1, int(self.board_size[0])), max(1, int(self.board_size[1]))
+
+    def _current_view_origin(self) -> Tuple[float, float]:
+        return self._screen_to_board(0, 0)
+
+    def _view_board_size(self) -> Tuple[int, int]:
+        canvas_width, canvas_height = self._get_canvas_size()
+        return (
+            max(1, int(canvas_width / max(0.05, self.view_zoom))),
+            max(1, int(canvas_height / max(0.05, self.view_zoom))),
+        )
+
+    def _translate_item_for_view(self, item: Dict, origin: Tuple[float, float]) -> Dict:
+        origin_x, origin_y = origin
+        translated = dict(item)
+        item_type = item.get("type")
+        if item_type == "stroke":
+            points = item.get("points") or []
+            translated["points"] = [(x - origin_x, y - origin_y) for x, y in points]
+        elif item_type in ("text", "stamp"):
+            pos = item.get("position") or (0, 0)
+            translated["position"] = (pos[0] - origin_x, pos[1] - origin_y)
+        return translated
 
     # ------------------------------------------------------------------
     # UI Construction
@@ -967,12 +998,15 @@ class WhiteboardController:
         self._refresh_viewport()
         self.canvas.delete("all")
         if self.grid_enabled:
+            viewport_size = self._get_canvas_size()
+            origin = self._current_view_origin()
             self._grid_overlay.draw_on_canvas(
                 self.canvas,
-                self.board_size,
+                viewport_size,
                 self.grid_size,
                 zoom=self.view_zoom,
                 pan=self._view_pan,
+                origin=origin,
             )
         for item in self._iter_visible_items():
             if item.get("type") == "stroke":
@@ -1027,14 +1061,20 @@ class WhiteboardController:
             self._update_preview()
 
     def _render_whiteboard_image(self, *, include_text: bool = True, for_player: bool = False):
-        visible_items = list(self._iter_visible_items(for_player=for_player))
+        viewport_size = self._view_board_size()
+        origin = self._current_view_origin()
+        visible_items = [
+            self._translate_item_for_view(item, origin)
+            for item in self._iter_visible_items(for_player=for_player)
+        ]
         return render_whiteboard_image(
             visible_items,
-            self.board_size,
+            viewport_size,
             font_cache=self._font_cache,
             include_text=include_text,
             grid_enabled=self.grid_enabled,
             grid_size=self.grid_size,
+            grid_origin=origin,
             for_player=for_player,
             zoom=self.view_zoom,
         )
