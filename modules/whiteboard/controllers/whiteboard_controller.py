@@ -279,33 +279,11 @@ class WhiteboardController:
         layer_menu.pack(side="left")
         self._layer_menu = layer_menu
 
-        visibility_frame = ctk.CTkFrame(toolbar, fg_color="transparent")
-        visibility_frame.pack(side="left", padx=(0, 6))
-        self._shared_visible = ctk.CTkCheckBox(
-            visibility_frame,
-            text="Shared",
-            command=self._on_toggle_shared_layer,
-            onvalue=1,
-            offvalue=0,
-        )
-        self._shared_visible.select() if self.show_shared_layer else self._shared_visible.deselect()
-        self._shared_visible.pack(side="left", padx=(0, 4))
-        self._gm_visible = ctk.CTkCheckBox(
-            visibility_frame,
-            text="GM",
-            command=self._on_toggle_gm_layer,
-            onvalue=1,
-            offvalue=0,
-        )
-        self._gm_visible.select() if self.show_gm_layer else self._gm_visible.deselect()
-        self._gm_visible.pack(side="left")
+        self._build_toggle_menu(toolbar)
 
         grid_frame = ctk.CTkFrame(toolbar, fg_color="transparent")
         grid_frame.pack(side="left", padx=(0, 6))
-        self._grid_toggle = ctk.CTkCheckBox(grid_frame, text="Grid", command=self._on_toggle_grid)
-        if self.grid_enabled:
-            self._grid_toggle.select()
-        self._grid_toggle.pack(side="left", padx=(0, 6))
+        ctk.CTkLabel(grid_frame, text="Grid Size").pack(side="left", padx=(0, 4))
         grid_values = list(range(20, 201, 20))
         if self.grid_size not in grid_values:
             grid_values.append(int(self.grid_size))
@@ -319,10 +297,6 @@ class WhiteboardController:
         grid_menu.set(str(self.grid_size))
         grid_menu.pack(side="left")
         self._grid_menu = grid_menu
-        self._snap_toggle = ctk.CTkCheckBox(grid_frame, text="Snap", command=self._on_toggle_snap)
-        if self.snap_to_grid:
-            self._snap_toggle.select()
-        self._snap_toggle.pack(side="left", padx=(6, 0))
 
         history_frame = ctk.CTkFrame(toolbar, fg_color="transparent")
         history_frame.pack(side="left", padx=(0, 6))
@@ -341,6 +315,55 @@ class WhiteboardController:
         player_btn.pack(side="left", padx=(0, 4))
 
         self._update_tool_controls()
+
+    def _build_toggle_menu(self, toolbar: ctk.CTkFrame):
+        menu_frame = ctk.CTkFrame(toolbar, fg_color="transparent")
+        menu_frame.pack(side="left", padx=(0, 6))
+        ctk.CTkLabel(menu_frame, text="Visibility/Grid").pack(side="left", padx=(0, 4))
+        toggle_menu = ctk.CTkOptionMenu(
+            menu_frame,
+            values=self._toggle_menu_values(),
+            command=self._handle_toggle_menu_selection,
+            width=152,
+        )
+        toggle_menu.set("Visibility/Grid")
+        toggle_menu.pack(side="left")
+        self._toggle_menu = toggle_menu
+
+    def _toggle_menu_values(self):
+        return [
+            self._format_toggle_option("Shared visible", self.show_shared_layer),
+            self._format_toggle_option("GM visible", self.show_gm_layer),
+            self._format_toggle_option("Grid enabled", self.grid_enabled),
+            self._format_toggle_option("Snap to grid", self.snap_to_grid),
+        ]
+
+    def _format_toggle_option(self, label: str, enabled: bool) -> str:
+        return f"☑ {label}" if enabled else f"☐ {label}"
+
+    def _handle_toggle_menu_selection(self, selection: str):
+        label = selection[2:].strip() if selection.startswith(("☑", "☐")) else selection
+        handlers = {
+            "Shared visible": lambda: self._on_toggle_shared_layer(not self.show_shared_layer),
+            "GM visible": lambda: self._on_toggle_gm_layer(not self.show_gm_layer),
+            "Grid enabled": lambda: self._on_toggle_grid(not self.grid_enabled),
+            "Snap to grid": lambda: self._on_toggle_snap(not self.snap_to_grid),
+        }
+        action = handlers.get(label)
+        if action:
+            action()
+        self._refresh_toggle_menu()
+
+    def _refresh_toggle_menu(self):
+        toggle_menu = getattr(self, "_toggle_menu", None)
+        if not toggle_menu:
+            return
+        values = self._toggle_menu_values()
+        try:
+            toggle_menu.configure(values=values)
+            toggle_menu.set("Visibility/Grid")
+        except Exception:
+            pass
 
     # ------------------------------------------------------------------
     # Event Handling
@@ -406,19 +429,28 @@ class WhiteboardController:
         self.state.active_layer = self.active_layer
         self._persist_state(update_only=True)
 
-    def _on_toggle_shared_layer(self):
-        self.show_shared_layer = bool(self._shared_visible.get())
+    def _on_toggle_shared_layer(self, value=None):
+        if value is None:
+            value = not self.show_shared_layer
+        self.show_shared_layer = bool(value)
         self.state.show_shared_layer = self.show_shared_layer
+        self._refresh_toggle_menu()
         self._persist_state(update_only=True)
 
-    def _on_toggle_gm_layer(self):
-        self.show_gm_layer = bool(self._gm_visible.get())
+    def _on_toggle_gm_layer(self, value=None):
+        if value is None:
+            value = not self.show_gm_layer
+        self.show_gm_layer = bool(value)
         self.state.show_gm_layer = self.show_gm_layer
+        self._refresh_toggle_menu()
         self._persist_state(update_only=True)
 
-    def _on_toggle_grid(self):
-        self.grid_enabled = bool(self._grid_toggle.get())
+    def _on_toggle_grid(self, value=None):
+        if value is None:
+            value = not self.grid_enabled
+        self.grid_enabled = bool(value)
         self.state.grid_enabled = self.grid_enabled
+        self._refresh_toggle_menu()
         self._persist_state(update_only=True)
 
     def _on_grid_size_change(self, value):
@@ -429,9 +461,12 @@ class WhiteboardController:
         self.state.grid_size = self.grid_size
         self._persist_state(update_only=True)
 
-    def _on_toggle_snap(self):
-        self.snap_to_grid = bool(self._snap_toggle.get())
+    def _on_toggle_snap(self, value=None):
+        if value is None:
+            value = not self.snap_to_grid
+        self.snap_to_grid = bool(value)
         self.state.snap_to_grid = self.snap_to_grid
+        self._refresh_toggle_menu()
         self._persist_state(update_only=True)
 
     def _on_stamp_size_change(self, value):
