@@ -1072,6 +1072,66 @@ class MainWindow(ctk.CTk):
                 except Exception:
                     pass
             return
+        # --- GENERIC VIEW MODE (e.g., whiteboard) ---
+        if self.current_open_entity is None and getattr(self, "current_open_view", None) is not None:
+            if self.banner_visible:
+                if self.banner_frame.winfo_exists():
+                    try:
+                        self.banner_frame.grid_remove()
+                    except Exception:
+                        pass
+                if self.inner_content_frame.winfo_exists():
+                    try:
+                        self.inner_content_frame.grid_remove()
+                    except Exception:
+                        pass
+                try:
+                    self.current_open_view.grid_forget()
+                    self.current_open_view.grid(
+                        in_=self.content_frame, row=0, column=0, sticky="nsew"
+                    )
+                except Exception:
+                    pass
+                self.content_frame.grid_rowconfigure(0, weight=1)
+                self.content_frame.grid_rowconfigure(1, weight=0)
+                self.banner_visible = False
+                try:
+                    self.banner_toggle_btn.configure(text="▼")
+                except Exception:
+                    pass
+            else:
+                try:
+                    self.banner_frame.grid(row=0, column=0, sticky="ew")
+                except Exception:
+                    pass
+                try:
+                    self.inner_content_frame.grid(row=1, column=0, sticky="nsew")
+                except Exception:
+                    pass
+                try:
+                    display_pcs_in_banner(
+                        self.banner_frame,
+                        {pc["Name"]: pc for pc in self.pc_wrapper.load_items()}
+                    )
+                except Exception:
+                    pass
+                try:
+                    self.current_open_view.grid_forget()
+                    self.current_open_view.grid(
+                        in_=self.inner_content_frame, row=0, column=0, sticky="nsew"
+                    )
+                except Exception:
+                    pass
+                self.inner_content_frame.grid_rowconfigure(0, weight=1)
+                self.inner_content_frame.grid_columnconfigure(0, weight=1)
+                self.content_frame.grid_rowconfigure(0, weight=0)
+                self.content_frame.grid_rowconfigure(1, weight=1)
+                self.banner_visible = True
+                try:
+                    self.banner_toggle_btn.configure(text="▲")
+                except Exception:
+                    pass
+            return
         # --- GRAPH MODE?  (no current_open_entity but a graph_type set) ---
         if self.current_open_entity is None and getattr(self, "_graph_type", None):
             # snapshot existing graph state
