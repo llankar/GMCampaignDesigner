@@ -106,6 +106,8 @@ class WhiteboardController:
             self.canvas.update_idletasks()
         except Exception:
             pass
+        content_width = float(self.board_size[0]) * float(self.view_zoom)
+        content_height = float(self.board_size[1]) * float(self.view_zoom)
         canvas_width = max(1, int(self.canvas.winfo_width()))
         canvas_height = max(1, int(self.canvas.winfo_height()))
         self._base_pan = self._compute_base_pan(canvas_width, canvas_height)
