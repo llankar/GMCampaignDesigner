@@ -38,7 +38,8 @@ def render_whiteboard_image(
     for_player: bool = False,
 ) -> Image.Image:
     width, height = _resolve_size(size)
-    img = Image.new("RGB", (width, height), "white")
+    base_color = (255, 255, 255, 255)
+    img = Image.new("RGBA", (width, height), base_color)
     draw = ImageDraw.Draw(img)
 
     font_cache = font_cache or TextFontCache()
@@ -82,7 +83,7 @@ def render_whiteboard_image(
     if grid_enabled:
         draw_grid_on_image(img, grid_size)
 
-    return img
+    return img.convert("RGB")
 
 
 def render_png_bytes(items: List[Dict[str, Any]], size: Tuple[int, int] = DEFAULT_SIZE) -> bytes:
