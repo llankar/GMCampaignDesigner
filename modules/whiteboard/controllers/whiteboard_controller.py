@@ -94,6 +94,9 @@ class WhiteboardController:
         container_fg = toolbar_container.cget("fg_color")
         if isinstance(container_fg, tuple):
             container_fg = container_fg[1] if ctk.get_appearance_mode() == "Dark" else container_fg[0]
+        elif isinstance(container_fg, str) and " " in container_fg:
+            light_color, dark_color, *_ = container_fg.split()
+            container_fg = dark_color if ctk.get_appearance_mode() == "Dark" else light_color
         if container_fg:
             toolbar_canvas.configure(bg=container_fg)
         scrollbar = ctk.CTkScrollbar(toolbar_container, orientation="horizontal", command=toolbar_canvas.xview)
