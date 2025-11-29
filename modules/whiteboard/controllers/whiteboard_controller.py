@@ -91,6 +91,11 @@ class WhiteboardController:
         toolbar_container.pack(fill="x", side="top", padx=6, pady=(2, 4))
 
         toolbar_canvas = tk.Canvas(toolbar_container, height=64, highlightthickness=0, bd=0)
+        container_fg = toolbar_container.cget("fg_color")
+        if isinstance(container_fg, tuple):
+            container_fg = container_fg[1] if ctk.get_appearance_mode() == "Dark" else container_fg[0]
+        if container_fg:
+            toolbar_canvas.configure(bg=container_fg)
         scrollbar = ctk.CTkScrollbar(toolbar_container, orientation="horizontal", command=toolbar_canvas.xview)
         toolbar_canvas.configure(xscrollcommand=scrollbar.set)
 
@@ -121,6 +126,7 @@ class WhiteboardController:
         toolbar.bind("<Configure>", _update_scroll_region)
         toolbar_container.bind("<Configure>", _sync_canvas_width)
 
+        self._toolbar_container = toolbar_container
         self._build_toolbar(toolbar)
 
         self.canvas = tk.Canvas(self.parent, bg="white", highlightthickness=0)
@@ -130,6 +136,19 @@ class WhiteboardController:
         self.canvas.bind("<ButtonRelease-1>", self._on_mouse_up)
         self.canvas.bind("<Double-Button-1>", self._on_double_click)
         self.canvas.bind("<Configure>", self._on_canvas_resize)
+
+        def _resize_canvas(_event=None):
+            toolbar_height = self._toolbar_container.winfo_height()
+            try:
+                parent_width = int(self.parent.winfo_width())
+                parent_height = int(self.parent.winfo_height())
+            except Exception:
+                return
+            new_height = max(1, parent_height - toolbar_height)
+            self.canvas.configure(width=parent_width, height=new_height)
+
+        self.parent.bind("<Configure>", _resize_canvas, add="+")
+        _resize_canvas()
 
     def _build_toolbar(self, toolbar: ctk.CTkFrame):
         tool_label = ctk.CTkLabel(toolbar, text="Tool")
@@ -294,19 +313,6 @@ class WhiteboardController:
 
         player_btn = ctk.CTkButton(toolbar, text="Open Player View", command=self.open_player_view)
         player_btn.pack(side="left", padx=(0, 4))
-
-        def _resize_canvas(_event=None):
-            toolbar_height = toolbar_container.winfo_height()
-            try:
-                parent_width = int(self.parent.winfo_width())
-                parent_height = int(self.parent.winfo_height())
-            except Exception:
-                return
-            new_height = max(1, parent_height - toolbar_height)
-            self.canvas.configure(width=parent_width, height=new_height)
-
-        self.parent.bind("<Configure>", _resize_canvas, add="+")
-        _resize_canvas()
 
     # ------------------------------------------------------------------
     # Event Handling
