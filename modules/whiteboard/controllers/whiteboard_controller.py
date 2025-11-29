@@ -178,8 +178,12 @@ class WhiteboardController:
         tool_menu.set("Pen")
         tool_menu.pack(side="left", padx=(0, 6))
 
+        tool_controls_holder = ctk.CTkFrame(toolbar, fg_color="transparent")
+        tool_controls_holder.pack(side="left", padx=(0, 8))
+
+        pen_frame = ctk.CTkFrame(tool_controls_holder, fg_color="transparent")
         color_btn = ctk.CTkButton(
-            toolbar,
+            pen_frame,
             text="",
             command=self._on_pick_color,
             width=36,
@@ -197,7 +201,7 @@ class WhiteboardController:
             width_values.append(int(self.stroke_width))
             width_values = sorted(set(width_values))
         width_menu = ctk.CTkOptionMenu(
-            toolbar,
+            pen_frame,
             values=[str(v) for v in width_values],
             command=self._on_width_change,
             width=88,
@@ -206,12 +210,13 @@ class WhiteboardController:
         width_menu.pack(side="left", padx=(0, 6))
         self._width_menu = width_menu
 
+        eraser_frame = ctk.CTkFrame(tool_controls_holder, fg_color="transparent")
         eraser_values = [4, 6, 8, 10, 12, 14, 16, 20, 24, 28, 32, 40, 48, 56, 60]
         if self.eraser_radius not in eraser_values:
             eraser_values.append(int(self.eraser_radius))
             eraser_values = sorted(set(eraser_values))
         eraser_menu = ctk.CTkOptionMenu(
-            toolbar,
+            eraser_frame,
             values=[str(v) for v in eraser_values],
             command=self._on_eraser_change,
             width=88,
@@ -220,13 +225,46 @@ class WhiteboardController:
         eraser_menu.pack(side="left", padx=(0, 6))
         self._eraser_menu = eraser_menu
 
-        text_size_label = ctk.CTkLabel(toolbar, text="Text Size")
-        text_size_label.pack(side="left", padx=(4, 4))
+        text_frame = ctk.CTkFrame(tool_controls_holder, fg_color="transparent")
+        text_size_label = ctk.CTkLabel(text_frame, text="Text Size")
+        text_size_label.pack(side="left", padx=(0, 4))
         text_sizes = ["16", "20", "24", "32", "40", "48"]
-        text_menu = ctk.CTkOptionMenu(toolbar, values=text_sizes, command=self._on_text_size_change, width=92)
+        text_menu = ctk.CTkOptionMenu(text_frame, values=text_sizes, command=self._on_text_size_change, width=92)
         text_menu.set(str(self.text_size))
         text_menu.pack(side="left", padx=(0, 6))
         self._text_menu = text_menu
+
+        stamp_frame = ctk.CTkFrame(tool_controls_holder, fg_color="transparent")
+        ctk.CTkLabel(stamp_frame, text="Stamp").pack(side="left", padx=(0, 4))
+        self._stamp_label_var = tk.StringVar(value=os.path.basename(self.stamp_asset) if self.stamp_asset else "Choose Stamp")
+        stamp_btn = ctk.CTkButton(
+            stamp_frame,
+            text="📁",
+            width=36,
+            height=32,
+            command=self._on_select_stamp_asset,
+        )
+        stamp_btn.pack(side="left", padx=(0, 4))
+        stamp_values = [24, 32, 40, 48, 64, 80, 96, 120, 144, 168, 196]
+        if self.stamp_size not in stamp_values:
+            stamp_values.append(int(self.stamp_size))
+            stamp_values = sorted(set(stamp_values))
+        stamp_size_menu = ctk.CTkOptionMenu(
+            stamp_frame,
+            values=[str(v) for v in stamp_values],
+            command=self._on_stamp_size_change,
+            width=96,
+        )
+        stamp_size_menu.set(str(self.stamp_size))
+        stamp_size_menu.pack(side="left")
+        self._stamp_size_menu = stamp_size_menu
+
+        self._tool_frames = {
+            "pen": pen_frame,
+            "eraser": eraser_frame,
+            "text": text_frame,
+            "stamp": stamp_frame,
+        }
 
         layer_frame = ctk.CTkFrame(toolbar, fg_color="transparent")
         layer_frame.pack(side="left", padx=(0, 6))
@@ -286,32 +324,6 @@ class WhiteboardController:
             self._snap_toggle.select()
         self._snap_toggle.pack(side="left", padx=(6, 0))
 
-        stamp_frame = ctk.CTkFrame(toolbar, fg_color="transparent")
-        stamp_frame.pack(side="left", padx=(0, 6))
-        ctk.CTkLabel(stamp_frame, text="Stamp").pack(side="left", padx=(0, 4))
-        self._stamp_label_var = tk.StringVar(value=os.path.basename(self.stamp_asset) if self.stamp_asset else "Choose Stamp")
-        stamp_btn = ctk.CTkButton(
-            stamp_frame,
-            text="📁",
-            width=36,
-            height=32,
-            command=self._on_select_stamp_asset,
-        )
-        stamp_btn.pack(side="left", padx=(0, 4))
-        stamp_values = [24, 32, 40, 48, 64, 80, 96, 120, 144, 168, 196]
-        if self.stamp_size not in stamp_values:
-            stamp_values.append(int(self.stamp_size))
-            stamp_values = sorted(set(stamp_values))
-        stamp_size_menu = ctk.CTkOptionMenu(
-            stamp_frame,
-            values=[str(v) for v in stamp_values],
-            command=self._on_stamp_size_change,
-            width=96,
-        )
-        stamp_size_menu.set(str(self.stamp_size))
-        stamp_size_menu.pack(side="left")
-        self._stamp_size_menu = stamp_size_menu
-
         history_frame = ctk.CTkFrame(toolbar, fg_color="transparent")
         history_frame.pack(side="left", padx=(0, 6))
         undo_btn = ctk.CTkButton(history_frame, text="Undo", command=self._undo_action, width=76)
@@ -328,11 +340,28 @@ class WhiteboardController:
         player_btn = ctk.CTkButton(toolbar, text="Open Player View", command=self.open_player_view)
         player_btn.pack(side="left", padx=(0, 4))
 
+        self._update_tool_controls()
+
     # ------------------------------------------------------------------
     # Event Handling
     # ------------------------------------------------------------------
+    def _update_tool_controls(self):
+        frames = getattr(self, "_tool_frames", {})
+        active = frames.get(self.tool)
+        for frame in frames.values():
+            try:
+                frame.pack_forget()
+            except Exception:
+                pass
+        if active:
+            try:
+                active.pack(side="left", padx=(0, 6))
+            except Exception:
+                pass
+
     def _on_tool_change(self, selection: str):
         self.tool = selection.lower()
+        self._update_tool_controls()
 
     def _on_pick_color(self):
         result = colorchooser.askcolor(color=self.ink_color)
