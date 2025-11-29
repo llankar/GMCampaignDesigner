@@ -51,6 +51,9 @@ def render_whiteboard_image(
     def _scale_point(point: Tuple[float, float]) -> Tuple[float, float]:
         return point[0] * zoom, point[1] * zoom
 
+    if grid_enabled:
+        draw_grid_on_image(img, int(max(1, grid_size * zoom)))
+
     for item in items:
         if for_player and normalize_layer(item.get("layer")) == WhiteboardLayer.GM.value:
             continue
@@ -88,9 +91,6 @@ def render_whiteboard_image(
                 img.alpha_composite(stamp_img, dest=(int(sx), int(sy)))
             except Exception:
                 continue
-
-    if grid_enabled:
-        draw_grid_on_image(img, int(max(1, grid_size * zoom)))
 
     return img.convert("RGB")
 
