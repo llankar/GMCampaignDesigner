@@ -715,23 +715,24 @@ class WhiteboardController:
             sx, sy = self._board_to_screen(x, y)
             flattened.extend([sx, sy])
         width = max(1.0, float(self.stroke_width) * float(self.view_zoom))
-        smooth_line = not self.snap_to_grid
         if self._preview_id and self.canvas.type(self._preview_id):
             self.canvas.coords(self._preview_id, *flattened)
             self.canvas.itemconfig(
                 self._preview_id,
                 fill=self.ink_color,
                 width=width,
-                smooth=smooth_line,
+                smooth=False,
+                capstyle="butt",
+                joinstyle="miter",
             )
         else:
             self._preview_id = self.canvas.create_line(
                 *flattened,
                 fill=self.ink_color,
                 width=width,
-                smooth=smooth_line,
-                capstyle="round",
-                joinstyle="round",
+                smooth=False,
+                capstyle="butt",
+                joinstyle="miter",
             )
 
     def _clear_preview(self):
@@ -1028,9 +1029,9 @@ class WhiteboardController:
                     *flattened,
                     fill=item.get("color", self.ink_color),
                     width=line_width,
-                    smooth=True,
-                    capstyle="round",
-                    joinstyle="round",
+                    smooth=False,
+                    capstyle="butt",
+                    joinstyle="miter",
                 )
                 item["canvas_ids"] = (line_id,)
             elif item.get("type") == "text":
