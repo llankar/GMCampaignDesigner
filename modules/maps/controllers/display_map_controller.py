@@ -2805,15 +2805,22 @@ class DisplayMapController:
         try:
             if self._whiteboard_preview_id and canvas.type(self._whiteboard_preview_id):
                 canvas.coords(self._whiteboard_preview_id, *screen_points)
-                canvas.itemconfig(self._whiteboard_preview_id, fill=self.whiteboard_color, width=self.whiteboard_width, smooth=True)
+                canvas.itemconfig(
+                    self._whiteboard_preview_id,
+                    fill=self.whiteboard_color,
+                    width=self.whiteboard_width,
+                    smooth=False,
+                    capstyle="butt",
+                    joinstyle="miter",
+                )
             else:
                 self._whiteboard_preview_id = canvas.create_line(
                     *screen_points,
                     fill=self.whiteboard_color,
                     width=self.whiteboard_width,
-                    smooth=True,
-                    capstyle="round",
-                    joinstyle="round",
+                    smooth=False,
+                    capstyle="butt",
+                    joinstyle="miter",
                     tags=("whiteboard_preview",),
                 )
             canvas.tag_raise(self._whiteboard_preview_id)
@@ -3530,7 +3537,14 @@ class DisplayMapController:
                     line_id = item["canvas_ids"][0]
                     try:
                         self.canvas.coords(line_id, *screen_coords)
-                        self.canvas.itemconfig(line_id, fill=color, width=width, smooth=True)
+                        self.canvas.itemconfig(
+                            line_id,
+                            fill=color,
+                            width=width,
+                            smooth=False,
+                            capstyle="butt",
+                            joinstyle="miter",
+                        )
                     except tk.TclError:
                         item["canvas_ids"] = ()
                         line_id = None
@@ -3542,9 +3556,9 @@ class DisplayMapController:
                             *screen_coords,
                             fill=color,
                             width=width,
-                            smooth=True,
-                            capstyle="round",
-                            joinstyle="round",
+                            smooth=False,
+                            capstyle="butt",
+                            joinstyle="miter",
                         )
                         item["canvas_ids"] = (line_id,)
                     except tk.TclError:
