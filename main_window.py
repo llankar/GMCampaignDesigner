@@ -1844,6 +1844,18 @@ class MainWindow(ctk.CTk):
             # track the active GM-screen view for our Ctrl+F handler
             self.current_gm_view = view
 
+            default_layout = layout_manager.get_scenario_default(view.scenario_name)
+            has_saved_layout = bool(initial_layout or default_layout)
+            if not has_saved_layout:
+                view.open_whiteboard_tab()
+                if not any((tab.get("meta") or {}).get("kind") == "note" for tab in view.tabs.values()):
+                    view.add_tab(
+                        "GM Notes",
+                        view.create_note_frame(),
+                        content_factory=lambda master: view.create_note_frame(master=master),
+                        layout_meta={"kind": "note"},
+                    )
+
         # 6) Insert the generic list‐selection view
         list_selection = GenericListSelectionView(
             parent,

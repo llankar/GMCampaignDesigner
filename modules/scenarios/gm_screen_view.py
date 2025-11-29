@@ -34,6 +34,7 @@ from modules.ui.chatbot_dialog import (
 )
 from modules.objects.loot_generator_panel import LootGeneratorPanel
 from modules.scenarios.random_tables_panel import RandomTablesPanel
+from modules.whiteboard.controllers.whiteboard_controller import WhiteboardController
 
 log_module_import(__name__)
 
@@ -173,6 +174,7 @@ class GMScreenView(ctk.CTkFrame):
             "Map Tool",
             "Scene Flow",
             "Loot Generator",
+            "Whiteboard",
             "Random Tables",
             "Factions",
             "Places",
@@ -666,6 +668,16 @@ class GMScreenView(ctk.CTkFrame):
         except Exception:
             pass
 
+    def _teardown_tab_content(self, frame):
+        if frame is None:
+            return
+        controller = getattr(frame, "whiteboard_controller", None)
+        if controller and hasattr(controller, "close"):
+            try:
+                controller.close()
+            except Exception:
+                pass
+
     def _apply_initial_layout(self):
         layout_name = self._pending_initial_layout
         if not layout_name:
@@ -1078,6 +1090,8 @@ class GMScreenView(ctk.CTkFrame):
                     meta["state"] = frame.get_state()
                 else:
                     meta.pop("state", None)
+            elif meta.get("kind") == "whiteboard":
+                meta.pop("controller", None)
             layout_tabs.append(meta)
         return {
             "scenario": self.scenario_name,
@@ -1230,6 +1244,7 @@ class GMScreenView(ctk.CTkFrame):
             if tab_frame is not None and tab_frame.winfo_exists():
                 tab_frame.destroy()
             content = tab.get("content_frame")
+            self._teardown_tab_content(content)
             if content is not None and content.winfo_exists():
                 content.destroy()
         self.tabs.clear()
@@ -1300,6 +1315,8 @@ class GMScreenView(ctk.CTkFrame):
             self.open_loot_generator_tab(title=title or "Loot Generator")
         elif kind == "random_tables":
             self.open_random_tables_tab(title=title or "Random Tables", initial_state=tab_def.get("state"))
+        elif kind == "whiteboard":
+            self.open_whiteboard_tab(title=title or "Whiteboard")
         else:
             raise ValueError(f"Unsupported tab kind '{kind}'")
 
@@ -1493,6 +1510,7 @@ class GMScreenView(ctk.CTkFrame):
 
         # Hide the current content
         old_frame = self.tabs[name]["content_frame"]
+        self._teardown_tab_content(old_frame)
         old_frame.pack_forget()
 
         # Create the Toplevel (hidden briefly)
@@ -1621,6 +1639,40 @@ class GMScreenView(ctk.CTkFrame):
             pass
         # Initial sizing once mounted
         self.after(50, _sync)
+
+    def open_whiteboard_tab(self, title=None):
+        """Open a whiteboard tab within the GM screen."""
+        if getattr(self, "_rich_host", None) is None or not self._rich_host.winfo_exists():
+            self._rich_host = ctk.CTkFrame(self)
+
+        container = ctk.CTkFrame(self._rich_host)
+        self._make_fullbleed(container)
+        controller = WhiteboardController(container, root_app=self)
+        container.whiteboard_controller = controller
+
+        def _on_destroy(_event=None, ctrl=controller):
+            try:
+                ctrl.close()
+            except Exception:
+                pass
+
+        container.bind("<Destroy>", _on_destroy, add="+")
+
+        def factory(master):
+            host_parent = master if master is not None else self._rich_host
+            frame = ctk.CTkFrame(host_parent)
+            self._make_fullbleed(frame)
+            ctrl = WhiteboardController(frame, root_app=self)
+            frame.whiteboard_controller = ctrl
+            frame.bind("<Destroy>", lambda _e=None, c=ctrl: c.close(), add="+")
+            return frame
+
+        self.add_tab(
+            title or "Whiteboard",
+            container,
+            content_factory=factory,
+            layout_meta={"kind": "whiteboard", "host": "rich", "controller": controller},
+        )
 
     def open_world_map_tab(self, map_name=None, title=None):
         """Open a WorldMapPanel inside a new GM-screen tab."""
@@ -1785,6 +1837,7 @@ class GMScreenView(ctk.CTkFrame):
         # Retrieve the detached window and its content frame
         detached_window = self.tabs[name]["window"]
         current_frame = self.tabs[name]["content_frame"]
+        self._teardown_tab_content(current_frame)
 
         # Preserve graph state if present
         saved_state = None
@@ -1860,6 +1913,7 @@ class GMScreenView(ctk.CTkFrame):
             self.tab_order.remove(name)
         if self.tabs[name].get("detached", False) and self.tabs[name].get("window"):
             self.tabs[name]["window"].destroy()
+        self._teardown_tab_content(self.tabs[name].get("content_frame"))
         self.tabs[name]["button_frame"].destroy()
         self.tabs[name]["content_frame"].destroy()
         del self.tabs[name]
@@ -2002,6 +2056,9 @@ class GMScreenView(ctk.CTkFrame):
             return
         elif entity_type == "Loot Generator":
             self.open_loot_generator_tab()
+            return
+        elif entity_type == "Whiteboard":
+            self.open_whiteboard_tab()
             return
         elif entity_type == "Random Tables":
             self.open_random_tables_tab()
