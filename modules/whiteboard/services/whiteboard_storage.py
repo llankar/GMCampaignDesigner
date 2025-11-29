@@ -27,6 +27,7 @@ class WhiteboardState:
     active_layer: str = "shared"
     show_shared_layer: bool = True
     show_gm_layer: bool = True
+    zoom: float = 1.0
 
     @staticmethod
     def from_dict(raw: Dict[str, Any]) -> "WhiteboardState":
@@ -46,6 +47,7 @@ class WhiteboardState:
             active_layer=str(raw.get("active_layer", "shared")),
             show_shared_layer=bool(raw.get("show_shared_layer", True)),
             show_gm_layer=bool(raw.get("show_gm_layer", True)),
+            zoom=float(raw.get("zoom", 1.0) or 1.0),
         )
 
     def to_dict(self) -> Dict[str, Any]:
@@ -62,6 +64,7 @@ class WhiteboardState:
             "active_layer": self.active_layer,
             "show_shared_layer": self.show_shared_layer,
             "show_gm_layer": self.show_gm_layer,
+            "zoom": float(self.zoom),
         }
 
 
