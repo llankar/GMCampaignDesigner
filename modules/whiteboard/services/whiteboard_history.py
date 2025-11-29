@@ -35,5 +35,9 @@ class WhiteboardHistory:
         return self._clone(next_state), True
 
     def _clone(self, items: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
-        return copy.deepcopy(items)
+        sanitized: List[Dict[str, Any]] = []
+        for item in items:
+            cleaned = {k: v for k, v in item.items() if k not in ("canvas_ids", "_image_ref")}
+            sanitized.append(copy.deepcopy(cleaned))
+        return sanitized
 
