@@ -2,7 +2,7 @@ import io
 import math
 import os
 import tkinter as tk
-from tkinter import colorchooser
+from tkinter import colorchooser, filedialog
 from typing import List, Dict, Tuple, Iterable
 
 import customtkinter as ctk
@@ -87,8 +87,28 @@ class WhiteboardController:
     # UI Construction
     # ------------------------------------------------------------------
     def _build_ui(self):
-        toolbar = ctk.CTkFrame(self.parent)
-        toolbar.pack(fill="x", side="top", padx=6, pady=4)
+        toolbar_container = ctk.CTkFrame(self.parent)
+        toolbar_container.pack(fill="x", side="top", padx=6, pady=4)
+
+        toolbar_canvas = tk.Canvas(toolbar_container, height=70, highlightthickness=0, bd=0)
+        scrollbar = ctk.CTkScrollbar(toolbar_container, orientation="horizontal", command=toolbar_canvas.xview)
+        toolbar_canvas.configure(xscrollcommand=scrollbar.set)
+
+        toolbar_canvas.pack(fill="x", side="top", expand=True)
+        scrollbar.pack(fill="x", side="bottom")
+
+        toolbar = ctk.CTkFrame(toolbar_canvas)
+        toolbar_canvas.create_window((0, 0), window=toolbar, anchor="nw")
+
+        def _update_scroll_region(event):
+            toolbar_canvas.configure(scrollregion=toolbar_canvas.bbox("all"))
+
+        def _sync_canvas_width(event):
+            toolbar_canvas.configure(width=event.width)
+
+        toolbar.bind("<Configure>", _update_scroll_region)
+        toolbar_container.bind("<Configure>", _sync_canvas_width)
+
         self._build_toolbar(toolbar)
 
         self.canvas = tk.Canvas(self.parent, bg="white", highlightthickness=0)
@@ -111,7 +131,17 @@ class WhiteboardController:
         tool_menu.set("Pen")
         tool_menu.pack(side="left", padx=(0, 10))
 
-        color_btn = ctk.CTkButton(toolbar, text="Ink Color", command=self._on_pick_color, width=110)
+        color_btn = ctk.CTkButton(
+            toolbar,
+            text="",
+            command=self._on_pick_color,
+            width=36,
+            height=32,
+            fg_color=self.ink_color,
+            hover_color=self.ink_color,
+            border_width=2,
+            border_color="#3a3a3a",
+        )
         color_btn.pack(side="left", padx=(0, 8))
         self._color_button = color_btn
 
@@ -212,17 +242,17 @@ class WhiteboardController:
         stamp_frame = ctk.CTkFrame(toolbar, fg_color="transparent")
         stamp_frame.pack(side="left", padx=(0, 10))
         ctk.CTkLabel(stamp_frame, text="Stamp").pack(side="left", padx=(0, 4))
-        asset_names = list(self._stamp_assets_map.keys()) or ["No assets"]
-        stamp_menu = ctk.CTkOptionMenu(
+        self._stamp_label_var = tk.StringVar(value=os.path.basename(self.stamp_asset) if self.stamp_asset else "Choose Stamp")
+        stamp_btn = ctk.CTkButton(
             stamp_frame,
-            values=asset_names,
-            command=self._on_stamp_asset_change,
-            width=140,
-            state="normal" if self._stamp_assets_map else "disabled",
+            text="📁",
+            width=36,
+            height=32,
+            command=self._on_select_stamp_asset,
         )
-        stamp_menu.set(asset_names[0])
-        stamp_menu.pack(side="left", padx=(0, 6))
-        self._stamp_menu = stamp_menu
+        stamp_btn.pack(side="left", padx=(0, 6))
+        stamp_label = ctk.CTkLabel(stamp_frame, textvariable=self._stamp_label_var)
+        stamp_label.pack(side="left", padx=(0, 6))
         stamp_values = [24, 32, 40, 48, 64, 80, 96, 120, 144, 168, 196]
         if self.stamp_size not in stamp_values:
             stamp_values.append(int(self.stamp_size))
@@ -264,9 +294,21 @@ class WhiteboardController:
         if result and result[1]:
             self.ink_color = result[1]
             try:
-                self._color_button.configure(fg_color=self.ink_color)
+                self._color_button.configure(fg_color=self.ink_color, hover_color=self.ink_color)
             except Exception:
                 pass
+
+    def _on_select_stamp_asset(self):
+        selection = filedialog.askopenfilename(
+            title="Choose Stamp Image",
+            filetypes=[
+                ("Image files", "*.png *.jpg *.jpeg *.gif *.bmp *.webp"),
+                ("All files", "*.*"),
+            ],
+        )
+        if selection:
+            self.stamp_asset = selection
+            self._update_stamp_label()
 
     def _on_width_change(self, value):
         try:
@@ -319,15 +361,16 @@ class WhiteboardController:
         self.state.snap_to_grid = self.snap_to_grid
         self._persist_state(update_only=True)
 
-    def _on_stamp_asset_change(self, selection: str):
-        if selection in self._stamp_assets_map:
-            self.stamp_asset = self._stamp_assets_map[selection]
-
     def _on_stamp_size_change(self, value):
         try:
             self.stamp_size = max(16, int(float(value)))
         except Exception:
             self.stamp_size = 64
+
+    def _update_stamp_label(self):
+        if hasattr(self, "_stamp_label_var"):
+            label = os.path.basename(self.stamp_asset) if self.stamp_asset else "Choose Stamp"
+            self._stamp_label_var.set(label)
 
     def _on_canvas_resize(self, event):
         new_size = (max(1, int(event.width)), max(1, int(event.height)))
