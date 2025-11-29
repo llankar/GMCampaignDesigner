@@ -189,12 +189,26 @@ def _build_toolbar(self):
     _pack_control(self.token_size_menu, trailing=4)
 
     drawing_section = _create_collapsible_section(toolbar, "Drawings")
+
+    drawing_container = ctk.CTkScrollableFrame(
+        drawing_section,
+        fg_color="transparent",
+        orientation="vertical",
+    )
+    drawing_container.pack(side="left", fill="both", expand=True, padx=(0, 4), pady=(2, 2))
+
+    def _pack_drawing_row(row, *, pady=(4, 2)):
+        row.pack(side="top", fill="x", anchor="w", padx=(6, 2), pady=pady)
+
+    drawing_tool_row = ctk.CTkFrame(drawing_container, fg_color="transparent")
+    _pack_drawing_row(drawing_tool_row)
+
     # --- Drawing Tool Selector ---
-    tool_label = ctk.CTkLabel(drawing_section, text="Tool")
+    tool_label = ctk.CTkLabel(drawing_tool_row, text="Tool")
     _pack_control(tool_label, leading=8, trailing=4)
     drawing_tools = ["Token", "Rectangle", "Oval", "Text", "Whiteboard", "Eraser"]
     self.drawing_tool_menu = ctk.CTkOptionMenu(
-        drawing_section,
+        drawing_tool_row,
         values=drawing_tools,
         command=self._on_drawing_tool_change, # To be created in DisplayMapController
         width=dropdown_width,
@@ -203,8 +217,8 @@ def _build_toolbar(self):
     self.drawing_tool_menu.set(self.drawing_mode.capitalize() if hasattr(self, 'drawing_mode') else "Token")
     _pack_control(self.drawing_tool_menu, trailing=4)
 
-    whiteboard_controls = ctk.CTkFrame(drawing_section, fg_color="transparent")
-    whiteboard_controls.pack(side="left", padx=(6, 2), pady=4)
+    whiteboard_controls = ctk.CTkFrame(drawing_container, fg_color="transparent")
+    _pack_drawing_row(whiteboard_controls)
     self.whiteboard_controls_frame = whiteboard_controls
 
     self.whiteboard_color_button = ctk.CTkButton(
@@ -237,8 +251,8 @@ def _build_toolbar(self):
     width_value_label.pack(side="left", padx=(4, 0))
     self.whiteboard_width_value_label = width_value_label
 
-    text_controls = ctk.CTkFrame(drawing_section, fg_color="transparent")
-    text_controls.pack(side="left", padx=(6, 2), pady=4)
+    text_controls = ctk.CTkFrame(drawing_container, fg_color="transparent")
+    _pack_drawing_row(text_controls)
     self.text_controls_frame = text_controls
     text_size_label = ctk.CTkLabel(text_controls, text="Text Size")
     text_size_label.pack(side="left", padx=(0, 2))
@@ -268,8 +282,8 @@ def _build_toolbar(self):
         pass
     self.text_color_button.pack(side="left", padx=(0, 4), pady=4)
 
-    eraser_controls = ctk.CTkFrame(drawing_section, fg_color="transparent")
-    eraser_controls.pack(side="left", padx=(8, 2), pady=4)
+    eraser_controls = ctk.CTkFrame(drawing_container, fg_color="transparent")
+    _pack_drawing_row(eraser_controls)
     self.eraser_controls_frame = eraser_controls
 
     eraser_width_container = ctk.CTkFrame(eraser_controls, fg_color="transparent")
@@ -278,10 +292,13 @@ def _build_toolbar(self):
     
 
     # --- Shape Fill Mode Selector (conditionally visible) ---
-    self.shape_fill_label = ctk.CTkLabel(drawing_section, text="Shape Fill:")
+    shape_controls_row = ctk.CTkFrame(drawing_container, fg_color="transparent")
+    self.shape_controls_row = shape_controls_row
+
+    self.shape_fill_label = ctk.CTkLabel(shape_controls_row, text="Shape Fill:")
     # Packed by _update_shape_controls_visibility
     self.shape_fill_mode_menu = ctk.CTkOptionMenu(
-        drawing_section,
+        shape_controls_row,
         values=["Filled", "Border Only"],
         command=self._on_shape_fill_mode_change, # To be created in DisplayMapController
         width=dropdown_width,
@@ -292,7 +309,7 @@ def _build_toolbar(self):
 
     # --- Shape Color Pickers (conditionally visible) ---
     self.shape_fill_color_button = ctk.CTkButton(
-        drawing_section,
+        shape_controls_row,
         text="Fill Color",
         width=80,
         command=self._on_pick_shape_fill_color # To be created in DisplayMapController
@@ -300,7 +317,7 @@ def _build_toolbar(self):
     # Packed by _update_shape_controls_visibility
 
     self.shape_border_color_button = ctk.CTkButton(
-        drawing_section,
+        shape_controls_row,
         text="Border Color",
         width=100,
         command=self._on_pick_shape_border_color # To be created in DisplayMapController
