@@ -1180,6 +1180,8 @@ class WhiteboardController:
             max(1, int(ch / max(0.05, self.view_zoom))),
         )
 
+        origin = self._current_view_origin()
+
         img = self._render_whiteboard_image(
             include_text=False, for_player=True, viewport_size=viewport_size
         )
@@ -1209,8 +1211,8 @@ class WhiteboardController:
             scaled_size = max(1, int(size * self.view_zoom))
             color = item.get("color", self.ink_color)
             font = self._font_cache.tk_font(scaled_size)
-            screen_x = pos[0] * self.view_zoom
-            screen_y = pos[1] * self.view_zoom
+            screen_x = (pos[0] - origin[0]) * self.view_zoom
+            screen_y = (pos[1] - origin[1]) * self.view_zoom
             canvas.create_text(
                 x_offset + screen_x,
                 y_offset + screen_y,
