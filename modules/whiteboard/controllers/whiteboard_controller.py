@@ -88,23 +88,35 @@ class WhiteboardController:
     # ------------------------------------------------------------------
     def _build_ui(self):
         toolbar_container = ctk.CTkFrame(self.parent)
-        toolbar_container.pack(fill="x", side="top", padx=6, pady=4)
+        toolbar_container.pack(fill="x", side="top", padx=6, pady=(2, 4))
 
-        toolbar_canvas = tk.Canvas(toolbar_container, height=70, highlightthickness=0, bd=0)
+        toolbar_canvas = tk.Canvas(toolbar_container, height=64, highlightthickness=0, bd=0)
         scrollbar = ctk.CTkScrollbar(toolbar_container, orientation="horizontal", command=toolbar_canvas.xview)
         toolbar_canvas.configure(xscrollcommand=scrollbar.set)
 
         toolbar_canvas.pack(fill="x", side="top", expand=True)
-        scrollbar.pack(fill="x", side="bottom")
 
         toolbar = ctk.CTkFrame(toolbar_canvas)
         toolbar_canvas.create_window((0, 0), window=toolbar, anchor="nw")
 
-        def _update_scroll_region(event):
-            toolbar_canvas.configure(scrollregion=toolbar_canvas.bbox("all"))
+        def _update_scroll_region(_event=None):
+            bbox = toolbar_canvas.bbox("all")
+            toolbar_canvas.configure(scrollregion=bbox)
+            if not bbox:
+                if scrollbar.winfo_ismapped():
+                    scrollbar.pack_forget()
+                return
+            content_width = bbox[2] - bbox[0]
+            canvas_width = toolbar_canvas.winfo_width()
+            if content_width > canvas_width:
+                if not scrollbar.winfo_ismapped():
+                    scrollbar.pack(fill="x", side="bottom")
+            elif scrollbar.winfo_ismapped():
+                scrollbar.pack_forget()
 
         def _sync_canvas_width(event):
             toolbar_canvas.configure(width=event.width)
+            _update_scroll_region()
 
         toolbar.bind("<Configure>", _update_scroll_region)
         toolbar_container.bind("<Configure>", _sync_canvas_width)
@@ -121,15 +133,15 @@ class WhiteboardController:
 
     def _build_toolbar(self, toolbar: ctk.CTkFrame):
         tool_label = ctk.CTkLabel(toolbar, text="Tool")
-        tool_label.pack(side="left", padx=(0, 6))
+        tool_label.pack(side="left", padx=(0, 4))
         tool_menu = ctk.CTkOptionMenu(
             toolbar,
             values=["Pen", "Text", "Stamp", "Eraser"],
             command=self._on_tool_change,
-            width=140,
+            width=130,
         )
         tool_menu.set("Pen")
-        tool_menu.pack(side="left", padx=(0, 10))
+        tool_menu.pack(side="left", padx=(0, 6))
 
         color_btn = ctk.CTkButton(
             toolbar,
@@ -142,7 +154,7 @@ class WhiteboardController:
             border_width=2,
             border_color="#3a3a3a",
         )
-        color_btn.pack(side="left", padx=(0, 8))
+        color_btn.pack(side="left", padx=(0, 6))
         self._color_button = color_btn
 
         width_values = [2, 4, 6, 8, 10, 12, 14, 16, 18, 20]
@@ -153,10 +165,10 @@ class WhiteboardController:
             toolbar,
             values=[str(v) for v in width_values],
             command=self._on_width_change,
-            width=90,
+            width=88,
         )
         width_menu.set(str(self.stroke_width))
-        width_menu.pack(side="left", padx=(0, 10))
+        width_menu.pack(side="left", padx=(0, 6))
         self._width_menu = width_menu
 
         eraser_values = [4, 6, 8, 10, 12, 14, 16, 20, 24, 28, 32, 40, 48, 56, 60]
@@ -167,35 +179,35 @@ class WhiteboardController:
             toolbar,
             values=[str(v) for v in eraser_values],
             command=self._on_eraser_change,
-            width=90,
+            width=88,
         )
         eraser_menu.set(str(self.eraser_radius))
-        eraser_menu.pack(side="left", padx=(0, 10))
+        eraser_menu.pack(side="left", padx=(0, 6))
         self._eraser_menu = eraser_menu
 
         text_size_label = ctk.CTkLabel(toolbar, text="Text Size")
-        text_size_label.pack(side="left", padx=(6, 4))
+        text_size_label.pack(side="left", padx=(4, 4))
         text_sizes = ["16", "20", "24", "32", "40", "48"]
-        text_menu = ctk.CTkOptionMenu(toolbar, values=text_sizes, command=self._on_text_size_change, width=100)
+        text_menu = ctk.CTkOptionMenu(toolbar, values=text_sizes, command=self._on_text_size_change, width=92)
         text_menu.set(str(self.text_size))
-        text_menu.pack(side="left", padx=(0, 10))
+        text_menu.pack(side="left", padx=(0, 6))
         self._text_menu = text_menu
 
         layer_frame = ctk.CTkFrame(toolbar, fg_color="transparent")
-        layer_frame.pack(side="left", padx=(0, 10))
+        layer_frame.pack(side="left", padx=(0, 6))
         ctk.CTkLabel(layer_frame, text="Layer").pack(side="left", padx=(0, 4))
         layer_menu = ctk.CTkOptionMenu(
             layer_frame,
             values=["Shared", "GM Only"],
             command=self._on_layer_change,
-            width=120,
+            width=112,
         )
         layer_menu.set("GM Only" if self.active_layer == WhiteboardLayer.GM.value else "Shared")
         layer_menu.pack(side="left")
         self._layer_menu = layer_menu
 
         visibility_frame = ctk.CTkFrame(toolbar, fg_color="transparent")
-        visibility_frame.pack(side="left", padx=(0, 10))
+        visibility_frame.pack(side="left", padx=(0, 6))
         self._shared_visible = ctk.CTkCheckBox(
             visibility_frame,
             text="Shared",
@@ -216,7 +228,7 @@ class WhiteboardController:
         self._gm_visible.pack(side="left")
 
         grid_frame = ctk.CTkFrame(toolbar, fg_color="transparent")
-        grid_frame.pack(side="left", padx=(0, 10))
+        grid_frame.pack(side="left", padx=(0, 6))
         self._grid_toggle = ctk.CTkCheckBox(grid_frame, text="Grid", command=self._on_toggle_grid)
         if self.grid_enabled:
             self._grid_toggle.select()
@@ -240,7 +252,7 @@ class WhiteboardController:
         self._snap_toggle.pack(side="left", padx=(6, 0))
 
         stamp_frame = ctk.CTkFrame(toolbar, fg_color="transparent")
-        stamp_frame.pack(side="left", padx=(0, 10))
+        stamp_frame.pack(side="left", padx=(0, 6))
         ctk.CTkLabel(stamp_frame, text="Stamp").pack(side="left", padx=(0, 4))
         self._stamp_label_var = tk.StringVar(value=os.path.basename(self.stamp_asset) if self.stamp_asset else "Choose Stamp")
         stamp_btn = ctk.CTkButton(
@@ -250,9 +262,9 @@ class WhiteboardController:
             height=32,
             command=self._on_select_stamp_asset,
         )
-        stamp_btn.pack(side="left", padx=(0, 6))
+        stamp_btn.pack(side="left", padx=(0, 4))
         stamp_label = ctk.CTkLabel(stamp_frame, textvariable=self._stamp_label_var)
-        stamp_label.pack(side="left", padx=(0, 6))
+        stamp_label.pack(side="left", padx=(0, 4))
         stamp_values = [24, 32, 40, 48, 64, 80, 96, 120, 144, 168, 196]
         if self.stamp_size not in stamp_values:
             stamp_values.append(int(self.stamp_size))
@@ -261,27 +273,40 @@ class WhiteboardController:
             stamp_frame,
             values=[str(v) for v in stamp_values],
             command=self._on_stamp_size_change,
-            width=100,
+            width=96,
         )
         stamp_size_menu.set(str(self.stamp_size))
         stamp_size_menu.pack(side="left")
         self._stamp_size_menu = stamp_size_menu
 
         history_frame = ctk.CTkFrame(toolbar, fg_color="transparent")
-        history_frame.pack(side="left", padx=(0, 8))
-        undo_btn = ctk.CTkButton(history_frame, text="Undo", command=self._undo_action, width=80)
+        history_frame.pack(side="left", padx=(0, 6))
+        undo_btn = ctk.CTkButton(history_frame, text="Undo", command=self._undo_action, width=76)
         undo_btn.pack(side="left", padx=(0, 4))
-        redo_btn = ctk.CTkButton(history_frame, text="Redo", command=self._redo_action, width=80)
+        redo_btn = ctk.CTkButton(history_frame, text="Redo", command=self._redo_action, width=76)
         redo_btn.pack(side="left")
 
         save_btn = ctk.CTkButton(toolbar, text="Save", command=self._persist_state)
-        save_btn.pack(side="left", padx=(0, 6))
+        save_btn.pack(side="left", padx=(0, 4))
 
         clear_btn = ctk.CTkButton(toolbar, text="Clear", command=self.clear_board)
-        clear_btn.pack(side="left", padx=(0, 6))
+        clear_btn.pack(side="left", padx=(0, 4))
 
         player_btn = ctk.CTkButton(toolbar, text="Open Player View", command=self.open_player_view)
-        player_btn.pack(side="left", padx=(0, 6))
+        player_btn.pack(side="left", padx=(0, 4))
+
+        def _resize_canvas(_event=None):
+            toolbar_height = toolbar_container.winfo_height()
+            try:
+                parent_width = int(self.parent.winfo_width())
+                parent_height = int(self.parent.winfo_height())
+            except Exception:
+                return
+            new_height = max(1, parent_height - toolbar_height)
+            self.canvas.configure(width=parent_width, height=new_height)
+
+        self.parent.bind("<Configure>", _resize_canvas, add="+")
+        _resize_canvas()
 
     # ------------------------------------------------------------------
     # Event Handling
