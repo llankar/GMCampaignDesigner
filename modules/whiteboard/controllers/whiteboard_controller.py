@@ -108,12 +108,7 @@ class WhiteboardController:
             pass
         canvas_width = max(1, int(self.canvas.winfo_width()))
         canvas_height = max(1, int(self.canvas.winfo_height()))
-        content_width = float(self.board_size[0]) * float(self.view_zoom)
-        content_height = float(self.board_size[1]) * float(self.view_zoom)
-        self._base_pan = (
-            (canvas_width - content_width) / 2.0,
-            (canvas_height - content_height) / 2.0,
-        )
+        self._base_pan = self._compute_base_pan(canvas_width, canvas_height)
         self._update_view_pan()
         self.canvas.configure(
             scrollregion=(
@@ -151,6 +146,15 @@ class WhiteboardController:
         self._view_pan_offset = offset
         self._update_view_pan()
         self._redraw_canvas()
+        self._update_player_view()
+
+    def _compute_base_pan(self, canvas_width: int, canvas_height: int) -> Tuple[float, float]:
+        content_width = float(self.board_size[0]) * float(self.view_zoom)
+        content_height = float(self.board_size[1]) * float(self.view_zoom)
+        return (
+            (canvas_width - content_width) / 2.0,
+            (canvas_height - content_height) / 2.0,
+        )
 
     # ------------------------------------------------------------------
     # UI Construction
@@ -1126,8 +1130,9 @@ class WhiteboardController:
         canvas.update_idletasks()
         cw = max(canvas.winfo_width(), 1)
         ch = max(canvas.winfo_height(), 1)
-        x_offset = max(0, (cw - img.width) // 2)
-        y_offset = max(0, (ch - img.height) // 2)
+        base_x, base_y = self._compute_base_pan(cw, ch)
+        x_offset = base_x + self._view_pan_offset[0]
+        y_offset = base_y + self._view_pan_offset[1]
 
         photo = ImageTk.PhotoImage(img)
         self._player_view_photo = photo
