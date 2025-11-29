@@ -35,6 +35,7 @@ def render_whiteboard_image(
     include_text: bool = True,
     grid_enabled: bool = False,
     grid_size: int = 50,
+    grid_origin: Tuple[float, float] = (0.0, 0.0),
     for_player: bool = False,
     zoom: float = 1.0,
 ) -> Image.Image:
@@ -52,7 +53,12 @@ def render_whiteboard_image(
         return point[0] * zoom, point[1] * zoom
 
     if grid_enabled:
-        draw_grid_on_image(img, int(max(1, grid_size * zoom)))
+        draw_grid_on_image(
+            img,
+            int(max(1, grid_size)),
+            origin=grid_origin,
+            zoom=zoom,
+        )
 
     for item in items:
         if for_player and normalize_layer(item.get("layer")) == WhiteboardLayer.GM.value:
