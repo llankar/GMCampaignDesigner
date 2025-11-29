@@ -283,7 +283,6 @@ def _build_toolbar(self):
     self.text_color_button.pack(side="left", padx=(0, 4), pady=4)
 
     eraser_controls = ctk.CTkFrame(drawing_container, fg_color="transparent")
-    _pack_drawing_row(eraser_controls)
     self.eraser_controls_frame = eraser_controls
 
     eraser_width_container = ctk.CTkFrame(eraser_controls, fg_color="transparent")
