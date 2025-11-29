@@ -4,6 +4,9 @@ from typing import List, Dict, Tuple, Any
 from PIL import Image, ImageDraw
 
 from modules.helpers.logging_helper import log_module_import
+from modules.whiteboard.models.layer_types import WhiteboardLayer, normalize_layer
+from modules.whiteboard.utils.grid_overlay import draw_grid_on_image
+from modules.whiteboard.utils.stamp_assets import load_pil_asset
 from modules.maps.utils.text_items import TextFontCache
 
 log_module_import(__name__)
@@ -30,6 +33,9 @@ def render_whiteboard_image(
     *,
     font_cache: TextFontCache | None = None,
     include_text: bool = True,
+    grid_enabled: bool = False,
+    grid_size: int = 50,
+    for_player: bool = False,
 ) -> Image.Image:
     width, height = _resolve_size(size)
     img = Image.new("RGB", (width, height), "white")
@@ -38,6 +44,8 @@ def render_whiteboard_image(
     font_cache = font_cache or TextFontCache()
 
     for item in items:
+        if for_player and normalize_layer(item.get("layer")) == WhiteboardLayer.GM.value:
+            continue
         item_type = item.get("type")
         if item_type == "stroke":
             points = item.get("points") or []
@@ -59,6 +67,20 @@ def render_whiteboard_image(
                 draw.text(pos, text_value, fill=color, font=font, anchor="lt")
             except Exception:
                 draw.text(pos, text_value, fill=color, font=font)
+        elif item_type == "stamp":
+            asset_path = item.get("asset")
+            if not asset_path:
+                continue
+            pos = item.get("position") or (0, 0)
+            size_px = int(item.get("size", 48))
+            try:
+                stamp_img = load_pil_asset(asset_path, size_px)
+                img.alpha_composite(stamp_img, dest=(int(pos[0]), int(pos[1])))
+            except Exception:
+                continue
+
+    if grid_enabled:
+        draw_grid_on_image(img, grid_size)
 
     return img
 
