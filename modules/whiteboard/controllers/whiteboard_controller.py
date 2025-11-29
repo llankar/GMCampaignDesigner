@@ -1131,7 +1131,7 @@ class WhiteboardController:
         win.geometry(f"{target.width}x{target.height}+{target.x}+{target.y}")
         win.lift(); win.focus_force(); win.attributes("-topmost", True); win.after_idle(lambda: win.attributes("-topmost", False))
 
-        canvas = tk.Canvas(win, bg="black", highlightthickness=0)
+        canvas = tk.Canvas(win, bg="white", highlightthickness=0)
         canvas.pack(fill="both", expand=True)
 
         self._player_view_window = win
@@ -1186,9 +1186,8 @@ class WhiteboardController:
         if img is None:
             return
 
-        base_x, base_y = self._compute_base_pan(cw, ch)
-        x_offset = base_x + self._view_pan_offset[0]
-        y_offset = base_y + self._view_pan_offset[1]
+        x_offset = 0
+        y_offset = 0
 
         photo = ImageTk.PhotoImage(img)
         self._player_view_photo = photo
