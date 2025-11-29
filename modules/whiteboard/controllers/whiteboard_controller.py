@@ -108,7 +108,7 @@ class WhiteboardController:
         toolbar_container = ctk.CTkFrame(self.parent)
         toolbar_container.pack(fill="x", side="top", padx=6, pady=(2, 4))
 
-        toolbar_canvas = tk.Canvas(toolbar_container, height=64, highlightthickness=0, bd=0)
+        toolbar_canvas = tk.Canvas(toolbar_container, height=35, highlightthickness=0, bd=0)
         container_fg = self._resolve_ctk_color(toolbar_container.cget("fg_color"))
         if container_fg:
             toolbar_canvas.configure(bg=container_fg)
