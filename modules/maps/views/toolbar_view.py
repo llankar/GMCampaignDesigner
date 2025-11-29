@@ -7,8 +7,8 @@ log_module_import(__name__)
 
 def _build_toolbar(self):
     section_tracker = {"count": 0}
-    horizontal_spacing = 8
-    control_pady = 8
+    horizontal_spacing = 4
+    control_pady = 4
 
     def _pack_control(widget, *, leading=0, trailing=None, pady=None):
         padx = (leading, horizontal_spacing if trailing is None else trailing)
@@ -22,12 +22,12 @@ def _build_toolbar(self):
                 width=2,
                 corner_radius=2,
             )
-            separator.pack(side="left", fill="y", padx=(4, 12), pady=(6, 6))
+            separator.pack(side="left", fill="y", padx=(4, 8), pady=(4, 4))
 
         section_tracker["count"] += 1
 
         section = ctk.CTkFrame(parent, fg_color="transparent")
-        section.pack(side="left", padx=(0, 12), pady=2, fill="y")
+        section.pack(side="left", padx=(0, 8), pady=2, fill="y")
 
         toggle_state = tk.BooleanVar(value=True)
         def _toggle():
@@ -44,10 +44,10 @@ def _build_toolbar(self):
             section,
             text=f"{title} ▼",
             command=_toggle,
-            width=92,
-            height=32,
+            width=82,
+            height=30,
         )
-        toggle_button.pack(side="left", padx=(0, 6), pady=4)
+        toggle_button.pack(side="left", padx=(0, 4), pady=4)
 
         content_frame = ctk.CTkFrame(
             section,
@@ -91,7 +91,7 @@ def _build_toolbar(self):
 
     }
 
-    dropdown_width = 100
+    dropdown_width = 0
 
     # Fog controls
     fog_section = _create_collapsible_section(toolbar, "Fog")
@@ -204,44 +204,44 @@ def _build_toolbar(self):
     _pack_control(self.drawing_tool_menu, trailing=4)
 
     whiteboard_controls = ctk.CTkFrame(drawing_section, fg_color="transparent")
-    whiteboard_controls.pack(side="left", padx=(8, 2), pady=4)
+    whiteboard_controls.pack(side="left", padx=(6, 2), pady=4)
     self.whiteboard_controls_frame = whiteboard_controls
 
     self.whiteboard_color_button = ctk.CTkButton(
         whiteboard_controls,
         text="Ink Color",
-        width=90,
+        width=0,
         command=self._on_pick_whiteboard_color,
     )
     try:
         self.whiteboard_color_button.configure(fg_color=getattr(self, "whiteboard_color", "#FF0000"))
     except tk.TclError:
         pass
-    _pack_control(self.whiteboard_color_button, leading=0, trailing=6, pady=6)
+    _pack_control(self.whiteboard_color_button, leading=0, trailing=4, pady=4)
 
     width_container = ctk.CTkFrame(whiteboard_controls, fg_color="transparent")
-    width_container.pack(side="left", padx=(0, 6), pady=6)
+    width_container.pack(side="left", padx=(0, 4), pady=4)
     width_label = ctk.CTkLabel(width_container, text="Width")
-    width_label.pack(side="left", padx=(0, 4))
+    width_label.pack(side="left", padx=(0, 2))
     self.whiteboard_width_slider = ctk.CTkSlider(
         width_container,
         from_=1,
         to=20,
         number_of_steps=19,
         command=self._on_whiteboard_width_change,
-        width=120,
+        width=110,
     )
     current_width = float(getattr(self, "whiteboard_width", 4))
     self.whiteboard_width_slider.set(current_width)
     width_value_label = ctk.CTkLabel(width_container, text=str(int(current_width)))
-    width_value_label.pack(side="left", padx=(6, 0))
+    width_value_label.pack(side="left", padx=(4, 0))
     self.whiteboard_width_value_label = width_value_label
 
     text_controls = ctk.CTkFrame(drawing_section, fg_color="transparent")
-    text_controls.pack(side="left", padx=(8, 2), pady=4)
+    text_controls.pack(side="left", padx=(6, 2), pady=4)
     self.text_controls_frame = text_controls
     text_size_label = ctk.CTkLabel(text_controls, text="Text Size")
-    text_size_label.pack(side="left", padx=(0, 4))
+    text_size_label.pack(side="left", padx=(0, 2))
     text_sizes = getattr(self, "text_size_options", [16, 20, 24, 32, 40])
     current_text_size = int(getattr(self, "text_size", text_sizes[0] if text_sizes else 24))
     if current_text_size not in text_sizes:
@@ -254,19 +254,19 @@ def _build_toolbar(self):
         width=dropdown_width,
     )
     self.text_size_menu.set(str(current_text_size))
-    self.text_size_menu.pack(side="left", padx=(0, 6), pady=6)
+    self.text_size_menu.pack(side="left", padx=(0, 4), pady=4)
 
     self.text_color_button = ctk.CTkButton(
         text_controls,
         text="Text Color",
-        width=90,
+        width=0,
         command=self._on_pick_whiteboard_color,
     )
     try:
         self.text_color_button.configure(fg_color=getattr(self, "whiteboard_color", "#FF0000"))
     except tk.TclError:
         pass
-    self.text_color_button.pack(side="left", padx=(0, 6), pady=6)
+    self.text_color_button.pack(side="left", padx=(0, 4), pady=4)
 
     eraser_controls = ctk.CTkFrame(drawing_section, fg_color="transparent")
     eraser_controls.pack(side="left", padx=(8, 2), pady=4)
