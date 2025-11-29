@@ -21,6 +21,12 @@ def _storage_path() -> str:
 class WhiteboardState:
     items: List[Dict[str, Any]] = field(default_factory=list)
     size: Tuple[int, int] = field(default_factory=lambda: DEFAULT_SIZE)
+    grid_enabled: bool = False
+    grid_size: int = 50
+    snap_to_grid: bool = False
+    active_layer: str = "shared"
+    show_shared_layer: bool = True
+    show_gm_layer: bool = True
 
     @staticmethod
     def from_dict(raw: Dict[str, Any]) -> "WhiteboardState":
@@ -31,14 +37,32 @@ class WhiteboardState:
                 size = DEFAULT_SIZE
         except Exception:
             size = DEFAULT_SIZE
-        return WhiteboardState(items=list(items), size=size)  # shallow copy to avoid mutation leaks
+        return WhiteboardState(
+            items=list(items),
+            size=size,
+            grid_enabled=bool(raw.get("grid_enabled", False)),
+            grid_size=int(raw.get("grid_size", 50) or 50),
+            snap_to_grid=bool(raw.get("snap_to_grid", False)),
+            active_layer=str(raw.get("active_layer", "shared")),
+            show_shared_layer=bool(raw.get("show_shared_layer", True)),
+            show_gm_layer=bool(raw.get("show_gm_layer", True)),
+        )
 
     def to_dict(self) -> Dict[str, Any]:
         serialized_items = []
         for item in self.items:
-            clean = {k: v for k, v in item.items() if k not in ("canvas_ids",)}
+            clean = {k: v for k, v in item.items() if k not in ("canvas_ids", "_image_ref")}
             serialized_items.append(clean)
-        return {"items": serialized_items, "size": list(self.size)}
+        return {
+            "items": serialized_items,
+            "size": list(self.size),
+            "grid_enabled": self.grid_enabled,
+            "grid_size": int(self.grid_size),
+            "snap_to_grid": self.snap_to_grid,
+            "active_layer": self.active_layer,
+            "show_shared_layer": self.show_shared_layer,
+            "show_gm_layer": self.show_gm_layer,
+        }
 
 
 class WhiteboardStorage:

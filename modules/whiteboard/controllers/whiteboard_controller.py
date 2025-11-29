@@ -1,8 +1,9 @@
 import io
 import math
+import os
 import tkinter as tk
 from tkinter import colorchooser
-from typing import List, Dict, Tuple
+from typing import List, Dict, Tuple, Iterable
 
 import customtkinter as ctk
 from PIL import Image, ImageTk
@@ -10,7 +11,11 @@ from screeninfo import get_monitors
 
 from modules.helpers.logging_helper import log_module_import, log_info, log_warning
 from modules.maps.utils.text_items import TextFontCache, prompt_for_text, text_hit_test
+from modules.whiteboard.models.layer_types import WhiteboardLayer, normalize_layer
 from modules.whiteboard.services.whiteboard_storage import WhiteboardStorage, WhiteboardState
+from modules.whiteboard.services.whiteboard_history import WhiteboardHistory
+from modules.whiteboard.utils.grid_overlay import GridOverlay
+from modules.whiteboard.utils.stamp_assets import available_stamp_assets, load_tk_asset
 from modules.whiteboard.utils.whiteboard_renderer import render_whiteboard_image
 from modules.whiteboard.views.web_whiteboard_view import (
     open_whiteboard_display,
@@ -30,11 +35,22 @@ class WhiteboardController:
         self.stroke_width = 4
         self.eraser_radius = 10
         self.text_size = 24
+        self.stamp_size = 64
+        self.stamp_asset = None
+        self.grid_enabled = False
+        self.grid_size = 50
+        self.snap_to_grid = False
+        self.active_layer: str = WhiteboardLayer.SHARED.value
+        self.show_shared_layer: bool = True
+        self.show_gm_layer: bool = True
 
         self._active_points: List[Tuple[float, float]] = []
         self._preview_id = None
         self._eraser_active = False
         self._eraser_dirty = False
+        self._eraser_recorded = False
+        self._grid_overlay = GridOverlay()
+        self._history = WhiteboardHistory()
 
         self._player_view_window = None
         self._player_view_canvas = None
@@ -50,7 +66,20 @@ class WhiteboardController:
         self.whiteboard_items: List[Dict] = list(self.state.items)
         self.board_size: Tuple[int, int] = tuple(self.state.size)
 
+        self.grid_enabled = bool(getattr(self.state, "grid_enabled", False))
+        self.grid_size = int(getattr(self.state, "grid_size", 50) or 50)
+        self.snap_to_grid = bool(getattr(self.state, "snap_to_grid", False))
+        self.active_layer = normalize_layer(getattr(self.state, "active_layer", WhiteboardLayer.SHARED.value))
+        self.show_shared_layer = bool(getattr(self.state, "show_shared_layer", True))
+        self.show_gm_layer = bool(getattr(self.state, "show_gm_layer", True))
+
+        assets = available_stamp_assets()
+        self._stamp_assets_map = {os.path.basename(path): path for path in assets}
+        if assets:
+            self.stamp_asset = assets[0]
+
         self._build_ui()
+        self._history.reset(self.whiteboard_items)
         self._redraw_canvas()
         self._update_web_display_whiteboard()
 
@@ -75,7 +104,7 @@ class WhiteboardController:
         tool_label.pack(side="left", padx=(0, 6))
         tool_menu = ctk.CTkOptionMenu(
             toolbar,
-            values=["Pen", "Text", "Eraser"],
+            values=["Pen", "Text", "Stamp", "Eraser"],
             command=self._on_tool_change,
             width=140,
         )
@@ -119,6 +148,88 @@ class WhiteboardController:
         text_menu.pack(side="left", padx=(0, 10))
         self._text_menu = text_menu
 
+        layer_frame = ctk.CTkFrame(toolbar, fg_color="transparent")
+        layer_frame.pack(side="left", padx=(0, 10))
+        ctk.CTkLabel(layer_frame, text="Layer").pack(side="left", padx=(0, 4))
+        layer_menu = ctk.CTkOptionMenu(
+            layer_frame,
+            values=["Shared", "GM Only"],
+            command=self._on_layer_change,
+            width=120,
+        )
+        layer_menu.set("GM Only" if self.active_layer == WhiteboardLayer.GM.value else "Shared")
+        layer_menu.pack(side="left")
+        self._layer_menu = layer_menu
+
+        visibility_frame = ctk.CTkFrame(toolbar, fg_color="transparent")
+        visibility_frame.pack(side="left", padx=(0, 10))
+        self._shared_visible = ctk.CTkCheckBox(
+            visibility_frame,
+            text="Shared",
+            command=self._on_toggle_shared_layer,
+            onvalue=1,
+            offvalue=0,
+        )
+        self._shared_visible.select() if self.show_shared_layer else self._shared_visible.deselect()
+        self._shared_visible.pack(side="left", padx=(0, 4))
+        self._gm_visible = ctk.CTkCheckBox(
+            visibility_frame,
+            text="GM",
+            command=self._on_toggle_gm_layer,
+            onvalue=1,
+            offvalue=0,
+        )
+        self._gm_visible.select() if self.show_gm_layer else self._gm_visible.deselect()
+        self._gm_visible.pack(side="left")
+
+        grid_frame = ctk.CTkFrame(toolbar, fg_color="transparent")
+        grid_frame.pack(side="left", padx=(0, 10))
+        self._grid_toggle = ctk.CTkCheckBox(grid_frame, text="Grid", command=self._on_toggle_grid)
+        if self.grid_enabled:
+            self._grid_toggle.select()
+        self._grid_toggle.pack(side="left", padx=(0, 6))
+        grid_slider = ctk.CTkSlider(grid_frame, from_=10, to=200, number_of_steps=38, command=self._on_grid_size_change, width=120)
+        grid_slider.set(self.grid_size)
+        grid_slider.pack(side="left")
+        self._grid_slider = grid_slider
+        self._snap_toggle = ctk.CTkCheckBox(grid_frame, text="Snap", command=self._on_toggle_snap)
+        if self.snap_to_grid:
+            self._snap_toggle.select()
+        self._snap_toggle.pack(side="left", padx=(6, 0))
+
+        stamp_frame = ctk.CTkFrame(toolbar, fg_color="transparent")
+        stamp_frame.pack(side="left", padx=(0, 10))
+        ctk.CTkLabel(stamp_frame, text="Stamp").pack(side="left", padx=(0, 4))
+        asset_names = list(self._stamp_assets_map.keys()) or ["No assets"]
+        stamp_menu = ctk.CTkOptionMenu(
+            stamp_frame,
+            values=asset_names,
+            command=self._on_stamp_asset_change,
+            width=140,
+            state="normal" if self._stamp_assets_map else "disabled",
+        )
+        stamp_menu.set(asset_names[0])
+        stamp_menu.pack(side="left", padx=(0, 6))
+        self._stamp_menu = stamp_menu
+        stamp_slider = ctk.CTkSlider(
+            stamp_frame,
+            from_=24,
+            to=196,
+            number_of_steps=43,
+            command=self._on_stamp_size_change,
+            width=120,
+        )
+        stamp_slider.set(self.stamp_size)
+        stamp_slider.pack(side="left")
+        self._stamp_slider = stamp_slider
+
+        history_frame = ctk.CTkFrame(toolbar, fg_color="transparent")
+        history_frame.pack(side="left", padx=(0, 8))
+        undo_btn = ctk.CTkButton(history_frame, text="Undo", command=self._undo_action, width=80)
+        undo_btn.pack(side="left", padx=(0, 4))
+        redo_btn = ctk.CTkButton(history_frame, text="Redo", command=self._redo_action, width=80)
+        redo_btn.pack(side="left")
+
         save_btn = ctk.CTkButton(toolbar, text="Save", command=self._persist_state)
         save_btn.pack(side="left", padx=(0, 6))
 
@@ -161,6 +272,49 @@ class WhiteboardController:
         except Exception:
             self.text_size = 24
 
+    def _on_layer_change(self, selection: str):
+        self.active_layer = WhiteboardLayer.GM.value if selection.lower().startswith("gm") else WhiteboardLayer.SHARED.value
+        self.state.active_layer = self.active_layer
+        self._persist_state(update_only=True)
+
+    def _on_toggle_shared_layer(self):
+        self.show_shared_layer = bool(self._shared_visible.get())
+        self.state.show_shared_layer = self.show_shared_layer
+        self._persist_state(update_only=True)
+
+    def _on_toggle_gm_layer(self):
+        self.show_gm_layer = bool(self._gm_visible.get())
+        self.state.show_gm_layer = self.show_gm_layer
+        self._persist_state(update_only=True)
+
+    def _on_toggle_grid(self):
+        self.grid_enabled = bool(self._grid_toggle.get())
+        self.state.grid_enabled = self.grid_enabled
+        self._persist_state(update_only=True)
+
+    def _on_grid_size_change(self, value):
+        try:
+            self.grid_size = max(10, int(float(value)))
+        except Exception:
+            self.grid_size = 50
+        self.state.grid_size = self.grid_size
+        self._persist_state(update_only=True)
+
+    def _on_toggle_snap(self):
+        self.snap_to_grid = bool(self._snap_toggle.get())
+        self.state.snap_to_grid = self.snap_to_grid
+        self._persist_state(update_only=True)
+
+    def _on_stamp_asset_change(self, selection: str):
+        if selection in self._stamp_assets_map:
+            self.stamp_asset = self._stamp_assets_map[selection]
+
+    def _on_stamp_size_change(self, value):
+        try:
+            self.stamp_size = max(16, int(float(value)))
+        except Exception:
+            self.stamp_size = 64
+
     def _on_canvas_resize(self, event):
         new_size = (max(1, int(event.width)), max(1, int(event.height)))
         if new_size != self.board_size:
@@ -169,26 +323,32 @@ class WhiteboardController:
 
     def _on_mouse_down(self, event):
         if self.tool == "pen":
-            self._active_points = [(event.x, event.y)]
+            snapped = self._snap_point(event.x, event.y) if self.snap_to_grid else (event.x, event.y)
+            self._active_points = [snapped]
             self._clear_preview()
         elif self.tool == "text":
             hit = self._find_text_item_at(event.x, event.y)
             if hit:
+                self._history.checkpoint(self.whiteboard_items)
                 self._start_text_drag(hit, event.x, event.y)
             else:
                 self._create_text_at(event.x, event.y)
+        elif self.tool == "stamp":
+            self._add_stamp_at(event.x, event.y)
         elif self.tool == "eraser":
             self._eraser_active = True
             if self._erase_at(event.x, event.y):
                 self._eraser_dirty = True
+                self._eraser_recorded = True
 
     def _on_mouse_move(self, event):
         if self.tool == "pen" and self._active_points:
             last = self._active_points[-1]
-            dx = event.x - last[0]
-            dy = event.y - last[1]
+            target_point = self._snap_point(event.x, event.y) if self.snap_to_grid else (event.x, event.y)
+            dx = target_point[0] - last[0]
+            dy = target_point[1] - last[1]
             if (dx * dx + dy * dy) >= 1.0:
-                self._active_points.append((event.x, event.y))
+                self._active_points.append(target_point)
                 self._update_preview()
         elif self.tool == "text" and self._dragging_text_item:
             self._update_text_drag(event.x, event.y)
@@ -204,6 +364,7 @@ class WhiteboardController:
                 self._persist_state()
             self._eraser_active = False
             self._eraser_dirty = False
+            self._eraser_recorded = False
         elif self.tool == "text" and self._dragging_text_item:
             self._persist_state()
             self._dragging_text_item = None
@@ -219,6 +380,7 @@ class WhiteboardController:
         updated = prompt_for_text(self.canvas, title="Edit Text", prompt="Update text:", initial=current_text)
         if updated is None:
             return
+        self._history.checkpoint(self.whiteboard_items)
         hit["text"] = updated
         self._apply_text_update(hit)
         self._persist_state()
@@ -259,11 +421,13 @@ class WhiteboardController:
         self._clear_preview()
         if len(points) < 2:
             return
+        self._history.checkpoint(self.whiteboard_items)
         stroke = {
             "type": "stroke",
             "points": points,
             "color": self.ink_color,
             "width": self.stroke_width,
+            "layer": self.active_layer,
         }
         self.whiteboard_items.append(stroke)
         self._persist_state()
@@ -286,15 +450,33 @@ class WhiteboardController:
         text = prompt_for_text(self.canvas, title="Add Text", prompt="Enter text:")
         if text is None:
             return
+        self._history.checkpoint(self.whiteboard_items)
+        point = self._snap_point(x, y) if self.snap_to_grid else (x, y)
         entry = {
             "type": "text",
-            "position": (x, y),
+            "position": point,
             "text": text,
             "color": self.ink_color,
             "size": self.text_size,
             "text_size": self.text_size,
+            "layer": self.active_layer,
         }
         self.whiteboard_items.append(entry)
+        self._persist_state()
+
+    def _add_stamp_at(self, x: float, y: float):
+        if not self.stamp_asset:
+            return
+        self._history.checkpoint(self.whiteboard_items)
+        point = self._snap_point(x, y) if self.snap_to_grid else (x, y)
+        stamp = {
+            "type": "stamp",
+            "position": point,
+            "asset": self.stamp_asset,
+            "size": self.stamp_size,
+            "layer": self.active_layer,
+        }
+        self.whiteboard_items.append(stamp)
         self._persist_state()
 
     def _find_text_item_at(self, x: float, y: float, *, radius: float = 6.0):
@@ -316,6 +498,8 @@ class WhiteboardController:
             return
         dx, dy = self._dragging_text_offset
         new_pos = (x - dx, y - dy)
+        if self.snap_to_grid:
+            new_pos = self._snap_point(*new_pos)
         item["position"] = new_pos
         self._apply_text_update(item)
 
@@ -336,6 +520,18 @@ class WhiteboardController:
             except tk.TclError:
                 pass
 
+    def _iter_visible_items(self, *, for_player: bool = False) -> Iterable[Dict]:
+        for item in self.whiteboard_items:
+            layer = normalize_layer(item.get("layer"))
+            if for_player and layer == WhiteboardLayer.GM.value:
+                continue
+            if not for_player:
+                if layer == WhiteboardLayer.SHARED.value and not self.show_shared_layer:
+                    continue
+                if layer == WhiteboardLayer.GM.value and not self.show_gm_layer:
+                    continue
+            yield item
+
     def _erase_at(self, x: float, y: float) -> bool:
         changed = False
         remaining = []
@@ -343,6 +539,13 @@ class WhiteboardController:
         radius = float(self.eraser_radius)
         radius_screen = radius
         for item in self.whiteboard_items:
+            layer = normalize_layer(item.get("layer"))
+            if layer == WhiteboardLayer.SHARED.value and not self.show_shared_layer:
+                remaining.append(item)
+                continue
+            if layer == WhiteboardLayer.GM.value and not self.show_gm_layer:
+                remaining.append(item)
+                continue
             item_type = item.get("type")
             if item_type == "text":
                 if text_hit_test(self.canvas, item, screen_point=point, radius=radius_screen, zoom=1.0, pan=(0, 0)):
@@ -352,8 +555,17 @@ class WhiteboardController:
                 if self._polyline_hits_point(item.get("points") or [], point, radius + float(item.get("width", 0)) / 2.0):
                     changed = True
                     continue
+            elif item_type == "stamp":
+                pos = item.get("position") or (0, 0)
+                size = float(item.get("size", self.stamp_size))
+                if abs(pos[0] - x) <= radius + size / 2 and abs(pos[1] - y) <= radius + size / 2:
+                    changed = True
+                    continue
             remaining.append(item)
         if changed:
+            if not self._eraser_recorded:
+                self._history.checkpoint(self.whiteboard_items)
+                self._eraser_recorded = True
             self.whiteboard_items = remaining
             self._redraw_canvas()
         return changed
@@ -380,20 +592,46 @@ class WhiteboardController:
         proj_y = y1 + t * dy
         return math.hypot(px - proj_x, py - proj_y)
 
+    def _snap_point(self, x: float, y: float) -> Tuple[float, float]:
+        grid = max(1, int(self.grid_size))
+        snapped_x = round(x / grid) * grid
+        snapped_y = round(y / grid) * grid
+        return float(snapped_x), float(snapped_y)
+
     # ------------------------------------------------------------------
     # Persistence and Rendering
     # ------------------------------------------------------------------
     def _persist_state(self, update_only: bool = False):
         self.state.items = list(self.whiteboard_items)
         self.state.size = tuple(self.board_size)
+        self.state.grid_enabled = self.grid_enabled
+        self.state.grid_size = int(self.grid_size)
+        self.state.snap_to_grid = self.snap_to_grid
+        self.state.active_layer = self.active_layer
+        self.state.show_shared_layer = self.show_shared_layer
+        self.state.show_gm_layer = self.show_gm_layer
         if not update_only:
             WhiteboardStorage.save_state(self.state)
         self._redraw_canvas()
         self._update_web_display_whiteboard()
 
+    def _undo_action(self):
+        restored, changed = self._history.undo(self.whiteboard_items)
+        if changed:
+            self.whiteboard_items = restored
+            self._persist_state()
+
+    def _redo_action(self):
+        restored, changed = self._history.redo(self.whiteboard_items)
+        if changed:
+            self.whiteboard_items = restored
+            self._persist_state()
+
     def _redraw_canvas(self):
         self.canvas.delete("all")
-        for item in self.whiteboard_items:
+        if self.grid_enabled:
+            self._grid_overlay.draw_on_canvas(self.canvas, self.board_size, self.grid_size)
+        for item in self._iter_visible_items():
             if item.get("type") == "stroke":
                 points = item.get("points") or []
                 if len(points) < 2:
@@ -423,13 +661,30 @@ class WhiteboardController:
                     anchor="nw",
                 )
                 item["canvas_ids"] = (text_id,)
+            elif item.get("type") == "stamp":
+                asset_path = item.get("asset")
+                if not asset_path:
+                    continue
+                pos = item.get("position") or (0, 0)
+                size = int(item.get("size", self.stamp_size))
+                try:
+                    photo = load_tk_asset(asset_path, size)
+                    stamp_id = self.canvas.create_image(pos[0], pos[1], image=photo, anchor="nw")
+                    item["canvas_ids"] = (stamp_id,)
+                    item["_image_ref"] = photo
+                except Exception:
+                    continue
 
-    def _render_whiteboard_image(self, *, include_text: bool = True):
+    def _render_whiteboard_image(self, *, include_text: bool = True, for_player: bool = False):
+        visible_items = list(self._iter_visible_items(for_player=for_player))
         return render_whiteboard_image(
-            self.whiteboard_items,
+            visible_items,
             self.board_size,
             font_cache=self._font_cache,
             include_text=include_text,
+            grid_enabled=self.grid_enabled,
+            grid_size=self.grid_size,
+            for_player=for_player,
         )
 
     def _update_web_display_whiteboard(self):
@@ -450,6 +705,7 @@ class WhiteboardController:
     def clear_board(self):
         if not self.whiteboard_items:
             return
+        self._history.checkpoint(self.whiteboard_items)
         self.whiteboard_items = []
         WhiteboardStorage.clear_state()
         self._persist_state()
@@ -517,7 +773,7 @@ class WhiteboardController:
         if not canvas or not window or not window.winfo_exists():
             return
 
-        img = self._render_whiteboard_image(include_text=False)
+        img = self._render_whiteboard_image(include_text=False, for_player=True)
         if img is None:
             return
 
@@ -539,7 +795,7 @@ class WhiteboardController:
 
         # Render text using canvas primitives to mirror map second-screen behavior
         canvas.delete("player_text")
-        for item in self.whiteboard_items:
+        for item in self._iter_visible_items(for_player=True):
             if item.get("type") != "text":
                 continue
             pos = item.get("position") or (0, 0)
