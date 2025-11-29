@@ -74,7 +74,7 @@ def render_whiteboard_image(
             for x, y in points:
                 sx, sy = _scale_point((x, y))
                 flattened.extend([sx, sy])
-            draw.line(flattened, fill=color, width=width_px, joint="curve")
+            draw.line(flattened, fill=color, width=width_px, joint="miter")
         elif item_type == "text" and include_text:
             text_value = item.get("text", "")
             pos = item.get("position") or (0, 0)
