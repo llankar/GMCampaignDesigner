@@ -56,6 +56,11 @@ class WhiteboardController:
         self._min_zoom: float = 0.5
         self._max_zoom: float = 3.0
         self._view_pan: Tuple[float, float] = (0.0, 0.0)
+        self._base_pan: Tuple[float, float] = (0.0, 0.0)
+        self._view_pan_offset: Tuple[float, float] = (0.0, 0.0)
+        self._panning_active = False
+        self._pan_start = (0.0, 0.0)
+        self._pan_origin_offset = (0.0, 0.0)
 
         self._player_view_window = None
         self._player_view_canvas = None
@@ -105,10 +110,11 @@ class WhiteboardController:
         canvas_height = max(1, int(self.canvas.winfo_height()))
         content_width = float(self.board_size[0]) * float(self.view_zoom)
         content_height = float(self.board_size[1]) * float(self.view_zoom)
-        self._view_pan = (
+        self._base_pan = (
             (canvas_width - content_width) / 2.0,
             (canvas_height - content_height) / 2.0,
         )
+        self._update_view_pan()
         self.canvas.configure(
             scrollregion=(
                 0,
@@ -135,6 +141,16 @@ class WhiteboardController:
         self._refresh_viewport()
         self._redraw_canvas()
         self._update_web_display_whiteboard()
+
+    def _update_view_pan(self):
+        base_x, base_y = self._base_pan
+        off_x, off_y = self._view_pan_offset
+        self._view_pan = (base_x + off_x, base_y + off_y)
+
+    def _set_view_pan_offset(self, offset: Tuple[float, float]):
+        self._view_pan_offset = offset
+        self._update_view_pan()
+        self._redraw_canvas()
 
     # ------------------------------------------------------------------
     # UI Construction
@@ -207,6 +223,9 @@ class WhiteboardController:
         self.canvas.bind("<MouseWheel>", self._on_mouse_wheel)
         self.canvas.bind("<Button-4>", self._on_mouse_wheel)
         self.canvas.bind("<Button-5>", self._on_mouse_wheel)
+        self.canvas.bind("<ButtonPress-2>", self._on_middle_mouse_down)
+        self.canvas.bind("<B2-Motion>", self._on_middle_mouse_move)
+        self.canvas.bind("<ButtonRelease-2>", self._on_middle_mouse_up)
         self.canvas.bind("<Configure>", self._on_canvas_resize)
 
         def _resize_canvas(_event=None):
@@ -553,6 +572,22 @@ class WhiteboardController:
             return
         step = 1.1 if delta > 0 else 0.9
         self._set_zoom(self.view_zoom * step)
+
+    def _on_middle_mouse_down(self, event):
+        self._panning_active = True
+        self._pan_start = (event.x, event.y)
+        self._pan_origin_offset = self._view_pan_offset
+
+    def _on_middle_mouse_move(self, event):
+        if not self._panning_active:
+            return
+        dx = event.x - self._pan_start[0]
+        dy = event.y - self._pan_start[1]
+        new_offset = (self._pan_origin_offset[0] + dx, self._pan_origin_offset[1] + dy)
+        self._set_view_pan_offset(new_offset)
+
+    def _on_middle_mouse_up(self, _event):
+        self._panning_active = False
 
     def _on_mouse_down(self, event):
         board_x, board_y = self._screen_to_board(event.x, event.y)
