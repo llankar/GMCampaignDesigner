@@ -8,6 +8,8 @@ def _script_block(board_width: int, board_height: int, refresh_ms: int, use_mjpe
     <script>
         (() => {{
             const boardSize = {{ width: {board_width}, height: {board_height} }};
+            const useMjpeg = {'true' if use_mjpeg else 'false'};
+            const refreshDelay = {refresh_ms};
             let drawing = false;
             let points = [];
             let currentScale = 1;
@@ -16,23 +18,31 @@ def _script_block(board_width: int, board_height: int, refresh_ms: int, use_mjpe
 
             const previewImg = document.getElementById('boardPreview');
             const canvas = document.getElementById('boardCanvas');
+            const surface = document.getElementById('boardSurface');
             const ctx = canvas.getContext('2d');
             const statusEl = document.getElementById('status');
             const undoBtn = document.getElementById('undoBtn');
             const textBtn = document.getElementById('textBtn');
 
+            canvas.width = boardSize.width;
+            canvas.height = boardSize.height;
+
             function resizeCanvas() {{
                 const wrapper = document.getElementById('boardContainer');
                 const scale = Math.min(wrapper.clientWidth / boardSize.width, wrapper.clientHeight / boardSize.height);
                 currentScale = scale || 1;
-                canvas.style.width = `${{boardSize.width * currentScale}}px`;
-                canvas.style.height = `${{boardSize.height * currentScale}}px`;
-                previewImg.style.width = canvas.style.width;
-                previewImg.style.height = canvas.style.height;
+                const displayWidth = boardSize.width * currentScale;
+                const displayHeight = boardSize.height * currentScale;
+                surface.style.width = `${{displayWidth}}px`;
+                surface.style.height = `${{displayHeight}}px`;
+                canvas.style.width = `${{displayWidth}}px`;
+                canvas.style.height = `${{displayHeight}}px`;
+                previewImg.style.width = `${{displayWidth}}px`;
+                previewImg.style.height = `${{displayHeight}}px`;
             }}
 
             function getBoardCoords(evt) {{
-                const rect = canvas.getBoundingClientRect();
+                const rect = surface.getBoundingClientRect();
                 const x = (evt.clientX - rect.left) * (boardSize.width / rect.width);
                 const y = (evt.clientY - rect.top) * (boardSize.height / rect.height);
                 return [x, y];
@@ -56,30 +66,60 @@ def _script_block(board_width: int, board_height: int, refresh_ms: int, use_mjpe
             }}
 
             function refreshPreview() {{
-                if ({'true' if use_mjpeg else 'false'}) {{
-                    previewImg.src = '/stream.mjpg';
+                if (useMjpeg) {{
+                    if (previewImg.src !== '/stream.mjpg') {{
+                        previewImg.src = '/stream.mjpg';
+                    }}
                 }} else {{
                     previewImg.src = `/board.png?ts=${{Date.now()}}`;
-                    setTimeout(refreshPreview, {refresh_ms});
+                    setTimeout(refreshPreview, refreshDelay);
                 }}
+            }}
+
+            function clearPreviewStroke() {{
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+            }}
+
+            function drawPreviewStroke() {{
+                if (points.length < 2) return;
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                ctx.lineWidth = 4;
+                ctx.lineCap = 'round';
+                ctx.lineJoin = 'round';
+                ctx.strokeStyle = '#ff0000';
+                ctx.beginPath();
+                ctx.moveTo(points[0][0], points[0][1]);
+                for (let i = 1; i < points.length; i++) {{
+                    ctx.lineTo(points[i][0], points[i][1]);
+                }}
+                ctx.stroke();
             }}
 
             function sendStroke() {{
                 if (!points.length) return;
-                api('/api/strokes', {{ points, color: '#ff0000', width: 4 }})
+                const strokePoints = points.slice();
+                api('/api/strokes', {{ points: strokePoints, color: '#ff0000', width: 4 }})
                     .then(result => {{
                         if (result.status >= 400) {{
                             setStatus(result.data.message || 'Unable to send stroke', true);
                         }} else {{
                             setStatus('Stroke sent');
+                            if (!useMjpeg) {{
+                                refreshPreview();
+                            }}
                         }}
+                        clearPreviewStroke();
                     }})
-                    .catch(() => setStatus('Network error', true));
+                    .catch(() => {{
+                        setStatus('Network error', true);
+                        clearPreviewStroke();
+                    }});
                 points = [];
             }}
 
             function handlePointerDown(evt) {{
                 if (!editingEnabled) return;
+                clearPreviewStroke();
                 drawing = true;
                 points = [];
                 points.push(getBoardCoords(evt));
@@ -89,12 +129,14 @@ def _script_block(board_width: int, board_height: int, refresh_ms: int, use_mjpe
                 if (!drawing || !editingEnabled) return;
                 const pos = getBoardCoords(evt);
                 points.push(pos);
+                drawPreviewStroke();
             }}
 
             function handlePointerUp(evt) {{
                 if (!drawing || !editingEnabled) return;
                 drawing = false;
                 points.push(getBoardCoords(evt));
+                drawPreviewStroke();
                 sendStroke();
             }}
 
@@ -136,7 +178,7 @@ def _script_block(board_width: int, board_height: int, refresh_ms: int, use_mjpe
                         textBtn.disabled = !editingEnabled;
                         setStatus(editingEnabled ? 'Editing enabled' : 'Editing disabled');
                         if (!data.use_mjpeg) {{
-                            setTimeout(refreshPreview, {refresh_ms});
+                            setTimeout(refreshPreview, refreshDelay);
                         }}
                     }})
                     .catch(() => setStatus('Unable to fetch status', true));
@@ -174,8 +216,9 @@ def build_player_page(board_size: tuple[int, int], refresh_ms: int, use_mjpeg: b
         <style>
             body {{ margin: 0; background: #f9fafb; font-family: 'Segoe UI', Tahoma, sans-serif; }}
             #boardContainer {{ position: relative; width: 100vw; height: 100vh; display: flex; align-items: center; justify-content: center; overflow: hidden; }}
-            #boardPreview {{ position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: contain; }}
-            #boardCanvas {{ position: relative; touch-action: none; width: 100%; height: 100%; background: transparent; }}
+            #boardSurface {{ position: relative; }}
+            #boardPreview {{ position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: contain; pointer-events: none; }}
+            #boardCanvas {{ position: absolute; top: 0; left: 0; touch-action: none; width: 100%; height: 100%; background: transparent; }}
             #toolbar {{ position: fixed; top: 12px; left: 50%; transform: translateX(-50%); display: flex; gap: 8px; background: rgba(255, 255, 255, 0.95); padding: 8px 12px; border-radius: 10px; box-shadow: 0 8px 20px rgba(0,0,0,0.15); }}
             #toolbar button {{ border: none; padding: 10px 14px; border-radius: 8px; cursor: pointer; font-weight: 600; background: #2563eb; color: #fff; }}
             #toolbar button:disabled {{ background: #9ca3af; cursor: not-allowed; }}
@@ -188,10 +231,12 @@ def build_player_page(board_size: tuple[int, int], refresh_ms: int, use_mjpeg: b
             <button id="undoBtn">Undo</button>
         </div>
         <div id="boardContainer">
-            <img id="boardPreview" src="/board.png{query_suffix}" alt="Whiteboard preview" />
-            <canvas id="boardCanvas" width="{width}" height="{height}"></canvas>
+            <div id="boardSurface">
+                <img id="boardPreview" src="/board.png{query_suffix}" alt="Whiteboard preview" />
+                <canvas id="boardCanvas" width="{width}" height="{height}"></canvas>
+            </div>
         </div>
-        <div id="status">Loading…</div>
+        <div id="status">Loading...</div>
         {_script_block(width, height, refresh_ms, use_mjpeg)}
     </body>
     </html>

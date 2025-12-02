@@ -67,7 +67,12 @@ def open_whiteboard_display(controller, port=None):
 
         def frame_bytes():
             if hasattr(controller, "_render_whiteboard_image"):
-                img = controller._render_whiteboard_image()
+                img = controller._render_whiteboard_image(
+                    for_player=True,
+                    viewport_size=getattr(controller, "board_size", (1920, 1080)),
+                    origin=(0.0, 0.0),
+                    zoom=1.0,
+                )
             else:
                 origin = (0.0, 0.0)
                 try:
@@ -80,6 +85,7 @@ def open_whiteboard_display(controller, port=None):
                     font_cache=getattr(controller, "_font_cache", None),
                     grid_origin=origin,
                     zoom=getattr(controller, "view_zoom", 1.0),
+                    for_player=True,
                 )
             buf = io.BytesIO()
             try:

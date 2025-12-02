@@ -1253,9 +1253,12 @@ class WhiteboardController:
         include_text: bool = True,
         for_player: bool = False,
         viewport_size: Tuple[int, int] | None = None,
+        origin: Tuple[float, float] | None = None,
+        zoom: float | None = None,
     ):
         viewport_size = viewport_size or self._view_board_size()
-        origin = self._current_view_origin()
+        origin = origin if origin is not None else self._current_view_origin()
+        zoom_value = self.view_zoom if zoom is None else float(zoom)
         visible_items = [
             self._translate_item_for_view(item, origin)
             for item in self._iter_visible_items(for_player=for_player)
@@ -1269,14 +1272,19 @@ class WhiteboardController:
             grid_size=self.grid_size,
             grid_origin=origin,
             for_player=for_player,
-            zoom=self.view_zoom,
+            zoom=zoom_value,
         )
 
     def _update_web_display_whiteboard(self):
         if not getattr(self, "_whiteboard_web_thread", None):
             self._update_player_view()
             return
-        img = self._render_whiteboard_image()
+        img = self._render_whiteboard_image(
+            for_player=True,
+            viewport_size=self.board_size,
+            origin=(0.0, 0.0),
+            zoom=1.0,
+        )
         if img is None:
             return
         buffer = io.BytesIO()
