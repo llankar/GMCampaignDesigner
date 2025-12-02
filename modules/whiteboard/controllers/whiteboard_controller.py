@@ -1,6 +1,7 @@
 import io
 import math
 import os
+import socket
 import tkinter as tk
 from tkinter import colorchooser, filedialog
 from typing import List, Dict, Tuple, Iterable
@@ -9,11 +10,13 @@ import customtkinter as ctk
 from PIL import Image, ImageTk
 from screeninfo import get_monitors
 
+from modules.helpers.config_helper import ConfigHelper
 from modules.helpers.logging_helper import log_module_import, log_info, log_warning
 from modules.maps.utils.text_items import TextFontCache, prompt_for_text, text_hit_test
 from modules.whiteboard.models.layer_types import WhiteboardLayer, normalize_layer
 from modules.whiteboard.services.whiteboard_storage import WhiteboardStorage, WhiteboardState
 from modules.whiteboard.services.whiteboard_history import WhiteboardHistory
+from modules.whiteboard.utils.remote_access_guard import RemoteAccessGuard
 from modules.whiteboard.utils.grid_overlay import GridOverlay
 from modules.whiteboard.utils.stamp_assets import available_stamp_assets, load_tk_asset
 from modules.whiteboard.utils.whiteboard_renderer import render_whiteboard_image
@@ -85,6 +88,7 @@ class WhiteboardController:
         self.active_layer = normalize_layer(getattr(self.state, "active_layer", WhiteboardLayer.SHARED.value))
         self.show_shared_layer = bool(getattr(self.state, "show_shared_layer", True))
         self.show_gm_layer = bool(getattr(self.state, "show_gm_layer", True))
+        self.remote_access_guard = RemoteAccessGuard.from_config(enabled=bool(getattr(self.state, "remote_edit_enabled", False)))
 
         assets = available_stamp_assets()
         self._stamp_assets_map = {os.path.basename(path): path for path in assets}
@@ -95,6 +99,7 @@ class WhiteboardController:
         self._history.reset(self.whiteboard_items)
         self._redraw_canvas()
         self._update_web_display_whiteboard()
+        self._ensure_web_display_running()
 
     # ------------------------------------------------------------------
     # View Helpers
@@ -418,6 +423,19 @@ class WhiteboardController:
         redo_btn = ctk.CTkButton(history_frame, text="Redo", command=self._redo_action, width=76)
         redo_btn.pack(side="left")
 
+        remote_frame = ctk.CTkFrame(toolbar, fg_color="transparent")
+        remote_frame.pack(side="left", padx=(0, 6))
+        self._remote_toggle_var = tk.BooleanVar(value=self.remote_access_guard.enabled)
+        remote_switch = ctk.CTkSwitch(
+            remote_frame,
+            text="Player Editing",
+            variable=self._remote_toggle_var,
+            command=self._on_remote_toggle,
+        )
+        remote_switch.pack(side="left", padx=(0, 4))
+        share_btn = ctk.CTkButton(remote_frame, text="Share Link", command=self._open_share_dialog, width=110)
+        share_btn.pack(side="left")
+
         save_btn = ctk.CTkButton(toolbar, text="Save", command=self._persist_state)
         save_btn.pack(side="left", padx=(0, 4))
 
@@ -477,6 +495,70 @@ class WhiteboardController:
             toggle_menu.set("Visibility/Grid")
         except Exception:
             pass
+
+    def _on_remote_toggle(self):
+        enabled = bool(self._remote_toggle_var.get())
+        self.remote_access_guard.set_enabled(enabled)
+        self._ensure_web_display_running()
+        self._persist_state(update_only=False)
+
+    def _build_share_url(self) -> str:
+        configured_port = ConfigHelper.get("WhiteboardServer", "port", fallback="") or getattr(self, "_whiteboard_port", None)
+        port = str(configured_port or "").strip()
+        host = ConfigHelper.get("WhiteboardServer", "public_host", fallback="") or socket.gethostname()
+        if not str(host).startswith(("http://", "https://")):
+            host = f"http://{host}"
+        base = str(host).rstrip("/")
+        if port and f":{port}" not in base.split("//", 1)[-1]:
+            base = f"{base}:{port}"
+        token = getattr(self.remote_access_guard, "token", "")
+        query = f"?token={token}" if token else ""
+        return f"{base}/{query}"
+
+    def _build_qr_image(self, url: str):
+        try:
+            import qrcode
+
+            img = qrcode.make(url)
+            img = img.resize((220, 220))
+            return ImageTk.PhotoImage(img)
+        except Exception:
+            return None
+
+    def _open_share_dialog(self):
+        self._ensure_web_display_running()
+        dialog = ctk.CTkToplevel(self.parent)
+        dialog.title("Share Whiteboard")
+        dialog.geometry("520x400")
+
+        url = self._build_share_url()
+        description = (
+            "Provide this link to players. They will need the GM editing toggle enabled "
+            "and, if configured, the token present in the URL."
+        )
+        ctk.CTkLabel(dialog, text=description, wraplength=480, justify="left").pack(padx=10, pady=(10, 8))
+
+        entry = ctk.CTkEntry(dialog, width=460)
+        entry.insert(0, url)
+        entry.pack(padx=10, pady=(0, 6))
+
+        def _copy_url():
+            try:
+                dialog.clipboard_clear()
+                dialog.clipboard_append(entry.get())
+            except Exception:
+                pass
+
+        copy_btn = ctk.CTkButton(dialog, text="Copy URL", command=_copy_url)
+        copy_btn.pack(pady=(0, 10))
+
+        qr = self._build_qr_image(url)
+        if qr is not None:
+            qr_label = ctk.CTkLabel(dialog, image=qr, text="")
+            qr_label.image = qr
+            qr_label.pack(pady=(4, 6))
+        else:
+            ctk.CTkLabel(dialog, text="Install the 'qrcode' package to render QR codes.").pack(pady=(4, 6))
 
     # ------------------------------------------------------------------
     # Event Handling
@@ -774,6 +856,53 @@ class WhiteboardController:
         simplified.append(points[-1])
         return simplified
 
+    # ------------------------------------------------------------------
+    # Remote Submissions
+    # ------------------------------------------------------------------
+    def handle_remote_stroke(self, *, points, color: str, width: float):
+        clean_points: List[Tuple[float, float]] = []
+        for point in points:
+            try:
+                x, y = float(point[0]), float(point[1])
+                clean_points.append((x, y))
+            except Exception:
+                continue
+        simplified = self._simplify_polyline(clean_points)
+        if len(simplified) < 2:
+            raise ValueError("Not enough points to record stroke")
+        self._history.checkpoint(self.whiteboard_items)
+        stroke = {
+            "type": "stroke",
+            "points": simplified,
+            "color": color,
+            "width": float(width),
+            "layer": WhiteboardLayer.SHARED.value,
+        }
+        self.whiteboard_items.append(stroke)
+        self._persist_state()
+
+    def handle_remote_text(self, *, text: str, position, color: str, size: float):
+        if not isinstance(position, (list, tuple)) or len(position) != 2:
+            raise ValueError("Position must include x and y")
+        pos = (float(position[0]), float(position[1]))
+        item = {
+            "type": "text",
+            "text": text,
+            "position": pos,
+            "color": color,
+            "size": float(size),
+            "layer": WhiteboardLayer.SHARED.value,
+        }
+        self._history.checkpoint(self.whiteboard_items)
+        self.whiteboard_items.append(item)
+        self._persist_state()
+
+    def handle_remote_undo(self):
+        restored, changed = self._history.undo(self.whiteboard_items)
+        if changed:
+            self.whiteboard_items = restored
+            self._persist_state()
+
     def _create_text_at(self, x: float, y: float):
         text = prompt_for_text(self.canvas, title="Add Text", prompt="Enter text:")
         if text is None:
@@ -984,6 +1113,7 @@ class WhiteboardController:
         self.state.show_shared_layer = self.show_shared_layer
         self.state.show_gm_layer = self.show_gm_layer
         self.state.zoom = self.view_zoom
+        self.state.remote_edit_enabled = bool(getattr(self, "remote_access_guard", None) and self.remote_access_guard.enabled)
         if not update_only:
             WhiteboardStorage.save_state(self.state)
         self._redraw_canvas()
@@ -1106,6 +1236,14 @@ class WhiteboardController:
         finally:
             buffer.close()
         self._update_player_view()
+
+    def _ensure_web_display_running(self):
+        if getattr(self, "_whiteboard_web_thread", None):
+            return
+        try:
+            open_whiteboard_display(self)
+        except Exception:
+            log_warning("Unable to start whiteboard web display", func_name="WhiteboardController._ensure_web_display_running")
 
     def clear_board(self):
         if not self.whiteboard_items:
@@ -1232,3 +1370,4 @@ class WhiteboardController:
 
     def close(self):
         self.close_player_view()
+        close_whiteboard_display(self)

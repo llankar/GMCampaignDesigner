@@ -1,12 +1,14 @@
+import io
 import threading
 import time
-import io
 from flask import Flask, Response
 from werkzeug.serving import make_server
 
 from modules.helpers.config_helper import ConfigHelper
 from modules.helpers.logging_helper import log_module_import
 from modules.whiteboard.utils.whiteboard_renderer import render_whiteboard_image
+from modules.whiteboard.views.web.api_blueprint import register_whiteboard_api
+from modules.whiteboard.views.web.player_page import build_player_page
 
 log_module_import(__name__)
 
@@ -33,40 +35,14 @@ def open_whiteboard_display(controller, port=None):
     except Exception:
         controller._whiteboard_use_mjpeg = True
 
+    register_whiteboard_api(app, controller, getattr(controller, "remote_access_guard", None))
+
     @app.route("/")
     def index():
         use_mjpeg = bool(getattr(controller, "_whiteboard_use_mjpeg", True))
-        img_src = "/stream.mjpg" if use_mjpeg else "/board.png?ts=0"
-        refresh_script = "" if use_mjpeg else f"""
-        <script>
-            document.addEventListener('DOMContentLoaded', () => {{
-                const REFRESH_MS = {int(getattr(controller, '_whiteboard_refresh_ms', 200))};
-                const img = document.getElementById('boardImage');
-                function scheduleNext() {{ setTimeout(reloadImage, REFRESH_MS); }}
-                function reloadImage() {{ img.src = '/board.png?ts=' + Date.now(); }}
-                img.onload = scheduleNext;
-                img.onerror = scheduleNext;
-                setTimeout(reloadImage, REFRESH_MS);
-            }});
-        </script>
-        """
-        return f"""
-        <!DOCTYPE html>
-        <html>
-        <head>
-        <meta charset='utf-8'>
-        <title>Player Whiteboard</title>
-        <style>
-            body {{ margin: 0; background: #fff; display: flex; align-items: center; justify-content: center; }}
-            img {{ max-width: 100%; max-height: 100vh; object-fit: contain; }}
-        </style>
-        {refresh_script}
-        </head>
-        <body>
-        <img id='boardImage' src='{img_src}'>
-        </body>
-        </html>
-        """
+        refresh_ms = int(getattr(controller, "_whiteboard_refresh_ms", 200))
+        token = getattr(getattr(controller, "remote_access_guard", None), "token", None)
+        return build_player_page(getattr(controller, "board_size", (1920, 1080)), refresh_ms, use_mjpeg, token)
 
     @app.route("/board.png")
     def board_png():
