@@ -3,6 +3,121 @@ from __future__ import annotations
 from urllib.parse import urlencode
 
 
+def _style_block() -> str:
+    return """
+    <style>
+        :root {
+            --panel-bg: rgba(255, 255, 255, 0.95);
+            --panel-shadow: 0 8px 20px rgba(0, 0, 0, 0.15);
+            --accent: #2563eb;
+            --accent-muted: #9ca3af;
+            --danger: #b91c1c;
+        }
+
+        * { box-sizing: border-box; }
+
+        body {
+            margin: 0;
+            background: #f9fafb;
+            font-family: 'Segoe UI', Tahoma, sans-serif;
+        }
+
+        #boardContainer {
+            position: relative;
+            width: 100vw;
+            height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+        }
+
+        #boardSurface { position: relative; }
+
+        #boardPreview {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+            pointer-events: none;
+        }
+
+        #boardCanvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            touch-action: none;
+            width: 100%;
+            height: 100%;
+            background: transparent;
+        }
+
+        #toolbar {
+            position: fixed;
+            top: 12px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            gap: 8px;
+            background: var(--panel-bg);
+            padding: 10px 12px;
+            border-radius: 10px;
+            box-shadow: var(--panel-shadow);
+            align-items: center;
+            flex-wrap: wrap;
+        }
+
+        #toolbar button {
+            border: none;
+            padding: 10px 14px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 600;
+            background: var(--accent);
+            color: #fff;
+            transition: background 0.15s ease;
+        }
+
+        #toolbar button.secondary { background: #111827; color: #fff; }
+        #toolbar button.ghost { background: #e5e7eb; color: #111827; }
+
+        #toolbar button:disabled { background: var(--accent-muted); cursor: not-allowed; }
+
+        #toolbar .field {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 8px 10px;
+            background: #f3f4f6;
+            border-radius: 8px;
+        }
+
+        #toolbar input[type='text'] {
+            border: 1px solid #d1d5db;
+            border-radius: 6px;
+            padding: 8px;
+            min-width: 180px;
+            font-weight: 600;
+        }
+
+        #status {
+            position: fixed;
+            bottom: 10px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: var(--panel-bg);
+            padding: 8px 12px;
+            border-radius: 8px;
+            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+            font-weight: 600;
+            color: #111827;
+        }
+    </style>
+    """
+
+
 def _script_block(board_width: int, board_height: int, refresh_ms: int, use_mjpeg: bool) -> str:
     return f"""
     <script>
@@ -13,7 +128,8 @@ def _script_block(board_width: int, board_height: int, refresh_ms: int, use_mjpe
             let drawing = false;
             let points = [];
             let currentScale = 1;
-            let currentToken = new URLSearchParams(window.location.search).get('token') || '';
+            let drawingArmed = false;
+            let currentToken = '';
             let editingEnabled = false;
 
             const previewImg = document.getElementById('boardPreview');
@@ -23,6 +139,9 @@ def _script_block(board_width: int, board_height: int, refresh_ms: int, use_mjpe
             const statusEl = document.getElementById('status');
             const undoBtn = document.getElementById('undoBtn');
             const textBtn = document.getElementById('textBtn');
+            const drawBtn = document.getElementById('drawBtn');
+            const refreshBtn = document.getElementById('refreshBtn');
+            const tokenInput = document.getElementById('tokenInput');
 
             function resizeCanvas() {{
                 const wrapper = document.getElementById('boardContainer');
@@ -52,7 +171,17 @@ def _script_block(board_width: int, board_height: int, refresh_ms: int, use_mjpe
 
             function setStatus(message, isError=false) {{
                 statusEl.textContent = message;
-                statusEl.style.color = isError ? '#b91c1c' : '#111827';
+                statusEl.style.color = isError ? getComputedStyle(document.documentElement).getPropertyValue('--danger') : '#111827';
+            }}
+
+            function applyToken(newToken) {{
+                currentToken = (newToken || '').trim();
+                tokenInput.value = currentToken;
+                if (currentToken) {{
+                    localStorage.setItem('whiteboardToken', currentToken);
+                }} else {{
+                    localStorage.removeItem('whiteboardToken');
+                }}
             }}
 
             function api(url, body={{}}) {{
@@ -121,7 +250,7 @@ def _script_block(board_width: int, board_height: int, refresh_ms: int, use_mjpe
             }}
 
             function handlePointerDown(evt) {{
-                if (!editingEnabled) return;
+                if (!editingEnabled || !drawingArmed) return;
                 clearPreviewStroke();
                 drawing = true;
                 points = [];
@@ -129,14 +258,14 @@ def _script_block(board_width: int, board_height: int, refresh_ms: int, use_mjpe
             }}
 
             function handlePointerMove(evt) {{
-                if (!drawing || !editingEnabled) return;
+                if (!drawing || !editingEnabled || !drawingArmed) return;
                 const pos = getBoardCoords(evt);
                 points.push(pos);
                 drawPreviewStroke();
             }}
 
             function handlePointerUp(evt) {{
-                if (!drawing || !editingEnabled) return;
+                if (!drawing || !editingEnabled || !drawingArmed) return;
                 drawing = false;
                 points.push(getBoardCoords(evt));
                 drawPreviewStroke();
@@ -172,6 +301,23 @@ def _script_block(board_width: int, board_height: int, refresh_ms: int, use_mjpe
                 }}).catch(() => setStatus('Network error', true));
             }}
 
+            function setDrawingArmed(value) {{
+                drawingArmed = !!value && editingEnabled;
+                drawBtn.textContent = drawingArmed ? 'Stop Drawing' : 'Start Drawing';
+                drawBtn.classList.toggle('ghost', !drawingArmed);
+                drawBtn.classList.toggle('secondary', drawingArmed);
+            }}
+
+            function handleTokenSubmit() {{
+                applyToken(tokenInput.value);
+                setStatus(currentToken ? 'Token saved' : 'Token cleared');
+            }}
+
+            function handleRefresh() {{
+                refreshPreview();
+                setStatus('Preview refreshed');
+            }}
+
             function syncStatus() {{
                 fetch('/api/status')
                     .then(resp => resp.json())
@@ -179,6 +325,8 @@ def _script_block(board_width: int, board_height: int, refresh_ms: int, use_mjpe
                         editingEnabled = !!data.editing_enabled;
                         undoBtn.disabled = !editingEnabled;
                         textBtn.disabled = !editingEnabled;
+                        drawBtn.disabled = !editingEnabled;
+                        setDrawingArmed(editingEnabled && drawingArmed);
                         setStatus(editingEnabled ? 'Editing enabled' : 'Editing disabled');
                         if (!data.use_mjpeg) {{
                             setTimeout(refreshPreview, refreshDelay);
@@ -194,8 +342,17 @@ def _script_block(board_width: int, board_height: int, refresh_ms: int, use_mjpe
             canvas.addEventListener('pointerleave', handlePointerUp);
             textBtn.addEventListener('click', handleText);
             undoBtn.addEventListener('click', handleUndo);
+            drawBtn.addEventListener('click', () => setDrawingArmed(!drawingArmed));
+            refreshBtn.addEventListener('click', handleRefresh);
+            tokenInput.addEventListener('change', handleTokenSubmit);
+            tokenInput.addEventListener('keyup', (evt) => {{
+                if (evt.key === 'Enter') {{
+                    handleTokenSubmit();
+                }}
+            }});
 
             resizeCanvas();
+            applyToken(new URLSearchParams(window.location.search).get('token') || localStorage.getItem('whiteboardToken') || '');
             syncStatus();
             refreshPreview();
         }})();
@@ -216,22 +373,18 @@ def build_player_page(board_size: tuple[int, int], refresh_ms: int, use_mjpeg: b
     <head>
         <meta charset='utf-8'>
         <title>Player Whiteboard</title>
-        <style>
-            body {{ margin: 0; background: #f9fafb; font-family: 'Segoe UI', Tahoma, sans-serif; }}
-            #boardContainer {{ position: relative; width: 100vw; height: 100vh; display: flex; align-items: center; justify-content: center; overflow: hidden; }}
-            #boardSurface {{ position: relative; }}
-            #boardPreview {{ position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: contain; pointer-events: none; }}
-            #boardCanvas {{ position: absolute; top: 0; left: 0; touch-action: none; width: 100%; height: 100%; background: transparent; }}
-            #toolbar {{ position: fixed; top: 12px; left: 50%; transform: translateX(-50%); display: flex; gap: 8px; background: rgba(255, 255, 255, 0.95); padding: 8px 12px; border-radius: 10px; box-shadow: 0 8px 20px rgba(0,0,0,0.15); }}
-            #toolbar button {{ border: none; padding: 10px 14px; border-radius: 8px; cursor: pointer; font-weight: 600; background: #2563eb; color: #fff; }}
-            #toolbar button:disabled {{ background: #9ca3af; cursor: not-allowed; }}
-            #status {{ position: fixed; bottom: 10px; left: 50%; transform: translateX(-50%); background: rgba(255,255,255,0.95); padding: 6px 10px; border-radius: 8px; box-shadow: 0 4px 16px rgba(0,0,0,0.08); font-weight: 600; }}
-        </style>
+        {_style_block()}
     </head>
     <body>
         <div id="toolbar">
+            <div class="field">
+                <label for="tokenInput" style="font-weight:700;">Access Token</label>
+                <input type="text" id="tokenInput" placeholder="Paste GM token" />
+            </div>
+            <button id="drawBtn" class="ghost">Start Drawing</button>
             <button id="textBtn">Place Text</button>
             <button id="undoBtn">Undo</button>
+            <button id="refreshBtn" class="ghost">Refresh Preview</button>
         </div>
         <div id="boardContainer">
             <div id="boardSurface">
