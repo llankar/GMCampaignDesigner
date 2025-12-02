@@ -24,27 +24,29 @@ def _script_block(board_width: int, board_height: int, refresh_ms: int, use_mjpe
             const undoBtn = document.getElementById('undoBtn');
             const textBtn = document.getElementById('textBtn');
 
-            canvas.width = boardSize.width;
-            canvas.height = boardSize.height;
-
             function resizeCanvas() {{
                 const wrapper = document.getElementById('boardContainer');
                 const scale = Math.min(wrapper.clientWidth / boardSize.width, wrapper.clientHeight / boardSize.height);
                 currentScale = scale || 1;
                 const displayWidth = boardSize.width * currentScale;
                 const displayHeight = boardSize.height * currentScale;
+                canvas.width = displayWidth;
+                canvas.height = displayHeight;
                 surface.style.width = `${{displayWidth}}px`;
                 surface.style.height = `${{displayHeight}}px`;
                 canvas.style.width = `${{displayWidth}}px`;
                 canvas.style.height = `${{displayHeight}}px`;
+                previewImg.width = displayWidth;
+                previewImg.height = displayHeight;
                 previewImg.style.width = `${{displayWidth}}px`;
                 previewImg.style.height = `${{displayHeight}}px`;
             }}
 
             function getBoardCoords(evt) {{
                 const rect = surface.getBoundingClientRect();
-                const x = (evt.clientX - rect.left) * (boardSize.width / rect.width);
-                const y = (evt.clientY - rect.top) * (boardSize.height / rect.height);
+                const scale = currentScale || 1;
+                const x = (evt.clientX - rect.left) / scale;
+                const y = (evt.clientY - rect.top) / scale;
                 return [x, y];
             }}
 
@@ -83,14 +85,15 @@ def _script_block(board_width: int, board_height: int, refresh_ms: int, use_mjpe
             function drawPreviewStroke() {{
                 if (points.length < 2) return;
                 ctx.clearRect(0, 0, canvas.width, canvas.height);
-                ctx.lineWidth = 4;
+                const scale = currentScale || 1;
+                ctx.lineWidth = 4 * scale;
                 ctx.lineCap = 'round';
                 ctx.lineJoin = 'round';
                 ctx.strokeStyle = '#ff0000';
                 ctx.beginPath();
-                ctx.moveTo(points[0][0], points[0][1]);
+                ctx.moveTo(points[0][0] * scale, points[0][1] * scale);
                 for (let i = 1; i < points.length; i++) {{
-                    ctx.lineTo(points[i][0], points[i][1]);
+                    ctx.lineTo(points[i][0] * scale, points[i][1] * scale);
                 }}
                 ctx.stroke();
             }}
