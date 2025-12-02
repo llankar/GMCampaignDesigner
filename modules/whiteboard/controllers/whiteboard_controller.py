@@ -5,7 +5,7 @@ import socket
 import threading
 import tkinter as tk
 from tkinter import colorchooser, filedialog
-from typing import List, Dict, Tuple, Iterable, Callable, Any
+from typing import List, Dict, Tuple, Iterable, Callable, Any, cast
 
 import customtkinter as ctk
 from PIL import Image, ImageTk
@@ -71,6 +71,7 @@ class WhiteboardController:
         self._player_view_canvas = None
         self._player_view_image_id = None
         self._player_view_photo = None
+        self._share_qr_image: ctk.CTkImage | None = None
 
         self._font_cache = TextFontCache()
 
@@ -81,7 +82,7 @@ class WhiteboardController:
 
         self.state: WhiteboardState = WhiteboardStorage.load_state()
         self.whiteboard_items: List[Dict] = list(self.state.items)
-        self.board_size: Tuple[int, int] = tuple(self.state.size)
+        self.board_size: Tuple[int, int] = (int(self.state.size[0]), int(self.state.size[1]))
         self.view_zoom = max(self._min_zoom, min(self._max_zoom, float(getattr(self.state, "zoom", 1.0) or 1.0)))
 
         self.grid_enabled = bool(getattr(self.state, "grid_enabled", False))
@@ -239,12 +240,13 @@ class WhiteboardController:
     # UI Construction
     # ------------------------------------------------------------------
     def _resolve_ctk_color(self, value):
-        if isinstance(value, tuple):
-            return value[1] if ctk.get_appearance_mode() == "Dark" and len(value) > 1 else value[0]
-        if isinstance(value, list):
-            if not value:
+        if isinstance(value, (tuple, list)):
+            colors = list(value)
+            if not colors:
                 return None
-            return value[1] if ctk.get_appearance_mode() == "Dark" and len(value) > 1 else value[0]
+            primary = colors[0]
+            secondary = colors[1] if len(colors) > 1 else primary
+            return secondary if ctk.get_appearance_mode() == "Dark" else primary
         if isinstance(value, str):
             if " " in value:
                 parts = value.split()
@@ -556,13 +558,15 @@ class WhiteboardController:
         query = f"?token={token}" if token else ""
         return f"{base}/{query}"
 
-    def _build_qr_image(self, url: str):
+    def _build_qr_image(self, url: str) -> ctk.CTkImage | None:
         try:
             import qrcode
+            from qrcode.image.pil import PilImage
 
-            img = qrcode.make(url)
-            img = img.resize((220, 220))
-            return ImageTk.PhotoImage(img)
+            qr_image = qrcode.make(url, image_factory=PilImage)
+            pil_image = cast(Image.Image, qr_image.get_image() if hasattr(qr_image, "get_image") else qr_image)
+            resized = pil_image.resize((220, 220))
+            return ctk.CTkImage(light_image=resized, dark_image=resized)
         except Exception:
             return None
 
@@ -595,8 +599,8 @@ class WhiteboardController:
 
         qr = self._build_qr_image(url)
         if qr is not None:
+            self._share_qr_image = qr
             qr_label = ctk.CTkLabel(dialog, image=qr, text="")
-            qr_label.image = qr
             qr_label.pack(pady=(4, 6))
         else:
             ctk.CTkLabel(dialog, text="Install the 'qrcode' package to render QR codes.").pack(pady=(4, 6))
@@ -712,7 +716,7 @@ class WhiteboardController:
             self.stamp_size = 64
 
     def _on_canvas_resize(self, event):
-        new_size = (max(1, int(event.width)), max(1, int(event.height)))
+        new_size: Tuple[int, int] = (max(1, int(event.width)), max(1, int(event.height)))
         self._refresh_viewport()
         if new_size != self.board_size:
             self.board_size = new_size
@@ -1155,7 +1159,7 @@ class WhiteboardController:
     # ------------------------------------------------------------------
     def _persist_state(self, update_only: bool = False):
         self.state.items = list(self.whiteboard_items)
-        self.state.size = tuple(self.board_size)
+        self.state.size = (int(self.board_size[0]), int(self.board_size[1]))
         self.state.grid_enabled = self.grid_enabled
         self.state.grid_size = int(self.grid_size)
         self.state.snap_to_grid = self.snap_to_grid
@@ -1369,6 +1373,9 @@ class WhiteboardController:
         self._player_view_photo = None
 
     def _update_player_view(self):
+        if threading.current_thread() is not threading.main_thread():
+            return self._dispatch_to_ui_thread(self._update_player_view)
+
         canvas = getattr(self, "_player_view_canvas", None)
         window = getattr(self, "_player_view_window", None)
         if not canvas or not window or not window.winfo_exists():
