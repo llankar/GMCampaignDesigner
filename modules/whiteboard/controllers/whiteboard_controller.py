@@ -2,9 +2,10 @@ import io
 import math
 import os
 import socket
+import threading
 import tkinter as tk
 from tkinter import colorchooser, filedialog
-from typing import List, Dict, Tuple, Iterable
+from typing import List, Dict, Tuple, Iterable, Callable, Any
 
 import customtkinter as ctk
 from PIL import Image, ImageTk
@@ -32,6 +33,7 @@ class WhiteboardController:
     def __init__(self, parent, *, root_app=None):
         self.parent = parent
         self._root_app = root_app
+        self._ui_dispatch_lock = threading.Lock()
 
         self.tool = "pen"
         self.ink_color = "#FF0000"
@@ -100,6 +102,45 @@ class WhiteboardController:
         self._redraw_canvas()
         self._update_web_display_whiteboard()
         self._ensure_web_display_running()
+
+    def _dispatch_to_ui_thread(self, func: Callable[[], Any]):
+        """
+        Ensure operations touching Tk widgets run on the UI thread.
+
+        Remote whiteboard edits arrive on the Flask server thread; directly
+        invoking Tk calls from there can crash the interpreter. We marshal the
+        work back to the UI thread and block until completion to preserve the
+        request/response flow.
+        """
+
+        if threading.current_thread() is threading.main_thread():
+            return func()
+
+        result: dict[str, Any] = {}
+        done = threading.Event()
+
+        def _runner():
+            try:
+                result["value"] = func()
+            except Exception as exc:  # noqa: BLE001
+                result["error"] = exc
+            finally:
+                done.set()
+
+        with self._ui_dispatch_lock:
+            try:
+                self.parent.after(0, _runner)
+            except Exception:
+                # If "after" is unavailable, execute immediately to avoid deadlock
+                _runner()
+                done.set()
+                return result.get("value")
+
+        if not done.wait(timeout=3):
+            raise TimeoutError("Timed out applying whiteboard change on UI thread")
+        if "error" in result:
+            raise result["error"]
+        return result.get("value")
 
     # ------------------------------------------------------------------
     # View Helpers
@@ -860,48 +901,57 @@ class WhiteboardController:
     # Remote Submissions
     # ------------------------------------------------------------------
     def handle_remote_stroke(self, *, points, color: str, width: float):
-        clean_points: List[Tuple[float, float]] = []
-        for point in points:
-            try:
-                x, y = float(point[0]), float(point[1])
-                clean_points.append((x, y))
-            except Exception:
-                continue
-        simplified = self._simplify_polyline(clean_points)
-        if len(simplified) < 2:
-            raise ValueError("Not enough points to record stroke")
-        self._history.checkpoint(self.whiteboard_items)
-        stroke = {
-            "type": "stroke",
-            "points": simplified,
-            "color": color,
-            "width": float(width),
-            "layer": WhiteboardLayer.SHARED.value,
-        }
-        self.whiteboard_items.append(stroke)
-        self._persist_state()
+        def _apply():
+            clean_points: List[Tuple[float, float]] = []
+            for point in points:
+                try:
+                    x, y = float(point[0]), float(point[1])
+                    clean_points.append((x, y))
+                except Exception:
+                    continue
+            simplified = self._simplify_polyline(clean_points)
+            if len(simplified) < 2:
+                raise ValueError("Not enough points to record stroke")
+            self._history.checkpoint(self.whiteboard_items)
+            stroke = {
+                "type": "stroke",
+                "points": simplified,
+                "color": color,
+                "width": float(width),
+                "layer": WhiteboardLayer.SHARED.value,
+            }
+            self.whiteboard_items.append(stroke)
+            self._persist_state()
+
+        self._dispatch_to_ui_thread(_apply)
 
     def handle_remote_text(self, *, text: str, position, color: str, size: float):
-        if not isinstance(position, (list, tuple)) or len(position) != 2:
-            raise ValueError("Position must include x and y")
-        pos = (float(position[0]), float(position[1]))
-        item = {
-            "type": "text",
-            "text": text,
-            "position": pos,
-            "color": color,
-            "size": float(size),
-            "layer": WhiteboardLayer.SHARED.value,
-        }
-        self._history.checkpoint(self.whiteboard_items)
-        self.whiteboard_items.append(item)
-        self._persist_state()
+        def _apply():
+            if not isinstance(position, (list, tuple)) or len(position) != 2:
+                raise ValueError("Position must include x and y")
+            pos = (float(position[0]), float(position[1]))
+            item = {
+                "type": "text",
+                "text": text,
+                "position": pos,
+                "color": color,
+                "size": float(size),
+                "layer": WhiteboardLayer.SHARED.value,
+            }
+            self._history.checkpoint(self.whiteboard_items)
+            self.whiteboard_items.append(item)
+            self._persist_state()
+
+        self._dispatch_to_ui_thread(_apply)
 
     def handle_remote_undo(self):
-        restored, changed = self._history.undo(self.whiteboard_items)
-        if changed:
-            self.whiteboard_items = restored
-            self._persist_state()
+        def _apply():
+            restored, changed = self._history.undo(self.whiteboard_items)
+            if changed:
+                self.whiteboard_items = restored
+                self._persist_state()
+
+        self._dispatch_to_ui_thread(_apply)
 
     def _create_text_at(self, x: float, y: float):
         text = prompt_for_text(self.canvas, title="Add Text", prompt="Enter text:")
