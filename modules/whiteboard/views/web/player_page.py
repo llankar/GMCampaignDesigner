@@ -173,13 +173,13 @@ def _script_block(board_width: int, board_height: int, refresh_ms: int, use_mjpe
                 const hue = Math.floor(Math.random() * 360);
                 const saturation = 70 + Math.floor(Math.random() * 20);
                 const lightness = 50 + Math.floor(Math.random() * 10);
-                const hsl = `hsl(${hue} ${saturation}% ${lightness}%)`;
+                const hsl = `hsl(${{hue}} ${{saturation}}% ${{lightness}}%)`;
                 const tempCanvas = document.createElement('canvas');
                 const tempCtx = tempCanvas.getContext('2d');
                 tempCtx.fillStyle = hsl;
                 tempCtx.fillRect(0, 0, 1, 1);
                 const data = tempCtx.getImageData(0, 0, 1, 1).data;
-                const hex = `#${[data[0], data[1], data[2]].map(v => v.toString(16).padStart(2, '0')).join('')}`;
+                const hex = `#${{[data[0], data[1], data[2]].map(v => v.toString(16).padStart(2, '0')).join('')}}`;
                 sessionStorage.setItem('whiteboardSessionColor', hex);
                 return hex;
             }
