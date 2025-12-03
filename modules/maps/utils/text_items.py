@@ -115,7 +115,12 @@ class TextFontCache:
                 family = self._resolved_family or self._family
                 self._pil_fonts[normalized] = ImageFont.truetype(family, normalized)
             except Exception:
-                self._pil_fonts[normalized] = ImageFont.load_default()
+                try:
+                    # Pillow bundles DejaVuSans, which provides a predictable size
+                    # even when the requested Tk font family is unavailable on the host.
+                    self._pil_fonts[normalized] = ImageFont.truetype("DejaVuSans.ttf", normalized)
+                except Exception:
+                    self._pil_fonts[normalized] = ImageFont.load_default()
         return self._pil_fonts[normalized]
 
 
