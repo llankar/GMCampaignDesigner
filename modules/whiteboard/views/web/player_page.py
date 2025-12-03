@@ -20,19 +20,28 @@ def _style_block() -> str:
             margin: 0;
             background: #f9fafb;
             font-family: 'Segoe UI', Tahoma, sans-serif;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
         }
 
         #boardContainer {
             position: relative;
-            width: 100vw;
-            height: 100vh;
+            width: 100%;
+            flex: 1 1 auto;
             display: flex;
             align-items: center;
             justify-content: center;
+            padding: 12px 16px 20px;
             overflow: hidden;
         }
 
-        #boardSurface { position: relative; }
+        #boardSurface {
+            position: relative;
+            max-width: 100%;
+            max-height: 100%;
+        }
 
         #boardPreview {
             position: absolute;
@@ -55,10 +64,9 @@ def _style_block() -> str:
         }
 
         #toolbar {
-            position: fixed;
+            position: sticky;
             top: 12px;
-            left: 50%;
-            transform: translateX(-50%);
+            align-self: center;
             display: flex;
             gap: 8px;
             background: var(--panel-bg);
@@ -67,6 +75,7 @@ def _style_block() -> str:
             box-shadow: var(--panel-shadow);
             align-items: center;
             flex-wrap: wrap;
+            z-index: 10;
         }
 
         #toolbar button {
@@ -113,6 +122,7 @@ def _style_block() -> str:
             box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
             font-weight: 600;
             color: #111827;
+            z-index: 10;
         }
     </style>
     """
