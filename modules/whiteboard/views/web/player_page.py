@@ -103,6 +103,14 @@ def _style_block() -> str:
             border-radius: 8px;
         }
 
+        #colorSwatch {
+            width: 20px;
+            height: 20px;
+            border-radius: 6px;
+            border: 2px solid rgba(0, 0, 0, 0.1);
+            box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.15);
+        }
+
         #toolbar input[type='text'] {
             border: 1px solid #d1d5db;
             border-radius: 6px;
@@ -141,6 +149,8 @@ def _script_block(board_width: int, board_height: int, refresh_ms: int, use_mjpe
             let drawingArmed = false;
             let currentToken = '';
             let editingEnabled = false;
+            let textSize = 24;
+            let sessionColor = '';
 
             const previewImg = document.getElementById('boardPreview');
             const canvas = document.getElementById('boardCanvas');
@@ -152,6 +162,33 @@ def _script_block(board_width: int, board_height: int, refresh_ms: int, use_mjpe
             const drawBtn = document.getElementById('drawBtn');
             const refreshBtn = document.getElementById('refreshBtn');
             const tokenInput = document.getElementById('tokenInput');
+            const colorSwatch = document.getElementById('colorSwatch');
+            const colorValue = document.getElementById('colorValue');
+
+            function createSessionColor() {
+                const existing = sessionStorage.getItem('whiteboardSessionColor');
+                if (existing) {
+                    return existing;
+                }
+                const hue = Math.floor(Math.random() * 360);
+                const saturation = 70 + Math.floor(Math.random() * 20);
+                const lightness = 50 + Math.floor(Math.random() * 10);
+                const hsl = `hsl(${hue} ${saturation}% ${lightness}%)`;
+                const tempCanvas = document.createElement('canvas');
+                const tempCtx = tempCanvas.getContext('2d');
+                tempCtx.fillStyle = hsl;
+                tempCtx.fillRect(0, 0, 1, 1);
+                const data = tempCtx.getImageData(0, 0, 1, 1).data;
+                const hex = `#${[data[0], data[1], data[2]].map(v => v.toString(16).padStart(2, '0')).join('')}`;
+                sessionStorage.setItem('whiteboardSessionColor', hex);
+                return hex;
+            }
+
+            function updateSessionColorDisplay() {
+                if (!sessionColor) return;
+                colorSwatch.style.backgroundColor = sessionColor;
+                colorValue.textContent = sessionColor.toUpperCase();
+            }
 
             function resizeCanvas() {{
                 const wrapper = document.getElementById('boardContainer');
@@ -228,7 +265,7 @@ def _script_block(board_width: int, board_height: int, refresh_ms: int, use_mjpe
                 ctx.lineWidth = 4 * scale;
                 ctx.lineCap = 'round';
                 ctx.lineJoin = 'round';
-                ctx.strokeStyle = '#ff0000';
+                ctx.strokeStyle = sessionColor;
                 ctx.beginPath();
                 ctx.moveTo(points[0][0] * scale, points[0][1] * scale);
                 for (let i = 1; i < points.length; i++) {{
@@ -240,7 +277,7 @@ def _script_block(board_width: int, board_height: int, refresh_ms: int, use_mjpe
             function sendStroke() {{
                 if (!points.length) return;
                 const strokePoints = points.slice();
-                api('/api/strokes', {{ points: strokePoints, color: '#ff0000', width: 4 }})
+                api('/api/strokes', {{ points: strokePoints, color: sessionColor, width: 4 }})
                     .then(result => {{
                         if (result.status >= 400) {{
                             setStatus(result.data.message || 'Unable to send stroke', true);
@@ -289,7 +326,7 @@ def _script_block(board_width: int, board_height: int, refresh_ms: int, use_mjpe
                 canvas.addEventListener('click', function handler(evt) {{
                     canvas.removeEventListener('click', handler);
                     const [x, y] = getBoardCoords(evt);
-                    api('/api/text', {{ text, position: [x, y], color: '#000000', size: 24 }})
+                    api('/api/text', {{ text, position: [x, y], color: sessionColor, size: textSize }})
                         .then(result => {{
                             if (result.status >= 400) {{
                                 setStatus(result.data.message || 'Unable to place text', true);
@@ -333,6 +370,7 @@ def _script_block(board_width: int, board_height: int, refresh_ms: int, use_mjpe
                     .then(resp => resp.json())
                     .then(data => {{
                         editingEnabled = !!data.editing_enabled;
+                        textSize = parseFloat(data.text_size || textSize) || textSize;
                         undoBtn.disabled = !editingEnabled;
                         textBtn.disabled = !editingEnabled;
                         drawBtn.disabled = !editingEnabled;
@@ -362,6 +400,8 @@ def _script_block(board_width: int, board_height: int, refresh_ms: int, use_mjpe
             }});
 
             resizeCanvas();
+            sessionColor = createSessionColor();
+            updateSessionColorDisplay();
             applyToken(new URLSearchParams(window.location.search).get('token') || localStorage.getItem('whiteboardToken') || '');
             syncStatus();
             refreshPreview();
@@ -390,6 +430,11 @@ def build_player_page(board_size: tuple[int, int], refresh_ms: int, use_mjpeg: b
             <div class="field">
                 <label for="tokenInput" style="font-weight:700;">Access Token</label>
                 <input type="text" id="tokenInput" placeholder="Paste GM token" />
+            </div>
+            <div class="field" aria-label="Session color">
+                <span style="font-weight:700;">Session Color</span>
+                <span id="colorSwatch"></span>
+                <span id="colorValue" style="font-weight:700;">--</span>
             </div>
             <button id="drawBtn" class="ghost">Start Drawing</button>
             <button id="textBtn">Place Text</button>

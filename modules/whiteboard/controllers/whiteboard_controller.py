@@ -940,6 +940,7 @@ class WhiteboardController:
                 "position": pos,
                 "color": color,
                 "size": float(size),
+                "text_size": float(size),
                 "layer": WhiteboardLayer.SHARED.value,
             }
             self._history.checkpoint(self.whiteboard_items)
