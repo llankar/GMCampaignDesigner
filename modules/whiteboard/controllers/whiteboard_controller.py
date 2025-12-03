@@ -545,13 +545,42 @@ class WhiteboardController:
         self._ensure_web_display_running()
         self._persist_state(update_only=False)
 
+    def _local_ip_address(self) -> str:
+        try:
+            with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as probe:
+                probe.connect(("8.8.8.8", 80))
+                return probe.getsockname()[0]
+        except Exception:
+            try:
+                return socket.gethostbyname(socket.gethostname())
+            except Exception:
+                return "127.0.0.1"
+
+    def _resolve_public_host(self) -> str:
+        raw_host = str(ConfigHelper.get("WhiteboardServer", "public_host", fallback="") or "").strip()
+        cleaned_host = raw_host.split("://", 1)[-1].split("/", 1)[0]
+
+        try:
+            socket.inet_aton(cleaned_host)
+            return cleaned_host
+        except OSError:
+            pass
+
+        if cleaned_host:
+            try:
+                resolved = socket.gethostbyname(cleaned_host)
+                if resolved:
+                    return resolved
+            except Exception:
+                pass
+
+        return self._local_ip_address()
+
     def _build_share_url(self) -> str:
         configured_port = ConfigHelper.get("WhiteboardServer", "port", fallback="") or getattr(self, "_whiteboard_port", None)
         port = str(configured_port or "").strip()
-        host = ConfigHelper.get("WhiteboardServer", "public_host", fallback="") or socket.gethostname()
-        if not str(host).startswith(("http://", "https://")):
-            host = f"http://{host}"
-        base = str(host).rstrip("/")
+        host = self._resolve_public_host()
+        base = f"http://{str(host).rstrip('/')}"
         if port and f":{port}" not in base.split("//", 1)[-1]:
             base = f"{base}:{port}"
         token = getattr(self.remote_access_guard, "token", "")
