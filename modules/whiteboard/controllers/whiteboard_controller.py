@@ -565,8 +565,9 @@ class WhiteboardController:
 
             qr_image = qrcode.make(url, image_factory=PilImage)
             pil_image = cast(Image.Image, qr_image.get_image() if hasattr(qr_image, "get_image") else qr_image)
-            resized = pil_image.resize((220, 220))
-            return ctk.CTkImage(light_image=resized, dark_image=resized)
+            qr_size = 320
+            resized = pil_image.resize((qr_size, qr_size))
+            return ctk.CTkImage(light_image=resized, dark_image=resized, size=(qr_size, qr_size))
         except Exception:
             return None
 
@@ -574,7 +575,7 @@ class WhiteboardController:
         self._ensure_web_display_running()
         dialog = ctk.CTkToplevel(self.parent)
         dialog.title("Share Whiteboard")
-        dialog.geometry("520x400")
+        dialog.geometry("580x460")
 
         url = self._build_share_url()
         description = (
