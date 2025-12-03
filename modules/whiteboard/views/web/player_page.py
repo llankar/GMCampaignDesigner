@@ -165,11 +165,11 @@ def _script_block(board_width: int, board_height: int, refresh_ms: int, use_mjpe
             const colorSwatch = document.getElementById('colorSwatch');
             const colorValue = document.getElementById('colorValue');
 
-            function createSessionColor() {
+            function createSessionColor() {{
                 const existing = sessionStorage.getItem('whiteboardSessionColor');
-                if (existing) {
+                if (existing) {{
                     return existing;
-                }
+                }}
                 const hue = Math.floor(Math.random() * 360);
                 const saturation = 70 + Math.floor(Math.random() * 20);
                 const lightness = 50 + Math.floor(Math.random() * 10);
@@ -182,13 +182,13 @@ def _script_block(board_width: int, board_height: int, refresh_ms: int, use_mjpe
                 const hex = `#${{[data[0], data[1], data[2]].map(v => v.toString(16).padStart(2, '0')).join('')}}`;
                 sessionStorage.setItem('whiteboardSessionColor', hex);
                 return hex;
-            }
+            }}
 
-            function updateSessionColorDisplay() {
+            function updateSessionColorDisplay() {{
                 if (!sessionColor) return;
                 colorSwatch.style.backgroundColor = sessionColor;
                 colorValue.textContent = sessionColor.toUpperCase();
-            }
+            }}
 
             function resizeCanvas() {{
                 const wrapper = document.getElementById('boardContainer');
