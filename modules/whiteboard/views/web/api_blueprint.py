@@ -27,6 +27,7 @@ def register_whiteboard_api(app, controller, access_guard: RemoteAccessGuard | N
                 "board_size": list(getattr(controller, "board_size", (1920, 1080))),
                 "refresh_ms": int(getattr(controller, "_whiteboard_refresh_ms", 200)),
                 "use_mjpeg": bool(getattr(controller, "_whiteboard_use_mjpeg", True)),
+                "text_size": int(getattr(controller, "text_size", 24)),
             }
         )
 
