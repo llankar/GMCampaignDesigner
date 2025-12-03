@@ -451,14 +451,14 @@ def _script_block(board_width: int, board_height: int, refresh_ms: int, use_mjpe
             canvas.addEventListener('pointerdown', handlePointerDown);
             canvas.addEventListener('pointermove', handlePointerMove);
             canvas.addEventListener('pointerup', handlePointerUp);
-            canvas.addEventListener('pointerleave', (evt) => {
-                if (isPanning) {
+            canvas.addEventListener('pointerleave', (evt) => {{
+                if (isPanning) {{
                     endPan();
-                }
-                if (drawing) {
+                }}
+                if (drawing) {{
                     handlePointerUp(evt);
-                }
-            });
+                }}
+            }});
             surface.addEventListener('wheel', handleWheel, { passive: false });
             surface.addEventListener('contextmenu', (evt) => evt.preventDefault());
             textBtn.addEventListener('click', handleText);
