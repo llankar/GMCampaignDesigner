@@ -151,9 +151,9 @@ def _script_block(board_width: int, board_height: int, refresh_ms: int, use_mjpe
             let currentScale = 1;
             let baseScale = 1;
             let zoomLevel = 1;
-            let pan = { x: 0, y: 0 };
+            let pan = {{ x: 0, y: 0 }};
             let isPanning = false;
-            let panStart = { x: 0, y: 0 };
+            let panStart = {{ x: 0, y: 0 }};
             let drawingArmed = false;
             let currentToken = '';
             let editingEnabled = false;
@@ -459,7 +459,7 @@ def _script_block(board_width: int, board_height: int, refresh_ms: int, use_mjpe
                     handlePointerUp(evt);
                 }}
             }});
-            surface.addEventListener('wheel', handleWheel, { passive: false });
+            surface.addEventListener('wheel', handleWheel, {{ passive: false }});
             surface.addEventListener('contextmenu', (evt) => evt.preventDefault());
             textBtn.addEventListener('click', handleText);
             undoBtn.addEventListener('click', handleUndo);
