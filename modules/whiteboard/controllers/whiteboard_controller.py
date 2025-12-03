@@ -605,6 +605,14 @@ class WhiteboardController:
         dialog = ctk.CTkToplevel(self.parent)
         dialog.title("Share Whiteboard")
         dialog.geometry("580x460")
+        try:
+            dialog.transient(self.parent)
+            dialog.lift()
+            dialog.focus_force()
+            dialog.attributes("-topmost", True)
+            dialog.after(200, lambda: dialog.attributes("-topmost", False))
+        except Exception:
+            pass
 
         url = self._build_share_url()
         description = (
