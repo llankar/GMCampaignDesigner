@@ -37,10 +37,13 @@ def _style_block() -> str:
             overflow: hidden;
         }
 
+        #boardContainer.panning { cursor: grabbing; }
+
         #boardSurface {
             position: relative;
             max-width: 100%;
             max-height: 100%;
+            transform-origin: center center;
         }
 
         #boardPreview {
@@ -146,6 +149,11 @@ def _script_block(board_width: int, board_height: int, refresh_ms: int, use_mjpe
             let drawing = false;
             let points = [];
             let currentScale = 1;
+            let baseScale = 1;
+            let zoomLevel = 1;
+            let pan = { x: 0, y: 0 };
+            let isPanning = false;
+            let panStart = { x: 0, y: 0 };
             let drawingArmed = false;
             let currentToken = '';
             let editingEnabled = false;
@@ -155,6 +163,7 @@ def _script_block(board_width: int, board_height: int, refresh_ms: int, use_mjpe
             const previewImg = document.getElementById('boardPreview');
             const canvas = document.getElementById('boardCanvas');
             const surface = document.getElementById('boardSurface');
+            const container = document.getElementById('boardContainer');
             const ctx = canvas.getContext('2d');
             const statusEl = document.getElementById('status');
             const undoBtn = document.getElementById('undoBtn');
@@ -190,12 +199,15 @@ def _script_block(board_width: int, board_height: int, refresh_ms: int, use_mjpe
                 colorValue.textContent = sessionColor.toUpperCase();
             }}
 
-            function resizeCanvas() {{
-                const wrapper = document.getElementById('boardContainer');
-                const scale = Math.min(wrapper.clientWidth / boardSize.width, wrapper.clientHeight / boardSize.height);
-                currentScale = scale || 1;
-                const displayWidth = boardSize.width * currentScale;
-                const displayHeight = boardSize.height * currentScale;
+            function clamp(value, min, max) {{
+                return Math.min(max, Math.max(min, value));
+            }}
+
+            function applyViewportTransform() {{
+                currentScale = (baseScale || 1) * (zoomLevel || 1);
+                const displayWidth = boardSize.width * (baseScale || 1);
+                const displayHeight = boardSize.height * (baseScale || 1);
+
                 canvas.width = displayWidth;
                 canvas.height = displayHeight;
                 surface.style.width = `${{displayWidth}}px`;
@@ -206,6 +218,12 @@ def _script_block(board_width: int, board_height: int, refresh_ms: int, use_mjpe
                 previewImg.height = displayHeight;
                 previewImg.style.width = `${{displayWidth}}px`;
                 previewImg.style.height = `${{displayHeight}}px`;
+                surface.style.transform = `translate(${{pan.x}}px, ${{pan.y}}px) scale(${{zoomLevel}})`;
+            }}
+
+            function resizeCanvas() {{
+                baseScale = Math.min(container.clientWidth / boardSize.width, container.clientHeight / boardSize.height) || 1;
+                applyViewportTransform();
             }}
 
             function getBoardCoords(evt) {{
@@ -296,7 +314,45 @@ def _script_block(board_width: int, board_height: int, refresh_ms: int, use_mjpe
                 points = [];
             }}
 
+            function isPanGesture(evt) {{
+                return evt.button === 1 || evt.button === 2 || evt.ctrlKey || evt.metaKey || evt.altKey || !editingEnabled;
+            }}
+
+            function beginPan(evt) {{
+                isPanning = true;
+                panStart = {{ x: evt.clientX, y: evt.clientY }};
+                container.classList.add('panning');
+            }}
+
+            function updatePan(evt) {{
+                if (!isPanning) return;
+                const deltaX = (evt.clientX - panStart.x) / (zoomLevel || 1);
+                const deltaY = (evt.clientY - panStart.y) / (zoomLevel || 1);
+                pan.x += deltaX;
+                pan.y += deltaY;
+                panStart = {{ x: evt.clientX, y: evt.clientY }};
+                applyViewportTransform();
+            }}
+
+            function endPan() {{
+                if (!isPanning) return;
+                isPanning = false;
+                container.classList.remove('panning');
+            }}
+
+            function handleWheel(evt) {{
+                evt.preventDefault();
+                const zoomChange = evt.deltaY < 0 ? 1.1 : 0.9;
+                zoomLevel = clamp(zoomLevel * zoomChange, 0.5, 3);
+                applyViewportTransform();
+            }}
+
             function handlePointerDown(evt) {{
+                if (isPanGesture(evt)) {{
+                    evt.preventDefault();
+                    beginPan(evt);
+                    return;
+                }}
                 if (!editingEnabled || !drawingArmed) return;
                 clearPreviewStroke();
                 drawing = true;
@@ -305,6 +361,11 @@ def _script_block(board_width: int, board_height: int, refresh_ms: int, use_mjpe
             }}
 
             function handlePointerMove(evt) {{
+                if (isPanning) {{
+                    evt.preventDefault();
+                    updatePan(evt);
+                    return;
+                }}
                 if (!drawing || !editingEnabled || !drawingArmed) return;
                 const pos = getBoardCoords(evt);
                 points.push(pos);
@@ -312,6 +373,9 @@ def _script_block(board_width: int, board_height: int, refresh_ms: int, use_mjpe
             }}
 
             function handlePointerUp(evt) {{
+                if (isPanning) {{
+                    endPan();
+                }}
                 if (!drawing || !editingEnabled || !drawingArmed) return;
                 drawing = false;
                 points.push(getBoardCoords(evt));
@@ -387,7 +451,16 @@ def _script_block(board_width: int, board_height: int, refresh_ms: int, use_mjpe
             canvas.addEventListener('pointerdown', handlePointerDown);
             canvas.addEventListener('pointermove', handlePointerMove);
             canvas.addEventListener('pointerup', handlePointerUp);
-            canvas.addEventListener('pointerleave', handlePointerUp);
+            canvas.addEventListener('pointerleave', (evt) => {
+                if (isPanning) {
+                    endPan();
+                }
+                if (drawing) {
+                    handlePointerUp(evt);
+                }
+            });
+            surface.addEventListener('wheel', handleWheel, { passive: false });
+            surface.addEventListener('contextmenu', (evt) => evt.preventDefault());
             textBtn.addEventListener('click', handleText);
             undoBtn.addEventListener('click', handleUndo);
             drawBtn.addEventListener('click', () => setDrawingArmed(!drawingArmed));
