@@ -354,6 +354,13 @@ def _script_block(
 
                 currentScale = (baseScale || 1) * (zoomLevel || 1);
 
+                const scaledSurfaceWidth = surfaceWidth * (zoomLevel || 1);
+                const scaledSurfaceHeight = surfaceHeight * (zoomLevel || 1);
+                const panLimitX = Math.max(padding, (scaledSurfaceWidth - viewportWidth) / 2 + padding);
+                const panLimitY = Math.max(padding, (scaledSurfaceHeight - viewportHeight) / 2 + padding);
+                pan.x = clamp(pan.x, -panLimitX, panLimitX);
+                pan.y = clamp(pan.y, -panLimitY, panLimitY);
+
                 canvas.width = boardDisplayWidth;
                 canvas.height = boardDisplayHeight;
                 surface.style.width = `${{surfaceWidth}}px`;
@@ -582,8 +589,9 @@ def _script_block(
                 if (!isPanning) return;
                 const deltaX = evt.clientX - panStart.x;
                 const deltaY = evt.clientY - panStart.y;
-                pan.x += deltaX;
-                pan.y += deltaY;
+                const speedScale = Math.max(zoomLevel || 1, 0.1);
+                pan.x += deltaX * speedScale;
+                pan.y += deltaY * speedScale;
                 panStart = {{ x: evt.clientX, y: evt.clientY }};
                 applyViewportTransform();
             }}
