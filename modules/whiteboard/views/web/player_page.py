@@ -384,7 +384,14 @@ def _script_block(board_width: int, board_height: int, refresh_ms: int, use_mjpe
             }}
 
             function isPanGesture(evt) {{
-                return evt.button === 1 || evt.button === 2 || evt.ctrlKey || evt.metaKey || evt.altKey || !editingEnabled;
+                const isTouch = evt.pointerType === 'touch';
+                const touchPan = isTouch && (!drawingArmed || !editingEnabled);
+                return (
+                    touchPan ||
+                    evt.button === 1 || evt.button === 2 ||
+                    evt.ctrlKey || evt.metaKey || evt.altKey ||
+                    !editingEnabled
+                );
             }}
 
             function beginPan(evt) {{
