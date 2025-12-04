@@ -356,8 +356,15 @@ def _script_block(
 
                 const scaledSurfaceWidth = surfaceWidth * (zoomLevel || 1);
                 const scaledSurfaceHeight = surfaceHeight * (zoomLevel || 1);
-                const panLimitX = Math.max(padding, (scaledSurfaceWidth - viewportWidth) / 2 + padding);
-                const panLimitY = Math.max(padding, (scaledSurfaceHeight - viewportHeight) / 2 + padding);
+                const effectiveZoom = Math.max(zoomLevel || 1, 0.01);
+                const panLimitX = Math.max(
+                    padding,
+                    ((surfaceWidth - viewportWidth) / 2 + padding) / effectiveZoom,
+                );
+                const panLimitY = Math.max(
+                    padding,
+                    ((surfaceHeight - viewportHeight) / 2 + padding) / effectiveZoom,
+                );
                 pan.x = clamp(pan.x, -panLimitX, panLimitX);
                 pan.y = clamp(pan.y, -panLimitY, panLimitY);
 
