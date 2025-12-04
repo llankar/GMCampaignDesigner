@@ -1329,19 +1329,53 @@ class WhiteboardController:
             pass
         return 1.0
 
-    def _web_render_geometry(self) -> Tuple[Tuple[int, int], float]:
+    def _web_content_bounds(self) -> Tuple[float, float, float, float]:
+        min_x = 0.0
+        min_y = 0.0
+        max_x = float(getattr(self, "board_size", (1920, 1080))[0])
+        max_y = float(getattr(self, "board_size", (1920, 1080))[1])
+
+        for item in self.whiteboard_items:
+            item_type = item.get("type")
+            if item_type == "stroke":
+                for x, y in item.get("points", ()):  # type: ignore[arg-type]
+                    min_x = min(min_x, float(x))
+                    min_y = min(min_y, float(y))
+                    max_x = max(max_x, float(x))
+                    max_y = max(max_y, float(y))
+            elif item_type in ("text", "stamp"):
+                pos = item.get("position") or (0, 0)
+                size = float(item.get("size", 0))
+                min_x = min(min_x, float(pos[0]))
+                min_y = min(min_y, float(pos[1]))
+                max_x = max(max_x, float(pos[0]) + size)
+                max_y = max(max_y, float(pos[1]) + size)
+
+        return min_x, min_y, max_x, max_y
+
+    def _web_render_geometry(self) -> Tuple[Tuple[int, int], Tuple[float, float], float]:
+        padding = 256.0
+        min_x, min_y, max_x, max_y = self._web_content_bounds()
+        origin = (min_x - padding, min_y - padding)
         viewport_size = (
-            max(1, int(getattr(self, "board_size", (1920, 1080))[0])),
-            max(1, int(getattr(self, "board_size", (1920, 1080))[1])),
+            max(1, int((max_x - min_x) + padding * 2)),
+            max(1, int((max_y - min_y) + padding * 2)),
         )
-        return viewport_size, max(self._min_zoom, min(self._max_zoom, float(getattr(self, "view_zoom", 1.0))))
+        viewport_size = (
+            max(viewport_size[0], int(getattr(self, "board_size", (1920, 1080))[0])),
+            max(viewport_size[1], int(getattr(self, "board_size", (1920, 1080))[1])),
+        )
+        zoom_value = max(self._min_zoom, min(self._max_zoom, float(getattr(self, "view_zoom", 1.0))))
+        self._web_view_origin = origin
+        self._web_view_size = viewport_size
+        return viewport_size, origin, zoom_value
 
     def render_web_whiteboard_image(self):
-        viewport_size, zoom_value = self._web_render_geometry()
+        viewport_size, origin, zoom_value = self._web_render_geometry()
         return self._render_whiteboard_image(
             for_player=True,
             viewport_size=viewport_size,
-            origin=(0.0, 0.0),
+            origin=origin,
             zoom=zoom_value,
             text_scale=self.get_web_text_scale(),
         )

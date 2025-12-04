@@ -42,7 +42,12 @@ def open_whiteboard_display(controller, port=None):
         use_mjpeg = bool(getattr(controller, "_whiteboard_use_mjpeg", True))
         refresh_ms = int(getattr(controller, "_whiteboard_refresh_ms", 200))
         token = getattr(getattr(controller, "remote_access_guard", None), "token", None)
-        return build_player_page(getattr(controller, "board_size", (1920, 1080)), refresh_ms, use_mjpeg, token)
+        try:
+            viewport_size, origin, _ = controller._web_render_geometry()
+        except Exception:
+            viewport_size = getattr(controller, "board_size", (1920, 1080))
+            origin = (0.0, 0.0)
+        return build_player_page(viewport_size, origin, refresh_ms, use_mjpeg, token)
 
     @app.route("/board.png")
     def board_png():
@@ -68,31 +73,33 @@ def open_whiteboard_display(controller, port=None):
         def frame_bytes():
             if hasattr(controller, "render_web_whiteboard_image"):
                 img = controller.render_web_whiteboard_image()
-            elif hasattr(controller, "_render_whiteboard_image"):
-                text_scale = controller.get_web_text_scale() if hasattr(controller, "get_web_text_scale") else 1.0
-                img = controller._render_whiteboard_image(
-                    for_player=True,
-                    viewport_size=getattr(controller, "board_size", (1920, 1080)),
-                    origin=(0.0, 0.0),
-                    zoom=getattr(controller, "view_zoom", 1.0),
-                    text_scale=text_scale,
-                )
             else:
-                origin = (0.0, 0.0)
                 try:
-                    origin = controller._current_view_origin()
+                    viewport_size, origin, zoom_value = controller._web_render_geometry()
                 except Exception:
-                    pass
+                    viewport_size = getattr(controller, "board_size", (1920, 1080))
+                    origin = (0.0, 0.0)
+                    zoom_value = getattr(controller, "view_zoom", 1.0)
+
                 text_scale = controller.get_web_text_scale() if hasattr(controller, "get_web_text_scale") else 1.0
-                img = render_whiteboard_image(
-                    controller.whiteboard_items,
-                    getattr(controller, "board_size", (1920, 1080)),
-                    font_cache=getattr(controller, "_font_cache", None),
-                    grid_origin=origin,
-                    zoom=getattr(controller, "view_zoom", 1.0),
-                    for_player=True,
-                    text_scale=text_scale,
-                )
+                if hasattr(controller, "_render_whiteboard_image"):
+                    img = controller._render_whiteboard_image(
+                        for_player=True,
+                        viewport_size=viewport_size,
+                        origin=origin,
+                        zoom=zoom_value,
+                        text_scale=text_scale,
+                    )
+                else:
+                    img = render_whiteboard_image(
+                        controller.whiteboard_items,
+                        viewport_size,
+                        font_cache=getattr(controller, "_font_cache", None),
+                        grid_origin=origin,
+                        zoom=zoom_value,
+                        for_player=True,
+                        text_scale=text_scale,
+                    )
             buf = io.BytesIO()
             try:
                 img.save(buf, format="JPEG", quality=85)

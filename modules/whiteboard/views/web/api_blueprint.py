@@ -21,10 +21,20 @@ def register_whiteboard_api(app, controller, access_guard: RemoteAccessGuard | N
 
     @app.route("/api/status", methods=["GET"])
     def api_status():
+        viewport_size = getattr(controller, "_web_view_size", None)
+        origin = getattr(controller, "_web_view_origin", None)
+        if viewport_size is None or origin is None:
+            try:
+                viewport_size, origin, _ = controller._web_render_geometry()
+            except Exception:
+                viewport_size = getattr(controller, "board_size", (1920, 1080))
+                origin = (0.0, 0.0)
+
         return jsonify(
             {
                 "editing_enabled": bool(access_guard.enabled),
-                "board_size": list(getattr(controller, "board_size", (1920, 1080))),
+                "board_size": list(viewport_size),
+                "board_origin": list(origin),
                 "refresh_ms": int(getattr(controller, "_whiteboard_refresh_ms", 200)),
                 "use_mjpeg": bool(getattr(controller, "_whiteboard_use_mjpeg", True)),
                 "text_size": int(getattr(controller, "text_size", 24)),

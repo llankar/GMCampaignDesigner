@@ -228,6 +228,8 @@ DEFAULT_TEXT_SIZE = 24
 def _script_block(
     board_width: int,
     board_height: int,
+    origin_x: float,
+    origin_y: float,
     refresh_ms: int,
     use_mjpeg: bool,
     text_sizes: list[int],
@@ -237,6 +239,7 @@ def _script_block(
     <script>
         (() => {{
             const boardSize = {{ width: {board_width}, height: {board_height} }};
+            const boardOrigin = {{ x: {origin_x}, y: {origin_y} }};
             const useMjpeg = {'true' if use_mjpeg else 'false'};
             const refreshDelay = {refresh_ms};
             const allowedTextSizes = [{', '.join(map(str, text_sizes))}];
@@ -304,6 +307,34 @@ def _script_block(
                 return Math.min(max, Math.max(min, value));
             }}
 
+            function updateBoardGeometry(size, origin) {{
+                let changed = false;
+
+                if (size && Number.isFinite(size.width) && Number.isFinite(size.height)) {{
+                    const width = Math.max(1, Number(size.width));
+                    const height = Math.max(1, Number(size.height));
+                    if (width !== boardSize.width || height !== boardSize.height) {{
+                        boardSize.width = width;
+                        boardSize.height = height;
+                        changed = true;
+                    }}
+                }}
+
+                if (origin && Number.isFinite(origin.x) && Number.isFinite(origin.y)) {{
+                    const ox = Number(origin.x);
+                    const oy = Number(origin.y);
+                    if (ox !== boardOrigin.x || oy !== boardOrigin.y) {{
+                        boardOrigin.x = ox;
+                        boardOrigin.y = oy;
+                        changed = true;
+                    }}
+                }}
+
+                if (changed) {{
+                    resizeCanvas();
+                }}
+            }}
+
             function applyViewportTransform() {{
                 currentScale = (baseScale || 1) * (zoomLevel || 1);
                 const displayWidth = boardSize.width * (baseScale || 1);
@@ -334,8 +365,8 @@ def _script_block(
             function getBoardCoordsFromClient(clientX, clientY) {{
                 const rect = surface.getBoundingClientRect();
                 const scale = currentScale || 1;
-                const x = (clientX - rect.left) / scale;
-                const y = (clientY - rect.top) / scale;
+                const x = (clientX - rect.left) / scale + boardOrigin.x;
+                const y = (clientY - rect.top) / scale + boardOrigin.y;
                 return [x, y];
             }}
 
@@ -476,9 +507,9 @@ def _script_block(
                 ctx.lineJoin = 'round';
                 ctx.strokeStyle = sessionColor;
                 ctx.beginPath();
-                ctx.moveTo(points[0][0] * scale, points[0][1] * scale);
+                ctx.moveTo((points[0][0] - boardOrigin.x) * scale, (points[0][1] - boardOrigin.y) * scale);
                 for (let i = 1; i < points.length; i++) {{
-                    ctx.lineTo(points[i][0] * scale, points[i][1] * scale);
+                    ctx.lineTo((points[i][0] - boardOrigin.x) * scale, (points[i][1] - boardOrigin.y) * scale);
                 }}
                 ctx.stroke();
             }}
@@ -719,6 +750,10 @@ def _script_block(
                     .then(data => {{
                         editingEnabled = !!data.editing_enabled;
                         textSize = parseFloat(data.text_size || textSize) || textSize;
+                        updateBoardGeometry(
+                            { width: (data.board_size || [])[0], height: (data.board_size || [])[1] },
+                            { x: (data.board_origin || [])[0], y: (data.board_origin || [])[1] }
+                        );
                         undoBtn.disabled = !editingEnabled;
                         textBtn.disabled = !editingEnabled;
                         drawBtn.disabled = !editingEnabled;
@@ -780,13 +815,20 @@ def _script_block(
     """
 
 
-def build_player_page(board_size: tuple[int, int], refresh_ms: int, use_mjpeg: bool, token: str | None = None) -> str:
+def build_player_page(
+    board_size: tuple[int, int],
+    board_origin: tuple[float, float],
+    refresh_ms: int,
+    use_mjpeg: bool,
+    token: str | None = None,
+) -> str:
     params = {}
     if token:
         params["token"] = token
     query = urlencode(params)
     query_suffix = f"?{query}" if query else ""
     width, height = board_size
+    origin_x, origin_y = board_origin
     options_html = "\n".join(
         f'                    <option value="{size}"{' selected' if size == DEFAULT_TEXT_SIZE else ''}>{size}</option>'
         for size in TEXT_SIZES
@@ -839,7 +881,7 @@ def build_player_page(board_size: tuple[int, int], refresh_ms: int, use_mjpeg: b
                 </div>
             </div>
         </div>
-        {_script_block(width, height, refresh_ms, use_mjpeg, TEXT_SIZES, DEFAULT_TEXT_SIZE)}
+        {_script_block(width, height, origin_x, origin_y, refresh_ms, use_mjpeg, TEXT_SIZES, DEFAULT_TEXT_SIZE)}
     </body>
     </html>
     """
