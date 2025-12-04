@@ -27,6 +27,9 @@ def _resolve_size(size: Tuple[int, int]) -> Tuple[int, int]:
         return DEFAULT_SIZE
 
 
+PLAYER_TEXT_SCALE = 2.0
+
+
 def render_whiteboard_image(
     items: List[Dict[str, Any]],
     size: Tuple[int, int] = DEFAULT_SIZE,
@@ -79,7 +82,10 @@ def render_whiteboard_image(
             text_value = item.get("text", "")
             pos = item.get("position") or (0, 0)
             color = item.get("color", DEFAULT_COLOR)
-            size_px = int(max(1, float(item.get("text_size", item.get("size", 24))) * zoom))
+            text_scale = PLAYER_TEXT_SCALE if for_player else 1.0
+            size_px = int(
+                max(1, float(item.get("text_size", item.get("size", 24))) * zoom * text_scale)
+            )
             font = font_cache.pil_font(size_px)
             try:
                 draw.text(_scale_point(pos), text_value, fill=color, font=font, anchor="lt")
