@@ -4,8 +4,9 @@ import os
 import socket
 import threading
 import tkinter as tk
+import uuid
 from tkinter import colorchooser, filedialog
-from typing import List, Dict, Tuple, Iterable, Callable, Any, cast
+from typing import Any, Callable, Dict, Iterable, List, Tuple, cast
 
 import customtkinter as ctk
 from PIL import Image, ImageTk
@@ -20,6 +21,7 @@ from modules.whiteboard.services.whiteboard_history import WhiteboardHistory
 from modules.whiteboard.utils.remote_access_guard import RemoteAccessGuard
 from modules.whiteboard.utils.grid_overlay import GridOverlay
 from modules.whiteboard.utils.stamp_assets import available_stamp_assets, load_tk_asset
+from modules.whiteboard.utils.uploaded_images import resolve_uploaded_asset
 from modules.whiteboard.utils.whiteboard_renderer import render_whiteboard_image
 from modules.whiteboard.views.web_whiteboard_view import (
     open_whiteboard_display,
@@ -231,7 +233,7 @@ class WhiteboardController:
         if item_type == "stroke":
             points = item.get("points") or []
             translated["points"] = [(x - origin_x, y - origin_y) for x, y in points]
-        elif item_type in ("text", "stamp"):
+        elif item_type in ("text", "stamp", "image"):
             pos = item.get("position") or (0, 0)
             translated["position"] = (pos[0] - origin_x, pos[1] - origin_y)
         return translated
@@ -939,6 +941,22 @@ class WhiteboardController:
         simplified.append(points[-1])
         return simplified
 
+    def _parse_image_size(self, size) -> Tuple[float, float]:
+        width = None
+        height = None
+        if isinstance(size, dict):
+            width = size.get("width")
+            height = size.get("height")
+        elif isinstance(size, (list, tuple)) and len(size) >= 2:
+            width, height = size[0], size[1]
+
+        try:
+            parsed_width = max(1.0, float(width))
+            parsed_height = max(1.0, float(height))
+            return parsed_width, parsed_height
+        except Exception as exc:  # noqa: BLE001
+            raise ValueError("Size must include width and height") from exc
+
     # ------------------------------------------------------------------
     # Remote Submissions
     # ------------------------------------------------------------------
@@ -983,6 +1001,54 @@ class WhiteboardController:
             }
             self._history.checkpoint(self.whiteboard_items)
             self.whiteboard_items.append(item)
+            self._persist_state()
+
+        self._dispatch_to_ui_thread(_apply)
+
+    def handle_remote_image(self, *, asset_key: str, position, size) -> str:
+        def _apply():
+            if not asset_key:
+                raise ValueError("Image asset is required")
+
+            asset_path = resolve_uploaded_asset(asset_key)
+            if not asset_path:
+                raise ValueError("Uploaded image not found")
+
+            if not isinstance(position, (list, tuple)) or len(position) != 2:
+                raise ValueError("Position must include x and y")
+
+            width, height = self._parse_image_size(size)
+            pos = (float(position[0]), float(position[1]))
+            image_id = uuid.uuid4().hex
+            item = {
+                "type": "image",
+                "asset": asset_key,
+                "position": pos,
+                "size": {"width": width, "height": height},
+                "image_id": image_id,
+                "layer": WhiteboardLayer.SHARED.value,
+            }
+            self._history.checkpoint(self.whiteboard_items)
+            self.whiteboard_items.append(item)
+            self._persist_state()
+            return image_id
+
+        return cast(str, self._dispatch_to_ui_thread(_apply))
+
+    def handle_remote_image_resize(self, *, image_id: str, size) -> None:
+        def _apply():
+            if not image_id:
+                raise ValueError("Image id is required")
+
+            target = next(
+                (item for item in self.whiteboard_items if item.get("type") == "image" and item.get("image_id") == image_id),
+                None,
+            )
+            if not target:
+                raise ValueError("Image not found")
+
+            width, height = self._parse_image_size(size)
+            target["size"] = {"width": width, "height": height}
             self._persist_state()
 
         self._dispatch_to_ui_thread(_apply)
@@ -1287,6 +1353,36 @@ class WhiteboardController:
                     item["_image_ref"] = photo
                 except Exception:
                     continue
+            elif item.get("type") == "image":
+                asset_key = item.get("asset")
+                if not asset_key:
+                    continue
+                pos = item.get("position") or (0, 0)
+                size = item.get("size") or {}
+                try:
+                    width = max(1, float(size.get("width", 0)))
+                    height = max(1, float(size.get("height", 0)))
+                except Exception:
+                    continue
+
+                screen_width = max(1, int(width * self.view_zoom))
+                screen_height = max(1, int(height * self.view_zoom))
+                asset_path = item.get("asset_path") or resolve_uploaded_asset(asset_key)
+                if not asset_path:
+                    continue
+
+                try:
+                    pil_img = Image.open(asset_path).convert("RGBA")
+                    resized = pil_img.resize((screen_width, screen_height), Image.LANCZOS)
+                    photo = ImageTk.PhotoImage(resized)
+                except Exception:
+                    continue
+
+                screen_pos = self._board_to_screen(*pos)
+                image_id = self.canvas.create_image(screen_pos[0], screen_pos[1], image=photo, anchor="nw")
+                item["canvas_ids"] = (image_id,)
+                item["asset_path"] = asset_path
+                item["_image_ref"] = photo
         if self._active_points:
             self._update_preview()
 

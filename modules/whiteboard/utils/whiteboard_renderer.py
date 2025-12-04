@@ -7,6 +7,7 @@ from modules.helpers.logging_helper import log_module_import
 from modules.whiteboard.models.layer_types import WhiteboardLayer, normalize_layer
 from modules.whiteboard.utils.grid_overlay import draw_grid_on_image
 from modules.whiteboard.utils.stamp_assets import load_pil_asset
+from modules.whiteboard.utils.uploaded_images import load_scaled_upload, resolve_uploaded_asset
 from modules.maps.utils.text_items import TextFontCache
 
 log_module_import(__name__)
@@ -104,6 +105,28 @@ def render_whiteboard_image(
                 stamp_img = load_pil_asset(asset_path, size_px)
                 sx, sy = _scale_point(pos)
                 img.alpha_composite(stamp_img, dest=(int(sx), int(sy)))
+            except Exception:
+                continue
+        elif item_type == "image":
+            asset_key = item.get("asset") or item.get("asset_key")
+            if not asset_key or not resolve_uploaded_asset(asset_key):
+                continue
+
+            pos = item.get("position") or (0, 0)
+            size = item.get("size") or {}
+            try:
+                width_px = int(max(1, float(size.get("width", 0)) * zoom))
+                height_px = int(max(1, float(size.get("height", 0)) * zoom))
+            except Exception:
+                width_px = height_px = 0
+
+            if width_px <= 0 or height_px <= 0:
+                continue
+
+            try:
+                upload_img = load_scaled_upload(asset_key, width_px, height_px)
+                sx, sy = _scale_point(pos)
+                img.alpha_composite(upload_img, dest=(int(sx), int(sy)))
             except Exception:
                 continue
 

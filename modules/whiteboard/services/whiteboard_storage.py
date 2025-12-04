@@ -55,7 +55,11 @@ class WhiteboardState:
     def to_dict(self) -> Dict[str, Any]:
         serialized_items = []
         for item in self.items:
-            clean = {k: v for k, v in item.items() if k not in ("canvas_ids", "_image_ref")}
+            clean = {
+                k: v
+                for k, v in item.items()
+                if k not in ("canvas_ids", "_image_ref", "asset_path")
+            }
             serialized_items.append(clean)
         return {
             "items": serialized_items,
