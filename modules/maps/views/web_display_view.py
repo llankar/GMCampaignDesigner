@@ -104,13 +104,11 @@ def open_web_display(self, port=None):
             except Exception:
                 pass
             try:
-                if 'A' in img.getbands():
-                    alpha = img.getchannel('A')
-                else:
-                    alpha = None
-                base_rgb = img.convert('RGB') if img.mode != 'RGBA' else img.copy()
-                opaque = Image.new('RGB', img.size, (0, 0, 0))
-                opaque.paste(base_rgb, mask=alpha)
+                # Normalize to RGBA first so exotic modes (e.g. RGBA;16B) can be flattened.
+                rgba = img.convert('RGBA')
+                alpha = rgba.getchannel('A')
+                opaque = Image.new('RGB', rgba.size, (0, 0, 0))
+                opaque.paste(rgba.convert('RGB'), mask=alpha)
                 return opaque
             except Exception:
                 logging.getLogger(__name__).exception("Failed to convert map image to RGB for MJPEG stream")
