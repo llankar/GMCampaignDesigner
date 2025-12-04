@@ -31,6 +31,28 @@ def register_whiteboard_api(app, controller, access_guard: RemoteAccessGuard | N
                 viewport_size = getattr(controller, "board_size", (1920, 1080))
                 origin = (0.0, 0.0)
 
+        images = []
+        for item in getattr(controller, "whiteboard_items", []) or []:
+            if not isinstance(item, dict) or item.get("type") != "image":
+                continue
+            position = item.get("position") or (0.0, 0.0)
+            pos_x = pos_y = 0.0
+            if isinstance(position, (list, tuple)) and len(position) >= 2:
+                pos_x = float(position[0])
+                pos_y = float(position[1])
+
+            size = item.get("size") if isinstance(item.get("size"), dict) else {}
+            images.append(
+                {
+                    "image_id": item.get("image_id"),
+                    "position": [pos_x, pos_y],
+                    "size": {
+                        "width": float(size.get("width", 0.0)),
+                        "height": float(size.get("height", 0.0)),
+                    },
+                }
+            )
+
         return jsonify(
             {
                 "editing_enabled": bool(access_guard.enabled),
@@ -43,6 +65,7 @@ def register_whiteboard_api(app, controller, access_guard: RemoteAccessGuard | N
                     getattr(controller, "get_web_text_scale", lambda: 1.0)()
                 ),
                 "zoom": float(getattr(controller, "view_zoom", 1.0)),
+                "images": images,
             }
         )
 
