@@ -1298,6 +1298,7 @@ class WhiteboardController:
         viewport_size: Tuple[int, int] | None = None,
         origin: Tuple[float, float] | None = None,
         zoom: float | None = None,
+        text_scale: float = 1.0,
     ):
         viewport_size = viewport_size or self._view_board_size()
         origin = origin if origin is not None else self._current_view_origin()
@@ -1311,6 +1312,7 @@ class WhiteboardController:
             viewport_size,
             font_cache=self._font_cache,
             include_text=include_text,
+            text_scale=text_scale,
             grid_enabled=self.grid_enabled,
             grid_size=self.grid_size,
             grid_origin=origin,
@@ -1322,11 +1324,13 @@ class WhiteboardController:
         if not getattr(self, "_whiteboard_web_thread", None):
             self._update_player_view()
             return
+        web_text_scale = 2.0
         img = self._render_whiteboard_image(
             for_player=True,
             viewport_size=self.board_size,
             origin=(0.0, 0.0),
             zoom=1.0,
+            text_scale=web_text_scale,
         )
         if img is None:
             return
