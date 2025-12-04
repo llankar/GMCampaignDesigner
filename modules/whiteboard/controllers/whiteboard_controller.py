@@ -541,11 +541,7 @@ class WhiteboardController:
         action_menu.set("Actions")
         action_menu.pack(side="left")
         self._action_menu = action_menu
-
-        self._save_meta_var = tk.StringVar()
-        save_meta = ctk.CTkLabel(toolbar, textvariable=self._save_meta_var)
-        save_meta.pack(side="left", padx=(6, 0))
-        self._update_save_metadata()
+   
 
     def _handle_save_action(self, selection: str):
         if selection == "Save now":
