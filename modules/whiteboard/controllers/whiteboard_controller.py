@@ -1327,10 +1327,7 @@ class WhiteboardController:
                 return max(0.1, float(configured_scale))
         except Exception:
             pass
-        try:
-            return max(0.1, float(getattr(self, "text_size", 24)) / 12.0)
-        except Exception:
-            return 2.0
+        return 1.0
 
     def _web_render_geometry(self) -> Tuple[Tuple[int, int], float]:
         viewport_size = (
