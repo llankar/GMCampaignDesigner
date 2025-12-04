@@ -1,6 +1,10 @@
+import io
 import tkinter as tk
+from functools import lru_cache
+from pathlib import Path
 import customtkinter as ctk
 from PIL import ImageFont
+from importlib import resources
 
 DEFAULT_TEXT_SIZES = [12, 14, 16, 18, 20, 24, 28, 32, 40, 48, 60]
 
@@ -115,13 +119,65 @@ class TextFontCache:
                 family = self._resolved_family or self._family
                 self._pil_fonts[normalized] = ImageFont.truetype(family, normalized)
             except Exception:
-                try:
-                    # Pillow bundles DejaVuSans, which provides a predictable size
-                    # even when the requested Tk font family is unavailable on the host.
-                    self._pil_fonts[normalized] = ImageFont.truetype("DejaVuSans.ttf", normalized)
-                except Exception:
-                    self._pil_fonts[normalized] = ImageFont.load_default()
+                fallback = self._load_scalable_font(normalized)
+                if fallback is None:
+                    raise RuntimeError("Unable to load a scalable font for PIL text rendering")
+                self._pil_fonts[normalized] = fallback
         return self._pil_fonts[normalized]
+
+    @staticmethod
+    @lru_cache(maxsize=1)
+    def _fallback_font_bytes() -> bytes | None:
+        try:
+            font_file = resources.files("PIL").joinpath("fonts/DejaVuSans.ttf")
+            with font_file.open("rb") as fh:
+                return fh.read()
+        except Exception:
+            return None
+
+    @staticmethod
+    @lru_cache(maxsize=1)
+    def _fallback_font_path() -> str | None:
+        candidates: list[Path] = []
+        try:
+            import PIL
+
+            pil_dir = Path(PIL.__file__).resolve().parent
+            candidates.extend(
+                [
+                    pil_dir / "fonts" / "DejaVuSans.ttf",
+                    pil_dir / "DejaVuSans.ttf",
+                ]
+            )
+        except Exception:
+            pass
+        candidates.append(Path("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"))
+        for candidate in candidates:
+            if candidate.exists():
+                return str(candidate)
+        return None
+
+    def _load_scalable_font(self, size: int) -> ImageFont.FreeTypeFont | None:
+        """Load a scalable font even when the configured family is missing."""
+
+        fallback_path = self._fallback_font_path()
+        if fallback_path:
+            try:
+                return ImageFont.truetype(fallback_path, size)
+            except Exception:
+                pass
+
+        font_bytes = self._fallback_font_bytes()
+        if font_bytes:
+            try:
+                return ImageFont.truetype(io.BytesIO(font_bytes), size)
+            except Exception:
+                pass
+
+        try:
+            return ImageFont.truetype("DejaVuSans.ttf", size)
+        except Exception:
+            return None
 
 
 def approximate_text_bbox(position: tuple[float, float], *, text: str, size: int, zoom: float, pan: tuple[float, float], padding: float = 6.0) -> tuple[float, float, float, float]:
