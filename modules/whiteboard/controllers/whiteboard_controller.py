@@ -1320,18 +1320,40 @@ class WhiteboardController:
             zoom=zoom_value,
         )
 
+    def get_web_text_scale(self) -> float:
+        try:
+            configured_scale = ConfigHelper.get("WhiteboardServer", "web_text_scale", fallback=None)
+            if configured_scale is not None:
+                return max(0.1, float(configured_scale))
+        except Exception:
+            pass
+        try:
+            return max(0.1, float(getattr(self, "text_size", 24)) / 12.0)
+        except Exception:
+            return 2.0
+
+    def _web_render_geometry(self) -> Tuple[Tuple[int, int], float]:
+        viewport_size = (
+            max(1, int(getattr(self, "board_size", (1920, 1080))[0])),
+            max(1, int(getattr(self, "board_size", (1920, 1080))[1])),
+        )
+        return viewport_size, max(self._min_zoom, min(self._max_zoom, float(getattr(self, "view_zoom", 1.0))))
+
+    def render_web_whiteboard_image(self):
+        viewport_size, zoom_value = self._web_render_geometry()
+        return self._render_whiteboard_image(
+            for_player=True,
+            viewport_size=viewport_size,
+            origin=(0.0, 0.0),
+            zoom=zoom_value,
+            text_scale=self.get_web_text_scale(),
+        )
+
     def _update_web_display_whiteboard(self):
         if not getattr(self, "_whiteboard_web_thread", None):
             self._update_player_view()
             return
-        web_text_scale = 2.0
-        img = self._render_whiteboard_image(
-            for_player=True,
-            viewport_size=self.board_size,
-            origin=(0.0, 0.0),
-            zoom=1.0,
-            text_scale=web_text_scale,
-        )
+        img = self.render_web_whiteboard_image()
         if img is None:
             return
         buffer = io.BytesIO()
