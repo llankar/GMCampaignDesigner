@@ -40,7 +40,6 @@ class WhiteboardController:
         self._root_app = root_app
         self._ui_dispatch_lock = threading.Lock()
         self._pending_save_job: Optional[str] = None
-        self._save_reset_job: Optional[str] = None
 
         self.tool = "pen"
         self.ink_color = "#FF0000"
@@ -533,14 +532,9 @@ class WhiteboardController:
 
         save_frame = ctk.CTkFrame(toolbar, fg_color="transparent")
         save_frame.pack(side="left", padx=(0, 6))
-        self._save_status_var = tk.StringVar(value=self._format_save_status())
-        save_btn = ctk.CTkButton(save_frame, textvariable=self._save_status_var, command=lambda: self._persist_state(update_only=False), width=120)
-        save_btn.pack(side="left", padx=(0, 4))
-        self._save_button = save_btn
-
         action_menu = ctk.CTkOptionMenu(
             save_frame,
-            values=["Actions", "Restore last save", "View history"],
+            values=["Actions", "Save now", "Restore last save", "View history"],
             command=self._handle_save_action,
             width=130,
         )
@@ -554,7 +548,9 @@ class WhiteboardController:
         self._update_save_metadata()
 
     def _handle_save_action(self, selection: str):
-        if selection == "Restore last save":
+        if selection == "Save now":
+            self._persist_state(update_only=False)
+        elif selection == "Restore last save":
             self._restore_latest_snapshot()
         elif selection == "View history":
             self._open_history_dialog()
@@ -563,19 +559,11 @@ class WhiteboardController:
         except Exception:
             pass
 
-    def _format_save_status(self) -> str:
-        if self._pending_save_job:
-            return "Saving..."
-        if self._last_saved_at:
-            return "Saved"
-        return "Save"
-
     def _update_save_metadata(self, saved_at: Optional[str] = None):
         if saved_at:
             self._last_saved_at = saved_at
         if not self._last_saved_at:
             self._save_meta_var.set("No saves yet")
-            self._save_status_var.set(self._format_save_status())
             return
         try:
             ts = datetime.fromisoformat(self._last_saved_at.replace("Z", "+00:00"))
@@ -583,7 +571,6 @@ class WhiteboardController:
         except Exception:
             human = f"Saved {self._last_saved_at}"
         self._save_meta_var.set(human)
-        self._save_status_var.set(self._format_save_status())
 
     def _on_scenario_change(self, selection: str):
         scenario = selection or "Unassigned"
@@ -1512,37 +1499,17 @@ class WhiteboardController:
                 pass
         try:
             self._pending_save_job = self.parent.after(600, self._perform_save)
-            self._save_status_var.set(self._format_save_status())
         except Exception:
             self._perform_save()
 
     def _perform_save(self):
         self._pending_save_job = None
         try:
-            self._save_status_var.set("Saving...")
-        except Exception:
-            pass
-
-        try:
             _, saved_at = self._repository.save_snapshot(self._scenario_var.get(), self.state)
             self._update_save_metadata(saved_at)
         except Exception:
             log_warning("Failed to save whiteboard state", func_name="WhiteboardController._perform_save")
-            try:
-                self._save_status_var.set("Save")
-            except Exception:
-                pass
             return
-
-        if self._save_reset_job:
-            try:
-                self.parent.after_cancel(self._save_reset_job)
-            except Exception:
-                pass
-        try:
-            self._save_reset_job = self.parent.after(2000, lambda: self._save_status_var.set(self._format_save_status()))
-        except Exception:
-            pass
 
     def _undo_action(self):
         restored, changed = self._history.undo(self.whiteboard_items)
@@ -1898,11 +1865,5 @@ class WhiteboardController:
             except Exception:
                 pass
             self._pending_save_job = None
-        if self._save_reset_job:
-            try:
-                self.parent.after_cancel(self._save_reset_job)
-            except Exception:
-                pass
-            self._save_reset_job = None
         self.close_player_view()
         close_whiteboard_display(self)
