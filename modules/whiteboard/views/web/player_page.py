@@ -159,6 +159,8 @@ def _script_block(board_width: int, board_height: int, refresh_ms: int, use_mjpe
             let editingEnabled = false;
             let textSize = 24;
             let sessionColor = '';
+            let pinchState = null;
+            const activePointers = new Map();
 
             const previewImg = document.getElementById('boardPreview');
             const canvas = document.getElementById('boardCanvas');
@@ -227,11 +229,78 @@ def _script_block(board_width: int, board_height: int, refresh_ms: int, use_mjpe
             }}
 
             function getBoardCoords(evt) {{
+                return getBoardCoordsFromClient(evt.clientX, evt.clientY);
+            }}
+
+            function getBoardCoordsFromClient(clientX, clientY) {{
                 const rect = surface.getBoundingClientRect();
                 const scale = currentScale || 1;
-                const x = (evt.clientX - rect.left) / scale;
-                const y = (evt.clientY - rect.top) / scale;
+                const x = (clientX - rect.left) / scale;
+                const y = (clientY - rect.top) / scale;
                 return [x, y];
+            }}
+
+            function addActivePointer(evt) {{
+                activePointers.set(evt.pointerId, {{ x: evt.clientX, y: evt.clientY }});
+            }}
+
+            function updateActivePointer(evt) {{
+                if (activePointers.has(evt.pointerId)) {{
+                    activePointers.set(evt.pointerId, {{ x: evt.clientX, y: evt.clientY }});
+                }}
+            }}
+
+            function removeActivePointer(evt) {{
+                activePointers.delete(evt.pointerId);
+            }}
+
+            function getPinchData() {{
+                const pointers = Array.from(activePointers.values());
+                if (pointers.length < 2) return null;
+
+                const [first, second] = pointers;
+                const dx = second.x - first.x;
+                const dy = second.y - first.y;
+                const distance = Math.hypot(dx, dy) || 1;
+                const midpoint = {{ x: (first.x + second.x) / 2, y: (first.y + second.y) / 2 }};
+                return {{ distance, midpoint }};
+            }}
+
+            function startPinch() {{
+                const pinch = getPinchData();
+                if (!pinch) return;
+
+                pinchState = {{
+                    startDistance: pinch.distance,
+                    startZoom: zoomLevel,
+                    startPan: {{ ...pan }},
+                    anchorClient: {{ ...pinch.midpoint }},
+                    anchorBoard: getBoardCoordsFromClient(pinch.midpoint.x, pinch.midpoint.y),
+                }};
+                drawing = false;
+                clearPreviewStroke();
+            }}
+
+            function updatePinch() {{
+                if (!pinchState) return;
+                const pinch = getPinchData();
+                if (!pinch) return;
+
+                const scaleFactor = pinch.distance / (pinchState.startDistance || 1);
+                const newZoom = clamp(pinchState.startZoom * scaleFactor, 0.5, 3);
+                zoomLevel = newZoom;
+
+                const scale = (baseScale || 1) * newZoom;
+                const anchor = pinchState.anchorBoard;
+                const target = pinchState.anchorClient;
+                pan.x = target.x - anchor[0] * scale;
+                pan.y = target.y - anchor[1] * scale;
+
+                applyViewportTransform();
+            }}
+
+            function endPinch() {{
+                pinchState = null;
             }}
 
             function setStatus(message, isError=false) {{
@@ -348,6 +417,13 @@ def _script_block(board_width: int, board_height: int, refresh_ms: int, use_mjpe
             }}
 
             function handlePointerDown(evt) {{
+                addActivePointer(evt);
+
+                if (activePointers.size === 2) {{
+                    startPinch();
+                    return;
+                }}
+
                 if (isPanGesture(evt)) {{
                     evt.preventDefault();
                     beginPan(evt);
@@ -361,6 +437,14 @@ def _script_block(board_width: int, board_height: int, refresh_ms: int, use_mjpe
             }}
 
             function handlePointerMove(evt) {{
+                updateActivePointer(evt);
+
+                if (pinchState) {{
+                    evt.preventDefault();
+                    updatePinch();
+                    return;
+                }}
+
                 if (isPanning) {{
                     evt.preventDefault();
                     updatePan(evt);
@@ -373,6 +457,12 @@ def _script_block(board_width: int, board_height: int, refresh_ms: int, use_mjpe
             }}
 
             function handlePointerUp(evt) {{
+                removeActivePointer(evt);
+
+                if (pinchState && activePointers.size < 2) {{
+                    endPinch();
+                }}
+
                 if (isPanning) {{
                     endPan();
                 }}
@@ -451,7 +541,15 @@ def _script_block(board_width: int, board_height: int, refresh_ms: int, use_mjpe
             canvas.addEventListener('pointerdown', handlePointerDown);
             canvas.addEventListener('pointermove', handlePointerMove);
             canvas.addEventListener('pointerup', handlePointerUp);
+            canvas.addEventListener('pointercancel', (evt) => {{
+                removeActivePointer(evt);
+                endPan();
+                endPinch();
+                drawing = false;
+                clearPreviewStroke();
+            }});
             canvas.addEventListener('pointerleave', (evt) => {{
+                removeActivePointer(evt);
                 if (isPanning) {{
                     endPan();
                 }}
