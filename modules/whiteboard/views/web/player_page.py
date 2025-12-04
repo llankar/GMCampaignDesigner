@@ -66,45 +66,92 @@ def _style_block() -> str:
             background: transparent;
         }
 
-        #toolbar {
-            position: sticky;
-            top: 12px;
-            align-self: center;
-            display: flex;
-            gap: 8px;
+        #contextMenu {
+            position: fixed;
+            min-width: 260px;
             background: var(--panel-bg);
-            padding: 10px 12px;
-            border-radius: 10px;
+            border-radius: 12px;
             box-shadow: var(--panel-shadow);
-            align-items: center;
-            flex-wrap: wrap;
-            z-index: 10;
+            padding: 10px;
+            display: none;
+            z-index: 20;
+            border: 1px solid #e5e7eb;
         }
 
-        #toolbar button {
+        #contextMenu.visible { display: block; }
+
+        #contextMenu .menu-section {
+            padding: 8px 6px;
+            border-bottom: 1px solid #e5e7eb;
+        }
+
+        #contextMenu .menu-section:last-child { border-bottom: none; }
+
+        #contextMenu .menu-subheading {
+            font-size: 12px;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: #6b7280;
+            margin: 4px 0 8px;
+            font-weight: 700;
+        }
+
+        #contextMenu button.menu-item {
+            width: 100%;
+            text-align: left;
             border: none;
-            padding: 10px 14px;
+            background: #f3f4f6;
+            padding: 10px;
             border-radius: 8px;
+            margin-bottom: 6px;
             cursor: pointer;
+            font-weight: 700;
+        }
+
+        #contextMenu button.menu-item:hover { background: #e5e7eb; }
+
+        #contextMenu button.menu-item:disabled {
+            cursor: not-allowed;
+            background: #e5e7eb;
+            color: var(--accent-muted);
+        }
+
+        #contextMenu .menu-field {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            margin-bottom: 8px;
+        }
+
+        #contextMenu .menu-field label { font-weight: 700; color: #111827; }
+
+        #contextMenu input[type='text'] {
+            border: 1px solid #d1d5db;
+            border-radius: 6px;
+            padding: 8px;
             font-weight: 600;
+        }
+
+        #contextMenu select {
+            border: 1px solid #d1d5db;
+            border-radius: 6px;
+            padding: 8px;
+            font-weight: 600;
+            background: #fff;
+        }
+
+        #tokenSaveBtn {
+            align-self: flex-start;
+            border: none;
+            padding: 8px 12px;
+            border-radius: 8px;
             background: var(--accent);
             color: #fff;
-            transition: background 0.15s ease;
+            font-weight: 700;
+            cursor: pointer;
         }
 
-        #toolbar button.secondary { background: #111827; color: #fff; }
-        #toolbar button.ghost { background: #e5e7eb; color: #111827; }
-
-        #toolbar button:disabled { background: var(--accent-muted); cursor: not-allowed; }
-
-        #toolbar .field {
-            display: flex;
-            align-items: center;
-            gap: 6px;
-            padding: 8px 10px;
-            background: #f3f4f6;
-            border-radius: 8px;
-        }
+        #tokenSaveBtn:disabled { background: var(--accent-muted); cursor: not-allowed; }
 
         #colorSwatch {
             width: 20px;
@@ -114,20 +161,14 @@ def _style_block() -> str:
             box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.15);
         }
 
-        #toolbar input[type='text'] {
-            border: 1px solid #d1d5db;
-            border-radius: 6px;
-            padding: 8px;
-            min-width: 180px;
-            font-weight: 600;
-        }
-
-        #toolbar select {
-            border: 1px solid #d1d5db;
-            border-radius: 6px;
-            padding: 8px;
-            font-weight: 600;
-            background: #fff;
+        .color-row {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            background: #f3f4f6;
+            padding: 8px 10px;
+            border-radius: 8px;
+            font-weight: 700;
         }
 
         #status {
@@ -265,11 +306,12 @@ def _script_block(
             const container = document.getElementById('boardContainer');
             const ctx = canvas.getContext('2d');
             const statusEl = document.getElementById('status');
-            const undoBtn = document.getElementById('undoBtn');
-            const textBtn = document.getElementById('textBtn');
-            const drawBtn = document.getElementById('drawBtn');
-            const refreshBtn = document.getElementById('refreshBtn');
+            const undoBtn = document.getElementById('menuUndo');
+            const textBtn = document.getElementById('menuPlaceText');
+            const drawBtn = document.getElementById('menuDrawToggle');
+            const refreshBtn = document.getElementById('menuRefresh');
             const tokenInput = document.getElementById('tokenInput');
+            const tokenSaveBtn = document.getElementById('tokenSaveBtn');
             const colorSwatch = document.getElementById('colorSwatch');
             const colorValue = document.getElementById('colorValue');
             const textSizeSelect = document.getElementById('textSizeSelect');
@@ -277,6 +319,11 @@ def _script_block(
             const textInput = document.getElementById('textInput');
             const textCancel = document.getElementById('textCancel');
             const textSave = document.getElementById('textSave');
+            const contextMenu = document.getElementById('contextMenu');
+
+            const longPressDelay = 550;
+            let longPressTimer = null;
+            let longPressStart = null;
 
             function createSessionColor() {{
                 const existing = sessionStorage.getItem('whiteboardSessionColor');
@@ -713,8 +760,7 @@ def _script_block(
             function setDrawingArmed(value) {{
                 drawingArmed = !!value && editingEnabled;
                 drawBtn.textContent = drawingArmed ? 'Stop Drawing' : 'Start Drawing';
-                drawBtn.classList.toggle('ghost', !drawingArmed);
-                drawBtn.classList.toggle('secondary', drawingArmed);
+                drawBtn.setAttribute('aria-pressed', drawingArmed ? 'true' : 'false');
             }}
 
             function applyStoredTextSize(serverSize) {{
@@ -744,6 +790,69 @@ def _script_block(
                 setStatus('Preview refreshed');
             }}
 
+            function openContextMenu(x, y) {{
+                if (!contextMenu) return;
+                contextMenu.style.display = 'block';
+                const rect = contextMenu.getBoundingClientRect();
+                const maxX = window.innerWidth - rect.width - 8;
+                const maxY = window.innerHeight - rect.height - 8;
+                const clampedX = clamp(x, 8, maxX);
+                const clampedY = clamp(y, 8, maxY);
+                contextMenu.style.left = `${{clampedX}}px`;
+                contextMenu.style.top = `${{clampedY}}px`;
+                contextMenu.classList.add('visible');
+            }}
+
+            function closeContextMenu() {{
+                if (!contextMenu) return;
+                contextMenu.classList.remove('visible');
+                contextMenu.style.display = 'none';
+            }}
+
+            function clearLongPressTimer() {{
+                if (longPressTimer) {{
+                    clearTimeout(longPressTimer);
+                    longPressTimer = null;
+                }}
+                longPressStart = null;
+            }}
+
+            function scheduleLongPress(evt) {{
+                if (evt.pointerType !== 'touch') return;
+                longPressStart = {{ x: evt.clientX, y: evt.clientY }};
+                clearLongPressTimer();
+                longPressTimer = setTimeout(() => {{
+                    openContextMenu(evt.clientX, evt.clientY);
+                }}, longPressDelay);
+            }}
+
+            function maybeCancelLongPress(evt) {{
+                if (!longPressStart) return;
+                const distance = Math.hypot(evt.clientX - longPressStart.x, evt.clientY - longPressStart.y);
+                if (distance > 10) {{
+                    clearLongPressTimer();
+                }}
+            }}
+
+            function bindContextMenuTriggers(target) {{
+                target.addEventListener('contextmenu', (evt) => {{
+                    evt.preventDefault();
+                    openContextMenu(evt.clientX, evt.clientY);
+                }});
+
+                target.addEventListener('pointerdown', (evt) => {{
+                    scheduleLongPress(evt);
+                }});
+
+                target.addEventListener('pointermove', (evt) => {{
+                    maybeCancelLongPress(evt);
+                }});
+
+                target.addEventListener('pointerup', clearLongPressTimer);
+                target.addEventListener('pointercancel', clearLongPressTimer);
+                target.addEventListener('pointerleave', clearLongPressTimer);
+            }}
+
             function syncStatus() {{
                 fetch('/api/status')
                     .then(resp => resp.json())
@@ -758,6 +867,7 @@ def _script_block(
                         textBtn.disabled = !editingEnabled;
                         drawBtn.disabled = !editingEnabled;
                         textSizeSelect.disabled = !editingEnabled;
+                        tokenSaveBtn.disabled = !editingEnabled;
                         applyStoredTextSize(textSize);
                         setDrawingArmed(editingEnabled && drawingArmed);
                         setStatus(editingEnabled ? 'Editing enabled' : 'Editing disabled');
@@ -789,11 +899,13 @@ def _script_block(
                 }}
             }});
             surface.addEventListener('wheel', handleWheel, {{ passive: false }});
-            surface.addEventListener('contextmenu', (evt) => evt.preventDefault());
-            textBtn.addEventListener('click', handleText);
-            undoBtn.addEventListener('click', handleUndo);
-            drawBtn.addEventListener('click', () => setDrawingArmed(!drawingArmed));
-            refreshBtn.addEventListener('click', handleRefresh);
+            bindContextMenuTriggers(surface);
+            bindContextMenuTriggers(canvas);
+            textBtn.addEventListener('click', () => {{ closeContextMenu(); handleText(); }});
+            undoBtn.addEventListener('click', () => {{ closeContextMenu(); handleUndo(); }});
+            drawBtn.addEventListener('click', () => {{ closeContextMenu(); setDrawingArmed(!drawingArmed); }});
+            refreshBtn.addEventListener('click', () => {{ closeContextMenu(); handleRefresh(); }});
+            tokenSaveBtn.addEventListener('click', () => {{ closeContextMenu(); handleTokenSubmit(); }});
             tokenInput.addEventListener('change', handleTokenSubmit);
             tokenInput.addEventListener('keyup', (evt) => {{
                 if (evt.key === 'Enter') {{
@@ -803,6 +915,13 @@ def _script_block(
             textSizeSelect.addEventListener('change', () => {{
                 setTextSize(normalizeTextSize(textSizeSelect.value, textSize));
             }});
+
+            document.addEventListener('click', (evt) => {{
+                if (contextMenu && !contextMenu.contains(evt.target)) {{
+                    closeContextMenu();
+                }}
+            }});
+            window.addEventListener('resize', closeContextMenu);
 
             resizeCanvas();
             sessionColor = createSessionColor();
@@ -842,31 +961,39 @@ def build_player_page(
         {_style_block()}
     </head>
     <body>
-        <div id="toolbar">
-            <div class="field">
-                <label for="tokenInput" style="font-weight:700;">Access Token</label>
-                <input type="text" id="tokenInput" placeholder="Paste GM token" />
-            </div>
-            <div class="field" aria-label="Session color">
-                <span style="font-weight:700;">Session Color</span>
-                <span id="colorSwatch"></span>
-                <span id="colorValue" style="font-weight:700;">--</span>
-            </div>
-            <div class="field">
-                <label for="textSizeSelect" style="font-weight:700;">Text Size</label>
-                <select id="textSizeSelect">
-{options_html}
-                </select>
-            </div>
-            <button id="drawBtn" class="ghost">Start Drawing</button>
-            <button id="textBtn">Place Text</button>
-            <button id="undoBtn">Undo</button>
-            <button id="refreshBtn" class="ghost">Refresh Preview</button>
-        </div>
         <div id="boardContainer">
             <div id="boardSurface">
                 <img id="boardPreview" src="/board.png{query_suffix}" alt="Whiteboard preview" />
                 <canvas id="boardCanvas" width="{width}" height="{height}"></canvas>
+            </div>
+        </div>
+        <div id="contextMenu" role="menu" aria-label="Whiteboard actions">
+            <div class="menu-section">
+                <div class="menu-subheading">Quick Actions</div>
+                <button type="button" id="menuDrawToggle" class="menu-item">Start Drawing</button>
+                <button type="button" id="menuPlaceText" class="menu-item">Place Text</button>
+                <button type="button" id="menuUndo" class="menu-item">Undo</button>
+                <button type="button" id="menuRefresh" class="menu-item">Refresh Preview</button>
+            </div>
+            <div class="menu-section">
+                <div class="menu-subheading">Session</div>
+                <div class="menu-field">
+                    <label for="tokenInput">Access Token</label>
+                    <input type="text" id="tokenInput" placeholder="Paste GM token" />
+                    <button type="button" id="tokenSaveBtn">Save Token</button>
+                </div>
+                <div class="menu-field">
+                    <label for="textSizeSelect">Text Size</label>
+                    <select id="textSizeSelect">
+{options_html}
+                    </select>
+                </div>
+                <div class="menu-field">
+                    <span class="color-row" aria-label="Session color">
+                        <span id="colorSwatch"></span>
+                        <span id="colorValue">--</span>
+                    </span>
+                </div>
             </div>
         </div>
         <div id="status">Loading...</div>
