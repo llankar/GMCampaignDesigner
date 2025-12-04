@@ -18,7 +18,7 @@ def _style_block() -> str:
 
         body {
             margin: 0;
-            background: #f9fafb;
+            background: #fff;
             font-family: 'Segoe UI', Tahoma, sans-serif;
             min-height: 100vh;
             display: flex;
@@ -34,6 +34,7 @@ def _style_block() -> str:
             align-items: center;
             justify-content: center;
             padding: 0;
+            background: #fff;
             overflow: hidden;
         }
 
@@ -41,8 +42,7 @@ def _style_block() -> str:
 
         #boardSurface {
             position: relative;
-            max-width: 100%;
-            max-height: 100%;
+            background: #fff;
             transform-origin: center center;
         }
 
@@ -249,6 +249,7 @@ def _script_block(
             let baseScale = 1;
             let zoomLevel = 1;
             let pan = {{ x: 0, y: 0 }};
+            let boardOffset = {{ x: 0, y: 0 }};
             let isPanning = false;
             let panStart = {{ x: 0, y: 0 }};
             let drawingArmed = false;
@@ -336,26 +337,46 @@ def _script_block(
             }}
 
             function applyViewportTransform() {{
-                currentScale = (baseScale || 1) * (zoomLevel || 1);
-                const displayWidth = boardSize.width * (baseScale || 1);
-                const displayHeight = boardSize.height * (baseScale || 1);
+                const viewportWidth = container.clientWidth || window.innerWidth || boardSize.width;
+                const viewportHeight = container.clientHeight || window.innerHeight || boardSize.height;
+                const boardDisplayWidth = boardSize.width * (baseScale || 1);
+                const boardDisplayHeight = boardSize.height * (baseScale || 1);
+                const padding = 200;
+                const minimumSurfaceWidth = viewportWidth / Math.max(zoomLevel || 1, 0.01);
+                const minimumSurfaceHeight = viewportHeight / Math.max(zoomLevel || 1, 0.01);
+                const surfaceWidth = Math.max(boardDisplayWidth + padding * 2, minimumSurfaceWidth);
+                const surfaceHeight = Math.max(boardDisplayHeight + padding * 2, minimumSurfaceHeight);
 
-                canvas.width = displayWidth;
-                canvas.height = displayHeight;
-                surface.style.width = `${{displayWidth}}px`;
-                surface.style.height = `${{displayHeight}}px`;
-                canvas.style.width = `${{displayWidth}}px`;
-                canvas.style.height = `${{displayHeight}}px`;
-                previewImg.width = displayWidth;
-                previewImg.height = displayHeight;
-                previewImg.style.width = `${{displayWidth}}px`;
-                previewImg.style.height = `${{displayHeight}}px`;
+                boardOffset = {{
+                    x: (surfaceWidth - boardDisplayWidth) / 2,
+                    y: (surfaceHeight - boardDisplayHeight) / 2,
+                }};
+
+                currentScale = (baseScale || 1) * (zoomLevel || 1);
+
+                canvas.width = boardDisplayWidth;
+                canvas.height = boardDisplayHeight;
+                surface.style.width = `${{surfaceWidth}}px`;
+                surface.style.height = `${{surfaceHeight}}px`;
+                canvas.style.width = `${{boardDisplayWidth}}px`;
+                canvas.style.height = `${{boardDisplayHeight}}px`;
+                canvas.style.left = `${{boardOffset.x}}px`;
+                canvas.style.top = `${{boardOffset.y}}px`;
+                previewImg.width = boardDisplayWidth;
+                previewImg.height = boardDisplayHeight;
+                previewImg.style.width = `${{boardDisplayWidth}}px`;
+                previewImg.style.height = `${{boardDisplayHeight}}px`;
+                previewImg.style.left = `${{boardOffset.x}}px`;
+                previewImg.style.top = `${{boardOffset.y}}px`;
                 surface.style.transform = `translate(${{pan.x}}px, ${{pan.y}}px) scale(${{zoomLevel}})`;
             }}
 
             function resizeCanvas() {{
-                const widthScale = container.clientWidth / boardSize.width;
-                const heightScale = container.clientHeight / boardSize.height;
+                const viewportWidth = container.clientWidth || window.innerWidth || boardSize.width;
+                const viewportHeight = container.clientHeight || window.innerHeight || boardSize.height;
+                const buffer = 200;
+                const widthScale = (viewportWidth + buffer) / boardSize.width;
+                const heightScale = (viewportHeight + buffer) / boardSize.height;
                 baseScale = Math.max(widthScale, heightScale) || 1;
                 applyViewportTransform();
             }}
@@ -367,8 +388,10 @@ def _script_block(
             function getBoardCoordsFromClient(clientX, clientY) {{
                 const rect = surface.getBoundingClientRect();
                 const scale = currentScale || 1;
-                const x = (clientX - rect.left) / scale + boardOrigin.x;
-                const y = (clientY - rect.top) / scale + boardOrigin.y;
+                const offsetX = (boardOffset.x || 0) * (zoomLevel || 1);
+                const offsetY = (boardOffset.y || 0) * (zoomLevel || 1);
+                const x = (clientX - rect.left - offsetX) / scale + boardOrigin.x;
+                const y = (clientY - rect.top - offsetY) / scale + boardOrigin.y;
                 return [x, y];
             }}
 
@@ -419,7 +442,7 @@ def _script_block(
                 if (!pinch) return;
 
                 const scaleFactor = pinch.distance / (pinchState.startDistance || 1);
-                const newZoom = clamp(pinchState.startZoom * scaleFactor, 0.5, 3);
+                const newZoom = clamp(pinchState.startZoom * scaleFactor, 0.2, 3);
                 zoomLevel = newZoom;
 
                 const scale = (baseScale || 1) * newZoom;
@@ -574,7 +597,7 @@ def _script_block(
             function handleWheel(evt) {{
                 evt.preventDefault();
                 const zoomChange = evt.deltaY < 0 ? 1.1 : 0.9;
-                zoomLevel = clamp(zoomLevel * zoomChange, 0.5, 3);
+                zoomLevel = clamp(zoomLevel * zoomChange, 0.2, 3);
                 applyViewportTransform();
             }}
 
