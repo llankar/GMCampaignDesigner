@@ -402,8 +402,8 @@ def _script_block(board_width: int, board_height: int, refresh_ms: int, use_mjpe
 
             function updatePan(evt) {{
                 if (!isPanning) return;
-                const deltaX = (evt.clientX - panStart.x) / (zoomLevel || 1);
-                const deltaY = (evt.clientY - panStart.y) / (zoomLevel || 1);
+                const deltaX = evt.clientX - panStart.x;
+                const deltaY = evt.clientY - panStart.y;
                 pan.x += deltaX;
                 pan.y += deltaY;
                 panStart = {{ x: evt.clientX, y: evt.clientY }};
