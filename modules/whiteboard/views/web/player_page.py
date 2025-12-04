@@ -597,6 +597,7 @@ def _script_block(
             function beginPan(evt) {{
                 isPanning = true;
                 panStart = {{ x: evt.clientX, y: evt.clientY }};
+                clearLongPressTimer();
                 container.classList.add('panning');
             }}
 
@@ -627,16 +628,19 @@ def _script_block(
                 addActivePointer(evt);
 
                 if (activePointers.size === 2) {{
+                    clearLongPressTimer();
                     startPinch();
                     return;
                 }}
 
                 if (isPanGesture(evt)) {{
                     evt.preventDefault();
+                    clearLongPressTimer();
                     beginPan(evt);
                     return;
                 }}
                 if (!editingEnabled || !drawingArmed) return;
+                clearLongPressTimer();
                 clearPreviewStroke();
                 drawing = true;
                 points = [];
