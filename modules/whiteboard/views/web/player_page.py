@@ -423,7 +423,7 @@ def _script_block(
             function normalizeImageRecord(entry) {{
                 if (!entry || !entry.image_id) return null;
                 const position = Array.isArray(entry.position) && entry.position.length === 2 ? entry.position : [0, 0];
-                const size = entry.size || {};
+                const size = entry.size || {{}};
                 const normalizedSize = {{
                     width: Number(size.width) || 0,
                     height: Number(size.height) || 0,
