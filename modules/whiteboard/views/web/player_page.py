@@ -751,8 +751,8 @@ def _script_block(
                         editingEnabled = !!data.editing_enabled;
                         textSize = parseFloat(data.text_size || textSize) || textSize;
                         updateBoardGeometry(
-                            { width: (data.board_size || [])[0], height: (data.board_size || [])[1] },
-                            { x: (data.board_origin || [])[0], y: (data.board_origin || [])[1] }
+                            {{ width: (data.board_size || [])[0], height: (data.board_size || [])[1] }},
+                            {{ x: (data.board_origin || [])[0], y: (data.board_origin || [])[1] }}
                         );
                         undoBtn.disabled = !editingEnabled;
                         textBtn.disabled = !editingEnabled;
