@@ -1,6 +1,8 @@
 import io
 import threading
 import time
+import logging
+from PIL import Image
 from flask import Flask, Response
 from werkzeug.serving import make_server
 
@@ -70,6 +72,25 @@ def open_whiteboard_display(controller, port=None):
         boundary = "frame"
         interval = max(1, int(getattr(controller, "_whiteboard_refresh_ms", 200))) / 1000.0
 
+        def _ensure_rgb(img):
+            if img is None:
+                return None
+            if img.mode == "RGB":
+                return img
+            try:
+                return img.convert("RGB")
+            except Exception:
+                pass
+            try:
+                alpha = img.getchannel("A") if "A" in img.getbands() else None
+                base_rgb = img.convert("RGB") if img.mode != "RGBA" else img.copy()
+                opaque = Image.new("RGB", img.size, (0, 0, 0))
+                opaque.paste(base_rgb, mask=alpha)
+                return opaque
+            except Exception:
+                logging.getLogger(__name__).exception("Failed to convert whiteboard image to RGB for MJPEG stream")
+                return None
+
         def frame_bytes():
             if hasattr(controller, "render_web_whiteboard_image"):
                 img = controller.render_web_whiteboard_image()
@@ -100,6 +121,9 @@ def open_whiteboard_display(controller, port=None):
                         for_player=True,
                         text_scale=text_scale,
                     )
+            img = _ensure_rgb(img)
+            if img is None:
+                return None
             buf = io.BytesIO()
             try:
                 img.save(buf, format="JPEG", quality=85)
