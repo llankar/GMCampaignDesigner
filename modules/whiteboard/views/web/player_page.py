@@ -210,7 +210,8 @@ def _style_block() -> str:
             z-index: 10;
         }
 
-        #textDialog {
+        #textDialog,
+        #imageResizeDialog {
             position: fixed;
             inset: 0;
             background: rgba(17, 24, 39, 0.45);
@@ -221,11 +222,13 @@ def _style_block() -> str:
             z-index: 20;
         }
 
-        #textDialog.visible {
+        #textDialog.visible,
+        #imageResizeDialog.visible {
             display: flex;
         }
 
-        #textDialog .modal-card {
+        #textDialog .modal-card,
+        #imageResizeDialog .modal-card {
             background: #fff;
             border-radius: 12px;
             box-shadow: var(--panel-shadow);
@@ -237,13 +240,15 @@ def _style_block() -> str:
             gap: 12px;
         }
 
-        #textDialog h3 {
+        #textDialog h3,
+        #imageResizeDialog h3 {
             margin: 0;
             font-size: 18px;
             color: #111827;
         }
 
-        #textDialog p {
+        #textDialog p,
+        #imageResizeDialog p {
             margin: 0;
             color: #374151;
             line-height: 1.4;
@@ -260,13 +265,15 @@ def _style_block() -> str:
             font-family: 'Segoe UI', Tahoma, sans-serif;
         }
 
-        #textDialog .actions {
+        #textDialog .actions,
+        #imageResizeDialog .actions {
             display: flex;
             justify-content: flex-end;
             gap: 10px;
         }
 
-        #textDialog .actions button {
+        #textDialog .actions button,
+        #imageResizeDialog .actions button {
             padding: 10px 14px;
             border-radius: 8px;
             border: none;
@@ -274,14 +281,32 @@ def _style_block() -> str:
             cursor: pointer;
         }
 
-        #textDialog .actions .cancel {
+        #textDialog .actions .cancel,
+        #imageResizeDialog .actions .cancel {
             background: #e5e7eb;
             color: #111827;
         }
 
-        #textDialog .actions .save {
+        #textDialog .actions .save,
+        #imageResizeDialog .actions .save {
             background: var(--accent);
             color: #fff;
+        }
+
+        #imageResizeDialog .size-row {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        #imageResizeDialog input[type='range'] {
+            flex: 1 1 auto;
+        }
+
+        #imageResizeDialog .size-value {
+            min-width: 60px;
+            font-weight: 700;
+            text-align: right;
         }
     </style>
     """
@@ -323,6 +348,10 @@ def _script_block(
             let textSize = {default_text_size};
             let sessionColor = '';
             let pinchState = null;
+            let placedImages = [];
+            let activeResizeTarget = null;
+            let imagePlacementHandler = null;
+            let lastTap = {{ time: 0, position: [0, 0] }};
             const activePointers = new Map();
 
             const previewImg = document.getElementById('boardPreview');
@@ -345,6 +374,13 @@ def _script_block(
             const textCancel = document.getElementById('textCancel');
             const textSave = document.getElementById('textSave');
             const contextMenu = document.getElementById('contextMenu');
+            const addImageBtn = document.getElementById('menuAddImage');
+            const imageFileInput = document.getElementById('imageFileInput');
+            const imageResizeDialog = document.getElementById('imageResizeDialog');
+            const imageSizeRange = document.getElementById('imageSizeRange');
+            const imageSizeValue = document.getElementById('imageSizeValue');
+            const imageResizeCancel = document.getElementById('imageResizeCancel');
+            const imageResizeSave = document.getElementById('imageResizeSave');
 
             const longPressDelay = 550;
             let longPressTimer = null;
@@ -819,6 +855,148 @@ def _script_block(
                 setStatus('Preview refreshed');
             }}
 
+            function uploadImage(file) {{
+                const headers = {{}};
+                if (currentToken) {{
+                    headers['X-Whiteboard-Token'] = currentToken;
+                }}
+
+                const formData = new FormData();
+                formData.append('file', file);
+
+                return fetch('/api/images/upload', {{
+                    method: 'POST',
+                    headers,
+                    body: formData,
+                }}).then(resp => resp.json().then(data => {{ return {{ status: resp.status, data }}; }}));
+            }}
+
+            function fitImageWithinViewport(targetWidthPx, targetHeightPx) {{
+                const maxDisplayWidth = container.clientWidth * 0.9;
+                const maxDisplayHeight = container.clientHeight * 0.9;
+                const safeWidth = Math.max(1, targetWidthPx);
+                const safeHeight = Math.max(1, targetHeightPx);
+                const viewportScale = Math.min(1, maxDisplayWidth / safeWidth, maxDisplayHeight / safeHeight);
+                const base = baseScale || 1;
+                const widthBoard = (safeWidth * viewportScale) / base;
+                const heightBoard = (safeHeight * viewportScale) / base;
+                const boardScale = Math.min(1, boardSize.width / widthBoard, boardSize.height / heightBoard);
+                return {{ width: widthBoard * boardScale, height: heightBoard * boardScale }};
+            }}
+
+            function beginImagePlacement(uploaded) {{
+                if (!uploaded) return;
+                setStatus('Click on the board to place the image');
+                if (imagePlacementHandler) {{
+                    canvas.removeEventListener('click', imagePlacementHandler);
+                }}
+
+                imagePlacementHandler = (evt) => {{
+                    canvas.removeEventListener('click', imagePlacementHandler);
+                    imagePlacementHandler = null;
+                    const [x, y] = getBoardCoords(evt);
+                    const size = fitImageWithinViewport(uploaded.width, uploaded.height);
+                    api('/api/images/place', {{ asset_key: uploaded.asset_key, position: [x, y], size }})
+                        .then(result => {{
+                            if (result.status >= 400) {{
+                                setStatus(result.data.message || 'Unable to place image', true);
+                                return;
+                            }}
+                            setStatus('Image placed');
+                            if (result.data && result.data.image_id) {{
+                                placedImages.push({{
+                                    id: result.data.image_id,
+                                    position: [x, y],
+                                    size,
+                                    naturalWidth: uploaded.width,
+                                    naturalHeight: uploaded.height,
+                                }});
+                            }}
+                            if (!useMjpeg) {{
+                                refreshPreview();
+                            }}
+                        }})
+                        .catch(() => setStatus('Network error', true));
+                }};
+
+                canvas.addEventListener('click', imagePlacementHandler, {{ once: true }});
+            }}
+
+            function findPlacedImageAt(point) {{
+                const [x, y] = point;
+                return placedImages.find((img) => {{
+                    if (!img || !img.size) return false;
+                    const withinX = x >= img.position[0] && x <= img.position[0] + img.size.width;
+                    const withinY = y >= img.position[1] && y <= img.position[1] + img.size.height;
+                    return withinX && withinY;
+                }});
+            }}
+
+            function closeImageResizeDialog() {{
+                activeResizeTarget = null;
+                if (!imageResizeDialog) return;
+                imageResizeDialog.classList.remove('visible');
+                imageResizeDialog.setAttribute('aria-hidden', 'true');
+            }}
+
+            function openImageResizeDialog(target) {{
+                if (!target || !imageResizeDialog) return;
+                activeResizeTarget = target;
+                const base = baseScale || 1;
+                const currentWidth = target.size && target.size.width ? target.size.width : 0;
+                const percent = Math.max(5, Math.round((currentWidth * base) / (target.naturalWidth || 1) * 100));
+                imageSizeRange.value = String(percent);
+                imageSizeValue.textContent = `${{percent}}%`;
+                imageResizeDialog.classList.add('visible');
+                imageResizeDialog.removeAttribute('aria-hidden');
+            }}
+
+            function handleImageResizeSave() {{
+                if (!activeResizeTarget) return;
+                const percent = Math.max(5, parseFloat(imageSizeRange.value || '100'));
+                const targetWidthPx = activeResizeTarget.naturalWidth * (percent / 100);
+                const targetHeightPx = activeResizeTarget.naturalHeight * (percent / 100);
+                const size = fitImageWithinViewport(targetWidthPx, targetHeightPx);
+
+                api('/api/images/resize', {{ image_id: activeResizeTarget.id, size }})
+                    .then(result => {{
+                        if (result.status >= 400) {{
+                            setStatus(result.data.message || 'Unable to resize image', true);
+                        }} else {{
+                            activeResizeTarget.size = size;
+                            setStatus('Image resized');
+                            if (!useMjpeg) {{
+                                refreshPreview();
+                            }}
+                        }}
+                    }})
+                    .catch(() => setStatus('Network error', true))
+                    .finally(closeImageResizeDialog);
+            }}
+
+            function handleImageActivation(evt) {{
+                if (!editingEnabled) return;
+                const [x, y] = getBoardCoords(evt);
+                const target = findPlacedImageAt([x, y]);
+                if (target) {{
+                    evt.preventDefault();
+                    openImageResizeDialog(target);
+                }}
+            }}
+
+            function handleImagePointerUp(evt) {{
+                if (evt.pointerType !== 'touch') return;
+                const [x, y] = getBoardCoords(evt);
+                const now = Date.now();
+                const distance = Math.hypot(x - lastTap.position[0], y - lastTap.position[1]);
+                if (lastTap.time && distance < 12 && now - lastTap.time < 450) {{
+                    handleImageActivation(evt);
+                    lastTap = {{ time: 0, position: [0, 0] }};
+                }} else {{
+                    lastTap = {{ time: now, position: [x, y] }};
+                }}
+            }}
+
             function openContextMenu(x, y) {{
                 if (!contextMenu) return;
                 contextMenu.style.display = 'block';
@@ -897,6 +1075,7 @@ def _script_block(
                         undoBtn.disabled = !editingEnabled;
                         textBtn.disabled = !editingEnabled;
                         drawBtn.disabled = !editingEnabled;
+                        addImageBtn.disabled = !editingEnabled;
                         textSizeSelect.disabled = !editingEnabled;
                         tokenSaveBtn.disabled = !editingEnabled;
                         applyStoredTextSize(textSize);
@@ -913,6 +1092,8 @@ def _script_block(
             canvas.addEventListener('pointerdown', handlePointerDown);
             canvas.addEventListener('pointermove', handlePointerMove);
             canvas.addEventListener('pointerup', handlePointerUp);
+            canvas.addEventListener('pointerup', handleImagePointerUp);
+            canvas.addEventListener('dblclick', handleImageActivation);
             canvas.addEventListener('pointercancel', (evt) => {{
                 removeActivePointer(evt);
                 endPan();
@@ -935,6 +1116,13 @@ def _script_block(
             textBtn.addEventListener('click', () => {{ closeContextMenu(); handleText(); }});
             undoBtn.addEventListener('click', () => {{ closeContextMenu(); handleUndo(); }});
             drawBtn.addEventListener('click', () => {{ closeContextMenu(); setDrawingArmed(!drawingArmed); }});
+            addImageBtn.addEventListener('click', () => {{
+                closeContextMenu();
+                if (!editingEnabled) return;
+                if (imageFileInput) {{
+                    imageFileInput.click();
+                }}
+            }});
             refreshBtn.addEventListener('click', () => {{ closeContextMenu(); handleRefresh(); }});
             tokenSaveBtn.addEventListener('click', () => {{ closeContextMenu(); handleTokenSubmit(); }});
             tokenInput.addEventListener('change', handleTokenSubmit);
@@ -945,6 +1133,38 @@ def _script_block(
             }});
             textSizeSelect.addEventListener('change', () => {{
                 setTextSize(normalizeTextSize(textSizeSelect.value, textSize));
+            }});
+
+            imageFileInput.addEventListener('change', () => {{
+                const file = (imageFileInput.files || [])[0];
+                imageFileInput.value = '';
+                if (!file) return;
+                if (!editingEnabled) {{
+                    setStatus('Editing disabled', true);
+                    return;
+                }}
+                setStatus('Uploading image...');
+                uploadImage(file)
+                    .then(result => {{
+                        if (result.status >= 400) {{
+                            setStatus(result.data.message || 'Unable to upload image', true);
+                            return;
+                        }}
+                        setStatus('Image uploaded - click to place');
+                        beginImagePlacement(result.data);
+                    }})
+                    .catch(() => setStatus('Network error', true));
+            }});
+
+            imageSizeRange.addEventListener('input', () => {{
+                imageSizeValue.textContent = `${{imageSizeRange.value}}%`;
+            }});
+            imageResizeSave.addEventListener('click', () => {{ closeContextMenu(); handleImageResizeSave(); }});
+            imageResizeCancel.addEventListener('click', () => {{ closeImageResizeDialog(); }});
+            imageResizeDialog.addEventListener('click', (evt) => {{
+                if (evt.target === imageResizeDialog) {{
+                    closeImageResizeDialog();
+                }}
             }});
 
             document.addEventListener('click', (evt) => {{
@@ -1004,6 +1224,7 @@ def build_player_page(
                 <div class="menu-subheading">Quick Actions</div>
                 <button type="button" id="menuDrawToggle" class="menu-item">Start Drawing</button>
                 <button type="button" id="menuPlaceText" class="menu-item">Place Text</button>
+                <button type="button" id="menuAddImage" class="menu-item">Add Image</button>
                 <button type="button" id="menuUndo" class="menu-item">Undo</button>
                 <button type="button" id="menuRefresh" class="menu-item">Refresh Preview</button>
             </div>
@@ -1028,6 +1249,7 @@ def build_player_page(
                 </div>
             </div>
         </div>
+        <input type="file" id="imageFileInput" accept="image/png,image/jpeg,image/jpg,image/webp" style="display:none" />
         <div id="status">Loading...</div>
         <div id="textDialog" class="modal" role="dialog" aria-modal="true" aria-hidden="true">
             <div class="modal-card">
@@ -1037,6 +1259,20 @@ def build_player_page(
                 <div class="actions">
                     <button type="button" id="textCancel" class="cancel">Cancel</button>
                     <button type="button" id="textSave" class="save">Save</button>
+                </div>
+            </div>
+        </div>
+        <div id="imageResizeDialog" class="modal" role="dialog" aria-modal="true" aria-hidden="true">
+            <div class="modal-card">
+                <h3>Resize Image</h3>
+                <p>Adjust the size of the selected image. The preview will refresh after applying.</p>
+                <div class="size-row">
+                    <input type="range" id="imageSizeRange" min="10" max="200" step="5" value="100" aria-label="Image size percent" />
+                    <span class="size-value" id="imageSizeValue">100%</span>
+                </div>
+                <div class="actions">
+                    <button type="button" id="imageResizeCancel" class="cancel">Cancel</button>
+                    <button type="button" id="imageResizeSave" class="save">Apply</button>
                 </div>
             </div>
         </div>

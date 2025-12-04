@@ -3,6 +3,7 @@ from __future__ import annotations
 from flask import jsonify, request
 
 from modules.whiteboard.utils.remote_access_guard import RemoteAccessGuard
+from modules.whiteboard.utils.uploaded_images import save_uploaded_image
 
 
 def _extract_token() -> str | None:
@@ -85,6 +86,74 @@ def register_whiteboard_api(app, controller, access_guard: RemoteAccessGuard | N
         except Exception as exc:  # noqa: BLE001
             return jsonify({"message": f"Unable to place text: {exc}"}), 500
         return jsonify({"status": "ok"})
+
+    @app.route("/api/images/upload", methods=["POST"])
+    def api_image_upload():
+        unauthorized = _require_access()
+        if unauthorized:
+            return unauthorized
+
+        file = request.files.get("file")
+        if not file:
+            return jsonify({"message": "Image file is required"}), 400
+
+        try:
+            uploaded = save_uploaded_image(file)
+        except ValueError as exc:
+            return jsonify({"message": str(exc)}), 400
+        except Exception as exc:  # noqa: BLE001
+            return jsonify({"message": f"Unable to store image: {exc}"}), 500
+
+        return jsonify(
+            {
+                "asset_key": uploaded.asset_key,
+                "width": uploaded.width,
+                "height": uploaded.height,
+            }
+        )
+
+    @app.route("/api/images/place", methods=["POST"])
+    def api_image_place():
+        unauthorized = _require_access()
+        if unauthorized:
+            return unauthorized
+
+        payload = request.get_json(silent=True) or {}
+        asset_key = payload.get("asset_key") or payload.get("asset")
+        position = payload.get("position") or []
+        size = payload.get("size") or {}
+        if not asset_key:
+            return jsonify({"message": "asset_key is required"}), 400
+        if not isinstance(position, (list, tuple)) or len(position) != 2:
+            return jsonify({"message": "Position must include x and y"}), 400
+        try:
+            image_id = controller.handle_remote_image(asset_key=asset_key, position=position, size=size)
+        except ValueError as exc:
+            return jsonify({"message": str(exc)}), 400
+        except Exception as exc:  # noqa: BLE001
+            return jsonify({"message": f"Unable to place image: {exc}"}), 500
+        return jsonify({"status": "ok", "image_id": image_id})
+
+    @app.route("/api/images/resize", methods=["POST"])
+    def api_image_resize():
+        unauthorized = _require_access()
+        if unauthorized:
+            return unauthorized
+
+        payload = request.get_json(silent=True) or {}
+        image_id = payload.get("image_id")
+        size = payload.get("size") or {}
+        if not image_id:
+            return jsonify({"message": "image_id is required"}), 400
+
+        try:
+            controller.handle_remote_image_resize(image_id=image_id, size=size)
+        except ValueError as exc:
+            return jsonify({"message": str(exc)}), 400
+        except Exception as exc:  # noqa: BLE001
+            return jsonify({"message": f"Unable to resize image: {exc}"}), 500
+
+        return jsonify({"status": "ok", "image_id": image_id})
 
     @app.route("/api/undo", methods=["POST"])
     def api_undo():
