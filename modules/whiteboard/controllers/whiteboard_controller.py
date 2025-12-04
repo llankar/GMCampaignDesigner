@@ -534,13 +534,12 @@ class WhiteboardController:
         save_frame = ctk.CTkFrame(toolbar, fg_color="transparent")
         save_frame.pack(side="left", padx=(0, 6))
         self._save_status_var = tk.StringVar(value=self._format_save_status())
-        save_btn = ctk.CTkButton(save_frame, textvariable=self._save_status_var, command=lambda: self._persist_state(update_only=False), width=120)
-        save_btn.pack(side="left", padx=(0, 4))
-        self._save_button = save_btn
+        status_label = ctk.CTkLabel(save_frame, textvariable=self._save_status_var, width=120)
+        status_label.pack(side="left", padx=(0, 4))
 
         action_menu = ctk.CTkOptionMenu(
             save_frame,
-            values=["Actions", "Restore last save", "View history"],
+            values=["Actions", "Save now", "Restore last save", "View history"],
             command=self._handle_save_action,
             width=130,
         )
@@ -554,7 +553,9 @@ class WhiteboardController:
         self._update_save_metadata()
 
     def _handle_save_action(self, selection: str):
-        if selection == "Restore last save":
+        if selection == "Save now":
+            self._persist_state(update_only=False)
+        elif selection == "Restore last save":
             self._restore_latest_snapshot()
         elif selection == "View history":
             self._open_history_dialog()
