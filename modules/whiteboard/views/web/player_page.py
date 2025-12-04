@@ -73,6 +73,8 @@ def _style_block() -> str:
             border-radius: 12px;
             box-shadow: var(--panel-shadow);
             padding: 10px;
+            max-height: calc(100vh - 32px);
+            overflow-y: auto;
             display: none;
             z-index: 20;
             border: 1px solid #e5e7eb;
@@ -169,6 +171,29 @@ def _style_block() -> str:
             padding: 8px 10px;
             border-radius: 8px;
             font-weight: 700;
+        }
+
+        @media (max-width: 640px) {
+            #contextMenu {
+                padding: 8px;
+                border-radius: 10px;
+                max-height: calc(100vh - 24px);
+            }
+
+            #contextMenu .menu-section {
+                padding: 6px 4px;
+            }
+
+            #contextMenu button.menu-item {
+                padding: 9px 10px;
+                margin-bottom: 4px;
+                min-height: 44px;
+            }
+
+            #contextMenu .menu-field {
+                gap: 4px;
+                margin-bottom: 6px;
+            }
         }
 
         #status {
