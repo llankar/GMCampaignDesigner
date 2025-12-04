@@ -1,9 +1,10 @@
 import io
+import math
 import tkinter as tk
 from functools import lru_cache
 from pathlib import Path
 import customtkinter as ctk
-from PIL import ImageFont
+from PIL import Image, ImageDraw, ImageFont
 from importlib import resources
 
 DEFAULT_TEXT_SIZES = [12, 14, 16, 18, 20, 24, 28, 32, 40, 48, 60]
@@ -121,7 +122,7 @@ class TextFontCache:
             except Exception:
                 fallback = self._load_scalable_font(normalized)
                 if fallback is None:
-                    fallback = self._load_default_font()
+                    fallback = self._load_default_font(normalized)
                 self._pil_fonts[normalized] = fallback
         return self._pil_fonts[normalized]
 
@@ -179,13 +180,67 @@ class TextFontCache:
         except Exception:
             return None
 
-    def _load_default_font(self) -> ImageFont.ImageFont:
+    def _load_default_font(self, size: int) -> ImageFont.ImageFont:
         """Always return a usable PIL font to avoid crashes when fonts are missing."""
 
         try:
-            return ImageFont.load_default()
+            base = ImageFont.load_default()
+        except Exception as exc:
+            raise RuntimeError("Unable to load a scalable font for PIL text rendering") from exc
+
+        try:
+            variant = base.font_variant(size=size)
+            if variant:
+                return variant
         except Exception:
-            raise RuntimeError("Unable to load a scalable font for PIL text rendering")
+            pass
+
+        return _ScaledDefaultFont(base, size)
+
+
+class _ScaledDefaultFont(ImageFont.ImageFont):
+    """Scale PIL's default bitmap font to approximate a requested size."""
+
+    def __init__(self, base_font: ImageFont.ImageFont, size: int):
+        super().__init__()
+        self._base = base_font
+        self._scale = max(1.0, float(size) / max(1.0, self._measure("Hg")[1]))
+
+    def getbbox(self, text, *args, **kwargs):
+        left, top, right, bottom = self._measure(text)
+        return (
+            math.floor(left * self._scale),
+            math.floor(top * self._scale),
+            math.ceil(right * self._scale),
+            math.ceil(bottom * self._scale),
+        )
+
+    def getsize(self, text, *args, **kwargs):
+        _, _, right, bottom = self.getbbox(text, *args, **kwargs)
+        return right, bottom
+
+    def getmask(self, text, mode="L", *args, **kwargs):
+        left, top, right, bottom = self._measure(text)
+        width = max(1, int(right - left))
+        height = max(1, int(bottom - top))
+        base_image = Image.new(mode, (width, height), 0)
+        drawer = ImageDraw.Draw(base_image)
+        drawer.text((-left, -top), text, fill=255, font=self._base)
+        target_size = (
+            max(1, int(math.ceil(width * self._scale))),
+            max(1, int(math.ceil(height * self._scale))),
+        )
+        if target_size == base_image.size:
+            return base_image.im
+        return base_image.resize(target_size, Image.BICUBIC).im
+
+    def _measure(self, text: str) -> tuple[float, float, float, float]:
+        try:
+            left, top, right, bottom = self._base.getbbox(text)
+            return float(left), float(top), float(right), float(bottom)
+        except Exception:
+            width, height = self._base.getsize(text)
+            return 0.0, 0.0, float(width), float(height)
 
 
 def approximate_text_bbox(position: tuple[float, float], *, text: str, size: int, zoom: float, pan: tuple[float, float], padding: float = 6.0) -> tuple[float, float, float, float]:
