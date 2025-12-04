@@ -122,6 +122,14 @@ def _style_block() -> str:
             font-weight: 600;
         }
 
+        #toolbar select {
+            border: 1px solid #d1d5db;
+            border-radius: 6px;
+            padding: 8px;
+            font-weight: 600;
+            background: #fff;
+        }
+
         #status {
             position: fixed;
             bottom: 10px;
@@ -175,6 +183,7 @@ def _script_block(board_width: int, board_height: int, refresh_ms: int, use_mjpe
             const tokenInput = document.getElementById('tokenInput');
             const colorSwatch = document.getElementById('colorSwatch');
             const colorValue = document.getElementById('colorValue');
+            const textSizeSelect = document.getElementById('textSizeSelect');
 
             function createSessionColor() {{
                 const existing = sessionStorage.getItem('whiteboardSessionColor');
@@ -328,6 +337,21 @@ def _script_block(board_width: int, board_height: int, refresh_ms: int, use_mjpe
                     headers,
                     body: JSON.stringify(body)
                 }}).then(resp => resp.json().then(data => {{ return {{ status: resp.status, data }}; }}));
+            }}
+
+            function normalizeTextSize(value, fallback = 24) {{
+                const parsed = parseFloat(value);
+                return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
+            }}
+
+            function setTextSize(value, {{ persist = true }} = {{}}) {{
+                textSize = value;
+                if (textSizeSelect) {{
+                    textSizeSelect.value = String(Math.round(value));
+                }}
+                if (persist) {{
+                    localStorage.setItem('whiteboardTextSize', String(value));
+                }}
             }}
 
             function refreshPreview() {{
@@ -516,6 +540,15 @@ def _script_block(board_width: int, board_height: int, refresh_ms: int, use_mjpe
                 drawBtn.classList.toggle('secondary', drawingArmed);
             }}
 
+            function applyStoredTextSize(serverSize) {{
+                const stored = localStorage.getItem('whiteboardTextSize');
+                const storedSize = stored ? normalizeTextSize(stored, NaN) : NaN;
+                const baseSize = Number.isFinite(storedSize)
+                    ? storedSize
+                    : normalizeTextSize(serverSize, textSize);
+                setTextSize(baseSize, {{ persist: Number.isFinite(storedSize) }});
+            }}
+
             function handleTokenSubmit() {{
                 applyToken(tokenInput.value);
                 setStatus(currentToken ? 'Token saved' : 'Token cleared');
@@ -535,6 +568,8 @@ def _script_block(board_width: int, board_height: int, refresh_ms: int, use_mjpe
                         undoBtn.disabled = !editingEnabled;
                         textBtn.disabled = !editingEnabled;
                         drawBtn.disabled = !editingEnabled;
+                        textSizeSelect.disabled = !editingEnabled;
+                        applyStoredTextSize(textSize);
                         setDrawingArmed(editingEnabled && drawingArmed);
                         setStatus(editingEnabled ? 'Editing enabled' : 'Editing disabled');
                         if (!data.use_mjpeg) {{
@@ -576,6 +611,9 @@ def _script_block(board_width: int, board_height: int, refresh_ms: int, use_mjpe
                     handleTokenSubmit();
                 }}
             }});
+            textSizeSelect.addEventListener('change', () => {{
+                setTextSize(normalizeTextSize(textSizeSelect.value, textSize));
+            }});
 
             resizeCanvas();
             sessionColor = createSessionColor();
@@ -613,6 +651,19 @@ def build_player_page(board_size: tuple[int, int], refresh_ms: int, use_mjpeg: b
                 <span style="font-weight:700;">Session Color</span>
                 <span id="colorSwatch"></span>
                 <span id="colorValue" style="font-weight:700;">--</span>
+            </div>
+            <div class="field">
+                <label for="textSizeSelect" style="font-weight:700;">Text Size</label>
+                <select id="textSizeSelect">
+                    <option value="12">12</option>
+                    <option value="16">16</option>
+                    <option value="20">20</option>
+                    <option value="24" selected>24</option>
+                    <option value="28">28</option>
+                    <option value="32">32</option>
+                    <option value="36">36</option>
+                    <option value="40">40</option>
+                </select>
             </div>
             <button id="drawBtn" class="ghost">Start Drawing</button>
             <button id="textBtn">Place Text</button>
