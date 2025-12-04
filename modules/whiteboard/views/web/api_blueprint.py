@@ -28,6 +28,10 @@ def register_whiteboard_api(app, controller, access_guard: RemoteAccessGuard | N
                 "refresh_ms": int(getattr(controller, "_whiteboard_refresh_ms", 200)),
                 "use_mjpeg": bool(getattr(controller, "_whiteboard_use_mjpeg", True)),
                 "text_size": int(getattr(controller, "text_size", 24)),
+                "web_text_scale": float(
+                    getattr(controller, "get_web_text_scale", lambda: 1.0)()
+                ),
+                "zoom": float(getattr(controller, "view_zoom", 1.0)),
             }
         )
 

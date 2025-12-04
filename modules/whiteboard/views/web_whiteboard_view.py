@@ -64,16 +64,18 @@ def open_whiteboard_display(controller, port=None):
     def stream_mjpeg():
         boundary = "frame"
         interval = max(1, int(getattr(controller, "_whiteboard_refresh_ms", 200))) / 1000.0
-        web_text_scale = 2.0
 
         def frame_bytes():
-            if hasattr(controller, "_render_whiteboard_image"):
+            if hasattr(controller, "render_web_whiteboard_image"):
+                img = controller.render_web_whiteboard_image()
+            elif hasattr(controller, "_render_whiteboard_image"):
+                text_scale = controller.get_web_text_scale() if hasattr(controller, "get_web_text_scale") else 2.0
                 img = controller._render_whiteboard_image(
                     for_player=True,
                     viewport_size=getattr(controller, "board_size", (1920, 1080)),
                     origin=(0.0, 0.0),
-                    zoom=1.0,
-                    text_scale=web_text_scale,
+                    zoom=getattr(controller, "view_zoom", 1.0),
+                    text_scale=text_scale,
                 )
             else:
                 origin = (0.0, 0.0)
@@ -81,6 +83,7 @@ def open_whiteboard_display(controller, port=None):
                     origin = controller._current_view_origin()
                 except Exception:
                     pass
+                text_scale = controller.get_web_text_scale() if hasattr(controller, "get_web_text_scale") else 2.0
                 img = render_whiteboard_image(
                     controller.whiteboard_items,
                     getattr(controller, "board_size", (1920, 1080)),
@@ -88,7 +91,7 @@ def open_whiteboard_display(controller, port=None):
                     grid_origin=origin,
                     zoom=getattr(controller, "view_zoom", 1.0),
                     for_player=True,
-                    text_scale=web_text_scale,
+                    text_scale=text_scale,
                 )
             buf = io.BytesIO()
             try:
