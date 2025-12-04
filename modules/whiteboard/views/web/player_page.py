@@ -147,13 +147,25 @@ def _style_block() -> str:
     """
 
 
-def _script_block(board_width: int, board_height: int, refresh_ms: int, use_mjpeg: bool) -> str:
+TEXT_SIZES = [16, 20, 24, 32, 40, 48]
+DEFAULT_TEXT_SIZE = 24
+
+
+def _script_block(
+    board_width: int,
+    board_height: int,
+    refresh_ms: int,
+    use_mjpeg: bool,
+    text_sizes: list[int],
+    default_text_size: int,
+) -> str:
     return f"""
     <script>
         (() => {{
             const boardSize = {{ width: {board_width}, height: {board_height} }};
             const useMjpeg = {'true' if use_mjpeg else 'false'};
             const refreshDelay = {refresh_ms};
+            const allowedTextSizes = [{', '.join(map(str, text_sizes))}];
             let drawing = false;
             let points = [];
             let currentScale = 1;
@@ -165,7 +177,7 @@ def _script_block(board_width: int, board_height: int, refresh_ms: int, use_mjpe
             let drawingArmed = false;
             let currentToken = '';
             let editingEnabled = false;
-            let textSize = 24;
+            let textSize = {default_text_size};
             let sessionColor = '';
             let pinchState = null;
             const activePointers = new Map();
@@ -339,9 +351,17 @@ def _script_block(board_width: int, board_height: int, refresh_ms: int, use_mjpe
                 }}).then(resp => resp.json().then(data => {{ return {{ status: resp.status, data }}; }}));
             }}
 
-            function normalizeTextSize(value, fallback = 24) {{
+            function normalizeTextSize(value, fallback = allowedTextSizes[2]) {{
                 const parsed = parseFloat(value);
-                return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
+                if (!Number.isFinite(parsed)) {{
+                    return fallback;
+                }}
+
+                return allowedTextSizes.reduce((closest, size) => {{
+                    const difference = Math.abs(size - parsed);
+                    const closestDiff = Math.abs(closest - parsed);
+                    return difference < closestDiff ? size : closest;
+                }}, allowedTextSizes[0]);
             }}
 
             function setTextSize(value, {{ persist = true }} = {{}}) {{
@@ -541,12 +561,20 @@ def _script_block(board_width: int, board_height: int, refresh_ms: int, use_mjpe
             }}
 
             function applyStoredTextSize(serverSize) {{
+                const normalizedServerSize = normalizeTextSize(serverSize, textSize);
                 const stored = localStorage.getItem('whiteboardTextSize');
                 const storedSize = stored ? normalizeTextSize(stored, NaN) : NaN;
-                const baseSize = Number.isFinite(storedSize)
-                    ? storedSize
-                    : normalizeTextSize(serverSize, textSize);
-                setTextSize(baseSize, {{ persist: Number.isFinite(storedSize) }});
+
+                if (Number.isFinite(storedSize) && storedSize === normalizedServerSize) {{
+                    setTextSize(normalizedServerSize, {{ persist: true }});
+                    return;
+                }}
+
+                if (Number.isFinite(storedSize) && storedSize !== normalizedServerSize) {{
+                    localStorage.removeItem('whiteboardTextSize');
+                }}
+
+                setTextSize(normalizedServerSize, {{ persist: false }});
             }}
 
             function handleTokenSubmit() {{
@@ -633,6 +661,10 @@ def build_player_page(board_size: tuple[int, int], refresh_ms: int, use_mjpeg: b
     query = urlencode(params)
     query_suffix = f"?{query}" if query else ""
     width, height = board_size
+    options_html = "\n".join(
+        f'                    <option value="{size}"{' selected' if size == DEFAULT_TEXT_SIZE else ''}>{size}</option>'
+        for size in TEXT_SIZES
+    )
     return f"""
     <!DOCTYPE html>
     <html>
@@ -655,14 +687,7 @@ def build_player_page(board_size: tuple[int, int], refresh_ms: int, use_mjpeg: b
             <div class="field">
                 <label for="textSizeSelect" style="font-weight:700;">Text Size</label>
                 <select id="textSizeSelect">
-                    <option value="12">12</option>
-                    <option value="16">16</option>
-                    <option value="20">20</option>
-                    <option value="24" selected>24</option>
-                    <option value="28">28</option>
-                    <option value="32">32</option>
-                    <option value="36">36</option>
-                    <option value="40">40</option>
+{options_html}
                 </select>
             </div>
             <button id="drawBtn" class="ghost">Start Drawing</button>
@@ -677,7 +702,7 @@ def build_player_page(board_size: tuple[int, int], refresh_ms: int, use_mjpeg: b
             </div>
         </div>
         <div id="status">Loading...</div>
-        {_script_block(width, height, refresh_ms, use_mjpeg)}
+        {_script_block(width, height, refresh_ms, use_mjpeg, TEXT_SIZES, DEFAULT_TEXT_SIZE)}
     </body>
     </html>
     """
