@@ -33,7 +33,7 @@ def _style_block() -> str:
             display: flex;
             align-items: center;
             justify-content: center;
-            padding: 12px 16px 20px;
+            padding: 0;
             overflow: hidden;
         }
 
@@ -354,7 +354,9 @@ def _script_block(
             }}
 
             function resizeCanvas() {{
-                baseScale = Math.min(container.clientWidth / boardSize.width, container.clientHeight / boardSize.height) || 1;
+                const widthScale = container.clientWidth / boardSize.width;
+                const heightScale = container.clientHeight / boardSize.height;
+                baseScale = Math.max(widthScale, heightScale) || 1;
                 applyViewportTransform();
             }}
 
