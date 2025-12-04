@@ -33,6 +33,7 @@ def render_whiteboard_image(
     *,
     font_cache: TextFontCache | None = None,
     include_text: bool = True,
+    text_scale: float = 1.0,
     grid_enabled: bool = False,
     grid_size: int = 50,
     grid_origin: Tuple[float, float] = (0.0, 0.0),
@@ -79,7 +80,15 @@ def render_whiteboard_image(
             text_value = item.get("text", "")
             pos = item.get("position") or (0, 0)
             color = item.get("color", DEFAULT_COLOR)
-            size_px = int(max(1, float(item.get("text_size", item.get("size", 24))) * zoom))
+            effective_text_scale = max(0.1, float(text_scale))
+            size_px = int(
+                max(
+                    1,
+                    float(item.get("text_size", item.get("size", 24)))
+                    * zoom
+                    * effective_text_scale,
+                )
+            )
             font = font_cache.pil_font(size_px)
             try:
                 draw.text(_scale_point(pos), text_value, fill=color, font=font, anchor="lt")
