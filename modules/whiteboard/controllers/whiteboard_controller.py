@@ -5,8 +5,9 @@ import socket
 import threading
 import tkinter as tk
 import uuid
+from datetime import datetime
 from tkinter import colorchooser, filedialog
-from typing import Any, Callable, Dict, Iterable, List, Tuple, cast
+from typing import Any, Callable, Dict, Iterable, List, Optional, Tuple, cast
 
 import customtkinter as ctk
 from PIL import Image, ImageTk
@@ -14,8 +15,10 @@ from screeninfo import get_monitors
 
 from modules.helpers.config_helper import ConfigHelper
 from modules.helpers.logging_helper import log_module_import, log_info, log_warning
+from modules.generic.generic_model_wrapper import GenericModelWrapper
 from modules.maps.utils.text_items import TextFontCache, prompt_for_text, text_hit_test
 from modules.whiteboard.models.layer_types import WhiteboardLayer, normalize_layer
+from modules.whiteboard.services.whiteboard_repository import WhiteboardRepository
 from modules.whiteboard.services.whiteboard_storage import WhiteboardStorage, WhiteboardState
 from modules.whiteboard.services.whiteboard_history import WhiteboardHistory
 from modules.whiteboard.utils.remote_access_guard import RemoteAccessGuard
@@ -36,6 +39,8 @@ class WhiteboardController:
         self.parent = parent
         self._root_app = root_app
         self._ui_dispatch_lock = threading.Lock()
+        self._pending_save_job: Optional[str] = None
+        self._save_reset_job: Optional[str] = None
 
         self.tool = "pen"
         self.ink_color = "#FF0000"
@@ -82,7 +87,12 @@ class WhiteboardController:
         self._dragging_stamp_item = None
         self._dragging_stamp_offset = (0.0, 0.0)
 
-        self.state: WhiteboardState = WhiteboardStorage.load_state()
+        self._repository = WhiteboardRepository()
+        self._scenario_choices = self._load_scenarios()
+        default_scenario = self._scenario_choices[0] if self._scenario_choices else "Unassigned"
+        self._scenario_var = tk.StringVar(value=default_scenario)
+
+        self.state, saved_at = self._load_state_for_scenario(default_scenario)
         self.whiteboard_items: List[Dict] = list(self.state.items)
         self.board_size: Tuple[int, int] = (int(self.state.size[0]), int(self.state.size[1]))
         self.view_zoom = max(self._min_zoom, min(self._max_zoom, float(getattr(self.state, "zoom", 1.0) or 1.0)))
@@ -94,6 +104,8 @@ class WhiteboardController:
         self.show_shared_layer = bool(getattr(self.state, "show_shared_layer", True))
         self.show_gm_layer = bool(getattr(self.state, "show_gm_layer", True))
         self.remote_access_guard = RemoteAccessGuard.from_config(enabled=bool(getattr(self.state, "remote_edit_enabled", False)))
+
+        self._last_saved_at = saved_at
 
         assets = available_stamp_assets()
         self._stamp_assets_map = {os.path.basename(path): path for path in assets}
@@ -481,8 +493,7 @@ class WhiteboardController:
         share_btn = ctk.CTkButton(remote_frame, text="Share Link", command=self._open_share_dialog, width=110)
         share_btn.pack(side="left")
 
-        save_btn = ctk.CTkButton(toolbar, text="Save", command=self._persist_state)
-        save_btn.pack(side="left", padx=(0, 4))
+        self._build_save_controls(toolbar)
 
         clear_btn = ctk.CTkButton(toolbar, text="Clear", command=self.clear_board)
         clear_btn.pack(side="left", padx=(0, 4))
@@ -505,6 +516,164 @@ class WhiteboardController:
         toggle_menu.set("Visibility/Grid")
         toggle_menu.pack(side="left")
         self._toggle_menu = toggle_menu
+
+    def _build_save_controls(self, toolbar: ctk.CTkFrame):
+        scenario_frame = ctk.CTkFrame(toolbar, fg_color="transparent")
+        scenario_frame.pack(side="left", padx=(0, 6))
+        ctk.CTkLabel(scenario_frame, text="Scenario").pack(side="left", padx=(0, 4))
+        scenario_menu = ctk.CTkOptionMenu(
+            scenario_frame,
+            values=self._scenario_choices or ["Unassigned"],
+            command=self._on_scenario_change,
+            width=180,
+        )
+        scenario_menu.set(self._scenario_var.get())
+        scenario_menu.pack(side="left")
+        self._scenario_menu = scenario_menu
+
+        save_frame = ctk.CTkFrame(toolbar, fg_color="transparent")
+        save_frame.pack(side="left", padx=(0, 6))
+        self._save_status_var = tk.StringVar(value=self._format_save_status())
+        save_btn = ctk.CTkButton(save_frame, textvariable=self._save_status_var, command=lambda: self._persist_state(update_only=False), width=120)
+        save_btn.pack(side="left", padx=(0, 4))
+        self._save_button = save_btn
+
+        action_menu = ctk.CTkOptionMenu(
+            save_frame,
+            values=["Actions", "Restore last save", "View history"],
+            command=self._handle_save_action,
+            width=130,
+        )
+        action_menu.set("Actions")
+        action_menu.pack(side="left")
+        self._action_menu = action_menu
+
+        self._save_meta_var = tk.StringVar()
+        save_meta = ctk.CTkLabel(toolbar, textvariable=self._save_meta_var)
+        save_meta.pack(side="left", padx=(6, 0))
+        self._update_save_metadata()
+
+    def _handle_save_action(self, selection: str):
+        if selection == "Restore last save":
+            self._restore_latest_snapshot()
+        elif selection == "View history":
+            self._open_history_dialog()
+        try:
+            self._action_menu.set("Actions")
+        except Exception:
+            pass
+
+    def _format_save_status(self) -> str:
+        if self._pending_save_job:
+            return "Saving..."
+        if self._last_saved_at:
+            return "Saved"
+        return "Save"
+
+    def _update_save_metadata(self, saved_at: Optional[str] = None):
+        if saved_at:
+            self._last_saved_at = saved_at
+        if not self._last_saved_at:
+            self._save_meta_var.set("No saves yet")
+            self._save_status_var.set(self._format_save_status())
+            return
+        try:
+            ts = datetime.fromisoformat(self._last_saved_at.replace("Z", "+00:00"))
+            human = ts.strftime("Saved %Y-%m-%d %H:%M:%S")
+        except Exception:
+            human = f"Saved {self._last_saved_at}"
+        self._save_meta_var.set(human)
+        self._save_status_var.set(self._format_save_status())
+
+    def _on_scenario_change(self, selection: str):
+        scenario = selection or "Unassigned"
+        self._scenario_var.set(scenario)
+        state, saved_at = self._load_state_for_scenario(scenario)
+        self._apply_loaded_state(state, saved_at)
+
+    def _load_scenarios(self) -> List[str]:
+        try:
+            titles = [
+                str(item.get("Title")).strip()
+                for item in GenericModelWrapper("scenarios").load_items()
+                if item.get("Title")
+            ]
+            unique = sorted({t for t in titles if t})
+            return unique or ["Unassigned"]
+        except Exception:
+            return ["Unassigned"]
+
+    def _load_state_for_scenario(self, scenario_title: str) -> tuple[WhiteboardState, Optional[str]]:
+        state, saved_at = self._repository.load_latest_state(scenario_title)
+        if state:
+            return state, saved_at
+        fallback = WhiteboardStorage.load_state()
+        return fallback, None
+
+    def _apply_loaded_state(self, state: WhiteboardState, saved_at: Optional[str]):
+        self.state = state
+        self.whiteboard_items = list(state.items)
+        self.board_size = (int(self.state.size[0]), int(self.state.size[1]))
+        self.view_zoom = max(self._min_zoom, min(self._max_zoom, float(getattr(self.state, "zoom", 1.0) or 1.0)))
+        self.grid_enabled = bool(getattr(self.state, "grid_enabled", False))
+        self.grid_size = int(getattr(self.state, "grid_size", 50) or 50)
+        self.snap_to_grid = bool(getattr(self.state, "snap_to_grid", False))
+        self.active_layer = normalize_layer(getattr(self.state, "active_layer", WhiteboardLayer.SHARED.value))
+        self.show_shared_layer = bool(getattr(self.state, "show_shared_layer", True))
+        self.show_gm_layer = bool(getattr(self.state, "show_gm_layer", True))
+        self.remote_access_guard.set_enabled(bool(getattr(self.state, "remote_edit_enabled", False)))
+        self._remote_toggle_var.set(self.remote_access_guard.enabled)
+        self._refresh_toggle_menu()
+        self._history.reset(self.whiteboard_items)
+        self._refresh_viewport()
+        self._redraw_canvas()
+        self._update_web_display_whiteboard()
+        self._update_save_metadata(saved_at)
+
+    def _restore_latest_snapshot(self):
+        state, saved_at = self._load_state_for_scenario(self._scenario_var.get())
+        self._apply_loaded_state(state, saved_at)
+
+    def _open_history_dialog(self):
+        scenario = self._scenario_var.get()
+        entries = self._repository.list_history(scenario, limit=20)
+        dialog = ctk.CTkToplevel(self.parent)
+        dialog.title(f"Whiteboard history for {scenario}")
+        dialog.geometry("340x420")
+        dialog.grab_set()
+
+        if not entries:
+            ctk.CTkLabel(dialog, text="No saves yet for this scenario.").pack(padx=12, pady=12)
+            return
+
+        ctk.CTkLabel(dialog, text="Select a snapshot to restore:").pack(padx=12, pady=(12, 4))
+        list_frame = ctk.CTkScrollableFrame(dialog, width=320, height=320)
+        list_frame.pack(padx=12, pady=(0, 12), fill="both", expand=True)
+
+        for entry in entries:
+            try:
+                ts = datetime.fromisoformat(entry.saved_at.replace("Z", "+00:00"))
+                label = ts.strftime("%Y-%m-%d %H:%M:%S")
+            except Exception:
+                label = entry.saved_at
+            btn = ctk.CTkButton(
+                list_frame,
+                text=label,
+                command=lambda snap_id=entry.snapshot_id: self._restore_snapshot(snap_id, dialog),
+            )
+            btn.pack(fill="x", padx=6, pady=4)
+
+    def _restore_snapshot(self, snapshot_id: int, dialog: Optional[ctk.CTkToplevel] = None):
+        state = self._repository.load_snapshot(snapshot_id)
+        if not state:
+            log_warning("Snapshot missing", func_name="WhiteboardController._restore_snapshot")
+            return
+        self._apply_loaded_state(state, datetime.utcnow().isoformat())
+        if dialog is not None:
+            try:
+                dialog.destroy()
+            except Exception:
+                pass
 
     def _toggle_menu_values(self):
         return [
@@ -1315,6 +1484,15 @@ class WhiteboardController:
     # Persistence and Rendering
     # ------------------------------------------------------------------
     def _persist_state(self, update_only: bool = False):
+        self._sync_state_from_session()
+        if update_only:
+            self._schedule_save()
+        else:
+            self._perform_save()
+        self._redraw_canvas()
+        self._update_web_display_whiteboard()
+
+    def _sync_state_from_session(self):
         self.state.items = list(self.whiteboard_items)
         self.state.size = (int(self.board_size[0]), int(self.board_size[1]))
         self.state.grid_enabled = self.grid_enabled
@@ -1325,10 +1503,46 @@ class WhiteboardController:
         self.state.show_gm_layer = self.show_gm_layer
         self.state.zoom = self.view_zoom
         self.state.remote_edit_enabled = bool(getattr(self, "remote_access_guard", None) and self.remote_access_guard.enabled)
-        if not update_only:
-            WhiteboardStorage.save_state(self.state)
-        self._redraw_canvas()
-        self._update_web_display_whiteboard()
+
+    def _schedule_save(self):
+        if self._pending_save_job:
+            try:
+                self.parent.after_cancel(self._pending_save_job)
+            except Exception:
+                pass
+        try:
+            self._pending_save_job = self.parent.after(600, self._perform_save)
+            self._save_status_var.set(self._format_save_status())
+        except Exception:
+            self._perform_save()
+
+    def _perform_save(self):
+        self._pending_save_job = None
+        try:
+            self._save_status_var.set("Saving...")
+        except Exception:
+            pass
+
+        try:
+            _, saved_at = self._repository.save_snapshot(self._scenario_var.get(), self.state)
+            self._update_save_metadata(saved_at)
+        except Exception:
+            log_warning("Failed to save whiteboard state", func_name="WhiteboardController._perform_save")
+            try:
+                self._save_status_var.set("Save")
+            except Exception:
+                pass
+            return
+
+        if self._save_reset_job:
+            try:
+                self.parent.after_cancel(self._save_reset_job)
+            except Exception:
+                pass
+        try:
+            self._save_reset_job = self.parent.after(2000, lambda: self._save_status_var.set(self._format_save_status()))
+        except Exception:
+            pass
 
     def _undo_action(self):
         restored, changed = self._history.undo(self.whiteboard_items)
@@ -1678,5 +1892,17 @@ class WhiteboardController:
             )
 
     def close(self):
+        if self._pending_save_job:
+            try:
+                self.parent.after_cancel(self._pending_save_job)
+            except Exception:
+                pass
+            self._pending_save_job = None
+        if self._save_reset_job:
+            try:
+                self.parent.after_cancel(self._save_reset_job)
+            except Exception:
+                pass
+            self._save_reset_job = None
         self.close_player_view()
         close_whiteboard_display(self)
