@@ -121,7 +121,7 @@ class TextFontCache:
             except Exception:
                 fallback = self._load_scalable_font(normalized)
                 if fallback is None:
-                    raise RuntimeError("Unable to load a scalable font for PIL text rendering")
+                    fallback = self._load_default_font()
                 self._pil_fonts[normalized] = fallback
         return self._pil_fonts[normalized]
 
@@ -178,6 +178,14 @@ class TextFontCache:
             return ImageFont.truetype("DejaVuSans.ttf", size)
         except Exception:
             return None
+
+    def _load_default_font(self) -> ImageFont.ImageFont:
+        """Always return a usable PIL font to avoid crashes when fonts are missing."""
+
+        try:
+            return ImageFont.load_default()
+        except Exception:
+            raise RuntimeError("Unable to load a scalable font for PIL text rendering")
 
 
 def approximate_text_bbox(position: tuple[float, float], *, text: str, size: int, zoom: float, pan: tuple[float, float], padding: float = 6.0) -> tuple[float, float, float, float]:
