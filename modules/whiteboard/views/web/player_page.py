@@ -356,6 +356,7 @@ def _script_block(
             let imagePlacementHandler = null;
             let lastTap = {{ time: 0, position: [0, 0] }};
             const activePointers = new Map();
+            let previewTimer = null;
 
             const previewImg = document.getElementById('boardPreview');
             const canvas = document.getElementById('boardCanvas');
@@ -417,6 +418,38 @@ def _script_block(
 
             function clamp(value, min, max) {{
                 return Math.min(max, Math.max(min, value));
+            }}
+
+            function normalizeImageRecord(entry) {{
+                if (!entry || !entry.image_id) return null;
+                const position = Array.isArray(entry.position) && entry.position.length === 2 ? entry.position : [0, 0];
+                const size = entry.size || {};
+                const normalizedSize = {{
+                    width: Number(size.width) || 0,
+                    height: Number(size.height) || 0,
+                }};
+                const baseRecord = {{
+                    id: entry.image_id,
+                    position: [Number(position[0]) || 0, Number(position[1]) || 0],
+                    size: normalizedSize,
+                    naturalWidth: Number(entry.natural_width || entry.width) || normalizedSize.width,
+                    naturalHeight: Number(entry.natural_height || entry.height) || normalizedSize.height,
+                }};
+
+                const existing = placedImages.find((img) => img.id === baseRecord.id);
+                if (existing) {{
+                    baseRecord.naturalWidth = existing.naturalWidth || baseRecord.naturalWidth;
+                    baseRecord.naturalHeight = existing.naturalHeight || baseRecord.naturalHeight;
+                }}
+
+                return baseRecord;
+            }}
+
+            function hydratePlacedImages(entries) {{
+                placedImages = (entries || [])
+                    .map(normalizeImageRecord)
+                    .filter((value) => !!value);
+                setContextTarget(contextMenuBoardPoint);
             }}
 
             function updateBoardGeometry(size, origin) {{
@@ -602,7 +635,10 @@ def _script_block(
                     }}
                 }} else {{
                     previewImg.src = `/board.png?ts=${{Date.now()}}`;
-                    setTimeout(refreshPreview, refreshDelay);
+                    if (previewTimer) {{
+                        clearTimeout(previewTimer);
+                    }}
+                    previewTimer = setTimeout(refreshPreview, refreshDelay);
                 }}
             }}
 
@@ -870,6 +906,7 @@ def _script_block(
 
             function handleRefresh() {{
                 refreshPreview();
+                syncStatus();
                 setStatus('Preview refreshed');
             }}
 
@@ -922,13 +959,16 @@ def _script_block(
                             }}
                             setStatus('Image placed');
                             if (result.data && result.data.image_id) {{
-                                placedImages.push({{
-                                    id: result.data.image_id,
+                                const hydrated = normalizeImageRecord({{
+                                    image_id: result.data.image_id,
                                     position: [x, y],
                                     size,
-                                    naturalWidth: uploaded.width,
-                                    naturalHeight: uploaded.height,
+                                    natural_width: uploaded.width,
+                                    natural_height: uploaded.height,
                                 }});
+                                if (hydrated) {{
+                                    placedImages.push(hydrated);
+                                }}
                             }}
                             if (!useMjpeg) {{
                                 refreshPreview();
@@ -1177,6 +1217,7 @@ def _script_block(
                 fetch('/api/status')
                     .then(resp => resp.json())
                     .then(data => {{
+                        const previousEditing = editingEnabled;
                         editingEnabled = !!data.editing_enabled;
                         textSize = parseFloat(data.text_size || textSize) || textSize;
                         updateBoardGeometry(
@@ -1189,11 +1230,11 @@ def _script_block(
                         addImageBtn.disabled = !editingEnabled;
                         textSizeSelect.disabled = !editingEnabled;
                         tokenSaveBtn.disabled = !editingEnabled;
+                        hydratePlacedImages(data.images || []);
                         applyStoredTextSize(textSize);
                         setDrawingArmed(editingEnabled && drawingArmed);
-                        setStatus(editingEnabled ? 'Editing enabled' : 'Editing disabled');
-                        if (!data.use_mjpeg) {{
-                            setTimeout(refreshPreview, refreshDelay);
+                        if (previousEditing !== editingEnabled) {{
+                            setStatus(editingEnabled ? 'Editing enabled' : 'Editing disabled');
                         }}
                     }})
                     .catch(() => setStatus('Unable to fetch status', true));
@@ -1296,6 +1337,8 @@ def _script_block(
             sessionColor = createSessionColor();
             updateSessionColorDisplay();
             applyToken(new URLSearchParams(window.location.search).get('token') || localStorage.getItem('whiteboardToken') || '');
+            const statusIntervalMs = Math.max(refreshDelay, 1000);
+            setInterval(syncStatus, statusIntervalMs);
             syncStatus();
             refreshPreview();
         }})();
