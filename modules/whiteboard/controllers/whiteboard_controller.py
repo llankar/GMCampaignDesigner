@@ -1053,6 +1053,48 @@ class WhiteboardController:
 
         self._dispatch_to_ui_thread(_apply)
 
+    def handle_remote_image_move(self, *, image_id: str, position) -> None:
+        def _apply():
+            if not image_id:
+                raise ValueError("Image id is required")
+
+            if not isinstance(position, (list, tuple)) or len(position) != 2:
+                raise ValueError("Position must include x and y")
+
+            target = next(
+                (item for item in self.whiteboard_items if item.get("type") == "image" and item.get("image_id") == image_id),
+                None,
+            )
+            if not target:
+                raise ValueError("Image not found")
+
+            target["position"] = (float(position[0]), float(position[1]))
+            self._persist_state()
+
+        self._dispatch_to_ui_thread(_apply)
+
+    def handle_remote_image_delete(self, *, image_id: str) -> None:
+        def _apply():
+            if not image_id:
+                raise ValueError("Image id is required")
+
+            remaining = []
+            removed = False
+            for item in self.whiteboard_items:
+                if item.get("type") == "image" and item.get("image_id") == image_id:
+                    removed = True
+                    continue
+                remaining.append(item)
+
+            if not removed:
+                raise ValueError("Image not found")
+
+            self._history.checkpoint(self.whiteboard_items)
+            self.whiteboard_items = remaining
+            self._persist_state()
+
+        self._dispatch_to_ui_thread(_apply)
+
     def handle_remote_undo(self):
         def _apply():
             restored, changed = self._history.undo(self.whiteboard_items)
@@ -1220,6 +1262,16 @@ class WhiteboardController:
                 pos = item.get("position") or (0, 0)
                 size = float(item.get("size", self.stamp_size))
                 if abs(pos[0] - x) <= radius + size / 2 and abs(pos[1] - y) <= radius + size / 2:
+                    changed = True
+                    continue
+            elif item_type == "image":
+                pos = item.get("position") or (0.0, 0.0)
+                size = item.get("size") or {}
+                width = float(size.get("width", 0) or 0)
+                height = float(size.get("height", 0) or 0)
+                within_x = pos[0] - radius <= x <= pos[0] + width + radius
+                within_y = pos[1] - radius <= y <= pos[1] + height + radius
+                if within_x and within_y:
                     changed = True
                     continue
             remaining.append(item)

@@ -155,6 +155,47 @@ def register_whiteboard_api(app, controller, access_guard: RemoteAccessGuard | N
 
         return jsonify({"status": "ok", "image_id": image_id})
 
+    @app.route("/api/images/move", methods=["POST"])
+    def api_image_move():
+        unauthorized = _require_access()
+        if unauthorized:
+            return unauthorized
+
+        payload = request.get_json(silent=True) or {}
+        image_id = payload.get("image_id")
+        position = payload.get("position") or []
+        if not image_id:
+            return jsonify({"message": "image_id is required"}), 400
+
+        try:
+            controller.handle_remote_image_move(image_id=image_id, position=position)
+        except ValueError as exc:
+            return jsonify({"message": str(exc)}), 400
+        except Exception as exc:  # noqa: BLE001
+            return jsonify({"message": f"Unable to move image: {exc}"}), 500
+
+        return jsonify({"status": "ok", "image_id": image_id})
+
+    @app.route("/api/images/delete", methods=["POST"])
+    def api_image_delete():
+        unauthorized = _require_access()
+        if unauthorized:
+            return unauthorized
+
+        payload = request.get_json(silent=True) or {}
+        image_id = payload.get("image_id")
+        if not image_id:
+            return jsonify({"message": "image_id is required"}), 400
+
+        try:
+            controller.handle_remote_image_delete(image_id=image_id)
+        except ValueError as exc:
+            return jsonify({"message": str(exc)}), 400
+        except Exception as exc:  # noqa: BLE001
+            return jsonify({"message": f"Unable to delete image: {exc}"}), 500
+
+        return jsonify({"status": "ok", "image_id": image_id})
+
     @app.route("/api/undo", methods=["POST"])
     def api_undo():
         unauthorized = _require_access()

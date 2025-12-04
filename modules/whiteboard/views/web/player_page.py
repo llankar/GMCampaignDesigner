@@ -349,6 +349,9 @@ def _script_block(
             let sessionColor = '';
             let pinchState = null;
             let placedImages = [];
+            let activeImageDrag = null;
+            let contextMenuBoardPoint = null;
+            let contextMenuImageTarget = null;
             let activeResizeTarget = null;
             let imagePlacementHandler = null;
             let lastTap = {{ time: 0, position: [0, 0] }};
@@ -375,6 +378,7 @@ def _script_block(
             const textSave = document.getElementById('textSave');
             const contextMenu = document.getElementById('contextMenu');
             const addImageBtn = document.getElementById('menuAddImage');
+            const deleteImageBtn = document.getElementById('menuDeleteImage');
             const imageFileInput = document.getElementById('imageFileInput');
             const imageResizeDialog = document.getElementById('imageResizeDialog');
             const imageSizeRange = document.getElementById('imageSizeRange');
@@ -694,6 +698,11 @@ def _script_block(
                     return;
                 }}
 
+                if (beginImageDrag(evt)) {{
+                    clearLongPressTimer();
+                    return;
+                }}
+
                 if (isPanGesture(evt)) {{
                     evt.preventDefault();
                     clearLongPressTimer();
@@ -717,6 +726,11 @@ def _script_block(
                     return;
                 }}
 
+                if (updateImageDrag(evt)) {{
+                    evt.preventDefault();
+                    return;
+                }}
+
                 if (isPanning) {{
                     evt.preventDefault();
                     updatePan(evt);
@@ -733,6 +747,10 @@ def _script_block(
 
                 if (pinchState && activePointers.size < 2) {{
                     endPinch();
+                }}
+
+                if (endImageDrag(evt)) {{
+                    return;
                 }}
 
                 if (isPanning) {{
@@ -932,6 +950,17 @@ def _script_block(
                 }});
             }}
 
+            function updateContextMenuState() {{
+                if (!deleteImageBtn) return;
+                deleteImageBtn.disabled = !contextMenuImageTarget;
+            }}
+
+            function setContextTarget(point) {{
+                contextMenuBoardPoint = point;
+                contextMenuImageTarget = point ? findPlacedImageAt(point) : null;
+                updateContextMenuState();
+            }}
+
             function closeImageResizeDialog() {{
                 activeResizeTarget = null;
                 if (!imageResizeDialog) return;
@@ -974,6 +1003,82 @@ def _script_block(
                     .finally(closeImageResizeDialog);
             }}
 
+            function handleImageDelete() {{
+                if (!editingEnabled) return;
+                const target = contextMenuImageTarget;
+                if (!target) {{
+                    setStatus('No image selected to delete', true);
+                    return;
+                }}
+
+                api('/api/images/delete', {{ image_id: target.id }})
+                    .then(result => {{
+                        if (result.status >= 400) {{
+                            setStatus(result.data.message || 'Unable to delete image', true);
+                            return;
+                        }}
+                        placedImages = placedImages.filter((img) => img.id !== target.id);
+                        setContextTarget(contextMenuBoardPoint);
+                        setStatus('Image deleted');
+                        if (!useMjpeg) {{
+                            refreshPreview();
+                        }}
+                    }})
+                    .catch(() => setStatus('Network error', true));
+            }}
+
+            function beginImageDrag(evt) {{
+                if (!editingEnabled || drawingArmed) return false;
+                if (evt.button !== undefined && evt.button !== 0) return false;
+                const [x, y] = getBoardCoords(evt);
+                const target = findPlacedImageAt([x, y]);
+                if (!target) return false;
+
+                activeImageDrag = {{
+                    target,
+                    pointerId: evt.pointerId,
+                    offset: [x - target.position[0], y - target.position[1]],
+                    startPosition: [...target.position],
+                }};
+                try {{ canvas.setPointerCapture(evt.pointerId); }} catch (e) {{ /* ignore */ }}
+                setContextTarget([x, y]);
+                setStatus('Dragging image...');
+                return true;
+            }}
+
+            function updateImageDrag(evt) {{
+                if (!activeImageDrag || activeImageDrag.pointerId !== evt.pointerId) return false;
+                const [x, y] = getBoardCoords(evt);
+                const newPos = [x - activeImageDrag.offset[0], y - activeImageDrag.offset[1]];
+                activeImageDrag.target.position = newPos;
+                return true;
+            }}
+
+            function endImageDrag(evt) {{
+                if (!activeImageDrag || (evt && activeImageDrag.pointerId !== evt.pointerId)) return false;
+                const target = activeImageDrag.target;
+                const newPosition = target.position;
+                const original = activeImageDrag.startPosition;
+                activeImageDrag = null;
+                api('/api/images/move', {{ image_id: target.id, position: newPosition }})
+                    .then(result => {{
+                        if (result.status >= 400) {{
+                            target.position = original;
+                            setStatus(result.data.message || 'Unable to move image', true);
+                            return;
+                        }}
+                        setStatus('Image moved');
+                        if (!useMjpeg) {{
+                            refreshPreview();
+                        }}
+                    }})
+                    .catch(() => {{
+                        target.position = original;
+                        setStatus('Network error', true);
+                    }});
+                return true;
+            }}
+
             function handleImageActivation(evt) {{
                 if (!editingEnabled) return;
                 const [x, y] = getBoardCoords(evt);
@@ -997,8 +1102,12 @@ def _script_block(
                 }}
             }}
 
-            function openContextMenu(x, y) {{
+            function openContextMenu(x, y, options = {{}}) {{
                 if (!contextMenu) return;
+                if (options.boardPoint) {{
+                    setContextTarget(options.boardPoint);
+                }}
+                updateContextMenuState();
                 contextMenu.style.display = 'block';
                 const rect = contextMenu.getBoundingClientRect();
                 const maxX = window.innerWidth - rect.width - 8;
@@ -1031,7 +1140,8 @@ def _script_block(
                 clearLongPressTimer();
                 longPressStart = {{ x: evt.clientX, y: evt.clientY }};
                 longPressTimer = setTimeout(() => {{
-                    openContextMenu(evt.clientX, evt.clientY);
+                    const boardPoint = getBoardCoords(evt);
+                    openContextMenu(evt.clientX, evt.clientY, {{ boardPoint }});
                 }}, longPressDelay);
             }}
 
@@ -1046,7 +1156,8 @@ def _script_block(
             function bindContextMenuTriggers(target) {{
                 target.addEventListener('contextmenu', (evt) => {{
                     evt.preventDefault();
-                    openContextMenu(evt.clientX, evt.clientY);
+                    const boardPoint = getBoardCoords(evt);
+                    openContextMenu(evt.clientX, evt.clientY, {{ boardPoint }});
                 }});
 
                 target.addEventListener('pointerdown', (evt) => {{
@@ -1096,6 +1207,7 @@ def _script_block(
             canvas.addEventListener('dblclick', handleImageActivation);
             canvas.addEventListener('pointercancel', (evt) => {{
                 removeActivePointer(evt);
+                endImageDrag(evt);
                 endPan();
                 endPinch();
                 drawing = false;
@@ -1103,6 +1215,9 @@ def _script_block(
             }});
             canvas.addEventListener('pointerleave', (evt) => {{
                 removeActivePointer(evt);
+                if (endImageDrag(evt)) {{
+                    return;
+                }}
                 if (isPanning) {{
                     endPan();
                 }}
@@ -1123,6 +1238,9 @@ def _script_block(
                     imageFileInput.click();
                 }}
             }});
+            if (deleteImageBtn) {{
+                deleteImageBtn.addEventListener('click', () => {{ closeContextMenu(); handleImageDelete(); }});
+            }}
             refreshBtn.addEventListener('click', () => {{ closeContextMenu(); handleRefresh(); }});
             tokenSaveBtn.addEventListener('click', () => {{ closeContextMenu(); handleTokenSubmit(); }});
             tokenInput.addEventListener('change', handleTokenSubmit);
@@ -1225,6 +1343,7 @@ def build_player_page(
                 <button type="button" id="menuDrawToggle" class="menu-item">Start Drawing</button>
                 <button type="button" id="menuPlaceText" class="menu-item">Place Text</button>
                 <button type="button" id="menuAddImage" class="menu-item">Add Image</button>
+                <button type="button" id="menuDeleteImage" class="menu-item">Delete Image</button>
                 <button type="button" id="menuUndo" class="menu-item">Undo</button>
                 <button type="button" id="menuRefresh" class="menu-item">Refresh Preview</button>
             </div>
