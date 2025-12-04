@@ -94,16 +94,33 @@ def open_web_display(self, port=None):
         boundary = 'frame'
         interval = max(1, int(getattr(controller, '_web_refresh_ms', 200))) / 1000.0
 
-        def frame_bytes():
-            # Compose a JPEG-encoded frame from the current map state
-            img = _render_map_image(controller)
+        def _ensure_rgb(img):
             if img is None:
                 return None
-            if img.mode != 'RGB':
-                try:
-                    img = img.convert('RGB')
-                except Exception:
-                    pass
+            if img.mode == 'RGB':
+                return img
+            try:
+                return img.convert('RGB')
+            except Exception:
+                pass
+            try:
+                if 'A' in img.getbands():
+                    alpha = img.getchannel('A')
+                else:
+                    alpha = None
+                base_rgb = img.convert('RGB') if img.mode != 'RGBA' else img.copy()
+                opaque = Image.new('RGB', img.size, (0, 0, 0))
+                opaque.paste(base_rgb, mask=alpha)
+                return opaque
+            except Exception:
+                logging.getLogger(__name__).exception("Failed to convert map image to RGB for MJPEG stream")
+                return None
+
+        def frame_bytes():
+            # Compose a JPEG-encoded frame from the current map state
+            img = _ensure_rgb(_render_map_image(controller))
+            if img is None:
+                return None
             buf = io.BytesIO()
             try:
                 img.save(buf, format='JPEG', quality=80)
