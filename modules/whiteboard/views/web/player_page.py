@@ -143,6 +143,80 @@ def _style_block() -> str:
             color: #111827;
             z-index: 10;
         }
+
+        #textDialog {
+            position: fixed;
+            inset: 0;
+            background: rgba(17, 24, 39, 0.45);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            padding: 16px;
+            z-index: 20;
+        }
+
+        #textDialog.visible {
+            display: flex;
+        }
+
+        #textDialog .modal-card {
+            background: #fff;
+            border-radius: 12px;
+            box-shadow: var(--panel-shadow);
+            padding: 18px;
+            width: min(520px, 90vw);
+            max-width: 640px;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        #textDialog h3 {
+            margin: 0;
+            font-size: 18px;
+            color: #111827;
+        }
+
+        #textDialog p {
+            margin: 0;
+            color: #374151;
+            line-height: 1.4;
+        }
+
+        #textDialog textarea {
+            width: 100%;
+            min-height: 180px;
+            resize: vertical;
+            border-radius: 8px;
+            border: 1px solid #e5e7eb;
+            padding: 10px 12px;
+            font-size: 15px;
+            font-family: 'Segoe UI', Tahoma, sans-serif;
+        }
+
+        #textDialog .actions {
+            display: flex;
+            justify-content: flex-end;
+            gap: 10px;
+        }
+
+        #textDialog .actions button {
+            padding: 10px 14px;
+            border-radius: 8px;
+            border: none;
+            font-weight: 700;
+            cursor: pointer;
+        }
+
+        #textDialog .actions .cancel {
+            background: #e5e7eb;
+            color: #111827;
+        }
+
+        #textDialog .actions .save {
+            background: var(--accent);
+            color: #fff;
+        }
     </style>
     """
 
@@ -196,6 +270,10 @@ def _script_block(
             const colorSwatch = document.getElementById('colorSwatch');
             const colorValue = document.getElementById('colorValue');
             const textSizeSelect = document.getElementById('textSizeSelect');
+            const textDialog = document.getElementById('textDialog');
+            const textInput = document.getElementById('textInput');
+            const textCancel = document.getElementById('textCancel');
+            const textSave = document.getElementById('textSave');
 
             function createSessionColor() {{
                 const existing = sessionStorage.getItem('whiteboardSessionColor');
@@ -524,22 +602,70 @@ def _script_block(
                 sendStroke();
             }}
 
+            function showTextDialog() {{
+                return new Promise(resolve => {{
+                    const close = (value) => {{
+                        textDialog.classList.remove('visible');
+                        textDialog.setAttribute('aria-hidden', 'true');
+                        const cleaned = (value || '').trim();
+                        textInput.value = '';
+                        cleanup();
+                        resolve(cleaned || null);
+                    }};
+
+                    const onCancel = () => close(null);
+                    const onSave = () => close(textInput.value);
+                    const onKeyDown = (evt) => {{
+                        if (evt.key === 'Escape') {{
+                            evt.preventDefault();
+                            onCancel();
+                        }}
+                        if ((evt.key === 'Enter' && (evt.ctrlKey || evt.metaKey))) {{
+                            evt.preventDefault();
+                            onSave();
+                        }}
+                    }};
+                    const onBackdrop = (evt) => {{
+                        if (evt.target === textDialog) {{
+                            onCancel();
+                        }}
+                    }};
+                    const cleanup = () => {{
+                        textCancel.removeEventListener('click', onCancel);
+                        textSave.removeEventListener('click', onSave);
+                        textDialog.removeEventListener('keydown', onKeyDown);
+                        textDialog.removeEventListener('click', onBackdrop);
+                    }};
+
+                    textDialog.classList.add('visible');
+                    textDialog.removeAttribute('aria-hidden');
+                    textCancel.addEventListener('click', onCancel);
+                    textSave.addEventListener('click', onSave);
+                    textDialog.addEventListener('keydown', onKeyDown);
+                    textDialog.addEventListener('click', onBackdrop);
+                    textInput.focus();
+                }});
+            }}
+
             function handleText() {{
                 if (!editingEnabled) return;
-                const text = prompt('Enter text to place on the board:');
-                if (!text) return;
-                canvas.addEventListener('click', function handler(evt) {{
-                    canvas.removeEventListener('click', handler);
-                    const [x, y] = getBoardCoords(evt);
-                    api('/api/text', {{ text, position: [x, y], color: sessionColor, size: textSize }})
-                        .then(result => {{
-                            if (result.status >= 400) {{
-                                setStatus(result.data.message || 'Unable to place text', true);
-                            }} else {{
-                                setStatus('Text placed');
-                            }}
-                        }})
-                        .catch(() => setStatus('Network error', true));
+                showTextDialog().then(text => {{
+                    if (!text) return;
+                    setStatus('Click on the board to place text');
+                    const handler = (evt) => {{
+                        canvas.removeEventListener('click', handler);
+                        const [x, y] = getBoardCoords(evt);
+                        api('/api/text', {{ text, position: [x, y], color: sessionColor, size: textSize }})
+                            .then(result => {{
+                                if (result.status >= 400) {{
+                                    setStatus(result.data.message || 'Unable to place text', true);
+                                }} else {{
+                                    setStatus('Text placed');
+                                }}
+                            }})
+                            .catch(() => setStatus('Network error', true));
+                    }};
+                    canvas.addEventListener('click', handler, {{ once: true }});
                 }});
             }}
 
@@ -702,6 +828,17 @@ def build_player_page(board_size: tuple[int, int], refresh_ms: int, use_mjpeg: b
             </div>
         </div>
         <div id="status">Loading...</div>
+        <div id="textDialog" class="modal" role="dialog" aria-modal="true" aria-hidden="true">
+            <div class="modal-card">
+                <h3>Place Text</h3>
+                <p>Enter text to place on the board. Use Ctrl+Enter or Cmd+Enter to save.</p>
+                <textarea id="textInput" placeholder="Type your text here..." aria-label="Text to place"></textarea>
+                <div class="actions">
+                    <button type="button" id="textCancel" class="cancel">Cancel</button>
+                    <button type="button" id="textSave" class="save">Save</button>
+                </div>
+            </div>
+        </div>
         {_script_block(width, height, refresh_ms, use_mjpeg, TEXT_SIZES, DEFAULT_TEXT_SIZE)}
     </body>
     </html>
