@@ -105,6 +105,8 @@ class WhiteboardController:
         self.remote_access_guard = RemoteAccessGuard.from_config(enabled=bool(getattr(self.state, "remote_edit_enabled", False)))
 
         self._last_saved_at = saved_at
+        self._save_meta_var = tk.StringVar(value="No saves yet")
+        self._update_save_metadata(saved_at)
 
         assets = available_stamp_assets()
         self._stamp_assets_map = {os.path.basename(path): path for path in assets}
@@ -541,6 +543,9 @@ class WhiteboardController:
         action_menu.set("Actions")
         action_menu.pack(side="left")
         self._action_menu = action_menu
+
+        meta_label = ctk.CTkLabel(save_frame, textvariable=self._save_meta_var)
+        meta_label.pack(side="left", padx=(8, 0))
    
 
     def _handle_save_action(self, selection: str):
