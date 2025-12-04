@@ -408,7 +408,7 @@ class WhiteboardController:
             command=self._on_select_stamp_asset,
         )
         stamp_btn.pack(side="left", padx=(0, 4))
-        stamp_values = [24, 32, 40, 48, 64, 80, 96, 120, 144, 168, 196]
+        stamp_values = [24, 32, 40, 48, 64, 80, 96, 120, 144, 168, 196,512,1024,2048]
         if self.stamp_size not in stamp_values:
             stamp_values.append(int(self.stamp_size))
             stamp_values = sorted(set(stamp_values))
