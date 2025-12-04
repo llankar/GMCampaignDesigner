@@ -63,6 +63,7 @@ def save_uploaded_image(file_storage) -> UploadedImage:
         raise ValueError("No file provided")
 
     filename = file_storage.filename
+    extension = Path(filename).suffix.lower()
     if not is_allowed_extension(filename):
         raise ValueError("Unsupported image format")
 
@@ -73,9 +74,10 @@ def save_uploaded_image(file_storage) -> UploadedImage:
 
     try:
         with Image.open(file_storage.stream) as img:
-            safe_image = img.convert("RGBA")
+            convert_mode = "RGB" if extension in {".jpg", ".jpeg"} else "RGBA"
+            safe_image = img.convert(convert_mode)
             width, height = safe_image.size
-            asset_key = f"{uuid.uuid4().hex}{Path(filename).suffix.lower()}"
+            asset_key = f"{uuid.uuid4().hex}{extension}"
             destination = _uploads_root() / asset_key
             safe_image.save(destination)
     except Exception as exc:  # noqa: BLE001
