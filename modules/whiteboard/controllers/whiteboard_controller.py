@@ -555,19 +555,7 @@ class WhiteboardController:
         except Exception:
             pass
 
-    def _update_save_metadata(self, saved_at: Optional[str] = None):
-        if saved_at:
-            self._last_saved_at = saved_at
-        if not self._last_saved_at:
-            self._save_meta_var.set("No saves yet")
-            return
-        try:
-            ts = datetime.fromisoformat(self._last_saved_at.replace("Z", "+00:00"))
-            human = ts.strftime("Saved %Y-%m-%d %H:%M:%S")
-        except Exception:
-            human = f"Saved {self._last_saved_at}"
-        self._save_meta_var.set(human)
-
+    
     def _on_scenario_change(self, selection: str):
         scenario = selection or "Unassigned"
         self._scenario_var.set(scenario)
@@ -611,7 +599,6 @@ class WhiteboardController:
         self._refresh_viewport()
         self._redraw_canvas()
         self._update_web_display_whiteboard()
-        self._update_save_metadata(saved_at)
 
     def _restore_latest_snapshot(self):
         state, saved_at = self._load_state_for_scenario(self._scenario_var.get())
@@ -1502,7 +1489,6 @@ class WhiteboardController:
         self._pending_save_job = None
         try:
             _, saved_at = self._repository.save_snapshot(self._scenario_var.get(), self.state)
-            self._update_save_metadata(saved_at)
         except Exception:
             log_warning("Failed to save whiteboard state", func_name="WhiteboardController._perform_save")
             return
