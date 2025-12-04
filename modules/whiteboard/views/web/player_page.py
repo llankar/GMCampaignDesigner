@@ -823,8 +823,10 @@ def _script_block(
 
             function scheduleLongPress(evt) {{
                 if (evt.pointerType !== 'touch') return;
-                longPressStart = {{ x: evt.clientX, y: evt.clientY }};
+                if (activePointers.size > 1 || drawing || isPanning || pinchState) return;
+
                 clearLongPressTimer();
+                longPressStart = {{ x: evt.clientX, y: evt.clientY }};
                 longPressTimer = setTimeout(() => {{
                     openContextMenu(evt.clientX, evt.clientY);
                 }}, longPressDelay);
