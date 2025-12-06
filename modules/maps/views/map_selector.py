@@ -232,6 +232,12 @@ def _on_display_map(self, entity_type, map_name): # entity_type here is the map'
         pass
     setattr(self, "_video_bg_player", None)
 
+    rotation_raw = item.get("rotation_degrees", 0)
+    try:
+        self.base_rotation_degrees = float(rotation_raw) % 360
+    except Exception:
+        self.base_rotation_degrees = 0.0
+
     # 2) Tear down any existing UI & build toolbar + canvas
     # Reset any canvas/image bookkeeping so the new canvas does not try to
     # reuse stale ids from a previously opened map (which can happen when
@@ -291,9 +297,9 @@ def _on_display_map(self, entity_type, map_name): # entity_type here is the map'
                 messagebox.showerror(
                     "Map Image Missing",
                     f"The map image for '{map_name}' could not be found."
-                )
-                self.base_img = Image.new("RGBA", (1280, 720), (0, 0, 0, 255))
-            self._video_bg_player = None
+            )
+            self.base_img = Image.new("RGBA", (1280, 720), (0, 0, 0, 255))
+        self._video_bg_player = None
     else:
         try:
             self.base_img = Image.open(full_image_path).convert("RGBA")
@@ -303,6 +309,15 @@ def _on_display_map(self, entity_type, map_name): # entity_type here is the map'
                 f"The map image for '{map_name}' could not be found."
             )
             self.base_img = Image.new("RGBA", (1280, 720), (0, 0, 0, 255))
+
+    try:
+        self._apply_base_rotation()
+    except Exception:
+        log_warning(
+            "Failed to apply stored map rotation; continuing with unrotated base image.",
+            func_name="map_selector._on_display_map",
+        )
+
     mask_path = (item.get("FogMaskPath") or "").strip()
     full_mask_path = _resolve_campaign_path(mask_path) if mask_path else ""
     if mask_path and os.path.isfile(full_mask_path):
