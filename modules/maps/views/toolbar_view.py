@@ -83,6 +83,7 @@ def _build_toolbar(self):
         "reset": self.load_icon("assets/icons/full.png",     (48,48)),
         "save":  self.load_icon("assets/icons/save.png",     (48,48)),
         "fs":    self.load_icon("assets/icons/expand.png",   (48,48)),
+        "rotate":    self.load_icon("assets/icons/expand.png",   (48,48)),
         "npc":   self.load_icon("assets/icons/npc.png",      (48,48)),
         "creat": self.load_icon("assets/icons/creature.png", (48,48)),
         "pc":    self.load_icon("assets/icons/pc.png",       (48,48)),
@@ -326,6 +327,12 @@ def _build_toolbar(self):
     display_section = _create_collapsible_section(toolbar, "Display")
     display_actions = [
         {"key": "save", "icon": icons["save"], "tooltip": "Save Map", "command": self.save_map},
+        {
+            "key": "rotate_right",
+            "icon": icons["rotate"],
+            "tooltip": "Rotate Map 90° Right",
+            "command": self.rotate_map_background_right,
+        },
         {"key": "fullscreen", "icon": icons["fs"], "tooltip": "Fullscreen", "command": self.open_fullscreen},
         {"key": "web", "icon": icons["fs"], "tooltip": "Web Display", "command": self.open_web_display},
         {"key": "chatbot", "icon": icons["chatbot"], "tooltip": "Chatbot", "command": self.open_chatbot_assistant},
