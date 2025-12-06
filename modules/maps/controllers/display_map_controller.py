@@ -4910,6 +4910,29 @@ class DisplayMapController:
         if self.mask_img: self.mask_img.save(abs_mask_path, format="PNG")
         else: print("Warning: No fog mask image to save.")
         self.current_map["FogMaskPath"] = rel_mask_path; self._persist_tokens()
+
+        image_path = (self.current_map.get("Image") or "").strip()
+        abs_image_path = _resolve_campaign_path(image_path)
+        if (
+            abs_image_path
+            and getattr(self, "base_img", None) is not None
+            and not getattr(self, "_video_bg_player", None)
+        ):
+            try:
+                Path(abs_image_path).parent.mkdir(parents=True, exist_ok=True)
+                save_kwargs = {}
+                suffix = Path(abs_image_path).suffix.lower()
+                if suffix in {".jpg", ".jpeg"}:
+                    save_kwargs["format"] = "JPEG"
+                elif suffix == ".png":
+                    save_kwargs["format"] = "PNG"
+                self.base_img.save(abs_image_path, **save_kwargs)
+                self.current_map["Image"] = _campaign_relative_path(abs_image_path)
+            except Exception as exc:
+                log_warning(
+                    f"Failed to persist rotated base image: {exc}",
+                    func_name="DisplayMapController.save_map",
+                )
         self.current_map.update({
             "token_size": self.token_size,
             "pan_x": self.pan_x,
