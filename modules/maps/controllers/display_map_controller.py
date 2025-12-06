@@ -306,6 +306,51 @@ class DisplayMapController:
         except Exception:
             pass
 
+    def rotate_map_background_right(self):
+        """Rotate the loaded map background clockwise by 90 degrees."""
+        if getattr(self, "_video_bg_player", None):
+            log_warning(
+                "Rotation is currently unavailable while a video background is active.",
+                func_name="DisplayMapController.rotate_map_background_right",
+            )
+            messagebox.showwarning(
+                "Unavailable",
+                "Rotate is unavailable while a video background is playing.",
+            )
+            return
+
+        base_image = getattr(self, "base_img", None)
+        if base_image is None:
+            log_warning(
+                "Rotate requested without an active base image.",
+                func_name="DisplayMapController.rotate_map_background_right",
+            )
+            return
+
+        try:
+            rotated_base = base_image.transpose(Image.Transpose.ROTATE_270)
+        except Exception as exc:
+            log_warning(
+                f"Failed to rotate base image: {exc}",
+                func_name="DisplayMapController.rotate_map_background_right",
+            )
+            return
+
+        self.base_img = rotated_base
+
+        if getattr(self, "mask_img", None) is not None:
+            try:
+                self.mask_img = self.mask_img.transpose(Image.Transpose.ROTATE_270)
+            except Exception as exc:
+                log_warning(
+                    f"Failed to rotate fog mask: {exc}",
+                    func_name="DisplayMapController.rotate_map_background_right",
+                )
+                self.mask_img = Image.new("RGBA", self.base_img.size, (0, 0, 0, 128))
+
+        self._fit_initialized = False
+        self._apply_fit_mode()
+
     def _set_selection(self, items):
         """Centralised helper to assign the current selection list."""
         unique_items = []
