@@ -143,6 +143,8 @@ class DisplayMapController:
         self._selection_overlays = {}
         self._selection_icon_cache = {}
         self.clipboard_token = None # Copied item data (token or shape)
+
+        self.base_rotation_degrees = 0.0
     
         self.brush_size  = DEFAULT_BRUSH_SIZE
         self.brush_size_options = list(range(4, 129, 4))
@@ -337,6 +339,10 @@ class DisplayMapController:
             return
 
         self.base_img = rotated_base
+        self.base_rotation_degrees = (getattr(self, "base_rotation_degrees", 0) or 0) + 90
+        self.base_rotation_degrees = self.base_rotation_degrees % 360
+        if isinstance(getattr(self, "current_map", None), dict):
+            self.current_map["rotation_degrees"] = self.base_rotation_degrees
 
         if getattr(self, "mask_img", None) is not None:
             try:
@@ -350,6 +356,38 @@ class DisplayMapController:
 
         self._fit_initialized = False
         self._apply_fit_mode()
+
+    def _apply_base_rotation(self):
+        """Rotate the in-memory base image according to stored metadata."""
+        rotation_raw = getattr(self, "base_rotation_degrees", 0) or 0
+        try:
+            rotation = float(rotation_raw) % 360
+        except Exception:
+            rotation = 0.0
+
+        self.base_rotation_degrees = rotation
+
+        if rotation == 0:
+            return
+
+        if getattr(self, "_video_bg_player", None):
+            return
+
+        base_image = getattr(self, "base_img", None)
+        if base_image is None:
+            return
+
+        if rotation % 90 == 0:
+            steps = int((rotation // 90) % 4)
+            for _ in range(steps):
+                base_image = base_image.transpose(Image.Transpose.ROTATE_270)
+            self.base_img = base_image
+            return
+
+        try:
+            self.base_img = base_image.rotate(-rotation, expand=True)
+        except Exception:
+            self.base_img = base_image
 
     def _set_selection(self, items):
         """Centralised helper to assign the current selection list."""
@@ -4910,34 +4948,12 @@ class DisplayMapController:
         if self.mask_img: self.mask_img.save(abs_mask_path, format="PNG")
         else: print("Warning: No fog mask image to save.")
         self.current_map["FogMaskPath"] = rel_mask_path; self._persist_tokens()
-
-        image_path = (self.current_map.get("Image") or "").strip()
-        abs_image_path = _resolve_campaign_path(image_path)
-        if (
-            abs_image_path
-            and getattr(self, "base_img", None) is not None
-            and not getattr(self, "_video_bg_player", None)
-        ):
-            try:
-                Path(abs_image_path).parent.mkdir(parents=True, exist_ok=True)
-                save_kwargs = {}
-                suffix = Path(abs_image_path).suffix.lower()
-                if suffix in {".jpg", ".jpeg"}:
-                    save_kwargs["format"] = "JPEG"
-                elif suffix == ".png":
-                    save_kwargs["format"] = "PNG"
-                self.base_img.save(abs_image_path, **save_kwargs)
-                self.current_map["Image"] = _campaign_relative_path(abs_image_path)
-            except Exception as exc:
-                log_warning(
-                    f"Failed to persist rotated base image: {exc}",
-                    func_name="DisplayMapController.save_map",
-                )
         self.current_map.update({
             "token_size": self.token_size,
             "pan_x": self.pan_x,
             "pan_y": self.pan_y,
             "zoom": self.zoom,
+            "rotation_degrees": getattr(self, "base_rotation_degrees", 0) or 0,
             "hover_font_size": getattr(self, "hover_font_size", 14)
         })
         all_maps = list(self._maps.values()); self.maps.save_items(all_maps)
