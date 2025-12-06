@@ -83,7 +83,7 @@ def _build_toolbar(self):
         "reset": self.load_icon("assets/icons/full.png",     (48,48)),
         "save":  self.load_icon("assets/icons/save.png",     (48,48)),
         "fs":    self.load_icon("assets/icons/expand.png",   (48,48)),
-        "rotate":    self.load_icon("assets/icons/expand.png",   (48,48)),
+        "rotate":    self.load_icon("assets/icons/turn_background_icon.png",   (48,48)),
         "npc":   self.load_icon("assets/icons/npc.png",      (48,48)),
         "creat": self.load_icon("assets/icons/creature.png", (48,48)),
         "pc":    self.load_icon("assets/icons/pc.png",       (48,48)),
