@@ -45,6 +45,40 @@ def _campaign_relative_path(path: str) -> str:
     return relative.replace(os.sep, "/")
 
 
+@lru_cache(maxsize=64)
+def _find_existing_map_image(original_path: str) -> str:
+    """Attempt to locate a missing map background within the campaign."""
+
+    if not original_path:
+        return ""
+
+    campaign_dir = ConfigHelper.get_campaign_dir()
+    normalized = os.path.normpath(str(original_path))
+
+    if os.path.isabs(normalized) and os.path.exists(normalized):
+        return normalized
+
+    joined_candidate = os.path.normpath(os.path.join(campaign_dir, normalized))
+    if os.path.exists(joined_candidate):
+        return joined_candidate
+
+    filename = os.path.basename(normalized)
+    if not filename:
+        return ""
+
+    assets_root = os.path.join(campaign_dir, "assets")
+    search_roots = [assets_root, campaign_dir]
+
+    for root in search_roots:
+        if not os.path.isdir(root):
+            continue
+        for current_root, _, files in os.walk(root):
+            if filename in files:
+                return os.path.join(current_root, filename)
+
+    return ""
+
+
 @lru_cache(maxsize=1)
 def _default_token_image_path() -> str:
     """Locate the default pin image shipped with the application."""
@@ -223,6 +257,22 @@ def _on_display_map(self, entity_type, map_name): # entity_type here is the map'
     # 3) Load base image + fog mask (supports static image or video)
     image_path = (item.get("Image", "") or "").strip()
     full_image_path = _resolve_campaign_path(image_path)
+    map_normalized = False
+
+    if image_path and (not full_image_path or not os.path.isfile(full_image_path)):
+        fallback_image_path = _find_existing_map_image(image_path)
+        if fallback_image_path and os.path.isfile(fallback_image_path):
+            log_info(
+                f"Recovered missing map image for '{map_name}' from '{fallback_image_path}'.",
+                func_name="map_selector._on_display_map",
+            )
+            full_image_path = fallback_image_path
+            new_storage_path = _campaign_relative_path(fallback_image_path)
+            if new_storage_path != image_path:
+                item["Image"] = new_storage_path
+                if getattr(self, "current_map", None) is item:
+                    self.current_map["Image"] = new_storage_path
+                map_normalized = True
     self._video_current_frame_pil = None
     if full_image_path and os.path.isfile(full_image_path) and is_video_path(full_image_path):
         try:
@@ -550,6 +600,15 @@ def _on_display_map(self, entity_type, map_name): # entity_type here is the map'
             self._persist_tokens()
         except Exception as exc:
             print(f"[_on_display_map] Failed to persist normalized token data: {exc}")
+
+    if map_normalized:
+        try:
+            self.maps.save_items(list(self._maps.values()))
+        except Exception as exc:
+            log_warning(
+                f"Failed to persist normalized map image path: {exc}",
+                func_name="map_selector._on_display_map",
+            )
 
     # 8) Hydrate token metadata for info card display (ONLY FOR TOKENS)
     for current_item in self.tokens:
