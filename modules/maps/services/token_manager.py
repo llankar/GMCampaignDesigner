@@ -782,22 +782,23 @@ def _persist_tokens(self):
         return
 
     try:
-        all_maps_snapshot = []
-        for m in self._maps.values():
-            try:
-                snapshot = copy.deepcopy(m)
-            except Exception:
-                snapshot = dict(m)
-            all_maps_snapshot.append(snapshot)
+        maps_for_snapshot = list(self._maps.values())
     except Exception as snapshot_error:
         lock.release()
-        print(f"[persist_tokens] Snapshot error: {snapshot_error}")
+        print(f"[persist_tokens] Snapshot selection error: {snapshot_error}")
         return
 
-    # 2) Fire‐and‐forget the actual disk write so the UI never blocks
+    # 2) Fire‐and‐forget the deep copy + disk write so the UI never blocks
 
     def _write_maps():
         try:
+            all_maps_snapshot = []
+            for m in maps_for_snapshot:
+                try:
+                    snapshot = copy.deepcopy(m)
+                except Exception:
+                    snapshot = dict(m)
+                all_maps_snapshot.append(snapshot)
             self.maps.save_items(all_maps_snapshot)
         except Exception as e:
             print(f"[persist_tokens] Background save error: {e}")
