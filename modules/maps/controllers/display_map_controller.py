@@ -42,7 +42,13 @@ from modules.maps.services.token_manager import (
     _extract_entity_defense_value,
 )  # Keep this if it's used by other token_manager functions not moved
 from modules.maps.views.fullscreen_view import open_fullscreen, _update_fullscreen_map
-from modules.maps.views.web_display_view import open_web_display, _update_web_display_map, close_web_display
+from modules.maps.views.web_display_view import (
+    close_web_display,
+    open_web_display,
+    _describe_remote_tokens,
+    _update_web_display_map,
+    _web_render_geometry,
+)
 from modules.maps.services.entity_picker_service import (
     open_entity_picker,
     on_entity_selected,
@@ -5261,6 +5267,8 @@ class DisplayMapController:
     _show_token_menu = _show_token_menu # Token-specific context menu
     _update_fullscreen_map = _update_fullscreen_map
     _update_web_display_map = _update_web_display_map
+    _web_render_geometry = _web_render_geometry
+    _describe_remote_tokens = _describe_remote_tokens
     add_token = add_token # For adding new entity tokens
     clear_fog = clear_fog
     load_icon = load_icon
@@ -5440,9 +5448,117 @@ class DisplayMapController:
         print(f"[DEBUG] Handle Release: Item {item.get('canvas_ids')}")
         self._persist_tokens()
         self._active_resize_handle_info = None # Clear active resize operation
-        
+
         # Ensure handles are correctly redrawn for the item that was just resized,
         # if it's still the one in graphical edit mode.
         if item == self._graphical_edit_mode_item:
             self._draw_resize_handles(item)
     # Removed _on_shape_double_click as it's no longer the trigger
+
+    # --- Remote edit handlers ---
+    def _iter_pc_tokens(self):
+        for token in getattr(self, "tokens", []) or []:
+            if str(token.get("type", "token")).lower() != "token":
+                continue
+            if str(token.get("entity_type", "")).upper() != "PC":
+                continue
+            yield token
+
+    def _remote_checkpoint(self):
+        history = getattr(self, "_history", None)
+        if history and hasattr(history, "checkpoint"):
+            try:
+                history.checkpoint(self.tokens)
+            except Exception:
+                pass
+
+    def handle_remote_token_move(self, token_id: str, position):
+        try:
+            x, y = float(position[0]), float(position[1])
+        except Exception:
+            raise ValueError("position must include numeric x and y")
+
+        matched = None
+        for token in self._iter_pc_tokens():
+            remote_id = token.get("remote_id") or token.get("entity_id")
+            if remote_id and str(remote_id) == str(token_id):
+                matched = token
+                break
+        if matched is None:
+            raise ValueError("token_id does not reference a PC token")
+
+        matched["position"] = (x, y)
+        self._remote_checkpoint()
+        try:
+            self._update_canvas_images()
+        except Exception:
+            pass
+        _update_web_display_map(self)
+        try:
+            self._persist_tokens()
+        except Exception:
+            pass
+
+    def handle_remote_stroke(self, *, points, color: str, width: float):
+        processed = []
+        for pt in points:
+            try:
+                px, py = float(pt[0]), float(pt[1])
+            except Exception:
+                continue
+            processed.append((px, py))
+        if len(processed) < 2:
+            raise ValueError("At least two valid points are required")
+        stroke = {
+            "type": "whiteboard",
+            "position": processed[0],
+            "points": processed,
+            "color": color,
+            "width": max(1.0, float(width)),
+        }
+        self.tokens.append(stroke)
+        self._remote_checkpoint()
+        try:
+            self._update_canvas_images()
+        except Exception:
+            pass
+        _update_web_display_map(self)
+        try:
+            self._persist_tokens()
+        except Exception:
+            pass
+
+    def handle_remote_text(self, *, text: str, position, color: str, size: float, text_id: str | None = None):
+        try:
+            x, y = float(position[0]), float(position[1])
+        except Exception:
+            raise ValueError("position must include numeric x and y")
+        size = max(6.0, float(size))
+        target = None
+        if text_id:
+            for item in getattr(self, "tokens", []) or []:
+                if item.get("type") == "text" and str(item.get("text_id")) == str(text_id):
+                    target = item
+                    break
+        if target is None:
+            target = {
+                "type": "text",
+                "text_id": text_id or f"text-{len(self.tokens)}",
+            }
+            self.tokens.append(target)
+        target.update({
+            "text": text,
+            "position": (x, y),
+            "color": color,
+            "text_size": size,
+        })
+        self._remote_checkpoint()
+        try:
+            self._update_canvas_images()
+        except Exception:
+            pass
+        _update_web_display_map(self)
+        try:
+            self._persist_tokens()
+        except Exception:
+            pass
