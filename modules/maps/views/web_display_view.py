@@ -4,7 +4,7 @@ import threading
 import time
 from pathlib import Path
 
-from flask import Flask, Response, render_template_string, request
+from flask import Flask, Response, render_template_string, request, send_from_directory
 from werkzeug.serving import make_server
 from PIL import Image, ImageDraw
 from modules.helpers.config_helper import ConfigHelper
@@ -28,6 +28,7 @@ def open_web_display(self, port=None):
         static_folder=str(static_dir),
         static_url_path="/static",
     )
+    _favicon_path = static_dir / "favicon.ico"
     self._web_port = port
     try:
         map_token_raw = str(ConfigHelper.get("MapServer", "gm_token", fallback="") or "")
@@ -94,6 +95,12 @@ def open_web_display(self, port=None):
         </body>
         </html>
         """
+
+    @self._web_app.route('/favicon.ico')
+    def favicon():
+        if _favicon_path.exists():
+            return send_from_directory(static_dir, 'favicon.ico')
+        return ('', 204)
 
     @self._web_app.route('/player')
     def player():
