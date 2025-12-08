@@ -1,13 +1,17 @@
 import io
-import threading
 import logging
+import threading
 import time
-from flask import Flask, Response
+from pathlib import Path
+
+from flask import Flask, Response, render_template_string, request
 from werkzeug.serving import make_server
 from PIL import Image, ImageDraw
 from modules.helpers.config_helper import ConfigHelper
 from modules.helpers.logging_helper import log_module_import
+from modules.whiteboard.utils.remote_access_guard import RemoteAccessGuard
 from modules.maps.utils.text_items import TextFontCache
+from modules.maps.views.web_map_api import register_map_api
 
 log_module_import(__name__)
 
@@ -18,8 +22,26 @@ def open_web_display(self, port=None):
         port = int(ConfigHelper.get("MapServer", "map_port", fallback=32000))
     if getattr(self, '_web_server_thread', None):
         return  # already running
-    self._web_app = Flask(__name__)
+    static_dir = Path(__file__).resolve().parents[3] / "static"
+    self._web_app = Flask(
+        __name__,
+        static_folder=str(static_dir),
+        static_url_path="/static",
+    )
     self._web_port = port
+    try:
+        map_token_raw = str(ConfigHelper.get("MapServer", "gm_token", fallback="") or "")
+    except Exception:
+        map_token_raw = ""
+    try:
+        edit_enabled_raw = str(ConfigHelper.get("MapServer", "remote_edit_enabled", fallback="0") or "")
+        edit_enabled = edit_enabled_raw.strip().lower() in ("1", "true", "yes", "on")
+    except Exception:
+        edit_enabled = False
+    self._map_remote_access_guard = RemoteAccessGuard(
+        enabled=edit_enabled,
+        token=map_token_raw,
+    )
 
     controller = self
     # Polling interval for clients, in milliseconds (lower = smoother, higher = less CPU)
@@ -33,6 +55,8 @@ def open_web_display(self, port=None):
         self._web_use_mjpeg = use_mjpeg_raw.strip().lower() in ("1", "true", "yes", "y", "on")
     except Exception:
         self._web_use_mjpeg = True
+
+    register_map_api(self._web_app, controller=self, access_guard=self._map_remote_access_guard)
 
     @self._web_app.route('/')
     def index():
@@ -70,6 +94,47 @@ def open_web_display(self, port=None):
         </body>
         </html>
         """
+
+    @self._web_app.route('/player')
+    def player():
+        token_param = request.args.get('token', '')
+        return render_template_string(
+            """
+            <!DOCTYPE html>
+            <html lang='en'>
+            <head>
+                <meta charset='utf-8'>
+                <meta name='viewport' content='width=device-width, initial-scale=1'>
+                <title>Remote Map</title>
+                <link rel="preload" href="{{ script_path }}" as="script">
+                <style>
+                    html, body { margin: 0; padding: 0; height: 100%; }
+                    body { background: #0f172a; color: #e2e8f0; font-family: 'Segoe UI', Tahoma, sans-serif; }
+                    #mapStage { position: relative; width: 100%; height: 100%; overflow: hidden; }
+                    #mapImage { width: 100%; height: 100%; object-fit: contain; background: #0b1220; }
+                    #tokenLayer { position: absolute; inset: 0; pointer-events: none; }
+                    .token { position: absolute; width: 48px; height: 48px; border-radius: 12px; background: rgba(14,165,233,0.85); border: 2px solid rgba(255,255,255,0.8); color: #0b1220; font-weight: 800; display: grid; place-items: center; pointer-events: auto; touch-action: none; box-shadow: 0 10px 25px rgba(0,0,0,0.35); }
+                    #drawLayer { position: absolute; inset: 0; pointer-events: auto; touch-action: none; }
+                    #status { position: fixed; bottom: 12px; left: 12px; padding: 10px 12px; background: rgba(15,23,42,0.9); border-radius: 10px; box-shadow: 0 10px 25px rgba(0,0,0,0.35); font-weight: 700; }
+                </style>
+            </head>
+            <body>
+                <div id='mapStage'>
+                    <img id='mapImage' src='/map.png' alt='Map'>
+                    <canvas id='drawLayer'></canvas>
+                    <div id='tokenLayer'></div>
+                    <div id='status'>Connecting…</div>
+                </div>
+                <script>
+                    window.MAP_REMOTE_TOKEN = {{ token|tojson }};
+                </script>
+                <script src='{{ script_path }}' defer></script>
+            </body>
+            </html>
+            """,
+            token=token_param,
+            script_path='/static/maptool_web/player.js'
+        )
 
     @self._web_app.route('/map.png')
     def map_png():
@@ -165,6 +230,68 @@ def open_web_display(self, port=None):
     self._web_server_thread.start()
 
 
+def _web_render_geometry(self):
+    base = getattr(self, '_video_current_frame_pil', None) or getattr(self, 'base_img', None)
+    if base is None:
+        base_size = (1920, 1080)
+    else:
+        base_size = base.size
+    zoom = float(getattr(self, 'zoom', 1.0))
+    pan_x = float(getattr(self, 'pan_x', 0.0))
+    pan_y = float(getattr(self, 'pan_y', 0.0))
+    sw, sh = int(base_size[0] * zoom), int(base_size[1] * zoom)
+    x0, y0 = int(pan_x), int(pan_y)
+    min_x, min_y = min(0, x0), min(0, y0)
+    max_x, max_y = max(sw, x0 + sw), max(sh, y0 + sh)
+    width, height = max_x - min_x, max_y - min_y
+    self._web_view_size = (width, height)
+    self._web_view_origin = (min_x, min_y)
+    self._web_base_size = base_size
+    return (width, height), (min_x, min_y), base_size
+
+
+def _describe_remote_tokens(self, render_offset=None):
+    if render_offset is None:
+        _, render_offset, _ = _web_render_geometry(self)
+    min_x, min_y = render_offset
+    zoom = float(getattr(self, 'zoom', 1.0))
+    pan_x = float(getattr(self, 'pan_x', 0.0))
+    pan_y = float(getattr(self, 'pan_y', 0.0))
+    tokens = []
+    for idx, token in enumerate(getattr(self, 'tokens', []) or []):
+        if str(token.get('type', 'token')).lower() != 'token':
+            continue
+        if str(token.get('entity_type', '')).upper() != 'PC':
+            continue
+        remote_id = token.get('remote_id') or f"pc-{idx}-{token.get('entity_id') or token.get('entity_type') or 'token'}"
+        token['remote_id'] = remote_id
+        pos = token.get('position') or (0.0, 0.0)
+        try:
+            pos_x, pos_y = float(pos[0]), float(pos[1])
+        except Exception:
+            pos_x, pos_y = 0.0, 0.0
+        size_px = token.get('size', getattr(self, 'token_size', 64))
+        try:
+            size_px = float(size_px)
+        except Exception:
+            size_px = float(getattr(self, 'token_size', 64))
+        screen_x = float(pos_x * zoom + pan_x - min_x)
+        screen_y = float(pos_y * zoom + pan_y - min_y)
+        tokens.append(
+            {
+                'id': remote_id,
+                'entity_id': str(token.get('entity_id') or ""),
+                'label': str(token.get('entity_id') or token.get('entity_type') or 'PC'),
+                'position': [pos_x, pos_y],
+                'screen_position': [screen_x, screen_y],
+                'size': size_px,
+                'screen_size': size_px * zoom,
+                'border_color': token.get('border_color', '#0ea5e9'),
+            }
+        )
+    return tokens
+
+
 def _render_map_image(self):
     base = getattr(self, '_video_current_frame_pil', None) or getattr(self, 'base_img', None)
     if not base:
@@ -173,12 +300,9 @@ def _render_map_image(self):
         base = base.copy()
     except Exception:
         pass
-    w, h = base.size
-    sw, sh = int(w * self.zoom), int(h * self.zoom)
+    (width, height), (min_x, min_y), base_size = _web_render_geometry(self)
+    sw, sh = int(base_size[0] * self.zoom), int(base_size[1] * self.zoom)
     x0, y0 = int(self.pan_x), int(self.pan_y)
-    min_x, min_y = min(0, x0), min(0, y0)
-    max_x, max_y = max(sw, x0 + sw), max(sh, y0 + sh)
-    width, height = max_x - min_x, max_y - min_y
     img = Image.new('RGBA', (width, height), (0, 0, 0, 255))
     base_resized = base.resize((sw, sh), Image.LANCZOS)
     img.paste(base_resized, (x0 - min_x, y0 - min_y))
