@@ -119,7 +119,7 @@ def open_web_display(self, port=None):
                     body { background: #0f172a; color: #e2e8f0; font-family: 'Segoe UI', Tahoma, sans-serif; }
                     #mapStage { position: relative; width: 100%; height: 100%; overflow: hidden; }
                     #mapImage { width: 100%; height: 100%; object-fit: contain; background: #0b1220; }
-                    #tokenLayer { position: absolute; inset: 0; pointer-events: none; }
+                    #tokenLayer { position: absolute; inset: 0; pointer-events: auto; }
                     .token { position: absolute; width: 48px; height: 48px; border-radius: 12px; background: rgba(14,165,233,0.85); border: 2px solid rgba(255,255,255,0.8); color: #0b1220; font-weight: 800; display: grid; place-items: center; pointer-events: auto; touch-action: none; box-shadow: 0 10px 25px rgba(0,0,0,0.35); }
                     #drawLayer { position: absolute; inset: 0; pointer-events: auto; touch-action: none; }
                     #status { position: fixed; bottom: 12px; left: 12px; padding: 10px 12px; background: rgba(15,23,42,0.9); border-radius: 10px; box-shadow: 0 10px 25px rgba(0,0,0,0.35); font-weight: 700; }
