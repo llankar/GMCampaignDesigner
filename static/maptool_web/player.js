@@ -54,6 +54,7 @@
       const el = document.createElement('div');
       el.className = 'token';
       el.textContent = token.label || 'PC';
+      el.draggable = false;
       const screenX = (token.screen_position?.[0] || 0) / scaleX;
       const screenY = (token.screen_position?.[1] || 0) / scaleY;
       const size = (token.screen_size || 48) / Math.max(scaleX, scaleY);
@@ -178,6 +179,8 @@
 
   mapImg.addEventListener('load', ensureCanvasSize);
   window.addEventListener('resize', ensureCanvasSize);
+  mapImg.addEventListener('dragstart', (ev) => ev.preventDefault());
+  tokenLayer.addEventListener('dragstart', (ev) => ev.preventDefault());
 
   drawLayer.addEventListener('pointerdown', (ev) => {
     if (ev.pointerType === 'pen' || ev.pointerType === 'touch') {
