@@ -318,6 +318,12 @@ class GenericListView(ctk.CTkFrame):
         )
         self.grid_container.pack(fill="both", expand=True, padx=5, pady=5)
         self.grid_images = []
+        self.grid_image_cache = {}
+        self._grid_render_job = None
+        self._grid_loading_frame = None
+        self._grid_loading_bar = None
+        self._grid_render_threshold = 150
+        self._grid_batch_delay_ms = 40
 
         self.shelf_view = None
         if self.model_wrapper.entity_type == "objects":
@@ -593,6 +599,7 @@ class GenericListView(ctk.CTkFrame):
             return
         self.view_mode = "list"
         self._show_search_frame()
+        self._cancel_grid_render()
         self.grid_frame.pack_forget()
         self.tree_frame.pack(
             fill="both", expand=True, padx=5, pady=5, before=self.footer_frame
@@ -609,6 +616,7 @@ class GenericListView(ctk.CTkFrame):
             return
         self.view_mode = "shelf"
         self._hide_search_frame()
+        self._cancel_grid_render()
         self.tree_frame.pack_forget()
         self.grid_frame.pack_forget()
         self.shelf_view.show(before_widget=self.footer_frame)
@@ -618,90 +626,180 @@ class GenericListView(ctk.CTkFrame):
         self.update_entity_count()
         self._update_view_toggle_state()
 
+    def _cancel_grid_render(self):
+        if self._grid_render_job:
+            try:
+                self.after_cancel(self._grid_render_job)
+            except Exception:
+                pass
+        self._grid_render_job = None
+
+    def _show_grid_loading_indicator(self, row, columns):
+        if self._grid_loading_frame is None or not self._grid_loading_frame.winfo_exists():
+            self._grid_loading_frame = ctk.CTkFrame(self.grid_container, fg_color="#2B2B2B")
+            self._grid_loading_bar = ctk.CTkProgressBar(
+                self._grid_loading_frame, mode="indeterminate", width=200
+            )
+            self._grid_loading_bar.pack(fill="x", padx=10, pady=(5, 0))
+            self._grid_loading_bar.start()
+            ctk.CTkLabel(
+                self._grid_loading_frame,
+                text="Loading more...",
+                font=("Segoe UI", 11, "bold"),
+                justify="center",
+            ).pack(fill="x", padx=10, pady=(0, 5))
+        self._grid_loading_frame.grid(
+            row=row,
+            column=0,
+            columnspan=columns,
+            padx=10,
+            pady=10,
+            sticky="ew",
+        )
+
+    def _hide_grid_loading_indicator(self):
+        if self._grid_loading_bar and self._grid_loading_bar.winfo_exists():
+            try:
+                self._grid_loading_bar.stop()
+            except Exception:
+                pass
+        if self._grid_loading_frame and self._grid_loading_frame.winfo_exists():
+            self._grid_loading_frame.destroy()
+        self._grid_loading_frame = None
+        self._grid_loading_bar = None
+
+    def _calculate_grid_batch_size(self, total):
+        if total > 800:
+            return 90
+        if total > 500:
+            return 70
+        if total > 300:
+            return 60
+        if total > 150:
+            return 50
+        return total or 1
+
+    def _create_grid_card(self, item, row, col):
+        card = ctk.CTkFrame(
+            self.grid_container,
+            corner_radius=8,
+            fg_color="#1E1E1E",
+            border_width=1,
+            border_color="#1E1E1E",
+        )
+        card.grid(row=row, column=col, padx=10, pady=10, sticky="nsew")
+        image = self._load_grid_image(item)
+        image_label = ctk.CTkLabel(card, text="", image=image)
+        image_label.grid(row=0, column=0, padx=10, pady=(10, 5))
+        name = self.clean_value(item.get(self.unique_field, "")) or "Unnamed"
+        name_label = ctk.CTkLabel(card, text=name, justify="center", wraplength=160)
+        name_label.grid(row=1, column=0, padx=10, pady=(0, 10))
+
+        def bind_open(widget):
+            widget.bind(
+                "<Double-Button-1>",
+                lambda e, it=item: self.open_book(it)
+                if self.model_wrapper.entity_type == "books"
+                else self._edit_item(it),
+            )
+
+        bind_open(image_label)
+        bind_open(card)
+        bind_open(name_label)
+
+        def bind_select(widget):
+            widget.bind("<Button-1>", lambda e, it=item: self.on_grid_click(e, it))
+
+        bind_select(image_label)
+        bind_select(card)
+        bind_select(name_label)
+        if self.model_wrapper.entity_type == "books":
+            summary = self._summarize_book_excerpts(item)
+            if summary:
+                summary_label = ctk.CTkLabel(
+                    card,
+                    text=summary,
+                    justify="center",
+                    wraplength=160,
+                    font=("Segoe UI", 10),
+                )
+                summary_label.grid(row=2, column=0, padx=10, pady=(0, 5))
+                bind_select(summary_label)
+                bind_open(summary_label)
+                excerpt_button = ctk.CTkButton(
+                    card,
+                    text="Open Excerpts",
+                    width=140,
+                    command=lambda it=item, widget=card: self._show_book_excerpts_menu(it, widget),
+                )
+                excerpt_button.grid(row=3, column=0, padx=10, pady=(0, 10))
+            else:
+                hint_label = ctk.CTkLabel(
+                    card,
+                    text="No excerpts",
+                    font=("Segoe UI", 9, "italic"),
+                )
+                hint_label.grid(row=2, column=0, padx=10, pady=(0, 10))
+                bind_select(hint_label)
+                bind_open(hint_label)
+        base_id = self._get_base_id(item)
+        if base_id:
+            self.grid_cards.append({"base_id": base_id, "card": card})
+        return card
+
+    def _render_grid_batch(self):
+        if not hasattr(self, "grid_container"):
+            return
+        total = len(self.filtered_items)
+        if total == 0:
+            self._hide_grid_loading_indicator()
+            return
+        start = getattr(self, "_grid_batch_index", 0)
+        if start >= total:
+            self._hide_grid_loading_indicator()
+            return
+        end = min(start + getattr(self, "_grid_batch_size", total), total)
+        columns = getattr(self, "_grid_columns", 4)
+        for idx in range(start, end):
+            item = self.filtered_items[idx]
+            row, col = divmod(idx, columns)
+            self._create_grid_card(item, row, col)
+        self._grid_batch_index = end
+        self._refresh_grid_selection()
+        if end < total and getattr(self, "_grid_use_batches", False):
+            next_row = (end + columns - 1) // columns
+            self._show_grid_loading_indicator(next_row, columns)
+            self._grid_render_job = self.after(self._grid_batch_delay_ms, self._render_grid_batch)
+        else:
+            self._grid_render_job = None
+            self._hide_grid_loading_indicator()
+
     def populate_grid(self):
         if not hasattr(self, "grid_container"):
             return
+        self._cancel_grid_render()
         for child in self.grid_container.winfo_children():
             child.destroy()
         self.grid_images.clear()
         self.grid_cards = []
-        columns = 4
-        for col in range(columns):
+        self._grid_batch_index = 0
+        self._grid_columns = 4
+        for col in range(self._grid_columns):
             self.grid_container.grid_columnconfigure(col, weight=1)
         if not self.filtered_items:
+            self._hide_grid_loading_indicator()
             ctk.CTkLabel(self.grid_container, text="No entities to display").grid(
                 row=0, column=0, padx=10, pady=10, sticky="w"
             )
             return
-        for idx, item in enumerate(self.filtered_items):
-            row, col = divmod(idx, columns)
-            card = ctk.CTkFrame(
-                self.grid_container,
-                corner_radius=8,
-                fg_color="#1E1E1E",
-                border_width=1,
-                border_color="#1E1E1E",
-            )
-            card.grid(row=row, column=col, padx=10, pady=10, sticky="nsew")
-            image = self._load_grid_image(item)
-            image_label = ctk.CTkLabel(card, text="", image=image)
-            image_label.grid(row=0, column=0, padx=10, pady=(10, 5))
-            name = self.clean_value(item.get(self.unique_field, "")) or "Unnamed"
-            name_label = ctk.CTkLabel(
-                card, text=name, justify="center", wraplength=160
-            )
-            name_label.grid(row=1, column=0, padx=10, pady=(0, 10))
 
-            def bind_open(widget):
-                widget.bind(
-                    "<Double-Button-1>",
-                    lambda e, it=item: self.open_book(it)
-                    if self.model_wrapper.entity_type == "books"
-                    else self._edit_item(it),
-                )
-
-            bind_open(image_label)
-            bind_open(card)
-            bind_open(name_label)
-
-            def bind_select(widget):
-                widget.bind("<Button-1>", lambda e, it=item: self.on_grid_click(e, it))
-
-            bind_select(image_label)
-            bind_select(card)
-            bind_select(name_label)
-            if self.model_wrapper.entity_type == "books":
-                summary = self._summarize_book_excerpts(item)
-                if summary:
-                    summary_label = ctk.CTkLabel(
-                        card,
-                        text=summary,
-                        justify="center",
-                        wraplength=160,
-                        font=("Segoe UI", 10),
-                    )
-                    summary_label.grid(row=2, column=0, padx=10, pady=(0, 5))
-                    bind_select(summary_label)
-                    bind_open(summary_label)
-                    excerpt_button = ctk.CTkButton(
-                        card,
-                        text="Open Excerpts",
-                        width=140,
-                        command=lambda it=item, widget=card: self._show_book_excerpts_menu(it, widget),
-                    )
-                    excerpt_button.grid(row=3, column=0, padx=10, pady=(0, 10))
-                else:
-                    hint_label = ctk.CTkLabel(
-                        card,
-                        text="No excerpts",
-                        font=("Segoe UI", 9, "italic"),
-                    )
-                    hint_label.grid(row=2, column=0, padx=10, pady=(0, 10))
-                    bind_select(hint_label)
-                    bind_open(hint_label)
-            base_id = self._get_base_id(item)
-            if base_id:
-                self.grid_cards.append({"base_id": base_id, "card": card})
+        total = len(self.filtered_items)
+        self._grid_batch_size = self._calculate_grid_batch_size(total)
+        self._grid_use_batches = total > self._grid_render_threshold
+        if not self._grid_use_batches:
+            self._grid_batch_size = total
+        self._hide_grid_loading_indicator()
+        self._render_grid_batch()
 
     def on_grid_click(self, _event, item):
         self.toggle_item_selection(item)
@@ -764,6 +862,11 @@ class GenericListView(ctk.CTkFrame):
         if self.media_field:
             media_value = item.get(self.media_field, "")
         resolved = self._resolve_media_path(media_value)
+        cache_key = resolved or "__placeholder__"
+        cached = self.grid_image_cache.get(cache_key)
+        if cached:
+            self.grid_images.append(cached)
+            return cached
         image_obj = None
         if resolved:
             try:
@@ -775,6 +878,7 @@ class GenericListView(ctk.CTkFrame):
         if image_obj is None:
             image_obj = Image.new("RGBA", (160, 160), color="#3A3A3A")
         ctk_image = ctk.CTkImage(light_image=image_obj, size=(160, 160))
+        self.grid_image_cache[cache_key] = ctk_image
         self.grid_images.append(ctk_image)
         return ctk_image
 
