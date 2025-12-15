@@ -3402,9 +3402,19 @@ class GenericListView(ctk.CTkFrame):
     def _update_tree_selection_tags(self, selection=None):
         if not hasattr(self, "tree"):
             return
-        if selection is None:
-            selection = self.tree.selection()
-        selection_set = {iid for iid in selection if self.tree.exists(iid)}
+
+        try:
+            if not self.tree.winfo_exists():
+                return
+            if selection is None:
+                selection = self.tree.selection()
+        except tk.TclError:
+            return
+
+        try:
+            selection_set = {iid for iid in selection if self.tree.exists(iid)}
+        except tk.TclError:
+            return
         removed = self._last_tree_selection - selection_set
         added = selection_set - self._last_tree_selection
         for iid in removed:
