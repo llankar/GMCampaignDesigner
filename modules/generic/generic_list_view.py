@@ -191,8 +191,9 @@ class GenericListView(ctk.CTkFrame):
         self._ai_categorize_running = False
         self._display_queue = []
         self._next_page_start = 0
-        self._max_display_rows = 2000
-        self._page_size = 400
+        self._display_window_start = 0
+        self._max_display_rows = 40
+        self._page_size = 40
         self._group_nodes = {}
         self._pending_scroll_load = False
         self._tree_loader = None
@@ -555,12 +556,14 @@ class GenericListView(ctk.CTkFrame):
         else:
             self.batch_size = 300
             self._batch_delay_ms = 25
+        self.batch_size = min(self.batch_size, self._max_display_rows)
 
     def _reset_paging(self, total_items):
         self._display_queue = []
-        self._next_page_start = 0
+        self._display_window_start = 0
+        self._next_page_start = self._display_window_start
         self._pending_scroll_load = False
-        self._page_size = self._calculate_page_size(total_items)
+        self._page_size = min(self._calculate_page_size(total_items), self._max_display_rows)
 
     def _calculate_page_size(self, total_items):
         if total_items > 3000:
@@ -570,6 +573,26 @@ class GenericListView(ctk.CTkFrame):
         if total_items > 800:
             return 400
         return 250
+
+    def _reset_tree_for_window(self):
+        self._base_to_iids = {}
+        self._group_nodes = {}
+        if self._tree_loader:
+            self._tree_loader.reset_tree()
+        else:
+            self.tree.delete(*self.tree.get_children(""))
+        self._display_queue = []
+
+    def _shift_window_forward(self):
+        if self._display_window_start + self._max_display_rows >= len(self.filtered_items):
+            return
+        self._display_window_start = min(
+            self._display_window_start + self._page_size,
+            max(0, len(self.filtered_items) - self._max_display_rows),
+        )
+        self._next_page_start = self._display_window_start
+        self._reset_tree_for_window()
+        self._queue_next_page(reset_tree=True)
 
     def _queue_next_page(self, *, reset_tree=False):
         if not self.filtered_items or len(self._display_queue) >= self._max_display_rows:
@@ -604,6 +627,7 @@ class GenericListView(ctk.CTkFrame):
         end = min(
             self._next_page_start + self._page_size,
             self._next_page_start + remaining_display_capacity,
+            self._display_window_start + self._max_display_rows,
             len(self.filtered_items),
         )
         new_items = self.filtered_items[self._next_page_start:end]
@@ -685,7 +709,11 @@ class GenericListView(ctk.CTkFrame):
         total = len(self.filtered_items)
         overall = len(self.items)
         visible = min(len(self._display_queue), self._max_display_rows, total)
-        text = f"Displaying {visible} of {total} filtered / {overall} total entities"
+        start_idx = self._display_window_start + 1 if total else 0
+        end_idx = self._display_window_start + visible if total else 0
+        text = (
+            f"Displaying {start_idx}-{end_idx} of {total} filtered / {overall} total entities"
+        )
         self.count_label.configure(text=text)
         if self.shelf_view:
             self.shelf_view.update_summary()
@@ -701,10 +729,13 @@ class GenericListView(ctk.CTkFrame):
             pass
 
     def _can_load_more(self):
-        return (
-            self._next_page_start < len(self.filtered_items)
-            and len(self._display_queue) < self._max_display_rows
+        window_has_capacity = self._next_page_start < min(
+            len(self.filtered_items), self._display_window_start + self._max_display_rows
         )
+        more_windows_available = (
+            self._display_window_start + self._max_display_rows < len(self.filtered_items)
+        )
+        return (window_has_capacity and len(self._display_queue) < self._max_display_rows) or more_windows_available
 
     def _update_load_more_state(self):
         state = tk.NORMAL if self._can_load_more() else tk.DISABLED
@@ -712,7 +743,14 @@ class GenericListView(ctk.CTkFrame):
             self.load_more_button.configure(state=state)
 
     def _load_next_page(self, auto=False):
-        if not self._can_load_more() or self._tree_loading:
+        if self._tree_loading:
+            self._pending_scroll_load = False
+            return
+        if len(self._display_queue) >= self._max_display_rows:
+            self._shift_window_forward()
+            self._pending_scroll_load = False
+            return
+        if not self._can_load_more():
             self._pending_scroll_load = False
             return
         self._queue_next_page(reset_tree=False)
