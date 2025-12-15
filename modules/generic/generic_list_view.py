@@ -198,6 +198,7 @@ class GenericListView(ctk.CTkFrame):
         self._group_nodes = {}
         self._pending_scroll_load = False
         self._tree_loader = None
+        self._freeze_selection_changes = False
         self._tree_loading = False
         self._payload_executor = ThreadPoolExecutor(max_workers=1)
         self._payload_batch_size = 500
@@ -760,13 +761,13 @@ class GenericListView(ctk.CTkFrame):
 
     def _set_tree_loading(self, loading):
         self._tree_loading = loading
-        try:
-            if loading:
-                self.tree.state(("disabled",))
-            else:
-                self.tree.state(("!disabled",))
-        except Exception:
-            pass
+        # Keep the widget interactive during streaming updates while still
+        # avoiding mid-load selection churn.
+        self._freeze_selection_changes = bool(loading)
+        if not loading:
+            # Ensure any prior suppression is lifted even if exceptions occurred
+            # during loading.
+            self._suppress_tree_select_event = False
 
     def _can_load_more(self):
         return self._next_page_start < len(self.filtered_items)
@@ -3390,7 +3391,7 @@ class GenericListView(ctk.CTkFrame):
         self._update_tree_selection_tags(desired)
 
     def _on_tree_selection_changed(self, _event=None):
-        if self._suppress_tree_select_event:
+        if self._suppress_tree_select_event or self._freeze_selection_changes:
             return
         previous_selection = set(self._last_tree_selection)
         current_selection = self.tree.selection()
