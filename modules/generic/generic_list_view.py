@@ -200,6 +200,7 @@ class GenericListView(ctk.CTkFrame):
         self._tree_loader = None
         self._tree_loading = False
         self._payload_executor = ThreadPoolExecutor(max_workers=1)
+        self._payload_batch_size = 500
 
         # Load grouping from campaign-local settings
         cfg_grp = ConfigHelper.load_campaign_config()
@@ -559,6 +560,7 @@ class GenericListView(ctk.CTkFrame):
             self.batch_size = 300
             self._batch_delay_ms = 25
         # Allow large batches even when many rows are displayed to reduce UI churn
+        self._payload_batch_size = self._calculate_payload_batch_size(total_items)
 
     def _reset_paging(self, total_items):
         self._display_queue = []
@@ -575,6 +577,15 @@ class GenericListView(ctk.CTkFrame):
         if total_items > 800:
             return 400
         return 250
+
+    def _calculate_payload_batch_size(self, total_items):
+        if total_items > 3000:
+            return 1200
+        if total_items > 1500:
+            return 900
+        if total_items > 800:
+            return 700
+        return 500
 
     def _reset_tree_for_window(self):
         self._base_to_iids = {}
@@ -613,18 +624,31 @@ class GenericListView(ctk.CTkFrame):
         return new_items
 
     def _submit_payload_job(self, items, reset_tree):
-        def build_payloads():
-            return self._build_payloads(items)
+        def build_payload_batches():
+            batches = []
+            for start in range(0, len(items), self._payload_batch_size):
+                subset = items[start : start + self._payload_batch_size]
+                payloads = self._build_payloads(subset)
+                if payloads:
+                    batches.append(payloads)
+            return batches
 
         def on_complete(future):
             try:
-                payloads = future.result()
+                batches = future.result()
             except Exception:
-                payloads = []
-            self.after(0, lambda: self._start_tree_insertion(payloads, reset_tree))
+                batches = []
+            self.after(0, lambda: self._enqueue_payload_batches(batches, reset_tree))
 
-        future = self._payload_executor.submit(build_payloads)
+        future = self._payload_executor.submit(build_payload_batches)
         future.add_done_callback(on_complete)
+
+    def _enqueue_payload_batches(self, batches, reset_tree):
+        if not batches:
+            self._on_tree_load_complete()
+            return
+        for index, batch in enumerate(batches):
+            self._start_tree_insertion(batch, reset_tree if index == 0 else False)
 
     def _start_tree_insertion(self, payloads, reset_tree):
         if not payloads:
