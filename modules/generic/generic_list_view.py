@@ -747,7 +747,14 @@ class GenericListView(ctk.CTkFrame):
         text = (
             f"Displaying {start_idx}-{end_idx} of {total} filtered / {overall} total entities"
         )
-        self.count_label.configure(text=text)
+        if getattr(self, "count_label", None) is None:
+            return
+        try:
+            if self.count_label.winfo_exists():
+                self.count_label.configure(text=text)
+        except tk.TclError:
+            # The label may have been destroyed while a deferred update was still queued.
+            return
         if self.shelf_view:
             self.shelf_view.update_summary()
 
