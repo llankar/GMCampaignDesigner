@@ -230,6 +230,7 @@ class GenericListView(ctk.CTkFrame):
         self._link_column = None
         self._tree_columns = list(self.columns)
         self._linked_rows = {}
+        self._linked_row_sources = {}
         self._link_targets = {}
         self._link_children = {}
         self._auto_expanded_rows = set()
@@ -497,6 +498,7 @@ class GenericListView(ctk.CTkFrame):
         self._last_tree_selection = set()
         self._cell_texts.clear()
         self._linked_rows.clear()
+        self._linked_row_sources.clear()
         self._link_targets.clear()
         self._link_children.clear()
         self._auto_expanded_rows.clear()
@@ -947,14 +949,13 @@ class GenericListView(ctk.CTkFrame):
         # Track pointer row for double-click targeting independent of selection
         self._last_pointer_row = row
         if self._link_column and column == self._link_column and row:
-            if self._linked_rows.get(row):
-                self.tree.selection_set(row)
-                self.tree.focus(row)
-                self._link_toggle_in_progress = True
-                try:
-                    self._toggle_linked_rows(row)
-                finally:
-                    self._link_toggle_in_progress = False
+            self.tree.selection_set(row)
+            self.tree.focus(row)
+            self._link_toggle_in_progress = True
+            try:
+                self._toggle_linked_rows(row)
+            finally:
+                self._link_toggle_in_progress = False
             self.dragging_iid = None
             return
         # Prevent drag operations on non-root rows (e.g., linked headers/names)
@@ -1085,17 +1086,9 @@ class GenericListView(ctk.CTkFrame):
             base_id = sanitize_id(raw or f"item_{int(time.time()*1000)}").lower()
             iid = unique_iid(self.tree, base_id)
             name_text = self._format_cell("#0", item.get(self.unique_field, ""), iid)
-            if self._link_column:
-                linked = self._collect_linked_entities(item)
-                self._linked_rows[iid] = linked
-                self._link_children.pop(iid, None)
-                self._auto_expanded_rows.discard(iid)
-                self._pinned_linked_rows.discard(iid)
-            else:
-                linked = None
             vals = []
             if self._link_column:
-                vals.append("+" if linked else "")
+                vals.append(self._register_link_source(iid, item))
             vals.extend(
                 self._format_cell(c, self._get_display_value(item, c), iid) for c in self.columns
             )
@@ -1146,17 +1139,9 @@ class GenericListView(ctk.CTkFrame):
                 base_iid = sanitize_id(raw or f"item_{int(time.time()*1000)}").lower()
                 iid = unique_iid(self.tree, base_iid)
                 name_text = self._format_cell("#0", item.get(self.unique_field, ""), iid)
-                if self._link_column:
-                    linked = self._collect_linked_entities(item)
-                    self._linked_rows[iid] = linked
-                    self._link_children.pop(iid, None)
-                    self._auto_expanded_rows.discard(iid)
-                    self._pinned_linked_rows.discard(iid)
-                else:
-                    linked = None
                 vals = []
                 if self._link_column:
-                    vals.append("+" if linked else "")
+                    vals.append(self._register_link_source(iid, item))
                 vals.extend(
                     self._format_cell(c, self._get_display_value(item, c), iid) for c in self.columns
                 )
@@ -1333,8 +1318,68 @@ class GenericListView(ctk.CTkFrame):
             return ("",) + values
         return values
 
+    def _has_linkable_content(self, item):
+        if not isinstance(self.template, dict):
+            return False
+        fields = self.template.get("fields", [])
+        if not isinstance(fields, list):
+            return False
+        for field in fields:
+            if not isinstance(field, dict):
+                continue
+            field_type = str(field.get("type", "")).strip().lower()
+            if field_type not in {"list", "list_longtext"}:
+                continue
+            if field_type == "list_longtext" and not field.get("linked_type"):
+                continue
+            name = field.get("name")
+            if not name:
+                continue
+            raw_values = item.get(name) if isinstance(item, dict) else None
+            if isinstance(raw_values, str):
+                if raw_values.strip():
+                    return True
+            elif isinstance(raw_values, (list, tuple, dict)):
+                if raw_values:
+                    return True
+            elif raw_values:
+                return True
+        return False
+
+    def _register_link_source(self, iid, item):
+        marker = ""
+        if not self._link_column:
+            return marker
+        if self._has_linkable_content(item):
+            marker = "+"
+            self._linked_row_sources[iid] = item
+        else:
+            self._linked_row_sources.pop(iid, None)
+        self._linked_rows.pop(iid, None)
+        self._link_children.pop(iid, None)
+        self._auto_expanded_rows.discard(iid)
+        self._pinned_linked_rows.discard(iid)
+        return marker
+
+    def _ensure_linked_groups(self, parent_iid):
+        if parent_iid in self._linked_rows:
+            return self._linked_rows[parent_iid]
+        item = self._linked_row_sources.get(parent_iid)
+        if not item:
+            return None
+        groups = self._collect_linked_entities(item)
+        if groups:
+            self._linked_rows[parent_iid] = groups
+            if self._link_column and self.tree.exists(parent_iid):
+                self.tree.set(parent_iid, self._link_column, "–")
+        else:
+            self._linked_row_sources.pop(parent_iid, None)
+            if self._link_column and self.tree.exists(parent_iid):
+                self.tree.set(parent_iid, self._link_column, "")
+        return groups
+
     def _toggle_linked_rows(self, parent_iid):
-        groups = self._linked_rows.get(parent_iid)
+        groups = self._ensure_linked_groups(parent_iid)
         if not groups:
             return
         if parent_iid in self._link_children:
@@ -1395,14 +1440,14 @@ class GenericListView(ctk.CTkFrame):
                 name_nodes.append(name_iid)
         if headers:
             self._link_children[parent_iid] = {"headers": headers, "names": name_nodes}
-            if self._link_column:
-                self.tree.set(parent_iid, self._link_column, "–")
-            if auto:
-                self._auto_expanded_rows.add(parent_iid)
-                self._pinned_linked_rows.discard(parent_iid)
-            else:
-                self._pinned_linked_rows.add(parent_iid)
-                self._auto_expanded_rows.discard(parent_iid)
+        if self._link_column:
+            self.tree.set(parent_iid, self._link_column, "–")
+        if auto:
+            self._auto_expanded_rows.add(parent_iid)
+            self._pinned_linked_rows.discard(parent_iid)
+        else:
+            self._pinned_linked_rows.add(parent_iid)
+            self._auto_expanded_rows.discard(parent_iid)
 
     def _collapse_linked_rows(self, parent_iid):
         info = self._link_children.pop(parent_iid, None)
@@ -1414,9 +1459,11 @@ class GenericListView(ctk.CTkFrame):
             if self.tree.exists(header_iid):
                 self.tree.delete(header_iid)
         if self._link_column:
-            self.tree.set(parent_iid, self._link_column, "+")
+            marker = "+" if parent_iid in self._linked_row_sources else ""
+            self.tree.set(parent_iid, self._link_column, marker)
         self._auto_expanded_rows.discard(parent_iid)
         self._pinned_linked_rows.discard(parent_iid)
+        self._linked_rows.pop(parent_iid, None)
 
     def _open_link_target(self, iid):
         target = self._link_targets.get(iid)
@@ -3128,7 +3175,7 @@ class GenericListView(ctk.CTkFrame):
             for iid in newly_selected:
                 if iid in self._link_children:
                     continue
-                groups = self._linked_rows.get(iid)
+                groups = self._ensure_linked_groups(iid)
                 if groups:
                     self._expand_linked_rows(iid, groups, auto=True)
         for iid in deselected:
