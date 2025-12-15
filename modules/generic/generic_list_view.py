@@ -1076,11 +1076,14 @@ class GenericListView(ctk.CTkFrame):
             base_id = sanitize_id(raw or f"item_{int(time.time()*1000)}").lower()
             iid = unique_iid(self.tree, base_id)
             name_text = self._format_cell("#0", item.get(self.unique_field, ""), iid)
-            linked = self._collect_linked_entities(item)
-            self._linked_rows[iid] = linked
-            self._link_children.pop(iid, None)
-            self._auto_expanded_rows.discard(iid)
-            self._pinned_linked_rows.discard(iid)
+            if self._link_column:
+                linked = self._collect_linked_entities(item)
+                self._linked_rows[iid] = linked
+                self._link_children.pop(iid, None)
+                self._auto_expanded_rows.discard(iid)
+                self._pinned_linked_rows.discard(iid)
+            else:
+                linked = None
             vals = []
             if self._link_column:
                 vals.append("+" if linked else "")
@@ -1134,11 +1137,14 @@ class GenericListView(ctk.CTkFrame):
                 base_iid = sanitize_id(raw or f"item_{int(time.time()*1000)}").lower()
                 iid = unique_iid(self.tree, base_iid)
                 name_text = self._format_cell("#0", item.get(self.unique_field, ""), iid)
-                linked = self._collect_linked_entities(item)
-                self._linked_rows[iid] = linked
-                self._link_children.pop(iid, None)
-                self._auto_expanded_rows.discard(iid)
-                self._pinned_linked_rows.discard(iid)
+                if self._link_column:
+                    linked = self._collect_linked_entities(item)
+                    self._linked_rows[iid] = linked
+                    self._link_children.pop(iid, None)
+                    self._auto_expanded_rows.discard(iid)
+                    self._pinned_linked_rows.discard(iid)
+                else:
+                    linked = None
                 vals = []
                 if self._link_column:
                     vals.append("+" if linked else "")
