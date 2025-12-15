@@ -41,6 +41,7 @@ from modules.books.pdf_processing import (
     export_pdf_page_range,
     get_pdf_page_count,
 )
+from modules.generic.helpers.treeview_loader import TreeviewLoader
 from modules.helpers.logging_helper import (
     log_debug,
     log_function,
@@ -188,6 +189,14 @@ class GenericListView(ctk.CTkFrame):
         self.copied_items = []
         self.ai_categorize_button = None
         self._ai_categorize_running = False
+        self._display_queue = []
+        self._next_page_start = 0
+        self._max_display_rows = 2000
+        self._page_size = 400
+        self._group_nodes = {}
+        self._pending_scroll_load = False
+        self._tree_loader = None
+        self._tree_loading = False
 
         # Load grouping from campaign-local settings
         cfg_grp = ConfigHelper.load_campaign_config()
@@ -384,7 +393,8 @@ class GenericListView(ctk.CTkFrame):
 
         vsb = ttk.Scrollbar(self.tree_frame, orient="vertical", command=self.tree.yview)
         hsb = ttk.Scrollbar(self.tree_frame, orient="horizontal", command=self.tree.xview)
-        self.tree.configure(yscrollcommand=vsb.set, xscrollcommand=hsb.set)
+        self._vertical_scrollbar = vsb
+        self.tree.configure(yscrollcommand=self._on_tree_yview, xscrollcommand=hsb.set)
 
         self.tree.grid(row=0, column=0, sticky="nsew")
         vsb.grid(row=0, column=1, sticky="ns")
@@ -400,6 +410,7 @@ class GenericListView(ctk.CTkFrame):
         self.tree.bind("<<TreeviewSelect>>", self._on_tree_selection_changed)
         self.dragging_iid = None
         self.dragging_column = None
+        self._tree_loader = TreeviewLoader(self.tree)
         # --- Row color setup ---
         self.color_options = {
             "Red": "#FF6666",
@@ -432,6 +443,12 @@ class GenericListView(ctk.CTkFrame):
         self.count_label.pack(side="left", padx=5)
         self.selection_label = ctk.CTkLabel(self.footer_frame, text="")
         self.selection_label.pack(side="left", padx=5)
+        self.load_more_button = ctk.CTkButton(
+            self.footer_frame,
+            text="Load More",
+            command=self._load_next_page,
+        )
+        self.load_more_button.pack(side="right", padx=5, pady=5)
         self.bulk_action_button = ctk.CTkButton(
             self.footer_frame,
             text="Bulk Actions",
@@ -494,7 +511,10 @@ class GenericListView(ctk.CTkFrame):
 
     def refresh_list(self):
         log_info(f"Refreshing list for {self.model_wrapper.entity_type}", func_name="GenericListView.refresh_list")
-        self.tree.delete(*self.tree.get_children())
+        if self._tree_loader:
+            self._tree_loader.reset_tree()
+        else:
+            self.tree.delete(*self.tree.get_children())
         self._last_tree_selection = set()
         self._cell_texts.clear()
         self._linked_rows.clear()
@@ -504,36 +524,12 @@ class GenericListView(ctk.CTkFrame):
         self._auto_expanded_rows.clear()
         self._pinned_linked_rows.clear()
         self._base_to_iids = {}
+        self._group_nodes = {}
         self.batch_index = 0
         total_items = len(self.filtered_items)
-        if total_items > 1000:
-            self.batch_size = 120
-        elif total_items > 600:
-            self.batch_size = 90
-        elif total_items > 300:
-            self.batch_size = 70
-        elif total_items > 150:
-            self.batch_size = 55
-        else:
-            self.batch_size = 45
-        self._default_batch_size = self.batch_size
-        self._first_batch_size = min(50, self.batch_size)
-        self.batch_size = self._first_batch_size
-        self._first_batch_pending = self._default_batch_size != self._first_batch_size and total_items > self._first_batch_size
-        if total_items > 1000:
-            self._batch_delay_ms = 25
-        elif total_items > 600:
-            self._batch_delay_ms = 30
-        elif total_items > 300:
-            self._batch_delay_ms = 35
-        elif total_items > 150:
-            self._batch_delay_ms = 40
-        else:
-            self._batch_delay_ms = 50
-        if self.group_column:
-            self.insert_grouped_items()
-        else:
-            self.insert_next_batch()
+        self._configure_batch_settings(total_items)
+        self._reset_paging(total_items)
+        self._queue_next_page(reset_tree=True)
         if self.view_mode == "grid":
             self.populate_grid()
         elif self.view_mode == "shelf" and self.shelf_view:
@@ -544,14 +540,206 @@ class GenericListView(ctk.CTkFrame):
         if self.shelf_view:
             self.shelf_view.refresh_selection()
         self._update_bulk_controls()
+        self._update_load_more_state()
+
+    def _configure_batch_settings(self, total_items):
+        if total_items > 2500:
+            self.batch_size = 800
+            self._batch_delay_ms = 10
+        elif total_items > 1500:
+            self.batch_size = 650
+            self._batch_delay_ms = 15
+        elif total_items > 800:
+            self.batch_size = 500
+            self._batch_delay_ms = 20
+        else:
+            self.batch_size = 300
+            self._batch_delay_ms = 25
+
+    def _reset_paging(self, total_items):
+        self._display_queue = []
+        self._next_page_start = 0
+        self._pending_scroll_load = False
+        self._page_size = self._calculate_page_size(total_items)
+
+    def _calculate_page_size(self, total_items):
+        if total_items > 3000:
+            return 800
+        if total_items > 1500:
+            return 600
+        if total_items > 800:
+            return 400
+        return 250
+
+    def _queue_next_page(self, *, reset_tree=False):
+        if not self.filtered_items or len(self._display_queue) >= self._max_display_rows:
+            self._set_tree_loading(False)
+            return
+        new_items = self._slice_next_items()
+        if not new_items:
+            self._set_tree_loading(False)
+            return
+        payloads = self._build_payloads(new_items)
+        self._set_tree_loading(True)
+        if not self._tree_loader:
+            self._tree_loader = TreeviewLoader(self.tree)
+        if reset_tree or not self._tree_loader.is_running():
+            self._tree_loader.start(
+                payloads,
+                self._insert_tree_payload,
+                chunk_size=self.batch_size,
+                delay_ms=self._batch_delay_ms,
+                on_complete=self._on_tree_load_complete,
+                reset=reset_tree,
+            )
+        else:
+            self._tree_loader.append(payloads)
+
+    def _slice_next_items(self):
+        if self._next_page_start >= len(self.filtered_items):
+            return []
+        remaining_display_capacity = self._max_display_rows - len(self._display_queue)
+        if remaining_display_capacity <= 0:
+            return []
+        end = min(
+            self._next_page_start + self._page_size,
+            self._next_page_start + remaining_display_capacity,
+            len(self.filtered_items),
+        )
+        new_items = self.filtered_items[self._next_page_start:end]
+        self._display_queue.extend(new_items)
+        self._next_page_start = end
+        return new_items
+
+    def _build_payloads(self, items):
+        payloads = []
+        if self.group_column:
+            for item in items:
+                group_val = self.clean_value(item.get(self.group_column, "")) or "Unknown"
+                group_id = self._group_nodes.get(group_val)
+                if not group_id:
+                    base_group_id = sanitize_id(f"group_{group_val}")
+                    group_id = unique_iid(self.tree, base_group_id)
+                    self._group_nodes[group_val] = group_id
+                    payloads.append({"type": "group", "iid": group_id, "label": group_val})
+                payloads.append(self._build_row_payload(item, parent=group_id))
+        else:
+            payloads.extend(self._build_row_payload(item) for item in items)
+        return payloads
+
+    def _build_row_payload(self, item, parent=""):
+        raw = item.get(self.unique_field, "")
+        if isinstance(raw, dict):
+            raw = raw.get("text", "")
+        base_id = sanitize_id(raw or f"item_{int(time.time()*1000)}").lower()
+        iid = unique_iid(self.tree, base_id)
+        name_text = self._format_cell("#0", item.get(self.unique_field, ""), iid)
+        values = []
+        if self._link_column:
+            values.append(self._register_link_source(iid, item))
+        values.extend(
+            self._format_cell(c, self._get_display_value(item, c), iid) for c in self.columns
+        )
+        color = self.row_colors.get(base_id)
+        return {
+            "type": "item",
+            "parent": parent,
+            "iid": iid,
+            "text": name_text,
+            "values": tuple(values),
+            "base_id": base_id,
+            "color": color,
+        }
+
+    def _insert_tree_payload(self, payload):
+        if payload.get("type") == "group":
+            self.tree.insert("", "end", iid=payload["iid"], text=payload.get("label", ""), open=True)
+            return
+        iid = payload["iid"]
+        self.tree.insert(
+            payload.get("parent", ""),
+            "end",
+            iid=iid,
+            text=payload.get("text", ""),
+            values=payload.get("values", ()),
+        )
+        color = payload.get("color")
+        if color:
+            self.tree.item(iid, tags=(f"color_{color}",))
+        base_id = payload.get("base_id", "")
+        self._register_tree_iid(base_id, iid)
+        if base_id in self.selected_iids:
+            self.tree.selection_add(iid)
+
+    def _on_tree_load_complete(self):
+        self._tree_loading = False
+        self._set_tree_loading(False)
+        self._update_tree_selection_tags()
+        self.update_entity_count()
+        self._update_load_more_state()
+        if self._pending_scroll_load:
+            self._pending_scroll_load = False
+            self._load_next_page(auto=True)
 
     def update_entity_count(self):
         total = len(self.filtered_items)
         overall = len(self.items)
-        text = f"Displaying {total} of {overall} entities"
+        visible = min(len(self._display_queue), self._max_display_rows, total)
+        text = f"Displaying {visible} of {total} filtered / {overall} total entities"
         self.count_label.configure(text=text)
         if self.shelf_view:
             self.shelf_view.update_summary()
+
+    def _set_tree_loading(self, loading):
+        self._tree_loading = loading
+        try:
+            if loading:
+                self.tree.state(("disabled",))
+            else:
+                self.tree.state(("!disabled",))
+        except Exception:
+            pass
+
+    def _can_load_more(self):
+        return (
+            self._next_page_start < len(self.filtered_items)
+            and len(self._display_queue) < self._max_display_rows
+        )
+
+    def _update_load_more_state(self):
+        state = tk.NORMAL if self._can_load_more() else tk.DISABLED
+        if getattr(self, "load_more_button", None) and self.load_more_button.winfo_exists():
+            self.load_more_button.configure(state=state)
+
+    def _load_next_page(self, auto=False):
+        if not self._can_load_more() or self._tree_loading:
+            self._pending_scroll_load = False
+            return
+        self._queue_next_page(reset_tree=False)
+        if not auto:
+            self._pending_scroll_load = False
+
+    def _on_tree_yview(self, first, last):
+        if getattr(self, "_vertical_scrollbar", None):
+            self._vertical_scrollbar.set(first, last)
+        self._maybe_trigger_scroll_load(last)
+
+    def _maybe_trigger_scroll_load(self, last):
+        try:
+            position = float(last)
+        except Exception:
+            return
+        if (
+            position > 0.98
+            and self._can_load_more()
+            and not self._tree_loading
+            and not self._pending_scroll_load
+        ):
+            self._pending_scroll_load = True
+            self.after(50, self._trigger_scroll_load)
+
+    def _trigger_scroll_load(self):
+        self._load_next_page(auto=True)
 
     def _create_view_toggle_button(self, mode, label):
         if getattr(self, "view_toggle_frame", None) is None:
@@ -1077,43 +1265,7 @@ class GenericListView(ctk.CTkFrame):
         self.filter_items(self.search_var.get())
 
     def insert_next_batch(self):
-        end = min(self.batch_index + self.batch_size, len(self.filtered_items))
-        for i in range(self.batch_index, end):
-            item = self.filtered_items[i]
-            raw = item.get(self.unique_field, "")
-            if isinstance(raw, dict):
-                raw = raw.get("text", "")
-            base_id = sanitize_id(raw or f"item_{int(time.time()*1000)}").lower()
-            iid = unique_iid(self.tree, base_id)
-            name_text = self._format_cell("#0", item.get(self.unique_field, ""), iid)
-            vals = []
-            if self._link_column:
-                vals.append(self._register_link_source(iid, item))
-            vals.extend(
-                self._format_cell(c, self._get_display_value(item, c), iid) for c in self.columns
-            )
-            try:
-                self.tree.insert("", "end", iid=iid, text=name_text, values=tuple(vals))
-                color = self.row_colors.get(base_id)
-                if color:
-                    self.tree.item(iid, tags=(f"color_{color}",))
-                self._register_tree_iid(base_id, iid)
-                if base_id in self.selected_iids:
-                    self.tree.selection_add(iid)
-            except Exception as e:
-                print("[ERROR] inserting item:", e, iid, vals)
-        self.batch_index = end
-        if getattr(self, "_first_batch_pending", False):
-            self.batch_size = getattr(self, "_default_batch_size", self.batch_size)
-            self._first_batch_pending = False
-        if end < len(self.filtered_items):
-            delay = getattr(self, "_batch_delay_ms", 50)
-            try:
-                delay = max(1, int(delay))
-            except (TypeError, ValueError):
-                delay = 50
-            self.after(delay, self.insert_next_batch)
-        self._update_tree_selection_tags()
+        self._load_next_page(auto=True)
 
     def insert_grouped_items(self):
         grouped = {}
