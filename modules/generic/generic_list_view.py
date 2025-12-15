@@ -5,6 +5,7 @@ import os
 import sys
 import subprocess
 import threading
+from concurrent.futures import ThreadPoolExecutor
 from collections import OrderedDict
 import ast
 import customtkinter as ctk
@@ -192,12 +193,13 @@ class GenericListView(ctk.CTkFrame):
         self._display_queue = []
         self._next_page_start = 0
         self._display_window_start = 0
-        self._max_display_rows = 40
+        self._max_display_rows = 1000000
         self._page_size = 40
         self._group_nodes = {}
         self._pending_scroll_load = False
         self._tree_loader = None
         self._tree_loading = False
+        self._payload_executor = ThreadPoolExecutor(max_workers=1)
 
         # Load grouping from campaign-local settings
         cfg_grp = ConfigHelper.load_campaign_config()
@@ -556,14 +558,14 @@ class GenericListView(ctk.CTkFrame):
         else:
             self.batch_size = 300
             self._batch_delay_ms = 25
-        self.batch_size = min(self.batch_size, self._max_display_rows)
+        # Allow large batches even when many rows are displayed to reduce UI churn
 
     def _reset_paging(self, total_items):
         self._display_queue = []
         self._display_window_start = 0
         self._next_page_start = self._display_window_start
         self._pending_scroll_load = False
-        self._page_size = min(self._calculate_page_size(total_items), self._max_display_rows)
+        self._page_size = self._calculate_page_size(total_items)
 
     def _calculate_page_size(self, total_items):
         if total_items > 3000:
@@ -584,26 +586,50 @@ class GenericListView(ctk.CTkFrame):
         self._display_queue = []
 
     def _shift_window_forward(self):
-        if self._display_window_start + self._max_display_rows >= len(self.filtered_items):
-            return
-        self._display_window_start = min(
-            self._display_window_start + self._page_size,
-            max(0, len(self.filtered_items) - self._max_display_rows),
-        )
-        self._next_page_start = self._display_window_start
-        self._reset_tree_for_window()
-        self._queue_next_page(reset_tree=True)
+        # Windowing is no longer used; keep method for compatibility
+        return
 
     def _queue_next_page(self, *, reset_tree=False):
-        if not self.filtered_items or len(self._display_queue) >= self._max_display_rows:
+        if not self.filtered_items:
             self._set_tree_loading(False)
             return
         new_items = self._slice_next_items()
         if not new_items:
             self._set_tree_loading(False)
             return
-        payloads = self._build_payloads(new_items)
         self._set_tree_loading(True)
+        self._submit_payload_job(new_items, reset_tree)
+
+    def _slice_next_items(self):
+        if self._next_page_start >= len(self.filtered_items):
+            return []
+        end = min(
+            self._next_page_start + self._page_size,
+            len(self.filtered_items),
+        )
+        new_items = self.filtered_items[self._next_page_start:end]
+        self._display_queue.extend(new_items)
+        self._next_page_start = end
+        return new_items
+
+    def _submit_payload_job(self, items, reset_tree):
+        def build_payloads():
+            return self._build_payloads(items)
+
+        def on_complete(future):
+            try:
+                payloads = future.result()
+            except Exception:
+                payloads = []
+            self.after(0, lambda: self._start_tree_insertion(payloads, reset_tree))
+
+        future = self._payload_executor.submit(build_payloads)
+        future.add_done_callback(on_complete)
+
+    def _start_tree_insertion(self, payloads, reset_tree):
+        if not payloads:
+            self._on_tree_load_complete()
+            return
         if not self._tree_loader:
             self._tree_loader = TreeviewLoader(self.tree)
         if reset_tree or not self._tree_loader.is_running():
@@ -617,23 +643,6 @@ class GenericListView(ctk.CTkFrame):
             )
         else:
             self._tree_loader.append(payloads)
-
-    def _slice_next_items(self):
-        if self._next_page_start >= len(self.filtered_items):
-            return []
-        remaining_display_capacity = self._max_display_rows - len(self._display_queue)
-        if remaining_display_capacity <= 0:
-            return []
-        end = min(
-            self._next_page_start + self._page_size,
-            self._next_page_start + remaining_display_capacity,
-            self._display_window_start + self._max_display_rows,
-            len(self.filtered_items),
-        )
-        new_items = self.filtered_items[self._next_page_start:end]
-        self._display_queue.extend(new_items)
-        self._next_page_start = end
-        return new_items
 
     def _build_payloads(self, items):
         payloads = []
@@ -708,9 +717,9 @@ class GenericListView(ctk.CTkFrame):
     def update_entity_count(self):
         total = len(self.filtered_items)
         overall = len(self.items)
-        visible = min(len(self._display_queue), self._max_display_rows, total)
-        start_idx = self._display_window_start + 1 if total else 0
-        end_idx = self._display_window_start + visible if total else 0
+        visible = min(len(self._display_queue), total)
+        start_idx = 1 if total else 0
+        end_idx = visible if total else 0
         text = (
             f"Displaying {start_idx}-{end_idx} of {total} filtered / {overall} total entities"
         )
@@ -729,13 +738,7 @@ class GenericListView(ctk.CTkFrame):
             pass
 
     def _can_load_more(self):
-        window_has_capacity = self._next_page_start < min(
-            len(self.filtered_items), self._display_window_start + self._max_display_rows
-        )
-        more_windows_available = (
-            self._display_window_start + self._max_display_rows < len(self.filtered_items)
-        )
-        return (window_has_capacity and len(self._display_queue) < self._max_display_rows) or more_windows_available
+        return self._next_page_start < len(self.filtered_items)
 
     def _update_load_more_state(self):
         state = tk.NORMAL if self._can_load_more() else tk.DISABLED
@@ -744,10 +747,6 @@ class GenericListView(ctk.CTkFrame):
 
     def _load_next_page(self, auto=False):
         if self._tree_loading:
-            self._pending_scroll_load = False
-            return
-        if len(self._display_queue) >= self._max_display_rows:
-            self._shift_window_forward()
             self._pending_scroll_load = False
             return
         if not self._can_load_more():
