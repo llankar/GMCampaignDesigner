@@ -9,7 +9,7 @@ class TreeviewLoader:
         self.tree = tree
         self._rows: List[Any] = []
         self._insert_callback: Optional[Callable[[Any], None]] = None
-        self._chunk_size: int = 500
+        self._chunk_size: int = 40
         self._delay_ms: int = 1
         self._job: Optional[str] = None
         self._index: int = 0
