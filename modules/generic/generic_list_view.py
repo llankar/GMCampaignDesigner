@@ -505,20 +505,29 @@ class GenericListView(ctk.CTkFrame):
         self.batch_index = 0
         total_items = len(self.filtered_items)
         if total_items > 1000:
-            self.batch_size = 500
+            self.batch_size = 120
         elif total_items > 600:
-            self.batch_size = 300
+            self.batch_size = 90
         elif total_items > 300:
-            self.batch_size = 200
+            self.batch_size = 70
         elif total_items > 150:
-            self.batch_size = 100
+            self.batch_size = 55
         else:
-            self.batch_size = 50
+            self.batch_size = 45
         self._default_batch_size = self.batch_size
         self._first_batch_size = min(50, self.batch_size)
         self.batch_size = self._first_batch_size
         self._first_batch_pending = self._default_batch_size != self._first_batch_size and total_items > self._first_batch_size
-        self._batch_delay_ms = 50
+        if total_items > 1000:
+            self._batch_delay_ms = 25
+        elif total_items > 600:
+            self._batch_delay_ms = 30
+        elif total_items > 300:
+            self._batch_delay_ms = 35
+        elif total_items > 150:
+            self._batch_delay_ms = 40
+        else:
+            self._batch_delay_ms = 50
         if self.group_column:
             self.insert_grouped_items()
         else:
