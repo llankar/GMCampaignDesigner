@@ -3073,10 +3073,16 @@ class GenericListView(ctk.CTkFrame):
         threading.Thread(target=run, daemon=True).start()
 
     def _find_item_by_iid(self, iid):
-        # Prefer exact match on sanitized ID
+        mapped_base = None
+        for base, iids in self._base_to_iids.items():
+            if iid == base or iid in iids:
+                mapped_base = base
+                break
+
+        # Prefer exact match on sanitized ID or mapped base
         for it in self.filtered_items:
-            base_id = self._get_base_id(it)
-            if iid == base_id:
+            base_id = self._get_base_id(it, fallback_iid=mapped_base or iid)
+            if iid == base_id or (mapped_base and base_id == mapped_base):
                 return it, base_id
 
         # If the iid has a duplicate suffix like "_2", strip it and try again
@@ -3084,16 +3090,29 @@ class GenericListView(ctk.CTkFrame):
         if m:
             base = m.group(1)
             for it in self.filtered_items:
-                if self._get_base_id(it) == base:
-                    return it, base
+                base_id = self._get_base_id(it, fallback_iid=base)
+                if base_id == base:
+                    return it, base_id
 
         return None, None
 
-    def _get_base_id(self, item):
+    def _get_base_id(self, item, fallback_iid=None):
         raw = item.get(self.unique_field, "")
         if isinstance(raw, dict):
             raw = raw.get("text", "")
-        return sanitize_id(raw).lower()
+        sanitized = sanitize_id(raw).lower()
+        if sanitized:
+            return sanitized
+
+        # Try to derive the base id from existing tree mappings
+        if fallback_iid:
+            for base, iids in self._base_to_iids.items():
+                if fallback_iid == base or fallback_iid in iids:
+                    return base
+            if isinstance(fallback_iid, str) and fallback_iid.startswith("item_"):
+                return fallback_iid
+
+        return ""
 
     def _resolve_action_target_bases(self, iid):
         """Return base ids targeted by a row-level action."""
