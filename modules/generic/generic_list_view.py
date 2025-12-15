@@ -1155,6 +1155,15 @@ class GenericListView(ctk.CTkFrame):
             self.model_wrapper.save_items(self.items)
             self.refresh_list()
 
+    def _edit_selected_item(self):
+        selection = self.tree.selection()
+        iid = selection[0] if selection else self.tree.focus()
+        if not iid:
+            return
+        item, _ = self._find_item_by_iid(iid)
+        if item:
+            self._edit_item(item)
+
     def on_button_press(self, event):
         region = self.tree.identify("region", event.x, event.y)
         if region == "heading":
@@ -2331,6 +2340,11 @@ class GenericListView(ctk.CTkFrame):
                 command=lambda it=item: self._edit_item(it),
             )
             menu.add_separator()
+        if item and self.model_wrapper.entity_type != "books":
+            menu.add_command(
+                label="Edit…",
+                command=self._edit_selected_item,
+            )
         if self.model_wrapper.entity_type == "scenarios":
             menu.add_command(
                 label="Open in GM Screen",
