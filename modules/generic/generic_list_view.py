@@ -17,6 +17,7 @@ from PIL import Image
 from modules.generic.generic_editor_window import GenericEditorWindow
 from modules.generic.generic_model_wrapper import GenericModelWrapper
 from modules.generic.generic_list_selection_view import GenericListSelectionView
+import queue
 from modules.ui.image_viewer import show_portrait
 from modules.ui.second_screen_display import show_entity_on_second_screen
 from modules.helpers.config_helper import ConfigHelper
@@ -202,6 +203,12 @@ class GenericListView(ctk.CTkFrame):
         self._tree_loading = False
         self._payload_executor = ThreadPoolExecutor(max_workers=1)
         self._payload_batch_size = 500
+        self._load_queue = None
+        self._load_thread = None
+        self._load_session_id = 0
+        self._first_chunk_inserted = False
+        self._seen_base_ids = set()
+        self._iid_to_item = {}
 
         # Load grouping from campaign-local settings
         cfg_grp = ConfigHelper.load_campaign_config()
@@ -226,6 +233,19 @@ class GenericListView(ctk.CTkFrame):
             f["name"] for f in self.template["fields"]
             if f["name"] not in skip_for_columns
         ]
+        # Precompute which columns come from long-form fields so we can use
+        # a faster, approximate truncation for them instead of expensive font
+        # measurements on every cell.
+        self._longtext_columns = set()
+        for field in self.template.get("fields", []):
+            if not isinstance(field, dict):
+                continue
+            name = field.get("name")
+            if not name:
+                continue
+            ftype = str(field.get("type", "")).strip().lower()
+            if ftype in {"longtext", "list_longtext", "list"}:
+                self._longtext_columns.add(name)
 
         # Add a dedicated link column when the template supports linked entities so users
         # can expand/collapse rows to view the linked records.
@@ -458,12 +478,7 @@ class GenericListView(ctk.CTkFrame):
         self.count_label.pack(side="left", padx=5)
         self.selection_label = ctk.CTkLabel(self.footer_frame, text="")
         self.selection_label.pack(side="left", padx=5)
-        self.load_more_button = ctk.CTkButton(
-            self.footer_frame,
-            text="Load More",
-            command=self._load_next_page,
-        )
-        self.load_more_button.pack(side="right", padx=5, pady=5)
+        
         self.bulk_action_button = ctk.CTkButton(
             self.footer_frame,
             text="Bulk Actions",
@@ -526,6 +541,8 @@ class GenericListView(ctk.CTkFrame):
 
     def refresh_list(self):
         log_info(f"Refreshing list for {self.model_wrapper.entity_type}", func_name="GenericListView.refresh_list")
+        # Keep a tiny seed to show immediately
+        initial_slice = self.filtered_items[: min(50, len(self.filtered_items))]
         if self._tree_loader:
             self._tree_loader.reset_tree()
         else:
@@ -540,11 +557,56 @@ class GenericListView(ctk.CTkFrame):
         self._pinned_linked_rows.clear()
         self._base_to_iids = {}
         self._group_nodes = {}
+        self._seen_base_ids = set()
+        self._iid_to_item = {}
         self.batch_index = 0
         total_items = len(self.filtered_items)
+        # Configure batch sizing before streaming so TreeviewLoader has sane chunks.
         self._configure_batch_settings(total_items)
-        self._reset_paging(total_items)
-        self._queue_next_page(reset_tree=True)
+        # Keep UI insert bursts small so rows appear in ~20-item increments.
+        self.batch_size = 10
+        # Reset collections to avoid double-counting once background load begins.
+        self.items = []
+        self.filtered_items = []
+        self._display_queue = []
+        self._next_page_start = 0
+        self._pending_scroll_load = False
+        self._page_size = self._calculate_page_size(total_items)
+        # Use small delay to let the UI breathe while streaming in rows.
+        self._batch_delay_ms = 5
+        self._payload_batch_size = self._calculate_payload_batch_size(total_items)
+        self._set_tree_loading(True)
+        if self._tree_loader:
+            self._tree_loader.reset_tree()
+        else:
+            self.tree.delete(*self.tree.get_children())
+        # Seed the UI immediately with a small slice so something appears at once.
+        if initial_slice:
+            self.items.extend(initial_slice)
+            self.filtered_items.extend(initial_slice)
+            self._display_queue.extend(initial_slice)
+            initial_payloads = self._build_payloads(initial_slice)
+            self._start_tree_insertion(initial_payloads, reset_tree=True)
+            for it in initial_slice:
+                base_id = self._get_base_id(it)
+                if base_id:
+                    self._seen_base_ids.add(base_id)
+        # Async background fetch: load DB rows in a worker thread, enqueue to UI.
+        self._first_chunk_inserted = False
+        self._load_session_id += 1
+        session_id = self._load_session_id
+        self._load_queue = queue.Queue()
+        query = ""
+        if hasattr(self, "search_var"):
+            try:
+                query = self.search_var.get().strip().lower()
+            except Exception:
+                query = ""
+        self._load_thread = threading.Thread(
+            target=self._background_fetch_items, args=(session_id,), daemon=True
+        )
+        self._load_thread.start()
+        self.after(0, lambda: self._drain_load_queue(session_id, query))
         if self.view_mode == "grid":
             self.populate_grid()
         elif self.view_mode == "shelf" and self.shelf_view:
@@ -606,6 +668,104 @@ class GenericListView(ctk.CTkFrame):
         else:
             self.tree.delete(*self.tree.get_children(""))
         self._display_queue = []
+
+    def _background_fetch_items(self, session_id):
+        """Load items from DB in chunks on a worker thread."""
+        import sqlite3
+
+        try:
+            conn = self.model_wrapper._get_connection()
+            conn.row_factory = sqlite3.Row
+            cur = conn.cursor()
+            cur.execute(f"SELECT * FROM {self.model_wrapper.table}")
+            batch = 40
+            while True:
+                rows = cur.fetchmany(batch)
+                if not rows:
+                    break
+                items = [self.model_wrapper._deserialize_row(r) for r in rows]
+                if self._load_queue:
+                    self._load_queue.put((session_id, items))
+            if self._load_queue:
+                self._load_queue.put((session_id, None))
+        except Exception as exc:
+            if self._load_queue:
+                self._load_queue.put((session_id, exc))
+        finally:
+            try:
+                conn.close()
+            except Exception:
+                pass
+
+    def _drain_load_queue(self, session_id, query):
+        if session_id != self._load_session_id:
+            return
+        done = False
+        try:
+            sid, payload = self._load_queue.get_nowait()
+        except queue.Empty:
+            pass
+        else:
+            if sid == session_id:
+                if isinstance(payload, Exception):
+                    # Log and stop loading on error
+                    log_warning(f"Background load failed: {payload}", func_name="GenericListView._drain_load_queue")
+                    done = True
+                elif payload is None:
+                    done = True
+                else:
+                    self._handle_loaded_items(payload, query)
+        if done:
+            self._on_tree_load_complete()
+        else:
+            self.after(15, lambda: self._drain_load_queue(session_id, query))
+
+    def _handle_loaded_items(self, items, query):
+        # Merge into master list
+        self.items.extend(items)
+        # Apply in-flight filter if any
+        if query:
+            def iter_search_values(item):
+                if self.model_wrapper.entity_type == "books":
+                    for col in self.columns:
+                        yield self._get_display_value(item, col)
+                else:
+                    yield from item.values()
+            filtered = [
+                it for it in items
+                if any(query in self.clean_value(v).lower() for v in iter_search_values(it))
+            ]
+        else:
+            filtered = items
+
+        if not filtered:
+            self.update_entity_count()
+            return
+
+        deduped = []
+        for it in filtered:
+            base_id = self._get_base_id(it)
+            if base_id and base_id in self._seen_base_ids:
+                continue
+            if base_id:
+                self._seen_base_ids.add(base_id)
+            deduped.append(it)
+
+        if not deduped:
+            self.update_entity_count()
+            return
+
+        # Only extend with deduped rows to avoid inflating counts
+        self.filtered_items.extend(deduped)
+        self._display_queue.extend(deduped)
+
+        reset_tree = not self._first_chunk_inserted
+        self._first_chunk_inserted = True
+        for start in range(0, len(deduped), self.batch_size):
+            subset = deduped[start : start + self.batch_size]
+            payloads = self._build_payloads(subset)
+            self._start_tree_insertion(payloads, reset_tree if start == 0 else False)
+        self.update_entity_count()
 
     def _shift_window_forward(self):
         # Windowing is no longer used; keep method for compatibility
@@ -717,6 +877,7 @@ class GenericListView(ctk.CTkFrame):
             "values": tuple(values),
             "base_id": base_id,
             "color": color,
+            "item": item,
         }
 
     def _insert_tree_payload(self, payload):
@@ -724,8 +885,13 @@ class GenericListView(ctk.CTkFrame):
             self.tree.insert("", "end", iid=payload["iid"], text=payload.get("label", ""), open=True)
             return
         iid = payload["iid"]
+        parent = payload.get("parent", "")
+        if parent and not self.tree.exists(parent):
+            # Safeguard: create the missing group node to avoid Tk errors.
+            label = payload.get("group_label") or parent.replace("group_", "").replace("_", " ").title()
+            self.tree.insert("", "end", iid=parent, text=label, open=True)
         self.tree.insert(
-            payload.get("parent", ""),
+            parent,
             "end",
             iid=iid,
             text=payload.get("text", ""),
@@ -736,6 +902,11 @@ class GenericListView(ctk.CTkFrame):
             self.tree.item(iid, tags=(f"color_{color}",))
         base_id = payload.get("base_id", "")
         self._register_tree_iid(base_id, iid)
+        if base_id:
+            self._seen_base_ids.add(base_id)
+        # Map iid to original item for reliable lookups when double-clicking.
+        if "item" in payload:
+            self._iid_to_item[iid] = payload["item"]
         if base_id in self.selected_iids:
             self.tree.selection_add(iid)
 
@@ -780,45 +951,26 @@ class GenericListView(ctk.CTkFrame):
             self._suppress_tree_select_event = False
 
     def _can_load_more(self):
-        return self._next_page_start < len(self.filtered_items)
+        return False
 
     def _update_load_more_state(self):
-        state = tk.NORMAL if self._can_load_more() else tk.DISABLED
+        state = tk.DISABLED
         if getattr(self, "load_more_button", None) and self.load_more_button.winfo_exists():
             self.load_more_button.configure(state=state)
 
     def _load_next_page(self, auto=False):
-        if self._tree_loading:
-            self._pending_scroll_load = False
-            return
-        if not self._can_load_more():
-            self._pending_scroll_load = False
-            return
-        self._queue_next_page(reset_tree=False)
-        if not auto:
-            self._pending_scroll_load = False
+        self._pending_scroll_load = False
 
     def _on_tree_yview(self, first, last):
         if getattr(self, "_vertical_scrollbar", None):
             self._vertical_scrollbar.set(first, last)
-        self._maybe_trigger_scroll_load(last)
+        # No-op for infinite scrolling; everything is loaded eagerly.
 
     def _maybe_trigger_scroll_load(self, last):
-        try:
-            position = float(last)
-        except Exception:
-            return
-        if (
-            position > 0.98
-            and self._can_load_more()
-            and not self._tree_loading
-            and not self._pending_scroll_load
-        ):
-            self._pending_scroll_load = True
-            self.after(50, self._trigger_scroll_load)
+        return
 
     def _trigger_scroll_load(self):
-        self._load_next_page(auto=True)
+        return
 
     def _create_view_toggle_button(self, mode, label):
         if getattr(self, "view_toggle_frame", None) is None:
@@ -2248,6 +2400,11 @@ class GenericListView(ctk.CTkFrame):
     def _truncate_text(self, text, column_id):
         if not text:
             return ""
+        # For long-form fields (description-like), use a fast character-based
+        # truncation to avoid thousands of font measurement calls on big
+        # datasets (e.g., Dresden NPCs).
+        if column_id in self._longtext_columns:
+            return self._approximate_truncate(text, column_id)
         try:
             width = self.tree.column(column_id, "width")
         except Exception:
@@ -2281,6 +2438,19 @@ class GenericListView(ctk.CTkFrame):
                 high = mid - 1
 
         return best_prefix + self._ellipsis
+
+    def _approximate_truncate(self, text, column_id):
+        """Cheap truncation for longtext columns: trim by character count."""
+        try:
+            width = self.tree.column(column_id, "width")
+        except Exception:
+            width = 0
+        # Roughly 6px per character for the bold Segoe 10 font; keep a minimum
+        # so very narrow columns still show something.
+        char_limit = max(30, int(width / 6) if width else 120)
+        if len(text) <= char_limit:
+            return text
+        return text[: max(char_limit - len(self._ellipsis), 0)].rstrip() + self._ellipsis
 
     def sort_column(self, column_name):
         if not hasattr(self, "sort_directions"):
@@ -3333,6 +3503,11 @@ class GenericListView(ctk.CTkFrame):
         threading.Thread(target=run, daemon=True).start()
 
     def _find_item_by_iid(self, iid):
+        # Fast lookup for streamed rows
+        if iid in self._iid_to_item:
+            item = self._iid_to_item.get(iid)
+            return item, self._get_base_id(item or {}, fallback_iid=iid)
+
         mapped_base = None
         for base, iids in self._base_to_iids.items():
             if iid == base or iid in iids:
