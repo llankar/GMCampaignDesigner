@@ -15,6 +15,28 @@ if errorlevel 1 (
   exit /b 1
 )
 
+REM ===== Update version.txt (filevers/prodvers/FileVersion/ProductVersion) and commit/push before anything else =====
+powershell -NoProfile -Command ^
+  "$tag='%TAG%';" ^
+  "$ver=($tag -replace '^v','').Trim();" ^
+  "$tuple='(' + ($ver -split '\.' -join ', ') + ')';" ^
+  "(Get-Content 'version.txt') " ^
+  " -replace 'filevers=\([^)]*\)', ('filevers=' + $tuple)" ^
+  " -replace 'prodvers=\([^)]*\)', ('prodvers=' + $tuple)" ^
+  " -replace \"StringStruct\\('FileVersion',\\s*'[^']*'\\)\", \"StringStruct('FileVersion', '$ver')\"" ^
+  " -replace \"StringStruct\\('ProductVersion',\\s*'[^']*'\\)\", \"StringStruct('ProductVersion', '$ver')\"" ^
+  " | Set-Content -Encoding UTF8 'version.txt'"
+if errorlevel 1 goto :err
+git diff --quiet -- version.txt
+if errorlevel 1 (
+  echo [INFO] Updating version.txt to %TAG% and committing...
+  git add version.txt || goto :err
+  git commit -m "Bump version to %TAG%" || goto :err
+  git push || goto :err
+) else (
+  echo [INFO] version.txt already at %TAG%; skipping commit.
+)
+
 REM ===== Build =====
 pyinstaller --noconfirm --clean main_window.spec
 if errorlevel 1 goto :err
@@ -29,8 +51,18 @@ REM ===== Zip the build =====
 powershell -NoProfile -Command "Compress-Archive -Path 'dist\RPGCampaignManager\*' -DestinationPath '%ZIP%' -Force"
 if errorlevel 1 goto :err
 
-REM ===== Update version.txt and commit/push before tagging =====
-echo %TAG%>version.txt
+REM ===== Update version.txt (filevers/prodvers/FileVersion/ProductVersion) and commit/push before tagging =====
+powershell -NoProfile -Command ^
+  "$tag='%TAG%';" ^
+  "$ver=($tag -replace '^v','').Trim();" ^
+  "$tuple='(' + ($ver -split '\.' -join ', ') + ')';" ^
+  "(Get-Content 'version.txt') " ^
+  " -replace 'filevers=\([^)]*\)', ('filevers=' + $tuple)" ^
+  " -replace 'prodvers=\([^)]*\)', ('prodvers=' + $tuple)" ^
+  " -replace \"StringStruct\\('FileVersion',\\s*'[^']*'\\)\", \"StringStruct('FileVersion', '$ver')\"" ^
+  " -replace \"StringStruct\\('ProductVersion',\\s*'[^']*'\\)\", \"StringStruct('ProductVersion', '$ver')\"" ^
+  " | Set-Content -Encoding UTF8 'version.txt'"
+if errorlevel 1 goto :err
 git diff --quiet -- version.txt
 if errorlevel 1 (
   echo [INFO] Updating version.txt to %TAG% and committing...
