@@ -18,11 +18,11 @@ VSVersionInfo(
         '040904B0',
         [StringStruct('CompanyName', 'LLA Company'),
          StringStruct('FileDescription', 'RPGCampaignManager'),
-         StringStruct('FileVersion', '1.0.1.6'),
+         StringStruct('FileVersion', '1.0.1.7'),
          StringStruct('InternalName', 'RPGCampaignManager'),
          StringStruct('OriginalFilename', 'RPGCampaignManager.exe'),
          StringStruct('ProductName', 'RPGCampaignManager'),
-         StringStruct('ProductVersion', '1.0.1.6')])
+         StringStruct('ProductVersion', '1.0.1.7')])
       ]),
     VarFileInfo([VarStruct('Translation', [1033, 1200])])
   ]
