@@ -226,6 +226,13 @@ class GenericListView(ctk.CTkFrame):
             f["name"] for f in self.template["fields"]
             if f["name"] not in skip_for_columns
         ]
+
+        # Add a dedicated link column when the template supports linked entities so users
+        # can expand/collapse rows to view the linked records.
+        self._link_column = "_linked"
+        if not self._template_supports_linking():
+            self._link_column = None
+
         if self.model_wrapper.entity_type == "books":
             lightweight_columns = [
                 "Title",
@@ -241,8 +248,11 @@ class GenericListView(ctk.CTkFrame):
             if "Excerpts" not in self.columns:
                 self.columns.append("Excerpts")
 
-        self._link_column = None
-        self._tree_columns = list(self.columns)
+        self._tree_columns = (
+            [self._link_column] + list(self.columns)
+            if self._link_column
+            else list(self.columns)
+        )
         self._linked_rows = {}
         self._linked_row_sources = {}
         self._link_targets = {}
@@ -1547,6 +1557,21 @@ class GenericListView(ctk.CTkFrame):
         if self._link_column:
             return ("",) + values
         return values
+
+    def _template_supports_linking(self):
+        fields = self.template.get("fields", []) if isinstance(self.template, dict) else []
+        if not isinstance(fields, list):
+            return False
+        for field in fields:
+            if not isinstance(field, dict):
+                continue
+            field_type = str(field.get("type", "")).strip().lower()
+            if field_type not in {"list", "list_longtext"}:
+                continue
+            if field_type == "list_longtext" and not field.get("linked_type"):
+                continue
+            return True
+        return False
 
     def _has_linkable_content(self, item):
         if not isinstance(self.template, dict):
