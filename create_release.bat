@@ -29,6 +29,45 @@ REM ===== Zip the build =====
 powershell -NoProfile -Command "Compress-Archive -Path 'dist\RPGCampaignManager\*' -DestinationPath '%ZIP%' -Force"
 if errorlevel 1 goto :err
 
+REM ===== Update version.txt and commit/push before tagging =====
+echo %TAG%>version.txt
+git diff --quiet -- version.txt
+if errorlevel 1 (
+  echo [INFO] Updating version.txt to %TAG% and committing...
+  git add version.txt || goto :err
+  git commit -m "Bump version to %TAG%" || goto :err
+  git push || goto :err
+) else (
+  echo [INFO] version.txt already at %TAG%; skipping commit.
+)
+
+REM ===== Build release notes with commit list since previous tag =====
+set "NOTES_FILE=docs/release-notes.md"
+set "TMP_NOTES=%TEMP%\release-notes-%TAG%.md"
+if exist "%TMP_NOTES%" del "%TMP_NOTES%"
+if exist "%NOTES_FILE%" (
+  copy /y "%NOTES_FILE%" "%TMP_NOTES%" >nul
+) else (
+  echo GMCampaignDesigner %TAG%>"%TMP_NOTES%"
+)
+
+REM Find previous tag (if any)
+set "PREV_TAG="
+for /f "usebackq delims=" %%t in (`git describe --tags --abbrev=0 "%TAG%^" 2^>nul`) do set "PREV_TAG=%%t"
+if not defined PREV_TAG (
+  for /f "usebackq delims=" %%t in (`git describe --tags --abbrev=0 HEAD^ 2^>nul`) do set "PREV_TAG=%%t"
+)
+
+echo.>>"%TMP_NOTES%"
+if defined PREV_TAG (
+  echo Commits since %PREV_TAG%:>>"%TMP_NOTES%"
+  git log --pretty=format:"- %%s (%%h)" %PREV_TAG%..%TAG% >>"%TMP_NOTES%"
+) else (
+  echo Commits in %TAG%:>>"%TMP_NOTES%"
+  git log --pretty=format:"- %%s (%%h)" %TAG% >>"%TMP_NOTES%"
+)
+echo.>>"%TMP_NOTES%"
+
 REM ===== Git tag and push =====
 git tag -f "%TAG%"
 if errorlevel 1 goto :err
@@ -39,10 +78,10 @@ REM ===== If release exists: edit + clobber asset; else: create =====
 gh release view "%TAG%" >nul 2>nul
 if errorlevel 1 (
   echo [INFO] Release %TAG% not found. Creating...
-  gh release create "%TAG%" "%ZIP%" --title "GMCampaignDesigner %TAG%" --notes-file "docs/release-notes.md" || exit /b 1
+  gh release create "%TAG%" "%ZIP%" --title "GMCampaignDesigner %TAG%" --notes-file "%TMP_NOTES%" || exit /b 1
 ) else (
   echo [INFO] Release %TAG% exists. Updating...
-  gh release edit "%TAG%" --title "GMCampaignDesigner %TAG%" --notes-file "docs/release-notes.md" || exit /b 1
+  gh release edit "%TAG%" --title "GMCampaignDesigner %TAG%" --notes-file "%TMP_NOTES%" || exit /b 1
   gh release upload "%TAG%" "%ZIP%" --clobber || exit /b 1
 )
 
