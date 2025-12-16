@@ -418,8 +418,8 @@ class GenericListView(ctk.CTkFrame):
             self.tree.heading(self._link_column, text="")
             self.tree.column(
                 self._link_column,
-                width=30,
-                minwidth=24,
+                width=0,
+                minwidth=0,
                 anchor="center",
                 stretch=False,
             )
@@ -761,10 +761,8 @@ class GenericListView(ctk.CTkFrame):
 
         reset_tree = not self._first_chunk_inserted
         self._first_chunk_inserted = True
-        for start in range(0, len(deduped), self.batch_size):
-            subset = deduped[start : start + self.batch_size]
-            payloads = self._build_payloads(subset)
-            self._start_tree_insertion(payloads, reset_tree if start == 0 else False)
+        # Build payloads off the UI thread to keep the interface responsive.
+        self._submit_payload_job(deduped, reset_tree)
         self.update_entity_count()
 
     def _shift_window_forward(self):
