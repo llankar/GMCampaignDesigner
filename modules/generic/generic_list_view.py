@@ -1324,7 +1324,14 @@ class GenericListView(ctk.CTkFrame):
         )
         self.master.wait_window(editor)
         if getattr(editor, "saved", False):
-            self.model_wrapper.save_items(self.items)
+            # Persist only the edited record so filtering does not risk
+            # overwriting/deleting the rest of the table.
+            try:
+                key_field = self.unique_field or self.model_wrapper._infer_key_field()
+                self.model_wrapper.save_item(editor.item, key_field=key_field)
+            except Exception as exc:
+                messagebox.showerror("Save Error", f"Failed to save changes: {exc}")
+                return
             self.refresh_list()
 
     def _edit_selected_item(self):

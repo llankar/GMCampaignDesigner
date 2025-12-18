@@ -1419,7 +1419,13 @@ class GenericEditorWindow(ctk.CTkToplevel):
                         for rte in widget
                     ]
             elif field_type == "longtext":
-                data = widget.get_text_data()
+                # Read-only previews (e.g. ExtractedText) do not expose ``get_text_data``.
+                # Keep their existing payload so the save routine doesn't crash and block
+                # persistence of the other fields.
+                if hasattr(widget, "get_text_data"):
+                    data = widget.get_text_data()
+                else:
+                    data = self.item.get(field_name, "")
                 if isinstance(data, dict) and not data.get("text", "").strip():
                     self.item[field_name] = ""
                 else:
