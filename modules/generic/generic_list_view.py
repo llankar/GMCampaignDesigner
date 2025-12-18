@@ -880,6 +880,8 @@ class GenericListView(ctk.CTkFrame):
 
     def _insert_tree_payload(self, payload):
         if payload.get("type") == "group":
+            if self.tree.exists(payload["iid"]):
+                return
             self.tree.insert("", "end", iid=payload["iid"], text=payload.get("label", ""), open=True)
             return
         iid = payload["iid"]
@@ -888,6 +890,8 @@ class GenericListView(ctk.CTkFrame):
             # Safeguard: create the missing group node to avoid Tk errors.
             label = payload.get("group_label") or parent.replace("group_", "").replace("_", " ").title()
             self.tree.insert("", "end", iid=parent, text=label, open=True)
+        if self.tree.exists(iid):
+            return
         self.tree.insert(
             parent,
             "end",
