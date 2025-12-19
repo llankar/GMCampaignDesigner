@@ -192,6 +192,11 @@ class GenericListView(ctk.CTkFrame):
         self._tree_loader = None
         self._freeze_selection_changes = False
         self._tree_loading = False
+        self._truncate_cache = {}
+        self._truncate_cache_limit = 8000
+        self._hovered_column = None
+        self._resizing_column = None
+        self._total_item_count = 0
         self._payload_executor = ThreadPoolExecutor(max_workers=1)
         self._payload_batch_size = 500
         self._load_queue = None
@@ -462,6 +467,8 @@ class GenericListView(ctk.CTkFrame):
 
         self._cell_texts = {}
         self._tooltip = _ToolTip(self.tree, self._get_cell_text)
+        self.tree.bind("<Motion>", self._on_tree_motion, add="+")
+        self.tree.bind("<Leave>", self._on_tree_leave, add="+")
 
         self.footer_frame = ctk.CTkFrame(self)
         self.footer_frame.pack(fill="x", padx=5, pady=(0, 5))
@@ -553,6 +560,8 @@ class GenericListView(ctk.CTkFrame):
         self._iid_to_item = {}
         self.batch_index = 0
         total_items = len(self.filtered_items)
+        self._total_item_count = total_items
+        self._truncate_cache.clear()
         # Configure batch sizing before streaming so TreeviewLoader has sane chunks.
         self._configure_batch_settings(total_items)
         # Keep UI insert bursts small so rows appear in ~20-item increments.
@@ -1355,6 +1364,12 @@ class GenericListView(ctk.CTkFrame):
 
     def on_button_press(self, event):
         region = self.tree.identify("region", event.x, event.y)
+        if region == "separator":
+            self._resizing_column = self._normalize_column_id(
+                self.tree.identify_column(event.x)
+            )
+            self.dragging_column = None
+            return
         if region == "heading":
             col = self.tree.identify_column(event.x)
             if col != "#0":
@@ -1388,6 +1403,7 @@ class GenericListView(ctk.CTkFrame):
             self.dragging_column = None
         else:
             self.on_tree_drop(event)
+        self._resizing_column = None
         self._save_column_settings()
 
     def on_tree_click(self, event):
@@ -1415,6 +1431,14 @@ class GenericListView(ctk.CTkFrame):
             return
         self.dragging_iid = row
         self.start_index = self.tree.index(self.dragging_iid) if self.dragging_iid else None
+
+    def _on_tree_motion(self, event):
+        column = self._normalize_column_id(self.tree.identify_column(event.x))
+        if column != self._hovered_column:
+            self._hovered_column = column
+
+    def _on_tree_leave(self, _):
+        self._hovered_column = None
 
     def on_tree_drag(self, event):
         pass
@@ -2412,18 +2436,20 @@ class GenericListView(ctk.CTkFrame):
     def _format_cell(self, column_id, value, iid=None):
         """Prepare a value for display in the tree, truncating if needed."""
         text = self.clean_value(value)
-        if iid is not None and column_id != "#0" and column_id != self._link_column:
+        if iid is not None and self._should_cache_cell_text(column_id):
             self._cell_texts[(iid, column_id)] = text
         return self._truncate_text(text, column_id)
 
     def _truncate_text(self, text, column_id):
         if not text:
             return ""
+        if column_id in self._longtext_columns:
+            return self._approximate_truncate(text, column_id)
+        if self._tree_loading and not self._should_use_precise_truncation(column_id):
+            return self._approximate_truncate(text, column_id)
         # For long-form fields (description-like), use a fast character-based
         # truncation to avoid thousands of font measurement calls on big
         # datasets (e.g., Dresden NPCs).
-        if column_id in self._longtext_columns:
-            return self._approximate_truncate(text, column_id)
         try:
             width = self.tree.column(column_id, "width")
         except Exception:
@@ -2431,17 +2457,26 @@ class GenericListView(ctk.CTkFrame):
         if width <= 0:
             return text
 
+        cached = self._truncate_cache.get((column_id, width, text))
+        if cached is not None:
+            return cached
+
         available = max(width - 12, 0)
         if self._tree_font.measure(text) <= available:
+            self._store_truncate_cache(column_id, width, text, text)
             return text
 
         ellipsis_width = self._tree_font.measure(self._ellipsis)
         if ellipsis_width >= available:
-            return self._ellipsis if ellipsis_width <= width else ""
+            result = self._ellipsis if ellipsis_width <= width else ""
+            self._store_truncate_cache(column_id, width, text, result)
+            return result
 
         max_width = available - ellipsis_width
         if max_width <= 0:
-            return self._ellipsis
+            result = self._ellipsis
+            self._store_truncate_cache(column_id, width, text, result)
+            return result
 
         # Binary search the longest prefix that fits the available width.
         low, high = 0, len(text)
@@ -2456,7 +2491,34 @@ class GenericListView(ctk.CTkFrame):
             else:
                 high = mid - 1
 
-        return best_prefix + self._ellipsis
+        result = best_prefix + self._ellipsis
+        self._store_truncate_cache(column_id, width, text, result)
+        return result
+
+    def _should_cache_cell_text(self, column_id):
+        if column_id == "#0" or column_id == self._link_column:
+            return False
+        column_key = self._normalize_column_id(column_id)
+        try:
+            display = set(self.tree["displaycolumns"])
+        except Exception:
+            display = set(self.columns)
+        if column_key not in display:
+            return False
+        return self._total_item_count <= 1500
+
+    def _should_use_precise_truncation(self, column_id):
+        column_key = self._normalize_column_id(column_id)
+        if self._resizing_column and column_key == self._resizing_column:
+            return True
+        if self._hovered_column and column_key == self._hovered_column:
+            return True
+        return False
+
+    def _store_truncate_cache(self, column_id, width, text, result):
+        if len(self._truncate_cache) >= self._truncate_cache_limit:
+            self._truncate_cache.clear()
+        self._truncate_cache[(column_id, width, text)] = result
 
     def _approximate_truncate(self, text, column_id):
         """Cheap truncation for longtext columns: trim by character count."""
