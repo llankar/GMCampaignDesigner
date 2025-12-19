@@ -22,6 +22,8 @@ class TreeviewLoader:
             self.tree.state(("disabled",))
         except Exception:
             pass
+        if not self._tree_alive():
+            return
         self.tree.delete(*self.tree.get_children(""))
         try:
             self.tree.state(("!disabled",))
@@ -81,13 +83,27 @@ class TreeviewLoader:
     def _run_next_chunk(self) -> None:
         if not self._insert_callback:
             return
+        if not self._tree_alive():
+            self._job = None
+            self._rows = []
+            return
         end = min(self._index + self._chunk_size, len(self._rows))
         for payload in self._rows[self._index:end]:
             self._insert_callback(payload)
         self._index = end
         if self._index < len(self._rows):
+            if not self._tree_alive():
+                self._job = None
+                self._rows = []
+                return
             self._job = self.tree.after(self._delay_ms, self._run_next_chunk)
         else:
             self._job = None
             if self._on_complete:
                 self._on_complete()
+
+    def _tree_alive(self) -> bool:
+        try:
+            return bool(self.tree.winfo_exists())
+        except Exception:
+            return False

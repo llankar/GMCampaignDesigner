@@ -925,6 +925,8 @@ class GenericListView(ctk.CTkFrame):
         }
 
     def _insert_tree_payload(self, payload):
+        if not self._tree_is_available():
+            return
         if payload.get("type") == "group":
             if self.tree.exists(payload["iid"]):
                 return
@@ -967,6 +969,12 @@ class GenericListView(ctk.CTkFrame):
         if self._pending_scroll_load:
             self._pending_scroll_load = False
             self._load_next_page(auto=True)
+
+    def _tree_is_available(self):
+        try:
+            return bool(self.tree.winfo_exists())
+        except Exception:
+            return False
 
     def update_entity_count(self):
         total = len(self.filtered_items)
