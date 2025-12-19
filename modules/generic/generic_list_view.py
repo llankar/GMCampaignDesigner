@@ -44,6 +44,7 @@ from modules.books.pdf_processing import (
     get_pdf_page_count,
 )
 from modules.generic.helpers.treeview_loader import TreeviewLoader
+from modules.generic.helpers.virtual_list_controller import VirtualListController
 from modules.helpers.logging_helper import (
     log_debug,
     log_function,
@@ -198,6 +199,13 @@ class GenericListView(ctk.CTkFrame):
         self._resizing_column = None
         self._total_item_count = 0
         self._payload_executor = ThreadPoolExecutor(max_workers=1)
+        self._virtual_mode_enabled = False
+        self._virtual_controller = None
+        self._virtual_buffer_rows = 8
+        self._virtual_threshold = 1200
+        self._virtual_row_height = 25
+        self._virtual_update_job = None
+        self._virtual_window_items = []
         self._payload_batch_size = 500
         self._load_queue = None
         self._load_thread = None
@@ -564,6 +572,7 @@ class GenericListView(ctk.CTkFrame):
         self._truncate_cache.clear()
         # Configure batch sizing before streaming so TreeviewLoader has sane chunks.
         self._configure_batch_settings(total_items)
+        self._configure_virtual_mode(total_items)
         # Reset collections to avoid double-counting once background load begins.
         if not skip_background_fetch:
             self.items = []
@@ -583,22 +592,33 @@ class GenericListView(ctk.CTkFrame):
             if not skip_background_fetch:
                 self.items.extend(initial_slice)
                 self.filtered_items.extend(initial_slice)
-            self._display_queue.extend(initial_slice)
-            initial_payloads = self._build_payloads(initial_slice)
-            self._start_tree_insertion(initial_payloads, reset_tree=True)
+            if self._virtual_mode_enabled:
+                self._set_virtual_total_rows(len(self.filtered_items))
+                self._render_virtual_window()
+            else:
+                self._display_queue.extend(initial_slice)
+                initial_payloads = self._build_payloads(initial_slice)
+                self._start_tree_insertion(initial_payloads, reset_tree=True)
             for it in initial_slice:
                 base_id = self._get_base_id(it)
                 if base_id:
                     self._seen_base_ids.add(base_id)
+        elif self._virtual_mode_enabled:
+            self._set_virtual_total_rows(len(self.filtered_items))
+            self._render_virtual_window()
         if skip_background_fetch:
             self._load_session_id += 1
             self._load_queue = None
             remaining_items = self.filtered_items[len(initial_slice):]
-            if remaining_items:
-                self._display_queue.extend(remaining_items)
-                self._submit_payload_job(remaining_items, reset_tree=False)
-            elif not initial_slice:
-                self._on_tree_load_complete()
+            if self._virtual_mode_enabled:
+                self._set_virtual_total_rows(len(self.filtered_items))
+                self._render_virtual_window()
+            else:
+                if remaining_items:
+                    self._display_queue.extend(remaining_items)
+                    self._submit_payload_job(remaining_items, reset_tree=False)
+                elif not initial_slice:
+                    self._on_tree_load_complete()
         else:
             # Async background fetch: load DB rows in a worker thread, enqueue to UI.
             self._first_chunk_inserted = False
@@ -669,10 +689,99 @@ class GenericListView(ctk.CTkFrame):
             return 700
         return 500
 
+    def _should_use_virtual_mode(self, total_items):
+        if self.group_column:
+            return False
+        return total_items >= self._virtual_threshold
+
+    def _configure_virtual_mode(self, total_items):
+        enable = self._should_use_virtual_mode(total_items)
+        if enable == self._virtual_mode_enabled:
+            if enable:
+                self._set_virtual_total_rows(len(self.filtered_items))
+            return
+        if enable:
+            self._virtual_mode_enabled = True
+            # Treeview virtualization is used for now; consider swapping in a canvas-based
+            # list renderer for extremely large datasets.
+            if not self._virtual_controller:
+                self._virtual_controller = VirtualListController(
+                    self.tree,
+                    self._vertical_scrollbar,
+                    row_height=self._virtual_row_height,
+                    buffer_rows=self._virtual_buffer_rows,
+                )
+            self._virtual_controller.attach(self._on_virtual_window_changed)
+            self._virtual_controller.refresh_window_for_height(self.tree.winfo_height() or 0)
+            self._set_virtual_total_rows(len(self.filtered_items))
+        else:
+            self._virtual_mode_enabled = False
+            if self._virtual_controller:
+                self._virtual_controller.detach()
+            self.tree.configure(yscrollcommand=self._on_tree_yview)
+            if self._vertical_scrollbar:
+                self._vertical_scrollbar.configure(command=self.tree.yview)
+            if self._virtual_update_job:
+                try:
+                    self.after_cancel(self._virtual_update_job)
+                except Exception:
+                    pass
+                self._virtual_update_job = None
+            self._virtual_window_items = []
+
+    def _set_virtual_total_rows(self, total_rows):
+        if self._virtual_controller:
+            self._virtual_controller.set_total_rows(total_rows)
+
+    def _on_virtual_window_changed(self, start_index, window_rows):
+        self._virtual_window_start = start_index
+        self._virtual_window_rows = window_rows
+        self._schedule_virtual_window_refresh()
+
+    def _schedule_virtual_window_refresh(self):
+        if self._virtual_update_job:
+            return
+        self._virtual_update_job = self.after(10, self._render_virtual_window)
+
+    def _render_virtual_window(self):
+        if self._virtual_update_job:
+            try:
+                self.after_cancel(self._virtual_update_job)
+            except Exception:
+                pass
+            self._virtual_update_job = None
+        if not self._virtual_mode_enabled:
+            return
+        start_index = getattr(self, "_virtual_window_start", 0)
+        window_rows = getattr(self, "_virtual_window_rows", 1)
+        total = len(self.filtered_items)
+        if total == 0:
+            self._reset_tree_for_window()
+            self._display_queue = []
+            self.update_entity_count()
+            return
+        start_index = max(0, min(start_index, total - 1))
+        end_index = min(start_index + window_rows, total)
+        window_items = self.filtered_items[start_index:end_index]
+        self._virtual_window_items = window_items
+        self._reset_tree_for_window()
+        self._display_queue = list(window_items)
+        payloads = self._build_payloads(window_items)
+        self._set_tree_loading(True)
+        self._start_tree_insertion(payloads, reset_tree=True)
+
     def _reset_tree_for_window(self):
         self._base_to_iids = {}
         self._base_id_counters = {}
         self._group_nodes = {}
+        self._iid_to_item = {}
+        self._last_tree_selection = set()
+        self._linked_rows.clear()
+        self._linked_row_sources.clear()
+        self._link_targets.clear()
+        self._link_children.clear()
+        self._auto_expanded_rows.clear()
+        self._pinned_linked_rows.clear()
         if self._tree_loader:
             self._tree_loader.reset_tree()
         else:
@@ -772,6 +881,12 @@ class GenericListView(ctk.CTkFrame):
 
         # Only extend with deduped rows to avoid inflating counts
         self.filtered_items.extend(deduped)
+        if self._virtual_mode_enabled:
+            self._set_virtual_total_rows(len(self.filtered_items))
+            self._schedule_virtual_window_refresh()
+            self.update_entity_count()
+            return
+
         self._display_queue.extend(deduped)
 
         reset_tree = not self._first_chunk_inserted
@@ -940,9 +1055,15 @@ class GenericListView(ctk.CTkFrame):
     def update_entity_count(self):
         total = len(self.filtered_items)
         overall = len(self.items)
-        visible = min(len(self._display_queue), total)
-        start_idx = 1 if total else 0
-        end_idx = visible if total else 0
+        if self._virtual_mode_enabled:
+            window_items = len(self._virtual_window_items or [])
+            start_base = getattr(self, "_virtual_window_start", 0)
+            start_idx = start_base + 1 if total else 0
+            end_idx = min(start_base + window_items, total) if total else 0
+        else:
+            visible = min(len(self._display_queue), total)
+            start_idx = 1 if total else 0
+            end_idx = visible if total else 0
         text = (
             f"Displaying {start_idx}-{end_idx} of {total} filtered / {overall} total entities"
         )
@@ -979,6 +1100,8 @@ class GenericListView(ctk.CTkFrame):
         self._pending_scroll_load = False
 
     def _on_tree_yview(self, first, last):
+        if self._virtual_mode_enabled:
+            return
         if getattr(self, "_vertical_scrollbar", None):
             self._vertical_scrollbar.set(first, last)
         # No-op for infinite scrolling; everything is loaded eagerly.
@@ -1053,6 +1176,9 @@ class GenericListView(ctk.CTkFrame):
         )
         if self.shelf_view:
             self.shelf_view.hide()
+        if self._virtual_mode_enabled and self._virtual_controller:
+            self._virtual_controller.refresh_window_for_height(self.tree.winfo_height() or 0)
+            self._render_virtual_window()
         self.update_entity_count()
         self._update_view_toggle_state()
 
@@ -3651,10 +3777,11 @@ class GenericListView(ctk.CTkFrame):
         if not hasattr(self, "tree"):
             return
         visible = set(self._base_to_iids.keys())
-        if visible:
-            self.selected_iids = {base_id for base_id in self.selected_iids if base_id in visible}
-        else:
-            self.selected_iids = set()
+        if not self._virtual_mode_enabled:
+            if visible:
+                self.selected_iids = {base_id for base_id in self.selected_iids if base_id in visible}
+            else:
+                self.selected_iids = set()
         self._suppress_tree_select_event = True
         desired = []
         try:
@@ -3684,12 +3811,24 @@ class GenericListView(ctk.CTkFrame):
                 headers = set(info.get("headers", []))
                 if names.intersection(selection_set) or headers.intersection(selection_set):
                     parents_with_selected_children.add(parent_iid)
-        selected = set()
-        for iid in current_selection:
-            _, base_id = self._find_item_by_iid(iid)
-            if base_id:
-                selected.add(base_id)
-        self.selected_iids = selected
+        if self._virtual_mode_enabled:
+            selected = set(self.selected_iids)
+            for iid in deselected:
+                _, base_id = self._find_item_by_iid(iid)
+                if base_id and base_id in selected:
+                    selected.remove(base_id)
+            for iid in newly_selected:
+                _, base_id = self._find_item_by_iid(iid)
+                if base_id:
+                    selected.add(base_id)
+            self.selected_iids = selected
+        else:
+            selected = set()
+            for iid in current_selection:
+                _, base_id = self._find_item_by_iid(iid)
+                if base_id:
+                    selected.add(base_id)
+            self.selected_iids = selected
         if current_selection:
             focus_iid = self.tree.focus()
             if focus_iid not in current_selection:
