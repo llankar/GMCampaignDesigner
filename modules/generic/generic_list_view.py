@@ -564,8 +564,6 @@ class GenericListView(ctk.CTkFrame):
         self._truncate_cache.clear()
         # Configure batch sizing before streaming so TreeviewLoader has sane chunks.
         self._configure_batch_settings(total_items)
-        # Keep UI insert bursts small so rows appear in ~20-item increments.
-        self.batch_size = 10
         # Reset collections to avoid double-counting once background load begins.
         if not skip_background_fetch:
             self.items = []
@@ -574,8 +572,6 @@ class GenericListView(ctk.CTkFrame):
         self._next_page_start = 0
         self._pending_scroll_load = False
         self._page_size = self._calculate_page_size(total_items)
-        # Use small delay to let the UI breathe while streaming in rows.
-        self._batch_delay_ms = 5
         self._payload_batch_size = self._calculate_payload_batch_size(total_items)
         self._set_tree_loading(True)
         if self._tree_loader:
@@ -635,16 +631,16 @@ class GenericListView(ctk.CTkFrame):
     def _configure_batch_settings(self, total_items):
         if total_items > 2500:
             self.batch_size = 800
-            self._batch_delay_ms = 10
+            self._batch_delay_ms = 8
         elif total_items > 1500:
             self.batch_size = 650
-            self._batch_delay_ms = 15
+            self._batch_delay_ms = 10
         elif total_items > 800:
             self.batch_size = 500
-            self._batch_delay_ms = 20
+            self._batch_delay_ms = 12
         else:
             self.batch_size = 300
-            self._batch_delay_ms = 25
+            self._batch_delay_ms = 15
         # Allow large batches even when many rows are displayed to reduce UI churn
         self._payload_batch_size = self._calculate_payload_batch_size(total_items)
 
