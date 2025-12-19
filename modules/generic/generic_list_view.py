@@ -1796,11 +1796,7 @@ class GenericListView(ctk.CTkFrame):
         marker = ""
         if not self._link_column:
             return marker
-        if self._has_linkable_content(item):
-            marker = "+"
-            self._linked_row_sources[iid] = item
-        else:
-            self._linked_row_sources.pop(iid, None)
+        self._linked_row_sources[iid] = item
         self._linked_rows.pop(iid, None)
         self._link_children.pop(iid, None)
         self._auto_expanded_rows.discard(iid)
@@ -1812,6 +1808,11 @@ class GenericListView(ctk.CTkFrame):
             return self._linked_rows[parent_iid]
         item = self._linked_row_sources.get(parent_iid)
         if not item:
+            return None
+        if not self._has_linkable_content(item):
+            self._linked_row_sources.pop(parent_iid, None)
+            if self._link_column and self.tree.exists(parent_iid):
+                self.tree.set(parent_iid, self._link_column, "")
             return None
         groups = self._collect_linked_entities(item)
         if groups:
