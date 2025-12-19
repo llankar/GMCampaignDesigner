@@ -109,16 +109,6 @@ except AttributeError:  # Pillow < 9.1 fallback
 def sanitize_id(s):
     return re.sub(r'[^a-zA-Z0-9]+', '_', str(s)).strip('_')
 
-@log_function
-def unique_iid(tree, base_id):
-    """Return a unique iid for the given treeview based on base_id."""
-    iid = base_id
-    counter = 1
-    while tree.exists(iid):
-        counter += 1
-        iid = f"{base_id}_{counter}"
-    return iid
-
 @log_methods
 class _ToolTip:
     """Simple tooltip for a Treeview showing full cell text on hover."""
@@ -186,6 +176,7 @@ class GenericListView(ctk.CTkFrame):
         self.filtered_items = list(self.items)
         self.selected_iids = set()
         self._base_to_iids = {}
+        self._base_id_counters = {}
         self._suppress_tree_select_event = False
         self.grid_cards = []
         self.copied_items = []
@@ -556,6 +547,7 @@ class GenericListView(ctk.CTkFrame):
         self._auto_expanded_rows.clear()
         self._pinned_linked_rows.clear()
         self._base_to_iids = {}
+        self._base_id_counters = {}
         self._group_nodes = {}
         self._seen_base_ids = set()
         self._iid_to_item = {}
@@ -674,12 +666,18 @@ class GenericListView(ctk.CTkFrame):
 
     def _reset_tree_for_window(self):
         self._base_to_iids = {}
+        self._base_id_counters = {}
         self._group_nodes = {}
         if self._tree_loader:
             self._tree_loader.reset_tree()
         else:
             self.tree.delete(*self.tree.get_children(""))
         self._display_queue = []
+
+    def _next_iid(self, base_id):
+        counter = self._base_id_counters.get(base_id, 0) + 1
+        self._base_id_counters[base_id] = counter
+        return f"{base_id}_{counter}"
 
     def _background_fetch_items(self, session_id):
         """Load items from DB in chunks on a worker thread."""
@@ -857,7 +855,7 @@ class GenericListView(ctk.CTkFrame):
                 group_id = self._group_nodes.get(group_val)
                 if not group_id:
                     base_group_id = sanitize_id(f"group_{group_val}")
-                    group_id = unique_iid(self.tree, base_group_id)
+                    group_id = self._next_iid(base_group_id)
                     self._group_nodes[group_val] = group_id
                     payloads.append({"type": "group", "iid": group_id, "label": group_val})
                 payloads.append(self._build_row_payload(item, parent=group_id))
@@ -870,7 +868,7 @@ class GenericListView(ctk.CTkFrame):
         if isinstance(raw, dict):
             raw = raw.get("text", "")
         base_id = sanitize_id(raw or f"item_{int(time.time()*1000)}").lower()
-        iid = unique_iid(self.tree, base_id)
+        iid = self._next_iid(base_id)
         name_text = self._format_cell("#0", item.get(self.unique_field, ""), iid)
         values = []
         if self._link_column:
@@ -1536,7 +1534,7 @@ class GenericListView(ctk.CTkFrame):
 
         for group_val in sorted(grouped.keys()):
             base_group_id = sanitize_id(f"group_{group_val}")
-            group_id = unique_iid(self.tree, base_group_id)
+            group_id = self._next_iid(base_group_id)
             self.tree.insert(
                 "",
                 "end",
@@ -1550,7 +1548,7 @@ class GenericListView(ctk.CTkFrame):
                 if isinstance(raw, dict):
                     raw = raw.get("text", "")
                 base_iid = sanitize_id(raw or f"item_{int(time.time()*1000)}").lower()
-                iid = unique_iid(self.tree, base_iid)
+                iid = self._next_iid(base_iid)
                 name_text = self._format_cell("#0", item.get(self.unique_field, ""), iid)
                 vals = []
                 if self._link_column:
@@ -1823,7 +1821,7 @@ class GenericListView(ctk.CTkFrame):
             if not names:
                 continue
             header_base = sanitize_id(f"{parent_iid}_{slug}_group") or f"{parent_iid}_{slug}_group"
-            header_iid = unique_iid(self.tree, header_base)
+            header_iid = self._next_iid(header_base)
             header_label = self._display_label_for_slug(slug)
             self.tree.insert(parent_iid, "end", iid=header_iid, text=header_label, values=self._blank_row_values())
             self.tree.item(header_iid, open=True)
@@ -1849,7 +1847,7 @@ class GenericListView(ctk.CTkFrame):
                     sanitize_id(f"{parent_iid}_{slug}_{display_name}")
                     or f"{parent_iid}_{slug}_{int(time.time()*1000)}"
                 )
-                name_iid = unique_iid(self.tree, name_base)
+                name_iid = self._next_iid(name_base)
                 self.tree.insert(
                     header_iid,
                     "end",
