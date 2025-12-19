@@ -233,6 +233,7 @@ class GenericListView(ctk.CTkFrame):
         # a faster, approximate truncation for them instead of expensive font
         # measurements on every cell.
         self._longtext_columns = set()
+        self._json_columns = set()
         for field in self.template.get("fields", []):
             if not isinstance(field, dict):
                 continue
@@ -242,6 +243,9 @@ class GenericListView(ctk.CTkFrame):
             ftype = str(field.get("type", "")).strip().lower()
             if ftype in {"longtext", "list_longtext", "list"}:
                 self._longtext_columns.add(name)
+                self._json_columns.add(name)
+        if self._json_columns:
+            self.model_wrapper.set_json_columns(self._json_columns)
 
         # Add a dedicated link column when the template supports linked entities so users
         # can expand/collapse rows to view the linked records.
