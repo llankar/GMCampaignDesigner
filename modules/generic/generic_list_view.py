@@ -172,8 +172,8 @@ class GenericListView(ctk.CTkFrame):
         self.media_field = self._detect_media_field()
         os.makedirs(PORTRAIT_FOLDER, exist_ok=True)
 
-        self.items = self.model_wrapper.load_items()
-        self.filtered_items = list(self.items)
+        self.items = []
+        self.filtered_items = []
         self.selected_iids = set()
         self._base_to_iids = {}
         self._base_id_counters = {}
@@ -286,6 +286,9 @@ class GenericListView(ctk.CTkFrame):
         # --- Column configuration ---
         self.column_section = f"ColumnSettings_{self.model_wrapper.entity_type}"
         self._load_column_settings()
+
+        self.items = self._load_list_items()
+        self.filtered_items = list(self.items)
 
         # --- Display fields for second screen ---
         self.display_section = f"DisplayFields_{self.model_wrapper.entity_type}"
@@ -519,13 +522,32 @@ class GenericListView(ctk.CTkFrame):
                     kwargs["before"] = self.tree_frame
             self.search_frame.pack(**kwargs)
 
+    def _list_view_columns(self):
+        if hasattr(self, "column_order") and hasattr(self, "hidden_columns"):
+            visible_columns = [c for c in self.column_order if c not in self.hidden_columns]
+        else:
+            visible_columns = list(self.columns)
+        columns = []
+        if self.unique_field:
+            columns.append(self.unique_field)
+        for col in visible_columns:
+            if col and col not in columns:
+                columns.append(col)
+        return columns
+
+    def _load_list_items(self):
+        return self.model_wrapper.load_items(
+            columns=self._list_view_columns(),
+            deserialize=False,
+        )
+
     def reload_from_db(self):
         """Reload items from the model wrapper and refresh the view."""
         log_info(
             f"Reloading {self.model_wrapper.entity_type} list from database",
             func_name="GenericListView.reload_from_db",
         )
-        self.items = self.model_wrapper.load_items()
+        self.items = self._load_list_items()
         self.filtered_items = list(self.items)
         self.selected_iids.clear()
         self.refresh_list()
@@ -696,13 +718,18 @@ class GenericListView(ctk.CTkFrame):
             conn = self.model_wrapper._get_connection()
             conn.row_factory = sqlite3.Row
             cur = conn.cursor()
-            cur.execute(f"SELECT * FROM {self.model_wrapper.table}")
+            columns = self._list_view_columns()
+            if columns:
+                column_list = ", ".join(columns)
+                cur.execute(f"SELECT {column_list} FROM {self.model_wrapper.table}")
+            else:
+                cur.execute(f"SELECT * FROM {self.model_wrapper.table}")
             batch = 40
             while True:
                 rows = cur.fetchmany(batch)
                 if not rows:
                     break
-                items = [self.model_wrapper._deserialize_row(r) for r in rows]
+                items = [{key: row[key] for key in row.keys()} for row in rows]
                 if self._load_queue:
                     self._load_queue.put((session_id, items))
             if self._load_queue:
@@ -2064,7 +2091,7 @@ class GenericListView(ctk.CTkFrame):
                 messagebox.showerror("Open Linked Entity", f"Failed to save changes: {exc}")
                 return
             if slug == self.model_wrapper.entity_type:
-                self.items = self.model_wrapper.load_items()
+                self.items = self._load_list_items()
                 current_query = self.search_var.get() if hasattr(self, "search_var") else ""
                 if current_query:
                     self.filter_items(current_query)
@@ -2986,7 +3013,7 @@ class GenericListView(ctk.CTkFrame):
             messagebox.showerror("Import Books", f"Failed to save imported books:\n{exc}")
             return
 
-        self.items = self.model_wrapper.load_items()
+        self.items = self._load_list_items()
         self.filter_items(self.search_var.get())
         messagebox.showinfo(
             "Import Books",
@@ -3084,7 +3111,7 @@ class GenericListView(ctk.CTkFrame):
 
     def _on_book_indexing_complete(self, success_count, failures):
         try:
-            self.items = self.model_wrapper.load_items()
+            self.items = self._load_list_items()
         except Exception as exc:
             messagebox.showerror("Book Indexing", f"Failed to refresh books after indexing:\n{exc}")
             return
@@ -3548,7 +3575,7 @@ class GenericListView(ctk.CTkFrame):
                     except Exception as save_exc:
                         messagebox.showerror("AI Categorize", f"Failed to save categories: {save_exc}")
                         return
-                    self.items = self.model_wrapper.load_items()
+                    self.items = self._load_list_items()
                     self.filter_items(current_query)
                 summary = []
                 if updated:

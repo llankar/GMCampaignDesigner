@@ -67,13 +67,20 @@ class GenericModelWrapper:
             return "Title"
         return "Name"
 
-    def load_items(self):
+    def load_items(self, columns=None, deserialize=True):
         conn = self._get_connection()
         conn.row_factory = sqlite3.Row  # This makes rows behave like dictionaries.
         cursor = conn.cursor()
-        cursor.execute(f"SELECT * FROM {self.table}")
+        if columns:
+            column_list = ", ".join(columns)
+            cursor.execute(f"SELECT {column_list} FROM {self.table}")
+        else:
+            cursor.execute(f"SELECT * FROM {self.table}")
         rows = cursor.fetchall()
-        items = [self._deserialize_row(row) for row in rows]
+        if deserialize:
+            items = [self._deserialize_row(row) for row in rows]
+        else:
+            items = [{key: row[key] for key in row.keys()} for row in rows]
         conn.close()
         return items
 
