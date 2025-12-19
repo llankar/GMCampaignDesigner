@@ -1,27 +1,57 @@
 import sqlite3
 import json
 from db.db import get_connection, load_schema_from_json
+from modules.helpers.template_loader import load_template
 from modules.helpers.logging_helper import log_module_import
 
 log_module_import(__name__)
 
+JSON_FIELD_TYPES = {"list", "list_longtext", "longtext"}
+
+
 class GenericModelWrapper:
-    def __init__(self, entity_type, db_path=None):
+    def __init__(self, entity_type, db_path=None, json_columns=None):
         self.entity_type = entity_type
         # Assume your table name is the same as the entity type (e.g., "npcs")
         self.table = entity_type
         self._db_path = db_path
+        self._json_columns = set(json_columns) if json_columns else None
 
     def _get_connection(self):
         if self._db_path:
             return sqlite3.connect(self._db_path)
         return get_connection()
 
+    def set_json_columns(self, json_columns):
+        self._json_columns = set(json_columns) if json_columns else set()
+
+    def _resolve_json_columns(self):
+        if self._json_columns is not None:
+            return self._json_columns
+        try:
+            template = load_template(self.entity_type)
+        except Exception:
+            self._json_columns = set()
+            return self._json_columns
+        columns = set()
+        for field in template.get("fields", []):
+            if not isinstance(field, dict):
+                continue
+            field_type = str(field.get("type", "")).strip().lower()
+            if field_type not in JSON_FIELD_TYPES:
+                continue
+            name = field.get("name")
+            if name:
+                columns.add(name)
+        self._json_columns = columns
+        return self._json_columns
+
     def _deserialize_row(self, row):
         item = {}
+        json_columns = self._resolve_json_columns()
         for key in row.keys():
             value = row[key]
-            if isinstance(value, str) and value.strip().startswith(("{", "[", "\"")):
+            if isinstance(value, str) and key in json_columns:
                 try:
                     item[key] = json.loads(value)
                 except (TypeError, json.JSONDecodeError):
