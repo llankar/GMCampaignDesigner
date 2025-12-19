@@ -539,7 +539,7 @@ class GenericListView(ctk.CTkFrame):
         title = str(item.get(self.unique_field, ""))
         show_portrait(path, title)
 
-    def refresh_list(self):
+    def refresh_list(self, *, skip_background_fetch=False):
         log_info(f"Refreshing list for {self.model_wrapper.entity_type}", func_name="GenericListView.refresh_list")
         # Keep a tiny seed to show immediately
         initial_slice = self.filtered_items[: min(50, len(self.filtered_items))]
@@ -566,8 +566,9 @@ class GenericListView(ctk.CTkFrame):
         # Keep UI insert bursts small so rows appear in ~20-item increments.
         self.batch_size = 10
         # Reset collections to avoid double-counting once background load begins.
-        self.items = []
-        self.filtered_items = []
+        if not skip_background_fetch:
+            self.items = []
+            self.filtered_items = []
         self._display_queue = []
         self._next_page_start = 0
         self._pending_scroll_load = False
@@ -582,8 +583,9 @@ class GenericListView(ctk.CTkFrame):
             self.tree.delete(*self.tree.get_children())
         # Seed the UI immediately with a small slice so something appears at once.
         if initial_slice:
-            self.items.extend(initial_slice)
-            self.filtered_items.extend(initial_slice)
+            if not skip_background_fetch:
+                self.items.extend(initial_slice)
+                self.filtered_items.extend(initial_slice)
             self._display_queue.extend(initial_slice)
             initial_payloads = self._build_payloads(initial_slice)
             self._start_tree_insertion(initial_payloads, reset_tree=True)
@@ -591,22 +593,32 @@ class GenericListView(ctk.CTkFrame):
                 base_id = self._get_base_id(it)
                 if base_id:
                     self._seen_base_ids.add(base_id)
-        # Async background fetch: load DB rows in a worker thread, enqueue to UI.
-        self._first_chunk_inserted = False
-        self._load_session_id += 1
-        session_id = self._load_session_id
-        self._load_queue = queue.Queue()
-        query = ""
-        if hasattr(self, "search_var"):
-            try:
-                query = self.search_var.get().strip().lower()
-            except Exception:
-                query = ""
-        self._load_thread = threading.Thread(
-            target=self._background_fetch_items, args=(session_id,), daemon=True
-        )
-        self._load_thread.start()
-        self.after(0, lambda: self._drain_load_queue(session_id, query))
+        if skip_background_fetch:
+            self._load_session_id += 1
+            self._load_queue = None
+            remaining_items = self.filtered_items[len(initial_slice):]
+            if remaining_items:
+                self._display_queue.extend(remaining_items)
+                self._submit_payload_job(remaining_items, reset_tree=False)
+            elif not initial_slice:
+                self._on_tree_load_complete()
+        else:
+            # Async background fetch: load DB rows in a worker thread, enqueue to UI.
+            self._first_chunk_inserted = False
+            self._load_session_id += 1
+            session_id = self._load_session_id
+            self._load_queue = queue.Queue()
+            query = ""
+            if hasattr(self, "search_var"):
+                try:
+                    query = self.search_var.get().strip().lower()
+                except Exception:
+                    query = ""
+            self._load_thread = threading.Thread(
+                target=self._background_fetch_items, args=(session_id,), daemon=True
+            )
+            self._load_thread.start()
+            self.after(0, lambda: self._drain_load_queue(session_id, query))
         if self.view_mode == "grid":
             self.populate_grid()
         elif self.view_mode == "shelf" and self.shelf_view:
@@ -2470,7 +2482,7 @@ class GenericListView(ctk.CTkFrame):
             key=lambda x: str(x.get(column_name, "")),
             reverse=not asc
         )
-        self.refresh_list()
+        self.refresh_list(skip_background_fetch=True)
 
     def on_double_click(self, event):
         # Resolve target strictly from pointer position to avoid stale selection
