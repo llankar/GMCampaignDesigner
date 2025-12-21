@@ -1,58 +1,36 @@
-import json
-import re
-import time
-import os
-import sys
-import subprocess
-import threading
-from concurrent.futures import ThreadPoolExecutor
-from collections import OrderedDict
 import ast
+import copy
+import functools
+import json
+import os
+import queue
+import re
+import shutil
+import subprocess
+import sys
+import threading
+import time
+from collections import OrderedDict
+from concurrent.futures import ThreadPoolExecutor
+
 import customtkinter as ctk
 import tkinter as tk
 import tkinter.font as tkfont
-from tkinter import ttk, messagebox, filedialog, simpledialog
-import copy
 from PIL import Image
-from modules.generic.generic_editor_window import GenericEditorWindow
+from tkinter import filedialog, messagebox, simpledialog, ttk
+
 from modules.generic.generic_model_wrapper import GenericModelWrapper
-from modules.generic.generic_list_selection_view import GenericListSelectionView
-import queue
-from modules.ui.image_viewer import show_portrait
-from modules.ui.second_screen_display import show_entity_on_second_screen
-from modules.helpers.config_helper import ConfigHelper
-from modules.helpers import theme_manager
-from modules.audio.entity_audio import (
-    get_entity_audio_value,
-    play_entity_audio,
-    stop_entity_audio,
-)
-from modules.scenarios.gm_screen_view import GMScreenView
-from modules.scenarios.gm_layout_manager import GMScreenLayoutManager
-from modules.ai.authoring_wizard import AuthoringWizardView
-from modules.ai.local_ai_client import LocalAIClient
-import shutil
-from modules.helpers.template_loader import load_template
-from modules.books.book_importer import (
-    extract_text_from_book,
-    prepare_books_from_directory,
-    prepare_books_from_files,
-)
-from modules.books.book_viewer import open_book_viewer
-from modules.books.pdf_processing import (
-    export_pdf_page_range,
-    get_pdf_page_count,
-)
 from modules.generic.helpers.treeview_loader import TreeviewLoader
+from modules.helpers import theme_manager
+from modules.helpers.config_helper import ConfigHelper
 from modules.helpers.logging_helper import (
     log_debug,
     log_function,
     log_info,
     log_methods,
-    log_warning,
     log_module_import,
+    log_warning,
 )
-from modules.objects.object_shelf_canvas_view import ObjectShelfView
 from modules.objects.object_constants import OBJECT_CATEGORY_ALLOWED
 
 log_module_import(__name__)
@@ -105,6 +83,123 @@ except AttributeError:  # Pillow < 9.1 fallback
     RESAMPLE_MODE = Image.LANCZOS
 
 
+def _lazy_editor_window():
+    from modules.generic.generic_editor_window import GenericEditorWindow
+
+    return GenericEditorWindow
+
+
+def _lazy_selection_view():
+    from modules.generic.generic_list_selection_view import GenericListSelectionView
+
+    return GenericListSelectionView
+
+
+def _lazy_portrait_viewer():
+    from modules.ui.image_viewer import show_portrait
+
+    return show_portrait
+
+
+def _lazy_second_screen():
+    from modules.ui.second_screen_display import show_entity_on_second_screen
+
+    return show_entity_on_second_screen
+
+
+def _lazy_audio():
+    from modules.audio.entity_audio import (
+        get_entity_audio_value,
+        play_entity_audio,
+        stop_entity_audio,
+    )
+
+    return get_entity_audio_value, play_entity_audio, stop_entity_audio
+
+
+def _lazy_gm_screen():
+    from modules.scenarios.gm_layout_manager import GMScreenLayoutManager
+    from modules.scenarios.gm_screen_view import GMScreenView
+
+    return GMScreenLayoutManager, GMScreenView
+
+
+def _lazy_ai_components():
+    from modules.ai.authoring_wizard import AuthoringWizardView
+    from modules.ai.local_ai_client import LocalAIClient
+
+    return AuthoringWizardView, LocalAIClient
+
+
+def _lazy_template_loader():
+    from modules.helpers.template_loader import load_template
+
+    return load_template
+
+
+def _lazy_book_importers():
+    from modules.books.book_importer import (
+        extract_text_from_book,
+        prepare_books_from_directory,
+        prepare_books_from_files,
+    )
+
+    return extract_text_from_book, prepare_books_from_directory, prepare_books_from_files
+
+
+def _lazy_book_viewer():
+    from modules.books.book_viewer import open_book_viewer
+
+    return open_book_viewer
+
+
+def _lazy_pdf_processing():
+    from modules.books.pdf_processing import export_pdf_page_range, get_pdf_page_count
+
+    return export_pdf_page_range, get_pdf_page_count
+
+
+def _lazy_object_shelf():
+    from modules.objects.object_shelf_canvas_view import ObjectShelfView
+
+    return ObjectShelfView
+
+
+def _profile_call(name, fn):
+    if getattr(fn, "_profile_wrapped", False):
+        return fn
+
+    @functools.wraps(fn)
+    def wrapper(*args, **kwargs):
+        return fn(*args, **kwargs)
+
+    wrapper._profile_wrapped = True
+    return wrapper
+
+
+def _profile_module_functions(namespace, func_names, prefix):
+    for name in func_names:
+        fn = namespace.get(name)
+        if not callable(fn):
+            continue
+        namespace[name] = _profile_call(f"{prefix}.{name}", fn)
+
+
+def _profile_class_methods(cls, prefix):
+    for attr_name, attr_value in list(vars(cls).items()):
+        if attr_name.startswith("__"):
+            continue
+        wrapped = None
+        if isinstance(attr_value, staticmethod):
+            wrapped = staticmethod(_profile_call(f"{prefix}.{attr_name}", attr_value.__func__))
+        elif isinstance(attr_value, classmethod):
+            wrapped = classmethod(_profile_call(f"{prefix}.{attr_name}", attr_value.__func__))
+        elif callable(attr_value):
+            wrapped = _profile_call(f"{prefix}.{attr_name}", attr_value)
+        if wrapped is not None:
+            setattr(cls, attr_name, wrapped)
+
+
 @log_function
 def sanitize_id(s):
     return re.sub(r'[^a-zA-Z0-9]+', '_', str(s)).strip('_')
@@ -119,7 +214,6 @@ def unique_iid(tree, base_id):
         iid = f"{base_id}_{counter}"
     return iid
 
-@log_methods
 class _ToolTip:
     """Simple tooltip for a Treeview showing full cell text on hover."""
     def __init__(self, widget, text_resolver=None):
@@ -173,7 +267,6 @@ class _ToolTip:
             self.tipwindow = None
             self.text = ""
 
-@log_methods
 class GenericListView(ctk.CTkFrame):
     def __init__(self, master, model_wrapper, template, *args, **kwargs):
         super().__init__(master, *args, **kwargs)
@@ -182,8 +275,11 @@ class GenericListView(ctk.CTkFrame):
         self.media_field = self._detect_media_field()
         os.makedirs(PORTRAIT_FOLDER, exist_ok=True)
 
-        self.items = self.model_wrapper.load_items()
-        self.filtered_items = list(self.items)
+        # Start with empty collections and stream data in asynchronously to avoid
+        # blocking the UI on large tables.
+        self.items = []
+        self.filtered_items = []
+        self._initial_dataset_ready = False
         self.selected_iids = set()
         self._base_to_iids = {}
         self._suppress_tree_select_event = False
@@ -327,12 +423,12 @@ class GenericListView(ctk.CTkFrame):
         if self.model_wrapper.entity_type == "books":
             ctk.CTkButton(
                 self.search_frame,
-                text="Import PDFs…",
+                text="Import PDFs...",
                 command=self.import_books_from_files_dialog,
             ).pack(side="left", padx=5)
             ctk.CTkButton(
                 self.search_frame,
-                text="Import Folder…",
+                text="Import Folder...",
                 command=self.import_books_from_directory_dialog,
             ).pack(side="left", padx=5)
         if self.model_wrapper.entity_type in ("npcs", "scenarios"):
@@ -372,7 +468,8 @@ class GenericListView(ctk.CTkFrame):
 
         self.shelf_view = None
         if self.model_wrapper.entity_type == "objects":
-            self.shelf_view = ObjectShelfView(self, OBJECT_CATEGORY_ALLOWED)
+            shelf_cls = _lazy_object_shelf()
+            self.shelf_view = shelf_cls(self, OBJECT_CATEGORY_ALLOWED)
 
         style = ttk.Style(self)
         style.theme_use("clam")
@@ -523,8 +620,9 @@ class GenericListView(ctk.CTkFrame):
             f"Reloading {self.model_wrapper.entity_type} list from database",
             func_name="GenericListView.reload_from_db",
         )
-        self.items = self.model_wrapper.load_items()
-        self.filtered_items = list(self.items)
+        self.items = []
+        self.filtered_items = []
+        self._initial_dataset_ready = False
         self.selected_iids.clear()
         self.refresh_list()
         self._update_bulk_controls()
@@ -537,10 +635,13 @@ class GenericListView(ctk.CTkFrame):
             return
         path = item.get("Portrait", "")
         title = str(item.get(self.unique_field, ""))
+        show_portrait = _lazy_portrait_viewer()
         show_portrait(path, title)
 
     def refresh_list(self, *, skip_background_fetch=False):
         log_info(f"Refreshing list for {self.model_wrapper.entity_type}", func_name="GenericListView.refresh_list")
+        if not skip_background_fetch:
+            self._initial_dataset_ready = False
         # Keep a tiny seed to show immediately
         initial_slice = self.filtered_items[: min(50, len(self.filtered_items))]
         if self._tree_loader:
@@ -728,6 +829,7 @@ class GenericListView(ctk.CTkFrame):
                 else:
                     self._handle_loaded_items(payload, query)
         if done:
+            self._initial_dataset_ready = True
             self._on_tree_load_complete()
         else:
             self.after(15, lambda: self._drain_load_queue(session_id, query))
@@ -1327,7 +1429,8 @@ class GenericListView(ctk.CTkFrame):
         return ctk_image
 
     def _edit_item(self, item):
-        editor = GenericEditorWindow(
+        editor_cls = _lazy_editor_window()
+        editor = editor_cls(
             self.master,
             item,
             self.template,
@@ -1799,7 +1902,7 @@ class GenericListView(ctk.CTkFrame):
         if groups:
             self._linked_rows[parent_iid] = groups
             if self._link_column and self.tree.exists(parent_iid):
-                self.tree.set(parent_iid, self._link_column, "–")
+                self.tree.set(parent_iid, self._link_column, "-")
         else:
             self._linked_row_sources.pop(parent_iid, None)
             if self._link_column and self.tree.exists(parent_iid):
@@ -1869,7 +1972,7 @@ class GenericListView(ctk.CTkFrame):
         if headers:
             self._link_children[parent_iid] = {"headers": headers, "names": name_nodes}
         if self._link_column:
-            self.tree.set(parent_iid, self._link_column, "–")
+            self.tree.set(parent_iid, self._link_column, "-")
         if auto:
             self._auto_expanded_rows.add(parent_iid)
             self._pinned_linked_rows.discard(parent_iid)
@@ -1963,6 +2066,7 @@ class GenericListView(ctk.CTkFrame):
             messagebox.showerror("Open Linked Entity", f"Unable to prepare editor for '{slug}': {exc}")
             return
         try:
+            load_template = _lazy_template_loader()
             template = load_template(slug)
         except Exception as exc:
             messagebox.showerror("Open Linked Entity", f"Unable to load template for '{slug}': {exc}")
@@ -2025,7 +2129,8 @@ class GenericListView(ctk.CTkFrame):
             )
             return
 
-        editor = GenericEditorWindow(
+        editor_cls = _lazy_editor_window()
+        editor = editor_cls(
             self.master,
             target_item,
             template,
@@ -2041,13 +2146,12 @@ class GenericListView(ctk.CTkFrame):
                 messagebox.showerror("Open Linked Entity", f"Failed to save changes: {exc}")
                 return
             if slug == self.model_wrapper.entity_type:
-                self.items = self.model_wrapper.load_items()
                 current_query = self.search_var.get() if hasattr(self, "search_var") else ""
-                if current_query:
-                    self.filter_items(current_query)
-                else:
-                    self.filtered_items = list(self.items)
-                    self.refresh_list()
+                try:
+                    self.search_var.set(current_query)
+                except Exception:
+                    pass
+                self.reload_from_db()
 
     def clean_value(self, val):
         if val is None:
@@ -2158,7 +2262,7 @@ class GenericListView(ctk.CTkFrame):
 
     def _parse_page_range_input(self, text, total_pages):
         cleaned = text.strip()
-        match = re.fullmatch(r"(\d+)(?:\s*-\s*(\d+))?", cleaned)
+        match = re.fullmatch(r"(\d+)(...:\s*-\s*(\d+))...", cleaned)
         if not match:
             raise ValueError("Enter a page number or range such as '5-8'.")
         start = int(match.group(1))
@@ -2232,6 +2336,7 @@ class GenericListView(ctk.CTkFrame):
     def open_book(self, item):
         if not item:
             return
+        open_book_viewer = _lazy_book_viewer()
         top = self.winfo_toplevel() if hasattr(self, "winfo_toplevel") else self.master
         open_book_viewer(top, item)
 
@@ -2243,6 +2348,7 @@ class GenericListView(ctk.CTkFrame):
             messagebox.showwarning("Extract Pages", "This book has no attachment to extract from.")
             return
         campaign_dir = ConfigHelper.get_campaign_dir()
+        export_pdf_page_range, get_pdf_page_count = _lazy_pdf_processing()
         try:
             total_pages = get_pdf_page_count(attachment, campaign_dir=campaign_dir)
         except Exception as exc:
@@ -2421,44 +2527,18 @@ class GenericListView(ctk.CTkFrame):
     def _truncate_text(self, text, column_id):
         if not text:
             return ""
-        # For long-form fields (description-like), use a fast character-based
-        # truncation to avoid thousands of font measurement calls on big
-        # datasets (e.g., Dresden NPCs).
-        if column_id in self._longtext_columns:
-            return self._approximate_truncate(text, column_id)
+        # Use a cheap, width-based estimate to avoid expensive tk font measurements per cell.
         try:
             width = self.tree.column(column_id, "width")
         except Exception:
             width = 0
         if width <= 0:
             return text
-
-        available = max(width - 12, 0)
-        if self._tree_font.measure(text) <= available:
+        # Rough chars per pixel; subtract padding to reflect tree padding.
+        char_limit = max(8, int((width - 10) / 6))
+        if len(text) <= char_limit:
             return text
-
-        ellipsis_width = self._tree_font.measure(self._ellipsis)
-        if ellipsis_width >= available:
-            return self._ellipsis if ellipsis_width <= width else ""
-
-        max_width = available - ellipsis_width
-        if max_width <= 0:
-            return self._ellipsis
-
-        # Binary search the longest prefix that fits the available width.
-        low, high = 0, len(text)
-        best_prefix = ""
-        while low <= high:
-            mid = (low + high) // 2
-            candidate = text[:mid]
-            candidate_width = self._tree_font.measure(candidate)
-            if candidate_width <= max_width:
-                best_prefix = candidate
-                low = mid + 1
-            else:
-                high = mid - 1
-
-        return best_prefix + self._ellipsis
+        return text[: max(char_limit - len(self._ellipsis), 0)].rstrip() + self._ellipsis
 
     def _approximate_truncate(self, text, column_id):
         """Cheap truncation for longtext columns: trim by character count."""
@@ -2466,8 +2546,6 @@ class GenericListView(ctk.CTkFrame):
             width = self.tree.column(column_id, "width")
         except Exception:
             width = 0
-        # Roughly 6px per character for the bold Segoe 10 font; keep a minimum
-        # so very narrow columns still show something.
         char_limit = max(30, int(width / 6) if width else 120)
         if len(text) <= char_limit:
             return text
@@ -2546,7 +2624,7 @@ class GenericListView(ctk.CTkFrame):
                 command=lambda it=item: self.open_book(it),
             )
             menu.add_command(
-                label="Extract Pages…",
+                label="Extract Pages...",
                 command=lambda it=item: self.extract_book_pages(it),
             )
             excerpts = list(self._iter_book_excerpts(item))
@@ -2560,13 +2638,13 @@ class GenericListView(ctk.CTkFrame):
                     )
                 menu.add_cascade(label="Open Excerpt", menu=excerpt_menu)
             menu.add_command(
-                label="Edit Details…",
+                label="Edit Details...",
                 command=lambda it=item: self._edit_item(it),
             )
             menu.add_separator()
         if item and self.model_wrapper.entity_type != "books":
             menu.add_command(
-                label="Edit…",
+                label="Edit...",
                 command=self._edit_selected_item,
             )
         if self.model_wrapper.entity_type == "scenarios":
@@ -2617,7 +2695,8 @@ class GenericListView(ctk.CTkFrame):
                     label="Play Audio",
                     command=lambda i=item: self.play_item_audio(i)
                 )
-                menu.add_command(label="Stop Audio", command=stop_entity_audio)
+                _, _, stop_audio = _lazy_audio()
+                menu.add_command(label="Stop Audio", command=stop_audio)
         menu.post(event.x_root, event.y_root)
 
     def display_on_second_screen(self, iid):
@@ -2627,12 +2706,14 @@ class GenericListView(ctk.CTkFrame):
             return
         title = str(item.get(self.unique_field, ""))
         fields = list(self.display_fields) if getattr(self, 'display_fields', None) else list(self.columns[:3])
-        show_entity_on_second_screen(item=item, title=title, fields=fields)
+        show_on_second_screen = _lazy_second_screen()
+        show_on_second_screen(item=item, title=title, fields=fields)
 
     def _get_audio_value(self, item):
         if not item:
             return ""
-        return get_entity_audio_value(item)
+        get_audio_value, _, _ = _lazy_audio()
+        return get_audio_value(item)
 
     def play_item_audio(self, item):
         audio_value = self._get_audio_value(item)
@@ -2640,7 +2721,8 @@ class GenericListView(ctk.CTkFrame):
             messagebox.showinfo("Audio", "No audio file configured for this entry.")
             return
         name = str(item.get(self.unique_field, "Entity"))
-        if not play_entity_audio(audio_value, entity_label=name):
+        _, play_audio, _ = _lazy_audio()
+        if not play_audio(audio_value, entity_label=name):
             messagebox.showwarning("Audio", f"Unable to play audio for {name}.")
 
     def delete_item(self, iid):
@@ -2692,8 +2774,9 @@ class GenericListView(ctk.CTkFrame):
         window.title(f"Scenario: {title}")
 
         window.geometry("1920x1080+0+0")
-        layout_manager = GMScreenLayoutManager()
-        view = GMScreenView(
+        layout_manager_cls, gm_view_cls = _lazy_gm_screen()
+        layout_manager = layout_manager_cls()
+        view = gm_view_cls(
             window,
             scenario_item=item,
             initial_layout=None,
@@ -2712,7 +2795,8 @@ class GenericListView(ctk.CTkFrame):
 
     def open_editor(self, item, creation_mode=False):
         log_info(f"Opening editor for {self.model_wrapper.entity_type} (creation={creation_mode})", func_name="GenericListView.open_editor")
-        ed = GenericEditorWindow(
+        editor_cls = _lazy_editor_window()
+        ed = editor_cls(
             self.master, item, self.template,
             self.model_wrapper, creation_mode
         )
@@ -2721,8 +2805,16 @@ class GenericListView(ctk.CTkFrame):
 
     def filter_items(self, query):
         log_info(f"Filtering {self.model_wrapper.entity_type} with query: {query}", func_name="GenericListView.filter_items")
-        q = query.strip().lower()
-        if q:
+        trimmed = query.strip()
+        # Keep the search box in sync when filtering is triggered programmatically.
+        try:
+            self.search_var.set(trimmed)
+        except Exception:
+            pass
+        normalized = trimmed.lower()
+        has_cache = bool(self.items)
+
+        if normalized and has_cache:
             def iter_search_values(item):
                 if self.model_wrapper.entity_type == "books":
                     for col in self.columns:
@@ -2732,10 +2824,18 @@ class GenericListView(ctk.CTkFrame):
 
             self.filtered_items = [
                 it for it in self.items
-                if any(q in self.clean_value(v).lower() for v in iter_search_values(it))
+                if any(normalized in self.clean_value(v).lower() for v in iter_search_values(it))
             ]
-        else:
+            self.refresh_list(skip_background_fetch=True)
+            return
+
+        if not normalized and has_cache:
             self.filtered_items = list(self.items)
+            self.refresh_list(skip_background_fetch=True)
+            return
+
+        # Fall back to streaming from the database when no cached dataset exists yet.
+        self.filtered_items = list(self.items)
         self.refresh_list()
 
     def add_items(self, items):
@@ -2783,7 +2883,7 @@ class GenericListView(ctk.CTkFrame):
         if not messagebox.askyesno(
             "Merge Duplicates",
             f"Found {total_items} duplicate entries across {len(duplicates)} names. "
-            "Merge them into single entities?",
+            "Merge them into single entities...",
         ):
             return
 
@@ -2861,6 +2961,7 @@ class GenericListView(ctk.CTkFrame):
         )
         if not file_paths:
             return
+        _, _, prepare_books_from_files = _lazy_book_importers()
         try:
             records = prepare_books_from_files(file_paths, campaign_dir=ConfigHelper.get_campaign_dir())
         except Exception as exc:
@@ -2875,6 +2976,7 @@ class GenericListView(ctk.CTkFrame):
         dir_path = filedialog.askdirectory(title="Select Folder Containing PDFs")
         if not dir_path:
             return
+        _, prepare_books_from_directory, _ = _lazy_book_importers()
         try:
             records = prepare_books_from_directory(dir_path, campaign_dir=ConfigHelper.get_campaign_dir())
         except Exception as exc:
@@ -2925,8 +3027,12 @@ class GenericListView(ctk.CTkFrame):
             messagebox.showerror("Import Books", f"Failed to save imported books:\n{exc}")
             return
 
-        self.items = self.model_wrapper.load_items()
-        self.filter_items(self.search_var.get())
+        current_query = self.search_var.get() if hasattr(self, "search_var") else ""
+        try:
+            self.search_var.set(current_query)
+        except Exception:
+            pass
+        self.reload_from_db()
         messagebox.showinfo(
             "Import Books",
             f"Imported {len(to_save)} book(s). Indexing will continue in the background.",
@@ -2982,6 +3088,7 @@ class GenericListView(ctk.CTkFrame):
             final_updates = []
             success = 0
             failures = []
+            extract_text_from_book, _, _ = _lazy_book_importers()
             for record in target_records:
                 attachment = record.get("Attachment", "")
                 try:
@@ -3022,17 +3129,17 @@ class GenericListView(ctk.CTkFrame):
         threading.Thread(target=worker, daemon=True).start()
 
     def _on_book_indexing_complete(self, success_count, failures):
+        current_query = self.search_var.get() if hasattr(self, "search_var") else ""
         try:
-            self.items = self.model_wrapper.load_items()
-        except Exception as exc:
-            messagebox.showerror("Book Indexing", f"Failed to refresh books after indexing:\n{exc}")
-            return
-        self.filter_items(self.search_var.get())
+            self.search_var.set(current_query)
+        except Exception:
+            pass
+        self.reload_from_db()
 
         if failures:
             failed_titles = ", ".join(title or "(Unknown)" for title, _ in failures[:5])
             if len(failures) > 5:
-                failed_titles += ", …"
+                failed_titles += ", ..."
             message = [f"Indexed {success_count} book(s).", f"Failed to index {len(failures)} book(s): {failed_titles}."]
             messagebox.showwarning("Book Indexing", "\n".join(message))
         else:
@@ -3092,7 +3199,8 @@ class GenericListView(ctk.CTkFrame):
         top.title("AI Authoring Wizard")
         top.geometry("1000x720")
         top.lift(); top.focus_force(); top.grab_set()
-        frame = AuthoringWizardView(top)
+        authoring_view, _ = _lazy_ai_components()
+        frame = authoring_view(top)
         frame.pack(fill="both", expand=True)
         try:
             frame.select_for(self.model_wrapper.entity_type)
@@ -3166,7 +3274,8 @@ class GenericListView(ctk.CTkFrame):
             f"Requesting AI categorization for {len(payload)} objects",
             func_name="GenericListView._request_ai_category_assignments",
         )
-        client = LocalAIClient()
+        _, ai_client_cls = _lazy_ai_components()
+        client = ai_client_cls()
         allowed_text = ", ".join(OBJECT_CATEGORY_ALLOWED)
         existing_text = ", ".join(existing_categories) if existing_categories else "None"
         objects_json = json.dumps(payload, ensure_ascii=False, indent=2)
@@ -3192,10 +3301,6 @@ class GenericListView(ctk.CTkFrame):
             {"role": "user", "content": user_content},
         ]
         raw = client.chat(messages, timeout=240)
-        log_debug(
-            f"AI categorization raw response type: {type(raw).__name__}",
-            func_name="GenericListView._request_ai_category_assignments",
-        )
         preview = raw.strip().replace("\r", " ").replace("\n", " ") if isinstance(raw, str) else str(raw)
         if len(preview) > 500:
             preview = preview[:497] + "..."
@@ -3204,7 +3309,7 @@ class GenericListView(ctk.CTkFrame):
             func_name="GenericListView._request_ai_category_assignments",
         )
         try:
-            data = LocalAIClient._parse_json_safe(raw)
+            data = ai_client_cls._parse_json_safe(raw)
         except Exception as exc:
             raise RuntimeError(f"AI returned invalid JSON: {exc}. Raw: {raw[:500]}")
 
@@ -3215,7 +3320,7 @@ class GenericListView(ctk.CTkFrame):
             if not isinstance(text, str):
                 return None
             pattern = re.compile(
-                r"\"(?:Name|name|Item|item)\"\s*:\s*\"([^\"]+)\"[^{}]*?\"(?:Category|category|Type|type)\"\s*:\s*\"([^\"]+)\"",
+                r"\"(...:Name|name|Item|item)\"\s*:\s*\"([^\"]+)\"[^{}]*...\"(...:Category|category|Type|type)\"\s*:\s*\"([^\"]+)\"",
                 re.DOTALL,
             )
             salvaged = []
@@ -3251,7 +3356,7 @@ class GenericListView(ctk.CTkFrame):
                 return converted
             if isinstance(value, str):
                 try:
-                    parsed = LocalAIClient._parse_json_safe(value)
+                    parsed = ai_client_cls._parse_json_safe(value)
                 except Exception as parse_exc:
                     log_warning(
                         f"Failed to parse string assignments: {parse_exc}",
@@ -3295,7 +3400,7 @@ class GenericListView(ctk.CTkFrame):
                     return None
                 if isinstance(current, str):
                     try:
-                        parsed = LocalAIClient._parse_json_safe(current)
+                        parsed = ai_client_cls._parse_json_safe(current)
                     except Exception:
                         return None
                     return _inner(parsed)
@@ -3336,7 +3441,7 @@ class GenericListView(ctk.CTkFrame):
             allowed_from_ai = [str(val) for val in allowed_from_ai.values() if isinstance(val, str)]
         if isinstance(allowed_from_ai, str):
             try:
-                parsed = LocalAIClient._parse_json_safe(allowed_from_ai)
+                parsed = ai_client_cls._parse_json_safe(allowed_from_ai)
                 allowed_from_ai = parsed if isinstance(parsed, list) else None
             except Exception as exc:
                 log_warning(
@@ -3411,7 +3516,7 @@ class GenericListView(ctk.CTkFrame):
             return
         if not messagebox.askyesno(
             "AI Categorize",
-            "Contact the local AI to classify every object and update the Category field?",
+            "Contact the local AI to classify every object and update the Category field...",
         ):
             return
 
@@ -3788,6 +3893,7 @@ class GenericListView(ctk.CTkFrame):
         dialog.grab_set()
 
         wrapper = GenericModelWrapper("scenarios")
+        load_template = _lazy_template_loader()
         template = load_template("scenarios")
 
         def _close_dialog():
@@ -3803,7 +3909,8 @@ class GenericListView(ctk.CTkFrame):
             if name:
                 self._apply_bulk_link_to_scenario(name, field_name)
 
-        view = GenericListSelectionView(
+        selection_view = _lazy_selection_view()
+        view = selection_view(
             dialog,
             "Scenarios",
             wrapper,
@@ -3872,6 +3979,7 @@ class GenericListView(ctk.CTkFrame):
         dialog.grab_set()
 
         wrapper = GenericModelWrapper("scenarios")
+        load_template = _lazy_template_loader()
         template = load_template("scenarios")
 
         def _close_dialog():
@@ -3887,7 +3995,8 @@ class GenericListView(ctk.CTkFrame):
             if name:
                 self._apply_bulk_add_to_gm_screen(name, gm_type)
 
-        view = GenericListSelectionView(
+        selection_view = _lazy_selection_view()
+        view = selection_view(
             dialog,
             "Scenarios",
             wrapper,
@@ -3900,7 +4009,8 @@ class GenericListView(ctk.CTkFrame):
         dialog.wait_window(dialog)
 
     def _apply_bulk_add_to_gm_screen(self, scenario_name, gm_type):
-        manager = GMScreenLayoutManager()
+        layout_manager_cls, _ = _lazy_gm_screen()
+        manager = layout_manager_cls()
         existing_default = manager.get_scenario_default(scenario_name)
         layout_name = existing_default
         layout = manager.get_layout(layout_name) if layout_name else None
@@ -4054,6 +4164,7 @@ class GenericListView(ctk.CTkFrame):
             ConfigHelper._campaign_mtime = os.path.getmtime(ConfigHelper.get_campaign_settings_path())
         except OSError:
             pass
+        
 
     def _show_columns_menu(self, event):
         menu = tk.Menu(self, tearoff=0)
