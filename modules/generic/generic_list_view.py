@@ -542,6 +542,9 @@ class GenericListView(ctk.CTkFrame):
         self.tree.bind("<<TreeviewSelect>>", self._on_tree_selection_changed)
         self.dragging_iid = None
         self.dragging_column = None
+        self._drag_start_row = None
+        self._drag_start_xy = None
+        self._drag_threshold = 6
         self._tree_loader = TreeviewLoader(self.tree)
         # --- Row color setup ---
         self.color_options = {
@@ -1058,6 +1061,10 @@ class GenericListView(ctk.CTkFrame):
 
     def _set_tree_loading(self, loading):
         self._tree_loading = loading
+        log_info(
+            f"Tree loading set to {loading}",
+            func_name="GenericListView._set_tree_loading",
+        )
         # Keep the widget interactive during streaming updates while still
         # avoiding mid-load selection churn.
         self._freeze_selection_changes = bool(loading)
@@ -1460,6 +1467,10 @@ class GenericListView(ctk.CTkFrame):
 
     def on_button_press(self, event):
         region = self.tree.identify("region", event.x, event.y)
+        log_info(
+            f"ButtonPress region={region} row={self.tree.identify_row(event.y)} col={self.tree.identify_column(event.x)} loading={self._tree_loading}",
+            func_name="GenericListView.on_button_press",
+        )
         if region == "heading":
             col = self.tree.identify_column(event.x)
             if col != "#0":
@@ -1473,7 +1484,18 @@ class GenericListView(ctk.CTkFrame):
     def on_mouse_move(self, event):
         if self.dragging_column:
             return
-        self.on_tree_drag(event)
+        # Activate row drag only after cursor moved enough to count as a drag.
+        if not self.dragging_iid and self._drag_start_row and self._drag_start_xy:
+            dx = abs(event.x - self._drag_start_xy[0])
+            dy = abs(event.y - self._drag_start_xy[1])
+            if max(dx, dy) >= self._drag_threshold:
+                self.dragging_iid = self._drag_start_row
+                try:
+                    self.start_index = self.tree.index(self.dragging_iid)
+                except tk.TclError:
+                    self.start_index = None
+        if self.dragging_iid:
+            self.on_tree_drag(event)
 
     def on_button_release(self, event):
         if self.dragging_column:
@@ -1492,12 +1514,18 @@ class GenericListView(ctk.CTkFrame):
                     self._apply_column_settings()
             self.dragging_column = None
         else:
-            self.on_tree_drop(event)
+            if self.dragging_iid:
+                self.on_tree_drop(event)
+        self._reset_drag_state()
         self._save_column_settings()
 
     def on_tree_click(self, event):
         column = self._normalize_column_id(self.tree.identify_column(event.x))
         row = self.tree.identify_row(event.y)
+        log_info(
+            f"Tree click row={row} column={column} loading={self._tree_loading}",
+            func_name="GenericListView.on_tree_click",
+        )
         # Track pointer row for double-click targeting independent of selection
         self._last_pointer_row = row
         if self._link_column and column == self._link_column and row:
@@ -1513,13 +1541,14 @@ class GenericListView(ctk.CTkFrame):
         # Prevent drag operations on non-root rows (e.g., linked headers/names)
         # so clicking a sub-entity does not move it to the top level.
         if row and self.tree.parent(row) != "":
-            self.dragging_iid = None
+            self._reset_drag_state()
             return
         if self.group_column or self.filtered_items != self.items:
-            self.dragging_iid = None
+            self._reset_drag_state()
             return
-        self.dragging_iid = row
-        self.start_index = self.tree.index(self.dragging_iid) if self.dragging_iid else None
+        # Defer starting drag until movement threshold is hit.
+        self._drag_start_row = row
+        self._drag_start_xy = (event.x, event.y)
 
     def on_tree_drag(self, event):
         pass
@@ -1532,6 +1561,9 @@ class GenericListView(ctk.CTkFrame):
             return
         # Do not allow dragging of non-root rows (linked children/headers)
         if self.tree.parent(self.dragging_iid) != "":
+            self.dragging_iid = None
+            return
+        if self.start_index is None:
             self.dragging_iid = None
             return
         target_iid = self.tree.identify_row(event.y)
@@ -1559,6 +1591,15 @@ class GenericListView(ctk.CTkFrame):
             self.model_wrapper.save_items(self.items)
             self._save_list_order()
         self.dragging_iid = None
+        self._drag_start_row = None
+        self._drag_start_xy = None
+        self.start_index = None
+
+    def _reset_drag_state(self):
+        self.dragging_iid = None
+        self._drag_start_row = None
+        self._drag_start_xy = None
+        self.start_index = None
 
     def copy_item(self, iid):
         """Copy the currently selected items or the provided iid."""
@@ -2570,6 +2611,10 @@ class GenericListView(ctk.CTkFrame):
             # Fallback to selection/focus only as last resort
             selection = self.tree.selection()
             iid = selection[0] if selection else self.tree.focus()
+        log_info(
+            f"Double-click: click_iid={click_iid}, resolved_iid={iid}, tree_loading={self._tree_loading}",
+            func_name="GenericListView.on_double_click",
+        )
         if not iid:
             return
         # Do not force selection changes here; it can interfere with child targeting
@@ -2579,6 +2624,19 @@ class GenericListView(ctk.CTkFrame):
             self._last_pointer_row = None
             return
         item, _ = self._find_item_by_iid(iid)
+        if not item:
+            # Fallback: resolve by the visible text in the unique column to handle
+            # rare cases where the iid mapping was not populated yet.
+            try:
+                display_name = self.tree.item(iid, "text")
+            except Exception:
+                display_name = ""
+            if display_name:
+                normalized = self.clean_value(display_name)
+                for candidate in self.filtered_items or self.items:
+                    if self.clean_value(candidate.get(self.unique_field, "")) == normalized:
+                        item = candidate
+                        break
         if item:
             modifiers = getattr(event, "state", 0)
             if (
@@ -2588,6 +2646,14 @@ class GenericListView(ctk.CTkFrame):
                 self.open_book(item)
             else:
                 self._edit_item(item)
+        else:
+            log_info(
+                f"Double-click could not resolve item: iid={iid}, "
+                f"tree_loading={self._tree_loading}, "
+                f"iid_cache={len(self._iid_to_item)}, base_map={len(self._base_to_iids)}, "
+                f"display_rows={len(self._display_queue)}",
+                func_name="GenericListView.on_double_click",
+            )
         # Clear pointer snapshot after handling
         self._last_pointer_row = None
 
@@ -3719,6 +3785,7 @@ class GenericListView(ctk.CTkFrame):
     def _on_tree_selection_changed(self, _event=None):
         if self._suppress_tree_select_event or self._freeze_selection_changes:
             return
+        start = time.perf_counter()
         previous_selection = set(self._last_tree_selection)
         current_selection = self.tree.selection()
         selection_set = {iid for iid in current_selection}
@@ -3770,6 +3837,11 @@ class GenericListView(ctk.CTkFrame):
         self._refresh_grid_selection()
         if self.shelf_view:
             self.shelf_view.refresh_selection()
+        elapsed_ms = (time.perf_counter() - start) * 1000
+        log_info(
+            f"Selection change processed in {elapsed_ms:.2f} ms (selected={len(selection_set)}, newly_selected={len(newly_selected)}, deselected={len(deselected)})",
+            func_name="GenericListView._on_tree_selection_changed",
+        )
 
     def _update_tree_selection_tags(self, selection=None):
         if not hasattr(self, "tree"):
