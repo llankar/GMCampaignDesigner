@@ -646,7 +646,13 @@ def screenshot_app_views():
     except Exception:
         pass
 
-
+    # Whiteboard (GM view)
+    try:
+        app.open_whiteboard()
+        app.update(); app.update_idletasks()
+        shots["whiteboard"] = str(grab_widget_screenshot(app, "whiteboard") or "")
+    except Exception:
+        pass
 
     # World Map (nested navigation)
     try:
@@ -740,6 +746,28 @@ def screenshot_app_views():
     except Exception:
         pass
 
+    # Fallback to curated screenshots when live capture is missing or empty
+    fallback_assets = {
+        # entity managers
+        "entity_scenarios": DOCS_DIR / "images" / "entity_scenarios.png",
+        "entity_pcs": DOCS_DIR / "images" / "entity_pcs.png",
+        "entity_npcs": DOCS_DIR / "images" / "entity_npcs.png",
+        "entity_creatures": DOCS_DIR / "images" / "entity_creatures.png",
+        "entity_factions": DOCS_DIR / "images" / "entity_factions.png",
+        "entity_places": DOCS_DIR / "images" / "entity_places.png",
+        "entity_objects": DOCS_DIR / "images" / "entity_objects.png",
+        "entity_informations": DOCS_DIR / "images" / "entity_informations.png",
+        "entity_clues": DOCS_DIR / "images" / "entity_clues.png",
+        "entity_maps": DOCS_DIR / "images" / "entity_maps.png",
+        "entity_books": DOCS_DIR / "images" / "entity_books.png",
+        # bars and extras
+        "dice_bar": DOCS_DIR / "images" / "dice_bar.png",
+        "audio_bar": DOCS_DIR / "images" / "audio_bar.png",
+    }
+    for key, path in fallback_assets.items():
+        if (not shots.get(key)) and path.exists():
+            shots[key] = str(path)
+
     try:
         app.destroy()
     except Exception:
@@ -808,6 +836,8 @@ def build_html(api_data, menu_data, shots):
         add_group("Graph Editors", ["npc_graph", "pc_graph", "faction_graph", "scenario_graph"])
         add_group("GM & Scenario Tools", ["gm_screen", "scenario_generator", "scenario_importer"])
         add_group("Map Tools", ["map_tool_selector", "map_tool_map1", "map_tool_map2", "map_tool_rectangle", "map_tool_oval"])
+        add_group("Whiteboard", ["whiteboard"])
+        add_group("Dice & Music Bars", ["dice_bar", "audio_bar"])
 
         remaining = [k for k in sorted(shots) if k not in used]
         if remaining:
@@ -1004,7 +1034,7 @@ def build_user_manual(shots, menu_data, py_files):
         "<html><head><meta charset='utf-8'><title>GMCampaignDesigner User Manual</title>",
         "<link rel='stylesheet' href='user-manual.css'></head><body>",
         "<header><h1>GMCampaignDesigner User Manual</h1></header>",
-        "<nav><a href='#getting-started'>Getting Started</a><a href='#sidebar-accordion'>Sidebar Accordion</a><a href='#entity-managers'>Entity Managers</a><a href='#detail-windows'>Detail Windows</a><a href='#editor-tools'>Editor Tools</a><a href='#graph-editors'>Graph Editors</a><a href='#gm-screen'>GM Screen</a><a href='#scenario-tools'>Scenario Tools</a><a href='#scene-flow'>Scene Flow</a><a href='#map-tool'>Map Tool</a><a href='#world-map'>World Map</a><a href='#dice-roller'>Dice Roller</a><a href='#audio-&-music'>Audio &amp; Music</a><a href='#books'>Books</a><a href='#tips'>Tips</a></nav><div class='container'>"
+        "<nav><a href='#getting-started'>Getting Started</a><a href='#sidebar-accordion'>Sidebar Accordion</a><a href='#entity-managers'>Entity Managers</a><a href='#detail-windows'>Detail Windows</a><a href='#editor-tools'>Editor Tools</a><a href='#graph-editors'>Graph Editors</a><a href='#gm-screen'>GM Screen</a><a href='#scenario-tools'>Scenario Tools</a><a href='#scene-flow'>Scene Flow</a><a href='#map-tool'>Map Tool</a><a href='#whiteboard'>Whiteboard</a><a href='#world-map'>World Map</a><a href='#dice-roller'>Dice Roller</a><a href='#audio-&-music'>Audio &amp; Music</a><a href='#books'>Books</a><a href='#tips'>Tips</a></nav><div class='container'>"
     ]
 
     parts.append(section('Getting Started',
@@ -1134,7 +1164,9 @@ def build_user_manual(shots, menu_data, py_files):
 
         "<li><b>Tokens & auras:</b> Add NPC, PC, or creature tokens, colour their borders, track HP overlays, and duplicate or delete entries through the context menu.</li>"
 
-        "<li><b>Drawing tools:</b> Switch between Token, Rectangle, and Oval modes to sketch zones, spell areas, or light auras with filled/outline styles.</li>"
+        "<li><b>Drawing tools:</b> Switch between Token, Rectangle, and Oval modes to sketch zones, spell areas, or light auras with filled/outline styles; add editable text labels and tweak drawing colours.</li>"
+
+        "<li><b>Background rotation:</b> Rotate the map image from the toolbar; rotation is saved with the background for consistent sharing/exports.</li>"
 
         "<li><b>Broadcast & sync:</b> Mirror the current map to fullscreen or the web client; pan and zoom updates are pushed live.</li>"
 
@@ -1156,11 +1188,18 @@ def build_user_manual(shots, menu_data, py_files):
 
     ))
 
+    parts.append(section('Whiteboard',
+        "<p>The Whiteboard gives you a synchronized canvas for prep and live collaboration. Use it in the GM view, pop a player view to a second screen, or share a web link/QR code.</p>"
+        "<ul>"
+        "<li><b>Tools:</b> Pen, eraser, stamps, and editable text (double-click to edit); pick colours, sizes, and layers.</li>"
+        "<li><b>Layers & grid:</b> Toggle shared/GM layers, enable grid overlay, and snap strokes or stamps to the grid.</li>"
+        "<li><b>Pan & zoom:</b> Middle-drag to pan, mouse wheel to zoom; the canvas extends infinitely.</li>"
+        "<li><b>Save/load:</b> Whiteboard states are stored in the database with autosave; load previous boards instantly.</li>"
+        "<li><b>Player view:</b> Open a fullscreen view on another monitor or share via QR/link for remote collaboration.</li>"
+        "</ul>"
+        + (img('whiteboard', 'Whiteboard') if shots.get('whiteboard') else '')
+    ))
 
-
-
-
-    
 
     parts.append(section('World Map',
         "<p>The World Map window lets you navigate nested maps, place NPC/PC/Creature/Place tokens, and drill down to regional maps while reviewing a compact inspector for the selected entity.</p>"
