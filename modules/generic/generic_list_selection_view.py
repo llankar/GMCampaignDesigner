@@ -3,6 +3,7 @@ from tkinter import ttk, messagebox
 import customtkinter as ctk
 import time
 import re
+import os
 from modules.helpers.logging_helper import log_module_import
 
 log_module_import(__name__)
@@ -140,9 +141,7 @@ class GenericListSelectionView(ctk.CTkFrame):
         self.item_by_id = {}
         for item in self.filtered_items:
             # For the unique field (usually "Name")
-            raw_val = item.get(self.unique_field, "")
-            if isinstance(raw_val, dict):
-                raw_val = raw_val.get("text", "")
+            raw_val = self._clean_value(item.get(self.unique_field, ""))
             base_id = self.sanitize_id(raw_val or f"item_{int(time.time()*1000)}")
             iid = base_id
             suffix = 1
@@ -150,13 +149,7 @@ class GenericListSelectionView(ctk.CTkFrame):
                 iid = f"{base_id}_{suffix}"
                 suffix += 1
 
-            # For the extra columns, if the value is a dict, show just the "text"
-            def get_display_value(val):
-                if isinstance(val, dict):
-                    return val.get("text", "")
-                return str(val)
-
-            values = [get_display_value(item.get(col, "")) for col in self.columns]
+            values = [self._clean_value(item.get(col, "")) for col in self.columns]
             self.tree.insert("", "end", iid=iid, text=raw_val, values=values)
             self.item_by_id[iid] = item
 
@@ -237,6 +230,32 @@ class GenericListSelectionView(ctk.CTkFrame):
     def select_entity(self, item):
         self.on_select_callback(self.entity_type, item.get("Name", item.get("Title", "Unnamed")))
         self.destroy()
+
+    def _clean_value(self, val):
+        if val is None:
+            return ""
+        if isinstance(val, dict):
+            if "text" in val:
+                return self._clean_value(val.get("text", ""))
+            if "Label" in val or "label" in val:
+                label = val.get("Label", val.get("label", ""))
+                return str(label).strip()
+            if "Path" in val or "path" in val:
+                start = val.get("StartPage") or val.get("start_page")
+                end = val.get("EndPage") or val.get("end_page")
+                if isinstance(val.get("page_range"), (list, tuple)) and len(val["page_range"]) >= 2:
+                    start = start or val["page_range"][0]
+                    end = end or val["page_range"][1]
+                label = None
+                if start and end and start != end:
+                    label = f"pp. {start}-{end}"
+                elif start:
+                    label = f"p. {start}"
+                return label or os.path.basename(str(val.get("Path") or val.get("path") or ""))
+            return ", ".join(self._clean_value(v) for v in val.values())
+        if isinstance(val, list):
+            return ", ".join(self._clean_value(v) for v in val if v is not None)
+        return str(val).replace("{", "").replace("}", "").strip()
 
     def sanitize_id(self, s):
         return re.sub(r'[^a-zA-Z0-9]+', '_', str(s)).strip('_')
