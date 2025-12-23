@@ -24,6 +24,7 @@ from datetime import datetime
 from sqlalchemy.orm import joinedload
 
 from modules.helpers.config_helper import ConfigHelper
+from modules.helpers.portrait_helper import primary_portrait
 from modules.generic.generic_model_wrapper import GenericModelWrapper
 from modules.helpers.text_helpers import format_multiline_text, rtf_to_html
 from modules.helpers.logging_helper import log_module_import
@@ -355,7 +356,7 @@ def get_portrait_mapping():
         npc_wrapper = GenericModelWrapper("npcs")
         for npc in npc_wrapper.load_items():
             name = npc.get("Name","").strip()
-            portrait = npc.get("Portrait","").strip()
+            portrait = primary_portrait(npc.get("Portrait", "")).strip()
             if name and portrait:
                 mapping[name] = portrait
                 logging.debug("Mapping NPC portrait: %s -> %s", name, portrait)
@@ -370,7 +371,7 @@ def get_places_list():
         for p in wrapper.load_items():
             if p.get("PlayerDisplay") in (True,"True","true",1,"1"):
                 p["DisplayDescription"] = format_multiline_text(p.get("Description","")) if p.get("Description") else ""
-                portrait = str(p.get("Portrait") or "").strip()
+                portrait = primary_portrait(p.get("Portrait") or "").strip()
                 if portrait:
                     portrait = portrait.replace("\\","/").lstrip("/")
                     p["PortraitURL"] = f"/portraits/{os.path.basename(portrait)}"
@@ -411,7 +412,7 @@ def get_clues_list():
                 # fallback: plain text with linebreaks
                 text = str(desc).replace("\n", "<br>")
                 clue["DisplayDescription"] = html.escape(text)
-            portrait = str(clue.get("Portrait") or "").strip()
+            portrait = primary_portrait(clue.get("Portrait") or "").strip()
             if portrait:
                 portrait = portrait.replace("\\","/").lstrip("/")
                 clue["PortraitURL"] = f"/portraits/{os.path.basename(portrait)}"

@@ -5,6 +5,7 @@ from ctypes import wintypes
 import tkinter as tk
 import customtkinter as ctk
 from PIL import Image, ImageTk
+from modules.helpers.portrait_helper import resolve_portrait_path
 from modules.helpers.logging_helper import (
     log_function,
     log_info,
@@ -41,19 +42,16 @@ def show_portrait(path, title=None):
     Display a full‑screen CTkToplevel showing the image at `path`.
     Clicking anywhere closes the window.
     """
-    if path and not os.path.isabs(path):
-        candidate = os.path.join(ConfigHelper.get_campaign_dir(), path)
-        if os.path.exists(candidate):
-            path = candidate
-    if not path or not os.path.exists(path):
+    resolved = resolve_portrait_path(path, ConfigHelper.get_campaign_dir())
+    if not resolved or not os.path.exists(resolved):
         log_warning(f"Portrait path missing or invalid: {path}", func_name="show_portrait")
         tk.messagebox.showerror("Error", "No valid portrait available.")
         return
 
     try:
-        img = Image.open(path)
+        img = Image.open(resolved)
     except Exception as e:
-        log_warning(f"Failed to load portrait {path}: {e}", func_name="show_portrait")
+        log_warning(f"Failed to load portrait {resolved}: {e}", func_name="show_portrait")
         tk.messagebox.showerror("Error", f"Failed to load image: {e}")
         return
 
@@ -73,7 +71,7 @@ def show_portrait(path, title=None):
     sx, sy, sw, sh = target
 
     win = ctk.CTkToplevel()
-    win.title(title or os.path.basename(path))
+    win.title(title or os.path.basename(resolved))
     win.geometry(f"{sw}x{sh}+{sx}+{sy}")
     win.update_idletasks()
 

@@ -5,6 +5,7 @@ import zipfile
 from tkinter import filedialog, messagebox
 from modules.generic.generic_model_wrapper import GenericModelWrapper
 from modules.helpers.config_helper import ConfigHelper
+from modules.helpers.portrait_helper import primary_portrait
 from modules.helpers.logging_helper import log_module_import
 
 log_module_import(__name__)
@@ -59,7 +60,7 @@ def preview_and_export_foundry(self):
 
     # Process NPCs to update their portrait paths:
     for npc in npc_list:
-        portrait = npc.get("Portrait", "")
+        portrait = primary_portrait(npc.get("Portrait", ""))
         if portrait:
             # Normalize path separators.
             portrait = portrait.replace("\\", "/")

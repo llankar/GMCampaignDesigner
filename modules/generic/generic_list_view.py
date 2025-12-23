@@ -23,6 +23,7 @@ from modules.generic.generic_model_wrapper import GenericModelWrapper
 from modules.generic.helpers.treeview_loader import TreeviewLoader
 from modules.helpers import theme_manager
 from modules.helpers.config_helper import ConfigHelper
+from modules.helpers.portrait_helper import primary_portrait, resolve_portrait_path
 from modules.helpers.logging_helper import (
     log_debug,
     log_function,
@@ -636,7 +637,7 @@ class GenericListView(ctk.CTkFrame):
         if not item:
             messagebox.showerror("Error", "Item not found.")
             return
-        path = item.get("Portrait", "")
+        path = primary_portrait(item.get("Portrait", ""))
         title = str(item.get(self.unique_field, ""))
         show_portrait = _lazy_portrait_viewer()
         show_portrait(path, title)
@@ -2674,14 +2675,9 @@ class GenericListView(ctk.CTkFrame):
 
     def _show_item_menu(self, iid, event):
         item, base_id = self._find_item_by_iid(iid)
-        campaign_dir = ConfigHelper.get_campaign_dir()
-        portrait_path = item.get("Portrait", "") if item else ""
-        if portrait_path:
-            if not os.path.isabs(portrait_path):
-                portrait_path = os.path.join(campaign_dir, portrait_path)
-            has_portrait = os.path.exists(portrait_path)
-        else:
-            has_portrait = False
+        portrait_path = primary_portrait(item.get("Portrait", "")) if item else ""
+        resolved_portrait = resolve_portrait_path(portrait_path, ConfigHelper.get_campaign_dir())
+        has_portrait = bool(resolved_portrait and os.path.exists(resolved_portrait))
 
         menu = tk.Menu(self, tearoff=0)
         if self.model_wrapper.entity_type == "books" and item:

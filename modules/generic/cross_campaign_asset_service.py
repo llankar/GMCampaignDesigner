@@ -17,6 +17,7 @@ from typing import Dict, Iterable, List, Optional, Tuple
 from modules.audio.entity_audio import normalize_audio_reference
 from modules.generic.generic_model_wrapper import GenericModelWrapper
 from modules.helpers.config_helper import ConfigHelper
+from modules.helpers.portrait_helper import parse_portrait_value, serialize_portrait_value
 from modules.helpers.logging_helper import (
     log_exception,
     log_module_import,
@@ -141,24 +142,29 @@ def _determine_record_key(record: dict) -> str:
     return str(record.get("rowid") or record.get("_id") or id(record))
 
 
-def _collect_portrait(entity_type: str, record: dict, campaign_dir: Path) -> Optional[AssetReference]:
-    portrait = (record.get("Portrait") or "").strip()
-    if not portrait:
-        return None
-    absolute = _campaign_join(campaign_dir, portrait)
-    if not absolute.exists():
-        log_warning(
-            f"Portrait missing for record {_determine_record_key(record)}: {portrait}",
-            func_name="modules.generic.cross_campaign_asset_service._collect_portrait",
+def _collect_portraits(entity_type: str, record: dict, campaign_dir: Path) -> List[AssetReference]:
+    portraits = parse_portrait_value(record.get("Portrait"))
+    collected: List[AssetReference] = []
+    for portrait in portraits:
+        if not portrait:
+            continue
+        absolute = _campaign_join(campaign_dir, portrait)
+        if not absolute.exists():
+            log_warning(
+                f"Portrait missing for record {_determine_record_key(record)}: {portrait}",
+                func_name="modules.generic.cross_campaign_asset_service._collect_portraits",
+            )
+            continue
+        collected.append(
+            AssetReference(
+                entity_type=entity_type,
+                record_key=_determine_record_key(record),
+                asset_type="portrait",
+                original_path=portrait,
+                absolute_path=absolute,
+            )
         )
-        return None
-    return AssetReference(
-        entity_type=entity_type,
-        record_key=_determine_record_key(record),
-        asset_type="portrait",
-        original_path=portrait,
-        absolute_path=absolute,
-    )
+    return collected
 
 
 def _collect_audio_asset(entity_type: str, record: dict, campaign_dir: Path) -> Optional[AssetReference]:
@@ -433,9 +439,7 @@ def collect_assets(entity_type: str, records: Iterable[dict], campaign_dir: Path
     attachment_field = ATTACHMENT_FIELDS.get(entity_type)
     for record in records:
         if entity_type in PORTRAIT_ENTITY_TYPES:
-            portrait = _collect_portrait(entity_type, record, campaign_dir)
-            if portrait:
-                collected.append(portrait)
+            collected.extend(_collect_portraits(entity_type, record, campaign_dir))
         if entity_type in AUDIO_ENTITY_TYPES:
             audio = _collect_audio_asset(entity_type, record, campaign_dir)
             if audio:
@@ -990,9 +994,10 @@ def _rewrite_record_paths(entity_type: str, record: dict, replacements: Dict[str
     updated = copy.deepcopy(record)
 
     if entity_type in PORTRAIT_ENTITY_TYPES:
-        portrait = updated.get("Portrait")
-        if portrait in replacements:
-            updated["Portrait"] = replacements[portrait]
+        portraits = parse_portrait_value(updated.get("Portrait"))
+        if portraits:
+            rewritten = [replacements.get(path, path) for path in portraits]
+            updated["Portrait"] = serialize_portrait_value(rewritten)
 
     if entity_type in AUDIO_ENTITY_TYPES:
         audio = updated.get("Audio")
@@ -1034,4 +1039,3 @@ def _rewrite_record_paths(entity_type: str, record: dict, replacements: Dict[str
 
 def cleanup_analysis(analysis: BundleAnalysis) -> None:
     shutil.rmtree(analysis.temp_dir, ignore_errors=True)
-

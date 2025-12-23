@@ -25,6 +25,7 @@ from modules.generic.generic_model_wrapper import GenericModelWrapper
 from modules.generic.generic_editor_window import GenericEditorWindow
 from modules.generic.generic_list_selection_view import GenericListSelectionView
 from modules.helpers.config_helper import ConfigHelper
+from modules.helpers.portrait_helper import primary_portrait, resolve_portrait_path
 from modules.helpers.text_helpers import deserialize_possible_json, format_longtext
 from modules.ui.image_viewer import show_portrait
 from modules.helpers.template_loader import load_template
@@ -1204,8 +1205,9 @@ class ScenarioGraphEditor(ctk.CTkFrame):
             messagebox.showerror("Error", f"Entity '{name_key}' not found.")
             return
 
-        portrait_path = entity_data.get("Portrait", "")
-        if not portrait_path or not os.path.exists(portrait_path):
+        portrait_path = primary_portrait(entity_data.get("Portrait", ""))
+        resolved_portrait = resolve_portrait_path(portrait_path, ConfigHelper.get_campaign_dir())
+        if not resolved_portrait or not os.path.exists(resolved_portrait):
             messagebox.showerror("Error", "No valid portrait found for this entity.")
             return
         show_portrait(portrait_path, name_key)
@@ -2679,7 +2681,7 @@ class ScenarioGraphEditor(ctk.CTkFrame):
             p_w = p_h = 0
             if node_type in ["npc", "creature"]:
                 portrait, (p_w, p_h) = self.load_portrait_scaled(
-                    data.get("Portrait", ""),
+                    primary_portrait(data.get("Portrait", "")),
                     node_tag,
                     scale
                 )

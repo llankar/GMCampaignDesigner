@@ -16,6 +16,7 @@ from modules.pcs.pc_graph_editor import PCGraphEditor
 from modules.scenarios.scenario_graph_editor import ScenarioGraphEditor
 from modules.generic.generic_list_selection_view import GenericListSelectionView
 from modules.helpers.config_helper import ConfigHelper
+from modules.helpers.portrait_helper import primary_portrait, resolve_portrait_path
 import random
 from modules.helpers.logging_helper import (
     log_function,
@@ -2204,8 +2205,10 @@ class GMScreenView(ctk.CTkFrame):
             master = self.content_area
         frame = ctk.CTkFrame(master)
         template = self.templates[entity_type]
-        if (entity_type == "NPCs" or entity_type == "PCs" or entity_type == "Creatures" ) and "Portrait" in entity and os.path.exists(entity["Portrait"]):
-            img = Image.open(entity["Portrait"])
+        portrait_path = primary_portrait(entity.get("Portrait"))
+        resolved_portrait = resolve_portrait_path(portrait_path, ConfigHelper.get_campaign_dir())
+        if (entity_type in {"NPCs", "PCs", "Creatures"}) and resolved_portrait and os.path.exists(resolved_portrait):
+            img = Image.open(resolved_portrait)
             img = img.resize((200, 200), Image.Resampling.LANCZOS)
             ctk_image = ctk.CTkImage(light_image=img, size=(200, 200))
             portrait_label = ctk.CTkLabel(frame, image=ctk_image, text="")

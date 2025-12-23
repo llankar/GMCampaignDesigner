@@ -17,6 +17,7 @@ from modules.generic.generic_list_selection_view import GenericListSelectionView
 from modules.helpers.config_helper import ConfigHelper
 from modules.helpers.template_loader import load_template
 from modules.helpers.text_helpers import format_longtext
+from modules.helpers.portrait_helper import primary_portrait
 from modules.ui.chatbot_dialog import (
     get_default_chatbot_wrappers,
     open_chatbot_dialog,
@@ -2108,11 +2109,7 @@ class WorldMapPanel(ctk.CTkFrame):
 
     def _resolve_portrait_path(self, record: dict) -> str | None:
         portrait = record.get("Portrait")
-        if isinstance(portrait, dict):
-            return portrait.get("path") or portrait.get("text")
-        if isinstance(portrait, str):
-            return portrait
-        return None
+        return primary_portrait(portrait) or None
 
     def _resolve_map_image(self, record: dict) -> str | None:
         return record.get("Image")

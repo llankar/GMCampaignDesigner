@@ -58,6 +58,7 @@ from modules.helpers.system_config import register_system_change_listener
 from modules.ui.tooltip import ToolTip
 from modules.ui.icon_button import create_icon_button
 from modules.ui.portrait_importer import PortraitImporter
+from modules.helpers.portrait_helper import parse_portrait_value, serialize_portrait_value
 from modules.ui.system_selector_dialog import CampaignSystemSelectorDialog
 from modules.ui.database_manager_dialog import DatabaseManagerDialog
 
@@ -1471,10 +1472,28 @@ class MainWindow(ctk.CTk):
                     if field not in item:
                         continue
 
-                    new_value, changed = self._normalize_single_media_path(item.get(field, ""), unique_candidates)
-                    if changed:
-                        item[field] = new_value
-                        updated = True
+                    current_value = item.get(field, "")
+                    if field.lower() == "portrait":
+                        portraits = parse_portrait_value(current_value)
+                        normalized = []
+                        changed = False
+                        for portrait in portraits:
+                            new_value, was_changed = self._normalize_single_media_path(
+                                portrait, unique_candidates
+                            )
+                            normalized.append(new_value)
+                            changed = changed or was_changed
+                        serialized = serialize_portrait_value(normalized)
+                        if changed or serialized != current_value:
+                            item[field] = serialized
+                            updated = True
+                    else:
+                        new_value, changed = self._normalize_single_media_path(
+                            current_value, unique_candidates
+                        )
+                        if changed:
+                            item[field] = new_value
+                            updated = True
 
             if updated:
                 try:

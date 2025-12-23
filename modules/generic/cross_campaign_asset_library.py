@@ -32,6 +32,7 @@ from modules.generic.cross_campaign_asset_service import (
 from modules.generic.github_gallery_client import GalleryBundleSummary, GithubGalleryClient
 from modules.helpers.config_helper import ConfigHelper
 from modules.helpers.logging_helper import log_exception, log_info, log_warning
+from modules.helpers.portrait_helper import primary_portrait
 from modules.helpers.secret_helper import decrypt_secret, encrypt_secret
 from modules.helpers.selection_dialog import SelectionDialog
 from modules.helpers.template_loader import load_entity_definitions, list_known_entities
@@ -336,7 +337,7 @@ class CrossCampaignAssetLibraryWindow(ctk.CTkToplevel):
 
         image_path = None
         if entity_type in {"npcs", "objects", "pcs", "creatures", "places", "clues"}:
-            image_path = record.get("Portrait")
+            image_path = primary_portrait(record.get("Portrait"))
         elif entity_type == "maps":
             image_path = record.get("Image")
 
@@ -1181,4 +1182,3 @@ class OnlineGalleryDialog(ctk.CTkToplevel):
             self.delete_btn.configure(state=state)
         except Exception:
             pass
-

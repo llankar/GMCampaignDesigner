@@ -5,6 +5,7 @@ from PIL import Image
 from customtkinter import CTkLabel, CTkImage
 from modules.helpers.text_helpers import format_longtext
 from modules.helpers.config_helper import ConfigHelper
+from modules.helpers.portrait_helper import primary_portrait, resolve_portrait_path
 from modules.helpers.logging_helper import log_module_import
 
 log_module_import(__name__)
@@ -87,15 +88,16 @@ class EntitySelectionDialog(ctk.CTkToplevel):
         col_index = 0
 
         if self.has_portrait:
-            portrait_path = item.get("Portrait", "")
-            if portrait_path and os.path.exists(portrait_path):
-                if portrait_path not in self.image_cache:
-                    img = Image.open(portrait_path)
+            portrait_path = primary_portrait(item.get("Portrait", ""))
+            resolved_portrait = resolve_portrait_path(portrait_path, ConfigHelper.get_campaign_dir())
+            if resolved_portrait and os.path.exists(resolved_portrait):
+                if resolved_portrait not in self.image_cache:
+                    img = Image.open(resolved_portrait)
                     img.thumbnail(MAX_PORTRAIT_SIZE)
                     ctk_img = CTkImage(light_image=img, dark_image=img, size=MAX_PORTRAIT_SIZE)
-                    self.image_cache[portrait_path] = ctk_img
+                    self.image_cache[resolved_portrait] = ctk_img
 
-                portrait_label = CTkLabel(self.table_frame, text="", image=self.image_cache[portrait_path])
+                portrait_label = CTkLabel(self.table_frame, text="", image=self.image_cache[resolved_portrait])
             else:
                 portrait_label = ctk.CTkLabel(self.table_frame, text="[No Image]")
 

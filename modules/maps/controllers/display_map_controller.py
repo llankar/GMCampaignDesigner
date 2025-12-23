@@ -63,6 +63,7 @@ from modules.helpers.template_loader import load_template
 CLIPBOARD_SKIP = object()
 from modules.helpers.text_helpers import format_longtext
 from modules.helpers.config_helper import ConfigHelper
+from modules.helpers.portrait_helper import primary_portrait
 from modules.ui.image_viewer import show_portrait
 from modules.maps.utils.text_items import (
     DEFAULT_TEXT_SIZES,
@@ -834,7 +835,7 @@ class DisplayMapController:
             if not search_map: return
             idx = listbox.curselection()[0]; etype, name, record = search_map[idx]
             portrait = record.get("Portrait", "")
-            path = portrait.get("path") or portrait.get("text", "") if isinstance(portrait, dict) else portrait
+            path = primary_portrait(portrait)
             self.add_token(path, etype, name, record) # This specifically adds a new token
             popup.destroy()
         entry.bind("<Return>", lambda e: on_select()); listbox.bind("<Return>", lambda e: on_select())

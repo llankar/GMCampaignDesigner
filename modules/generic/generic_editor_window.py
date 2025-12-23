@@ -26,6 +26,11 @@ import ast
 from io import BytesIO
 from pathlib import Path
 from modules.audio.entity_audio import play_entity_audio, resolve_audio_path, stop_entity_audio
+from modules.helpers.portrait_helper import (
+    parse_portrait_value,
+    primary_portrait,
+    serialize_portrait_value,
+)
 from modules.helpers.logging_helper import (
     log_function,
     log_info,
@@ -1462,7 +1467,13 @@ class GenericEditorWindow(ctk.CTkToplevel):
                 value = widget.get() if hasattr(widget, "get") else str(widget)
                 self.item[field_name] = self._campaign_relative_path(value)
             elif field_name == "Portrait":
-                self.item[field_name] = self._campaign_relative_path(self.portrait_path)
+                portrait_paths = getattr(self, "portrait_paths", [])
+                normalized = [
+                    self._campaign_relative_path(path)
+                    for path in portrait_paths
+                    if path
+                ]
+                self.item[field_name] = serialize_portrait_value(normalized)
             elif field_name == "Image":
                 self.item[field_name] = self._campaign_relative_path(self.image_path)
             elif field_type == "boolean":
@@ -1488,45 +1499,40 @@ class GenericEditorWindow(ctk.CTkToplevel):
         frame.pack(fill="x", pady=5)
 
         campaign_dir = Path(ConfigHelper.get_campaign_dir())
-        raw_path = self.item.get("Portrait", "") or ""
-        normalized_path = self._campaign_relative_path(raw_path)
-        self.portrait_path = normalized_path
-
-        abs_path = None
-        if normalized_path:
-            candidate = Path(normalized_path)
-            abs_path = candidate if candidate.is_absolute() else campaign_dir / candidate
-        elif raw_path:
-            candidate = Path(raw_path)
-            abs_path = candidate if candidate.is_absolute() else campaign_dir / candidate
+        raw_value = self.item.get("Portrait", "") or ""
+        normalized_paths = [
+            self._campaign_relative_path(path)
+            for path in parse_portrait_value(raw_value)
+            if path
+        ]
+        self.portrait_paths = normalized_paths
+        self.portrait_path = primary_portrait(self.portrait_paths)
 
         image_frame = ctk.CTkFrame(frame)
         image_frame.pack(fill="x", pady=5)
 
-        if abs_path and abs_path.exists():
-            try:
-                image = Image.open(abs_path).resize((256, 256))
-                self.portrait_image = ctk.CTkImage(light_image=image, size=(256, 256))
-                self.portrait_label = ctk.CTkLabel(image_frame, image=self.portrait_image, text="")
-            except Exception:
-                self.portrait_label = ctk.CTkLabel(image_frame, text="[No Portrait]")
-                self.portrait_image = None
-        else:
-            self.portrait_label = ctk.CTkLabel(image_frame, text="[No Portrait]")
-            self.portrait_image = None
-            if not normalized_path:
-                self.portrait_path = ""
-
+        self.portrait_label = ctk.CTkLabel(image_frame, text="[No Portrait]")
         self.portrait_label.pack(pady=5)
+
+        list_frame = ctk.CTkFrame(frame)
+        list_frame.pack(fill="x", pady=(0, 5))
+
+        ctk.CTkLabel(list_frame, text="Portraits").pack(anchor="w", padx=5, pady=(5, 0))
+        self.portrait_listbox = tk.Listbox(list_frame, height=4, exportselection=False)
+        self.portrait_listbox.pack(fill="x", padx=5, pady=5)
+        self._refresh_portrait_listbox(select_primary=True)
+        self.portrait_listbox.bind("<<ListboxSelect>>", self._on_portrait_select)
 
         button_frame = ctk.CTkFrame(frame)
         button_frame.pack(pady=5)
 
-        ctk.CTkButton(button_frame, text="Select Portrait", command=self.select_portrait).pack(side="left", padx=5)
+        ctk.CTkButton(button_frame, text="Add Portrait(s)", command=self.select_portrait).pack(side="left", padx=5)
         ctk.CTkButton(button_frame, text="Paste Portrait", command=self.paste_portrait_from_clipboard).pack(side="left", padx=5)
         ctk.CTkButton(button_frame, text="Create Portrait with description", command=self.create_portrait_with_swarmui).pack(side="left", padx=5)
+        ctk.CTkButton(button_frame, text="Set Primary", command=self.set_primary_portrait).pack(side="left", padx=5)
+        ctk.CTkButton(button_frame, text="Remove Selected", command=self.remove_selected_portrait).pack(side="left", padx=5)
 
-        self._update_portrait_preview()
+        self._update_portrait_preview(primary_only=True)
 
     def paste_portrait_from_clipboard(self):
         """Paste image from clipboard and set as entity portrait.
@@ -1543,15 +1549,17 @@ class GenericEditorWindow(ctk.CTkToplevel):
             return
 
         if isinstance(data, list):
+            added = False
             for path in data:
                 try:
                     if os.path.isfile(path):
-                        self.portrait_path = self.copy_and_resize_portrait(path)
-                        self._update_portrait_preview()
-                        return
+                        copied = self.copy_and_resize_portrait(path)
+                        self._add_portrait_path(copied, make_primary=not self.portrait_paths)
+                        added = True
                 except Exception:
                     continue
-            messagebox.showinfo("Paste Portrait", "Clipboard has file paths but none are valid images.")
+            if not added:
+                messagebox.showinfo("Paste Portrait", "Clipboard has file paths but none are valid images.")
             return
 
         if isinstance(data, Image.Image):
@@ -1578,8 +1586,7 @@ class GenericEditorWindow(ctk.CTkToplevel):
                     relative = dest_path.relative_to(campaign_dir).as_posix()
                 except ValueError:
                     relative = dest_path.as_posix()
-                self.portrait_path = relative
-                self._update_portrait_preview()
+                self._add_portrait_path(relative, make_primary=not self.portrait_paths)
                 return
             except Exception as e:
                 messagebox.showerror("Paste Portrait", f"Failed to paste image: {e}")
@@ -1860,8 +1867,8 @@ class GenericEditorWindow(ctk.CTkToplevel):
                 f.write(chosen_bytes)
 
             # Associate the selected portrait with the NPC data.
-            self.portrait_path = self.copy_and_resize_portrait(output_filename)
-            self._update_portrait_preview()
+            generated_path = self.copy_and_resize_portrait(output_filename)
+            self._add_portrait_path(generated_path, make_primary=not self.portrait_paths)
 
             # Copy the original generated file to assets/generated and delete local temp
             GENERATED_FOLDER = os.path.join(ConfigHelper.get_campaign_dir(), "assets", "generated")
@@ -1929,8 +1936,8 @@ class GenericEditorWindow(ctk.CTkToplevel):
         return selected["idx"]
 
     def select_portrait(self):
-        file_path = filedialog.askopenfilename(
-            title="Select Portrait Image",
+        file_paths = filedialog.askopenfilenames(
+            title="Select Portrait Image(s)",
             filetypes=[
                 ("Image Files", "*.png;*.jpg;*.jpeg;*.gif;*.bmp;*.webp"),
                 ("PNG Files", "*.png"),
@@ -1942,9 +1949,10 @@ class GenericEditorWindow(ctk.CTkToplevel):
             ]
         )
 
-        if file_path:
-            self.portrait_path = self.copy_and_resize_portrait(file_path)
-            self._update_portrait_preview()
+        if file_paths:
+            for file_path in file_paths:
+                copied = self.copy_and_resize_portrait(file_path)
+                self._add_portrait_path(copied, make_primary=not self.portrait_paths)
     
     def select_image(self):
         file_path = filedialog.askopenfilename(
@@ -2006,10 +2014,92 @@ class GenericEditorWindow(ctk.CTkToplevel):
             return name
         return f"{name} (missing)"
 
-    def _update_portrait_preview(self):
+    def _refresh_portrait_listbox(self, *, select_primary: bool = False, selected_index: int | None = None):
+        if not getattr(self, "portrait_listbox", None):
+            return
+        self.portrait_listbox.delete(0, "end")
+        for path in self.portrait_paths:
+            self.portrait_listbox.insert("end", path)
+        if not self.portrait_paths:
+            return
+        if select_primary or selected_index is None:
+            index = 0
+        else:
+            index = max(0, min(selected_index, len(self.portrait_paths) - 1))
+        self.portrait_listbox.selection_clear(0, "end")
+        self.portrait_listbox.selection_set(index)
+        self.portrait_listbox.activate(index)
+
+    def _on_portrait_select(self, _event=None):
+        if not getattr(self, "portrait_listbox", None):
+            return
+        selection = self.portrait_listbox.curselection()
+        if not selection:
+            return
+        index = selection[0]
+        try:
+            path = self.portrait_paths[index]
+        except IndexError:
+            return
+        self._update_portrait_preview(path=path)
+
+    def _add_portrait_path(self, path: str, *, make_primary: bool = False):
+        if not path:
+            return
+        normalized = self._campaign_relative_path(path)
+        if not normalized:
+            return
+        if normalized in self.portrait_paths:
+            if make_primary and self.portrait_paths[0] != normalized:
+                self.portrait_paths.remove(normalized)
+                self.portrait_paths.insert(0, normalized)
+        else:
+            if make_primary:
+                self.portrait_paths.insert(0, normalized)
+            else:
+                self.portrait_paths.append(normalized)
+        self._refresh_portrait_listbox(select_primary=make_primary)
+        self._update_portrait_preview()
+
+    def set_primary_portrait(self):
+        if not getattr(self, "portrait_listbox", None):
+            return
+        selection = self.portrait_listbox.curselection()
+        if not selection:
+            return
+        index = selection[0]
+        if index == 0:
+            return
+        try:
+            path = self.portrait_paths.pop(index)
+        except IndexError:
+            return
+        self.portrait_paths.insert(0, path)
+        self._refresh_portrait_listbox(select_primary=True)
+        self._update_portrait_preview()
+
+    def remove_selected_portrait(self):
+        if not getattr(self, "portrait_listbox", None):
+            return
+        selection = list(self.portrait_listbox.curselection())
+        if not selection:
+            return
+        for index in sorted(selection, reverse=True):
+            if 0 <= index < len(self.portrait_paths):
+                self.portrait_paths.pop(index)
+        self._refresh_portrait_listbox(select_primary=True)
+        self._update_portrait_preview()
+
+    def _update_portrait_preview(self, *, path: str | None = None, primary_only: bool = False):
         campaign_dir = Path(ConfigHelper.get_campaign_dir())
-        if self.portrait_path:
-            candidate = Path(self.portrait_path)
+        if path is None:
+            if primary_only:
+                path = primary_portrait(self.portrait_paths)
+            else:
+                path = primary_portrait(self.portrait_paths)
+        self.portrait_path = primary_portrait(self.portrait_paths)
+        if path:
+            candidate = Path(path)
             abs_path = candidate if candidate.is_absolute() else campaign_dir / candidate
         else:
             abs_path = None
@@ -2021,10 +2111,10 @@ class GenericEditorWindow(ctk.CTkToplevel):
             else:
                 raise FileNotFoundError
         except Exception:
-            display_name = os.path.basename(self.portrait_path) if self.portrait_path else "[No Portrait]"
+            display_name = os.path.basename(path) if path else "[No Portrait]"
             self.portrait_label.configure(image=None, text=display_name)
             self.portrait_image = None
-        self.field_widgets["Portrait"] = self.portrait_path
+        self.field_widgets["Portrait"] = serialize_portrait_value(self.portrait_paths)
 
     def copy_and_resize_image(self, src_path):
         campaign_dir = Path(ConfigHelper.get_campaign_dir())

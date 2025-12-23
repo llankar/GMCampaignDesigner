@@ -18,6 +18,7 @@ import os
 import textwrap
 from modules.ui.image_viewer import show_portrait
 from modules.helpers.config_helper import ConfigHelper
+from modules.helpers.portrait_helper import primary_portrait, resolve_portrait_path
 from modules.audio.entity_audio import (
     get_entity_audio_value,
     play_entity_audio,
@@ -220,13 +221,10 @@ class NPCGraphEditor(ctk.CTkFrame):
            #logging.error(f"NPC '{npc_name}' not found.")
             return
 
-        portrait_path = npc_data.get("Portrait", "")
+        portrait_path = primary_portrait(npc_data.get("Portrait", ""))
        #logging.debug(f"Portrait path: {portrait_path}")
-        if portrait_path and not os.path.isabs(portrait_path):
-            candidate = os.path.join(ConfigHelper.get_campaign_dir(), portrait_path)
-            if os.path.exists(candidate):
-                portrait_path = candidate
-        if not portrait_path or not os.path.exists(portrait_path):
+        resolved_portrait = resolve_portrait_path(portrait_path, ConfigHelper.get_campaign_dir())
+        if not resolved_portrait or not os.path.exists(resolved_portrait):
             messagebox.showerror("Error", "No valid portrait found for this NPC.")
            #logging.error("No valid portrait found.")
             return
@@ -814,13 +812,10 @@ class NPCGraphEditor(ctk.CTkFrame):
             # ── Load & scale portrait ─────────────────────────────────
             portrait_img = None
             p_w = p_h = 0
-            portrait_path = data.get("Portrait", "")
-            if portrait_path and not os.path.isabs(portrait_path):
-                candidate = os.path.join(ConfigHelper.get_campaign_dir(), portrait_path)
-                if os.path.exists(candidate):
-                    portrait_path = candidate
-            if portrait_path and os.path.exists(portrait_path):
-                img = Image.open(portrait_path)
+            portrait_path = primary_portrait(data.get("Portrait", ""))
+            resolved_portrait = resolve_portrait_path(portrait_path, ConfigHelper.get_campaign_dir())
+            if resolved_portrait and os.path.exists(resolved_portrait):
+                img = Image.open(resolved_portrait)
                 ow, oh = img.size
                 max_w = int(80 * scale)
                 max_h = int(80 * scale)
