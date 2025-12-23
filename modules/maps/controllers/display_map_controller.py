@@ -63,7 +63,12 @@ from modules.helpers.template_loader import load_template
 CLIPBOARD_SKIP = object()
 from modules.helpers.text_helpers import format_longtext
 from modules.helpers.config_helper import ConfigHelper
-from modules.helpers.portrait_helper import primary_portrait
+from modules.helpers.portrait_helper import (
+    parse_portrait_value,
+    portrait_menu_label,
+    primary_portrait,
+    resolve_portrait_candidate,
+)
 from modules.ui.image_viewer import show_portrait
 from modules.maps.utils.text_items import (
     DEFAULT_TEXT_SIZES,
@@ -4318,15 +4323,30 @@ class DisplayMapController:
         )
 
         if count == 1 and valid_tokens[0].get("image_path"):
-            menu.add_command(
-                label="Show Portrait",
-                command=lambda: show_portrait(
-                    valid_tokens[0]["image_path"],
+            portrait_paths = [
+                path
+                for path in parse_portrait_value(valid_tokens[0].get("image_path", ""))
+                if resolve_portrait_candidate(path, ConfigHelper.get_campaign_dir())
+            ]
+            if portrait_paths:
+                title = (
                     valid_tokens[0].get("entity_id")
                     or valid_tokens[0].get("entity_type")
-                    or "Entity",
-                ),
-            )
+                    or "Entity"
+                )
+                if len(portrait_paths) == 1:
+                    menu.add_command(
+                        label="Show Portrait",
+                        command=lambda p=portrait_paths[0]: show_portrait(p, title),
+                    )
+                else:
+                    portrait_menu = tk.Menu(menu, tearoff=0)
+                    for index, path in enumerate(portrait_paths, start=1):
+                        portrait_menu.add_command(
+                            label=portrait_menu_label(path, index),
+                            command=lambda p=path: show_portrait(p, title),
+                        )
+                    menu.add_cascade(label="Show Portraits", menu=portrait_menu)
         elif count > 1:
             menu.add_command(
                 label="Show Portraits",
