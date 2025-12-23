@@ -29,6 +29,7 @@ from modules.scenarios.gm_layout_manager import GMScreenLayoutManager
 from modules.maps.world_map_view import WorldMapPanel
 from modules.maps.controllers.display_map_controller import DisplayMapController
 from modules.scenarios.scene_flow_viewer import create_scene_flow_frame, scene_flow_content_factory
+from modules.scenarios.plot_twist_scheduler import PlotTwistScheduler
 from modules.ui.chatbot_dialog import (
     open_chatbot_dialog,
     _DEFAULT_NAME_FIELD_OVERRIDES as CHATBOT_NAME_OVERRIDES,
@@ -64,6 +65,11 @@ class GMScreenView(ctk.CTkFrame):
         self._edit_menu_label = "Edit Entity"
         self._state_loaded = False
         self._scene_metadata = {}
+        self._session_active = False
+        self._session_start = None
+        self._plot_twist_scheduler = PlotTwistScheduler(self)
+        self._session_mid_var = tk.StringVar()
+        self._session_end_var = tk.StringVar()
 
         self._load_persisted_state()
 
@@ -195,6 +201,9 @@ class GMScreenView(ctk.CTkFrame):
             ("Open Chatbot", self.open_chatbot),
         ]
         self._add_menu = self._build_add_menu()
+        self._session_controls = ctk.CTkFrame(self.tab_bar_bottom)
+        self._session_controls.pack(side="right", padx=8, pady=4)
+        self._build_session_controls()
         self.layout_status_label = ctk.CTkLabel(self.tab_bar_bottom, text="")
         self.layout_status_label.pack(side="right", padx=8, pady=5)
 
@@ -450,7 +459,118 @@ class GMScreenView(ctk.CTkFrame):
     def _on_destroy(self, event=None):
         if event is not None and event.widget is not self:
             return
+        self._end_session(silent=True)
         self._teardown_toplevel_shortcuts()
+
+    def _build_session_controls(self):
+        self._load_session_hours()
+        ctk.CTkLabel(self._session_controls, text="Session:").pack(side="left", padx=(6, 4))
+
+        mid_label = ctk.CTkLabel(self._session_controls, text="Mid (hrs)")
+        mid_label.pack(side="left", padx=(0, 4))
+        mid_entry = ctk.CTkEntry(self._session_controls, width=60, textvariable=self._session_mid_var)
+        mid_entry.pack(side="left", padx=(0, 8))
+
+        end_label = ctk.CTkLabel(self._session_controls, text="End (hrs)")
+        end_label.pack(side="left", padx=(0, 4))
+        end_entry = ctk.CTkEntry(self._session_controls, width=60, textvariable=self._session_end_var)
+        end_entry.pack(side="left", padx=(0, 8))
+
+        start_btn = ctk.CTkButton(self._session_controls, text="Start", width=70, command=self._start_session)
+        start_btn.pack(side="left", padx=(0, 4))
+        end_btn = ctk.CTkButton(self._session_controls, text="End", width=70, command=self._end_session)
+        end_btn.pack(side="left")
+
+        mid_entry.bind("<FocusOut>", self._persist_session_hours, add="+")
+        end_entry.bind("<FocusOut>", self._persist_session_hours, add="+")
+        mid_entry.bind("<Return>", self._persist_session_hours, add="+")
+        end_entry.bind("<Return>", self._persist_session_hours, add="+")
+
+        self._session_mid_entry = mid_entry
+        self._session_end_entry = end_entry
+        self._session_start_button = start_btn
+        self._session_end_button = end_btn
+        self._update_session_controls_state()
+
+    def _load_session_hours(self):
+        defaults = {"mid_hours": 1.0, "end_hours": 2.0}
+        manager = getattr(self, "layout_manager", None)
+        if manager is None:
+            self._session_mid_var.set(str(defaults["mid_hours"]))
+            self._session_end_var.set(str(defaults["end_hours"]))
+            return
+        stored = manager.get_session_hours(self.scenario_name)
+        mid_value = stored.get("mid_hours", defaults["mid_hours"])
+        end_value = stored.get("end_hours", defaults["end_hours"])
+        self._session_mid_var.set("" if mid_value is None else str(mid_value))
+        self._session_end_var.set("" if end_value is None else str(end_value))
+
+    def _parse_hours_value(self, value: str) -> Optional[float]:
+        trimmed = value.strip()
+        if not trimmed:
+            return None
+        try:
+            return float(trimmed)
+        except ValueError:
+            return None
+
+    def _persist_session_hours(self, _event=None):
+        mid_value = self._parse_hours_value(self._session_mid_var.get())
+        end_value = self._parse_hours_value(self._session_end_var.get())
+        manager = getattr(self, "layout_manager", None)
+        if manager is None:
+            return
+        manager.set_session_hours(self.scenario_name, mid_value, end_value)
+
+    def _start_session(self):
+        mid_value = self._parse_hours_value(self._session_mid_var.get())
+        end_value = self._parse_hours_value(self._session_end_var.get())
+        if mid_value is None or end_value is None:
+            messagebox.showwarning("Session Timers", "Please enter numeric hour offsets for both mid and end timers.")
+            return
+        if mid_value < 0 or end_value < 0:
+            messagebox.showwarning("Session Timers", "Hour offsets must be zero or positive.")
+            return
+
+        self._persist_session_hours()
+        self._session_start = datetime.now()
+        self._session_active = True
+        self._plot_twist_scheduler.start(
+            self._session_start,
+            mid_value,
+            end_value,
+            on_mid=self._handle_mid_plot_twist,
+            on_end=self._handle_end_plot_twist,
+        )
+        log_info(
+            f"Session started for '{self.scenario_name}' with mid={mid_value}, end={end_value}.",
+            func_name="GMScreenView._start_session",
+        )
+        self._update_session_controls_state()
+
+    def _end_session(self, silent: bool = False):
+        if not self._session_active and not self._plot_twist_scheduler.is_active():
+            return
+        self._plot_twist_scheduler.cancel()
+        self._session_active = False
+        self._session_start = None
+        if not silent:
+            log_info(f"Session ended for '{self.scenario_name}'.", func_name="GMScreenView._end_session")
+        self._update_session_controls_state()
+
+    def _update_session_controls_state(self):
+        is_active = bool(self._session_active)
+        try:
+            self._session_start_button.configure(state=("disabled" if is_active else "normal"))
+            self._session_end_button.configure(state=("normal" if is_active else "disabled"))
+        except Exception:
+            pass
+
+    def _handle_mid_plot_twist(self):
+        messagebox.showinfo("Plot Twist", "Mid-session plot twist time!")
+
+    def _handle_end_plot_twist(self):
+        messagebox.showinfo("Plot Twist", "End-of-session plot twist time!")
 
     def _persist_scene_state(self):
         if not self._state_loaded:

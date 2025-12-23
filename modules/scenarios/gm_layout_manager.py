@@ -13,7 +13,12 @@ class GMScreenLayoutManager:
 
     def __init__(self):
         self.path = os.path.join(ConfigHelper.get_campaign_dir(), self.FILE_NAME)
-        self.data: Dict[str, Any] = {"layouts": {}, "scenario_defaults": {}, "scenario_state": {}}
+        self.data: Dict[str, Any] = {
+            "layouts": {},
+            "scenario_defaults": {},
+            "scenario_state": {},
+            "session_settings": {},
+        }
         self._load()
 
     # ------------------------------------------------------------------
@@ -29,18 +34,30 @@ class GMScreenLayoutManager:
             layouts = raw.get("layouts") or {}
             scenario_defaults = raw.get("scenario_defaults") or {}
             scenario_state = raw.get("scenario_state") or {}
-            if not isinstance(layouts, dict) or not isinstance(scenario_defaults, dict) or not isinstance(scenario_state, dict):
+            session_settings = raw.get("session_settings") or {}
+            if (
+                not isinstance(layouts, dict)
+                or not isinstance(scenario_defaults, dict)
+                or not isinstance(scenario_state, dict)
+                or not isinstance(session_settings, dict)
+            ):
                 raise ValueError("Layout file malformed")
             self.data["layouts"] = layouts
             self.data["scenario_defaults"] = scenario_defaults
             self.data["scenario_state"] = scenario_state
+            self.data["session_settings"] = session_settings
         except Exception as exc:
             log_exception(exc, func_name="GMScreenLayoutManager._load")
             log_warning(
                 f"Failed to load GM layouts from {self.path}. Reinitializing empty store.",
                 func_name="GMScreenLayoutManager._load",
             )
-            self.data = {"layouts": {}, "scenario_defaults": {}, "scenario_state": {}}
+            self.data = {
+                "layouts": {},
+                "scenario_defaults": {},
+                "scenario_state": {},
+                "session_settings": {},
+            }
 
     def _write(self) -> None:
         os.makedirs(os.path.dirname(self.path), exist_ok=True)
@@ -119,6 +136,30 @@ class GMScreenLayoutManager:
         if not entry:
             store.pop(scenario_title, None)
 
+        self._write()
+
+    # ------------------------------------------------------------------
+    # Session settings (plot twist scheduler hours)
+    # ------------------------------------------------------------------
+    def get_session_hours(self, scenario_title: str) -> Dict[str, float]:
+        if not scenario_title:
+            return {}
+        raw = self.data.get("session_settings", {}).get(scenario_title) or {}
+        if not isinstance(raw, dict):
+            return {}
+        return json.loads(json.dumps(raw))
+
+    def set_session_hours(self, scenario_title: str, mid_hours: Optional[float], end_hours: Optional[float]) -> None:
+        if not scenario_title:
+            return
+        store = self.data.setdefault("session_settings", {})
+        if mid_hours is None and end_hours is None:
+            store.pop(scenario_title, None)
+        else:
+            store[scenario_title] = {
+                "mid_hours": mid_hours,
+                "end_hours": end_hours,
+            }
         self._write()
 
 
