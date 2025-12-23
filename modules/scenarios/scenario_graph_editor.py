@@ -25,7 +25,13 @@ from modules.generic.generic_model_wrapper import GenericModelWrapper
 from modules.generic.generic_editor_window import GenericEditorWindow
 from modules.generic.generic_list_selection_view import GenericListSelectionView
 from modules.helpers.config_helper import ConfigHelper
-from modules.helpers.portrait_helper import primary_portrait, resolve_portrait_path
+from modules.helpers.portrait_helper import (
+    parse_portrait_value,
+    portrait_menu_label,
+    primary_portrait,
+    resolve_portrait_candidate,
+    resolve_portrait_path,
+)
 from modules.helpers.text_helpers import deserialize_possible_json, format_longtext
 from modules.ui.image_viewer import show_portrait
 from modules.helpers.template_loader import load_template
@@ -3466,8 +3472,6 @@ class ScenarioGraphEditor(ctk.CTkFrame):
         node_menu.add_command(label="Delete Node", command=self.delete_node)
         node_menu.add_separator()
         node_menu.add_command(label="Change Color", command=lambda: self.show_color_menu(x, y))
-        if self.selected_node and (self.selected_node.startswith("npc_") or self.selected_node.startswith("creature_")):
-            node_menu.add_command(label="Display Portrait", command=self.display_portrait_window)
         record = None
         entity_name = None
         if self.selected_node:
@@ -3480,6 +3484,28 @@ class ScenarioGraphEditor(ctk.CTkFrame):
             elif self.selected_node.startswith("place_"):
                 entity_name = self.selected_node.replace("place_", "").replace("_", " ")
                 record = self.places.get(entity_name, {})
+        if record and entity_name and (
+            self.selected_node.startswith("npc_") or self.selected_node.startswith("creature_")
+        ):
+            portrait_paths = [
+                path
+                for path in parse_portrait_value(record.get("Portrait", ""))
+                if resolve_portrait_candidate(path, ConfigHelper.get_campaign_dir())
+            ]
+            if portrait_paths:
+                if len(portrait_paths) == 1:
+                    node_menu.add_command(
+                        label="Display Portrait",
+                        command=lambda p=portrait_paths[0], n=entity_name: show_portrait(p, n),
+                    )
+                else:
+                    portrait_menu = Menu(node_menu, tearoff=0)
+                    for index, path in enumerate(portrait_paths, start=1):
+                        portrait_menu.add_command(
+                            label=portrait_menu_label(path, index),
+                            command=lambda p=path, n=entity_name: show_portrait(p, n),
+                        )
+                    node_menu.add_cascade(label="Display Portraits", menu=portrait_menu)
         audio_value = self._get_entity_audio(record)
         if audio_value:
             node_menu.add_separator()

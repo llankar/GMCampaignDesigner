@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 from pathlib import Path
 from typing import Iterable, List, Optional
 
@@ -61,8 +62,7 @@ def primary_portrait(value) -> str:
     return portraits[0] if portraits else ""
 
 
-def resolve_portrait_path(value, campaign_dir: Optional[str] = None) -> Optional[str]:
-    path = primary_portrait(value)
+def resolve_portrait_candidate(path: str, campaign_dir: Optional[str] = None) -> Optional[str]:
     if not path:
         return None
     candidate = Path(path)
@@ -75,3 +75,15 @@ def resolve_portrait_path(value, campaign_dir: Optional[str] = None) -> Optional
     if candidate.exists():
         return str(candidate)
     return None
+
+
+def resolve_portrait_path(value, campaign_dir: Optional[str] = None) -> Optional[str]:
+    path = primary_portrait(value)
+    return resolve_portrait_candidate(path, campaign_dir)
+
+
+def portrait_menu_label(path: str, index: int) -> str:
+    base = os.path.basename(str(path)) if path else ""
+    if base:
+        return f"{index}. {base}"
+    return f"Portrait {index}"

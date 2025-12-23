@@ -23,7 +23,13 @@ from modules.generic.generic_model_wrapper import GenericModelWrapper
 from modules.generic.helpers.treeview_loader import TreeviewLoader
 from modules.helpers import theme_manager
 from modules.helpers.config_helper import ConfigHelper
-from modules.helpers.portrait_helper import primary_portrait, resolve_portrait_path
+from modules.helpers.portrait_helper import (
+    parse_portrait_value,
+    portrait_menu_label,
+    primary_portrait,
+    resolve_portrait_candidate,
+    resolve_portrait_path,
+)
 from modules.helpers.logging_helper import (
     log_debug,
     log_function,
@@ -2675,9 +2681,12 @@ class GenericListView(ctk.CTkFrame):
 
     def _show_item_menu(self, iid, event):
         item, base_id = self._find_item_by_iid(iid)
-        portrait_path = primary_portrait(item.get("Portrait", "")) if item else ""
-        resolved_portrait = resolve_portrait_path(portrait_path, ConfigHelper.get_campaign_dir())
-        has_portrait = bool(resolved_portrait and os.path.exists(resolved_portrait))
+        portrait_paths = [
+            path
+            for path in parse_portrait_value(item.get("Portrait", ""))
+            if resolve_portrait_candidate(path, ConfigHelper.get_campaign_dir())
+        ]
+        has_portrait = bool(portrait_paths)
 
         menu = tk.Menu(self, tearoff=0)
         if self.model_wrapper.entity_type == "books" and item:
@@ -2720,10 +2729,21 @@ class GenericListView(ctk.CTkFrame):
                 command=lambda: self.display_on_second_screen(iid)
             )
         if has_portrait:
-            menu.add_command(
-                label="Show Portrait",
-                command=lambda: self.show_portrait_window(iid)
-            )
+            show_portrait = _lazy_portrait_viewer()
+            title = str(item.get(self.unique_field, "")) if item else ""
+            if len(portrait_paths) == 1:
+                menu.add_command(
+                    label="Show Portrait",
+                    command=lambda p=portrait_paths[0]: show_portrait(p, title),
+                )
+            else:
+                portrait_menu = tk.Menu(menu, tearoff=0)
+                for index, path in enumerate(portrait_paths, start=1):
+                    portrait_menu.add_command(
+                        label=portrait_menu_label(path, index),
+                        command=lambda p=path: show_portrait(p, title),
+                    )
+                menu.add_cascade(label="Show Portraits", menu=portrait_menu)
         menu.add_command(
             label="Copy",
             command=lambda: self.copy_item(iid)
