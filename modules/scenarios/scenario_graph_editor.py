@@ -40,7 +40,7 @@ from modules.audio.entity_audio import (
     play_entity_audio,
     stop_entity_audio,
 )
-from modules.helpers.logging_helper import log_module_import
+from modules.helpers.logging_helper import log_module_import, log_warning
 
 log_module_import(__name__)
 
@@ -48,6 +48,11 @@ log_module_import(__name__)
 PORTRAIT_FOLDER = os.path.join(ConfigHelper.get_campaign_dir(), "assets", "portraits")
 MAX_PORTRAIT_SIZE = (128, 128)
 ENTITY_TOOLTIP_PORTRAIT_MAX_SIZE = (180, 180)
+PORTRAIT_MENU_THUMB_SIZE = (48, 48)
+try:
+    RESAMPLE_MODE = Image.Resampling.LANCZOS
+except AttributeError:  # Pillow < 9.1 fallback
+    RESAMPLE_MODE = Image.LANCZOS
 ctk.set_appearance_mode("Dark")
 theme_manager.apply_theme(theme_manager.get_theme())
 
@@ -270,6 +275,7 @@ class ScenarioGraphEditor(ctk.CTkFrame):
         self._entity_tooltip_image_cache = {}
         self._entity_tooltip_hide_after_id = None
         self._entity_tooltip_active_tag = None
+        self._portrait_menu_images = []
 
         self.init_toolbar()
         self.active_detail_scene_tag = None
@@ -3467,8 +3473,26 @@ class ScenarioGraphEditor(ctk.CTkFrame):
     def _end_canvas_pan(self, _event):
         self._is_panning = False
 
+    def _load_portrait_menu_image(self, path: str) -> ImageTk.PhotoImage | None:
+        resolved = resolve_portrait_candidate(path, ConfigHelper.get_campaign_dir())
+        if not resolved:
+            return None
+        try:
+            img = Image.open(resolved)
+            img.thumbnail(PORTRAIT_MENU_THUMB_SIZE, RESAMPLE_MODE)
+            photo = ImageTk.PhotoImage(img)
+            self._portrait_menu_images.append(photo)
+            return photo
+        except Exception as exc:
+            log_warning(
+                f"Failed to load portrait menu thumbnail for '{path}': {exc}",
+                func_name="ScenarioGraphEditor._load_portrait_menu_image",
+            )
+            return None
+
     def show_node_menu(self, x, y):
         node_menu = Menu(self.canvas, tearoff=0)
+        self._portrait_menu_images = []
         node_menu.add_command(label="Delete Node", command=self.delete_node)
         node_menu.add_separator()
         node_menu.add_command(label="Change Color", command=lambda: self.show_color_menu(x, y))
@@ -3501,10 +3525,19 @@ class ScenarioGraphEditor(ctk.CTkFrame):
                 else:
                     portrait_menu = Menu(node_menu, tearoff=0)
                     for index, path in enumerate(portrait_paths, start=1):
-                        portrait_menu.add_command(
-                            label=portrait_menu_label(path, index),
-                            command=lambda p=path, n=entity_name: show_portrait(p, n),
-                        )
+                        portrait_image = self._load_portrait_menu_image(path)
+                        if portrait_image:
+                            portrait_menu.add_command(
+                                label=portrait_menu_label(path, index),
+                                image=portrait_image,
+                                compound="left",
+                                command=lambda p=path, n=entity_name: show_portrait(p, n),
+                            )
+                        else:
+                            portrait_menu.add_command(
+                                label=portrait_menu_label(path, index),
+                                command=lambda p=path, n=entity_name: show_portrait(p, n),
+                            )
                     node_menu.add_cascade(label="Display Portraits", menu=portrait_menu)
         audio_value = self._get_entity_audio(record)
         if audio_value:
