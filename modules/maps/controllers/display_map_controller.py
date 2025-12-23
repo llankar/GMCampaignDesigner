@@ -4312,6 +4312,24 @@ class DisplayMapController:
             )
             return None
 
+    def _get_token_portrait_paths(self, token: dict) -> list[str]:
+        entity_record = token.get("entity_record") or {}
+        portrait_value = entity_record.get("Portrait", "")
+        return [
+            path
+            for path in parse_portrait_value(portrait_value)
+            if resolve_portrait_candidate(path, ConfigHelper.get_campaign_dir())
+        ]
+
+    def _get_token_portrait_title(self, token: dict) -> str:
+        entity_record = token.get("entity_record") or {}
+        return (
+            entity_record.get("Name")
+            or token.get("entity_id")
+            or token.get("entity_type")
+            or "Entity"
+        )
+
     def _show_token_menu(self, event, tokens):
         valid_tokens = [t for t in tokens if isinstance(t, dict) and t.get("type") == "token"]
         if not valid_tokens:
@@ -4348,18 +4366,10 @@ class DisplayMapController:
             label=f"Send to Back", command=lambda: self._send_items_to_back(valid_tokens)
         )
 
-        if count == 1 and valid_tokens[0].get("image_path"):
-            portrait_paths = [
-                path
-                for path in parse_portrait_value(valid_tokens[0].get("image_path", ""))
-                if resolve_portrait_candidate(path, ConfigHelper.get_campaign_dir())
-            ]
+        if count == 1:
+            portrait_paths = self._get_token_portrait_paths(valid_tokens[0])
             if portrait_paths:
-                title = (
-                    valid_tokens[0].get("entity_id")
-                    or valid_tokens[0].get("entity_type")
-                    or "Entity"
-                )
+                title = self._get_token_portrait_title(valid_tokens[0])
                 if len(portrait_paths) == 1:
                     menu.add_command(
                         label="Show Portrait",
@@ -4403,12 +4413,10 @@ class DisplayMapController:
 
     def _show_portraits_for_tokens(self, tokens):
         for token in tokens:
-            path = token.get("image_path")
-            if path:
-                show_portrait(
-                    path,
-                    token.get("entity_id") or token.get("entity_type") or "Entity",
-                )
+            portrait_paths = self._get_token_portrait_paths(token)
+            title = self._get_token_portrait_title(token)
+            for path in portrait_paths:
+                show_portrait(path, title)
 
     def _play_audio_for_tokens(self, tokens):
         for token in tokens:
