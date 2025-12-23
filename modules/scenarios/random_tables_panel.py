@@ -7,6 +7,7 @@ from tkinter import messagebox
 
 from modules.dice import dice_engine
 from modules.helpers.random_table_loader import RandomTableLoader
+from modules.helpers.plot_twist_helper import PLOT_TWIST_TABLE_ID
 from modules.helpers.logging_helper import (
     log_exception,
     log_info,
@@ -132,7 +133,8 @@ class RandomTablesPanel(ctk.CTkFrame):
         self.count_var = ctk.StringVar(value="3")
         ctk.CTkEntry(actions, textvariable=self.count_var, width=60).grid(row=0, column=2, padx=(4, 8))
         ctk.CTkButton(actions, text="Roll Multiple", command=self.roll_multiple).grid(row=0, column=3, sticky="w")
-        ctk.CTkButton(actions, text="Edit Table", command=self._edit_selected_table).grid(row=0, column=4, padx=(8, 0))
+        ctk.CTkButton(actions, text="Plot Twists", command=self._jump_to_plot_twists).grid(row=0, column=4, padx=(8, 0))
+        ctk.CTkButton(actions, text="Edit Table", command=self._edit_selected_table).grid(row=0, column=5, padx=(8, 0))
 
         history_frame = ctk.CTkFrame(self)
         history_frame.grid(row=3, column=0, sticky="nsew", padx=8, pady=(0, 8))
@@ -327,6 +329,19 @@ class RandomTablesPanel(ctk.CTkFrame):
         except Exception as exc:
             log_exception(exc, func_name="RandomTablesPanel._edit_selected_table")
             messagebox.showerror("Random Tables", f"Unable to open editor:\n{exc}")
+
+    def _jump_to_plot_twists(self) -> None:
+        if PLOT_TWIST_TABLE_ID not in self.tables:
+            messagebox.showinfo("Random Tables", "The Plot Twists table is not available.")
+            return
+        if hasattr(self, "category_var"):
+            self.category_var.set("All")
+        if hasattr(self, "style_var"):
+            self.style_var.set("All")
+        if hasattr(self, "tag_var"):
+            self.tag_var.set("")
+        self.selected_table_id = PLOT_TWIST_TABLE_ID
+        self._refresh_table_list()
 
     # ------------------------------------------------------------------
     def get_state(self) -> Dict:

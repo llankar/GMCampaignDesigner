@@ -30,11 +30,13 @@ from modules.maps.world_map_view import WorldMapPanel
 from modules.maps.controllers.display_map_controller import DisplayMapController
 from modules.scenarios.scene_flow_viewer import create_scene_flow_frame, scene_flow_content_factory
 from modules.scenarios.plot_twist_scheduler import PlotTwistScheduler
+from modules.scenarios.plot_twist_panel import PlotTwistPanel
 from modules.ui.chatbot_dialog import (
     open_chatbot_dialog,
     _DEFAULT_NAME_FIELD_OVERRIDES as CHATBOT_NAME_OVERRIDES,
 )
 from modules.objects.loot_generator_panel import LootGeneratorPanel
+from modules.helpers.plot_twist_helper import roll_plot_twist
 from modules.scenarios.random_tables_panel import RandomTablesPanel
 from modules.whiteboard.controllers.whiteboard_controller import WhiteboardController
 
@@ -183,6 +185,7 @@ class GMScreenView(ctk.CTkFrame):
             "Loot Generator",
             "Whiteboard",
             "Random Tables",
+            "Plot Twists",
             "Factions",
             "Places",
             "NPCs",
@@ -567,10 +570,20 @@ class GMScreenView(ctk.CTkFrame):
             pass
 
     def _handle_mid_plot_twist(self):
-        messagebox.showinfo("Plot Twist", "Mid-session plot twist time!")
+        self._show_plot_twist_prompt("Mid-session plot twist time!")
 
     def _handle_end_plot_twist(self):
-        messagebox.showinfo("Plot Twist", "End-of-session plot twist time!")
+        self._show_plot_twist_prompt("End-of-session plot twist time!")
+
+    def _show_plot_twist_prompt(self, header: str) -> None:
+        result = roll_plot_twist()
+        if not result:
+            messagebox.showinfo("Plot Twist", header)
+            return
+        messagebox.showinfo(
+            "Plot Twist",
+            f\"{header}\\n\\n{result.get('table')}: {result.get('roll')} -> {result.get('result')}\",
+        )
 
     def _persist_scene_state(self):
         if not self._state_loaded:
@@ -1436,6 +1449,8 @@ class GMScreenView(ctk.CTkFrame):
             self.open_loot_generator_tab(title=title or "Loot Generator")
         elif kind == "random_tables":
             self.open_random_tables_tab(title=title or "Random Tables", initial_state=tab_def.get("state"))
+        elif kind == "plot_twists":
+            self.open_plot_twists_tab(title=title or "Plot Twists")
         elif kind == "whiteboard":
             self.open_whiteboard_tab(title=title or "Whiteboard")
         else:
@@ -1946,6 +1961,21 @@ class GMScreenView(ctk.CTkFrame):
             layout_meta={"kind": "random_tables", "state": panel.get_state()},
         )
 
+    def open_plot_twists_tab(self, title=None):
+        """Open the plot twist panel inside the GM screen."""
+        tab_name = title or "Plot Twists"
+        panel = PlotTwistPanel(self.content_area)
+
+        def factory(master):
+            return PlotTwistPanel(master)
+
+        self.add_tab(
+            tab_name,
+            panel,
+            content_factory=factory,
+            layout_meta={"kind": "plot_twists"},
+        )
+
 
     def reattach_tab(self, name):
         log_info(f"Reattaching tab: {name}", func_name="GMScreenView.reattach_tab")
@@ -2183,6 +2213,9 @@ class GMScreenView(ctk.CTkFrame):
             return
         elif entity_type == "Random Tables":
             self.open_random_tables_tab()
+            return
+        elif entity_type == "Plot Twists":
+            self.open_plot_twists_tab()
             return
         elif entity_type == "NPC Graph":
             if getattr(self, "_rich_host", None) is None or not self._rich_host.winfo_exists():

@@ -10,9 +10,13 @@
         {
           "id": "universal_plot_twists",
           "title": "Nearly-Universal Plot Twists",
-          "dice": "1d16",
+          "dice": "1d40",
           "description": "Generic plot twists you can layer onto almost any adventure framework.",
-          "tags": ["twist", "generic", "meta"],
+          "tags": [
+            "twist",
+            "generic",
+            "meta"
+          ],
           "entries": [
             {
               "range": "1",
@@ -77,6 +81,102 @@
             {
               "range": "16",
               "result": "Rival party: another competent adventuring group is on the same job with different goals; sometimes they’re allies, sometimes competition, sometimes future enemies."
+            },
+            {
+              "range": "17",
+              "result": "The MacGuffin is a decoy: the real prize is hidden elsewhere or never left its original vault."
+            },
+            {
+              "range": "18",
+              "result": "Time pressure spikes: a hard deadline collapses, accelerating the crisis or forcing a rushed plan."
+            },
+            {
+              "range": "19",
+              "result": "The patron goes missing: the PCs must rescue their employer or deal with a less competent handler."
+            },
+            {
+              "range": "20",
+              "result": "Betrayal inside the inner circle: a trusted ally flips sides or sells out the mission."
+            },
+            {
+              "range": "21",
+              "result": "The objective relocates: the target moves to an unexpected place, changing all access routes."
+            },
+            {
+              "range": "22",
+              "result": "The threat is a symptom: a larger, unseen enemy is actually pulling the strings."
+            },
+            {
+              "range": "23",
+              "result": "Winning has a cost: success triggers a secondary danger or awakens a worse problem."
+            },
+            {
+              "range": "24",
+              "result": "A hidden witness emerges: someone saw the PCs and can expose or blackmail them."
+            },
+            {
+              "range": "25",
+              "result": "Rules change locally: magic/tech fails, glitches, or behaves unpredictably in the key area."
+            },
+            {
+              "range": "26",
+              "result": "Unexpected inheritance: the PCs gain a title, asset, or territory—with immediate obligations."
+            },
+            {
+              "range": "27",
+              "result": "Opposition wants the same goal for different reasons, opening a chance for negotiation."
+            },
+            {
+              "range": "28",
+              "result": "Critical evidence is trapped or cursed, turning the clue into a hazard."
+            },
+            {
+              "range": "29",
+              "result": "Prophecies are staged: the predictions were manipulated to steer the PCs."
+            },
+            {
+              "range": "30",
+              "result": "An escape route appears: the quarry has a hidden exit that flips the chase."
+            },
+            {
+              "range": "31",
+              "result": "The victim is already dead: the job shifts to cover-up, recovery, or resurrection."
+            },
+            {
+              "range": "32",
+              "result": "Multiple crises hit at once, forcing the party to split focus or choose one disaster."
+            },
+            {
+              "range": "33",
+              "result": "Identity swap: the target is disguised as someone else, and the obvious figure is a decoy."
+            },
+            {
+              "range": "34",
+              "result": "The contract is a double-cross: payment comes in favors, debt, or reputational strings."
+            },
+            {
+              "range": "35",
+              "result": "Memory gap: the PCs discover their memories were altered, hiding key actions."
+            },
+            {
+              "range": "36",
+              "result": "Duplicate appears: a clone, twin, or copy makes it unclear who is real."
+            },
+            {
+              "range": "37",
+              "result": "The safe haven is compromised: allies are infiltrated or the sanctuary is unsafe."
+            },
+            {
+              "range": "38",
+              "result": "Reputation flip: the PCs are framed for the disaster they are trying to stop."
+            },
+            {
+              "range": "39",
+              "result": "A secret relationship is revealed: the villain is tied to a beloved NPC."
+            },
+            {
+              "range": "40",
+              "result": "Moral inversion: the enemy's goal is noble, but their methods are monstrous."
             }
           ]
         }
