@@ -16,7 +16,7 @@ from concurrent.futures import ThreadPoolExecutor
 import customtkinter as ctk
 import tkinter as tk
 import tkinter.font as tkfont
-from PIL import Image
+from PIL import Image, ImageTk
 from tkinter import filedialog, messagebox, simpledialog, ttk
 
 from modules.generic.generic_model_wrapper import GenericModelWrapper
@@ -25,7 +25,6 @@ from modules.helpers import theme_manager
 from modules.helpers.config_helper import ConfigHelper
 from modules.helpers.portrait_helper import (
     parse_portrait_value,
-    portrait_menu_label,
     primary_portrait,
     resolve_portrait_candidate,
     resolve_portrait_path,
@@ -82,6 +81,7 @@ ENTITY_DISPLAY_LABELS = {
 }
 
 AI_CATEGORIZE_BATCH_SIZE = 20
+PORTRAIT_MENU_THUMB_SIZE = (48, 48)
 
 
 try:
@@ -312,6 +312,7 @@ class GenericListView(ctk.CTkFrame):
         self._first_chunk_inserted = False
         self._seen_base_ids = set()
         self._iid_to_item = {}
+        self._portrait_menu_images = []
 
         # Load grouping from campaign-local settings
         cfg_grp = ConfigHelper.load_campaign_config()
@@ -1608,6 +1609,23 @@ class GenericListView(ctk.CTkFrame):
         self._drag_start_xy = None
         self.start_index = None
 
+    def _load_portrait_menu_image(self, path: str) -> ImageTk.PhotoImage | None:
+        resolved = resolve_portrait_candidate(path, ConfigHelper.get_campaign_dir())
+        if not resolved:
+            return None
+        try:
+            img = Image.open(resolved)
+            img.thumbnail(PORTRAIT_MENU_THUMB_SIZE, RESAMPLE_MODE)
+            photo = ImageTk.PhotoImage(img)
+            self._portrait_menu_images.append(photo)
+            return photo
+        except Exception as exc:
+            log_warning(
+                f"Failed to load portrait menu thumbnail for '{path}': {exc}",
+                func_name="GenericListView._load_portrait_menu_image",
+            )
+            return None
+
     def copy_item(self, iid):
         """Copy the currently selected items or the provided iid."""
         selection = list(self.tree.selection())
@@ -2687,6 +2705,7 @@ class GenericListView(ctk.CTkFrame):
             if resolve_portrait_candidate(path, ConfigHelper.get_campaign_dir())
         ]
         has_portrait = bool(portrait_paths)
+        self._portrait_menu_images = []
 
         menu = tk.Menu(self, tearoff=0)
         if self.model_wrapper.entity_type == "books" and item:
@@ -2739,10 +2758,20 @@ class GenericListView(ctk.CTkFrame):
             else:
                 portrait_menu = tk.Menu(menu, tearoff=0)
                 for index, path in enumerate(portrait_paths, start=1):
-                    portrait_menu.add_command(
-                        label=portrait_menu_label(path, index),
-                        command=lambda p=path: show_portrait(p, title),
-                    )
+                    label = f"Portrait {index}"
+                    portrait_image = self._load_portrait_menu_image(path)
+                    if portrait_image:
+                        portrait_menu.add_command(
+                            label=label,
+                            image=portrait_image,
+                            compound="left",
+                            command=lambda p=path: show_portrait(p, title),
+                        )
+                    else:
+                        portrait_menu.add_command(
+                            label=label,
+                            command=lambda p=path: show_portrait(p, title),
+                        )
                 menu.add_cascade(label="Show Portraits", menu=portrait_menu)
         menu.add_command(
             label="Copy",
