@@ -30,6 +30,7 @@ from modules.maps.world_map_view import WorldMapPanel
 from modules.maps.controllers.display_map_controller import DisplayMapController
 from modules.scenarios.scene_flow_viewer import create_scene_flow_frame, scene_flow_content_factory
 from modules.scenarios.plot_twist_scheduler import PlotTwistScheduler
+from modules.scenarios.plot_twist_panel import PlotTwistPanel
 from modules.ui.chatbot_dialog import (
     open_chatbot_dialog,
     _DEFAULT_NAME_FIELD_OVERRIDES as CHATBOT_NAME_OVERRIDES,
@@ -183,6 +184,7 @@ class GMScreenView(ctk.CTkFrame):
             "Loot Generator",
             "Whiteboard",
             "Random Tables",
+            "Plot Twists",
             "Factions",
             "Places",
             "NPCs",
@@ -1946,6 +1948,16 @@ class GMScreenView(ctk.CTkFrame):
             layout_meta={"kind": "random_tables", "state": panel.get_state()},
         )
 
+    def open_plot_twist_popup(self):
+        host = self.winfo_toplevel()
+        popup = ctk.CTkToplevel(host)
+        popup.title("Plot Twists")
+        popup.geometry("480x320")
+        popup.transient(host)
+        popup.grab_set()
+        panel = PlotTwistPanel(popup)
+        panel.pack(fill="both", expand=True, padx=12, pady=12)
+
 
     def reattach_tab(self, name):
         log_info(f"Reattaching tab: {name}", func_name="GMScreenView.reattach_tab")
@@ -2183,6 +2195,9 @@ class GMScreenView(ctk.CTkFrame):
             return
         elif entity_type == "Random Tables":
             self.open_random_tables_tab()
+            return
+        elif entity_type == "Plot Twists":
+            self.open_plot_twist_popup()
             return
         elif entity_type == "NPC Graph":
             if getattr(self, "_rich_host", None) is None or not self._rich_host.winfo_exists():

@@ -23,6 +23,7 @@ from modules.ui.chatbot_dialog import (
     open_chatbot_dialog,
     _DEFAULT_NAME_FIELD_OVERRIDES as CHATBOT_NAME_OVERRIDES,
 )
+from modules.scenarios.plot_twist_panel import PlotTwistPanel
 from modules.helpers.logging_helper import (
     log_debug,
     log_error,
@@ -342,6 +343,29 @@ class WorldMapPanel(ctk.CTkFrame):
         )
         self.highlight_button.pack(side="right")
 
+        self.plot_twist_section = ctk.CTkFrame(self.inspector_container, fg_color="transparent")
+        self.plot_twist_section.pack(fill="x", padx=16, pady=(0, 12))
+
+        plot_twist_header = ctk.CTkFrame(self.plot_twist_section, fg_color="transparent")
+        plot_twist_header.pack(fill="x")
+        ctk.CTkLabel(plot_twist_header, text="Plot Twist", font=("Segoe UI", 13, "bold")).pack(side="left")
+        self.plot_twist_toggle = ctk.CTkButton(
+            plot_twist_header,
+            text="Hide",
+            width=70,
+            command=self._toggle_plot_twist_panel,
+        )
+        self.plot_twist_toggle.pack(side="right")
+
+        self.plot_twist_panel_container = ctk.CTkFrame(self.plot_twist_section, fg_color="#141C30", corner_radius=16)
+        self.plot_twist_panel_container.pack(fill="x", pady=(8, 0))
+        self.plot_twist_panel = PlotTwistPanel(
+            self.plot_twist_panel_container,
+            compact=True,
+            show_title=False,
+        )
+        self.plot_twist_panel.pack(fill="x", padx=10, pady=10)
+
         tabs_wrapper = ctk.CTkFrame(self.inspector_container, fg_color="transparent")
         tabs_wrapper.pack(fill="x", padx=16, pady=(0, 12))
 
@@ -371,6 +395,14 @@ class WorldMapPanel(ctk.CTkFrame):
         self.bind("<Control-s>", self._on_save_shortcut)
 
         self._clear_inspector()
+
+    def _toggle_plot_twist_panel(self) -> None:
+        if self.plot_twist_panel_container.winfo_ismapped():
+            self.plot_twist_panel_container.pack_forget()
+            self.plot_twist_toggle.configure(text="Show")
+        else:
+            self.plot_twist_panel_container.pack(fill="x", pady=(8, 0))
+            self.plot_twist_toggle.configure(text="Hide")
 
     def _on_inspector_tab_selected(self, tab_name: str) -> None:
         if not tab_name:

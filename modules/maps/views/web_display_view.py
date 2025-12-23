@@ -4,7 +4,7 @@ import threading
 import time
 from pathlib import Path
 
-from flask import Flask, Response, render_template_string, request, send_from_directory
+from flask import Flask, Response, jsonify, render_template_string, request, send_from_directory
 from werkzeug.serving import make_server
 from PIL import Image, ImageDraw
 from modules.helpers.config_helper import ConfigHelper
@@ -12,6 +12,7 @@ from modules.helpers.logging_helper import log_module_import
 from modules.whiteboard.utils.remote_access_guard import RemoteAccessGuard
 from modules.maps.utils.text_items import TextFontCache
 from modules.maps.views.web_map_api import register_map_api
+from modules.scenarios.plot_twist_panel import get_latest_plot_twist, roll_plot_twist
 
 log_module_import(__name__)
 
@@ -59,6 +60,21 @@ def open_web_display(self, port=None):
 
     register_map_api(self._web_app, controller=self, access_guard=self._map_remote_access_guard)
 
+    def _plot_twist_payload(result):
+        if not result:
+            return {"has_result": False}
+        payload = result.to_payload()
+        payload["has_result"] = True
+        return payload
+
+    @self._web_app.route('/plot_twist')
+    def plot_twist():
+        return jsonify(_plot_twist_payload(get_latest_plot_twist()))
+
+    @self._web_app.route('/plot_twist/roll', methods=['POST'])
+    def plot_twist_roll():
+        return jsonify(_plot_twist_payload(roll_plot_twist()))
+
     @self._web_app.route('/')
     def index():
         # Basic HTML page that reloads the map image periodically so
@@ -85,13 +101,101 @@ def open_web_display(self, port=None):
         <meta charset='utf-8'>
         <title>Map Display</title>
         <style>
-            body {{ margin: 0; }}
-            img {{ max-width: 100%; height: auto; }}
+            body {{ margin: 0; font-family: 'Segoe UI', Tahoma, sans-serif; background: #0b1220; }}
+            img {{ max-width: 100%; height: auto; display: block; }}
+            #plotTwistPopup {{
+                position: fixed;
+                top: 16px;
+                right: 16px;
+                width: min(340px, calc(100% - 32px));
+                background: rgba(15, 23, 42, 0.92);
+                color: #e2e8f0;
+                border-radius: 12px;
+                box-shadow: 0 16px 30px rgba(0, 0, 0, 0.35);
+                padding: 14px 16px;
+                z-index: 100;
+            }}
+            #plotTwistPopup h2 {{
+                margin: 0 0 8px 0;
+                font-size: 16px;
+            }}
+            #plotTwistResult {{
+                font-size: 14px;
+                line-height: 1.4;
+                margin-bottom: 8px;
+            }}
+            #plotTwistMeta {{
+                font-size: 12px;
+                color: #94a3b8;
+                margin-bottom: 10px;
+            }}
+            #plotTwistButton {{
+                background: #38bdf8;
+                border: none;
+                color: #0f172a;
+                padding: 6px 12px;
+                border-radius: 8px;
+                font-weight: 700;
+                cursor: pointer;
+            }}
+            #plotTwistButton:active {{
+                transform: translateY(1px);
+            }}
         </style>
         {refresh_script}
         </head>
         <body>
+        <div id="plotTwistPopup">
+            <h2>Plot Twist</h2>
+            <div id="plotTwistResult">Loading latest twist…</div>
+            <div id="plotTwistMeta"></div>
+            <button id="plotTwistButton" type="button">Roll another</button>
+        </div>
         <img id='mapImage' src='{img_src}'>
+        <script>
+            const plotTwistResult = document.getElementById('plotTwistResult');
+            const plotTwistMeta = document.getElementById('plotTwistMeta');
+            const plotTwistButton = document.getElementById('plotTwistButton');
+
+            function renderPlotTwist(data) {{
+                if (!data || !data.has_result) {{
+                    plotTwistResult.textContent = 'No plot twist rolled yet.';
+                    plotTwistMeta.textContent = '';
+                    return;
+                }}
+                plotTwistResult.textContent = data.result || 'No plot twist rolled yet.';
+                const table = data.table ? `${{data.table}}` : 'Plot Twist';
+                const roll = data.roll !== undefined ? `Roll ${{data.roll}}` : 'Roll ?';
+                const stamp = data.timestamp ? data.timestamp : '';
+                plotTwistMeta.textContent = `${{table}} · ${{roll}} · ${{stamp}}`;
+            }}
+
+            async function fetchPlotTwist() {{
+                try {{
+                    const response = await fetch('/plot_twist');
+                    if (!response.ok) return;
+                    const data = await response.json();
+                    renderPlotTwist(data);
+                }} catch (err) {{
+                    plotTwistResult.textContent = 'Unable to load plot twist.';
+                }}
+            }}
+
+            async function rollPlotTwist() {{
+                try {{
+                    const response = await fetch('/plot_twist/roll', {{ method: 'POST' }});
+                    if (!response.ok) return;
+                    const data = await response.json();
+                    renderPlotTwist(data);
+                }} catch (err) {{
+                    plotTwistResult.textContent = 'Unable to roll a plot twist.';
+                }}
+            }}
+
+            plotTwistButton.addEventListener('click', rollPlotTwist);
+            fetchPlotTwist();
+            setInterval(fetchPlotTwist, 30000);
+        </script>
         </body>
         </html>
         """
