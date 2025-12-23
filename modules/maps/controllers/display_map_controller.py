@@ -102,6 +102,12 @@ if TYPE_CHECKING:
 DEFAULT_BRUSH_SIZE = 32  # px
 DEFAULT_SHAPE_WIDTH = 50
 DEFAULT_SHAPE_HEIGHT = 50
+PORTRAIT_MENU_THUMB_SIZE = (48, 48)
+
+try:
+    RESAMPLE_MODE = Image.Resampling.LANCZOS
+except AttributeError:  # Pillow < 9.1 fallback
+    RESAMPLE_MODE = Image.LANCZOS
 
 MASKS_DIR = os.path.join(ConfigHelper.get_campaign_dir(), "masks")
 MAX_ZOOM = 3.0
@@ -155,6 +161,7 @@ class DisplayMapController:
         self._selection_overlays = {}
         self._selection_icon_cache = {}
         self.clipboard_token = None # Copied item data (token or shape)
+        self._portrait_menu_images = []
 
         self.base_rotation_degrees = 0.0
     
@@ -4287,6 +4294,24 @@ class DisplayMapController:
         if not token or token.get("type") != "token":
             return
         self._resize_tokens([token])
+
+    def _load_portrait_menu_image(self, path: str) -> ImageTk.PhotoImage | None:
+        resolved = resolve_portrait_candidate(path, ConfigHelper.get_campaign_dir())
+        if not resolved:
+            return None
+        try:
+            img = Image.open(resolved)
+            img.thumbnail(PORTRAIT_MENU_THUMB_SIZE, RESAMPLE_MODE)
+            photo = ImageTk.PhotoImage(img)
+            self._portrait_menu_images.append(photo)
+            return photo
+        except Exception as exc:
+            log_warning(
+                f"Failed to load portrait menu thumbnail for '{path}': {exc}",
+                func_name="DisplayMapController._load_portrait_menu_image",
+            )
+            return None
+
     def _show_token_menu(self, event, tokens):
         valid_tokens = [t for t in tokens if isinstance(t, dict) and t.get("type") == "token"]
         if not valid_tokens:
@@ -4295,6 +4320,7 @@ class DisplayMapController:
         count = len(valid_tokens)
         plural = "s" if count != 1 else ""
         menu = tk.Menu(self.canvas, tearoff=0)
+        self._portrait_menu_images = []
 
         menu.add_command(
             label=f"Resize Token{plural}",
@@ -4342,10 +4368,19 @@ class DisplayMapController:
                 else:
                     portrait_menu = tk.Menu(menu, tearoff=0)
                     for index, path in enumerate(portrait_paths, start=1):
-                        portrait_menu.add_command(
-                            label=portrait_menu_label(path, index),
-                            command=lambda p=path: show_portrait(p, title),
-                        )
+                        portrait_image = self._load_portrait_menu_image(path)
+                        if portrait_image:
+                            portrait_menu.add_command(
+                                label=portrait_menu_label(path, index),
+                                image=portrait_image,
+                                compound="left",
+                                command=lambda p=path: show_portrait(p, title),
+                            )
+                        else:
+                            portrait_menu.add_command(
+                                label=portrait_menu_label(path, index),
+                                command=lambda p=path: show_portrait(p, title),
+                            )
                     menu.add_cascade(label="Show Portraits", menu=portrait_menu)
         elif count > 1:
             menu.add_command(
