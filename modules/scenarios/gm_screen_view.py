@@ -30,7 +30,7 @@ from modules.maps.world_map_view import WorldMapPanel
 from modules.maps.controllers.display_map_controller import DisplayMapController
 from modules.scenarios.scene_flow_viewer import create_scene_flow_frame, scene_flow_content_factory
 from modules.scenarios.plot_twist_scheduler import PlotTwistScheduler
-from modules.scenarios.plot_twist_panel import PlotTwistPanel
+from modules.scenarios.plot_twist_panel import PlotTwistPanel, roll_plot_twist
 from modules.ui.chatbot_dialog import (
     open_chatbot_dialog,
     _DEFAULT_NAME_FIELD_OVERRIDES as CHATBOT_NAME_OVERRIDES,
@@ -569,10 +569,18 @@ class GMScreenView(ctk.CTkFrame):
             pass
 
     def _handle_mid_plot_twist(self):
-        messagebox.showinfo("Plot Twist", "Mid-session plot twist time!")
+        result = roll_plot_twist()
+        messagebox.showinfo(
+            "Plot Twist",
+            f"Mid-session plot twist:\n{result.result}\n\n{result.table} · Roll {result.roll}",
+        )
 
     def _handle_end_plot_twist(self):
-        messagebox.showinfo("Plot Twist", "End-of-session plot twist time!")
+        result = roll_plot_twist()
+        messagebox.showinfo(
+            "Plot Twist",
+            f"End-of-session plot twist:\n{result.result}\n\n{result.table} · Roll {result.roll}",
+        )
 
     def _persist_scene_state(self):
         if not self._state_loaded:

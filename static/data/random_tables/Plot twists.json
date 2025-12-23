@@ -10,7 +10,7 @@
         {
           "id": "universal_plot_twists",
           "title": "Nearly-Universal Plot Twists",
-          "dice": "1d16",
+          "dice": "1d40",
           "description": "Generic plot twists you can layer onto almost any adventure framework.",
           "tags": ["twist", "generic", "meta"],
           "entries": [
@@ -77,6 +77,102 @@
             {
               "range": "16",
               "result": "Rival party: another competent adventuring group is on the same job with different goals; sometimes they’re allies, sometimes competition, sometimes future enemies."
+            },
+            {
+              "range": "17",
+              "result": "Double agent: a trusted ally or contact is secretly reporting to the opposition and steering the PCs into traps."
+            },
+            {
+              "range": "18",
+              "result": "Timeline slip: the disaster already started (or hasn’t yet); the PCs must adjust to a shifted timetable and lost time."
+            },
+            {
+              "range": "19",
+              "result": "Decoy objective: the artifact, map, or target is a fake; the real prize is elsewhere or already moved."
+            },
+            {
+              "range": "20",
+              "result": "Shared fate: the antagonist and PCs are mystically linked; harming one harms the other, forcing a non-lethal solution."
+            },
+            {
+              "range": "21",
+              "result": "Half-truth clue: the key information is technically true but dangerously misleading without hidden context."
+            },
+            {
+              "range": "22",
+              "result": "Sponsor flips: the group’s patron changes priorities or sides, demanding the PCs sabotage their own mission."
+            },
+            {
+              "range": "23",
+              "result": "Third faction revealed: an unseen power has been manipulating both sides for its own agenda."
+            },
+            {
+              "range": "24",
+              "result": "Guardian, not monster: the apparent threat is actually holding something worse at bay or protecting innocents."
+            },
+            {
+              "range": "25",
+              "result": "Disaster interrupts: a storm, quake, or magical surge reshapes the map and raises the stakes mid-mission."
+            },
+            {
+              "range": "26",
+              "result": "Law on the hunt: authorities label the PCs criminals, forcing them to clear their names while solving the main problem."
+            },
+            {
+              "range": "27",
+              "result": "Resource collapse: time, air, or supplies run out faster than expected; rationing becomes critical."
+            },
+            {
+              "range": "28",
+              "result": "Impostor in the room: a key NPC is a shapeshifter, illusion, or disguised enemy operative."
+            },
+            {
+              "range": "29",
+              "result": "Conflicting contracts: the same reward has already been promised to a rival group or faction."
+            },
+            {
+              "range": "30",
+              "result": "Living location: the dungeon, city, or ship is sentient and reacts to the PCs’ choices."
+            },
+            {
+              "range": "31",
+              "result": "Victory condition flips: success now requires preserving or restoring the objective, not destroying it."
+            },
+            {
+              "range": "32",
+              "result": "Benevolent villain: the antagonist is trying to prevent a greater catastrophe; the PCs must reassess their goals."
+            },
+            {
+              "range": "33",
+              "result": "Hidden countdown: a ritual or detonation will complete at a precise hour, forcing a race against the clock."
+            },
+            {
+              "range": "34",
+              "result": "Rumor war: misinformation spreads, turning allies and the public against the PCs."
+            },
+            {
+              "range": "35",
+              "result": "Escape blocked: the obvious exit or transport is destroyed, forcing a desperate alternate route."
+            },
+            {
+              "range": "36",
+              "result": "Scale shock: the threat is far larger (or smaller) than expected, changing tactics dramatically."
+            },
+            {
+              "range": "37",
+              "result": "Mirror mission: the opposing side believes the PCs are the villains; both groups think they’re the heroes."
+            },
+            {
+              "range": "38",
+              "result": "Unstable power source: the magic, tech, or relic needed to win might destroy everything if pushed too far."
+            },
+            {
+              "range": "39",
+              "result": "Unexpected heir: a new claimant insists the objective belongs to them by right or lineage."
+            },
+            {
+              "range": "40",
+              "result": "It was a test: the entire mission was staged to evaluate the PCs, and failure has real consequences."
             }
           ]
         }

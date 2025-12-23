@@ -2,19 +2,15 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime
-import os
 from typing import Callable, Optional
 
 import customtkinter as ctk
 
 from modules.dice import dice_engine
 from modules.helpers.logging_helper import log_exception, log_info, log_methods, log_module_import
-from modules.helpers.random_table_loader import RandomTableLoader
+from modules.helpers.random_table_loader import PLOT_TWIST_TABLE_ID, load_plot_twist_table
 
 log_module_import(__name__)
-
-
-PLOT_TWIST_TABLE_ID = "universal_plot_twists"
 
 
 @dataclass(frozen=True)
@@ -42,21 +38,11 @@ _listeners: list[Callable[[PlotTwistResult], None]] = []
 _table_cache: Optional[dict] = None
 
 
-def _plot_twist_data_path() -> str:
-    project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
-    return os.path.join(project_root, "static", "data", "random_tables", "Plot twists.json")
-
-
 def _load_plot_twist_table() -> Optional[dict]:
     global _table_cache
     if _table_cache:
         return _table_cache
-    loader = RandomTableLoader(_plot_twist_data_path())
-    data = loader.load()
-    table = (data.get("tables") or {}).get(PLOT_TWIST_TABLE_ID)
-    if not table:
-        tables = list((data.get("tables") or {}).values())
-        table = tables[0] if tables else None
+    table = load_plot_twist_table(PLOT_TWIST_TABLE_ID)
     _table_cache = table
     return table
 
