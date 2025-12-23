@@ -6,6 +6,7 @@ from datetime import datetime
 from tkinter import filedialog, messagebox
 from PIL import Image
 from functools import partial
+from typing import Optional
 from modules.generic.generic_model_wrapper import GenericModelWrapper
 from modules.helpers.template_loader import load_template as load_entity_template
 from modules.helpers.text_helpers import format_multiline_text
