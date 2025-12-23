@@ -5,6 +5,7 @@ import customtkinter as ctk
 from PIL import Image, ImageTk
 from modules.ui.image_viewer import _get_monitors
 from modules.helpers.config_helper import ConfigHelper
+from modules.helpers.portrait_helper import primary_portrait, resolve_portrait_path
 from modules.helpers.text_helpers import format_multiline_text
 from modules.helpers.logging_helper import (
     log_function,
@@ -44,15 +45,8 @@ def show_entity_on_second_screen(item, title, fields):
     # Optional portrait at top if requested
     portrait_label = None
     if any(f.lower() == "portrait" for f in fields):
-        portrait_rel = item.get("Portrait", "")
-        portrait_abs = None
-        if portrait_rel:
-            if os.path.isabs(portrait_rel) and os.path.exists(portrait_rel):
-                portrait_abs = portrait_rel
-            else:
-                candidate = os.path.join(ConfigHelper.get_campaign_dir(), portrait_rel)
-                if os.path.exists(candidate):
-                    portrait_abs = candidate
+        portrait_rel = primary_portrait(item.get("Portrait", ""))
+        portrait_abs = resolve_portrait_path(portrait_rel, ConfigHelper.get_campaign_dir())
         if portrait_abs:
             try:
                 img = Image.open(portrait_abs)
@@ -309,4 +303,3 @@ def show_entity_on_second_screen(item, title, fields):
         win.after(100, lambda: win.attributes("-topmost", False))
     except Exception:
         pass
-

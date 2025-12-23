@@ -20,6 +20,7 @@ import re
 from tkinter.font import Font  # add at top of file
 from modules.ui.image_viewer import show_portrait
 from modules.helpers.config_helper import ConfigHelper
+from modules.helpers.portrait_helper import primary_portrait, resolve_portrait_path
 from modules.audio.entity_audio import (
     get_entity_audio_value,
     play_entity_audio,
@@ -168,12 +169,9 @@ class PCGraphEditor(ctk.CTkFrame):
             return
 
         # 3) Grab the portrait path
-        portrait_path = npc_data.get("Portrait", "")
-        if portrait_path and not os.path.isabs(portrait_path):
-            candidate = os.path.join(ConfigHelper.get_campaign_dir(), portrait_path)
-            if os.path.exists(candidate):
-                portrait_path = candidate
-        if not portrait_path or not os.path.exists(portrait_path):
+        portrait_path = primary_portrait(npc_data.get("Portrait", ""))
+        resolved_portrait = resolve_portrait_path(portrait_path, ConfigHelper.get_campaign_dir())
+        if not resolved_portrait or not os.path.exists(resolved_portrait):
             messagebox.showerror("Error", "No valid portrait found for this NPC.")
             return
 

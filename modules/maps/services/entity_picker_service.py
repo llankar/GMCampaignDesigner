@@ -3,6 +3,7 @@ from modules.ui.image_viewer import show_portrait
 from modules.generic.generic_list_selection_view import GenericListSelectionView
 from tkinter import messagebox
 from modules.helpers.logging_helper import log_module_import
+from modules.helpers.portrait_helper import primary_portrait
 
 log_module_import(__name__)
 
@@ -54,11 +55,7 @@ def on_entities_selected(self, entity_type, records, picker_frame):
 
 def _extract_portrait_path(record):
     portrait = record.get("Portrait")
-    if isinstance(portrait, dict):
-        path = portrait.get("path") or portrait.get("text")
-    else:
-        path = portrait
-    return path
+    return primary_portrait(portrait)
 
 def _get_entity_display_name(record):
     return record.get("Name") or record.get("Title") or "Unnamed"
@@ -71,4 +68,3 @@ def _add_entity_record(self, entity_type, record):
         return False
     self.add_token(path, entity_type, entity_name, record)
     return True
-

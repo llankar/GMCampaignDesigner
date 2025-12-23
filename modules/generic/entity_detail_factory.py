@@ -14,6 +14,7 @@ from tkinter import Toplevel, messagebox
 from tkinter import ttk
 import tkinter.font as tkfont
 import tkinter as tk
+from modules.helpers.portrait_helper import primary_portrait, resolve_portrait_path
 from modules.ui.image_viewer import show_portrait
 from modules.ui.tooltip import ToolTip
 from modules.generic.generic_editor_window import GenericEditorWindow
@@ -265,13 +266,10 @@ def insert_npc_table(parent, header, npc_names, open_entity_callback):
         data = npc_map.get(name, {}) or {}
 
         # portrait
-        portrait_path = data.get("Portrait")
-        if portrait_path and not os.path.isabs(portrait_path):
-            candidate = os.path.join(ConfigHelper.get_campaign_dir(), portrait_path)
-            if os.path.exists(candidate):
-                portrait_path = candidate
-        if portrait_path and os.path.exists(portrait_path):
-            img = Image.open(portrait_path).resize((40,40), Image.Resampling.LANCZOS)
+        portrait_path = primary_portrait(data.get("Portrait"))
+        resolved_portrait = resolve_portrait_path(portrait_path, ConfigHelper.get_campaign_dir())
+        if resolved_portrait and os.path.exists(resolved_portrait):
+            img = Image.open(resolved_portrait).resize((40,40), Image.Resampling.LANCZOS)
             photo = CTkImage(light_image=img, size=(40,40))
             widget = CTkLabel(table, image=photo, text="", anchor="center")
             widget.image = photo
@@ -357,13 +355,10 @@ def insert_creature_table(parent, header, creature_names, open_entity_callback):
         data = creature_map.get(name, {}) or {}
 
         # portrait
-        portrait_path = data.get("Portrait")
-        if portrait_path and not os.path.isabs(portrait_path):
-            candidate = os.path.join(ConfigHelper.get_campaign_dir(), portrait_path)
-            if os.path.exists(candidate):
-                portrait_path = candidate
-        if portrait_path and os.path.exists(portrait_path):
-            img = Image.open(portrait_path).resize((40,40), Image.Resampling.LANCZOS)
+        portrait_path = primary_portrait(data.get("Portrait"))
+        resolved_portrait = resolve_portrait_path(portrait_path, ConfigHelper.get_campaign_dir())
+        if resolved_portrait and os.path.exists(resolved_portrait):
+            img = Image.open(resolved_portrait).resize((40,40), Image.Resampling.LANCZOS)
             photo = CTkImage(light_image=img, size=(40,40))
             widget = CTkLabel(table, image=photo, text="", anchor="center")
             widget.image = photo
@@ -456,7 +451,7 @@ def insert_places_table(parent, header, place_names, open_entity_callback):
     # populate rows
     for r, name in enumerate(place_names, start=1):
         data     = place_map.get(name, {}) or {}
-        portrait = data.get("Portrait", "")
+        portrait = primary_portrait(data.get("Portrait", ""))
         desc     = format_longtext(data.get("Description", ""))
         secrets  = format_longtext(data.get("Secrets", ""))
         npcs     = data.get("NPCs") or []
@@ -472,8 +467,9 @@ def insert_places_table(parent, header, place_names, open_entity_callback):
 
             # Portrait thumbnail
             elif c == 0:
-                if portrait and os.path.exists(portrait):
-                    img   = Image.open(portrait).resize((40, 40), Image.Resampling.LANCZOS)
+                resolved_portrait = resolve_portrait_path(portrait, ConfigHelper.get_campaign_dir())
+                if resolved_portrait and os.path.exists(resolved_portrait):
+                    img   = Image.open(resolved_portrait).resize((40, 40), Image.Resampling.LANCZOS)
                     photo = CTkImage(light_image=img, size=(40, 40))
                     cell  = CTkLabel(table, image=photo, text="", anchor="center")
                     cell.image = photo
@@ -1175,15 +1171,12 @@ def create_entity_detail_frame(entity_type, entity, master, open_entity_callback
     content_frame.portrait_images = {}
 
     # If entity_type is "NPCs" and the entity has a valid Portrait, load and show it.
-    portrait_path = entity.get("Portrait")
+    portrait_path = primary_portrait(entity.get("Portrait"))
     if (entity_type in {"NPCs", "PCs", "Creatures"}) :
-        if portrait_path and not os.path.isabs(portrait_path):
-            candidate = os.path.join(ConfigHelper.get_campaign_dir(), portrait_path)
-            if os.path.exists(candidate):
-                portrait_path = candidate
-        if portrait_path and os.path.exists(portrait_path):
+        resolved_portrait = resolve_portrait_path(portrait_path, ConfigHelper.get_campaign_dir())
+        if resolved_portrait and os.path.exists(resolved_portrait):
             try:
-                img = Image.open(portrait_path)
+                img = Image.open(resolved_portrait)
                 img = img.resize(PORTRAIT_SIZE, Image.Resampling.LANCZOS)
                 ctk_image = CTkImage(light_image=img, size=PORTRAIT_SIZE)
                 portrait_label = CTkLabel(content_frame, image=ctk_image, text="")
