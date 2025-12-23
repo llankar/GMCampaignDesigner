@@ -8,6 +8,9 @@ from modules.helpers.logging_helper import log_info, log_module_import
 log_module_import(__name__)
 
 
+PLOT_TWIST_TABLE_ID = "universal_plot_twists"
+
+
 class RandomTableLoader:
     """Load and validate random tables from a JSON file or directory."""
 
@@ -189,4 +192,19 @@ class RandomTableLoader:
         return text or None
 
 
-__all__ = ["RandomTableLoader"]
+def plot_twist_data_path() -> str:
+    project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
+    return os.path.join(project_root, "static", "data", "random_tables", "Plot twists.json")
+
+
+def load_plot_twist_table(table_id: str = PLOT_TWIST_TABLE_ID) -> Optional[dict]:
+    loader = RandomTableLoader(plot_twist_data_path())
+    data = loader.load()
+    table = (data.get("tables") or {}).get(table_id)
+    if table:
+        return table
+    tables = list((data.get("tables") or {}).values())
+    return tables[0] if tables else None
+
+
+__all__ = ["RandomTableLoader", "PLOT_TWIST_TABLE_ID", "plot_twist_data_path", "load_plot_twist_table"]
