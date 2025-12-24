@@ -10,7 +10,7 @@
         {
           "id": "universal_plot_twists",
           "title": "Nearly-Universal Plot Twists",
-          "dice": "1d40",
+          "dice": "1d100",
           "description": "Generic plot twists you can layer onto almost any adventure framework.",
           "tags": ["twist", "generic", "meta"],
           "entries": [
@@ -173,6 +173,246 @@
             {
               "range": "40",
               "result": "It was a test: the entire mission was staged to evaluate the PCs, and failure has real consequences."
+            },
+            {
+              "range": "41",
+              "result": "False flag: the attack was staged to frame another faction, and proof is buried at the scene."
+            },
+            {
+              "range": "42",
+              "result": "Protect the enemy: the only witness or key to the puzzle is a hostile figure the PCs must keep alive."
+            },
+            {
+              "range": "43",
+              "result": "Cursed boon: the reward grants power but attaches a looming drawback the PCs must manage."
+            },
+            {
+              "range": "44",
+              "result": "Double location: the target exists in two places at once; destroying one makes the other stronger."
+            },
+            {
+              "range": "45",
+              "result": "Mission hijack: a powerful faction commandeers the job mid-way, reassigning objectives and threatening consequences."
+            },
+            {
+              "range": "46",
+              "result": "Familiar traitor: a trusted retainer, squire, or aide has been compromised, not by malice but by coercion."
+            },
+            {
+              "range": "47",
+              "result": "Split timeline: half the party experiences a different version of events, revealing hidden motives and omitted facts."
+            },
+            {
+              "range": "48",
+              "result": "The villain is a proxy: the real mastermind is a higher authority or patron hidden behind layers of intermediaries."
+            },
+            {
+              "range": "49",
+              "result": "Neutral ground: the decisive scene must happen in a protected or sacred place where violence is forbidden."
+            },
+            {
+              "range": "50",
+              "result": "Power vacuum: defeating the antagonist creates a dangerous void that immediate rivals rush to fill."
+            },
+            {
+              "range": "51",
+              "result": "Summoned debt: a powerful entity or organization demands payment for earlier help the PCs never noticed."
+            },
+            {
+              "range": "52",
+              "result": "Wrong target: the objective is real but belongs to an innocent party unrelated to the villain’s plan."
+            },
+            {
+              "range": "53",
+              "result": "Community backlash: the locals depend on the threat for survival, and removing it could harm them."
+            },
+            {
+              "range": "54",
+              "result": "Stolen identity: someone is using a PC’s name or insignia to commit crimes, implicating the group."
+            },
+            {
+              "range": "55",
+              "result": "Turning the key: the only way to stop the threat requires activating it at a controlled level."
+            },
+            {
+              "range": "56",
+              "result": "Unexpected custodian: a minor NPC is secretly the rightful steward of the objective and demands a say."
+            },
+            {
+              "range": "57",
+              "result": "Collateral miracle: the disaster also prevents a worse future, making the “fix” morally complex."
+            },
+            {
+              "range": "58",
+              "result": "Betrayal insurance: the villain planned for the PCs’ interference and has already set their failsafe in motion."
+            },
+            {
+              "range": "59",
+              "result": "Secret truce: rival factions are negotiating behind closed doors, and the PCs' actions could spark a war."
+            },
+            {
+              "range": "60",
+              "result": "Reverse rescue: the “victim” is shielding the captors from something far worse and refuses to leave."
+            },
+            {
+              "range": "61",
+              "result": "The map changes: routes and doors rearrange based on choices, making backtracking impossible."
+            },
+            {
+              "range": "62",
+              "result": "Blackmail leverage: someone holds damning evidence against a PC, forcing cooperation or silence."
+            },
+            {
+              "range": "63",
+              "result": "Resource corruption: the tools needed to win are tainted and risk turning the PCs into the threat."
+            },
+            {
+              "range": "64",
+              "result": "Silent witness: a key NPC can’t speak or communicate in normal ways; the party must interpret clues."
+            },
+            {
+              "range": "65",
+              "result": "Mistaken prophecy: the foretold “chosen one” is a red herring, and the real trigger is hidden in the fine print."
+            },
+            {
+              "range": "66",
+              "result": "Hostile environment ally: the environment itself can be persuaded to help—if the PCs pay its price."
+            },
+            {
+              "range": "67",
+              "result": "Enemy in the future: a rival from a future timeline is sabotaging outcomes to prevent a catastrophe."
+            },
+            {
+              "range": "68",
+              "result": "False ending: the apparent climax is a deliberate diversion designed to reveal the PCs’ capabilities."
+            },
+            {
+              "range": "69",
+              "result": "Balance keeper: a neutral arbiter will intervene if any side gains too much power."
+            },
+            {
+              "range": "70",
+              "result": "Stolen time: the PCs lose a chunk of time with no memory, and someone else acted in their name."
+            },
+            {
+              "range": "71",
+              "result": "The witness is the culprit: the person who reports the crime is secretly responsible for it."
+            },
+            {
+              "range": "72",
+              "result": "Reputation trap: the PCs must publicly take a stance that alienates someone they need later."
+            },
+            {
+              "range": "73",
+              "result": "Moral mirror: an NPC repeats the PCs’ methods, exposing hypocrisy or unintended consequences."
+            },
+            {
+              "range": "74",
+              "result": "Hidden sanctuary: the final location is a place the PCs swore to protect or keep secret."
+            },
+            {
+              "range": "75",
+              "result": "Volatile truth: revealing the real story would cause chaos, panic, or riots."
+            },
+            {
+              "range": "76",
+              "result": "Tenuous cure: saving the target requires a dangerous ritual or experimental procedure."
+            },
+            {
+              "range": "77",
+              "result": "Ambiguous enemy: the opposition is a collective hive-mind where no single individual is “the villain.”"
+            },
+            {
+              "range": "78",
+              "result": "False safehouse: the most obvious refuge is a trap with watchers already inside."
+            },
+            {
+              "range": "79",
+              "result": "Debt collectors: a third party demands immediate payment or service, interrupting the mission."
+            },
+            {
+              "range": "80",
+              "result": "Rival rescue: another group saves the PCs from danger but expects a favor they can’t refuse."
+            },
+            {
+              "range": "81",
+              "result": "Locked memory: the crucial clue is sealed in a PC’s lost memory and can only be recovered with risk."
+            },
+            {
+              "range": "82",
+              "result": "The key is alive: the object needed to win is a sentient being with its own agenda."
+            },
+            {
+              "range": "83",
+              "result": "Allies at odds: two of the PCs’ patrons start feuding, and both demand loyalty."
+            },
+            {
+              "range": "84",
+              "result": "Mask of the villain: the antagonist is gone, and an imitator is exploiting their reputation."
+            },
+            {
+              "range": "85",
+              "result": "Blessing backlash: the land or people reject outside intervention, even if it helps."
+            },
+            {
+              "range": "86",
+              "result": "Reverse heist: the PCs must plant an item or person rather than steal it."
+            },
+            {
+              "range": "87",
+              "result": "Encrypted motive: the villain’s true goal is hidden in code, requiring a specialist or key artifact."
+            },
+            {
+              "range": "88",
+              "result": "Delayed effect: success won’t show results for days, and the PCs must trust the plan."
+            },
+            {
+              "range": "89",
+              "result": "The city is complicit: local leaders are all invested in the threat continuing."
+            },
+            {
+              "range": "90",
+              "result": "Unexpected hostage: someone the PCs care about is captured after the mission begins."
+            },
+            {
+              "range": "91",
+              "result": "Overlapping crises: a second, unrelated disaster erupts at the same time, splitting attention."
+            },
+            {
+              "range": "92",
+              "result": "Borrowed enemy: the threat is borrowed from another faction, and returns come due mid-story."
+            },
+            {
+              "range": "93",
+              "result": "No one is in charge: the opposition is chaotic and leaderless, making negotiation impossible."
+            },
+            {
+              "range": "94",
+              "result": "Sympathetic monster: the “beast” is intelligent and wants a deal, not a fight."
+            },
+            {
+              "range": "95",
+              "result": "Unwelcome fame: the PCs’ involvement becomes public, attracting crowds, media, or worshippers."
+            },
+            {
+              "range": "96",
+              "result": "Borrowed power: the solution requires a temporary pact that will demand repayment later."
+            },
+            {
+              "range": "97",
+              "result": "The prize is bait: obtaining the objective exposes the PCs to tracking, curses, or pursuit."
+            },
+            {
+              "range": "98",
+              "result": "Vanishing villain: the antagonist disappears entirely, leaving a vacuum and unanswered questions."
+            },
+            {
+              "range": "99",
+              "result": "Reverse evidence: clues implicate a PC unless they uncover the real source."
+            },
+            {
+              "range": "100",
+              "result": "Mercy clause: the villain surrenders with terms, and honoring them changes the campaign’s future."
             }
           ]
         }
