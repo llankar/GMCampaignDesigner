@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime
-import textwrap
 from typing import Callable, Optional
 
 import customtkinter as ctk
@@ -184,7 +183,4 @@ class PlotTwistPanel(ctk.CTkFrame):
         self._apply_result(result)
 
     def _format_result(self, result: PlotTwistResult) -> str:
-        if self._layout != "toolbar":
-            return result.result
-        single_line = " ".join(result.result.split())
-        return textwrap.shorten(single_line, width=80, placeholder="…")
+        return result.result
