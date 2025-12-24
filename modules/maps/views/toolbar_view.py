@@ -2,6 +2,12 @@ import tkinter as tk
 import customtkinter as ctk
 from modules.ui.icon_dropdown import IconDropdown
 from modules.helpers.logging_helper import log_module_import
+from modules.scenarios.plot_twist_panel import (
+    add_plot_twist_listener,
+    get_latest_plot_twist,
+    remove_plot_twist_listener,
+    roll_plot_twist,
+)
 
 log_module_import(__name__)
 
@@ -373,6 +379,66 @@ def _build_toolbar(self):
     )
     self.fit_mode_menu.set(current_fit)
     _pack_control(self.fit_mode_menu, trailing=4)
+
+    plot_twist_section = _create_collapsible_section(toolbar, "Plot Twist")
+    plot_twist_container = ctk.CTkFrame(plot_twist_section, fg_color="transparent")
+    plot_twist_container.pack(side="left", padx=(6, 6), pady=(6, 6))
+
+    self._plot_twist_result_var = ctk.StringVar(value="No plot twist rolled yet.")
+
+    plot_twist_title = ctk.CTkLabel(
+        plot_twist_container,
+        text="Latest:",
+        font=("Segoe UI", 12, "bold"),
+    )
+    plot_twist_title.pack(anchor="w")
+
+    plot_twist_result_label = ctk.CTkLabel(
+        plot_twist_container,
+        textvariable=self._plot_twist_result_var,
+        justify="left",
+        wraplength=260,
+    )
+    plot_twist_result_label.pack(anchor="w", pady=(2, 4))
+
+    def _render_plot_twist(result):
+        if not result:
+            self._plot_twist_result_var.set("No plot twist rolled yet.")
+            return
+        message = result.result or "No plot twist rolled yet."
+        if len(message) > 80:
+            message = f"{message[:77].rstrip()}..."
+        self._plot_twist_result_var.set(message)
+
+    def _roll_plot_twist():
+        _render_plot_twist(roll_plot_twist())
+
+    plot_twist_actions = ctk.CTkFrame(plot_twist_container, fg_color="transparent")
+    plot_twist_actions.pack(anchor="w", pady=(2, 0))
+    plot_twist_roll_button = ctk.CTkButton(
+        plot_twist_actions,
+        text="Roll",
+        width=70,
+        command=_roll_plot_twist,
+    )
+    plot_twist_roll_button.pack(side="left", padx=(0, 6))
+
+    def _on_plot_twist_update(result):
+        _render_plot_twist(result)
+
+    add_plot_twist_listener(_on_plot_twist_update)
+    self._plot_twist_toolbar_listener = _on_plot_twist_update
+    _render_plot_twist(get_latest_plot_twist())
+
+    def _on_toolbar_destroy(event):
+        if event.widget is not self.parent:
+            return
+        listener = getattr(self, "_plot_twist_toolbar_listener", None)
+        if listener:
+            remove_plot_twist_listener(listener)
+            self._plot_twist_toolbar_listener = None
+
+    self.parent.bind("<Destroy>", _on_toolbar_destroy, add="+")
 
     # Initial visibility update for shape controls (call method on self)
     if hasattr(self, '_update_shape_controls_visibility'):
