@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime
-import textwrap
 from typing import Callable, Optional
 
 import customtkinter as ctk
@@ -123,6 +122,8 @@ class PlotTwistPanel(ctk.CTkFrame):
         body_font = ("Segoe UI", 12 if is_toolbar else (13 if compact else 14))
         meta_font = ("Segoe UI", 10 if is_toolbar else (11 if compact else 12))
         wraplength = 240 if is_toolbar else (280 if compact else 420)
+        self._wraplength_base = wraplength
+        self._wraplength_expanded = 360 if is_toolbar else wraplength
 
         if show_title:
             title_label = ctk.CTkLabel(self, text="Plot Twist", font=title_font)
@@ -173,6 +174,13 @@ class PlotTwistPanel(ctk.CTkFrame):
 
     def _apply_result(self, result: PlotTwistResult) -> None:
         self.result_var.set(self._format_result(result))
+        if self._layout == "toolbar":
+            wraplength = (
+                self._wraplength_expanded
+                if len(result.result) > 120
+                else self._wraplength_base
+            )
+            self.result_label.configure(wraplength=wraplength)
         if self.meta_var:
             self.meta_var.set(f"{result.table} · Roll {result.roll} · {result.timestamp_label}")
 
@@ -186,5 +194,4 @@ class PlotTwistPanel(ctk.CTkFrame):
     def _format_result(self, result: PlotTwistResult) -> str:
         if self._layout != "toolbar":
             return result.result
-        single_line = " ".join(result.result.split())
-        return textwrap.shorten(single_line, width=80, placeholder="…")
+        return " ".join(result.result.split())
