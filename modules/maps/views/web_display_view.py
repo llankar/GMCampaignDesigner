@@ -227,9 +227,21 @@ def open_web_display(self, port=None):
                     .token { position: absolute; width: 48px; height: 48px; border-radius: 12px; background: rgba(14,165,233,0.85); border: 2px solid rgba(255,255,255,0.8); color: #0b1220; font-weight: 800; display: grid; place-items: center; pointer-events: auto; touch-action: none; box-shadow: 0 10px 25px rgba(0,0,0,0.35); user-select: none; -webkit-user-drag: none; }
                     #drawLayer { position: absolute; inset: 0; pointer-events: auto; touch-action: none; }
                     #status { position: fixed; bottom: 12px; left: 12px; padding: 10px 12px; background: rgba(15,23,42,0.9); border-radius: 10px; box-shadow: 0 10px 25px rgba(0,0,0,0.35); font-weight: 700; }
+                    #plotTwistPopup { position: fixed; top: 12px; right: 12px; width: min(340px, calc(100% - 24px)); background: rgba(15, 23, 42, 0.92); color: #e2e8f0; border-radius: 12px; box-shadow: 0 16px 30px rgba(0, 0, 0, 0.35); padding: 14px 16px; z-index: 200; }
+                    #plotTwistPopup h2 { margin: 0 0 8px 0; font-size: 16px; }
+                    #plotTwistResult { font-size: 14px; line-height: 1.4; margin-bottom: 8px; }
+                    #plotTwistMeta { font-size: 12px; color: #94a3b8; margin-bottom: 10px; }
+                    #plotTwistButton { background: #38bdf8; border: none; color: #0f172a; padding: 6px 12px; border-radius: 8px; font-weight: 700; cursor: pointer; }
+                    #plotTwistButton:active { transform: translateY(1px); }
                 </style>
             </head>
             <body>
+                <div id="plotTwistPopup">
+                    <h2>Plot Twist</h2>
+                    <div id="plotTwistResult">Loading latest twist…</div>
+                    <div id="plotTwistMeta"></div>
+                    <button id="plotTwistButton" type="button">Roll a twist</button>
+                </div>
                 <div id='mapStage'>
                     <img id='mapImage' src='/map.png' alt='Map' draggable='false'>
                     <canvas id='drawLayer'></canvas>
@@ -240,6 +252,7 @@ def open_web_display(self, port=None):
                     window.MAP_REMOTE_TOKEN = {{ token|tojson }};
                 </script>
                 <script src='{{ script_path }}' defer></script>
+                <script src='/static/maptool_web/plot_twist.js' defer></script>
             </body>
             </html>
             """,
