@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime
+import textwrap
 from typing import Callable, Optional
 
 import customtkinter as ctk
@@ -103,15 +104,25 @@ def roll_plot_twist() -> PlotTwistResult:
 
 @log_methods
 class PlotTwistPanel(ctk.CTkFrame):
-    def __init__(self, master=None, *, compact: bool = False, show_title: bool = True, **kwargs):
+    def __init__(
+        self,
+        master=None,
+        *,
+        compact: bool = False,
+        show_title: bool = True,
+        layout: str = "default",
+        **kwargs,
+    ):
         super().__init__(master, **kwargs)
         self._compact = compact
+        self._layout = layout
         self.columnconfigure(0, weight=1)
 
-        title_font = ("Segoe UI", 15, "bold")
-        body_font = ("Segoe UI", 13 if compact else 14)
-        meta_font = ("Segoe UI", 11 if compact else 12)
-        wraplength = 280 if compact else 420
+        is_toolbar = layout == "toolbar"
+        title_font = ("Segoe UI", 13 if is_toolbar else 15, "bold")
+        body_font = ("Segoe UI", 12 if is_toolbar else (13 if compact else 14))
+        meta_font = ("Segoe UI", 10 if is_toolbar else (11 if compact else 12))
+        wraplength = 240 if is_toolbar else (280 if compact else 420)
 
         if show_title:
             title_label = ctk.CTkLabel(self, text="Plot Twist", font=title_font)
@@ -128,18 +139,25 @@ class PlotTwistPanel(ctk.CTkFrame):
             justify="left",
             font=body_font,
         )
-        self.result_label.grid(row=row_offset, column=0, sticky="ew", padx=6, pady=(0, 4))
+        self.meta_var = None
+        self.meta_label = None
+        if is_toolbar:
+            self.columnconfigure(1, weight=0)
+            self.result_label.grid(row=row_offset, column=0, sticky="ew", padx=(6, 4), pady=(0, 4))
+            self.roll_button = ctk.CTkButton(self, text="Roll", width=64, command=self.roll_another)
+            self.roll_button.grid(row=row_offset, column=1, sticky="e", padx=(4, 6), pady=(0, 4))
+        else:
+            self.result_label.grid(row=row_offset, column=0, sticky="ew", padx=6, pady=(0, 4))
+            self.meta_var = ctk.StringVar(value="")
+            self.meta_label = ctk.CTkLabel(self, textvariable=self.meta_var, font=meta_font, text_color="#A3ADC2")
+            self.meta_label.grid(row=row_offset + 1, column=0, sticky="w", padx=6, pady=(0, 8))
 
-        self.meta_var = ctk.StringVar(value="")
-        self.meta_label = ctk.CTkLabel(self, textvariable=self.meta_var, font=meta_font, text_color="#A3ADC2")
-        self.meta_label.grid(row=row_offset + 1, column=0, sticky="w", padx=6, pady=(0, 8))
+            button_row = ctk.CTkFrame(self, fg_color="transparent")
+            button_row.grid(row=row_offset + 2, column=0, sticky="ew", padx=6, pady=(0, 4))
+            button_row.columnconfigure(0, weight=1)
 
-        button_row = ctk.CTkFrame(self, fg_color="transparent")
-        button_row.grid(row=row_offset + 2, column=0, sticky="ew", padx=6, pady=(0, 4))
-        button_row.columnconfigure(0, weight=1)
-
-        self.roll_button = ctk.CTkButton(button_row, text="Roll another", command=self.roll_another)
-        self.roll_button.grid(row=0, column=0, sticky="w")
+            self.roll_button = ctk.CTkButton(button_row, text="Roll another", command=self.roll_another)
+            self.roll_button.grid(row=0, column=0, sticky="w")
 
         add_plot_twist_listener(self._on_plot_twist_update)
         self.bind("<Destroy>", self._on_destroy, add="+")
@@ -154,8 +172,9 @@ class PlotTwistPanel(ctk.CTkFrame):
             self._apply_result(result)
 
     def _apply_result(self, result: PlotTwistResult) -> None:
-        self.result_var.set(result.result)
-        self.meta_var.set(f"{result.table} · Roll {result.roll} · {result.timestamp_label}")
+        self.result_var.set(self._format_result(result))
+        if self.meta_var:
+            self.meta_var.set(f"{result.table} · Roll {result.roll} · {result.timestamp_label}")
 
     def _on_plot_twist_update(self, result: PlotTwistResult) -> None:
         self._apply_result(result)
@@ -163,3 +182,9 @@ class PlotTwistPanel(ctk.CTkFrame):
     def roll_another(self) -> None:
         result = roll_plot_twist()
         self._apply_result(result)
+
+    def _format_result(self, result: PlotTwistResult) -> str:
+        if self._layout != "toolbar":
+            return result.result
+        single_line = " ".join(result.result.split())
+        return textwrap.shorten(single_line, width=80, placeholder="…")

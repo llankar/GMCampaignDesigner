@@ -376,7 +376,13 @@ def _build_toolbar(self):
     _pack_control(self.fit_mode_menu, trailing=4)
 
     plot_twist_section = _create_collapsible_section(toolbar, "Plot Twist")
-    plot_twist_panel = PlotTwistPanel(plot_twist_section, compact=True, show_title=False, fg_color="transparent")
+    plot_twist_panel = PlotTwistPanel(
+        plot_twist_section,
+        compact=True,
+        show_title=False,
+        layout="toolbar",
+        fg_color="transparent",
+    )
     plot_twist_panel.pack(side="left", padx=(6, 6), pady=(6, 6))
 
     # Initial visibility update for shape controls (call method on self)
