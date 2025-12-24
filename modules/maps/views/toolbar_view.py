@@ -69,11 +69,9 @@ def _build_toolbar(self):
     except Exception:
         pass
 
-    # Scrollable frame for the actual toolbar content
-    # Set a fixed height for the scrollable area, width will be determined by content
-    # The scrollbar will appear automatically if content width exceeds available width.
-    toolbar_height = 65 # Adjust as needed for your icon/widget sizes
-    toolbar = ctk.CTkScrollableFrame(toolbar_container, orientation="horizontal", height=toolbar_height)
+    # Scrollable frame for the actual toolbar content.
+    # Let the height expand to fit content so longer plot twists can show fully.
+    toolbar = ctk.CTkScrollableFrame(toolbar_container, orientation="horizontal")
     toolbar.pack(fill="x", expand=True) # Make the scrollable area fill the container
 
     # Load icons
