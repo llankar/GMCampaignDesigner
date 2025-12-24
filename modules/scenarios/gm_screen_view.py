@@ -242,8 +242,10 @@ class GMScreenView(ctk.CTkFrame):
         try:
             viewport = self.content_area if hasattr(self, "content_area") else self
             viewport.update_idletasks()
-            w = max(1, int(viewport.winfo_width()))
-            h = max(1, int(viewport.winfo_height()))
+            w = int(viewport.winfo_width())
+            h = int(viewport.winfo_height())
+            if w <= 1 or h <= 1:
+                return
             container.pack_propagate(False)
             container.configure(width=w, height=h)
         except Exception:
@@ -2161,6 +2163,12 @@ class GMScreenView(ctk.CTkFrame):
 
             frame = tab["content_frame"]
             frame.pack(fill="both", expand=True)
+            if target_host != "rich":
+                try:
+                    self._sync_fullbleed_now(frame)
+                    self.after(60, lambda cf=frame: self._sync_fullbleed_now(cf))
+                except Exception:
+                    pass
 
     def add_new_tab(self):
         log_info("Opening entity selection for new tab", func_name="GMScreenView.add_new_tab")
