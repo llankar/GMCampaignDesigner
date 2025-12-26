@@ -175,6 +175,9 @@ class MainWindow(ctk.CTk):
         root.bind_all("<F4>", lambda _event: self.open_scenario_builder())
         root.bind_all("<F5>", lambda _event: self.open_world_map())
         root.bind_all("<F6>", lambda _event: self.change_database_storage())
+        root.bind_all("<F7>", lambda _event: self.open_audio_bar())
+        root.bind_all("<F8>", lambda _event: self.open_dice_bar())
+        root.bind_all("<F12>", lambda _event: self.destroy())
 
     def open_ai_settings(self):
         log_info("Opening AI settings dialog", func_name="main_window.MainWindow.open_ai_settings")
