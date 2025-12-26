@@ -156,6 +156,7 @@ class MainWindow(ctk.CTk):
         self.whiteboard_controller = None
         root = self.winfo_toplevel()
         root.bind_all("<Control-f>", self._on_ctrl_f)
+        self._bind_global_shortcuts()
 
         self._system_listener_unsub = register_system_change_listener(self._on_system_changed)
         # Rebuild colorized UI bits when theme changes
@@ -165,6 +166,15 @@ class MainWindow(ctk.CTk):
         self.after(400, self.open_audio_bar)
         self.after(600, lambda: self._queue_update_check(force=True))
         self.after(800, self._auto_open_gm_screen_if_available)
+
+    def _bind_global_shortcuts(self):
+        root = self.winfo_toplevel()
+        root.bind_all("<F1>", lambda _event: self.open_gm_screen())
+        root.bind_all("<F2>", lambda _event: self.map_tool())
+        root.bind_all("<F3>", lambda _event: self.open_whiteboard())
+        root.bind_all("<F4>", lambda _event: self.open_scenario_builder())
+        root.bind_all("<F5>", lambda _event: self.open_world_map())
+        root.bind_all("<F6>", lambda _event: self.change_database_storage())
 
     def open_ai_settings(self):
         log_info("Opening AI settings dialog", func_name="main_window.MainWindow.open_ai_settings")
