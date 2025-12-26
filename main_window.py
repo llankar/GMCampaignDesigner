@@ -175,8 +175,8 @@ class MainWindow(ctk.CTk):
         root.bind_all("<F4>", lambda _event: self.open_scenario_builder())
         root.bind_all("<F5>", lambda _event: self.open_world_map())
         root.bind_all("<F6>", lambda _event: self.change_database_storage())
-        root.bind_all("<F7>", lambda _event: self.open_audio_bar())
-        root.bind_all("<F8>", lambda _event: self.open_dice_bar())
+        root.bind_all("<F7>", lambda _event: self.open_sound_manager())
+        root.bind_all("<F8>", lambda _event: self.open_dice_roller())
         root.bind_all("<F12>", lambda _event: self.destroy())
 
     def open_ai_settings(self):
@@ -298,7 +298,6 @@ class MainWindow(ctk.CTk):
             "generate_scenario": "generate_scenario_icon.png",
             "dice_roller": "dice_roller_icon.png",
             "dice_bar": "dice_roller_icon.png",
-            "sound_manager": "sound_manager_icon.png",
             "audio_controls": "sound_manager_icon.png",
             "scene_flow_viewer": "scenes_flow_icon.png",
             "create_random_table"   : "random_table_icon.png",
