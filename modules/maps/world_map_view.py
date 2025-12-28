@@ -849,7 +849,7 @@ class WorldMapPanel(ctk.CTkFrame):
             "type": "map" if entity_type == "Map" else "entity",
             "x_norm": 0.5,
             "y_norm": 0.5,
-            "size": 120,
+            "size": 40,
             "portrait_path": self._resolve_portrait_path(record) if entity_type != "Map" else None,
             "image_path": self._resolve_map_image(record) if entity_type == "Map" else None,
             "linked_map": record.get("Name") if entity_type == "Map" else None,
