@@ -830,7 +830,7 @@ class MainWindow(ctk.CTk):
             ("import_portraits", "Import Portraits from Folder", self.import_portraits_from_directory),
             ("map_tool", "Map Tool", self.map_tool),
             ("whiteboard", "Whiteboard", self.open_whiteboard),
-            ("sound_manager", "Sound & Music Manager", self.open_sound_manager),
+            ("audio_controls", "Sound & Music Manager", self.open_sound_manager),
             ("dice_roller", "Open Dice Roller", self.open_dice_roller),
         ]
 
