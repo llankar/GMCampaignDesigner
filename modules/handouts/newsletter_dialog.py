@@ -41,6 +41,7 @@ class NewsletterConfigDialog(ctk.CTkToplevel):
         self._language_var = tk.StringVar(value="français")
         self._style_var = tk.StringVar(value="neutre")
         self._use_ai_var = tk.BooleanVar(value=False)
+        self._destroy_scheduled = False
 
         self._build_ui()
 
@@ -155,3 +156,53 @@ class NewsletterConfigDialog(ctk.CTkToplevel):
 
     def _handle_cancel(self) -> None:
         self.destroy()
+
+    def _schedule_safe_destroy(self) -> None:  # pragma: no cover - UI teardown
+        if self._destroy_scheduled:
+            return
+
+        self._destroy_scheduled = True
+
+        try:
+            if self.winfo_exists():
+                self.withdraw()
+        except Exception:
+            pass
+
+        def _finalize() -> None:
+            try:
+                super(NewsletterConfigDialog, self).destroy()
+            except Exception:
+                pass
+
+        try:
+            self.after(150, _finalize)
+        except Exception:
+            _finalize()
+
+    def destroy(self) -> None:  # pragma: no cover - UI teardown
+        self._schedule_safe_destroy()
+
+    def focus_set(self) -> None:  # pragma: no cover - UI focus handling
+        try:
+            if not self.winfo_exists():
+                return
+        except Exception:
+            return
+
+        try:
+            super().focus_set()
+        except tk.TclError:
+            pass
+
+    def focus_force(self) -> None:  # pragma: no cover - UI focus handling
+        try:
+            if not self.winfo_exists():
+                return
+        except Exception:
+            return
+
+        try:
+            super().focus_force()
+        except tk.TclError:
+            pass
