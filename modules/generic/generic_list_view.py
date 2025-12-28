@@ -160,6 +160,20 @@ def _lazy_book_viewer():
     return open_book_viewer
 
 
+def _lazy_newsletter_components():
+    from modules.handouts.newsletter_ai import generate_newsletter_ai
+    from modules.handouts.newsletter_dialog import NewsletterConfigDialog
+    from modules.handouts.newsletter_generator import build_newsletter_payload
+    from modules.handouts.newsletter_window import NewsletterWindow
+
+    return (
+        NewsletterConfigDialog,
+        NewsletterWindow,
+        generate_newsletter_ai,
+        build_newsletter_payload,
+    )
+
+
 def _lazy_pdf_processing():
     from modules.books.pdf_processing import export_pdf_page_range, get_pdf_page_count
 
@@ -2742,6 +2756,10 @@ class GenericListView(ctk.CTkFrame):
                 label="Open in GM Screen",
                 command=lambda: self.open_in_gm_screen(iid)
             )
+            menu.add_command(
+                label="Generate Newsletter...",
+                command=lambda: self.open_newsletter_preview(iid),
+            )
         if item:
             menu.add_command(
                 label="Display on Second Screen",
@@ -2819,6 +2837,65 @@ class GenericListView(ctk.CTkFrame):
         fields = list(self.display_fields) if getattr(self, 'display_fields', None) else list(self.columns[:3])
         show_on_second_screen = _lazy_second_screen()
         show_on_second_screen(item=item, title=title, fields=fields)
+
+    def open_newsletter_preview(self, iid):
+        item, _ = self._find_item_by_iid(iid)
+        if not item:
+            return
+        scenario_title = str(item.get("Title") or item.get(self.unique_field, "")).strip()
+        if not scenario_title:
+            messagebox.showwarning(
+                "Newsletter",
+                "Impossible de déterminer le titre du scénario.",
+            )
+            return
+
+        (
+            NewsletterConfigDialog,
+            NewsletterWindow,
+            generate_newsletter_ai,
+            build_newsletter_payload,
+        ) = _lazy_newsletter_components()
+
+        def _handle_generate(config):
+            sections = config.get("sections") or []
+            language = config.get("language")
+            style = config.get("style")
+            use_ai = bool(config.get("use_ai"))
+
+            if use_ai:
+                ai_text = generate_newsletter_ai(
+                    {"scenario_title": scenario_title, "sections": sections},
+                    language,
+                    style,
+                )
+                NewsletterWindow(
+                    self,
+                    ai_text=ai_text,
+                    language=language,
+                    style=style,
+                    title=f"Newsletter - {scenario_title}",
+                )
+            else:
+                payload = build_newsletter_payload(
+                    scenario_title,
+                    sections,
+                    language,
+                    style,
+                )
+                NewsletterWindow(
+                    self,
+                    payload=payload,
+                    language=language,
+                    style=style,
+                    title=f"Newsletter - {scenario_title}",
+                )
+
+        dialog = NewsletterConfigDialog(self, scenario_title, on_generate=_handle_generate)
+        dialog.transient(self.winfo_toplevel())
+        dialog.grab_set()
+        dialog.focus_force()
+        dialog.wait_window(dialog)
 
     def _get_audio_value(self, item):
         if not item:
