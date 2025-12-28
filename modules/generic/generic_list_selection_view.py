@@ -112,10 +112,16 @@ class GenericListSelectionView(ctk.CTkFrame):
         self.selection_indicator_image.put("#FFFFFF", to=(0, 0, 4, 30))
         self._indicator_item_ids = set()
         self.item_by_id = {}
+        self._selection_anchor = None
 
         # Bind double-click event and initial refresh
         self.tree.bind("<Double-1>", self.on_double_click)
         self.tree.bind("<<TreeviewSelect>>", self._on_tree_select_change)
+        if self.allow_multi_select:
+            self.tree.bind("<Control-a>", self._on_ctrl_a)
+            self.tree.bind("<Control-A>", self._on_ctrl_a)
+            self.tree.bind("<Shift-Button-1>", self._on_shift_click)
+            self.tree.bind("<Button-1>", self._on_click, add=True)
         self.refresh_list()
 
         button_label = "Add Selected" if self.allow_multi_select else "Open Selected"
@@ -270,9 +276,53 @@ class GenericListSelectionView(ctk.CTkFrame):
             if self.tree.exists(iid):
                 self.tree.item(iid, image=self.selection_indicator_image)
         self._indicator_item_ids = current_ids
+        if current_ids:
+            self._selection_anchor = self.tree.focus() or next(iter(current_ids))
 
     def _clear_selection_indicator(self):
         for iid in list(self._indicator_item_ids):
             if self.tree.exists(iid):
                 self.tree.item(iid, image="")
         self._indicator_item_ids = set()
+
+    def _on_ctrl_a(self, _event=None):
+        if not self.allow_multi_select:
+            return None
+        all_ids = self.tree.get_children()
+        if all_ids:
+            self.tree.selection_set(all_ids)
+            self._selection_anchor = all_ids[0]
+        return "break"
+
+    def _on_click(self, event):
+        if not self.allow_multi_select:
+            return None
+        if event.state & 0x0001 or event.state & 0x0004:
+            return None
+        item_id = self.tree.identify_row(event.y)
+        if item_id:
+            self._selection_anchor = item_id
+        return None
+
+    def _on_shift_click(self, event):
+        if not self.allow_multi_select:
+            return None
+        item_id = self.tree.identify_row(event.y)
+        if not item_id:
+            return "break"
+        if not self._selection_anchor:
+            self._selection_anchor = item_id
+        self._select_range(self._selection_anchor, item_id)
+        return "break"
+
+    def _select_range(self, start_iid, end_iid):
+        all_ids = list(self.tree.get_children())
+        try:
+            start_index = all_ids.index(start_iid)
+            end_index = all_ids.index(end_iid)
+        except ValueError:
+            return
+        if start_index > end_index:
+            start_index, end_index = end_index, start_index
+        range_ids = all_ids[start_index : end_index + 1]
+        self.tree.selection_set(range_ids)
