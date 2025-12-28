@@ -1213,19 +1213,26 @@ def create_entity_detail_frame(entity_type, entity, master, open_entity_callback
     # Return the scrollable container so that whoever creates the window or tab gets a frame with scrollbars.
     return content_frame
 
-@log_function
-def open_entity_window(entity_type, name):
-    log_info(f"Opening entity window for {entity_type}: {name}", func_name="open_entity_window")
-    wrapper = wrappers[entity_type]
-    items = wrapper.load_items()
+def _normalize_entity_names(entity_type, selection):
     key = "Title" if entity_type == "Scenarios" else "Name"
-    entity = next((i for i in items if i.get(key) == name), None)
-    if not entity:
-        messagebox.showerror("Error", f"{entity_type[:-1]} '{name}' not found.")
-        return
+    if isinstance(selection, (list, tuple, set)):
+        candidates = selection
+    else:
+        candidates = [selection]
 
+    names = []
+    for entry in candidates:
+        if isinstance(entry, dict):
+            resolved = entry.get(key) or entry.get("Name") or entry.get("Title")
+        else:
+            resolved = entry
+        if resolved:
+            names.append(resolved)
+    return names
+
+def _open_entity_detail_window(entity_type, entity_name, entity):
     new_window = ctk.CTkToplevel()
-    new_window.title(f"{entity_type[:-1]}: {name}")
+    new_window.title(f"{entity_type[:-1]}: {entity_name}")
     new_window.geometry("1000x600")
     new_window.minsize(1000, 600)
     new_window.configure(padx=10, pady=10)
@@ -1238,3 +1245,22 @@ def open_entity_window(entity_type, name):
         open_entity_callback=open_entity_window
     )
     detail_frame.pack(fill="both", expand=True)
+
+@log_function
+def open_entity_window(entity_type, name):
+    names = _normalize_entity_names(entity_type, name)
+    if not names:
+        return
+
+    wrapper = wrappers[entity_type]
+    items = wrapper.load_items()
+    key = "Title" if entity_type == "Scenarios" else "Name"
+    item_lookup = {item.get(key): item for item in items if item.get(key)}
+
+    for entity_name in names:
+        log_info(f"Opening entity window for {entity_type}: {entity_name}", func_name="open_entity_window")
+        entity = item_lookup.get(entity_name)
+        if not entity:
+            messagebox.showerror("Error", f"{entity_type[:-1]} '{entity_name}' not found.")
+            continue
+        _open_entity_detail_window(entity_type, entity_name, entity)
