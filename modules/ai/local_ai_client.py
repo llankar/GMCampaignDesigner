@@ -205,7 +205,7 @@ class LocalAIClient:
             "${ErrorActionPreference} = 'Stop'\n"
             "[Console]::OutputEncoding = New-Object System.Text.UTF8Encoding $false\n"
             "$json = @'\n" + json_text + "\n'@\n"
-            f"$resp = Invoke-WebRequest -Uri '{url}' -Method Post -Headers {headers_ps} -Body $json\n"
+            f"$resp = Invoke-WebRequest -Uri '{url}' -Method Post -Headers {headers_ps} -Body $json -UseBasicParsing\n"
             "$resp.Content\n"
         )
 
