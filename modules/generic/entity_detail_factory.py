@@ -1246,8 +1246,56 @@ def _open_entity_detail_window(entity_type, entity_name, entity):
     )
     detail_frame.pack(fill="both", expand=True)
 
+def _open_entity_picker(entity_type):
+    wrapper = wrappers.get(entity_type)
+    if not wrapper:
+        messagebox.showerror("Error", f"Unknown type '{entity_type}'.")
+        return
+
+    try:
+        template = load_template(entity_type.lower())
+    except Exception as exc:
+        messagebox.showerror("Error", f"Unable to load template for '{entity_type}': {exc}")
+        return
+
+    picker = ctk.CTkToplevel()
+    picker.title(f"Select {entity_type}")
+    picker.geometry("1200x800")
+    picker.transient(picker.master)
+    picker.grab_set()
+    picker.focus_force()
+
+    def _close_picker():
+        if picker.winfo_exists():
+            picker.destroy()
+
+    def _on_single_select(_, name):
+        open_entity_window(entity_type, name)
+        _close_picker()
+
+    def _on_multi_select(_, selection):
+        open_entity_window(entity_type, selection)
+        _close_picker()
+
+    from modules.generic.generic_list_selection_view import GenericListSelectionView
+
+    view = GenericListSelectionView(
+        picker,
+        entity_type,
+        wrapper,
+        template,
+        on_select_callback=_on_single_select,
+        allow_multi_select=True,
+        on_multi_select_callback=_on_multi_select,
+    )
+    view.pack(fill="both", expand=True)
+
 @log_function
 def open_entity_window(entity_type, name):
+    if name is None:
+        _open_entity_picker(entity_type)
+        return
+
     names = _normalize_entity_names(entity_type, name)
     if not names:
         return
