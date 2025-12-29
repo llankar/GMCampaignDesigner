@@ -17,10 +17,21 @@ def position_window_at_top(window, width=None, height=None):
     screen_width = window.winfo_screenwidth()
     screen_height = window.winfo_screenheight()
 
+    # Prefer the current geometry if already set (e.g., after window.geometry("900x650"))
+    try:
+        geo = window.geometry().split("+", 1)[0]
+        parsed_w, parsed_h = map(int, geo.split("x"))
+        g_width = parsed_w if parsed_w > 10 else None
+        g_height = parsed_h if parsed_h > 10 else None
+    except Exception:
+        g_width = g_height = None
+
     if width is None:
-        width = window.winfo_reqwidth()
+        width_candidates = [g_width, window.winfo_width(), window.winfo_reqwidth()]
+        width = next((w for w in width_candidates if w and w > 1), 1)
     if height is None:
-        height = window.winfo_reqheight()
+        height_candidates = [g_height, window.winfo_height(), window.winfo_reqheight()]
+        height = next((h for h in height_candidates if h and h > 1), 1)
 
     x = (screen_width - width) // 2
     y = 0  # Collé en haut de l'écran

@@ -31,6 +31,7 @@ class NewsletterWindow(ctk.CTkToplevel):
         super().__init__(parent)
         self.title(title)
         self.geometry("900x650")
+        self.minsize(900, 500)
         position_window_at_top(self)
 
         self._payload = payload

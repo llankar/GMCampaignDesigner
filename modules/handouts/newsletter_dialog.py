@@ -32,7 +32,7 @@ class NewsletterConfigDialog(ctk.CTkToplevel):
         super().__init__(parent)
         self.title("Newsletter - Configuration")
         self.geometry("520x520")
-        position_window_at_top(self)
+        self.minsize(520, 520)
 
         self._scenario_title = scenario_title
         self._on_generate = on_generate
@@ -44,6 +44,7 @@ class NewsletterConfigDialog(ctk.CTkToplevel):
         self._destroy_scheduled = False
 
         self._build_ui()
+        position_window_at_top(self)
 
     def _build_ui(self) -> None:
         header = ctk.CTkLabel(
