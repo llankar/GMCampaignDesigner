@@ -39,6 +39,7 @@ from modules.ui.chatbot_dialog import (
 from modules.objects.loot_generator_panel import LootGeneratorPanel
 from modules.scenarios.random_tables_panel import RandomTablesPanel
 from modules.whiteboard.controllers.whiteboard_controller import WhiteboardController
+from modules.puzzles.puzzle_display_window import create_puzzle_display_frame
 
 log_module_import(__name__)
 
@@ -197,6 +198,7 @@ class GMScreenView(ctk.CTkFrame):
             "Clues",
             "Informations",
             "Puzzles",
+            "Puzzle Display",
             "Note Tab",
             "NPC Graph",
             "PC Graph",
@@ -1454,6 +1456,14 @@ class GMScreenView(ctk.CTkFrame):
             self.open_random_tables_tab(title=title or "Random Tables", initial_state=tab_def.get("state"))
         elif kind == "whiteboard":
             self.open_whiteboard_tab(title=title or "Whiteboard")
+        elif kind == "puzzle_display":
+            puzzle_name = tab_def.get("puzzle_name")
+            puzzle_item = None
+            if puzzle_name:
+                wrapper = self.wrappers.get("Puzzles")
+                items = wrapper.load_items() if wrapper else []
+                puzzle_item = next((i for i in items if i.get("Name") == puzzle_name), None)
+            self.open_puzzle_display_tab(puzzle_item or {}, title=title or "Puzzle Display")
         else:
             raise ValueError(f"Unsupported tab kind '{kind}'")
 
@@ -1962,6 +1972,23 @@ class GMScreenView(ctk.CTkFrame):
             layout_meta={"kind": "random_tables", "state": panel.get_state()},
         )
 
+    def open_puzzle_display_tab(self, puzzle_item=None, title=None):
+        """Open the puzzle display window inside the GM screen."""
+        if puzzle_item is None:
+            puzzle_item = {}
+        name = puzzle_item.get("Name") or title or "Puzzle Display"
+        frame = create_puzzle_display_frame(self.content_area, puzzle_item)
+        self.add_tab(
+            title or name,
+            frame,
+            content_factory=lambda master: create_puzzle_display_frame(master, puzzle_item),
+            layout_meta={
+                "kind": "puzzle_display",
+                "puzzle_name": puzzle_item.get("Name") or "",
+                "title": title or name,
+            },
+        )
+
     def open_plot_twist_popup(self):
         host = self.winfo_toplevel()
         popup = ctk.CTkToplevel(host)
@@ -2216,6 +2243,9 @@ class GMScreenView(ctk.CTkFrame):
         elif entity_type == "Random Tables":
             self.open_random_tables_tab()
             return
+        elif entity_type == "Puzzle Display":
+            self._select_puzzle_for_display()
+            return
         elif entity_type == "Plot Twists":
             self.open_plot_twist_popup()
             return
@@ -2266,6 +2296,33 @@ class GMScreenView(ctk.CTkFrame):
         # Use the new GenericListSelectionView (import it accordingly)
         view = GenericListSelectionView(selection_popup, entity_type, model_wrapper, template, self.open_entity_tab)
 
+        view.pack(fill="both", expand=True)
+
+    def _select_puzzle_for_display(self) -> None:
+        selection_popup = ctk.CTkToplevel(self)
+        selection_popup.title("Select Puzzle")
+        selection_popup.geometry("1200x800")
+        selection_popup.transient(self.winfo_toplevel())
+        selection_popup.grab_set()
+        selection_popup.focus_force()
+
+        def _open_puzzle_tab(_entity_type: str, name: str) -> None:
+            selection_popup.destroy()
+            wrapper = self.wrappers.get("Puzzles")
+            items = wrapper.load_items() if wrapper else []
+            puzzle_item = next((i for i in items if i.get("Name") == name), None)
+            if puzzle_item is None:
+                messagebox.showerror("Error", f"Puzzle '{name}' not found.")
+                return
+            self.open_puzzle_display_tab(puzzle_item, title=f"Puzzle Display: {name}")
+
+        view = GenericListSelectionView(
+            selection_popup,
+            "Puzzles",
+            self.wrappers["Puzzles"],
+            self.templates["Puzzles"],
+            _open_puzzle_tab,
+        )
         view.pack(fill="both", expand=True)
 
 
