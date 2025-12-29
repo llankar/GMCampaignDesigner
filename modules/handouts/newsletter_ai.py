@@ -52,7 +52,7 @@ def generate_newsletter_ai(payload, language, style):
         f"Sections activées: {section_list}\n"
         "Rappel: no spoilers. Ne révèle pas de secrets, surprises ou twists.\n\n"
         "Utilise uniquement les informations fournies ci-dessous. "
-        "Ne réécris pas de contenu inventé. "
+        "Ne réécris pas de contenu inventé. Le texte doit être au passé simple.\n\n"
         "Rédige un article de journal in-universe en français, 3 à 4 paragraphes, "
         "sans titres ni listes. Intègre naturellement les PNJ et scènes dans le récit, sans annexes.\n\n"
         "Contenu structuré (JSON):\n"
