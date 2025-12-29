@@ -216,7 +216,14 @@ def _render_generic_text_section(scenario, section_name):
     return [{"Text": text}]
 
 
-def build_newsletter_payload(scenario_title, sections, language, style):
+def _render_base_section(base_text):
+    text = _coerce_scene_text(base_text)
+    if not text:
+        return []
+    return [{"Text": text}]
+
+
+def build_newsletter_payload(scenario_title, sections, language, style, base_text=None):
     """Build a neutral newsletter payload from a scenario.
 
     Returns a dict mapping section names to lists of items.
@@ -224,7 +231,11 @@ def build_newsletter_payload(scenario_title, sections, language, style):
     scenario_wrapper = GenericModelWrapper("scenarios")
     scenario = scenario_wrapper.load_item_by_key(scenario_title, key_field="Title")
     if not scenario:
-        return {}
+        payload = {}
+        base_items = _render_base_section(base_text)
+        if base_items:
+            payload["Base"] = base_items
+        return payload
 
     section_specs = _normalise_sections(sections)
     if not section_specs:
@@ -235,6 +246,9 @@ def build_newsletter_payload(scenario_title, sections, language, style):
         ]
 
     payload = {}
+    base_items = _render_base_section(base_text)
+    if base_items:
+        payload["Base"] = base_items
     for section_name, _config in section_specs:
         section_key = str(section_name or "").strip()
         if not section_key:

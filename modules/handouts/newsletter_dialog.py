@@ -31,8 +31,8 @@ class NewsletterConfigDialog(ctk.CTkToplevel):
     ) -> None:
         super().__init__(parent)
         self.title("Newsletter - Configuration")
-        self.geometry("520x520")
-        self.minsize(520, 520)
+        self.geometry("520x680")
+        self.minsize(520, 680)
 
         self._scenario_title = scenario_title
         self._on_generate = on_generate
@@ -41,6 +41,7 @@ class NewsletterConfigDialog(ctk.CTkToplevel):
         self._language_var = tk.StringVar(value="français")
         self._style_var = tk.StringVar(value="neutre")
         self._use_ai_var = tk.BooleanVar(value=False)
+        self._base_textbox: ctk.CTkTextbox | None = None
         self._destroy_scheduled = False
 
         self._build_ui()
@@ -53,6 +54,17 @@ class NewsletterConfigDialog(ctk.CTkToplevel):
             font=("Arial", 18, "bold"),
         )
         header.pack(fill="x", padx=20, pady=(20, 10))
+
+        recap_frame = ctk.CTkFrame(self)
+        recap_frame.pack(fill="both", expand=False, padx=20, pady=(0, 10))
+        recap_label = ctk.CTkLabel(
+            recap_frame,
+            text="Résumé de la partie (base principale du texte)",
+            font=("Arial", 14, "bold"),
+        )
+        recap_label.pack(anchor="w", padx=10, pady=(10, 4))
+        self._base_textbox = ctk.CTkTextbox(recap_frame, height=120, wrap="word")
+        self._base_textbox.pack(fill="x", padx=10, pady=(0, 10))
 
         section_frame = ctk.CTkFrame(self)
         section_frame.pack(fill="both", expand=False, padx=20, pady=10)
@@ -144,12 +156,16 @@ class NewsletterConfigDialog(ctk.CTkToplevel):
         language = self._language_var.get().strip() or None
         style = self._style_var.get().strip() or None
         use_ai = bool(self._use_ai_var.get())
+        base_text = ""
+        if self._base_textbox is not None:
+            base_text = self._base_textbox.get("1.0", "end").strip()
 
         payload: Dict[str, object] = {
             "sections": sections,
             "language": language,
             "style": style,
             "use_ai": use_ai,
+            "base_text": base_text or None,
         }
         if self._on_generate:
             self._on_generate(payload)

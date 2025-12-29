@@ -2,7 +2,7 @@ import json
 
 from modules.ai.local_ai_client import LocalAIClient
 from modules.handouts.newsletter_generator import build_newsletter_payload
-from modules.handouts.newsletter_plain_renderer import render_plain_newsletter
+from modules.handouts.newsletter_plain_renderer import BASE_KEYS, render_plain_newsletter
 from modules.helpers.logging_helper import log_info, log_module_import, log_warning
 
 log_module_import(__name__)
@@ -13,7 +13,8 @@ def _coerce_payload(payload, language, style):
         scenario_title = payload.get("scenario_title")
         if scenario_title:
             sections = payload.get("sections")
-            return build_newsletter_payload(scenario_title, sections, language, style)
+            base_text = payload.get("base_text")
+            return build_newsletter_payload(scenario_title, sections, language, style, base_text)
         return payload
     if isinstance(payload, (list, tuple)):
         if not payload:
@@ -32,6 +33,30 @@ def _render_plain_newsletter(payload, language, style):
     return render_plain_newsletter(payload)
 
 
+def _extract_base_text(payload):
+    if not isinstance(payload, dict):
+        return ""
+    for key, items in payload.items():
+        if str(key).strip().lower() not in BASE_KEYS:
+            continue
+        if isinstance(items, dict):
+            text = items.get("Text") or items.get("Description") or items.get("Summary")
+            return str(text).strip() if text else ""
+        if isinstance(items, (list, tuple)):
+            parts = []
+            for item in items:
+                if isinstance(item, dict):
+                    text = item.get("Text") or item.get("Description") or item.get("Summary")
+                    if text:
+                        parts.append(str(text).strip())
+                elif item:
+                    parts.append(str(item).strip())
+            return "\n".join([part for part in parts if part]).strip()
+        if items:
+            return str(items).strip()
+    return ""
+
+
 def generate_newsletter_ai(payload, language, style):
     resolved_payload = _coerce_payload(payload, language, style)
     fallback_render = _render_plain_newsletter(resolved_payload, language, style)
@@ -41,6 +66,7 @@ def generate_newsletter_ai(payload, language, style):
 
     section_names = [str(name).strip() for name in resolved_payload.keys() if str(name).strip()]
     section_list = ", ".join(section_names) if section_names else "Aucune"
+    base_text = _extract_base_text(resolved_payload)
 
     prompt = (
         "Tu es un assistant qui rédige une newsletter de campagne RPG pour les joueurs.\n"
@@ -52,7 +78,9 @@ def generate_newsletter_ai(payload, language, style):
         f"Sections activées: {section_list}\n"
         "Rappel: no spoilers. Ne révèle pas de secrets, surprises ou twists.\n\n"
         "Utilise uniquement les informations fournies ci-dessous. "
-        "Ne réécris pas de contenu inventé. Le texte doit être au passé simple.\n\n"
+        "Ne réécris pas de contenu inventé. Le texte doit être au passé simple.\n"
+        "Le texte du MJ doit servir de trame principale; le reste sert d'appoint.\n\n"
+        f"Texte du MJ (trame principale):\n{base_text or 'Aucun'}\n\n"
         "Rédige un article de journal in-universe en français, 3 à 4 paragraphes, "
         "sans titres ni listes. Intègre naturellement les PNJ et scènes dans le récit, sans annexes.\n\n"
         "Contenu structuré (JSON):\n"
