@@ -10,6 +10,9 @@ SUMMARY_KEYS = {"summary", "résumé", "resume"}
 SCENE_KEYS = {"scenes", "scènes", "scene", "scène"}
 BASE_KEYS = {"base", "récit", "recit", "recap", "chronique"}
 ENTITY_KEYS = {
+    "pcs",
+    "pjs",
+    "personnages joueurs",
     "npcs",
     "pnjs",
     "personnages",

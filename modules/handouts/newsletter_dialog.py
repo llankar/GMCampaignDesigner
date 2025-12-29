@@ -5,6 +5,7 @@ import tkinter as tk
 from tkinter import messagebox
 from typing import Callable, Dict, List
 
+from modules.generic.generic_model_wrapper import GenericModelWrapper
 from modules.helpers.logging_helper import log_module_import
 from modules.helpers.window_helper import position_window_at_top
 
@@ -31,8 +32,8 @@ class NewsletterConfigDialog(ctk.CTkToplevel):
     ) -> None:
         super().__init__(parent)
         self.title("Newsletter - Configuration")
-        self.geometry("520x680")
-        self.minsize(520, 680)
+        self.geometry("520x780")
+        self.minsize(520, 780)
 
         self._scenario_title = scenario_title
         self._on_generate = on_generate
@@ -42,10 +43,24 @@ class NewsletterConfigDialog(ctk.CTkToplevel):
         self._style_var = tk.StringVar(value="neutre")
         self._use_ai_var = tk.BooleanVar(value=False)
         self._base_textbox: ctk.CTkTextbox | None = None
+        self._pc_vars: Dict[str, tk.BooleanVar] = {}
+        self._pc_summaries: List[Dict[str, str]] = []
         self._destroy_scheduled = False
 
+        self._load_pcs()
         self._build_ui()
         position_window_at_top(self)
+
+    def _load_pcs(self) -> None:
+        wrapper = GenericModelWrapper("pcs")
+        pcs = wrapper.load_items()
+        summaries: List[Dict[str, str]] = []
+        for pc in pcs or []:
+            name = str(pc.get("Name") or "").strip()
+            if not name:
+                continue
+            summaries.append({"name": name})
+        self._pc_summaries = sorted(summaries, key=lambda item: item["name"].lower())
 
     def _build_ui(self) -> None:
         header = ctk.CTkLabel(
@@ -123,6 +138,28 @@ class NewsletterConfigDialog(ctk.CTkToplevel):
         )
         ai_checkbox.pack(anchor="w", padx=10, pady=8)
 
+        if self._pc_summaries:
+            pc_frame = ctk.CTkFrame(self)
+            pc_frame.pack(fill="both", expand=False, padx=20, pady=(5, 10))
+            pc_label = ctk.CTkLabel(
+                pc_frame,
+                text="PJs participants",
+                font=("Arial", 14, "bold"),
+            )
+            pc_label.pack(anchor="w", padx=10, pady=(10, 4))
+            pc_scroll = ctk.CTkScrollableFrame(pc_frame, height=130)
+            pc_scroll.pack(fill="x", padx=10, pady=(0, 10))
+            for pc in self._pc_summaries:
+                name = pc["name"]
+                var = tk.BooleanVar(value=True)
+                self._pc_vars[name] = var
+                checkbox = ctk.CTkCheckBox(
+                    pc_scroll,
+                    text=name,
+                    variable=var,
+                )
+                checkbox.pack(anchor="w", padx=8, pady=4)
+
         button_row = ctk.CTkFrame(self)
         button_row.pack(fill="x", padx=20, pady=(0, 20))
         button_row.columnconfigure(0, weight=1)
@@ -159,6 +196,9 @@ class NewsletterConfigDialog(ctk.CTkToplevel):
         base_text = ""
         if self._base_textbox is not None:
             base_text = self._base_textbox.get("1.0", "end").strip()
+        selected_pcs = [
+            name for name, var in self._pc_vars.items() if var.get()
+        ]
 
         payload: Dict[str, object] = {
             "sections": sections,
@@ -166,6 +206,7 @@ class NewsletterConfigDialog(ctk.CTkToplevel):
             "style": style,
             "use_ai": use_ai,
             "base_text": base_text or None,
+            "pcs": selected_pcs,
         }
         if self._on_generate:
             self._on_generate(payload)

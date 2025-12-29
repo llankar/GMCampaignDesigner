@@ -14,7 +14,15 @@ def _coerce_payload(payload, language, style):
         if scenario_title:
             sections = payload.get("sections")
             base_text = payload.get("base_text")
-            return build_newsletter_payload(scenario_title, sections, language, style, base_text)
+            pcs = payload.get("pcs")
+            return build_newsletter_payload(
+                scenario_title,
+                sections,
+                language,
+                style,
+                base_text,
+                pcs,
+            )
         return payload
     if isinstance(payload, (list, tuple)):
         if not payload:
