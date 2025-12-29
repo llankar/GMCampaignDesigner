@@ -84,7 +84,7 @@ class CustomFieldsEditor(ctk.CTkToplevel):
         ctk.CTkLabel(form, text="Linked Type (for list)").grid(row=2, column=0, padx=4, pady=4, sticky="w")
         self.linked_var = tk.StringVar(value="")
         # known linked types match display names used elsewhere
-        self.known_linked = ["NPCs", "PCs", "Creatures", "Factions", "Objects", "Places", "Scenarios", "Clues", "Informations", "Maps", "Books"]
+        self.known_linked = ["NPCs", "PCs", "Creatures", "Factions", "Objects", "Places", "Scenarios", "Clues", "Informations", "Puzzles", "Maps", "Books"]
         self.linked_menu = ctk.CTkOptionMenu(form, values=[""] + self.known_linked, variable=self.linked_var)
         self.linked_menu.grid(row=2, column=1, padx=4, pady=4, sticky="ew")
 

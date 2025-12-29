@@ -35,6 +35,7 @@ ATTACHMENT_FIELDS = {
     "clues": "Attachment",
     "informations": "Attachment",
     "books": "Attachment",
+    "puzzles": "Handout",
 }
 
 

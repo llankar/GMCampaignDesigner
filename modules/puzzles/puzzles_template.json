@@ -1,0 +1,10 @@
+{
+  "fields": [
+    {"name": "Name", "type": "text"},
+    {"name": "DifficultyTags", "type": "list"},
+    {"name": "Description", "type": "longtext"},
+    {"name": "Solution", "type": "longtext"},
+    {"name": "HandoutText", "type": "longtext"},
+    {"name": "Handout", "type": "file"}
+  ]
+}
