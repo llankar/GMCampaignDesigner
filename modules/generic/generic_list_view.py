@@ -63,6 +63,7 @@ GM_SCREEN_ENTITY_TYPES = {
     "objects": "Objects",
     "clues": "Clues",
     "informations": "Informations",
+    "puzzles": "Puzzles",
     "books": "Books",
 }
 
@@ -76,6 +77,7 @@ ENTITY_DISPLAY_LABELS = {
     "objects": "Objects",
     "clues": "Clues",
     "informations": "Informations",
+    "puzzles": "Puzzles",
     "maps": "Maps",
     "books": "Books",
 }

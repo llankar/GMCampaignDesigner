@@ -27,6 +27,7 @@ _BUILTIN_ENTITY_METADATA = {
     "objects": {"label": "Objects", "icon": "assets/objects_icon.png"},
     "informations": {"label": "Informations", "icon": "assets/informations_icon.png"},
     "clues": {"label": "Clues", "icon": "assets/clues_icon.png"},
+    "puzzles": {"label": "Puzzles", "icon": "assets/random_table_icon.png"},
     "maps": {"label": "Maps", "icon": "assets/maps_icon.png"},
     "books": {"label": "Books", "icon": "assets/books_icon.png"},
 }

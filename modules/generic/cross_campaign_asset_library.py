@@ -331,6 +331,9 @@ class CrossCampaignAssetLibraryWindow(ctk.CTkToplevel):
         attachment_value = record.get("Attachment")
         if attachment_value:
             extra_lines.append(f"Attachment: {attachment_value}")
+        handout_value = record.get("Handout")
+        if handout_value:
+            extra_lines.append(f"Handout: {handout_value}")
         if extra_lines:
             self.preview_text.insert("end", "\n\n" + "\n".join(extra_lines))
         self.preview_text.configure(state="disabled")
