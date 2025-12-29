@@ -2863,6 +2863,7 @@ class GenericListView(ctk.CTkFrame):
             style = config.get("style")
             use_ai = bool(config.get("use_ai"))
             base_text = config.get("base_text")
+            pcs = config.get("pcs") or []
 
             if use_ai:
                 ai_text = generate_newsletter_ai(
@@ -2870,6 +2871,7 @@ class GenericListView(ctk.CTkFrame):
                         "scenario_title": scenario_title,
                         "sections": sections,
                         "base_text": base_text,
+                        "pcs": pcs,
                     },
                     language,
                     style,
@@ -2888,6 +2890,7 @@ class GenericListView(ctk.CTkFrame):
                     language,
                     style,
                     base_text,
+                    pcs,
                 )
                 NewsletterWindow(
                     self,

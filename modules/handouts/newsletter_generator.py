@@ -123,7 +123,7 @@ def _build_entity_summary(entity_label, name):
         return {"Name": display_name}
     resolved_name = resolved.get("Name") or resolved.get("Title") or display_name
     summary_text = ""
-    for key in ("Description", "Summary", "Notes", "Gist"):
+    for key in ("Description", "Summary", "Notes", "Gist", "Background", "Traits", "Role"):
         if resolved.get(key):
             summary_text = _coerce_scene_text(resolved.get(key))
             if summary_text:
@@ -223,7 +223,7 @@ def _render_base_section(base_text):
     return [{"Text": text}]
 
 
-def build_newsletter_payload(scenario_title, sections, language, style, base_text=None):
+def build_newsletter_payload(scenario_title, sections, language, style, base_text=None, pcs=None):
     """Build a neutral newsletter payload from a scenario.
 
     Returns a dict mapping section names to lists of items.
@@ -235,6 +235,9 @@ def build_newsletter_payload(scenario_title, sections, language, style, base_tex
         base_items = _render_base_section(base_text)
         if base_items:
             payload["Base"] = base_items
+        pc_items = _resolve_entity_summaries("PCs", pcs)
+        if pc_items:
+            payload["PCs"] = pc_items
         return payload
 
     section_specs = _normalise_sections(sections)
@@ -249,6 +252,9 @@ def build_newsletter_payload(scenario_title, sections, language, style, base_tex
     base_items = _render_base_section(base_text)
     if base_items:
         payload["Base"] = base_items
+    pc_items = _resolve_entity_summaries("PCs", pcs)
+    if pc_items:
+        payload["PCs"] = pc_items
     for section_name, _config in section_specs:
         section_key = str(section_name or "").strip()
         if not section_key:
