@@ -162,6 +162,12 @@ def _lazy_book_viewer():
     return open_book_viewer
 
 
+def _lazy_puzzle_display():
+    from modules.puzzles.puzzle_display_window import open_puzzle_display
+
+    return open_puzzle_display
+
+
 def _lazy_newsletter_components():
     from modules.handouts.newsletter_ai import generate_newsletter_ai
     from modules.handouts.newsletter_dialog import NewsletterConfigDialog
@@ -2755,6 +2761,11 @@ class GenericListView(ctk.CTkFrame):
                 label="Edit...",
                 command=self._edit_selected_item,
             )
+        if item and self.model_wrapper.entity_type == "puzzles":
+            menu.add_command(
+                label="Display Puzzle",
+                command=lambda: self.display_puzzle(iid),
+            )
         if self.model_wrapper.entity_type == "scenarios":
             menu.add_command(
                 label="Open in GM Screen",
@@ -2831,6 +2842,14 @@ class GenericListView(ctk.CTkFrame):
                 _, _, stop_audio = _lazy_audio()
                 menu.add_command(label="Stop Audio", command=stop_audio)
         menu.post(event.x_root, event.y_root)
+
+    def display_puzzle(self, iid):
+        item, _ = self._find_item_by_iid(iid)
+        if not item:
+            return
+        open_puzzle_display = _lazy_puzzle_display()
+        parent = self.winfo_toplevel() if hasattr(self, "winfo_toplevel") else self.master
+        open_puzzle_display(parent, item)
 
     def display_on_second_screen(self, iid):
         log_info(f"Displaying {self.model_wrapper.entity_type} on second screen: {iid}", func_name="GenericListView.display_on_second_screen")
