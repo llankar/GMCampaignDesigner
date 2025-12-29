@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import Any, Dict, Iterable, List, Tuple
 
 from modules.handouts.newsletter_generator import build_newsletter_payload
+from modules.handouts.newsletter_plain_renderer import render_plain_newsletter
 from modules.helpers.logging_helper import log_module_import
 from modules.helpers.text_helpers import ai_text_to_rtf_json, deserialize_possible_json
 
@@ -12,57 +13,8 @@ DEFAULT_FONT = "Arial"
 DEFAULT_FONT_SIZE = 12
 
 
-def _format_item_line(item: Any) -> str | None:
-    if isinstance(item, dict):
-        title = str(item.get("Title") or item.get("Name") or "").strip()
-        text = str(item.get("Text") or item.get("Description") or "").strip()
-        if title and text:
-            return f"- {title}: {text}"
-        if title:
-            return f"- {title}"
-        if text:
-            return f"- {text}"
-        related = item.get("Related")
-        if isinstance(related, dict) and related:
-            related_parts = []
-            for key, entries in related.items():
-                names = []
-                for entry in entries or []:
-                    if isinstance(entry, dict) and entry.get("Name"):
-                        names.append(str(entry.get("Name")).strip())
-                    elif entry:
-                        names.append(str(entry).strip())
-                if names:
-                    related_parts.append(f"{key}: {', '.join(names)}")
-            if related_parts:
-                return f"- Related: {'; '.join(related_parts)}"
-        return None
-    if item is None:
-        return None
-    text = str(item).strip()
-    return f"- {text}" if text else None
-
-
-def _render_newsletter_markdown(payload: Dict[str, Iterable[Any]] | None, language: str | None, style: str | None) -> str:
-    lines: List[str] = ["# Newsletter"]
-    meta_parts = []
-    if language:
-        meta_parts.append(f"Langue: {language}")
-    if style:
-        meta_parts.append(f"Style: {style}")
-    if meta_parts:
-        lines.append(f"*{' - '.join(meta_parts)}*")
-
-    for section_name, items in (payload or {}).items():
-        if not items:
-            continue
-        lines.append("")
-        lines.append(f"## {section_name}")
-        for item in items:
-            line = _format_item_line(item)
-            if line:
-                lines.append(line)
-    return "\n".join(lines).strip()
+def _render_newsletter_plain(payload: Dict[str, Iterable[Any]] | None) -> str:
+    return render_plain_newsletter(payload)
 
 
 def _coerce_payload(payload: Any, language: str | None, style: str | None) -> Dict[str, Iterable[Any]]:
@@ -159,8 +111,8 @@ def build_newsletter_rtf_json_from_payload(
     style: str | None = None,
 ) -> Dict[str, Any]:
     resolved_payload = _coerce_payload(payload, language, style)
-    markdown_text = _render_newsletter_markdown(resolved_payload, language, style)
-    return ai_text_to_rtf_json(markdown_text)
+    plain_text = _render_newsletter_plain(resolved_payload)
+    return ai_text_to_rtf_json(plain_text)
 
 
 def build_newsletter_rtf_json_from_ai_text(raw_text: Any) -> Dict[str, Any]:

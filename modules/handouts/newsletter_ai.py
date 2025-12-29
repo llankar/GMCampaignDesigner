@@ -2,6 +2,7 @@ import json
 
 from modules.ai.local_ai_client import LocalAIClient
 from modules.handouts.newsletter_generator import build_newsletter_payload
+from modules.handouts.newsletter_plain_renderer import render_plain_newsletter
 from modules.helpers.logging_helper import log_info, log_module_import, log_warning
 
 log_module_import(__name__)
@@ -27,54 +28,8 @@ def _coerce_payload(payload, language, style):
     return {}
 
 
-def _format_item_line(item):
-    if isinstance(item, dict):
-        title = str(item.get("Title") or item.get("Name") or "").strip()
-        text = str(item.get("Text") or item.get("Description") or "").strip()
-        if title and text:
-            return f"- {title}: {text}"
-        if title:
-            return f"- {title}"
-        if text:
-            return f"- {text}"
-        related = item.get("Related")
-        if isinstance(related, dict) and related:
-            related_parts = []
-            for key, entries in related.items():
-                names = []
-                for entry in entries or []:
-                    if isinstance(entry, dict) and entry.get("Name"):
-                        names.append(str(entry.get("Name")).strip())
-                    elif entry:
-                        names.append(str(entry).strip())
-                if names:
-                    related_parts.append(f"{key}: {', '.join(names)}")
-            if related_parts:
-                return f"- Related: {'; '.join(related_parts)}"
-        return None
-    if item is None:
-        return None
-    text = str(item).strip()
-    return f"- {text}" if text else None
-
-
 def _render_plain_newsletter(payload, language, style):
-    title_parts = ["Newsletter"]
-    if language:
-        title_parts.append(f"Langue: {language}")
-    if style:
-        title_parts.append(f"Style: {style}")
-    lines = [" - ".join(title_parts)]
-    for section_name, items in (payload or {}).items():
-        if not items:
-            continue
-        lines.append("")
-        lines.append(str(section_name))
-        for item in items:
-            line = _format_item_line(item)
-            if line:
-                lines.append(line)
-    return "\n".join(lines).strip()
+    return render_plain_newsletter(payload)
 
 
 def generate_newsletter_ai(payload, language, style):
@@ -89,13 +44,17 @@ def generate_newsletter_ai(payload, language, style):
 
     prompt = (
         "Tu es un assistant qui rédige une newsletter de campagne RPG pour les joueurs.\n"
-        f"Langue: {language or 'français'}\n"
-        f"Ton / style: {style or 'neutre'}\n"
+        "Langue obligatoire: français.\n"
+        "Ton: news in-universe (journal local, bulletin, chronique de ville).\n"
+        "Longueur: 3 à 4 paragraphes.\n"
+        "Interdit: titres, sections, listes, annexes.\n"
+        "Intègre naturellement les PNJ et scènes dans le récit, sans énumération finale.\n"
         f"Sections activées: {section_list}\n"
         "Rappel: no spoilers. Ne révèle pas de secrets, surprises ou twists.\n\n"
         "Utilise uniquement les informations fournies ci-dessous. "
         "Ne réécris pas de contenu inventé. "
-        "Retourne un texte clair, agréable à lire, avec des titres de section.\n\n"
+        "Rédige un article de journal in-universe en français, 3 à 4 paragraphes, "
+        "sans titres ni listes. Intègre naturellement les PNJ et scènes dans le récit, sans annexes.\n\n"
         "Contenu structuré (JSON):\n"
         f"{json.dumps(resolved_payload, ensure_ascii=False, indent=2)}"
     )
