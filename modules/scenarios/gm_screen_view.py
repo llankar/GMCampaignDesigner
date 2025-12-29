@@ -1977,11 +1977,15 @@ class GMScreenView(ctk.CTkFrame):
         if puzzle_item is None:
             puzzle_item = {}
         name = puzzle_item.get("Name") or title or "Puzzle Display"
-        frame = create_puzzle_display_frame(self.content_area, puzzle_item)
+        frame = create_puzzle_display_frame(self.content_area, puzzle_item, scrollable=False)
         self.add_tab(
             title or name,
             frame,
-            content_factory=lambda master: create_puzzle_display_frame(master, puzzle_item),
+            content_factory=lambda master: create_puzzle_display_frame(
+                master,
+                puzzle_item,
+                scrollable=False,
+            ),
             layout_meta={
                 "kind": "puzzle_display",
                 "puzzle_name": puzzle_item.get("Name") or "",
