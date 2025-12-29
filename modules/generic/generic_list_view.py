@@ -2715,11 +2715,13 @@ class GenericListView(ctk.CTkFrame):
 
     def _show_item_menu(self, iid, event):
         item, base_id = self._find_item_by_iid(iid)
-        portrait_paths = [
-            path
-            for path in parse_portrait_value(item.get("Portrait", ""))
-            if resolve_portrait_candidate(path, ConfigHelper.get_campaign_dir())
-        ]
+        portrait_paths = []
+        if item:
+            portrait_paths = [
+                path
+                for path in parse_portrait_value(item.get("Portrait", ""))
+                if resolve_portrait_candidate(path, ConfigHelper.get_campaign_dir())
+            ]
         has_portrait = bool(portrait_paths)
         self._portrait_menu_images = []
 
