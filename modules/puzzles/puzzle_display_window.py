@@ -179,10 +179,16 @@ def _add_handout_section(
     )
 
 
-def create_puzzle_display_frame(parent: ParentWidget, puzzle_item: dict | None) -> ctk.CTkScrollableFrame:
+def create_puzzle_display_frame(
+    parent: ParentWidget,
+    puzzle_item: dict | None,
+    *,
+    scrollable: bool = True,
+) -> ctk.CTkFrame:
     puzzle_item = puzzle_item or {}
     name = puzzle_item.get("Name") or "Puzzle"
-    content = ctk.CTkScrollableFrame(parent)
+    content_parent = ctk.CTkScrollableFrame if scrollable else ctk.CTkFrame
+    content = content_parent(parent)
     content.pack(fill="both", expand=True, padx=20, pady=20)
     content._handout_images = []
 
