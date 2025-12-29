@@ -8,6 +8,7 @@ log_module_import(__name__)
 
 SUMMARY_KEYS = {"summary", "résumé", "resume"}
 SCENE_KEYS = {"scenes", "scènes", "scene", "scène"}
+BASE_KEYS = {"base", "récit", "recit", "recap", "chronique"}
 ENTITY_KEYS = {
     "npcs",
     "pnjs",
@@ -119,11 +120,16 @@ def render_plain_newsletter(payload: Dict[str, Iterable[Any]] | None) -> str:
     if not payload:
         return ""
 
+    base_section = _find_section_items(payload, BASE_KEYS)
     summary_section = _find_section_items(payload, SUMMARY_KEYS)
     scene_section = _find_section_items(payload, SCENE_KEYS)
     entity_section = _find_section_items(payload, ENTITY_KEYS)
 
-    used_keys = {section[0] for section in [summary_section, scene_section, entity_section] if section}
+    used_keys = {section[0] for section in [base_section, summary_section, scene_section, entity_section] if section}
+
+    base_sentences: List[str] = []
+    if base_section:
+        base_sentences = _collect_section_sentences(base_section[1])
 
     sentences: List[str] = []
     if summary_section:
@@ -140,4 +146,7 @@ def render_plain_newsletter(payload: Dict[str, Iterable[Any]] | None) -> str:
 
     sentences = [sentence for sentence in sentences if sentence]
     paragraphs = _build_paragraphs(sentences)
-    return "\n\n".join(paragraphs).strip()
+    base_paragraph = " ".join(base_sentences).strip() if base_sentences else ""
+    if base_paragraph:
+        paragraphs = [base_paragraph] + paragraphs
+    return "\n\n".join([p for p in paragraphs if p]).strip()
