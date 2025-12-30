@@ -30,6 +30,10 @@ class AutoGenerationService:
                 self._generate_linked_entities(entity_slug, item, user_prompt)
         return items
 
+    def generate_story_arc_and_save(self, scenario_count: int, user_prompt: str) -> List[Dict[str, Any]]:
+        arc = self._generator.generate_story_arc(scenario_count, user_prompt)
+        return self._generator.save_story_arc(arc)
+
     def _generate_linked_entities(self, entity_slug: str, item: Dict[str, Any], user_prompt: str) -> None:
         template = load_template(entity_slug)
         fields = template.get("fields", [])

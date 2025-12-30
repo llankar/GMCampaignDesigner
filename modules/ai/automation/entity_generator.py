@@ -6,8 +6,9 @@ from modules.ai.local_ai_client import LocalAIClient
 from modules.ai.automation.prompt_builder import (
     build_entity_prompt,
     build_linked_entities_prompt,
+    build_story_arc_prompt,
 )
-from modules.ai.automation.response_parser import parse_ai_json
+from modules.ai.automation.response_parser import parse_ai_json, parse_story_arc_json
 from modules.generic.generic_model_wrapper import GenericModelWrapper
 from modules.helpers.logging_helper import log_info, log_module_import
 from modules.helpers.template_loader import load_template
@@ -61,6 +62,67 @@ class EntityAutoGenerator:
             f"Saved {len(items)} {entity_slug} item(s) via automation.",
             func_name="EntityAutoGenerator.save",
         )
+
+    def generate_story_arc(self, scenario_count: int, user_prompt: str) -> Dict[str, Any]:
+        prompt = build_story_arc_prompt(scenario_count, user_prompt)
+        response = self._ai.chat(
+            [
+                {"role": "system", "content": "You are a helpful RPG content generator."},
+                {"role": "user", "content": prompt},
+            ]
+        )
+        return parse_story_arc_json(response)
+
+    def save_story_arc(self, arc: Dict[str, Any]) -> List[Dict[str, Any]]:
+        scenarios = arc.get("Scenarios", [])
+        if not isinstance(scenarios, list):
+            return []
+        self._ensure_schema("scenarios")
+        wrapper = GenericModelWrapper("scenarios", db_path=self._db_path)
+        saved_items: List[Dict[str, Any]] = []
+
+        for scenario in scenarios:
+            if not isinstance(scenario, dict):
+                continue
+            title = str(scenario.get("Title", "")).strip()
+            synopsis = str(scenario.get("Synopsis", "")).strip()
+            goal = str(scenario.get("Goal", "")).strip()
+            outcome = str(scenario.get("Outcome", "")).strip()
+            hooks = scenario.get("Hooks") or []
+            leads_to = str(scenario.get("LeadsTo", "")).strip()
+            if not isinstance(hooks, list):
+                hooks = []
+
+            notes_parts = []
+            if leads_to:
+                notes_parts.append(f"LeadsTo: {leads_to}")
+            if arc.get("ArcTitle"):
+                notes_parts.append(f"Arc: {arc.get('ArcTitle')}")
+            if arc.get("Premise"):
+                notes_parts.append(f"Premise: {arc.get('Premise')}")
+            if arc.get("Tone"):
+                notes_parts.append(f"Tone: {arc.get('Tone')}")
+            notes = "\n".join(notes_parts).strip()
+
+            item = {
+                "Title": title,
+                "Summary": synopsis,
+                "Secrets": "\n".join(part for part in [f"Goal: {goal}" if goal else "", f"Outcome: {outcome}" if outcome else ""] if part),
+                "Scenes": hooks,
+                "NPCs": scenario.get("KeyNPCs", []) if isinstance(scenario.get("KeyNPCs", []), list) else [],
+                "Places": scenario.get("KeyLocations", []) if isinstance(scenario.get("KeyLocations", []), list) else [],
+                "Objects": scenario.get("KeyItems", []) if isinstance(scenario.get("KeyItems", []), list) else [],
+            }
+            if notes:
+                item["Notes"] = notes
+            wrapper.save_item(item)
+            saved_items.append(item)
+
+        log_info(
+            f"Saved {len(saved_items)} scenario(s) from story arc via automation.",
+            func_name="EntityAutoGenerator.save_story_arc",
+        )
+        return saved_items
 
     def _normalize_payload(
         self,
