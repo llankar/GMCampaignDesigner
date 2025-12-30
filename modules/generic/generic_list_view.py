@@ -140,6 +140,12 @@ def _lazy_ai_components():
     return AuthoringWizardView, LocalAIClient
 
 
+def _lazy_auto_generation_dialog():
+    from modules.ai.automation.ui.auto_generation_dialog import AutoGenerationDialog
+
+    return AutoGenerationDialog
+
+
 def _lazy_template_loader():
     from modules.helpers.template_loader import load_template
 
@@ -465,6 +471,9 @@ class GenericListView(ctk.CTkFrame):
             ctk.CTkButton(self.search_frame, text="AI Wizard",
                           command=self.open_ai_wizard)\
                 .pack(side="left", padx=5)
+        ctk.CTkButton(self.search_frame, text="Auto Generate",
+            command=self.open_auto_generation)\
+        .pack(side="left", padx=5)
         ctk.CTkButton(self.search_frame, text="Group By",
             command=self.choose_group_column)\
         .pack(side="left", padx=5)
@@ -3433,6 +3442,16 @@ class GenericListView(ctk.CTkFrame):
                 pass
             top.destroy()
         top.protocol("WM_DELETE_WINDOW", on_close)
+
+    def open_auto_generation(self):
+        dialog_cls = _lazy_auto_generation_dialog()
+        dialog = dialog_cls(
+            self,
+            default_entity=self.model_wrapper.entity_type,
+            on_complete=self.reload_from_db,
+        )
+        dialog.focus_force()
+        return dialog
 
     def _set_ai_categorize_running(self, running: bool):
         self._ai_categorize_running = running
