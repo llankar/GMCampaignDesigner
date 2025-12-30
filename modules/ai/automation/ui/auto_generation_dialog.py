@@ -128,7 +128,7 @@ class AutoGenerationDialog(ctk.CTkToplevel):
                 include_linked=include_linked,
             )
         except Exception as exc:
-            self.after(0, lambda: self._on_error(exc))
+            self.after(0, lambda exc=exc: self._on_error(exc))
             return
         self.after(0, self._on_success)
 
