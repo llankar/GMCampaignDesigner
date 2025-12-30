@@ -2878,7 +2878,7 @@ class GenericListView(ctk.CTkFrame):
         if not scenario_title:
             messagebox.showwarning(
                 "Newsletter",
-                "Impossible de déterminer le titre du scénario.",
+                "Unable to determine the scenario title.",
             )
             return
 

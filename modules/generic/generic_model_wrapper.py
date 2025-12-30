@@ -117,7 +117,7 @@ class GenericModelWrapper:
         try:
             existing_columns = self._ensure_schema(cursor, items)
 
-            # Détermine le champ unique à utiliser
+            # Determine the unique field to use
             if items:
                 sample_item = items[0]
                 if "Name" in sample_item:
@@ -127,9 +127,9 @@ class GenericModelWrapper:
                 else:
                     unique_field = list(sample_item.keys())[0]
             else:
-                unique_field = "Name"  # Valeur par défaut si la liste est vide
+                unique_field = "Name"  # Default value when the list is empty
 
-            # Insertion ou mise à jour (INSERT OR REPLACE)
+            # Insert or update (INSERT OR REPLACE)
             for item in items:
                 keys = [key for key in item.keys() if key in existing_columns]
                 values = []
@@ -144,8 +144,8 @@ class GenericModelWrapper:
                 if keys:
                     cursor.execute(sql, values)
 
-            # Gestion du cas de suppression :
-            # On construit la liste des identifiants uniques présents dans les items
+            # Handle the deletion case:
+            # Build the list of unique identifiers present in the items
             unique_ids = [item[unique_field] for item in items if unique_field in item]
 
             if replace:
@@ -154,7 +154,7 @@ class GenericModelWrapper:
                     delete_sql = f"DELETE FROM {self.table} WHERE {unique_field} NOT IN ({placeholders})"
                     cursor.execute(delete_sql, unique_ids)
                 else:
-                    # S'il n'y a aucun item, supprimer tous les enregistrements de la table
+                    # If there are no items, delete all records from the table
                     delete_sql = f"DELETE FROM {self.table}"
                     cursor.execute(delete_sql)
 

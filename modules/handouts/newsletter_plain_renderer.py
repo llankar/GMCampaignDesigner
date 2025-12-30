@@ -6,27 +6,18 @@ from modules.helpers.logging_helper import log_module_import
 
 log_module_import(__name__)
 
-SUMMARY_KEYS = {"summary", "résumé", "resume"}
-SCENE_KEYS = {"scenes", "scènes", "scene", "scène"}
-BASE_KEYS = {"base", "récit", "recit", "recap", "chronique"}
+SUMMARY_KEYS = {"summary", "overview"}
+SCENE_KEYS = {"scenes", "scene"}
+BASE_KEYS = {"base", "recap", "chronicle", "narrative"}
 ENTITY_KEYS = {
     "pcs",
-    "pjs",
-    "personnages joueurs",
     "npcs",
-    "pnjs",
-    "personnages",
     "places",
-    "lieux",
     "factions",
     "items",
-    "objets",
     "threats",
-    "menaces",
     "clues",
-    "indices",
     "rewards",
-    "récompenses",
 }
 
 
@@ -52,7 +43,7 @@ def _related_summary(related: Dict[str, Iterable[Any]]) -> str:
         if names:
             related_parts.append(f"{key}: {', '.join(names)}")
     if related_parts:
-        return "Liens mentionnés : " + "; ".join(related_parts)
+        return "Links mentioned: " + "; ".join(related_parts)
     return ""
 
 
@@ -102,17 +93,17 @@ def _build_paragraphs(sentences: List[str]) -> List[str]:
         return []
     paragraph_count = 3 if len(sentences) <= 6 else 4
     starters = [
-        "Dans les rues et les tavernes, les nouvelles du jour retiennent l'attention.",
-        "Les derniers événements ont laissé des traces visibles.",
-        "Au fil des témoignages, plusieurs noms et lieux reviennent.",
-        "En toile de fond, les rumeurs continuent de se propager.",
+        "In the streets and taverns, the day's news draws attention.",
+        "Recent events have left visible marks.",
+        "Across the accounts, several names and places keep resurfacing.",
+        "In the background, rumors continue to spread.",
     ]
     chunks: List[List[str]] = [[] for _ in range(paragraph_count)]
     for idx, sentence in enumerate(sentences):
         chunks[idx % paragraph_count].append(sentence)
     paragraphs = []
     for idx, chunk in enumerate(chunks):
-        starter = starters[idx] if idx < len(starters) else "La chronique du jour se poursuit."
+        starter = starters[idx] if idx < len(starters) else "Today's chronicle continues."
         content = " ".join(chunk).strip()
         paragraph = f"{starter} {content}".strip() if content else starter
         paragraphs.append(paragraph.strip())

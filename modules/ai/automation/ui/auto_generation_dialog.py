@@ -33,7 +33,7 @@ class AutoGenerationDialog(ctk.CTkToplevel):
         self._build_layout()
 
     def _build_layout(self):
-        header = ctk.CTkLabel(self, text="Auto-génération IA", font=("Arial", 18, "bold"))
+        header = ctk.CTkLabel(self, text="AI Auto-Generation", font=("Arial", 18, "bold"))
         header.pack(pady=(12, 8))
 
         form = ctk.CTkFrame(self)
@@ -41,7 +41,7 @@ class AutoGenerationDialog(ctk.CTkToplevel):
 
         row = ctk.CTkFrame(form)
         row.pack(fill="x", pady=4)
-        ctk.CTkLabel(row, text="Type d'entité", width=140, anchor="w").pack(side="left")
+        ctk.CTkLabel(row, text="Entity type", width=140, anchor="w").pack(side="left")
         options = [self._entity_labels[slug] for slug in self._entity_slugs]
         self._label_to_slug = {self._entity_labels[slug]: slug for slug in self._entity_slugs}
         self.entity_menu = ctk.CTkOptionMenu(
@@ -55,30 +55,30 @@ class AutoGenerationDialog(ctk.CTkToplevel):
 
         row = ctk.CTkFrame(form)
         row.pack(fill="x", pady=4)
-        ctk.CTkLabel(row, text="Nombre", width=140, anchor="w").pack(side="left")
+        ctk.CTkLabel(row, text="Count", width=140, anchor="w").pack(side="left")
         ctk.CTkEntry(row, textvariable=self.count_var).pack(side="left", fill="x", expand=True, padx=8)
 
         row = ctk.CTkFrame(form)
         row.pack(fill="x", pady=4)
         ctk.CTkCheckBox(
             row,
-            text="Créer automatiquement les entités liées",
+            text="Automatically create linked entities",
             variable=self.include_linked_var,
         ).pack(side="left", padx=8)
 
-        ctk.CTkLabel(self, text="Brief / contraintes", anchor="w").pack(anchor="w", padx=20)
+        ctk.CTkLabel(self, text="Brief / constraints", anchor="w").pack(anchor="w", padx=20)
         self.prompt_box = ctk.CTkTextbox(self, height=160, wrap="word")
         self.prompt_box.pack(fill="both", expand=True, padx=16, pady=(4, 8))
 
-        self.status_var = ctk.StringVar(value="Prêt.")
+        self.status_var = ctk.StringVar(value="Ready.")
         status = ctk.CTkLabel(self, textvariable=self.status_var, anchor="w")
         status.pack(fill="x", padx=16, pady=(0, 8))
 
         btn_row = ctk.CTkFrame(self)
         btn_row.pack(fill="x", padx=16, pady=(0, 12))
-        self.run_button = ctk.CTkButton(btn_row, text="Lancer", command=self._start_generation)
+        self.run_button = ctk.CTkButton(btn_row, text="Run", command=self._start_generation)
         self.run_button.pack(side="left", padx=4)
-        ctk.CTkButton(btn_row, text="Fermer", command=self.destroy).pack(side="right", padx=4)
+        ctk.CTkButton(btn_row, text="Close", command=self.destroy).pack(side="right", padx=4)
 
     def _on_entity_label_selected(self, label: str):
         slug = self._label_to_slug.get(label)
@@ -90,19 +90,19 @@ class AutoGenerationDialog(ctk.CTkToplevel):
             return
         entity_slug = self.entity_var.get().strip()
         if not entity_slug:
-            messagebox.showerror("Erreur", "Sélectionnez un type d'entité.")
+            messagebox.showerror("Error", "Select an entity type.")
             return
         raw_count = self.count_var.get().strip()
         if not raw_count:
-            messagebox.showerror("Erreur", "Nombre invalide.")
+            messagebox.showerror("Error", "Invalid count.")
             return
         try:
             count = int(raw_count)
         except Exception:
-            messagebox.showerror("Erreur", "Nombre invalide.")
+            messagebox.showerror("Error", "Invalid count.")
             return
         if count <= 0:
-            messagebox.showerror("Erreur", "Le nombre doit être supérieur à 0.")
+            messagebox.showerror("Error", "Count must be greater than 0.")
             return
 
         prompt = self.prompt_box.get("1.0", "end").strip()
@@ -110,7 +110,7 @@ class AutoGenerationDialog(ctk.CTkToplevel):
 
         self._running = True
         self.run_button.configure(state="disabled")
-        self.status_var.set("Génération en cours...")
+        self.status_var.set("Generation in progress...")
 
         thread = threading.Thread(
             target=self._run_generation,
@@ -133,7 +133,7 @@ class AutoGenerationDialog(ctk.CTkToplevel):
         self.after(0, self._on_success)
 
     def _on_success(self):
-        self.status_var.set("Terminé. Les entités ont été créées.")
+        self.status_var.set("Done. The entities have been created.")
         self.run_button.configure(state="normal")
         self._running = False
         if self._on_complete:
@@ -143,7 +143,7 @@ class AutoGenerationDialog(ctk.CTkToplevel):
                 pass
 
     def _on_error(self, exc: Exception):
-        self.status_var.set("Erreur pendant la génération.")
+        self.status_var.set("Error during generation.")
         self.run_button.configure(state="normal")
         self._running = False
-        messagebox.showerror("Erreur", str(exc))
+        messagebox.showerror("Error", str(exc))
