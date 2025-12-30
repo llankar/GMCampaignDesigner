@@ -10,6 +10,9 @@ log_module_import(__name__)
 
 
 class AutoGenerationDialog(ctk.CTkToplevel):
+    _STORY_ARC_SLUG = "__story_arc__"
+    _STORY_ARC_LABEL = "Story arc (scenarios)"
+
     def __init__(self, parent, *, default_entity: str | None = None, on_complete=None):
         super().__init__(parent)
         self.title("Auto Generation")
@@ -23,6 +26,7 @@ class AutoGenerationDialog(ctk.CTkToplevel):
 
         entity_defs = load_entity_definitions()
         self._entity_labels = {slug: meta["label"] for slug, meta in entity_defs.items()}
+        self._entity_labels[self._STORY_ARC_SLUG] = self._STORY_ARC_LABEL
         self._entity_slugs = sorted(self._entity_labels.keys())
 
         default_slug = default_entity if default_entity in self._entity_slugs else (self._entity_slugs[0] if self._entity_slugs else "")
@@ -31,6 +35,7 @@ class AutoGenerationDialog(ctk.CTkToplevel):
         self.include_linked_var = ctk.BooleanVar(value=True)
 
         self._build_layout()
+        self._apply_entity_mode()
 
     def _build_layout(self):
         header = ctk.CTkLabel(self, text="AI Auto-Generation", font=("Arial", 18, "bold"))
@@ -55,16 +60,19 @@ class AutoGenerationDialog(ctk.CTkToplevel):
 
         row = ctk.CTkFrame(form)
         row.pack(fill="x", pady=4)
-        ctk.CTkLabel(row, text="Count", width=140, anchor="w").pack(side="left")
-        ctk.CTkEntry(row, textvariable=self.count_var).pack(side="left", fill="x", expand=True, padx=8)
+        self.count_label = ctk.CTkLabel(row, text="Count", width=140, anchor="w")
+        self.count_label.pack(side="left")
+        self.count_entry = ctk.CTkEntry(row, textvariable=self.count_var)
+        self.count_entry.pack(side="left", fill="x", expand=True, padx=8)
 
         row = ctk.CTkFrame(form)
         row.pack(fill="x", pady=4)
-        ctk.CTkCheckBox(
+        self.include_linked_checkbox = ctk.CTkCheckBox(
             row,
             text="Automatically create linked entities",
             variable=self.include_linked_var,
-        ).pack(side="left", padx=8)
+        )
+        self.include_linked_checkbox.pack(side="left", padx=8)
 
         ctk.CTkLabel(self, text="Brief / constraints", anchor="w").pack(anchor="w", padx=20)
         self.prompt_box = ctk.CTkTextbox(self, height=160, wrap="word")
@@ -84,6 +92,16 @@ class AutoGenerationDialog(ctk.CTkToplevel):
         slug = self._label_to_slug.get(label)
         if slug:
             self.entity_var.set(slug)
+        self._apply_entity_mode()
+
+    def _apply_entity_mode(self):
+        is_story_arc = self.entity_var.get() == self._STORY_ARC_SLUG
+        self.count_label.configure(text="Scenario count" if is_story_arc else "Count")
+        if is_story_arc:
+            self.include_linked_var.set(False)
+            self.include_linked_checkbox.configure(state="disabled")
+        else:
+            self.include_linked_checkbox.configure(state="normal")
 
     def _start_generation(self):
         if self._running:
@@ -121,12 +139,15 @@ class AutoGenerationDialog(ctk.CTkToplevel):
 
     def _run_generation(self, entity_slug: str, count: int, prompt: str, include_linked: bool):
         try:
-            self._service.generate_and_save(
-                entity_slug,
-                count,
-                prompt,
-                include_linked=include_linked,
-            )
+            if entity_slug == self._STORY_ARC_SLUG:
+                self._service.generate_story_arc_and_save(count, prompt)
+            else:
+                self._service.generate_and_save(
+                    entity_slug,
+                    count,
+                    prompt,
+                    include_linked=include_linked,
+                )
         except Exception as exc:
             self.after(0, lambda exc=exc: self._on_error(exc))
             return

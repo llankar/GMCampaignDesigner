@@ -74,3 +74,43 @@ def build_linked_entities_prompt(
         f"Parent context:\n{parent_context}\n\n"
         f"User prompt: {user_prompt}\n"
     )
+
+
+def build_story_arc_prompt(scenario_count: int, user_prompt: str) -> str:
+    schema_hint = {
+        "ArcTitle": "",
+        "Premise": "",
+        "Tone": "",
+        "ScenarioCount": scenario_count,
+        "Scenarios": [
+            {
+                "Title": "",
+                "Synopsis": "",
+                "Goal": "",
+                "KeyNPCs": [],
+                "KeyLocations": [],
+                "KeyItems": [],
+                "Hooks": [],
+                "Outcome": "",
+                "LeadsTo": "",
+            }
+        ],
+    }
+    schema_json = json.dumps(schema_hint, indent=2, ensure_ascii=False)
+
+    return (
+        "You are generating a narrative story arc for an RPG campaign. "
+        "Return ONLY valid JSON.\n"
+        f"Scenario count: {scenario_count}\n\n"
+        "Rules:\n"
+        "- Output must be a single JSON object.\n"
+        "- Include keys: ArcTitle, Premise, Tone, ScenarioCount, Scenarios.\n"
+        "- ScenarioCount must match the number of Scenarios items.\n"
+        "- Each scenario must include Title, Synopsis, Goal, KeyNPCs, KeyLocations, "
+        "KeyItems, Hooks, Outcome, LeadsTo.\n"
+        "- Use lists for KeyNPCs, KeyLocations, KeyItems, Hooks (even if empty).\n"
+        "- Use plain strings for other fields.\n"
+        "- Do not wrap the JSON in markdown fences.\n\n"
+        f"Example shape (not actual content):\n{schema_json}\n\n"
+        f"User prompt: {user_prompt}\n"
+    )
