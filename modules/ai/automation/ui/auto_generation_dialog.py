@@ -97,11 +97,7 @@ class AutoGenerationDialog(ctk.CTkToplevel):
     def _apply_entity_mode(self):
         is_story_arc = self.entity_var.get() == self._STORY_ARC_SLUG
         self.count_label.configure(text="Scenario count" if is_story_arc else "Count")
-        if is_story_arc:
-            self.include_linked_var.set(False)
-            self.include_linked_checkbox.configure(state="disabled")
-        else:
-            self.include_linked_checkbox.configure(state="normal")
+        self.include_linked_checkbox.configure(state="normal")
 
     def _start_generation(self):
         if self._running:
@@ -140,7 +136,7 @@ class AutoGenerationDialog(ctk.CTkToplevel):
     def _run_generation(self, entity_slug: str, count: int, prompt: str, include_linked: bool):
         try:
             if entity_slug == self._STORY_ARC_SLUG:
-                self._service.generate_story_arc_and_save(count, prompt)
+                self._service.generate_story_arc_and_save(count, prompt, include_linked=include_linked)
             else:
                 self._service.generate_and_save(
                     entity_slug,
