@@ -27,7 +27,7 @@ class AutoGenerationDialog(ctk.CTkToplevel):
 
         default_slug = default_entity if default_entity in self._entity_slugs else (self._entity_slugs[0] if self._entity_slugs else "")
         self.entity_var = ctk.StringVar(value=default_slug)
-        self.count_var = ctk.IntVar(value=1)
+        self.count_var = ctk.StringVar(value="1")
         self.include_linked_var = ctk.BooleanVar(value=True)
 
         self._build_layout()
@@ -92,8 +92,12 @@ class AutoGenerationDialog(ctk.CTkToplevel):
         if not entity_slug:
             messagebox.showerror("Erreur", "Sélectionnez un type d'entité.")
             return
+        raw_count = self.count_var.get().strip()
+        if not raw_count:
+            messagebox.showerror("Erreur", "Nombre invalide.")
+            return
         try:
-            count = int(self.count_var.get())
+            count = int(raw_count)
         except Exception:
             messagebox.showerror("Erreur", "Nombre invalide.")
             return
