@@ -7,7 +7,7 @@ from modules.helpers.logging_helper import log_module_import
 log_module_import(__name__)
 
 def format_longtext(data, max_length=30000):
-    """ Formate un champ longtext pour l'afficher dans une liste (abrégé + multi-lignes). """
+    """Format a longtext field for list display (abridged + multi-line)."""
     if isinstance(data, dict):
         text = data.get("text", "")
     else:

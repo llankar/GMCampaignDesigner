@@ -1777,7 +1777,7 @@ class ScenarioGraphEditor(ctk.CTkFrame):
                 if stripped.isdigit():
                     target_index = int(stripped)
                 else:
-                    match = re.search(r"(scene|scène)\s*(\d+)", stripped, re.IGNORECASE)
+                    match = re.search(r"(scene|act)\s*(\d+)", stripped, re.IGNORECASE)
                     if match:
                         target_index = int(match.group(2))
             key = (repr(target_value), text_clean)
@@ -1859,7 +1859,7 @@ class ScenarioGraphEditor(ctk.CTkFrame):
             return ""
         cleaned = str(text).strip()
         cleaned = re.sub(r"^[\u2022\-\*\s\t]+", "", cleaned)
-        cleaned = re.sub(r"^(?:scene|scène|acte)\s*\d+\s*[:.\-]*\s*", "", cleaned, flags=re.IGNORECASE)
+        cleaned = re.sub(r"^(?:scene|act)\s*\d+\s*[:.\-]*\s*", "", cleaned, flags=re.IGNORECASE)
         cleaned = re.sub(r"^[^\w]+", "", cleaned)
         return cleaned.strip()
 
@@ -2393,14 +2393,14 @@ class ScenarioGraphEditor(ctk.CTkFrame):
                 if target:
                     return target
             lowered = ref.lower()
-            match = re.search(r"(scene|scène|acte)\s*(\d+)", lowered)
+            match = re.search(r"(scene|act)\s*(\d+)", lowered)
             if match:
                 num = int(match.group(2))
                 target = index_lookup.get(num)
                 if target:
                     return target
             candidates = [ref, lowered]
-            cleaned = re.sub(r"^(scene|scène|acte)\s*", "", lowered, flags=re.IGNORECASE).strip()
+            cleaned = re.sub(r"^(scene|act)\s*", "", lowered, flags=re.IGNORECASE).strip()
             if cleaned and cleaned != lowered:
                 candidates.append(cleaned)
             if ":" in ref:

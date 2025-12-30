@@ -1,7 +1,7 @@
 import customtkinter as ctk
 import tkinter as tk
 from tkinter import simpledialog, colorchooser
-from modules.helpers.custom_buttons import MinimalCTkButton  # Import de notre bouton personnalisé
+from modules.helpers.custom_buttons import MinimalCTkButton  # Import our custom button
 from modules.helpers.logging_helper import log_module_import
 
 log_module_import(__name__)
@@ -14,7 +14,7 @@ class RichTextEditor(ctk.CTkFrame):
         self.toolbar = ctk.CTkFrame(self)
         self.toolbar.pack(fill="x", padx=5, pady=5)
 
-        # Bouton Bold
+        # Bold button
         bold_button = MinimalCTkButton(self.toolbar, text="Bold", command=self.toggle_bold)
         bold_button.pack(side="left", padx=5)
 

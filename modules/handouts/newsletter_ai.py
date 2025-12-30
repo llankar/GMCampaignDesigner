@@ -73,25 +73,26 @@ def generate_newsletter_ai(payload, language, style):
         return fallback_render
 
     section_names = [str(name).strip() for name in resolved_payload.keys() if str(name).strip()]
-    section_list = ", ".join(section_names) if section_names else "Aucune"
+    section_list = ", ".join(section_names) if section_names else "None"
     base_text = _extract_base_text(resolved_payload)
 
+    required_language = language or "English"
     prompt = (
-        "Tu es un assistant qui rédige une newsletter de campagne RPG pour les joueurs.\n"
-        "Langue obligatoire: français.\n"
-        "Ton: news in-universe (journal local, bulletin, chronique de ville).\n"
-        "Longueur: 3 à 4 paragraphes.\n"
-        "Interdit: titres, sections, listes, annexes.\n"
-        "Intègre naturellement les PNJ et scènes dans le récit, sans énumération finale.\n"
-        f"Sections activées: {section_list}\n"
-        "Rappel: no spoilers. Ne révèle pas de secrets, surprises ou twists.\n\n"
-        "Utilise uniquement les informations fournies ci-dessous. "
-        "Ne réécris pas de contenu inventé. Le texte doit être au passé simple.\n"
-        "Le texte du MJ doit servir de trame principale; le reste sert d'appoint.\n\n"
-        f"Texte du MJ (trame principale):\n{base_text or 'Aucun'}\n\n"
-        "Rédige un article de journal in-universe en français, 3 à 4 paragraphes, "
-        "sans titres ni listes. Intègre naturellement les PNJ et scènes dans le récit, sans annexes.\n\n"
-        "Contenu structuré (JSON):\n"
+        "You are an assistant who writes an RPG campaign newsletter for players.\n"
+        f"Required language: {required_language}.\n"
+        "Tone: in-universe news (local paper, bulletin, city chronicle).\n"
+        "Length: 3 to 4 paragraphs.\n"
+        "Forbidden: titles, sections, lists, appendices.\n"
+        "Integrate NPCs and scenes naturally in the narrative, without a final enumeration.\n"
+        f"Active sections: {section_list}\n"
+        "Reminder: no spoilers. Do not reveal secrets, surprises, or twists.\n\n"
+        "Use only the information provided below. "
+        "Do not rewrite invented content.\n"
+        "The GM text should serve as the main thread; the rest is supporting detail.\n\n"
+        f"GM text (main thread):\n{base_text or 'None'}\n\n"
+        f"Write an in-universe newspaper article in {required_language}, 3 to 4 paragraphs, "
+        "with no titles or lists. Integrate NPCs and scenes naturally in the narrative, without appendices.\n\n"
+        "Structured content (JSON):\n"
         f"{json.dumps(resolved_payload, ensure_ascii=False, indent=2)}"
     )
 
@@ -99,7 +100,7 @@ def generate_newsletter_ai(payload, language, style):
     try:
         client = LocalAIClient()
         response = client.chat([
-            {"role": "system", "content": "Rédige des newsletters RPG claires et sans spoilers."},
+            {"role": "system", "content": "Write clear, spoiler-free RPG newsletters."},
             {"role": "user", "content": prompt},
         ])
         if response and response.strip():

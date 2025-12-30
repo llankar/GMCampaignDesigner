@@ -5,10 +5,10 @@ log_module_import(__name__)
 
 @log_function
 def position_window_at_top(window, width=None, height=None):
-    """ Positionne une fenêtre au sommet de l'écran, centrée horizontalement.
+    """Position a window at the top of the screen, centered horizontally.
 
     Args:
-        window: la fenêtre CustomTkinter ou Tkinter à positionner.
+        window: the CustomTkinter or Tkinter window to position.
         width: largeur fixe (facultatif). Si None, utilise la taille actuelle.
         height: hauteur fixe (facultatif). Si None, utilise la taille actuelle.
     """
@@ -34,7 +34,7 @@ def position_window_at_top(window, width=None, height=None):
         height = next((h for h in height_candidates if h and h > 1), 1)
 
     x = (screen_width - width) // 2
-    y = 0  # Collé en haut de l'écran
+    y = 0  # Keep flush to the top of the screen
 
     geometry = f"{width}x{height}+{x}+{y}"
     log_debug(f"Applying geometry {geometry} on screen {screen_width}x{screen_height}",

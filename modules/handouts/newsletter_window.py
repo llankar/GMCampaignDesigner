@@ -63,14 +63,14 @@ class NewsletterWindow(ctk.CTkToplevel):
 
         copy_plain = ctk.CTkButton(
             button_row,
-            text="Copier dans le presse-papiers",
+            text="Copy to clipboard",
             command=self._copy_plain_text,
         )
         copy_plain.grid(row=0, column=0, padx=5, sticky="ew")
 
         copy_rtf = ctk.CTkButton(
             button_row,
-            text="Copier en RTF",
+            text="Copy as RTF",
             command=self._copy_rtf,
         )
         copy_rtf.grid(row=0, column=1, padx=5, sticky="ew")
@@ -93,7 +93,7 @@ class NewsletterWindow(ctk.CTkToplevel):
 
         try:
             render_rtf_to_text_widget(self.textbox, self._rtf_json)
-            self.status_var.set("RTF chargé.")
+            self.status_var.set("RTF loaded.")
         except Exception as exc:
             log_exception(
                 f"RTF rendering failed: {exc}",
@@ -103,35 +103,35 @@ class NewsletterWindow(ctk.CTkToplevel):
             self.textbox.delete("1.0", tk.END)
             self.textbox.insert("1.0", str(self._rtf_json.get("text", "")))
             self.textbox.configure(state="disabled")
-            self.status_var.set("Affichage en texte brut (RTF non compatible).")
+            self.status_var.set("Displayed as plain text (RTF not compatible).")
 
     def _copy_plain_text(self) -> None:
         text = str(self._rtf_json.get("text", ""))
         if not text.strip():
-            messagebox.showinfo("Newsletter", "Aucun texte à copier.")
+            messagebox.showinfo("Newsletter", "No text to copy.")
             return
         try:
             self.clipboard_clear()
             self.clipboard_append(text)
-            self.status_var.set("Texte copié dans le presse-papiers.")
+            self.status_var.set("Text copied to clipboard.")
         except Exception as exc:
             log_exception(
                 f"Clipboard copy failed: {exc}",
                 func_name="NewsletterWindow._copy_plain_text",
             )
-            messagebox.showwarning("Newsletter", "Impossible de copier le texte.")
+            messagebox.showwarning("Newsletter", "Unable to copy the text.")
 
     def _copy_rtf(self) -> None:
         if not self._rtf_string.strip():
-            messagebox.showinfo("Newsletter", "Aucun RTF à copier.")
+            messagebox.showinfo("Newsletter", "No RTF to copy.")
             return
         try:
             self.clipboard_clear()
             self.clipboard_append(self._rtf_string)
-            self.status_var.set("RTF copié dans le presse-papiers.")
+            self.status_var.set("RTF copied to clipboard.")
         except Exception as exc:
             log_exception(
                 f"RTF clipboard copy failed: {exc}",
                 func_name="NewsletterWindow._copy_rtf",
             )
-            messagebox.showwarning("Newsletter", "Impossible de copier le RTF.")
+            messagebox.showwarning("Newsletter", "Unable to copy the RTF.")

@@ -12,14 +12,14 @@ from modules.helpers.window_helper import position_window_at_top
 log_module_import(__name__)
 
 SECTION_OPTIONS = [
-    ("Summary", "Résumé"),
-    ("Scenes", "Scènes"),
-    ("Places", "Lieux"),
-    ("NPCs", "PNJ"),
-    ("Creatures", "Créatures"),
+    ("Summary", "Summary"),
+    ("Scenes", "Scenes"),
+    ("Places", "Places"),
+    ("NPCs", "NPCs"),
+    ("Creatures", "Creatures"),
     ("Factions", "Factions"),
-    ("Objects", "Objets"),
-    ("Books", "Livres"),
+    ("Objects", "Objects"),
+    ("Books", "Books"),
 ]
 
 
@@ -31,7 +31,7 @@ class NewsletterConfigDialog(ctk.CTkToplevel):
         on_generate: Callable[[Dict[str, object]], None] | None = None,
     ) -> None:
         super().__init__(parent)
-        self.title("Newsletter - Configuration")
+        self.title("Newsletter - Settings")
         self.geometry("520x780")
         self.minsize(520, 780)
 
@@ -39,8 +39,8 @@ class NewsletterConfigDialog(ctk.CTkToplevel):
         self._on_generate = on_generate
 
         self._section_vars: Dict[str, tk.BooleanVar] = {}
-        self._language_var = tk.StringVar(value="français")
-        self._style_var = tk.StringVar(value="neutre")
+        self._language_var = tk.StringVar(value="English")
+        self._style_var = tk.StringVar(value="neutral")
         self._use_ai_var = tk.BooleanVar(value=False)
         self._base_textbox: ctk.CTkTextbox | None = None
         self._pc_vars: Dict[str, tk.BooleanVar] = {}
@@ -65,7 +65,7 @@ class NewsletterConfigDialog(ctk.CTkToplevel):
     def _build_ui(self) -> None:
         header = ctk.CTkLabel(
             self,
-            text=f"Newsletter : {self._scenario_title}",
+            text=f"Newsletter: {self._scenario_title}",
             font=("Arial", 18, "bold"),
         )
         header.pack(fill="x", padx=20, pady=(20, 10))
@@ -74,7 +74,7 @@ class NewsletterConfigDialog(ctk.CTkToplevel):
         recap_frame.pack(fill="both", expand=False, padx=20, pady=(0, 10))
         recap_label = ctk.CTkLabel(
             recap_frame,
-            text="Résumé de la partie (base principale du texte)",
+            text="Session summary (main text base)",
             font=("Arial", 14, "bold"),
         )
         recap_label.pack(anchor="w", padx=10, pady=(10, 4))
@@ -86,7 +86,7 @@ class NewsletterConfigDialog(ctk.CTkToplevel):
 
         section_label = ctk.CTkLabel(
             section_frame,
-            text="Sections à inclure",
+            text="Sections to include",
             font=("Arial", 14, "bold"),
         )
         section_label.grid(row=0, column=0, columnspan=2, sticky="w", pady=(10, 5))
@@ -105,7 +105,7 @@ class NewsletterConfigDialog(ctk.CTkToplevel):
 
         language_frame = ctk.CTkFrame(self)
         language_frame.pack(fill="x", padx=20, pady=(15, 5))
-        ctk.CTkLabel(language_frame, text="Langue", width=90, anchor="w").grid(
+        ctk.CTkLabel(language_frame, text="Language", width=90, anchor="w").grid(
             row=0,
             column=0,
             padx=10,
@@ -118,7 +118,7 @@ class NewsletterConfigDialog(ctk.CTkToplevel):
 
         style_frame = ctk.CTkFrame(self)
         style_frame.pack(fill="x", padx=20, pady=(5, 5))
-        ctk.CTkLabel(style_frame, text="Ton / style", width=90, anchor="w").grid(
+        ctk.CTkLabel(style_frame, text="Tone / style", width=90, anchor="w").grid(
             row=0,
             column=0,
             padx=10,
@@ -133,7 +133,7 @@ class NewsletterConfigDialog(ctk.CTkToplevel):
         ai_frame.pack(fill="x", padx=20, pady=(5, 15))
         ai_checkbox = ctk.CTkCheckBox(
             ai_frame,
-            text="Utiliser l'IA locale",
+            text="Use local AI",
             variable=self._use_ai_var,
         )
         ai_checkbox.pack(anchor="w", padx=10, pady=8)
@@ -143,7 +143,7 @@ class NewsletterConfigDialog(ctk.CTkToplevel):
             pc_frame.pack(fill="both", expand=False, padx=20, pady=(5, 10))
             pc_label = ctk.CTkLabel(
                 pc_frame,
-                text="PJs participants",
+                text="Participating PCs",
                 font=("Arial", 14, "bold"),
             )
             pc_label.pack(anchor="w", padx=10, pady=(10, 4))
@@ -167,14 +167,14 @@ class NewsletterConfigDialog(ctk.CTkToplevel):
 
         generate_button = ctk.CTkButton(
             button_row,
-            text="Prévisualiser",
+            text="Preview",
             command=self._handle_generate,
         )
         generate_button.grid(row=0, column=0, padx=8, sticky="ew")
 
         cancel_button = ctk.CTkButton(
             button_row,
-            text="Annuler",
+            text="Cancel",
             command=self._handle_cancel,
         )
         cancel_button.grid(row=0, column=1, padx=8, sticky="ew")
@@ -186,7 +186,7 @@ class NewsletterConfigDialog(ctk.CTkToplevel):
         if not sections:
             messagebox.showwarning(
                 "Newsletter",
-                "Sélectionnez au moins une section.",
+                "Select at least one section.",
                 parent=self,
             )
             return
