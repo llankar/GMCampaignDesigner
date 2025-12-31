@@ -25,6 +25,31 @@
             height: 90vh;
             display: block;
         }
+
+        #linkMenu {
+            position: absolute;
+            display: none;
+            background: #fff;
+            border: 1px solid #1D3572;
+            border-radius: 6px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+            z-index: 11000;
+            min-width: 140px;
+        }
+
+        #linkMenu button {
+            width: 100%;
+            padding: 8px 12px;
+            background: none;
+            border: none;
+            text-align: left;
+            cursor: pointer;
+            font-size: 14px;
+        }
+
+        #linkMenu button:hover {
+            background: #f0f0f0;
+        }
     </style>
 </head>
 
@@ -47,6 +72,9 @@
                 z-index: 10000;
         ">
         <div id="popupContent"></div>
+    </div>
+    <div id="linkMenu">
+        <button id="deleteLinkBtn">Delete link</button>
     </div>
     <script>
         fetch('/api/character-graph?graph={{ selected_graph }}')
@@ -78,6 +106,10 @@
                         }
                     };
                 }).filter(Boolean);
+                const linkMenu = document.getElementById('linkMenu');
+                const deleteLinkBtn = document.getElementById('deleteLinkBtn');
+                let activeEdge = null;
+
                 const cy = cytoscape({
                     container: document.getElementById('cy'),
                     elements: { nodes, edges },
@@ -119,6 +151,11 @@
                     layout: { name: 'preset' }
                 });
 
+                const hideLinkMenu = () => {
+                    linkMenu.style.display = 'none';
+                    activeEdge = null;
+                };
+
                 cy.on('tap', 'node', evt => {
                     const node = evt.target;
                     const label = node.data('label');
@@ -135,6 +172,52 @@
                 cy.on('tap', evt => {
                     if (evt.target === cy) {
                         document.getElementById('npcPopup').style.display = 'none';
+                    }
+                    hideLinkMenu();
+                });
+
+                cy.on('cxttap', 'edge', evt => {
+                    evt.originalEvent.preventDefault();
+                    activeEdge = evt.target;
+                    const { clientX, clientY } = evt.originalEvent;
+                    linkMenu.style.left = `${clientX}px`;
+                    linkMenu.style.top = `${clientY}px`;
+                    linkMenu.style.display = 'block';
+                });
+
+                document.addEventListener('click', event => {
+                    if (!linkMenu.contains(event.target)) {
+                        hideLinkMenu();
+                    }
+                });
+
+                deleteLinkBtn.addEventListener('click', async () => {
+                    if (!activeEdge) {
+                        hideLinkMenu();
+                        return;
+                    }
+                    const payload = {
+                        graph: '{{ selected_graph }}',
+                        source: activeEdge.data('source'),
+                        target: activeEdge.data('target'),
+                        label: activeEdge.data('label') || ''
+                    };
+                    try {
+                        const response = await fetch('/api/character-graph/link-delete', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify(payload)
+                        });
+                        if (!response.ok) {
+                            const errorData = await response.json().catch(() => ({}));
+                            console.error('Failed to delete link', errorData);
+                        } else {
+                            cy.remove(activeEdge);
+                        }
+                    } catch (error) {
+                        console.error('Error deleting link:', error);
+                    } finally {
+                        hideLinkMenu();
                     }
                 });
             })
