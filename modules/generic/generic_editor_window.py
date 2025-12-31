@@ -410,7 +410,9 @@ class GenericEditorWindow(ctk.CTkToplevel):
 
         ctk.CTkLabel(self.scroll_frame, text=field_name).pack(pady=(5, 0), anchor="w")
 
-        if field_type == "list_longtext":
+        if field_type == "links":
+            self.create_character_links_field(field)
+        elif field_type == "list_longtext":
             self.create_dynamic_longtext_list(field)
         elif field_type == "longtext":
             self.create_longtext_field(field)
@@ -821,6 +823,46 @@ class GenericEditorWindow(ctk.CTkToplevel):
         self.field_widgets[f"{field['name']}_container"] = container
         self.field_widgets[f"{field['name']}_add_scene"] = add_scene
         self.field_widgets[f"{field['name']}_renumber"] = renumber_scenes
+
+    def create_character_links_field(self, field):
+        container = ctk.CTkFrame(self.scroll_frame)
+        container.pack(fill="x", pady=4)
+
+        description = ctk.CTkLabel(
+            container,
+            text="Managed by the Character Graph editor.",
+            text_color="#A0A0A0",
+        )
+        description.pack(anchor="w", padx=4, pady=(0, 4))
+
+        links = self.item.get(field["name"], [])
+        if not isinstance(links, list):
+            links = []
+
+        if not links:
+            ctk.CTkLabel(container, text="No links yet.").pack(anchor="w", padx=4)
+        else:
+            for link in links:
+                if isinstance(link, dict):
+                    target_type = link.get("target_type") or "unknown"
+                    target_name = link.get("target_name") or "unknown"
+                    label = link.get("label") or ""
+                    arrow_mode = link.get("arrow_mode") or "both"
+                    parts = [f"{target_type.upper()}: {target_name}"]
+                    if label:
+                        parts.append(f"label: {label}")
+                    if arrow_mode:
+                        parts.append(f"arrow: {arrow_mode}")
+                    text = " | ".join(parts)
+                else:
+                    text = str(link)
+                ctk.CTkLabel(container, text=text, wraplength=900, justify="left").pack(
+                    anchor="w",
+                    padx=4,
+                    pady=2,
+                )
+
+        self.field_widgets[field["name"]] = links
 
     def create_audio_field(self, field):
         frame = ctk.CTkFrame(self.scroll_frame)
@@ -1412,6 +1454,10 @@ class GenericEditorWindow(ctk.CTkToplevel):
             field_type = str(field.get("type", "")).lower()
 
             if field_name in ["FogMaskPath", "Tokens", "token_size"]:
+                continue
+            if field_type == "links":
+                if field_name not in self.item:
+                    self.item[field_name] = []
                 continue
             widget = self.field_widgets[field_name]
             if field_type == "list_longtext":
