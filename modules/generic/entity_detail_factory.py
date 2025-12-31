@@ -1065,7 +1065,11 @@ def EditWindow(self, item, template, model_wrapper, creation_mode=False, on_save
     )
     self.master.wait_window(editor)
     if getattr(editor, "saved", False):
-        model_wrapper.save_item(target, key_field=key_field)
+        model_wrapper.save_item(
+            target,
+            key_field=key_field,
+            original_key_value=key_value,
+        )
         # let the detail frame know it should refresh itself
         if callable(on_save):
             on_save(target)
