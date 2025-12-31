@@ -1212,8 +1212,13 @@ class CharacterGraphEditor(ctk.CTkFrame):
         tag = tag or self.selected_shape
         if not tag:
             return
-        self.canvas.tag_raise(tag, "background")
-        self.canvas.tag_lower(tag, "link")
+        background_exists = bool(self.canvas.find_withtag("background"))
+        if background_exists:
+            self.canvas.tag_raise(tag, "background")
+        else:
+            self.canvas.tag_lower(tag)
+        if self.canvas.find_withtag("link"):
+            self.canvas.tag_lower(tag, "link")
 
     def activate_resize_mode(self, shape_tag):
         shape = self.shapes.get(shape_tag)
@@ -1450,14 +1455,21 @@ class CharacterGraphEditor(ctk.CTkFrame):
             ))
         # Check if there are any "link" items before using them as reference.
         # bring links above the background
+        background_exists = bool(self.canvas.find_withtag("background"))
         if self.canvas.find_withtag("link"):
-            self.canvas.tag_raise("link", "background")
+            if background_exists:
+                self.canvas.tag_raise("link", "background")
+            else:
+                self.canvas.tag_raise("link")
         # then make sure nodes (post-its) are on top of everything
         if self.canvas.find_withtag("node"):
             self.canvas.tag_raise("node")
         # finally keep shapes just above background but below links/nodes
         if self.canvas.find_withtag("shape"):
-            self.canvas.tag_raise("shape", "background")
+            if background_exists:
+                self.canvas.tag_raise("shape", "background")
+            else:
+                self.canvas.tag_raise("shape")
 
 
     def start_drag(self, event):
