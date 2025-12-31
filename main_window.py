@@ -66,8 +66,7 @@ from modules.generic.generic_list_view import GenericListView
 from modules.generic.generic_model_wrapper import GenericModelWrapper
 from modules.scenarios.gm_screen_view import GMScreenView
 from modules.scenarios.gm_layout_manager import GMScreenLayoutManager
-from modules.npcs.npc_graph_editor import NPCGraphEditor
-from modules.pcs.pc_graph_editor import PCGraphEditor
+from modules.characters.character_graph_editor import CharacterGraphEditor
 from modules.scenarios.scenario_graph_editor import ScenarioGraphEditor
 from modules.scenarios.scenario_importer import ScenarioImportWindow
 from modules.objects.object_importer import ObjectImportWindow
@@ -280,8 +279,7 @@ class MainWindow(ctk.CTk):
             "export_scenarios": "export_icon.png",
             "asset_library": "icons/save.png",
             "gm_screen": "gm_screen_icon.png",
-            "npc_graph": "npc_graph_icon.png",
-            "pc_graph": "pc_graph_icon.png",
+            "character_graph": "npc_graph_icon.png",
             "faction_graph": "faction_graph_icon.png",
             "scenario_graph": "scenario_graph_icon.png",
             "scenario_builder": "scenario_graph_icon.png",
@@ -808,8 +806,7 @@ class MainWindow(ctk.CTk):
             entity_buttons.append((key, tooltip, lambda s=slug: self.open_entity(s)))
 
         relations = [
-            ("npc_graph", "Open NPC Graph Editor", self.open_npc_graph_editor),
-            ("pc_graph", "Open PC Graph Editor", self.open_pc_graph_editor),
+            ("character_graph", "Open Character Graph Editor", self.open_character_graph_editor),
             ("faction_graph", "Open Factions Graph Editor", self.open_faction_graph_editor),
             ("scenario_graph", "Open Scenario Graph Editor", self.open_scenario_graph_editor),
             ("create_random_table", "Create Random Table", self.open_random_table_editor),
@@ -1170,10 +1167,13 @@ class MainWindow(ctk.CTk):
             parent.grid_columnconfigure(0, weight=1)
 
             # re‐instantiate the proper editor type, then restore its state
-            if self._graph_type == 'npc':
-                editor = NPCGraphEditor(new_container, self.npc_wrapper, self.faction_wrapper)
-            elif self._graph_type == 'pc':
-                editor = PCGraphEditor(new_container, self.pc_wrapper, self.faction_wrapper)
+            if self._graph_type == 'character':
+                editor = CharacterGraphEditor(
+                    new_container,
+                    self.npc_wrapper,
+                    self.pc_wrapper,
+                    self.faction_wrapper,
+                )
             elif self._graph_type == 'faction':
                 editor = FactionGraphEditor(new_container, self.faction_wrapper)
             else:  # 'scenario'
@@ -1925,8 +1925,8 @@ class MainWindow(ctk.CTk):
         except Exception:
             pass
 
-    def open_npc_graph_editor(self):
-        self._graph_type = 'npc'
+    def open_character_graph_editor(self):
+        self._graph_type = 'character'
         self.current_gm_view = None
         self.clear_current_content()
         self.banner_toggle_btn.configure(state="normal")
@@ -1937,32 +1937,17 @@ class MainWindow(ctk.CTk):
         parent.grid_rowconfigure(0, weight=1)
         parent.grid_columnconfigure(0, weight=1)
 
-        editor = NPCGraphEditor(container, self.npc_wrapper, self.faction_wrapper)
+        editor = CharacterGraphEditor(
+            container,
+            self.npc_wrapper,
+            self.pc_wrapper,
+            self.faction_wrapper,
+        )
         editor.pack(fill="both", expand=True)
 
         # keep both container and editor so we can snapshot/restore
         container.graph_editor = editor
-        self.current_open_view   = container
-        self.current_open_entity = None
-
-
-    def open_pc_graph_editor(self):
-        self._graph_type = 'pc'
-        self.current_gm_view = None
-        self.clear_current_content()
-        self.banner_toggle_btn.configure(state="normal")
-        parent = self.get_content_container()
-
-        container = ctk.CTkFrame(parent)
-        container.grid(row=0, column=0, sticky="nsew")
-        parent.grid_rowconfigure(0, weight=1)
-        parent.grid_columnconfigure(0, weight=1)
-
-        editor = PCGraphEditor(container, self.pc_wrapper, self.faction_wrapper)
-        editor.pack(fill="both", expand=True)
-
-        container.graph_editor = editor
-        self.current_open_view   = container
+        self.current_open_view = container
         self.current_open_entity = None
 
 

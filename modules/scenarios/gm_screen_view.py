@@ -12,8 +12,7 @@ from modules.helpers.template_loader import load_template as load_entity_templat
 from modules.helpers.text_helpers import format_multiline_text
 from customtkinter import CTkLabel, CTkImage
 from modules.generic.entity_detail_factory import create_entity_detail_frame
-from modules.npcs.npc_graph_editor import NPCGraphEditor
-from modules.pcs.pc_graph_editor import PCGraphEditor
+from modules.characters.character_graph_editor import CharacterGraphEditor
 from modules.scenarios.scenario_graph_editor import ScenarioGraphEditor
 from modules.generic.generic_list_selection_view import GenericListSelectionView
 from modules.helpers.config_helper import ConfigHelper
@@ -200,8 +199,7 @@ class GMScreenView(ctk.CTkFrame):
             "Puzzles",
             "Puzzle Display",
             "Note Tab",
-            "NPC Graph",
-            "PC Graph",
+            "Character Graph",
             "Scenario Graph Editor",
             "separator",
             ("Save Layout", self._prompt_save_layout),
@@ -1410,26 +1408,16 @@ class GMScreenView(ctk.CTkFrame):
                 content_factory=lambda master, initial_text=text: self.create_note_frame(master=master, initial_text=initial_text),
                 layout_meta={"kind": "note"},
             )
-        elif kind == "npc_graph":
+        elif kind in ("npc_graph", "pc_graph", "character_graph"):
             # Ensure rich host exists for graph editors
             if getattr(self, "_rich_host", None) is None or not self._rich_host.winfo_exists():
                 self._rich_host = ctk.CTkFrame(self)
             parent = self._rich_host
             self.add_tab(
-                title or "NPC Graph",
-                self.create_npc_graph_frame(master=parent),
-                content_factory=lambda master=parent: self.create_npc_graph_frame(master),
-                layout_meta={"kind": "npc_graph", "host": "rich"},
-            )
-        elif kind == "pc_graph":
-            if getattr(self, "_rich_host", None) is None or not self._rich_host.winfo_exists():
-                self._rich_host = ctk.CTkFrame(self)
-            parent = self._rich_host
-            self.add_tab(
-                title or "PC Graph",
-                self.create_pc_graph_frame(master=parent),
-                content_factory=lambda master=parent: self.create_pc_graph_frame(master),
-                layout_meta={"kind": "pc_graph", "host": "rich"},
+                title or "Character Graph",
+                self.create_character_graph_frame(master=parent),
+                content_factory=lambda master=parent: self.create_character_graph_frame(master),
+                layout_meta={"kind": "character_graph", "host": "rich"},
             )
         elif kind == "scenario_graph":
             if getattr(self, "_rich_host", None) is None or not self._rich_host.winfo_exists():
@@ -2253,27 +2241,15 @@ class GMScreenView(ctk.CTkFrame):
         elif entity_type == "Plot Twists":
             self.open_plot_twist_popup()
             return
-        elif entity_type == "NPC Graph":
+        elif entity_type == "Character Graph":
             if getattr(self, "_rich_host", None) is None or not self._rich_host.winfo_exists():
                 self._rich_host = ctk.CTkFrame(self)
             host_parent = self._rich_host
             self.add_tab(
-                "NPC Graph",
-                self.create_npc_graph_frame(master=host_parent),
-                content_factory=lambda master=host_parent: self.create_npc_graph_frame(master),
-                layout_meta={"kind": "npc_graph", "host": "rich"}
-            )
-
-            return
-        elif entity_type == "PC Graph":
-            if getattr(self, "_rich_host", None) is None or not self._rich_host.winfo_exists():
-                self._rich_host = ctk.CTkFrame(self)
-            host_parent = self._rich_host
-            self.add_tab(
-                "PC Graph",
-                self.create_pc_graph_frame(master=host_parent),
-                content_factory=lambda master=host_parent: self.create_pc_graph_frame(master),
-                layout_meta={"kind": "pc_graph", "host": "rich"}
+                "Character Graph",
+                self.create_character_graph_frame(master=host_parent),
+                content_factory=lambda master=host_parent: self.create_character_graph_frame(master),
+                layout_meta={"kind": "character_graph", "host": "rich"}
             )
 
             return
@@ -2504,21 +2480,16 @@ class GMScreenView(ctk.CTkFrame):
             file.write(content)
         messagebox.showinfo("Saved", f"Note saved to {file_path}")
     
-    def create_npc_graph_frame(self, master=None):
+    def create_character_graph_frame(self, master=None):
         if master is None:
             master = self.content_area
         frame = ctk.CTkFrame(master)
-        graph_editor = NPCGraphEditor(frame, self.wrappers["NPCs"], self.wrappers["Factions"])
-        graph_editor.pack(fill="both", expand=True)
-        frame.graph_editor = graph_editor  # Save a reference for state management
-        
-        return frame
-    
-    def create_pc_graph_frame(self, master=None):
-        if master is None:
-            master = self.content_area
-        frame = ctk.CTkFrame(master)
-        graph_editor = PCGraphEditor(frame, self.wrappers["PCs"], self.wrappers["Factions"])
+        graph_editor = CharacterGraphEditor(
+            frame,
+            self.wrappers["NPCs"],
+            self.wrappers["PCs"],
+            self.wrappers["Factions"],
+        )
         graph_editor.pack(fill="both", expand=True)
         frame.graph_editor = graph_editor  # Save a reference for state management
         return frame

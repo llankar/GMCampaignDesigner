@@ -392,8 +392,7 @@ def screenshot_app_views():
             pass
 
     for key, fn in [
-        ("npc_graph", app.open_npc_graph_editor),
-        ("pc_graph", app.open_pc_graph_editor),
+        ("character_graph", app.open_character_graph_editor),
         ("faction_graph", app.open_faction_graph_editor),
         ("scenario_graph", app.open_scenario_graph_editor),
     ]:
@@ -833,7 +832,7 @@ def build_html(api_data, menu_data, shots):
             used.update(entity_keys)
 
         add_group("Detail & Editor Windows", ["scenario_detail", "scenario_editor", "custom_fields_editor"])
-        add_group("Graph Editors", ["npc_graph", "pc_graph", "faction_graph", "scenario_graph"])
+        add_group("Graph Editors", ["character_graph", "faction_graph", "scenario_graph"])
         add_group("GM & Scenario Tools", ["gm_screen", "scenario_generator", "scenario_importer"])
         add_group("Map Tools", ["map_tool_selector", "map_tool_map1", "map_tool_map2", "map_tool_rectangle", "map_tool_oval"])
         add_group("Whiteboard", ["whiteboard"])
@@ -974,7 +973,7 @@ def build_user_manual(shots, menu_data, py_files):
 
     entity_menu = collect_items(lambda mod: 'generic/generic_list_view.py' in mod.replace('\\', '/'))
     graph_menu_all = collect_items(lambda mod: any(s in mod.replace('\\', '/') for s in [
-        'npcs/npc_graph_editor.py', 'pcs/pc_graph_editor.py', 'factions/faction_graph_editor.py', 'scenarios/scenario_graph_editor.py'
+        'characters/character_graph_editor.py', 'factions/faction_graph_editor.py', 'scenarios/scenario_graph_editor.py'
     ]))
     map_menu_all = collect_items(lambda mod: 'maps/controllers/display_map_controller.py' in mod.replace('\\', '/'))
     clues_menu = collect_items(lambda mod: 'web/templates/clues.html' in mod.replace('\\', '/'))
@@ -1111,7 +1110,7 @@ def build_user_manual(shots, menu_data, py_files):
         ge_link_html = "<li><b>Arrow Mode submenu:</b> " + ', '.join(arrow_items) + "</li>"
     ge_shape_html = ''.join(f"<li>{i}</li>" for i in shape_items_graph) if shape_items_graph else ''
     parts.append(section('Graph Editors',
-        "<p>Visual editors for NPCs, PCs, Factions, and Scenarios let you map relationships and story beats.</p>"
+        "<p>Visual editors for Characters, Factions, and Scenarios let you map relationships and story beats.</p>"
         "<ul>"
         "<li><b>Add nodes:</b> Use the toolbar actions or double-click (where available) to create a node.</li>"
         "<li><b>Drag to arrange:</b> Left-click and drag nodes to reposition; mouse wheel zooms the canvas.</li>"
@@ -1120,7 +1119,7 @@ def build_user_manual(shots, menu_data, py_files):
         + ("<p><b>Right-click a node for:</b></p><ul>" + ge_node_html + "</ul>" if ge_node_html else "")
         + ("<p><b>Right-click a link for:</b></p><ul>" + ge_link_html + "</ul>" if ge_link_html else "")
         + ("<p><b>Right-click a shape for:</b></p><ul>" + ge_shape_html + "</ul>" if ge_shape_html else "")
-        + img('npc_graph', 'NPC Graph') + img('pc_graph', 'PC Graph')
+        + img('character_graph', 'Character Graph')
         + img('faction_graph', 'Faction Graph') + img('scenario_graph', 'Scenario Graph')
     ))
 
@@ -1260,6 +1259,3 @@ def build_user_manual(shots, menu_data, py_files):
 
 if __name__ == "__main__":
     main()
-
-
-
