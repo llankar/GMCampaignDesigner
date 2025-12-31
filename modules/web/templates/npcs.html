@@ -49,26 +49,35 @@
         <div id="popupContent"></div>
     </div>
     <script>
-        fetch('/api/npc-graph?graph={{ selected_graph }}')
+        fetch('/api/character-graph?graph={{ selected_graph }}')
             .then(response => response.json())
             .then(data => {
-                const nodes = data.nodes.map((node, idx) => ({
+                const nodes = data.nodes.map((node) => ({
                     data: {
-                        id: 'node' + idx,
-                        label: node.npc_name,
+                        id: node.tag,
+                        label: node.entity_name,
+                        type: node.entity_type,
                         color: node.color,
                         portrait: node.portrait,
                         background: node.background
                     },
                     position: { x: node.x, y: node.y }
                 }));
-                const edges = data.links.map(link => ({
-                    data: {
-                        source: nodes.find(n => n.data.label === link.npc_name1).data.id,
-                        target: nodes.find(n => n.data.label === link.npc_name2).data.id,
-                        label: link.text
+                const nodeByTag = new Map(nodes.map(n => [n.data.id, n]));
+                const edges = data.links.map(link => {
+                    const sourceNode = nodeByTag.get(link.node1_tag);
+                    const targetNode = nodeByTag.get(link.node2_tag);
+                    if (!sourceNode || !targetNode) {
+                        return null;
                     }
-                }));
+                    return {
+                        data: {
+                            source: sourceNode.data.id,
+                            target: targetNode.data.id,
+                            label: link.text || ''
+                        }
+                    };
+                }).filter(Boolean);
                 const cy = cytoscape({
                     container: document.getElementById('cy'),
                     elements: { nodes, edges },
@@ -113,10 +122,11 @@
                 cy.on('tap', 'node', evt => {
                     const node = evt.target;
                     const label = node.data('label');
+                    const type = node.data('type') ? node.data('type').toUpperCase() : '';
                     const bkg = node.data('background') || "(No background)";
                     const popup = document.getElementById('npcPopup');
                     document.getElementById('popupContent').innerHTML =
-                        `<strong>${label}</strong><br><br>${bkg}`;
+                        `<strong>${type ? type + ': ' : ''}${label}</strong><br><br>${bkg}`;
                     const pos = evt.renderedPosition || node.renderedPosition();
                     popup.style.left = (pos.x + 20) + 'px';
                     popup.style.top = (pos.y + 80) + 'px';

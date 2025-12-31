@@ -247,6 +247,8 @@ app.register_blueprint(journal_bp)
 CURRENT_DIR    = os.path.dirname(__file__)
 BASE_DIR       = os.path.dirname(DB_PATH)
 GRAPH_DIR      = os.path.join(BASE_DIR, "assets", "graphs")
+CHARACTER_GRAPH_DIR = os.path.join(BASE_DIR, "graphs")
+DEFAULT_CHARACTER_GRAPH = "character_graph.json"
 PORTRAITS_DIR  = os.path.join(BASE_DIR, "assets", "portraits")
 FALLBACK_PORTRAIT = "/assets/images/fallback.png"
 UPLOAD_FOLDER  = os.path.join(BASE_DIR, "assets", "uploads")
@@ -343,11 +345,16 @@ def save_positions(positions):
 # ──────────────────────────────────────────────────────────────────────────────
 def get_graph_list():
     try:
-        files = [f for f in os.listdir(GRAPH_DIR+"/npcs/") if f.lower().endswith(".json")]
-        logging.debug("Found graph files: %s", files)
+        if not os.path.isdir(CHARACTER_GRAPH_DIR):
+            return []
+        files = [
+            f for f in os.listdir(CHARACTER_GRAPH_DIR)
+            if f.lower().endswith(".json") and "character" in f.lower()
+        ]
+        logging.debug("Found character graph files: %s", files)
         return files
     except Exception as e:
-        logging.error("Error listing graph files: %s", e)
+        logging.error("Error listing character graph files: %s", e)
         return []
 
 def get_portrait_mapping():
@@ -363,6 +370,102 @@ def get_portrait_mapping():
     except Exception as e:
         logging.error("Error loading NPCs: %s", e)
     return mapping
+
+def get_character_record_maps():
+    records = {"npc": {}, "pc": {}}
+    try:
+        npc_wrapper = GenericModelWrapper("npcs")
+        records["npc"] = {
+            npc.get("Name", "").strip(): npc for npc in npc_wrapper.load_items()
+        }
+    except Exception as e:
+        logging.error("Error loading NPCs: %s", e)
+    try:
+        pc_wrapper = GenericModelWrapper("pcs")
+        records["pc"] = {
+            pc.get("Name", "").strip(): pc for pc in pc_wrapper.load_items()
+        }
+    except Exception as e:
+        logging.error("Error loading PCs: %s", e)
+    return records
+
+def normalize_character_graph(graph_data):
+    if not isinstance(graph_data, dict):
+        return {"nodes": [], "links": []}
+    graph_data.setdefault("nodes", [])
+    graph_data.setdefault("links", [])
+    seen = set()
+    for node in graph_data["nodes"]:
+        if "entity_type" not in node or "entity_name" not in node:
+            if "npc_name" in node:
+                node["entity_type"] = "npc"
+                node["entity_name"] = node.pop("npc_name")
+            elif "pc_name" in node:
+                node["entity_type"] = "pc"
+                node["entity_name"] = node.pop("pc_name")
+        entity_type = node.get("entity_type", "npc")
+        entity_name = node.get("entity_name", "").strip()
+        base = f"{entity_type}_{entity_name.replace(' ', '_')}"
+        tag = node.get("tag", base)
+        if tag in seen:
+            i = 1
+            while f"{base}_{i}" in seen:
+                i += 1
+            tag = f"{base}_{i}"
+        node["tag"] = tag
+        node.setdefault("color", "#1D3572")
+        seen.add(tag)
+    for link in graph_data["links"]:
+        if "node1_tag" not in link or "node2_tag" not in link:
+            if "npc_name1" in link and "npc_name2" in link:
+                link["node1_tag"] = f"npc_{link['npc_name1'].replace(' ', '_')}"
+                link["node2_tag"] = f"npc_{link['npc_name2'].replace(' ', '_')}"
+                link.pop("npc_name1", None)
+                link.pop("npc_name2", None)
+            elif "pc_name1" in link and "pc_name2" in link:
+                link["node1_tag"] = f"pc_{link['pc_name1'].replace(' ', '_')}"
+                link["node2_tag"] = f"pc_{link['pc_name2'].replace(' ', '_')}"
+                link.pop("pc_name1", None)
+                link.pop("pc_name2", None)
+        link.setdefault("arrow_mode", "both")
+    return graph_data
+
+def load_character_graph(graph_file=None):
+    os.makedirs(CHARACTER_GRAPH_DIR, exist_ok=True)
+    safe_name = secure_filename(graph_file or DEFAULT_CHARACTER_GRAPH)
+    if not safe_name:
+        safe_name = DEFAULT_CHARACTER_GRAPH
+    path = os.path.join(CHARACTER_GRAPH_DIR, safe_name)
+    if not os.path.exists(path):
+        return None, path
+    with open(path, encoding="utf-8") as f:
+        data = json.load(f)
+    return normalize_character_graph(data), path
+
+def build_character_graph_payload(graph_data):
+    record_maps = get_character_record_maps()
+    for node in graph_data.get("nodes", []):
+        entity_type = node.get("entity_type", "npc")
+        entity_name = node.get("entity_name", "").strip()
+        record = record_maps.get(entity_type, {}).get(entity_name)
+        portrait_src = ""
+        if record:
+            portrait_src = primary_portrait(record.get("Portrait", "")).strip()
+        if portrait_src:
+            node["portrait"] = f"/portraits/{os.path.basename(portrait_src)}"
+        else:
+            node["portrait"] = FALLBACK_PORTRAIT
+        background_text = ""
+        if record:
+            for key in ("Background", "Description", "Notes", "Backstory"):
+                value = record.get(key)
+                if value:
+                    background_text = value
+                    break
+        node["background"] = (
+            format_multiline_text(background_text) if background_text else "(No background)"
+        )
+    return graph_data
 
 def get_places_list():
     try:
@@ -494,26 +597,18 @@ def add_clue_link():
 @app.route('/api/npc-graph')
 def npc_graph():
     graph_file = request.args.get("graph")
-    if not graph_file:
-        return jsonify(error="No graph specified"), 400
-    path = os.path.join(GRAPH_DIR+"/npcs/", graph_file)
-    if not os.path.exists(path):
+    graph_data, path = load_character_graph(graph_file)
+    if not graph_data:
         return jsonify(error="Graph file not found"), 404
-    with open(path, encoding='utf-8') as f:
-        data = json.load(f)
-    portrait_map = get_portrait_mapping()
-    npcs = []
-    try:
-        npcs = GenericModelWrapper("npcs").load_items()
-    except:
-        pass
-    for node in data.get("nodes", []):
-        name = node.get("npc_name","")
-        src = portrait_map.get(name,"").strip()
-        node["portrait"] = os.path.basename(src) if src else FALLBACK_PORTRAIT
-        match = next((n for n in npcs if n.get("Name","").strip() == name), None)
-        node["background"] = format_multiline_text(match.get("Background","")) if match else "(No background)"
-    return jsonify(data)
+    return jsonify(build_character_graph_payload(graph_data))
+
+@app.route('/api/character-graph')
+def character_graph():
+    graph_file = request.args.get("graph")
+    graph_data, path = load_character_graph(graph_file)
+    if not graph_data:
+        return jsonify(error="Graph file not found"), 404
+    return jsonify(build_character_graph_payload(graph_data))
 
 @app.route('/api/clue-positions', methods=['GET'])
 def get_clue_positions():
