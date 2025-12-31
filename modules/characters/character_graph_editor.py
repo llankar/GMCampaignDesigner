@@ -622,7 +622,7 @@ class CharacterGraphEditor(ctk.CTkFrame):
         tab_id = self.tab_id_by_name.get(selected_name)
         if tab_id:
             set_active_tab(self.graph, tab_id)
-            self.draw_graph()
+        self.draw_graph()
 
     def open_manage_tabs(self):
         ManageGraphTabsDialog(self, self.graph, on_update=self._on_tabs_updated)
