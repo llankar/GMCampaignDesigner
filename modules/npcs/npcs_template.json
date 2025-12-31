@@ -60,7 +60,7 @@
     },
     {
       "name": "Links",
-      "type": "list_longtext"
+      "type": "links"
     },
     {
       "name": "Portrait",
