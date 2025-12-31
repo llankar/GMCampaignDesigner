@@ -1750,8 +1750,24 @@ class CharacterGraphEditor(ctk.CTkFrame):
 
     def _get_visible_graph_data(self):
         ensure_graph_tabs(self.graph)
+        self._sync_active_tab_selection()
         active_tab = get_active_tab(self.graph)
         return filter_graph_for_tab(self.graph, active_tab)
+
+    def _sync_active_tab_selection(self):
+        if not self.tab_selector_var:
+            return
+        selected_name = (self.tab_selector_var.get() or "").strip()
+        if not selected_name:
+            return
+        tab_id = self.tab_id_by_name.get(selected_name)
+        if not tab_id:
+            for tab in self.graph.get("tabs", []):
+                if tab.get("name") == selected_name:
+                    tab_id = tab.get("id")
+                    break
+        if tab_id:
+            set_active_tab(self.graph, tab_id)
 
     def draw_graph(self):
         #self.canvas.delete("shape")
