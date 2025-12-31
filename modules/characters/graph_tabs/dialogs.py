@@ -21,6 +21,7 @@ class ManageGraphTabsDialog(ctk.CTkToplevel):
 
         self.tab_list = tk.Listbox(container, height=12)
         self.tab_list.pack(fill="both", expand=True, padx=8, pady=8)
+        self.tab_list.bind("<<ListboxSelect>>", self._on_tab_selected)
 
         button_row = ctk.CTkFrame(container)
         button_row.pack(fill="x", padx=8, pady=(0, 8))
@@ -50,6 +51,16 @@ class ManageGraphTabsDialog(ctk.CTkToplevel):
     def _selected_index(self):
         selection = self.tab_list.curselection()
         return selection[0] if selection else None
+
+    def _on_tab_selected(self, _event=None):
+        tab = self._selected_tab()
+        if not tab:
+            return
+        if self.graph.get("active_tab_id") == tab.get("id"):
+            return
+        set_active_tab(self.graph, tab.get("id"))
+        self._refresh_list()
+        self.on_update()
 
     def _selected_tab(self):
         idx = self._selected_index()
