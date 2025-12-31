@@ -1475,6 +1475,8 @@ class GenericListView(ctk.CTkFrame):
         return ctk_image
 
     def _edit_item(self, item):
+        key_field = self.unique_field or self.model_wrapper._infer_key_field()
+        original_key_value = item.get(key_field)
         editor_cls = _lazy_editor_window()
         editor = editor_cls(
             self.master,
@@ -1488,8 +1490,6 @@ class GenericListView(ctk.CTkFrame):
             # Persist only the edited record so filtering does not risk
             # overwriting/deleting the rest of the table.
             try:
-                key_field = self.unique_field or self.model_wrapper._infer_key_field()
-                original_key_value = item.get(key_field)
                 self.model_wrapper.save_item(
                     editor.item,
                     key_field=key_field,

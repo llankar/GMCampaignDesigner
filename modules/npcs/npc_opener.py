@@ -27,6 +27,9 @@ def open_npc_editor_window(npc_name):
     # 3. Import GenericEditorWindow locally to avoid circular imports
     
 
+    key_field = npc_wrapper._infer_key_field()
+    original_key_value = npc_item.get(key_field)
+
     # 4. Create the editor window
     #    GenericEditorWindow is itself a Toplevel, so we can pass None or any master.
     editor_window = GenericEditorWindow(None, npc_item, npc_template, npc_wrapper)
@@ -38,8 +41,6 @@ def open_npc_editor_window(npc_name):
     editor_window.wait_window()
 
     if getattr(editor_window, "saved", False):
-        key_field = npc_wrapper._infer_key_field()
-        original_key_value = npc_item.get(key_field)
         npc_wrapper.save_item(
             editor_window.item,
             key_field=key_field,
