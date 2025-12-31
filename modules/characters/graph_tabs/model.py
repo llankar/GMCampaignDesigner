@@ -65,6 +65,8 @@ def filter_graph_for_tab(graph: Dict, tab: Dict) -> Tuple[List[Dict], List[Dict]
     node_tags = set(subset.get("node_tags") or [])
     entity_types = {t for t in subset.get("entity_types") or [] if t}
     search = (subset.get("search") or "").strip().lower()
+    if not node_tags and not entity_types and not search:
+        return [], []
 
     filtered_nodes = []
     for node in nodes:

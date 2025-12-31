@@ -184,6 +184,18 @@ class CharacterGraphEditor(ctk.CTkFrame):
     def _get_node_by_tag(self, tag):
         return next((node for node in self.graph["nodes"] if node.get("tag") == tag), None)
 
+    def _add_node_to_active_tab(self, tag):
+        active_tab = get_active_tab(self.graph)
+        subset = active_tab.get("subsetDefinition") or {}
+        if subset.get("mode") == "all":
+            return
+        node_tags = list(subset.get("node_tags") or [])
+        if tag not in node_tags:
+            node_tags.append(tag)
+        subset["mode"] = "subset"
+        subset["node_tags"] = node_tags
+        active_tab["subsetDefinition"] = subset
+
     def _get_entity_record(self, entity_type, entity_name):
         records = self.entity_records.get(entity_type, {})
         return records.get(entity_name)
@@ -776,6 +788,7 @@ class CharacterGraphEditor(ctk.CTkFrame):
             "y": y0,
         })
         self.node_positions[tag] = (x0, y0)
+        self._add_node_to_active_tab(tag)
 
         self.pending_entity = None
         self.canvas.unbind("<Button-1>")
@@ -845,6 +858,7 @@ class CharacterGraphEditor(ctk.CTkFrame):
                 })
                 # record its canvas position
                 self.node_positions[tag] = (x, y)
+                self._add_node_to_active_tab(tag)
 
             # ── 4) Restore drag handlers so these new nodes can be moved ───
             self.canvas.unbind("<Button-1>")
@@ -1036,6 +1050,18 @@ class CharacterGraphEditor(ctk.CTkFrame):
             return
 
         tag = self.selected_node
+        active_tab = get_active_tab(self.graph)
+        subset = active_tab.get("subsetDefinition") or {}
+        if subset.get("mode") != "all":
+            node_tags = list(subset.get("node_tags") or [])
+            if tag in node_tags:
+                node_tags.remove(tag)
+            subset["mode"] = "subset"
+            subset["node_tags"] = node_tags
+            active_tab["subsetDefinition"] = subset
+            self.selected_node = None
+            self.draw_graph()
+            return
         # 1) Remove all canvas items for this node (post-it, pin, portrait, text)
         self.canvas.delete(tag)
 
