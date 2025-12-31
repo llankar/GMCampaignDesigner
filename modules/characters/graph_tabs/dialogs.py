@@ -15,6 +15,9 @@ class ManageGraphTabsDialog(ctk.CTkToplevel):
 
         self.geometry("520x420")
         self.minsize(520, 420)
+        self.transient(master)
+        self.lift()
+        self.focus_force()
 
         container = ctk.CTkFrame(self)
         container.pack(fill="both", expand=True, padx=12, pady=12)
@@ -35,7 +38,6 @@ class ManageGraphTabsDialog(ctk.CTkToplevel):
         action_row = ctk.CTkFrame(container)
         action_row.pack(fill="x", padx=8, pady=(0, 8))
         ctk.CTkButton(action_row, text="Set Active", command=self._set_active).pack(side="left", padx=4)
-        ctk.CTkButton(action_row, text="Edit Subset", command=self._edit_subset).pack(side="left", padx=4)
         ctk.CTkButton(action_row, text="Close", command=self._close).pack(side="right", padx=4)
 
         self._refresh_list()
@@ -172,6 +174,9 @@ class GraphTabSubsetDialog(ctk.CTkToplevel):
 
         self.geometry("520x520")
         self.minsize(520, 520)
+        self.transient(master)
+        self.lift()
+        self.focus_force()
 
         container = ctk.CTkFrame(self)
         container.pack(fill="both", expand=True, padx=12, pady=12)
