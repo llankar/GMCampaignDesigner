@@ -83,7 +83,7 @@ class ManageGraphTabsDialog(ctk.CTkToplevel):
             return
         tab = build_default_tab()
         tab["name"] = self._unique_name(name.strip() or "Tab")
-        tab["subsetDefinition"] = {"mode": "all"}
+        tab["subsetDefinition"] = {"mode": "subset", "node_tags": []}
         self.graph.setdefault("tabs", []).append(tab)
         self.graph["active_tab_id"] = tab["id"]
         self._refresh_list()
