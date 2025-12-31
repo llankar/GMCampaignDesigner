@@ -13,8 +13,8 @@ class ManageGraphTabsDialog(ctk.CTkToplevel):
         self.on_update = on_update
         ensure_graph_tabs(self.graph)
 
-        self.geometry("520x420")
-        self.minsize(520, 420)
+        self.geometry("640x520")
+        self.minsize(640, 520)
         self.transient(master)
         self.lift()
         self.focus_force()

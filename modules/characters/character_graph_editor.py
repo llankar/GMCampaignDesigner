@@ -442,6 +442,7 @@ class CharacterGraphEditor(ctk.CTkFrame):
             shape["y"] = anchor_y + dy * scale_change
 
         self.draw_graph()
+        self._autosave_graph()
  # ─────────────────────────────────────────────────────────────────────────
     # FUNCTION: open_character_editor
     # Opens the Generic Editor Window for the clicked character.
@@ -553,8 +554,6 @@ class CharacterGraphEditor(ctk.CTkFrame):
         ctk.CTkButton(toolbar, text="Add PC", command=lambda: self.add_entity("pc")).pack(side="left", padx=5)
         ctk.CTkButton(toolbar, text="Add Faction", command=self.add_faction).pack(side="left", padx=5)
         ctk.CTkButton(toolbar, text="Add Link", command=self.start_link_creation).pack(side="left", padx=5)
-        ctk.CTkButton(toolbar, text="Save", command=self.save_graph).pack(side="left", padx=5)
-        ctk.CTkButton(toolbar, text="Load", command=self.load_graph).pack(side="left", padx=5)
 
         # 🆕 Add Shape Buttons
         ctk.CTkButton(toolbar, text="Add Rectangle", command=lambda: self.add_shape("rectangle")).pack(side="left", padx=5)
@@ -590,6 +589,7 @@ class CharacterGraphEditor(ctk.CTkFrame):
                 shape["x"], shape["y"] = x, y
 
         self.draw_graph()
+        self._autosave_graph()
 
     def _refresh_tab_selector(self):
         ensure_graph_tabs(self.graph)
@@ -623,6 +623,7 @@ class CharacterGraphEditor(ctk.CTkFrame):
         if tab_id:
             set_active_tab(self.graph, tab_id)
         self.draw_graph()
+        self._autosave_graph()
 
     def open_manage_tabs(self):
         ManageGraphTabsDialog(self, self.graph, on_update=self._on_tabs_updated)
@@ -630,6 +631,7 @@ class CharacterGraphEditor(ctk.CTkFrame):
     def _on_tabs_updated(self):
         self._refresh_tab_selector()
         self.draw_graph()
+        self._autosave_graph()
 
     # ─────────────────────────────────────────────────────────────────────────
     # FUNCTION: start_link_creation
@@ -711,6 +713,7 @@ class CharacterGraphEditor(ctk.CTkFrame):
             ):
                 self._persist_link_to_entities(existing)
                 self.draw_graph()
+                self._autosave_graph()
                 return
         new_link = {
             "node1_tag": tag1,
@@ -721,6 +724,7 @@ class CharacterGraphEditor(ctk.CTkFrame):
         self.graph["links"].append(new_link)
         self._persist_link_to_entities(new_link)
         self.draw_graph()
+        self._autosave_graph()
 
     # ─────────────────────────────────────────────────────────────────────────
     # FUNCTION: add_entity
@@ -794,6 +798,7 @@ class CharacterGraphEditor(ctk.CTkFrame):
         self.canvas.unbind("<Button-1>")
         self.canvas.bind("<Button-1>", self.start_drag)
         self.draw_graph()
+        self._autosave_graph()
 
     # ─────────────────────────────────────────────────────────────────────────
     # FUNCTION: add_faction
@@ -868,6 +873,7 @@ class CharacterGraphEditor(ctk.CTkFrame):
 
             # ── 5) Redraw everything (post-its, portraits, links, etc.) ────
             self.draw_graph()
+            self._autosave_graph()
 
         # ── 6) Instantiate the actual list view with your faction_wrapper ──
         view = GenericListSelectionView(
@@ -940,6 +946,7 @@ class CharacterGraphEditor(ctk.CTkFrame):
         if tag in self.shapes:
             del self.shapes[tag]
         self.graph["shapes"] = [s for s in self.graph["shapes"] if s["tag"] != tag]
+        self._autosave_graph()
     
 
     # ─────────────────────────────────────────────────────────────────────────
@@ -1040,6 +1047,7 @@ class CharacterGraphEditor(ctk.CTkFrame):
         if updated_link:
             self._persist_link_to_entities(updated_link)
         self.draw_graph()
+        self._autosave_graph()
 
     # ─────────────────────────────────────────────────────────────────────────
     # FUNCTION: delete_node
@@ -1061,6 +1069,7 @@ class CharacterGraphEditor(ctk.CTkFrame):
             active_tab["subsetDefinition"] = subset
             self.selected_node = None
             self.draw_graph()
+            self._autosave_graph()
             return
         # 1) Remove all canvas items for this node (post-it, pin, portrait, text)
         self.canvas.delete(tag)
@@ -1086,6 +1095,7 @@ class CharacterGraphEditor(ctk.CTkFrame):
 
         # 4) Redraw the rest of the graph
         self.draw_graph()
+        self._autosave_graph()
 
     def redraw_after_drag(self):
         self.draw_graph()
@@ -1479,11 +1489,14 @@ class CharacterGraphEditor(ctk.CTkFrame):
                 if node.get("tag") == self.selected_node:
                     node["color"] = color
                     break
+            self._autosave_graph()
+
     def change_shape_color(self, tag, color):
         self.canvas.itemconfig(tag, fill=color)
         shape = self.shapes.get(tag)
         if shape:
             shape["color"] = color
+            self._autosave_graph()
 
     def show_shape_menu(self, x, y, shape_tag):
         shape_menu = Menu(self.canvas, tearoff=0)
@@ -1521,6 +1534,7 @@ class CharacterGraphEditor(ctk.CTkFrame):
             shape["z"] = max_z + 1
             # Update the order in the graph's shapes list.
             self.graph["shapes"].sort(key=lambda s: s.get("z", 0))
+            self._autosave_graph()
 
     def send_to_back(self, tag=None):
         tag = tag or self.selected_shape
@@ -1533,6 +1547,7 @@ class CharacterGraphEditor(ctk.CTkFrame):
             self.canvas.tag_lower(tag)
         if self.canvas.find_withtag("link"):
             self.canvas.tag_lower(tag, "link")
+        self._autosave_graph()
 
     def activate_resize_mode(self, shape_tag):
         shape = self.shapes.get(shape_tag)
@@ -1613,6 +1628,7 @@ class CharacterGraphEditor(ctk.CTkFrame):
         self.resizing_shape_tag = None
         self.resize_start = None
         self.resize_center = None
+        self._autosave_graph()
 
     # ─────────────────────────────────────────────────────────────────────────
     # FUNCTION: distance_point_to_line
@@ -1655,6 +1671,7 @@ class CharacterGraphEditor(ctk.CTkFrame):
         self.graph["shapes"].append(shape)
         self.shapes[tag] = shape
         self.draw_shape(shape)
+        self._autosave_graph()
 
     def draw_shape(self, shape):
         scale = self.canvas_scale
@@ -1690,7 +1707,10 @@ class CharacterGraphEditor(ctk.CTkFrame):
             self.shapes[shape["tag"]] = shape
             self.draw_shape(shape)
 
-    def save_graph(self, path=None):
+    def _autosave_graph(self):
+        self.save_graph(show_message=False)
+
+    def save_graph(self, path=None, show_message=True):
         if not path:
             path = self.graph_path
         os.makedirs(os.path.dirname(path), exist_ok=True)
@@ -1727,7 +1747,8 @@ class CharacterGraphEditor(ctk.CTkFrame):
         except Exception as e:
             messagebox.showerror("Save Error", f"Could not save file:\n{e}")
             return
-        messagebox.showinfo("Saved", f"Graph saved to:\n{path}")
+        if show_message:
+            messagebox.showinfo("Saved", f"Graph saved to:\n{path}")
 
     def load_portrait_scaled(self, portrait_path, node_tag, scale=1.0):
         if portrait_path and not os.path.isabs(portrait_path):
@@ -1868,7 +1889,10 @@ class CharacterGraphEditor(ctk.CTkFrame):
         self.drag_start = (x, y)
 
     def end_drag(self, event):
+        did_drag = bool(self.selected_node or self.selected_shape)
         self.selected_node = None
         self.selected_shape = None
         self.selected_items = []
         self.drag_start = None
+        if did_drag:
+            self._autosave_graph()
