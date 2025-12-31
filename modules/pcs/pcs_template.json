@@ -8,6 +8,7 @@
       {"name": "Notes", "type": "longtext"},
       {"name": "Factions", "type": "list", "linked_type": "Factions"},
       {"name": "Objects", "type": "list", "linked_type": "Objects"},
+      {"name": "Links", "type": "list_longtext"},
       {"name": "Portrait", "type": "text"},
       {"name": "Audio", "type": "audio"}
   ]
