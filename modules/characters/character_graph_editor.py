@@ -184,6 +184,199 @@ class CharacterGraphEditor(ctk.CTkFrame):
             item["Name"]: item for item in wrapper.load_items()
         }
 
+    def _entity_type_to_table(self, entity_type):
+        if entity_type == "npc":
+            return "npcs"
+        if entity_type == "pc":
+            return "pcs"
+        return None
+
+    def _load_entity_wrapper(self, entity_type):
+        table = self._entity_type_to_table(entity_type)
+        if not table:
+            return None
+        return GenericModelWrapper(table)
+
+    def _load_entity_record_from_db(self, entity_type, entity_name):
+        wrapper = self._load_entity_wrapper(entity_type)
+        if not wrapper:
+            return None
+        return wrapper.load_item_by_key(entity_name)
+
+    def _save_entity_record(self, entity_type, record):
+        wrapper = self._load_entity_wrapper(entity_type)
+        if not wrapper:
+            return
+        wrapper.save_item(record)
+        if isinstance(record, dict):
+            name = record.get("Name")
+            if name:
+                self.entity_records.setdefault(entity_type, {})[name] = record
+
+    def _get_node_entity_info(self, tag):
+        node = self._get_node_by_tag(tag)
+        if not node:
+            return None
+        entity_type = node.get("entity_type")
+        entity_name = node.get("entity_name")
+        if not entity_type or not entity_name:
+            return None
+        return entity_type, entity_name
+
+    def _normalize_links_list(self, record):
+        if not isinstance(record, dict):
+            return []
+        links = record.get("Links")
+        if isinstance(links, list):
+            return links
+        return []
+
+    def _upsert_link_entry(self, record, target_type, target_name, label, arrow_mode):
+        if not isinstance(record, dict):
+            return False
+        links = self._normalize_links_list(record)
+        for link in links:
+            if not isinstance(link, dict):
+                continue
+            if (
+                link.get("target_type") == target_type
+                and link.get("target_name") == target_name
+                and link.get("label") == label
+            ):
+                if arrow_mode and link.get("arrow_mode") != arrow_mode:
+                    link["arrow_mode"] = arrow_mode
+                    record["Links"] = links
+                    return True
+                record["Links"] = links
+                return False
+        links.append({
+            "target_type": target_type,
+            "target_name": target_name,
+            "label": label,
+            "arrow_mode": arrow_mode or "both",
+        })
+        record["Links"] = links
+        return True
+
+    def _remove_link_entry(self, record, target_type, target_name, label):
+        if not isinstance(record, dict):
+            return False
+        links = self._normalize_links_list(record)
+        if not links:
+            return False
+        new_links = []
+        removed = False
+        for link in links:
+            if not isinstance(link, dict):
+                new_links.append(link)
+                continue
+            if (
+                link.get("target_type") == target_type
+                and link.get("target_name") == target_name
+                and link.get("label") == label
+            ):
+                removed = True
+                continue
+            new_links.append(link)
+        if removed:
+            record["Links"] = new_links
+        return removed
+
+    def _persist_link_to_entities(self, link):
+        node1 = self._get_node_entity_info(link.get("node1_tag"))
+        node2 = self._get_node_entity_info(link.get("node2_tag"))
+        if not node1 or not node2:
+            return
+        entity_type1, entity_name1 = node1
+        entity_type2, entity_name2 = node2
+        label = link.get("text") or ""
+        arrow_mode = link.get("arrow_mode") or "both"
+        record1 = self._load_entity_record_from_db(entity_type1, entity_name1)
+        if record1:
+            changed = self._upsert_link_entry(
+                record1,
+                entity_type2,
+                entity_name2,
+                label,
+                arrow_mode,
+            )
+            if changed:
+                self._save_entity_record(entity_type1, record1)
+        record2 = self._load_entity_record_from_db(entity_type2, entity_name2)
+        if record2:
+            changed = self._upsert_link_entry(
+                record2,
+                entity_type1,
+                entity_name1,
+                label,
+                arrow_mode,
+            )
+            if changed:
+                self._save_entity_record(entity_type2, record2)
+
+    def _remove_link_from_entities(self, link):
+        node1 = self._get_node_entity_info(link.get("node1_tag"))
+        node2 = self._get_node_entity_info(link.get("node2_tag"))
+        if not node1 or not node2:
+            return
+        entity_type1, entity_name1 = node1
+        entity_type2, entity_name2 = node2
+        label = link.get("text") or ""
+        record1 = self._load_entity_record_from_db(entity_type1, entity_name1)
+        if record1:
+            removed = self._remove_link_entry(
+                record1,
+                entity_type2,
+                entity_name2,
+                label,
+            )
+            if removed:
+                self._save_entity_record(entity_type1, record1)
+        record2 = self._load_entity_record_from_db(entity_type2, entity_name2)
+        if record2:
+            removed = self._remove_link_entry(
+                record2,
+                entity_type1,
+                entity_name1,
+                label,
+            )
+            if removed:
+                self._save_entity_record(entity_type2, record2)
+
+    def _rebuild_links_from_entities(self):
+        tag_lookup = {
+            (node.get("entity_type"), node.get("entity_name")): node.get("tag")
+            for node in self.graph.get("nodes", [])
+        }
+        rebuilt_links = []
+        seen = set()
+        for (entity_type, entity_name), tag in tag_lookup.items():
+            if not tag:
+                continue
+            record = self._get_entity_record(entity_type, entity_name)
+            if not record:
+                continue
+            for link in self._normalize_links_list(record):
+                if not isinstance(link, dict):
+                    continue
+                target_type = link.get("target_type")
+                target_name = link.get("target_name")
+                label = link.get("label") or ""
+                target_tag = tag_lookup.get((target_type, target_name))
+                if not target_tag:
+                    continue
+                link_key = tuple(sorted((tag, target_tag))) + (label,)
+                if link_key in seen:
+                    continue
+                seen.add(link_key)
+                rebuilt_links.append({
+                    "node1_tag": tag,
+                    "node2_tag": target_tag,
+                    "text": label,
+                    "arrow_mode": link.get("arrow_mode") or "both",
+                })
+        self.graph["links"] = rebuilt_links
+
     def _get_entity_opener(self, entity_type):
         if entity_type == "pc":
             return pc_opener.open_pc_editor_window
@@ -432,12 +625,25 @@ class CharacterGraphEditor(ctk.CTkFrame):
         if tag1 not in self.node_positions or tag2 not in self.node_positions:
             messagebox.showerror("Error", "One or both characters not found.")
             return
-        self.graph["links"].append({
+        for existing in self.graph["links"]:
+            if (
+                existing.get("text") == link_text
+                and (
+                    (existing.get("node1_tag") == tag1 and existing.get("node2_tag") == tag2)
+                    or (existing.get("node1_tag") == tag2 and existing.get("node2_tag") == tag1)
+                )
+            ):
+                self._persist_link_to_entities(existing)
+                self.draw_graph()
+                return
+        new_link = {
             "node1_tag": tag1,
             "node2_tag": tag2,
             "text": link_text,
             "arrow_mode": "both"  # Options: "none", "start", "end", "both"
-        })
+        }
+        self.graph["links"].append(new_link)
+        self._persist_link_to_entities(new_link)
         self.draw_graph()
 
     # ─────────────────────────────────────────────────────────────────────────
@@ -744,13 +950,17 @@ class CharacterGraphEditor(ctk.CTkFrame):
     def set_arrow_mode(self, new_mode):
         if not self.selected_link:
             return
+        updated_link = None
         for link in self.graph["links"]:
             if (
                 link.get("node1_tag") == self.selected_link.get("node1_tag")
                 and link.get("node2_tag") == self.selected_link.get("node2_tag")
             ):
                 link["arrow_mode"] = new_mode
+                updated_link = link
                 break
+        if updated_link:
+            self._persist_link_to_entities(updated_link)
         self.draw_graph()
 
     # ─────────────────────────────────────────────────────────────────────────
@@ -770,6 +980,12 @@ class CharacterGraphEditor(ctk.CTkFrame):
             n for n in self.graph["nodes"]
             if n.get("tag") != tag
         ]
+        links_to_remove = [
+            l for l in self.graph["links"]
+            if tag in (l.get("node1_tag"), l.get("node2_tag"))
+        ]
+        for link in links_to_remove:
+            self._remove_link_from_entities(link)
         self.graph["links"] = [
             l for l in self.graph["links"]
             if tag not in (l.get("node1_tag"), l.get("node2_tag"))
@@ -1130,6 +1346,12 @@ class CharacterGraphEditor(ctk.CTkFrame):
                     link.pop("pc_name1", None)
                     link.pop("pc_name2", None)
             link.setdefault("arrow_mode", "both")
+
+        self._refresh_entity_records("npc")
+        self._refresh_entity_records("pc")
+        for link in list(self.graph.get("links", [])):
+            self._persist_link_to_entities(link)
+        self._rebuild_links_from_entities()
 
         # ── 5) Rebuild shapes dict & counter ─────────────────────────────────────
         shapes_sorted = sorted(self.graph["shapes"], key=lambda s: s.get("z", 0))
