@@ -961,9 +961,9 @@ class CharacterGraphEditor(ctk.CTkFrame):
             return
 
         tags = self.canvas.gettags(item[0])
-        if "link" in tags:
-            self.show_link_menu(int(x), int(y))
+        if "link" in tags or "link_text" in tags or "arrowhead" in tags:
             self.selected_link = self.get_link_by_position(x, y)
+            self.show_link_menu(int(x), int(y))
         elif any(self._is_node_tag(tag) for tag in tags):
             self.selected_node = self._extract_node_tag(tags)
             self.show_node_menu(x, y)
@@ -999,6 +999,8 @@ class CharacterGraphEditor(ctk.CTkFrame):
         arrow_submenu.add_command(label="Arrow at End", command=lambda: self.set_arrow_mode("end"))
         arrow_submenu.add_command(label="Arrows at Both Ends", command=lambda: self.set_arrow_mode("both"))
         link_menu.add_cascade(label="Arrow Mode", menu=arrow_submenu)
+        link_menu.add_separator()
+        link_menu.add_command(label="Delete Link", command=self.delete_link)
         link_menu.post(x, y)
 
     # ─────────────────────────────────────────────────────────────────────────
@@ -1048,6 +1050,26 @@ class CharacterGraphEditor(ctk.CTkFrame):
             self._persist_link_to_entities(updated_link)
         self.draw_graph()
         self._autosave_graph()
+
+    def delete_link(self):
+        if not self.selected_link:
+            return
+        link_to_remove = self.selected_link
+        self._remove_link_from_entities(link_to_remove)
+        self.graph["links"] = [
+            link for link in self.graph["links"]
+            if not self._link_matches(link, link_to_remove)
+        ]
+        self.selected_link = None
+        self.draw_graph()
+        self._autosave_graph()
+
+    def _link_matches(self, link, other):
+        if not isinstance(link, dict) or not isinstance(other, dict):
+            return False
+        link_nodes = {link.get("node1_tag"), link.get("node2_tag")}
+        other_nodes = {other.get("node1_tag"), other.get("node2_tag")}
+        return link_nodes == other_nodes and link.get("text") == other.get("text")
 
     # ─────────────────────────────────────────────────────────────────────────
     # FUNCTION: delete_node
