@@ -1489,7 +1489,12 @@ class GenericListView(ctk.CTkFrame):
             # overwriting/deleting the rest of the table.
             try:
                 key_field = self.unique_field or self.model_wrapper._infer_key_field()
-                self.model_wrapper.save_item(editor.item, key_field=key_field)
+                original_key_value = item.get(key_field)
+                self.model_wrapper.save_item(
+                    editor.item,
+                    key_field=key_field,
+                    original_key_value=original_key_value,
+                )
             except Exception as exc:
                 messagebox.showerror("Save Error", f"Failed to save changes: {exc}")
                 return

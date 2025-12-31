@@ -162,7 +162,7 @@ class GenericModelWrapper:
         finally:
             conn.close()
 
-    def save_item(self, item, *, key_field=None):
+    def save_item(self, item, *, key_field=None, original_key_value=None):
         if not isinstance(item, dict):
             raise TypeError("item must be a dictionary")
 
@@ -173,6 +173,7 @@ class GenericModelWrapper:
         try:
             existing_columns = self._ensure_schema(cursor, [item])
             key_field = self._infer_key_field(key_field)
+            key_value = item.get(key_field)
 
             keys = [key for key in item.keys() if key in existing_columns]
             values = []
@@ -184,6 +185,20 @@ class GenericModelWrapper:
 
             if not keys:
                 return
+
+            if (
+                original_key_value not in (None, "")
+                and key_value not in (None, "")
+                and original_key_value != key_value
+            ):
+                set_clause = ", ".join(f"{key} = ?" for key in keys)
+                update_sql = (
+                    f"UPDATE {self.table} SET {set_clause} WHERE {key_field} = ?"
+                )
+                cursor.execute(update_sql, values + [original_key_value])
+                if cursor.rowcount:
+                    conn.commit()
+                    return
 
             placeholders = ", ".join("?" for _ in keys)
             cols = ", ".join(keys)

@@ -39,4 +39,9 @@ def open_npc_editor_window(npc_name):
 
     if getattr(editor_window, "saved", False):
         key_field = npc_wrapper._infer_key_field()
-        npc_wrapper.save_item(editor_window.item, key_field=key_field)
+        original_key_value = npc_item.get(key_field)
+        npc_wrapper.save_item(
+            editor_window.item,
+            key_field=key_field,
+            original_key_value=original_key_value,
+        )
