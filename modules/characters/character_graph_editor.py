@@ -20,6 +20,13 @@ from modules.helpers.template_loader import load_template
 from modules.npcs import npc_opener
 from modules.pcs import pc_opener
 from modules.ui.image_viewer import show_portrait
+from modules.characters.graph_tabs import (
+    ManageGraphTabsDialog,
+    ensure_graph_tabs,
+    filter_graph_for_tab,
+    get_active_tab,
+    set_active_tab,
+)
 
 log_module_import(__name__)
 
@@ -81,6 +88,7 @@ class CharacterGraphEditor(ctk.CTkFrame):
             "links": [],
             "shapes": []  # 
         }
+        ensure_graph_tabs(self.graph)
         self.original_positions = {}  # Backup for original character positions
         self.original_shape_positions = {}  # Backup for shapes
        
@@ -100,6 +108,9 @@ class CharacterGraphEditor(ctk.CTkFrame):
         self.selected_items = []  # All canvas items belonging to the selected node
         self.drag_start = None    # Starting point for dragging
         self.selected_link = None # Currently selected link for context menus
+        self.tab_selector_var = ctk.StringVar()
+        self.tab_selector = None
+        self.tab_id_by_name = {}
         
         # Initialize the toolbar and canvas frame
         self.init_toolbar()
@@ -162,6 +173,7 @@ class CharacterGraphEditor(ctk.CTkFrame):
         os.makedirs(GRAPH_STORAGE_DIR, exist_ok=True)
         if os.path.exists(self.graph_path):
             self.load_graph(self.graph_path)
+        self._refresh_tab_selector()
 
     def _is_node_tag(self, tag):
         return tag.startswith(NODE_TAG_PREFIXES)
@@ -490,7 +502,9 @@ class CharacterGraphEditor(ctk.CTkFrame):
 
     def set_state(self, state):
         self.graph = state.get("graph", {}).copy()
+        ensure_graph_tabs(self.graph)
         self.node_positions = state.get("node_positions", {}).copy()
+        self._refresh_tab_selector()
         self.draw_graph()  # Refresh the drawing
 
     # ─────────────────────────────────────────────────────────────────────────
@@ -534,6 +548,16 @@ class CharacterGraphEditor(ctk.CTkFrame):
         ctk.CTkButton(toolbar, text="Add Rectangle", command=lambda: self.add_shape("rectangle")).pack(side="left", padx=5)
         ctk.CTkButton(toolbar, text="Add Oval", command=lambda: self.add_shape("oval")).pack(side="left", padx=5)
         ctk.CTkButton(toolbar, text="Reset Zoom", command=self.reset_zoom).pack(side="left", padx=5)
+        ctk.CTkLabel(toolbar, text="Tab:").pack(side="left", padx=(15, 5))
+        self.tab_selector = ctk.CTkOptionMenu(
+            toolbar,
+            variable=self.tab_selector_var,
+            values=[],
+            command=self._on_tab_selected,
+            width=160,
+        )
+        self.tab_selector.pack(side="left", padx=5)
+        ctk.CTkButton(toolbar, text="Manage Tabs", command=self.open_manage_tabs).pack(side="left", padx=5)
 
     def reset_zoom(self):
         self.canvas_scale = 1.0
@@ -553,6 +577,46 @@ class CharacterGraphEditor(ctk.CTkFrame):
                 x, y = self.original_shape_positions[tag]
                 shape["x"], shape["y"] = x, y
 
+        self.draw_graph()
+
+    def _refresh_tab_selector(self):
+        ensure_graph_tabs(self.graph)
+        tabs = self.graph.get("tabs", [])
+        self.tab_id_by_name = {}
+        display_names = []
+        for tab in tabs:
+            name = tab.get("name", "Tab")
+            if name in self.tab_id_by_name:
+                suffix = 2
+                candidate = f"{name} ({suffix})"
+                while candidate in self.tab_id_by_name:
+                    suffix += 1
+                    candidate = f"{name} ({suffix})"
+                name = candidate
+            self.tab_id_by_name[name] = tab.get("id")
+            display_names.append(name)
+
+        if self.tab_selector:
+            self.tab_selector.configure(values=display_names)
+            active_tab = get_active_tab(self.graph)
+            active_name = next(
+                (name for name, tab_id in self.tab_id_by_name.items() if tab_id == active_tab.get("id")),
+                display_names[0] if display_names else "",
+            )
+            if active_name:
+                self.tab_selector_var.set(active_name)
+
+    def _on_tab_selected(self, selected_name):
+        tab_id = self.tab_id_by_name.get(selected_name)
+        if tab_id:
+            set_active_tab(self.graph, tab_id)
+            self.draw_graph()
+
+    def open_manage_tabs(self):
+        ManageGraphTabsDialog(self, self.graph, on_update=self._on_tabs_updated)
+
+    def _on_tabs_updated(self):
+        self._refresh_tab_selector()
         self.draw_graph()
 
     # ─────────────────────────────────────────────────────────────────────────
@@ -1044,7 +1108,7 @@ class CharacterGraphEditor(ctk.CTkFrame):
     # Iterates over all nodes in the graph, draws their rectangles, portraits, and labels,
     # and calculates/stores their bounding boxes.
     # ─────────────────────────────────────────────────────────────────────────
-    def draw_nodes(self):
+    def draw_nodes(self, nodes):
         scale = self.canvas_scale
         GAP = int(5 * scale)
         PAD = int(10 * scale)
@@ -1062,7 +1126,7 @@ class CharacterGraphEditor(ctk.CTkFrame):
             self.canvas.delete(tid)
             return (bbox[3] - bbox[1]) if bbox else 0
 
-        for node in self.graph["nodes"]:
+        for node in nodes:
             entity_type = node.get("entity_type")
             entity_name = node.get("entity_name")
             tag = node.get("tag")
@@ -1195,8 +1259,8 @@ class CharacterGraphEditor(ctk.CTkFrame):
     # FUNCTION: draw_all_links
     # Iterates over all links in the graph and draws them, then lowers link elements behind nodes.
     # ─────────────────────────────────────────────────────────────────────────
-    def draw_all_links(self):
-        for link in self.graph["links"]:
+    def draw_all_links(self, links):
+        for link in links:
             self.draw_one_link(link)
         self.canvas.tag_lower("link")
 
@@ -1299,6 +1363,7 @@ class CharacterGraphEditor(ctk.CTkFrame):
         with open(path, 'r', encoding='utf-8') as f:
             self.graph = json.load(f)
         self.graph.setdefault("shapes", [])
+        ensure_graph_tabs(self.graph)
 
         # ── 2) Ensure every node dict has its own unique `tag` ────────────────────
         seen = set()
@@ -1373,6 +1438,7 @@ class CharacterGraphEditor(ctk.CTkFrame):
         }
 
         # ── 7) Finally redraw ────────────────────────────────────────────────────
+        self._refresh_tab_selector()
         self.draw_graph()
 
     # ─────────────────────────────────────────────────────────────────────────
@@ -1602,6 +1668,7 @@ class CharacterGraphEditor(ctk.CTkFrame):
         if not path:
             path = self.graph_path
         os.makedirs(os.path.dirname(path), exist_ok=True)
+        ensure_graph_tabs(self.graph)
 
         # 2) Update each node entry with its unique tag and current x,y
         for node in self.graph["nodes"]:
@@ -1654,6 +1721,12 @@ class CharacterGraphEditor(ctk.CTkFrame):
         except Exception as e:
             print(f"Error loading portrait for {node_tag}: {e}")
             return None, (0, 0)
+
+    def _get_visible_graph_data(self):
+        ensure_graph_tabs(self.graph)
+        active_tab = get_active_tab(self.graph)
+        return filter_graph_for_tab(self.graph, active_tab)
+
     def draw_graph(self):
         #self.canvas.delete("shape")
         #self.canvas.delete("link")
@@ -1665,8 +1738,9 @@ class CharacterGraphEditor(ctk.CTkFrame):
                 self.canvas.delete(item)
         self.node_bboxes = {}
         self.draw_all_shapes()
-        self.draw_nodes()
-        self.draw_all_links()
+        visible_nodes, visible_links = self._get_visible_graph_data()
+        self.draw_nodes(visible_nodes)
+        self.draw_all_links(visible_links)
         self.canvas.update_idletasks()
         bbox = self.canvas.bbox("all")
         if bbox:

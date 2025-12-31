@@ -25,6 +25,7 @@ from sqlalchemy.orm import joinedload
 
 from modules.helpers.config_helper import ConfigHelper
 from modules.helpers.portrait_helper import primary_portrait
+from modules.characters.graph_tabs.model import ensure_graph_tabs
 from modules.generic.generic_model_wrapper import GenericModelWrapper
 from modules.helpers.text_helpers import format_multiline_text, rtf_to_html
 from modules.helpers.logging_helper import log_module_import
@@ -394,6 +395,7 @@ def normalize_character_graph(graph_data):
         return {"nodes": [], "links": []}
     graph_data.setdefault("nodes", [])
     graph_data.setdefault("links", [])
+    ensure_graph_tabs(graph_data)
     seen = set()
     for node in graph_data["nodes"]:
         if "entity_type" not in node or "entity_name" not in node:
