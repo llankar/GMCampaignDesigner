@@ -612,6 +612,39 @@ def character_graph():
         return jsonify(error="Graph file not found"), 404
     return jsonify(build_character_graph_payload(graph_data))
 
+@app.route('/api/character-graph/link-delete', methods=['POST'])
+def delete_character_graph_link():
+    data = request.get_json() or {}
+    graph_file = data.get("graph")
+    source = data.get("source")
+    target = data.get("target")
+    label = (data.get("label") or "").strip()
+    if not graph_file or not source or not target:
+        return jsonify(error="Missing graph, source, or target"), 400
+    graph_data, path = load_character_graph(graph_file)
+    if not graph_data:
+        return jsonify(error="Graph file not found"), 404
+    links = list(graph_data.get("links", []))
+    updated_links = []
+    removed = False
+    for link in links:
+        node1 = link.get("node1_tag")
+        node2 = link.get("node2_tag")
+        text = (link.get("text") or "").strip()
+        matches_nodes = (node1 == source and node2 == target) or (node1 == target and node2 == source)
+        matches_label = not label or text == label
+        if not removed and matches_nodes and matches_label:
+            removed = True
+            continue
+        updated_links.append(link)
+    if not removed:
+        return jsonify(error="Link not found"), 404
+    graph_data["links"] = updated_links
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    with open(path, "w", encoding="utf-8") as f:
+        json.dump(graph_data, f, ensure_ascii=False, indent=2)
+    return jsonify(success=True)
+
 @app.route('/api/clue-positions', methods=['GET'])
 def get_clue_positions():
     return jsonify(load_positions())
