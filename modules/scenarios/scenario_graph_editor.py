@@ -6,6 +6,7 @@ import tkinter.font as tkFont
 import re
 import os
 import ctypes
+from typing import Optional
 from ctypes import wintypes
 #import logging
 import tkinter as tk
@@ -1023,6 +1024,77 @@ class ScenarioGraphEditor(ctk.CTkFrame):
         except ValueError:
             return str(text)
 
+    def _estimate_scene_card_dimensions(
+        self,
+        text: str,
+        entity_entries: list[dict],
+        source_entry: Optional[dict],
+        card_size_key: str,
+        scale: float = 1.0,
+    ) -> tuple[int, int]:
+        safe_scale = scale or 1.0
+        card_size_key = str(card_size_key or "M").upper()
+        card_width = int(SCENE_CARD_WIDTHS.get(card_size_key, SCENE_CARD_WIDTHS["M"]) * safe_scale)
+
+        header_height = max(int(40 * safe_scale), 32)
+        padding_x = max(int(16 * safe_scale), 12)
+        body_padding_y = max(int(12 * safe_scale), 10)
+        body_wrap_width = max(card_width - 2 * padding_x, int(160 * safe_scale))
+
+        bullet_lines, truncated = self._summarize_scene_text(text, max_lines=4)
+        bullet_lines = [self._truncate_line(line, 96) for line in bullet_lines]
+        more_line_needed = truncated
+        if more_line_needed and len(bullet_lines) >= 4:
+            bullet_lines = bullet_lines[:3]
+
+        if not bullet_lines:
+            bullet_lines = ["No scene notes provided."]
+            more_line_needed = False
+
+        bullet_text = "\n".join(f"• {line}" for line in bullet_lines)
+        body_font = tkFont.Font(family="Arial", size=max(1, int(10 * safe_scale)))
+        more_font = tkFont.Font(family="Arial", size=max(1, int(10 * safe_scale)), slant="italic")
+        body_text_height = self._measure_text_height(bullet_text, body_font, body_wrap_width)
+        more_line_height = self._measure_text_height("• More…", more_font, body_wrap_width) if more_line_needed else 0
+        more_line_spacing = int(4 * safe_scale) if more_line_needed else 0
+        body_height = body_padding_y * 2 + body_text_height + (
+            more_line_height + more_line_spacing if more_line_needed else 0
+        )
+
+        chip_entities = [
+            ent
+            for ent in (entity_entries or [])
+            if isinstance(ent, dict)
+            and (ent.get("type") or "").lower() in {"npc", "creature", "place"}
+        ]
+        chip_count = min(len(chip_entities), 6)
+        chip_size = max(int(32 * safe_scale), 24)
+        chip_vertical_padding = max(int(8 * safe_scale), 4)
+        chips_height = chip_vertical_padding * 2 + chip_size if chip_count else 0
+
+        badge_font = tkFont.Font(family="Arial", size=max(1, int(9 * safe_scale)), weight="bold")
+        badge_height = max(int(24 * safe_scale), 18)
+        badge_gap = max(int(6 * safe_scale), 4)
+        badge_inner_pad = max(int(8 * safe_scale), 4)
+        badges = self._extract_scene_badges(source_entry or {})
+        badge_texts = [f"{badge['label']}: {badge['value']}" for badge in badges]
+        layout_width = max(card_width - 2 * padding_x, int(160 * safe_scale))
+        badge_section_height = 0
+        if badge_texts:
+            badge_section_height, _ = self._compute_badge_layout(
+                badge_texts,
+                badge_font,
+                layout_width,
+                badge_height,
+                badge_gap,
+                badge_inner_pad,
+            )
+        footer_padding = max(int(10 * safe_scale), 6)
+        footer_height = badge_section_height + 2 * footer_padding if badge_texts else 0
+
+        card_height = header_height + body_height + chips_height + footer_height
+        return card_width, int(card_height)
+
     def _determine_scene_card_size(self, text, entity_count):
         length = len(text or "")
         if entity_count >= 5 or length > 900:
@@ -1431,9 +1503,26 @@ class ScenarioGraphEditor(ctk.CTkFrame):
         self._clear_detail_panel()
 
         count = len(normalized_scenes)
+        max_card_width = SCENE_CARD_WIDTHS["M"]
+        max_card_height = 0
+        for scene in normalized_scenes:
+            text = scene.get("text", "") or ""
+            entities = scene.get("entities") or []
+            source_entry = scene.get("source_entry") or {}
+            card_size = self._determine_scene_card_size(text, len(entities)) or "M"
+            card_width, card_height = self._estimate_scene_card_dimensions(
+                text,
+                entities if isinstance(entities, list) else [],
+                source_entry if isinstance(source_entry, dict) else {},
+                card_size,
+                scale=1.0,
+            )
+            max_card_width = max(max_card_width, card_width)
+            max_card_height = max(max_card_height, card_height)
+
         cols = min(4, max(1, int(math.ceil(math.sqrt(count)))))
-        x_spacing = 240
-        y_spacing = 220
+        x_spacing = max(240, int(max_card_width + 80))
+        y_spacing = max(220, int(max_card_height + 120))
         origin_x = 400
         origin_y = 260
 
