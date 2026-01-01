@@ -1089,7 +1089,23 @@ class ScenesPlanningStep(WizardStep):
 
     def _normalise_scene(self, entry, index):
         if not isinstance(entry, dict):
-            return None
+            summary = coerce_text(entry).strip()
+            title = f"Scene {index + 1}"
+            if summary:
+                first_line = summary.splitlines()[0].strip()
+                if first_line:
+                    title = first_line if len(first_line) <= 60 else f"{first_line[:57]}..."
+            return {
+                "Title": title,
+                "Summary": summary,
+                "SceneType": "",
+                "NPCs": [],
+                "Creatures": [],
+                "Places": [],
+                "Maps": [],
+                "NextScenes": [],
+                "LinkData": [],
+            }
         next_refs = self._split_to_list(entry.get("NextScenes"))
         links_data = []
         raw_links = entry.get("Links")
