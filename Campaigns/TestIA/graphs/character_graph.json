@@ -1,0 +1,206 @@
+{
+  "nodes": [
+    {
+      "entity_type": "npc",
+      "entity_name": "Commander Voss – head of the imperial guard",
+      "tag": "npc_Commander_Voss_–_head_of_the_imperial_guard",
+      "x": 513.398818181818,
+      "y": 295.2214545454545,
+      "color": "#1D3572",
+      "collapsed": true
+    },
+    {
+      "entity_type": "npc",
+      "entity_name": "Captain Aileen – guard captain guarding the banquet",
+      "tag": "npc_Captain_Aileen_–_guard_captain_guarding_the_banquet",
+      "x": 787.217,
+      "y": 317.03963636363636,
+      "color": "#1D3572",
+      "collapsed": true
+    },
+    {
+      "entity_type": "pc",
+      "entity_name": "Lolo",
+      "tag": "pc_Lolo",
+      "x": 618.0351818181819,
+      "y": 229.31236363636367,
+      "color": "#1D3572",
+      "collapsed": false
+    },
+    {
+      "entity_type": "pc",
+      "entity_name": "Titi",
+      "tag": "pc_Titi",
+      "x": 898.4897272727271,
+      "y": 236.94872727272718,
+      "color": "#1D3572",
+      "collapsed": true
+    },
+    {
+      "entity_type": "npc",
+      "entity_name": "Commander Voss – head of the imperial guard",
+      "tag": "npc_Commander_Voss_–_head_of_the_imperial_guard_1",
+      "x": 557.9442727272726,
+      "y": 297.0396363636364,
+      "color": "#1D3572",
+      "collapsed": true
+    },
+    {
+      "entity_type": "npc",
+      "entity_name": "Captain Voss",
+      "tag": "npc_Captain_Voss",
+      "x": 1206.8533636363636,
+      "y": 541.4032727272727,
+      "color": "#1D3572",
+      "collapsed": true
+    },
+    {
+      "entity_type": "npc",
+      "entity_name": "Cultist Leader",
+      "tag": "npc_Cultist_Leader",
+      "x": 646.0,
+      "y": 535.0,
+      "color": "#1D3572",
+      "collapsed": true
+    },
+    {
+      "entity_type": "pc",
+      "entity_name": "Lolo",
+      "tag": "pc_Lolo_1",
+      "x": 575.0,
+      "y": 228.0,
+      "color": "#1D3572",
+      "collapsed": true
+    },
+    {
+      "entity_type": "npc",
+      "entity_name": "Captain Jaxon",
+      "tag": "npc_Captain_Jaxon",
+      "x": 580.0,
+      "y": 510.0,
+      "color": "#1D3572",
+      "collapsed": true
+    },
+    {
+      "entity_type": "npc",
+      "entity_name": "Nebula Guardian",
+      "tag": "npc_Nebula_Guardian",
+      "x": 844.0,
+      "y": 515.0,
+      "color": "#1D3572",
+      "collapsed": true
+    },
+    {
+      "entity_type": "npc",
+      "entity_name": "Captain Aileen",
+      "tag": "npc_Captain_Aileen",
+      "x": 821.0,
+      "y": 540.0,
+      "color": "#1D3572",
+      "collapsed": false
+    },
+    {
+      "entity_type": "npc",
+      "entity_name": "Emperor Varn ",
+      "tag": "npc_Emperor_Varn_",
+      "x": 732.0,
+      "y": 316.0,
+      "collapsed": true,
+      "color": "#1D3572"
+    }
+  ],
+  "links": [
+    {
+      "node1_tag": "pc_Lolo_1",
+      "node2_tag": "pc_Titi",
+      "text": "observe",
+      "arrow_mode": "both"
+    },
+    {
+      "node1_tag": "pc_Lolo_1",
+      "node2_tag": "npc_Cultist_Leader",
+      "text": "hate",
+      "arrow_mode": "both"
+    },
+    {
+      "node1_tag": "pc_Lolo_1",
+      "node2_tag": "npc_Captain_Jaxon",
+      "text": "like",
+      "arrow_mode": "both"
+    },
+    {
+      "node1_tag": "pc_Lolo_1",
+      "node2_tag": "npc_Nebula_Guardian",
+      "text": "hate",
+      "arrow_mode": "both"
+    },
+    {
+      "node1_tag": "pc_Titi",
+      "node2_tag": "npc_Emperor_Varn_",
+      "text": "father and son",
+      "arrow_mode": "both"
+    },
+    {
+      "node1_tag": "npc_Captain_Voss",
+      "node2_tag": "npc_Captain_Aileen_–_guard_captain_guarding_the_banquet",
+      "text": "ex lovers",
+      "arrow_mode": "both"
+    },
+    {
+      "node1_tag": "npc_Captain_Voss",
+      "node2_tag": "npc_Captain_Aileen",
+      "text": "ex lovers",
+      "arrow_mode": "both"
+    }
+  ],
+  "shapes": [],
+  "tabs": [
+    {
+      "id": "a4414b1f3ada4fa6a91309ce04353284",
+      "name": "All",
+      "subsetDefinition": {
+        "mode": "all"
+      },
+      "layoutPrefs": {}
+    },
+    {
+      "id": "b773554d5a604599880120c96d087f8b",
+      "name": "npcs",
+      "subsetDefinition": {
+        "mode": "subset",
+        "node_tags": [
+          "npc_Captain_Voss",
+          "npc_Captain_Aileen",
+          "npc_Emperor_Varn_"
+        ]
+      },
+      "layoutPrefs": {}
+    },
+    {
+      "id": "f3c309c5fa5644cba825b822a9070bfd",
+      "name": "pcs",
+      "subsetDefinition": {
+        "mode": "subset",
+        "node_tags": [
+          "pc_Lolo",
+          "pc_Titi"
+        ]
+      },
+      "layoutPrefs": {}
+    },
+    {
+      "id": "1f70e218ec934c84a30b090035c9bddc",
+      "name": "stories",
+      "subsetDefinition": {
+        "mode": "subset",
+        "node_tags": [
+          "pc_Lolo_1",
+          "npc_Captain_Jaxon",
+          "npc_Nebula_Guardian"
+        ]
+      },
+      "layoutPrefs": {}
+    }
+  ],
+  "active_tab_id": "f3c309c5fa5644cba825b822a9070bfd"
+}
