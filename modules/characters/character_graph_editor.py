@@ -22,9 +22,11 @@ from modules.pcs import pc_opener
 from modules.ui.image_viewer import show_portrait
 from modules.characters.graph_tabs import (
     ManageGraphTabsDialog,
+    build_default_tab,
     ensure_graph_tabs,
     filter_graph_for_tab,
     get_active_tab,
+    merge_graph_into,
     set_active_tab,
 )
 
@@ -636,6 +638,12 @@ class CharacterGraphEditor(ctk.CTkFrame):
             command=self.open_manage_tabs,
             **button_kwargs,
         ).pack(side="left", padx=5)
+        ctk.CTkButton(
+            toolbar,
+            text="Load JSON",
+            command=self.load_graph_into_tab,
+            **button_kwargs,
+        ).pack(side="left", padx=5)
 
     def toggle_nodes_collapsed(self):
         self.nodes_collapsed = not self.nodes_collapsed
@@ -703,6 +711,69 @@ class CharacterGraphEditor(ctk.CTkFrame):
         ManageGraphTabsDialog(self, self.graph, on_update=self._on_tabs_updated)
 
     def _on_tabs_updated(self):
+        self._refresh_tab_selector()
+        self.draw_graph()
+        self._autosave_graph()
+
+    def _unique_tab_name(self, base_name, current_tab=None):
+        existing = {tab.get("name") for tab in self.graph.get("tabs", []) if tab is not current_tab}
+        name = base_name
+        suffix = 2
+        while name in existing:
+            name = f"{base_name} ({suffix})"
+            suffix += 1
+        return name
+
+    def load_graph_into_tab(self):
+        path = filedialog.askopenfilename(
+            filetypes=[("JSON Files", "*.json")],
+            title="Load Character Graph JSON",
+        )
+        if not path:
+            return
+        try:
+            with open(path, "r", encoding="utf-8") as file:
+                imported_graph = json.load(file)
+        except Exception as exc:
+            messagebox.showerror("Load Error", f"Could not load file:\n{exc}")
+            return
+        try:
+            merge_result = merge_graph_into(
+                self.graph,
+                imported_graph,
+                self.nodes_collapsed,
+                self.shape_counter,
+            )
+        except ValueError as exc:
+            messagebox.showerror("Load Error", str(exc))
+            return
+
+        for node in merge_result.imported_nodes:
+            self.graph["nodes"].append(node)
+            tag = node.get("tag")
+            if tag:
+                self.node_positions[tag] = (node.get("x", 0), node.get("y", 0))
+                self.original_positions[tag] = (node.get("x", 0), node.get("y", 0))
+
+        for link in merge_result.imported_links:
+            self.graph["links"].append(link)
+
+        for shape in merge_result.imported_shapes:
+            self.graph.setdefault("shapes", []).append(shape)
+            tag = shape.get("tag")
+            if tag:
+                self.shapes[tag] = shape
+                self.original_shape_positions[tag] = (shape.get("x", 0), shape.get("y", 0))
+
+        self.shape_counter = merge_result.shape_counter
+
+        base_name = os.path.splitext(os.path.basename(path))[0] or "Imported"
+        tab = build_default_tab()
+        tab["name"] = self._unique_tab_name(base_name, current_tab=tab)
+        tab["subsetDefinition"] = {"mode": "subset", "node_tags": merge_result.imported_node_tags}
+        self.graph.setdefault("tabs", []).append(tab)
+        self.graph["active_tab_id"] = tab["id"]
+
         self._refresh_tab_selector()
         self.draw_graph()
         self._autosave_graph()
