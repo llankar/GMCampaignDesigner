@@ -1186,58 +1186,86 @@ class CharacterGraphEditor(ctk.CTkFrame):
             self.canvas.delete(tid)
             return (bbox[3] - bbox[1]) if bbox else 0
 
+        def measure_text_size(text, font, wrap_width=None):
+            tid = self.canvas.create_text(
+                0, 0,
+                text=text,
+                font=font,
+                width=wrap_width or 0,
+                anchor="nw"
+            )
+            bbox = self.canvas.bbox(tid)
+            self.canvas.delete(tid)
+            if not bbox:
+                return 0, 0
+            return bbox[2] - bbox[0], bbox[3] - bbox[1]
+
         for node in nodes:
             entity_type = node.get("entity_type")
             entity_name = node.get("entity_name")
             tag = node.get("tag")
             x, y = self.node_positions.get(tag, (node["x"], node["y"]))
-
-            # ── Load character data ───────────────────────────────────
-            data = self._get_entity_record(entity_type, entity_name) or {}
-            role = data.get("Role", "")
-            fv = data.get("Factions", "")
-            fv_text = ", ".join(fv) if isinstance(fv, list) else str(fv) if fv else ""
-
-            # ── Load & scale portrait ─────────────────────────────────
-            portrait_img = None
-            p_w = p_h = 0
-            portrait_path = primary_portrait(data.get("Portrait", ""))
-            resolved_portrait = resolve_portrait_path(portrait_path, ConfigHelper.get_campaign_dir())
-            if resolved_portrait and os.path.exists(resolved_portrait):
-                img = Image.open(resolved_portrait)
-                ow, oh = img.size
-                max_w = int(80 * scale)
-                max_h = int(80 * scale)
-                ratio = min(max_w/ow, max_h/oh, 1.0)
-                p_w, p_h = int(ow*ratio), int(oh*ratio)
-                img = img.resize((p_w, p_h), Image.Resampling.LANCZOS)
-                portrait_img = ImageTk.PhotoImage(img, master=self.canvas)
-                self.node_images[tag] = portrait_img
-
-            # ── Prepare title & body text ────────────────────────────
-            title_text = entity_name
-            body_text = "\n".join(filter(None, [role, fv_text]))
+            is_collapsed = node.get("collapsed", False)
 
             # ── Font definitions ─────────────────────────────────────
             title_font = ("Arial", max(1, int(10 * scale)), "bold")
             body_font  = ("Arial", max(1, int(9  * scale)))
 
-            # ── Compute wrap width & measure text heights ────────────
-            wrap_width = max(p_w, int(150 * scale)) - 2 * PAD
-            title_h = measure_text_height(title_text, title_font, wrap_width)
-            body_h  = measure_text_height(body_text,  body_font,  wrap_width) if body_text else 0
+            # ── Prepare title & body text ────────────────────────────
+            title_text = entity_name
 
-            # ── Compute content & node dimensions ────────────────────
-            content_w = max(p_w, wrap_width)
-            content_h = (
-                p_h
-                + (GAP if p_h > 0 and (title_h > 0 or body_h > 0) else 0)
-                + title_h
-                + (GAP if body_h > 0 else 0)
-                + body_h
-            )
-            min_w = content_w + 2 * PAD
-            min_h = content_h + 2 * PAD
+            if is_collapsed:
+                title_w, title_h = measure_text_size(title_text, title_font)
+                wrap_width = max(1, int(title_w))
+                body_text = ""
+                body_h = 0
+                p_w = p_h = 0
+                portrait_img = None
+
+                content_w = title_w
+                content_h = title_h
+                min_w = content_w + 2 * PAD
+                min_h = content_h + 2 * PAD
+            else:
+                # ── Load character data ───────────────────────────────────
+                data = self._get_entity_record(entity_type, entity_name) or {}
+                role = data.get("Role", "")
+                fv = data.get("Factions", "")
+                fv_text = ", ".join(fv) if isinstance(fv, list) else str(fv) if fv else ""
+                body_text = "\n".join(filter(None, [role, fv_text]))
+
+                # ── Load & scale portrait ─────────────────────────────────
+                portrait_img = None
+                p_w = p_h = 0
+                portrait_path = primary_portrait(data.get("Portrait", ""))
+                resolved_portrait = resolve_portrait_path(portrait_path, ConfigHelper.get_campaign_dir())
+                if resolved_portrait and os.path.exists(resolved_portrait):
+                    img = Image.open(resolved_portrait)
+                    ow, oh = img.size
+                    max_w = int(80 * scale)
+                    max_h = int(80 * scale)
+                    ratio = min(max_w / ow, max_h / oh, 1.0)
+                    p_w, p_h = int(ow * ratio), int(oh * ratio)
+                    img = img.resize((p_w, p_h), Image.Resampling.LANCZOS)
+                    portrait_img = ImageTk.PhotoImage(img, master=self.canvas)
+                    self.node_images[tag] = portrait_img
+
+                # ── Compute wrap width & measure text heights ────────────
+                wrap_width = max(p_w, int(150 * scale)) - 2 * PAD
+                title_h = measure_text_height(title_text, title_font, wrap_width)
+                body_h = measure_text_height(body_text, body_font, wrap_width) if body_text else 0
+
+                # ── Compute content & node dimensions ────────────────────
+                content_w = max(p_w, wrap_width)
+                content_h = (
+                    p_h
+                    + (GAP if p_h > 0 and (title_h > 0 or body_h > 0) else 0)
+                    + title_h
+                    + (GAP if body_h > 0 else 0)
+                    + body_h
+                )
+                min_w = content_w + 2 * PAD
+                min_h = content_h + 2 * PAD
 
             # ── 1) Draw the post-it background ───────────────────────
             if self.postit_base:
