@@ -98,13 +98,13 @@ class ScenarioCharacterGraphEditor(CharacterGraphEditor):
         return
 
     def _persist_link_to_entities(self, link):
-        return
+        super()._persist_link_to_entities(link)
 
     def _remove_link_from_entities(self, link):
-        return
+        super()._remove_link_from_entities(link)
 
     def _rebuild_links_from_entities(self):
-        return
+        super()._rebuild_links_from_entities()
 
     def create_new_entity(self, entity_type):  # pragma: no cover - UI interaction
         wrapper = self.entity_wrappers.get(entity_type)
@@ -379,6 +379,7 @@ def build_scenario_graph_with_links(
         if entity_type and entity_name:
             base_nodes_by_key[(entity_type, entity_name)] = node
 
+    added_nodes = []
     for entity_key in scenario_entities:
         if entity_key in base_nodes_by_key:
             continue
@@ -403,6 +404,9 @@ def build_scenario_graph_with_links(
         node.setdefault("collapsed", True)
         base_graph["nodes"].append(node)
         base_nodes_by_key[entity_key] = node
+        added_nodes.append(node)
+
+    _layout_new_scenario_nodes(base_graph, added_nodes)
 
     scenario_tags = {key: node.get("tag") for key, node in base_nodes_by_key.items()}
     existing_links = list(base_graph.get("links", []))
@@ -443,6 +447,42 @@ def _build_temporary_graph_path():
     graph_dir = os.path.join(campaign_dir, "graphs")
     os.makedirs(graph_dir, exist_ok=True)
     return os.path.join(graph_dir, f"scenario_graph_{uuid.uuid4().hex}.json")
+
+
+def _layout_new_scenario_nodes(base_graph, added_nodes):
+    if not added_nodes:
+        return
+    spacing_x = 240
+    spacing_y = 180
+    start_x = 200
+    start_y = 200
+    columns = 4
+
+    used_cells = set()
+    for node in base_graph.get("nodes", []):
+        if not isinstance(node, dict):
+            continue
+        if node in added_nodes:
+            continue
+        x = node.get("x")
+        y = node.get("y")
+        if x is None or y is None:
+            continue
+        col = round((x - start_x) / spacing_x)
+        row = round((y - start_y) / spacing_y)
+        used_cells.add((col, row))
+
+    next_index = 0
+    for node in added_nodes:
+        while True:
+            col = next_index % columns
+            row = next_index // columns
+            next_index += 1
+            if (col, row) not in used_cells:
+                used_cells.add((col, row))
+                break
+        node["x"] = start_x + col * spacing_x
+        node["y"] = start_y + row * spacing_y
 
 
 def _infer_shape_counter(graph):

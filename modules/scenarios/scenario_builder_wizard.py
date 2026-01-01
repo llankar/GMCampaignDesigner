@@ -435,7 +435,7 @@ class ScenesPlanningStep(WizardStep):
         else:
             self._state_ref["_SceneLayout"] = []
 
-        for field in ("NPCs", "Creatures", "Places", "Maps", "Factions", "Objects"):
+        for field in ("NPCs", "PCs", "Creatures", "Places", "Maps", "Factions", "Objects"):
             values = scenario.get(field) or []
             if isinstance(values, str):
                 values = self._split_to_list(values)
