@@ -569,16 +569,58 @@ class CharacterGraphEditor(ctk.CTkFrame):
         toolbar = ctk.CTkFrame(self)
         toolbar.pack(fill="x", padx=5, pady=5)
 
-        ctk.CTkButton(toolbar, text="Add NPC", command=lambda: self.add_entity("npc")).pack(side="left", padx=5)
-        ctk.CTkButton(toolbar, text="Add PC", command=lambda: self.add_entity("pc")).pack(side="left", padx=5)
-        ctk.CTkButton(toolbar, text="Add Faction", command=self.add_faction).pack(side="left", padx=5)
-        ctk.CTkButton(toolbar, text="Add Link", command=self.start_link_creation).pack(side="left", padx=5)
+        button_kwargs = {"width": 1}
+
+        ctk.CTkButton(
+            toolbar,
+            text="Add NPC",
+            command=lambda: self.add_entity("npc"),
+            **button_kwargs,
+        ).pack(side="left", padx=5)
+        ctk.CTkButton(
+            toolbar,
+            text="Add PC",
+            command=lambda: self.add_entity("pc"),
+            **button_kwargs,
+        ).pack(side="left", padx=5)
+        ctk.CTkButton(
+            toolbar,
+            text="Add Faction",
+            command=self.add_faction,
+            **button_kwargs,
+        ).pack(side="left", padx=5)
+        ctk.CTkButton(
+            toolbar,
+            text="Add Link",
+            command=self.start_link_creation,
+            **button_kwargs,
+        ).pack(side="left", padx=5)
 
         # 🆕 Add Shape Buttons
-        ctk.CTkButton(toolbar, text="Add Rectangle", command=lambda: self.add_shape("rectangle")).pack(side="left", padx=5)
-        ctk.CTkButton(toolbar, text="Add Oval", command=lambda: self.add_shape("oval")).pack(side="left", padx=5)
-        ctk.CTkButton(toolbar, text="+/-", command=self.toggle_nodes_collapsed).pack(side="left", padx=5)
-        ctk.CTkButton(toolbar, text="Reset Zoom", command=self.reset_zoom).pack(side="left", padx=5)
+        ctk.CTkButton(
+            toolbar,
+            text="Add Rectangle",
+            command=lambda: self.add_shape("rectangle"),
+            **button_kwargs,
+        ).pack(side="left", padx=5)
+        ctk.CTkButton(
+            toolbar,
+            text="Add Oval",
+            command=lambda: self.add_shape("oval"),
+            **button_kwargs,
+        ).pack(side="left", padx=5)
+        ctk.CTkButton(
+            toolbar,
+            text="+/-",
+            command=self.toggle_nodes_collapsed,
+            **button_kwargs,
+        ).pack(side="left", padx=5)
+        ctk.CTkButton(
+            toolbar,
+            text="Reset Zoom",
+            command=self.reset_zoom,
+            **button_kwargs,
+        ).pack(side="left", padx=5)
         ctk.CTkLabel(toolbar, text="Tab:").pack(side="left", padx=(15, 5))
         self.tab_selector = ctk.CTkOptionMenu(
             toolbar,
@@ -588,7 +630,12 @@ class CharacterGraphEditor(ctk.CTkFrame):
             width=160,
         )
         self.tab_selector.pack(side="left", padx=5)
-        ctk.CTkButton(toolbar, text="Manage Tabs", command=self.open_manage_tabs).pack(side="left", padx=5)
+        ctk.CTkButton(
+            toolbar,
+            text="Manage Tabs",
+            command=self.open_manage_tabs,
+            **button_kwargs,
+        ).pack(side="left", padx=5)
 
     def toggle_nodes_collapsed(self):
         self.nodes_collapsed = not self.nodes_collapsed
