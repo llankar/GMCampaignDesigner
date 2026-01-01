@@ -1432,8 +1432,8 @@ class ScenarioGraphEditor(ctk.CTkFrame):
 
         count = len(normalized_scenes)
         cols = min(4, max(1, int(math.ceil(math.sqrt(count)))))
-        x_spacing = 360
-        y_spacing = 320
+        x_spacing = 240
+        y_spacing = 220
         origin_x = 400
         origin_y = 260
 
