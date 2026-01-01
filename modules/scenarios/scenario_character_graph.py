@@ -49,6 +49,8 @@ class ScenarioCharacterGraphEditor(CharacterGraphEditor):
         if not entity:
             return
         super().place_pending_entity(event)
+        if self._merge_links_from_entities():
+            self.draw_graph()
         if callable(self._on_entity_added):
             name_value = entity.get("record", {}).get("Name")
             if name_value:
@@ -247,6 +249,7 @@ class ScenarioCharacterGraphEditor(CharacterGraphEditor):
 
         self._refresh_entity_records("npc")
         self._refresh_entity_records("pc")
+        self._merge_links_from_entities()
         self.draw_graph()
 
     def export_graph_data(self):
@@ -277,6 +280,52 @@ class ScenarioCharacterGraphEditor(CharacterGraphEditor):
                 shape.pop("resize_handle", None)
 
         return export_graph
+
+    def _merge_links_from_entities(self):
+        tag_lookup = {
+            (node.get("entity_type"), node.get("entity_name")): node.get("tag")
+            for node in self.graph.get("nodes", [])
+            if isinstance(node, dict)
+        }
+        if not tag_lookup:
+            return False
+        existing_links = [link for link in self.graph.get("links", []) if isinstance(link, dict)]
+        existing_keys = {
+            _entity_link_key(link)
+            for link in existing_links
+            if link.get("node1_tag") and link.get("node2_tag")
+        }
+        new_links = []
+        for (entity_type, entity_name), tag in tag_lookup.items():
+            if not tag:
+                continue
+            record = self._get_entity_record(entity_type, entity_name)
+            if not record:
+                continue
+            for link in self._normalize_links_list(record):
+                if not isinstance(link, dict):
+                    continue
+                target_type = link.get("target_type")
+                target_name = link.get("target_name")
+                label = link.get("label") or ""
+                target_tag = tag_lookup.get((target_type, target_name))
+                if not target_tag:
+                    continue
+                link_data = {
+                    "node1_tag": tag,
+                    "node2_tag": target_tag,
+                    "text": label,
+                    "arrow_mode": link.get("arrow_mode") or "both",
+                }
+                link_key = _entity_link_key(link_data)
+                if link_key in existing_keys:
+                    continue
+                existing_keys.add(link_key)
+                new_links.append(link_data)
+        if new_links:
+            self.graph.setdefault("links", []).extend(new_links)
+            return True
+        return False
 
 
 def sync_scenario_graph_to_global(scenario_graph, graph_path=DEFAULT_CHARACTER_GRAPH_PATH):
@@ -519,6 +568,18 @@ def _link_key(link):
     return (
         link.get("node1_tag"),
         link.get("node2_tag"),
+        link.get("text") or "",
+        link.get("arrow_mode") or "both",
+    )
+
+
+def _entity_link_key(link):
+    node1_tag = link.get("node1_tag")
+    node2_tag = link.get("node2_tag")
+    sorted_tags = tuple(sorted((node1_tag, node2_tag)))
+    return (
+        sorted_tags[0],
+        sorted_tags[1],
         link.get("text") or "",
         link.get("arrow_mode") or "both",
     )
