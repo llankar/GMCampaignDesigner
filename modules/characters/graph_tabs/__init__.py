@@ -6,6 +6,7 @@ from .model import (
     set_active_tab,
 )
 from .dialogs import ManageGraphTabsDialog
+from .importer import GraphImportResult, merge_graph_into
 
 __all__ = [
     "build_default_tab",
@@ -14,4 +15,6 @@ __all__ = [
     "get_active_tab",
     "set_active_tab",
     "ManageGraphTabsDialog",
+    "GraphImportResult",
+    "merge_graph_into",
 ]
