@@ -1270,8 +1270,11 @@ class CharacterGraphEditor(ctk.CTkFrame):
             # ── 1) Draw the post-it background ───────────────────────
             if self.postit_base:
                 ow, oh = self.postit_base.size
-                sf = max(min_w / ow, min_h / oh)
-                node_w, node_h = int(ow * sf), int(oh * sf)
+                if is_collapsed:
+                    node_w, node_h = int(min_w), int(min_h)
+                else:
+                    sf = max(min_w / ow, min_h / oh)
+                    node_w, node_h = int(ow * sf), int(oh * sf)
                 bg_img = self.postit_base.resize((node_w, node_h), Image.Resampling.LANCZOS)
                 bg_photo = ImageTk.PhotoImage(bg_img, master=self.canvas)
                 self.node_holder_images[tag] = bg_photo
