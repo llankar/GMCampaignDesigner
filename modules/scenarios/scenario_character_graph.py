@@ -306,6 +306,138 @@ def sync_scenario_graph_to_global(scenario_graph, graph_path=DEFAULT_CHARACTER_G
     return True
 
 
+def build_scenario_graph_with_links(
+    scenario_graph,
+    scenario_npcs,
+    scenario_pcs,
+    graph_path=DEFAULT_CHARACTER_GRAPH_PATH,
+):
+    base_graph = copy.deepcopy(scenario_graph) if isinstance(scenario_graph, dict) else {}
+    base_graph.setdefault("nodes", [])
+    base_graph.setdefault("links", [])
+    base_graph.setdefault("shapes", [])
+    ensure_graph_tabs(base_graph)
+
+    scenario_entities = {
+        ("npc", name) for name in (scenario_npcs or []) if isinstance(name, str) and name.strip()
+    }
+    scenario_entities.update(
+        ("pc", name) for name in (scenario_pcs or []) if isinstance(name, str) and name.strip()
+    )
+    if not scenario_entities:
+        return base_graph
+
+    global_graph = {"nodes": [], "links": [], "shapes": []}
+    if graph_path and os.path.exists(graph_path):
+        try:
+            with open(graph_path, "r", encoding="utf-8") as file:
+                global_graph = json.load(file)
+        except (OSError, json.JSONDecodeError):
+            global_graph = {"nodes": [], "links": [], "shapes": []}
+
+    global_graph.setdefault("nodes", [])
+    global_graph.setdefault("links", [])
+
+    global_nodes_by_key = {}
+    global_nodes_by_tag = {}
+    for node in global_graph.get("nodes", []):
+        if not isinstance(node, dict):
+            continue
+        entity_type = node.get("entity_type")
+        entity_name = node.get("entity_name")
+        if not entity_type or not entity_name:
+            if "npc_name" in node:
+                entity_type = "npc"
+                entity_name = node.get("npc_name")
+            elif "pc_name" in node:
+                entity_type = "pc"
+                entity_name = node.get("pc_name")
+        tag = node.get("tag")
+        if entity_type and entity_name:
+            global_nodes_by_key[(entity_type, entity_name)] = node
+        if tag:
+            global_nodes_by_tag[tag] = node
+
+    used_tags = {node.get("tag") for node in base_graph.get("nodes", []) if node.get("tag")}
+    base_nodes_by_key = {}
+    for node in base_graph.get("nodes", []):
+        if not isinstance(node, dict):
+            continue
+        entity_type = node.get("entity_type")
+        entity_name = node.get("entity_name")
+        if not entity_type or not entity_name:
+            if "npc_name" in node:
+                entity_type = "npc"
+                entity_name = node.get("npc_name")
+                node["entity_type"] = entity_type
+                node["entity_name"] = entity_name
+            elif "pc_name" in node:
+                entity_type = "pc"
+                entity_name = node.get("pc_name")
+                node["entity_type"] = entity_type
+                node["entity_name"] = entity_name
+        if entity_type and entity_name:
+            base_nodes_by_key[(entity_type, entity_name)] = node
+
+    for entity_key in scenario_entities:
+        if entity_key in base_nodes_by_key:
+            continue
+        source_node = global_nodes_by_key.get(entity_key)
+        node = copy.deepcopy(source_node) if isinstance(source_node, dict) else {}
+        entity_type, entity_name = entity_key
+        node["entity_type"] = entity_type
+        node["entity_name"] = entity_name
+        tag = node.get("tag")
+        base_tag = f"{entity_type}_{entity_name.replace(' ', '_')}"
+        if not tag or tag in used_tags:
+            tag = base_tag
+            index = 1
+            while tag in used_tags:
+                tag = f"{base_tag}_{index}"
+                index += 1
+        node["tag"] = tag
+        used_tags.add(tag)
+        node.setdefault("x", 200)
+        node.setdefault("y", 200)
+        node.setdefault("color", "#1D3572")
+        node.setdefault("collapsed", True)
+        base_graph["nodes"].append(node)
+        base_nodes_by_key[entity_key] = node
+
+    scenario_tags = {key: node.get("tag") for key, node in base_nodes_by_key.items()}
+    existing_links = list(base_graph.get("links", []))
+    existing_keys = {_link_key(link) for link in existing_links if isinstance(link, dict)}
+
+    for link in global_graph.get("links", []):
+        if not isinstance(link, dict):
+            continue
+        node1_tag, node2_tag = _normalize_link_tags(link)
+        if not node1_tag or not node2_tag:
+            continue
+        node1 = global_nodes_by_tag.get(node1_tag)
+        node2 = global_nodes_by_tag.get(node2_tag)
+        if not node1 or not node2:
+            continue
+        key1 = (node1.get("entity_type"), node1.get("entity_name"))
+        key2 = (node2.get("entity_type"), node2.get("entity_name"))
+        if key1 not in scenario_entities or key2 not in scenario_entities:
+            continue
+        new_link = copy.deepcopy(link)
+        new_link["node1_tag"] = scenario_tags.get(key1)
+        new_link["node2_tag"] = scenario_tags.get(key2)
+        if not new_link.get("node1_tag") or not new_link.get("node2_tag"):
+            continue
+        new_link.setdefault("arrow_mode", "both")
+        link_key = _link_key(new_link)
+        if link_key in existing_keys:
+            continue
+        existing_keys.add(link_key)
+        existing_links.append(new_link)
+
+    base_graph["links"] = existing_links
+    return base_graph
+
+
 def _build_temporary_graph_path():
     campaign_dir = ConfigHelper.get_campaign_dir() or os.getcwd()
     graph_dir = os.path.join(campaign_dir, "graphs")
@@ -350,6 +482,19 @@ def _link_key(link):
         link.get("text") or "",
         link.get("arrow_mode") or "both",
     )
+
+
+def _normalize_link_tags(link):
+    node1_tag = link.get("node1_tag")
+    node2_tag = link.get("node2_tag")
+    if not node1_tag or not node2_tag:
+        if "npc_name1" in link and "npc_name2" in link:
+            node1_tag = f"npc_{link['npc_name1'].replace(' ', '_')}"
+            node2_tag = f"npc_{link['npc_name2'].replace(' ', '_')}"
+        elif "pc_name1" in link and "pc_name2" in link:
+            node1_tag = f"pc_{link['pc_name1'].replace(' ', '_')}"
+            node2_tag = f"pc_{link['pc_name2'].replace(' ', '_')}"
+    return node1_tag, node2_tag
 
 
 def _add_nodes_to_active_tab(graph, node_tags):
