@@ -31,6 +31,7 @@ from modules.helpers.logging_helper import (
     log_info,
     log_module_import,
 )
+from modules.scenarios.scene_flow_viewer import create_scene_flow_frame
 
 log_module_import(__name__)
 
@@ -529,10 +530,19 @@ def insert_places_table(parent, header, place_names, open_entity_callback):
         table.grid_rowconfigure(r, weight=1)
         
 @log_function
-def insert_list_longtext(parent, header, items, open_entity_callback=None, entity_collector=None, gm_view=None):
+def insert_list_longtext(
+    parent,
+    header,
+    items,
+    open_entity_callback=None,
+    entity_collector=None,
+    gm_view=None,
+    show_header=True,
+):
     """Insert collapsible sections for long text lists such as scenario scenes."""
-    ctk.CTkLabel(parent, text=f"{header}:", font=("Arial", 16, "bold")) \
-        .pack(anchor="w", padx=10, pady=(10, 2))
+    if show_header:
+        ctk.CTkLabel(parent, text=f"{header}:", font=("Arial", 16, "bold")) \
+            .pack(anchor="w", padx=10, pady=(10, 2))
 
     def _flatten_strings(value):
         parsed = deserialize_possible_json(value)
@@ -977,14 +987,70 @@ def create_scenario_detail_frame(entity_type, scenario_item, master, open_entity
         if ftype == "text":
             insert_text(frame, name, value)
         elif ftype == "list_longtext":
-            insert_list_longtext(
-                frame,
-                name,
-                value,
-                open_entity_callback,
-                entity_collector=scene_entity_tracker,
-                gm_view=gm_view_instance,
-            )
+            if name == "Scenes" and gm_view_instance is not None:
+                scenes_container = ctk.CTkFrame(frame, fg_color="transparent")
+                scenes_container.pack(fill="both", expand=True, padx=10, pady=(10, 2))
+
+                header_row = ctk.CTkFrame(scenes_container, fg_color="transparent")
+                header_row.pack(fill="x", padx=10, pady=(0, 4))
+                ctk.CTkLabel(
+                    header_row,
+                    text="Scenes:",
+                    font=("Arial", 16, "bold"),
+                ).pack(side="left")
+
+                view_var = tk.StringVar(value="List")
+                view_toggle = ctk.CTkSegmentedButton(
+                    header_row,
+                    values=["List", "Scene Flow"],
+                    variable=view_var,
+                )
+                view_toggle.pack(side="right")
+
+                list_container = ctk.CTkFrame(scenes_container, fg_color="transparent")
+                list_container.pack(fill="x", expand=True)
+
+                insert_list_longtext(
+                    list_container,
+                    name,
+                    value,
+                    open_entity_callback,
+                    entity_collector=scene_entity_tracker,
+                    gm_view=gm_view_instance,
+                    show_header=False,
+                )
+
+                flow_container = ctk.CTkFrame(scenes_container, fg_color="transparent", height=520)
+                flow_container.pack_propagate(False)
+                scenario_title = str(
+                    scenario_item.get("Title") or scenario_item.get("Name") or ""
+                ).strip()
+                scene_flow_frame = create_scene_flow_frame(
+                    flow_container,
+                    scenario_title=scenario_title,
+                )
+                scene_flow_frame.pack(fill="both", expand=True)
+
+                def _toggle_scene_view(selected_view=None):
+                    selection = selected_view or view_var.get()
+                    if selection == "Scene Flow":
+                        list_container.pack_forget()
+                        flow_container.pack(fill="both", expand=True, padx=10, pady=(6, 0))
+                        scene_flow_frame.after_idle(scene_flow_frame._on_layout_resize)
+                    else:
+                        flow_container.pack_forget()
+                        list_container.pack(fill="x", expand=True)
+
+                view_toggle.configure(command=_toggle_scene_view)
+            else:
+                insert_list_longtext(
+                    frame,
+                    name,
+                    value,
+                    open_entity_callback,
+                    entity_collector=scene_entity_tracker,
+                    gm_view=gm_view_instance,
+                )
         elif ftype == "longtext":
             insert_longtext(frame, name, value)
         elif ftype == "list":
