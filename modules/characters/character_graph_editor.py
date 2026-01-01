@@ -1367,7 +1367,7 @@ class CharacterGraphEditor(ctk.CTkFrame):
             # ── 6) Draw collapse/expand toggle ───────────────────────
             toggle_radius = max(4, int(8 * scale))
             toggle_margin = max(2, int(6 * scale))
-            toggle_x = x + node_w / 2 - toggle_radius - toggle_margin
+            toggle_x = x + node_w / 2 + toggle_radius + toggle_margin
             toggle_y = y - node_h / 2 + toggle_radius + toggle_margin
             toggle_symbol = "+" if is_collapsed else "−"
             self.canvas.create_oval(
