@@ -21,6 +21,10 @@ from modules.scenarios.scene_flow_components import (
     SceneFlowPreview,
     normalise_scene_links,
 )
+from modules.scenarios.scenario_character_graph import (
+    ScenarioCharacterGraphEditor,
+    sync_scenario_graph_to_global,
+)
 
 try:
     _IMAGE_RESAMPLE = Image.Resampling.LANCZOS
@@ -1777,6 +1781,69 @@ class EntityLinkingStep(WizardStep):
         return True
 
 
+class CharacterRelationsStep(WizardStep):
+    def __init__(self, master, npc_wrapper, pc_wrapper, faction_wrapper):
+        super().__init__(master)
+        self.grid_rowconfigure(1, weight=1)
+        self.grid_columnconfigure(0, weight=1)
+
+        header = ctk.CTkFrame(self)
+        header.grid(row=0, column=0, sticky="ew", padx=20, pady=(20, 10))
+        header.grid_columnconfigure(0, weight=1)
+
+        ctk.CTkLabel(
+            header,
+            text="Character Relationships",
+            font=ctk.CTkFont(size=16, weight="bold"),
+            anchor="w",
+        ).grid(row=0, column=0, sticky="w", padx=12, pady=(10, 4))
+
+        ctk.CTkLabel(
+            header,
+            text=(
+                "Drop NPCs and PCs onto the board, create links between them, "
+                "and right-click nodes or links to delete."
+            ),
+            text_color="#9db4d1",
+            anchor="w",
+            justify="left",
+        ).grid(row=1, column=0, sticky="w", padx=12, pady=(0, 10))
+
+        self.sync_to_global_var = ctk.BooleanVar(value=False)
+        self.sync_switch = ctk.CTkSwitch(
+            header,
+            text="Sync to global character graph",
+            variable=self.sync_to_global_var,
+        )
+        self.sync_switch.grid(row=0, column=1, padx=12, pady=(10, 0), sticky="e")
+
+        self.sync_hint = ctk.CTkLabel(
+            header,
+            text="Disable to keep this graph only inside the scenario.",
+            text_color="#9db4d1",
+            anchor="e",
+        )
+        self.sync_hint.grid(row=1, column=1, padx=12, pady=(0, 10), sticky="e")
+
+        self.graph_editor = ScenarioCharacterGraphEditor(
+            self,
+            npc_wrapper=npc_wrapper,
+            pc_wrapper=pc_wrapper,
+            faction_wrapper=faction_wrapper,
+        )
+        self.graph_editor.grid(row=1, column=0, sticky="nsew", padx=20, pady=(0, 20))
+
+    def load_state(self, state):  # pragma: no cover - UI synchronization
+        self.sync_to_global_var.set(bool(state.get("ScenarioCharacterGraphSync")))
+        graph_data = state.get("ScenarioCharacterGraph") or {}
+        self.graph_editor.load_graph_data(graph_data)
+
+    def save_state(self, state):  # pragma: no cover - UI synchronization
+        state["ScenarioCharacterGraph"] = self.graph_editor.export_graph_data()
+        state["ScenarioCharacterGraphSync"] = bool(self.sync_to_global_var.get())
+        return True
+
+
 class ReviewStep(WizardStep):
     def __init__(self, master):
         super().__init__(master)
@@ -1961,10 +2028,13 @@ class ScenarioBuilderWizard(ctk.CTkToplevel):
             "Maps": [],
             "Factions": [],
             "Objects": [],
+            "ScenarioCharacterGraph": {"nodes": [], "links": []},
+            "ScenarioCharacterGraphSync": False,
         }
 
         self.scenario_wrapper = GenericModelWrapper("scenarios")
         self.npc_wrapper = GenericModelWrapper("npcs")
+        self.pc_wrapper = GenericModelWrapper("pcs")
         self.creature_wrapper = GenericModelWrapper("creatures")
         self.place_wrapper = GenericModelWrapper("places")
         self.map_wrapper = GenericModelWrapper("maps")
@@ -2098,6 +2168,15 @@ class ScenarioBuilderWizard(ctk.CTkToplevel):
         self.steps = [
             ("Visual Builder", planning_step),
             ("Entity Linking", EntityLinkingStep(self.step_container, entity_wrappers)),
+            (
+                "Character Relations",
+                CharacterRelationsStep(
+                    self.step_container,
+                    npc_wrapper=self.npc_wrapper,
+                    pc_wrapper=self.pc_wrapper,
+                    faction_wrapper=self.faction_wrapper,
+                ),
+            ),
             ("Review", ReviewStep(self.step_container)),
         ]
 
@@ -2268,7 +2347,9 @@ class ScenarioBuilderWizard(ctk.CTkToplevel):
             "Maps": list(dict.fromkeys(self.wizard_state.get("Maps", []))),
             "Factions": list(dict.fromkeys(self.wizard_state.get("Factions", []))),
             "Objects": list(dict.fromkeys(self.wizard_state.get("Objects", []))),
+            "ScenarioCharacterGraph": self.wizard_state.get("ScenarioCharacterGraph", {}),
         }
+        sync_graph = bool(self.wizard_state.get("ScenarioCharacterGraphSync"))
 
         buttons = {
             self.back_btn: self.back_btn.cget("state"),
@@ -2321,11 +2402,22 @@ class ScenarioBuilderWizard(ctk.CTkToplevel):
                     self.on_saved()
                 except Exception:
                     pass
+            if sync_graph:
+                try:
+                    sync_scenario_graph_to_global(
+                        self.wizard_state.get("ScenarioCharacterGraph") or {}
+                    )
+                except Exception as exc:  # pragma: no cover - defensive path
+                    log_exception(
+                        f"Failed to sync scenario character graph: {exc}",
+                        func_name="ScenarioBuilderWizard.finish",
+                    )
+                    messagebox.showwarning(
+                        "Character Graph Sync Failed",
+                        "The scenario was saved, but the global character graph could not be updated.",
+                    )
         finally:
             for btn, previous_state in buttons.items():
                 btn.configure(state=previous_state)
         self.destroy()
-
-
-
 
