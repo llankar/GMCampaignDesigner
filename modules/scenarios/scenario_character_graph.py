@@ -27,10 +27,12 @@ class ScenarioCharacterGraphEditor(CharacterGraphEditor):
         faction_wrapper,
         graph_data=None,
         on_entity_added=None,
+        on_entity_removed=None,
         *args,
         **kwargs,
     ):
         self._on_entity_added = on_entity_added
+        self._on_entity_removed = on_entity_removed
         graph_path = _build_temporary_graph_path()
         super().__init__(
             master,
@@ -53,6 +55,21 @@ class ScenarioCharacterGraphEditor(CharacterGraphEditor):
             name_value = entity.get("record", {}).get("Name")
             if name_value:
                 self._on_entity_added(entity.get("type"), name_value)
+
+    def delete_node(self):
+        tag = self.selected_node
+        entity_info = self._get_node_entity_info(tag) if tag else None
+        super().delete_node()
+        if not entity_info:
+            return
+        if any(
+            isinstance(node, dict) and node.get("tag") == tag
+            for node in self.graph.get("nodes", [])
+        ):
+            return
+        if callable(self._on_entity_removed):
+            entity_type, entity_name = entity_info
+            self._on_entity_removed(entity_type, entity_name)
 
     def init_toolbar(self):
         toolbar = ctk.CTkFrame(self)
