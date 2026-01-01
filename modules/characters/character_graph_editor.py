@@ -790,6 +790,7 @@ class CharacterGraphEditor(ctk.CTkFrame):
             "tag": tag,
             "x": x0,
             "y": y0,
+            "collapsed": True,
         })
         self.node_positions[tag] = (x0, y0)
         self._add_node_to_active_tab(tag)
@@ -860,6 +861,7 @@ class CharacterGraphEditor(ctk.CTkFrame):
                     "x": x,
                     "y": y,
                     "color": "#1D3572",
+                    "collapsed": True,
                 })
                 # record its canvas position
                 self.node_positions[tag] = (x, y)
@@ -1456,6 +1458,7 @@ class CharacterGraphEditor(ctk.CTkFrame):
         # ── 4) Fill in any defaults for color, arrow_mode, etc. ───────────────────
         for node in self.graph["nodes"]:
             node.setdefault("color", "#1D3572")
+            node.setdefault("collapsed", True)
         for link in self.graph["links"]:
             if "node1_tag" not in link or "node2_tag" not in link:
                 if "npc_name1" in link and "npc_name2" in link:
