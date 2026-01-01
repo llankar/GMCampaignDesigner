@@ -26,9 +26,11 @@ class ScenarioCharacterGraphEditor(CharacterGraphEditor):
         pc_wrapper,
         faction_wrapper,
         graph_data=None,
+        on_entity_added=None,
         *args,
         **kwargs,
     ):
+        self._on_entity_added = on_entity_added
         graph_path = _build_temporary_graph_path()
         super().__init__(
             master,
@@ -41,6 +43,16 @@ class ScenarioCharacterGraphEditor(CharacterGraphEditor):
             **kwargs,
         )
         self.load_graph_data(graph_data or {})
+
+    def place_pending_entity(self, event):
+        entity = self.pending_entity
+        if not entity:
+            return
+        super().place_pending_entity(event)
+        if callable(self._on_entity_added):
+            name_value = entity.get("record", {}).get("Name")
+            if name_value:
+                self._on_entity_added(entity.get("type"), name_value)
 
     def init_toolbar(self):
         toolbar = ctk.CTkFrame(self)
