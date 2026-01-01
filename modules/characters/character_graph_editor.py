@@ -422,6 +422,61 @@ class CharacterGraphEditor(ctk.CTkFrame):
                 })
         self.graph["links"] = rebuilt_links
 
+    def _link_key(self, link):
+        if not isinstance(link, dict):
+            return None
+        tag1 = link.get("node1_tag")
+        tag2 = link.get("node2_tag")
+        if not tag1 or not tag2:
+            return None
+        label = link.get("text") or ""
+        return tuple(sorted((tag1, tag2))) + (label,)
+
+    def _merge_links_from_entities(self):
+        tag_lookup = {
+            (node.get("entity_type"), node.get("entity_name")): node.get("tag")
+            for node in self.graph.get("nodes", [])
+        }
+        if not tag_lookup:
+            return False
+        existing_links = [link for link in self.graph.get("links", []) if isinstance(link, dict)]
+        existing_keys = {
+            self._link_key(link)
+            for link in existing_links
+            if link.get("node1_tag") and link.get("node2_tag")
+        }
+        new_links = []
+        for (entity_type, entity_name), tag in tag_lookup.items():
+            if not tag:
+                continue
+            record = self._get_entity_record(entity_type, entity_name)
+            if not record:
+                continue
+            for link in self._normalize_links_list(record):
+                if not isinstance(link, dict):
+                    continue
+                target_type = link.get("target_type")
+                target_name = link.get("target_name")
+                label = link.get("label") or ""
+                target_tag = tag_lookup.get((target_type, target_name))
+                if not target_tag:
+                    continue
+                link_data = {
+                    "node1_tag": tag,
+                    "node2_tag": target_tag,
+                    "text": label,
+                    "arrow_mode": link.get("arrow_mode") or "both",
+                }
+                link_key = self._link_key(link_data)
+                if link_key in existing_keys:
+                    continue
+                existing_keys.add(link_key)
+                new_links.append(link_data)
+        if new_links:
+            self.graph.setdefault("links", []).extend(new_links)
+            return True
+        return False
+
     def _get_entity_opener(self, entity_type):
         if entity_type == "pc":
             return pc_opener.open_pc_editor_window
@@ -943,6 +998,7 @@ class CharacterGraphEditor(ctk.CTkFrame):
         self.pending_entity = None
         self.canvas.unbind("<Button-1>")
         self.canvas.bind("<Button-1>", self.start_drag)
+        self._merge_links_from_entities()
         self.draw_graph()
         self._autosave_graph()
 
@@ -1019,6 +1075,7 @@ class CharacterGraphEditor(ctk.CTkFrame):
             self.canvas.bind("<ButtonRelease-1>", self.end_drag)
 
             # ── 5) Redraw everything (post-its, portraits, links, etc.) ────
+            self._merge_links_from_entities()
             self.draw_graph()
             self._autosave_graph()
 
@@ -1681,7 +1738,7 @@ class CharacterGraphEditor(ctk.CTkFrame):
         self._refresh_entity_records("pc")
         for link in list(self.graph.get("links", [])):
             self._persist_link_to_entities(link)
-        self._rebuild_links_from_entities()
+        self._merge_links_from_entities()
 
         # ── 5) Rebuild shapes dict & counter ─────────────────────────────────────
         shapes_sorted = sorted(self.graph["shapes"], key=lambda s: s.get("z", 0))

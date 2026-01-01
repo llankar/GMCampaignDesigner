@@ -49,8 +49,6 @@ class ScenarioCharacterGraphEditor(CharacterGraphEditor):
         if not entity:
             return
         super().place_pending_entity(event)
-        if self._merge_links_from_entities():
-            self.draw_graph()
         if callable(self._on_entity_added):
             name_value = entity.get("record", {}).get("Name")
             if name_value:
