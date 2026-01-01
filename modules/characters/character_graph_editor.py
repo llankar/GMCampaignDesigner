@@ -111,6 +111,7 @@ class CharacterGraphEditor(ctk.CTkFrame):
         self.tab_selector_var = ctk.StringVar()
         self.tab_selector = None
         self.tab_id_by_name = {}
+        self.nodes_collapsed = True
         
         # Initialize the toolbar and canvas frame
         self.init_toolbar()
@@ -558,6 +559,7 @@ class CharacterGraphEditor(ctk.CTkFrame):
         # 🆕 Add Shape Buttons
         ctk.CTkButton(toolbar, text="Add Rectangle", command=lambda: self.add_shape("rectangle")).pack(side="left", padx=5)
         ctk.CTkButton(toolbar, text="Add Oval", command=lambda: self.add_shape("oval")).pack(side="left", padx=5)
+        ctk.CTkButton(toolbar, text="+/-", command=self.toggle_nodes_collapsed).pack(side="left", padx=5)
         ctk.CTkButton(toolbar, text="Reset Zoom", command=self.reset_zoom).pack(side="left", padx=5)
         ctk.CTkLabel(toolbar, text="Tab:").pack(side="left", padx=(15, 5))
         self.tab_selector = ctk.CTkOptionMenu(
@@ -569,6 +571,13 @@ class CharacterGraphEditor(ctk.CTkFrame):
         )
         self.tab_selector.pack(side="left", padx=5)
         ctk.CTkButton(toolbar, text="Manage Tabs", command=self.open_manage_tabs).pack(side="left", padx=5)
+
+    def toggle_nodes_collapsed(self):
+        self.nodes_collapsed = not self.nodes_collapsed
+        for node in self.graph["nodes"]:
+            node["collapsed"] = self.nodes_collapsed
+        self.draw_graph()
+        self._autosave_graph()
 
     def reset_zoom(self):
         self.canvas_scale = 1.0
@@ -790,7 +799,7 @@ class CharacterGraphEditor(ctk.CTkFrame):
             "tag": tag,
             "x": x0,
             "y": y0,
-            "collapsed": True,
+            "collapsed": self.nodes_collapsed,
         })
         self.node_positions[tag] = (x0, y0)
         self._add_node_to_active_tab(tag)
@@ -861,7 +870,7 @@ class CharacterGraphEditor(ctk.CTkFrame):
                     "x": x,
                     "y": y,
                     "color": "#1D3572",
-                    "collapsed": True,
+                    "collapsed": self.nodes_collapsed,
                 })
                 # record its canvas position
                 self.node_positions[tag] = (x, y)
@@ -1490,6 +1499,10 @@ class CharacterGraphEditor(ctk.CTkFrame):
         for node in self.graph["nodes"]:
             node.setdefault("color", "#1D3572")
             node.setdefault("collapsed", True)
+        if self.graph["nodes"]:
+            self.nodes_collapsed = all(node.get("collapsed", True) for node in self.graph["nodes"])
+        else:
+            self.nodes_collapsed = True
         for link in self.graph["links"]:
             if "node1_tag" not in link or "node2_tag" not in link:
                 if "npc_name1" in link and "npc_name2" in link:
