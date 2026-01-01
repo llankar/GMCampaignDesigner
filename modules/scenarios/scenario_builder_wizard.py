@@ -1786,6 +1786,7 @@ class CharacterRelationsStep(WizardStep):
         super().__init__(master)
         self.grid_rowconfigure(1, weight=1)
         self.grid_columnconfigure(0, weight=1)
+        self._state_ref = None
 
         header = ctk.CTkFrame(self)
         header.grid(row=0, column=0, sticky="ew", padx=20, pady=(20, 10))
@@ -1830,8 +1831,29 @@ class CharacterRelationsStep(WizardStep):
             npc_wrapper=npc_wrapper,
             pc_wrapper=pc_wrapper,
             faction_wrapper=faction_wrapper,
+            on_entity_added=self._on_entity_added,
         )
         self.graph_editor.grid(row=1, column=0, sticky="nsew", padx=20, pady=(0, 20))
+
+    def set_state_binding(self, state, on_state_change=None):
+        self._state_ref = state
+        self._on_state_change = on_state_change
+
+    def _on_entity_added(self, entity_type, entity_name):
+        if not self._state_ref or not entity_name:
+            return
+        if entity_type == "npc":
+            field = "NPCs"
+        elif entity_type == "pc":
+            field = "PCs"
+        else:
+            return
+        values = list(self._state_ref.get(field) or [])
+        if entity_name not in values:
+            values.append(entity_name)
+            self._state_ref[field] = values
+            if callable(self._on_state_change):
+                self._on_state_change(source=self)
 
     def load_state(self, state):  # pragma: no cover - UI synchronization
         self.sync_to_global_var.set(bool(state.get("ScenarioCharacterGraphSync")))
@@ -1839,7 +1861,25 @@ class CharacterRelationsStep(WizardStep):
         self.graph_editor.load_graph_data(graph_data)
 
     def save_state(self, state):  # pragma: no cover - UI synchronization
-        state["ScenarioCharacterGraph"] = self.graph_editor.export_graph_data()
+        graph_data = self.graph_editor.export_graph_data()
+        state["ScenarioCharacterGraph"] = graph_data
+        npc_names = []
+        pc_names = []
+        for node in graph_data.get("nodes", []):
+            if not isinstance(node, dict):
+                continue
+            entity_type = node.get("entity_type")
+            entity_name = node.get("entity_name") or node.get("npc_name") or node.get("pc_name")
+            if not entity_name:
+                continue
+            if entity_type == "npc":
+                npc_names.append(entity_name)
+            elif entity_type == "pc":
+                pc_names.append(entity_name)
+        if npc_names:
+            state["NPCs"] = list(dict.fromkeys((state.get("NPCs") or []) + npc_names))
+        if pc_names:
+            state["PCs"] = list(dict.fromkeys((state.get("PCs") or []) + pc_names))
         state["ScenarioCharacterGraphSync"] = bool(self.sync_to_global_var.get())
         return True
 
@@ -2023,6 +2063,7 @@ class ScenarioBuilderWizard(ctk.CTkToplevel):
             "Secret": "",
             "Scenes": [],
             "NPCs": [],
+            "PCs": [],
             "Creatures": [],
             "Places": [],
             "Maps": [],
@@ -2167,7 +2208,6 @@ class ScenarioBuilderWizard(ctk.CTkToplevel):
 
         self.steps = [
             ("Visual Builder", planning_step),
-            ("Entity Linking", EntityLinkingStep(self.step_container, entity_wrappers)),
             (
                 "Character Relations",
                 CharacterRelationsStep(
@@ -2177,6 +2217,7 @@ class ScenarioBuilderWizard(ctk.CTkToplevel):
                     faction_wrapper=self.faction_wrapper,
                 ),
             ),
+            ("Entity Linking", EntityLinkingStep(self.step_container, entity_wrappers)),
             ("Review", ReviewStep(self.step_container)),
         ]
 
@@ -2343,6 +2384,7 @@ class ScenarioBuilderWizard(ctk.CTkToplevel):
             "Scenes": scenes,
             "Places": list(dict.fromkeys(self.wizard_state.get("Places", []))),
             "NPCs": list(dict.fromkeys(self.wizard_state.get("NPCs", []))),
+            "PCs": list(dict.fromkeys(self.wizard_state.get("PCs", []))),
             "Creatures": list(dict.fromkeys(self.wizard_state.get("Creatures", []))),
             "Maps": list(dict.fromkeys(self.wizard_state.get("Maps", []))),
             "Factions": list(dict.fromkeys(self.wizard_state.get("Factions", []))),
@@ -2420,4 +2462,3 @@ class ScenarioBuilderWizard(ctk.CTkToplevel):
             for btn, previous_state in buttons.items():
                 btn.configure(state=previous_state)
         self.destroy()
-
