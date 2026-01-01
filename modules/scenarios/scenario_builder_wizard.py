@@ -23,6 +23,7 @@ from modules.scenarios.scene_flow_components import (
 )
 from modules.scenarios.scenario_character_graph import (
     ScenarioCharacterGraphEditor,
+    build_scenario_graph_with_links,
     sync_scenario_graph_to_global,
 )
 
@@ -1858,6 +1859,11 @@ class CharacterRelationsStep(WizardStep):
     def load_state(self, state):  # pragma: no cover - UI synchronization
         self.sync_to_global_var.set(bool(state.get("ScenarioCharacterGraphSync")))
         graph_data = state.get("ScenarioCharacterGraph") or {}
+        graph_data = build_scenario_graph_with_links(
+            graph_data,
+            state.get("NPCs") or [],
+            state.get("PCs") or [],
+        )
         self.graph_editor.load_graph_data(graph_data)
 
     def save_state(self, state):  # pragma: no cover - UI synchronization
