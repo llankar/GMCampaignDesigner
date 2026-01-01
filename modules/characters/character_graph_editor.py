@@ -165,6 +165,7 @@ class CharacterGraphEditor(ctk.CTkFrame):
         self.canvas.bind("<Control-Button-5>", self._on_zoom)    # Linux scroll down
     # Bind double-click on any character element to open the editor window
         self.canvas.bind("<Double-Button-1>", self.open_character_editor)
+        self.canvas.tag_bind("collapse_toggle", "<Button-1>", self.on_toggle_collapse, add="+")
         self._is_panning = False
         self.canvas.bind("<Button-2>", self._start_canvas_pan)
         self.canvas.bind("<B2-Motion>", self._do_canvas_pan)
@@ -184,6 +185,23 @@ class CharacterGraphEditor(ctk.CTkFrame):
 
     def _get_node_by_tag(self, tag):
         return next((node for node in self.graph["nodes"] if node.get("tag") == tag), None)
+
+    def on_toggle_collapse(self, event):
+        item = self.canvas.find_withtag("current")
+        if not item:
+            return "break"
+        tags = self.canvas.gettags(item[0])
+        node_tag = self._extract_node_tag(tags)
+        if not node_tag:
+            return "break"
+        node = self._get_node_by_tag(node_tag)
+        if not node:
+            return "break"
+        node["collapsed"] = not node.get("collapsed", False)
+        self.nodes_collapsed = all(node.get("collapsed", True) for node in self.graph["nodes"])
+        self.draw_graph()
+        self._autosave_graph()
+        return "break"
 
     def _add_node_to_active_tab(self, tag):
         active_tab = get_active_tab(self.graph)
@@ -1346,13 +1364,37 @@ class CharacterGraphEditor(ctk.CTkFrame):
                     tags=(tag, "node_fg", "node")
                 )
 
-            # ── 6) Store bounding box for links ──────────────────────
+            # ── 6) Draw collapse/expand toggle ───────────────────────
+            toggle_radius = max(4, int(8 * scale))
+            toggle_margin = max(2, int(6 * scale))
+            toggle_x = x + node_w / 2 - toggle_radius - toggle_margin
+            toggle_y = y
+            toggle_symbol = "+" if is_collapsed else "−"
+            self.canvas.create_oval(
+                toggle_x - toggle_radius,
+                toggle_y - toggle_radius,
+                toggle_x + toggle_radius,
+                toggle_y + toggle_radius,
+                fill="#2B2B2B",
+                outline="#1B1B1B",
+                tags=(tag, "node_fg", "node", "collapse_toggle")
+            )
+            self.canvas.create_text(
+                toggle_x,
+                toggle_y,
+                text=toggle_symbol,
+                font=("Arial", max(1, int(10 * scale)), "bold"),
+                fill="white",
+                tags=(tag, "node_fg", "node", "collapse_toggle")
+            )
+
+            # ── 7) Store bounding box for links ──────────────────────
             self.node_bboxes[tag] = (
                 x - node_w / 2, y - node_h / 2,
                 x + node_w / 2, y + node_h / 2
             )
 
-            # ── 7) Layer foreground above background ────────────────
+            # ── 8) Layer foreground above background ────────────────
             self.canvas.tag_raise("node_fg", "node_bg")
 
     # ─────────────────────────────────────────────────────────────────────────
