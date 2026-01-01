@@ -1833,6 +1833,7 @@ class CharacterRelationsStep(WizardStep):
             pc_wrapper=pc_wrapper,
             faction_wrapper=faction_wrapper,
             on_entity_added=self._on_entity_added,
+            on_entity_removed=self._on_entity_removed,
         )
         self.graph_editor.grid(row=1, column=0, sticky="nsew", padx=20, pady=(0, 20))
 
@@ -1852,6 +1853,22 @@ class CharacterRelationsStep(WizardStep):
         values = list(self._state_ref.get(field) or [])
         if entity_name not in values:
             values.append(entity_name)
+            self._state_ref[field] = values
+            if callable(self._on_state_change):
+                self._on_state_change(source=self)
+
+    def _on_entity_removed(self, entity_type, entity_name):
+        if not self._state_ref or not entity_name:
+            return
+        if entity_type == "npc":
+            field = "NPCs"
+        elif entity_type == "pc":
+            field = "PCs"
+        else:
+            return
+        values = list(self._state_ref.get(field) or [])
+        if entity_name in values:
+            values = [value for value in values if value != entity_name]
             self._state_ref[field] = values
             if callable(self._on_state_change):
                 self._on_state_change(source=self)
