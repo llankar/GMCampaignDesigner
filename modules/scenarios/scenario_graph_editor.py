@@ -1528,13 +1528,24 @@ class ScenarioGraphEditor(ctk.CTkFrame):
 
         avg_card_width = sum(card_widths) / max(1, len(card_widths))
         avg_card_height = sum(card_heights) / max(1, len(card_heights))
-        base_padding_x = max(12, int(avg_card_width * 0.05))
-        base_padding_y = max(12, int(avg_card_height * 0.08))
 
         self.canvas.update_idletasks()
-        canvas_width = max(self.canvas.winfo_width(), 1)
-        origin_x = 400
-        origin_y = 260
+        canvas_width = max(int(self.canvas.winfo_width()), 1)
+        canvas_height = max(int(self.canvas.winfo_height()), 1)
+        available_width = canvas_width if canvas_width > 1 else int(max_card_width * 2)
+        available_height = canvas_height if canvas_height > 1 else int(max_card_height * 2)
+
+        base_padding_x = max(
+            12,
+            int(min(avg_card_width * 0.045, available_width * 0.025)),
+        )
+        base_padding_y = max(
+            18,
+            int(min(avg_card_height * 0.12, available_height * 0.08)),
+        )
+
+        origin_x = available_width / 2
+        origin_y = max(int(max_card_height * 0.7), int(available_height * 0.16))
 
         def build_rows(col_count):
             return [normalized_scenes[i:i + col_count] for i in range(0, count, col_count)]
@@ -1612,12 +1623,12 @@ class ScenarioGraphEditor(ctk.CTkFrame):
         padding_x = base_padding_x
         padding_y = base_padding_y
         positions = []
-        for _ in range(3):
+        for _ in range(4):
             cols, rows, positions = compute_layout(padding_x, padding_y)
             if not layout_has_overlap(positions):
                 break
-            padding_x = int(padding_x * 1.2)
-            padding_y = int(padding_y * 1.2)
+            padding_x = int(padding_x * 1.25)
+            padding_y = int(padding_y * 1.25)
         if layout_has_overlap(positions):
             log_warning("Scene flow layout overlaps detected; padding adjustments were insufficient.")
 

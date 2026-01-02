@@ -16,7 +16,7 @@ log_module_import(__name__)
 
 
 class SceneFlowViewerWindow(ctk.CTkToplevel):
-    """Toplevel window hosting a dedicated scene flow viewer."""
+    """Toplevel window hosting a dedicated scene flow viewer (v2 layout)."""
 
     def __init__(
         self,
@@ -66,7 +66,7 @@ class SceneFlowViewerWindow(ctk.CTkToplevel):
 
 
 class SceneFlowViewerFrame(ScenarioGraphEditor):
-    """ScenarioGraphEditor subclass that specialises in scene flow presentation."""
+    """ScenarioGraphEditor subclass that specialises in scene flow presentation (v2 layout)."""
 
     GRID_EXTENT_WIDTH = 6000
     GRID_EXTENT_HEIGHT = 4000
@@ -91,6 +91,8 @@ class SceneFlowViewerFrame(ScenarioGraphEditor):
         self._scenario_lookup: Dict[str, dict] = {}
         self._shadow_cache: Dict[tuple, tuple] = {}
         self._grid_tile_cache: Dict[str, ImageTk.PhotoImage] = {}
+        self._relayout_after_id: Optional[str] = None
+        self._relayout_in_progress = False
 
         super().__init__(
             master,
@@ -114,13 +116,7 @@ class SceneFlowViewerFrame(ScenarioGraphEditor):
     # Portrait handling
     # ------------------------------------------------------------------
     def load_portrait_scaled(self, portrait_path, node_tag, scale: float = 1.0):  # type: ignore[override]
-        """Load node portraits at twice the base size used by the editor.
-
-        The underlying graph editor already supports zoom scaling via the
-        ``scale`` parameter. By multiplying the provided scale we effectively
-        double the rendered size of portraits in the dedicated scene flow
-        viewer while still respecting zoom changes.
-        """
+        """Load node portraits at twice the base size used by the editor."""
 
         effective_scale = (scale or 0.0) * self.PORTRAIT_SCALE_MULTIPLIER
         if effective_scale <= 0:
@@ -259,15 +255,18 @@ class SceneFlowViewerFrame(ScenarioGraphEditor):
         # Apply the selected fit mode on first load for better initial view
         self._fit_initialized = False
         self._fit_to_view()
+        self._schedule_relayout(0)
 
     def _on_canvas_resized(self, _event=None) -> None:
         if not self._fit_initialized:
             self._fit_to_view()
+        self._schedule_relayout(80)
 
     def _on_fit_mode_change(self, value: str) -> None:
         self.fit_mode = (value or "Contain").title()
         self._fit_initialized = False
         self._fit_to_view()
+        self._schedule_relayout(0)
 
     def _fit_to_view(self) -> None:
         canvas = getattr(self, "canvas", None)
@@ -307,7 +306,8 @@ class SceneFlowViewerFrame(ScenarioGraphEditor):
             scale = float(scale)
         except Exception:
             scale = 1.0
-        scale = max(0.2, min(3.0, scale))
+        # Option 2: avoid upscaling to keep layout spacing consistent
+        scale = max(0.2, min(1.0, scale))
 
         if abs(getattr(self, "canvas_scale", 1.0) - scale) > 1e-3:
             self.canvas_scale = scale
@@ -417,6 +417,142 @@ class SceneFlowViewerFrame(ScenarioGraphEditor):
         self.canvas.tag_lower("scene_flow_bg")
 
     # ------------------------------------------------------------------
+    # Layout override
+    # ------------------------------------------------------------------
+    def _schedule_relayout(self, delay_ms: int = 60) -> None:
+        """Debounce relayout to handle resize/fit changes smoothly."""
+        if self._relayout_after_id:
+            try:
+                self.after_cancel(self._relayout_after_id)
+            except Exception:
+                pass
+            self._relayout_after_id = None
+        try:
+            self._relayout_after_id = self.after(delay_ms, self._relayout_scene_flow)
+        except Exception:
+            self._relayout_scene_flow()
+
+    def load_scenario_scene_flow(self, scenario=None):  # type: ignore[override]
+        """Load the scene flow then re-layout nodes to fit the available canvas."""
+        super().load_scenario_scene_flow(scenario)
+        self._relayout_scene_flow()
+
+    def _relayout_scene_flow(self) -> None:
+        if self._relayout_in_progress:
+            return
+        self._relayout_in_progress = True
+        self._relayout_after_id = None
+        if not getattr(self, "scene_flow_scenes", None):
+            self._relayout_in_progress = False
+            return
+
+        scenes = [s for s in self.scene_flow_scenes if s.get("tag")]
+        if not scenes:
+            self._relayout_in_progress = False
+            return
+
+        canvas = getattr(self, "canvas", None)
+        if not canvas:
+            self._relayout_in_progress = False
+            return
+
+        try:
+            canvas.update_idletasks()
+            available_width = max(int(canvas.winfo_width()), 800)
+            available_height = max(int(canvas.winfo_height()), 600)
+        except Exception:
+            available_width = 1200
+            available_height = 800
+
+        widths = [int(s.get("card_width", 320)) for s in scenes]
+        heights = [int(s.get("card_height", 220)) for s in scenes]
+        if not widths or not heights:
+            self._relayout_in_progress = False
+            return
+
+        avg_w = max(1, sum(widths) / len(widths))
+        avg_h = max(1, sum(heights) / len(heights))
+
+        gap_x = 30  # Fixed horizontal gap between cards (right edge to next left edge)
+        base_gap_y = max(16, int(avg_h * 0.1))
+        min_gap_y = max(8, int(base_gap_y * 0.6))
+        edge_pad_x = max(24, int(avg_w * 0.12))
+        edge_pad_y = max(24, int(avg_h * 0.1))
+
+        count = len(scenes)
+        approx_cols = max(1, int((available_width - 2 * edge_pad_x + gap_x) / max(avg_w + gap_x, 1)))
+        col_count = max(1, min(count, approx_cols))
+        gap_y = base_gap_y
+
+        def chunk(items, size):
+            for i in range(0, len(items), size):
+                yield items[i : i + size]
+
+        def compute_layout(cols, gx, gy):
+            rows = list(chunk(scenes, max(1, cols)))
+            row_heights = []
+            row_widths = []
+            for r in rows:
+                heights = [int(s.get("card_height", avg_h)) for s in r]
+                widths_row = [int(s.get("card_width", avg_w)) for s in r]
+                row_heights.append(max(heights) if heights else 0)
+                if widths_row:
+                    row_widths.append(sum(widths_row) + gx * max(0, len(widths_row) - 1))
+                else:
+                    row_widths.append(0)
+
+            total_width = edge_pad_x * 2 + (max(row_widths) if row_widths else 0)
+            total_height = edge_pad_y * 2 + sum(row_heights) + gy * max(0, len(rows) - 1)
+
+            positions = []
+            cursor_y = edge_pad_y
+            for row_idx, row in enumerate(rows):
+                cursor_x = edge_pad_x
+                height = row_heights[row_idx]
+                for col_idx, scene in enumerate(row):
+                    width = int(scene.get("card_width", avg_w))
+                    center_x = cursor_x + width / 2
+                    center_y = cursor_y + height / 2
+                    positions.append((center_x, center_y))
+                    cursor_x = center_x + width / 2 + gx
+                cursor_y += height + gy
+
+            return total_width, total_height, positions
+
+        for _ in range(12):
+            layout_width, layout_height, positions = compute_layout(col_count, gap_x, gap_y)
+            if layout_width > available_width and col_count > 1:
+                col_count -= 1
+                continue
+            if layout_height > available_height and col_count < count:
+                col_count += 1
+                continue
+            if layout_height > available_height and gap_y > min_gap_y:
+                gap_y = max(min_gap_y, int(gap_y * 0.9))
+                continue
+            break
+
+        _, _, positions = compute_layout(col_count, gap_x, gap_y)
+        for scene, (x, y) in zip(scenes, positions):
+            tag = scene.get("tag")
+            if not tag:
+                continue
+            self.node_positions[tag] = (x, y)
+            for node in self.graph.get("nodes", []):
+                node_tag = self._build_tag(node.get("type", ""), node.get("name", ""))
+                if node_tag == tag:
+                    node["x"] = x
+                    node["y"] = y
+                    break
+
+        self.original_positions = dict(self.node_positions)
+        self.canvas_scale = 1.0
+        self.draw_graph()
+        self._fit_initialized = False
+        self._fit_to_view()
+        self._relayout_in_progress = False
+
+    # ------------------------------------------------------------------
     # Scene drawing overrides
     # ------------------------------------------------------------------
     def _draw_scene_card(self, node, scale):  # type: ignore[override]
@@ -457,10 +593,7 @@ def create_scene_flow_frame(
     master=None,
     scenario_title: Optional[str] = None,
 ):
-    """Convenience factory to embed a SceneFlowViewerFrame without a window.
-
-    Resolves local wrappers and optionally selects an initial scenario by title.
-    """
+    """Convenience factory to embed a SceneFlowViewerFrame without a window."""
     scenario_wrapper = GenericModelWrapper("scenarios")
     npc_wrapper = GenericModelWrapper("npcs")
     creature_wrapper = GenericModelWrapper("creatures")
