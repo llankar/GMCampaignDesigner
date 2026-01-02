@@ -1878,14 +1878,23 @@ class MainWindow(ctk.CTk):
             default_layout = layout_manager.get_scenario_default(view.scenario_name)
             has_saved_layout = bool(initial_layout or default_layout)
             if not has_saved_layout:
-                view.open_whiteboard_tab()
-                if not any((tab.get("meta") or {}).get("kind") == "note" for tab in view.tabs.values()):
-                    view.add_tab(
-                        "GM Notes",
-                        view.create_note_frame(),
-                        content_factory=lambda master: view.create_note_frame(master=master),
-                        layout_meta={"kind": "note"},
-                    )
+                def _open_default_tabs():
+                    scenario_tab = view.tabs.get(view.scenario_name)
+                    if not scenario_tab:
+                        view.after(50, _open_default_tabs)
+                        return
+                    view.show_tab(view.scenario_name)
+                    view._sync_fullbleed_now(scenario_tab.get("content"))
+                    view.open_whiteboard_tab()
+                    if not any((tab.get("meta") or {}).get("kind") == "note" for tab in view.tabs.values()):
+                        view.add_tab(
+                            "GM Notes",
+                            view.create_note_frame(),
+                            content_factory=lambda master: view.create_note_frame(master=master),
+                            layout_meta={"kind": "note"},
+                        )
+
+                view.after_idle(_open_default_tabs)
 
         # 6) Insert the generic list‐selection view
         list_selection = GenericListSelectionView(
