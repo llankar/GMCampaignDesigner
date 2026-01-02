@@ -1883,16 +1883,16 @@ class MainWindow(ctk.CTk):
                     if not scenario_tab:
                         view.after(50, _open_default_tabs)
                         return
-                    view.show_tab(view.scenario_name)
-                    view._sync_fullbleed_now(scenario_tab.get("content"))
-                    view.open_whiteboard_tab()
+                    view.open_whiteboard_tab(activate=False)
                     if not any((tab.get("meta") or {}).get("kind") == "note" for tab in view.tabs.values()):
                         view.add_tab(
                             "GM Notes",
                             view.create_note_frame(),
                             content_factory=lambda master: view.create_note_frame(master=master),
                             layout_meta={"kind": "note"},
+                            activate=False,
                         )
+                    view.after_idle(lambda: view.show_tab(view.scenario_name))
 
                 view.after_idle(_open_default_tabs)
 

@@ -266,6 +266,7 @@ class GMScreenView(ctk.CTkFrame):
                 "entity_type": "Scenarios",
                 "entity_name": scenario_name,
             },
+            activate=True,
         )
         self.after_idle(lambda cf=frame: self._sync_fullbleed_now(cf))
 
@@ -763,7 +764,7 @@ class GMScreenView(ctk.CTkFrame):
                     continue
         return {"fields": fields}
 
-    def add_tab(self, name, content_frame, content_factory=None, layout_meta=None):
+    def add_tab(self, name, content_frame, content_factory=None, layout_meta=None, activate=True):
         log_info(f"Adding GM screen tab: {name}", func_name="GMScreenView.add_tab")
         tab_frame = ctk.CTkFrame(self.tab_bar)
         tab_frame.pack(side="left", padx=2, pady=5)
@@ -795,7 +796,8 @@ class GMScreenView(ctk.CTkFrame):
         }
 
         content_frame.pack_forget()
-        self.show_tab(name)
+        if activate:
+            self.show_tab(name)
         # 1) append to order list
         self.tab_order.append(name)
 
@@ -1801,7 +1803,7 @@ class GMScreenView(ctk.CTkFrame):
         # Initial sizing once mounted
         self.after(50, _sync)
 
-    def open_whiteboard_tab(self, title=None):
+    def open_whiteboard_tab(self, title=None, activate=True):
         """Open a whiteboard tab within the GM screen."""
         if getattr(self, "_rich_host", None) is None or not self._rich_host.winfo_exists():
             self._rich_host = ctk.CTkFrame(self)
@@ -1833,6 +1835,7 @@ class GMScreenView(ctk.CTkFrame):
             container,
             content_factory=factory,
             layout_meta={"kind": "whiteboard", "host": "rich", "controller": controller},
+            activate=activate,
         )
 
     def open_world_map_tab(self, map_name=None, title=None):
