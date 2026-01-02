@@ -1528,34 +1528,42 @@ class ScenarioGraphEditor(ctk.CTkFrame):
 
         avg_card_width = sum(card_widths) / max(1, len(card_widths))
         avg_card_height = sum(card_heights) / max(1, len(card_heights))
-        base_padding_x = max(16, int(avg_card_width * 0.1))
-        base_padding_y = max(16, int(avg_card_height * 0.1))
+        base_padding_x = max(12, int(avg_card_width * 0.05))
+        base_padding_y = max(12, int(avg_card_height * 0.08))
 
         self.canvas.update_idletasks()
         canvas_width = max(self.canvas.winfo_width(), 1)
         origin_x = 400
         origin_y = 260
 
-        def build_column_widths(col_count):
+        def build_rows(col_count):
+            return [normalized_scenes[i:i + col_count] for i in range(0, count, col_count)]
+
+        def build_column_widths(rows, col_count):
             widths = [0] * col_count
-            for index, scene in enumerate(normalized_scenes):
-                col_index = index % col_count
-                widths[col_index] = max(widths[col_index], scene.get("card_width", max_card_width))
+            for row in rows:
+                for col_index in range(col_count):
+                    if col_index >= len(row):
+                        continue
+                    scene = row[col_index]
+                    widths[col_index] = max(widths[col_index], scene.get("card_width", max_card_width))
             return widths
 
-        def build_row_heights(col_count):
-            row_count = max(1, int(math.ceil(count / col_count)))
-            heights = [0] * row_count
-            for index, scene in enumerate(normalized_scenes):
-                row_index = index // col_count
-                heights[row_index] = max(heights[row_index], scene.get("card_height", max_card_height))
+        def build_row_heights(rows):
+            heights = []
+            for row in rows:
+                row_height = 0
+                for scene in row:
+                    row_height = max(row_height, scene.get("card_height", max_card_height))
+                heights.append(row_height)
             return heights
 
         def choose_columns(padding_x):
             max_cols = max(1, count)
             chosen = 1
             for col_count in range(1, max_cols + 1):
-                col_widths = build_column_widths(col_count)
+                rows = build_rows(col_count)
+                col_widths = build_column_widths(rows, col_count)
                 total_width = sum(col_widths) + padding_x * max(0, col_count - 1)
                 if total_width <= canvas_width:
                     chosen = col_count
@@ -1563,9 +1571,10 @@ class ScenarioGraphEditor(ctk.CTkFrame):
 
         def compute_layout(padding_x, padding_y):
             col_count = choose_columns(padding_x)
-            row_count = max(1, int(math.ceil(count / col_count)))
-            col_widths = build_column_widths(col_count)
-            row_heights = build_row_heights(col_count)
+            rows = build_rows(col_count)
+            row_count = max(1, len(rows))
+            col_widths = build_column_widths(rows, col_count)
+            row_heights = build_row_heights(rows)
             total_width = sum(col_widths) + padding_x * max(0, col_count - 1)
             column_centers = []
             cursor_x = origin_x - total_width / 2
@@ -1578,10 +1587,9 @@ class ScenarioGraphEditor(ctk.CTkFrame):
                 row_centers.append(cursor_y + height / 2)
                 cursor_y += height + padding_y
             positions = []
-            for index, scene in enumerate(normalized_scenes):
-                row = index // col_count
-                col = index % col_count
-                positions.append((column_centers[col], row_centers[row]))
+            for row_index, row in enumerate(rows):
+                for col_index, _scene in enumerate(row):
+                    positions.append((column_centers[col_index], row_centers[row_index]))
             return col_count, row_count, positions
 
         def layout_has_overlap(positions):
