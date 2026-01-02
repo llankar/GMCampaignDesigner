@@ -18,6 +18,7 @@ from modules.generic.generic_list_selection_view import GenericListSelectionView
 from modules.helpers.config_helper import ConfigHelper
 from modules.helpers.portrait_helper import primary_portrait, resolve_portrait_path
 import random
+from collections import deque
 from modules.helpers.logging_helper import (
     log_function,
     log_info,
@@ -1471,56 +1472,67 @@ class GMScreenView(ctk.CTkFrame):
         self._clear_all_tabs()
 
         errors = []
-        for tab_def in tabs:
+        pending = deque(tabs)
+
+        def _finalize_restore():
+            if not self.tabs:
+                scenario_name = self.scenario.get("Title") or self.scenario.get("Name") or "Scenario"
+                frame = create_entity_detail_frame(
+                    "Scenarios",
+                    self.scenario,
+                    master=self.content_area,
+                    open_entity_callback=self.open_entity_tab,
+                )
+                self.add_tab(
+                    scenario_name,
+                    frame,
+                    content_factory=lambda master: create_entity_detail_frame(
+                        "Scenarios",
+                        self.scenario,
+                        master=master,
+                        open_entity_callback=self.open_entity_tab,
+                    ),
+                    layout_meta={
+                        "kind": "entity",
+                        "entity_type": "Scenarios",
+                        "entity_name": scenario_name,
+                    },
+                )
+
+            active_name = layout.get("active")
+            if active_name and active_name in self.tabs:
+                self.show_tab(active_name)
+            elif self.tab_order:
+                self.show_tab(self.tab_order[0])
+
+            if set_default:
+                self.layout_manager.set_scenario_default(self.scenario_name, layout_name)
+            elif layout.get("scenario") == self.scenario_name and layout_name == self.layout_manager.get_scenario_default(self.scenario_name):
+                pass
+
+            if self.tabs:
+                status_name = layout_name if not errors else f"{layout_name} (partial)"
+                self._update_layout_status(status_name)
+
+            if errors and not silent:
+                messagebox.showwarning(
+                    "Layout Issues",
+                    "Some tabs could not be restored:\n" + "\n".join(errors),
+                )
+
+        def _restore_next():
+            if not pending:
+                _finalize_restore()
+                return
+            tab_def = pending.popleft()
             try:
                 self._restore_tab_from_config(tab_def)
             except Exception as exc:
                 errors.append(f"{tab_def.get('title', 'Unknown')}: {exc}")
+            self.update_idletasks()
+            self.after_idle(_restore_next)
 
-        if not self.tabs:
-            scenario_name = self.scenario.get("Title") or self.scenario.get("Name") or "Scenario"
-            frame = create_entity_detail_frame(
-                "Scenarios",
-                self.scenario,
-                master=self.content_area,
-                open_entity_callback=self.open_entity_tab,
-            )
-            self.add_tab(
-                scenario_name,
-                frame,
-                content_factory=lambda master: create_entity_detail_frame(
-                    "Scenarios",
-                    self.scenario,
-                    master=master,
-                    open_entity_callback=self.open_entity_tab,
-                ),
-                layout_meta={
-                    "kind": "entity",
-                    "entity_type": "Scenarios",
-                    "entity_name": scenario_name,
-                },
-            )
-
-        active_name = layout.get("active")
-        if active_name and active_name in self.tabs:
-            self.show_tab(active_name)
-        elif self.tab_order:
-            self.show_tab(self.tab_order[0])
-
-        if set_default:
-            self.layout_manager.set_scenario_default(self.scenario_name, layout_name)
-        elif layout.get("scenario") == self.scenario_name and layout_name == self.layout_manager.get_scenario_default(self.scenario_name):
-            pass
-
-        if self.tabs:
-            status_name = layout_name if not errors else f"{layout_name} (partial)"
-            self._update_layout_status(status_name)
-
-        if errors and not silent:
-            messagebox.showwarning(
-                "Layout Issues",
-                "Some tabs could not be restored:\n" + "\n".join(errors),
-            )
+        self.after_idle(_restore_next)
 
     def _open_entity_from_layout(self, entity_type, entity_name):
         if entity_type == "Scenarios" and (self.scenario.get("Title") == entity_name or self.scenario.get("Name") == entity_name):
