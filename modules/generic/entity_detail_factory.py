@@ -999,7 +999,7 @@ def create_scenario_detail_frame(entity_type, scenario_item, master, open_entity
                     font=("Arial", 16, "bold"),
                 ).pack(side="left")
 
-                view_var = tk.StringVar(value="List")
+                view_var = tk.StringVar(value="Scene Flow")
                 view_toggle = ctk.CTkSegmentedButton(
                     header_row,
                     values=["List", "Scene Flow"],
@@ -1042,6 +1042,7 @@ def create_scenario_detail_frame(entity_type, scenario_item, master, open_entity
                         list_container.pack(fill="x", expand=True)
 
                 view_toggle.configure(command=_toggle_scene_view)
+                _toggle_scene_view("Scene Flow")
             else:
                 insert_list_longtext(
                     frame,
