@@ -220,21 +220,7 @@ class GMScreenView(ctk.CTkFrame):
         self._initialize_context_menu()
 
         # Example usage: create the first tab from the scenario_item
-        scenario_name = scenario_item.get("Title", "Unnamed Scenario")
-        frame = create_entity_detail_frame("Scenarios", scenario_item, master=self.content_area, open_entity_callback=self.open_entity_tab)
-        
-        # Make sure the frame can get focus so the binding works
-        self.focus_set()
-        self.add_tab(
-            scenario_name,
-            frame,
-            content_factory=lambda master: create_entity_detail_frame("Scenarios", scenario_item, master=master, open_entity_callback=self.open_entity_tab),
-            layout_meta={
-                "kind": "entity",
-                "entity_type": "Scenarios",
-                "entity_name": scenario_name,
-            },
-        )
+        self.after_idle(self._create_initial_scenario_tab)
 
         # Apply either the caller-specified layout or the scenario default
         self.after(100, self._apply_initial_layout)
@@ -254,6 +240,34 @@ class GMScreenView(ctk.CTkFrame):
             container.configure(width=w, height=h)
         except Exception:
             pass
+
+    def _create_initial_scenario_tab(self):
+        scenario_name = self.scenario.get("Title", "Unnamed Scenario")
+        frame = create_entity_detail_frame(
+            "Scenarios",
+            self.scenario,
+            master=self.content_area,
+            open_entity_callback=self.open_entity_tab,
+        )
+
+        # Make sure the frame can get focus so the binding works
+        self.focus_set()
+        self.add_tab(
+            scenario_name,
+            frame,
+            content_factory=lambda master: create_entity_detail_frame(
+                "Scenarios",
+                self.scenario,
+                master=master,
+                open_entity_callback=self.open_entity_tab,
+            ),
+            layout_meta={
+                "kind": "entity",
+                "entity_type": "Scenarios",
+                "entity_name": scenario_name,
+            },
+        )
+        self.after_idle(lambda cf=frame: self._sync_fullbleed_now(cf))
 
     def _build_add_menu(self):
         menu = tk.Menu(self, tearoff=0)
