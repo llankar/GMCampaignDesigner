@@ -1505,6 +1505,8 @@ class ScenarioGraphEditor(ctk.CTkFrame):
         count = len(normalized_scenes)
         max_card_width = SCENE_CARD_WIDTHS["M"]
         max_card_height = 0
+        card_widths = []
+        card_heights = []
         for scene in normalized_scenes:
             text = scene.get("text", "") or ""
             entities = scene.get("entities") or []
@@ -1517,27 +1519,102 @@ class ScenarioGraphEditor(ctk.CTkFrame):
                 card_size,
                 scale=1.0,
             )
+            scene["card_width"] = card_width
+            scene["card_height"] = card_height
+            card_widths.append(card_width)
+            card_heights.append(card_height)
             max_card_width = max(max_card_width, card_width)
             max_card_height = max(max_card_height, card_height)
 
-        cols = min(4, max(1, int(math.ceil(math.sqrt(count)))))
-        rows = max(1, int(math.ceil(count / cols)))
-        x_spacing = max(160, int(max_card_width + 40))
-        y_spacing = max(150, int(max_card_height + 60))
-        canvas_width = self.canvas.winfo_width()
-        canvas_height = self.canvas.winfo_height()
-        if canvas_width > 0 and cols > 1:
-            x_spacing = max(int(max_card_width + 20), min(x_spacing, int(canvas_width / cols)))
-        if canvas_height > 0 and rows > 1:
-            y_spacing = max(int(max_card_height + 30), min(y_spacing, int(canvas_height / rows)))
+        avg_card_width = sum(card_widths) / max(1, len(card_widths))
+        avg_card_height = sum(card_heights) / max(1, len(card_heights))
+        base_padding_x = max(16, int(avg_card_width * 0.1))
+        base_padding_y = max(16, int(avg_card_height * 0.1))
+
+        self.canvas.update_idletasks()
+        canvas_width = max(self.canvas.winfo_width(), 1)
         origin_x = 400
         origin_y = 260
 
+        def build_column_widths(col_count):
+            widths = [0] * col_count
+            for index, scene in enumerate(normalized_scenes):
+                col_index = index % col_count
+                widths[col_index] = max(widths[col_index], scene.get("card_width", max_card_width))
+            return widths
+
+        def build_row_heights(col_count):
+            row_count = max(1, int(math.ceil(count / col_count)))
+            heights = [0] * row_count
+            for index, scene in enumerate(normalized_scenes):
+                row_index = index // col_count
+                heights[row_index] = max(heights[row_index], scene.get("card_height", max_card_height))
+            return heights
+
+        def choose_columns(padding_x):
+            max_cols = max(1, count)
+            chosen = 1
+            for col_count in range(1, max_cols + 1):
+                col_widths = build_column_widths(col_count)
+                total_width = sum(col_widths) + padding_x * max(0, col_count - 1)
+                if total_width <= canvas_width:
+                    chosen = col_count
+            return chosen
+
+        def compute_layout(padding_x, padding_y):
+            col_count = choose_columns(padding_x)
+            row_count = max(1, int(math.ceil(count / col_count)))
+            col_widths = build_column_widths(col_count)
+            row_heights = build_row_heights(col_count)
+            total_width = sum(col_widths) + padding_x * max(0, col_count - 1)
+            column_centers = []
+            cursor_x = origin_x - total_width / 2
+            for width in col_widths:
+                column_centers.append(cursor_x + width / 2)
+                cursor_x += width + padding_x
+            row_centers = []
+            cursor_y = origin_y
+            for height in row_heights:
+                row_centers.append(cursor_y + height / 2)
+                cursor_y += height + padding_y
+            positions = []
+            for index, scene in enumerate(normalized_scenes):
+                row = index // col_count
+                col = index % col_count
+                positions.append((column_centers[col], row_centers[row]))
+            return col_count, row_count, positions
+
+        def layout_has_overlap(positions):
+            bboxes = []
+            for (x, y), scene in zip(positions, normalized_scenes):
+                width = scene.get("card_width", max_card_width)
+                height = scene.get("card_height", max_card_height)
+                bbox = (x - width / 2, y - height / 2, x + width / 2, y + height / 2)
+                for existing in bboxes:
+                    if not (
+                        bbox[2] <= existing[0]
+                        or bbox[0] >= existing[2]
+                        or bbox[3] <= existing[1]
+                        or bbox[1] >= existing[3]
+                    ):
+                        return True
+                bboxes.append(bbox)
+            return False
+
+        padding_x = base_padding_x
+        padding_y = base_padding_y
+        positions = []
+        for _ in range(3):
+            cols, rows, positions = compute_layout(padding_x, padding_y)
+            if not layout_has_overlap(positions):
+                break
+            padding_x = int(padding_x * 1.2)
+            padding_y = int(padding_y * 1.2)
+        if layout_has_overlap(positions):
+            log_warning("Scene flow layout overlaps detected; padding adjustments were insufficient.")
+
         for idx, scene in enumerate(normalized_scenes):
-            row = idx // cols
-            col = idx % cols
-            x = origin_x + (col - (cols - 1) / 2) * x_spacing
-            y = origin_y + row * y_spacing
+            x, y = positions[idx]
 
             display_name = scene.get("display_name") or f"Scene {idx + 1}"
             node_tag = self._build_tag("scene", display_name)
