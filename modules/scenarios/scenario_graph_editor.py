@@ -1521,8 +1521,15 @@ class ScenarioGraphEditor(ctk.CTkFrame):
             max_card_height = max(max_card_height, card_height)
 
         cols = min(4, max(1, int(math.ceil(math.sqrt(count)))))
-        x_spacing = max(200, int(max_card_width + 60))
-        y_spacing = max(190, int(max_card_height + 90))
+        rows = max(1, int(math.ceil(count / cols)))
+        x_spacing = max(160, int(max_card_width + 40))
+        y_spacing = max(150, int(max_card_height + 60))
+        canvas_width = self.canvas.winfo_width()
+        canvas_height = self.canvas.winfo_height()
+        if canvas_width > 0 and cols > 1:
+            x_spacing = max(int(max_card_width + 20), min(x_spacing, int(canvas_width / cols)))
+        if canvas_height > 0 and rows > 1:
+            y_spacing = max(int(max_card_height + 30), min(y_spacing, int(canvas_height / rows)))
         origin_x = 400
         origin_y = 260
 
