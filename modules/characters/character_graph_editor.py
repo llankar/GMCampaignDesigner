@@ -1633,7 +1633,7 @@ class CharacterGraphEditor(ctk.CTkFrame):
                     x + node_w / 2 + shadow_offset,
                     y + node_h / 2 + shadow_offset,
                     corner_radius,
-                    fill="#0f131a",
+                    fill="#0b1b36",
                     outline="",
                     tags=(tag, "node_bg", "node"),
                 )
@@ -1643,8 +1643,8 @@ class CharacterGraphEditor(ctk.CTkFrame):
                     x + node_w / 2,
                     y + node_h / 2,
                     corner_radius,
-                    fill="#1f2430",
-                    outline="#2f3747",
+                    fill="#123567",
+                    outline="#1f4a85",
                     width=max(1, int(1 * scale)),
                     tags=(tag, "node_bg", "node"),
                 )
@@ -1729,8 +1729,8 @@ class CharacterGraphEditor(ctk.CTkFrame):
                 toggle_y - toggle_radius,
                 toggle_x + toggle_radius,
                 toggle_y + toggle_radius,
-                fill="#2B2B2B" if node_style != "modern" else "#1b2230",
-                outline="#1B1B1B" if node_style != "modern" else "#2f3747",
+                fill="#2B2B2B" if node_style != "modern" else "#0f2c57",
+                outline="#1B1B1B" if node_style != "modern" else "#1f4a85",
                 tags=(tag, "node_fg", "node", "collapse_toggle")
             )
             self.canvas.create_text(

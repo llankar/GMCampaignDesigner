@@ -430,6 +430,17 @@ class ScenesPlanningStep(WizardStep):
         self._state_ref["Secrets"] = secrets
         self._state_ref["Secret"] = secrets
 
+        # Replace the character graph with the one from the loaded scenario (or reset).
+        graph_payload = scenario.get("ScenarioCharacterGraph") or {"nodes": [], "links": [], "shapes": []}
+        try:
+            graph_payload = copy.deepcopy(graph_payload)
+        except Exception:
+            graph_payload = {"nodes": [], "links": [], "shapes": []}
+        self._state_ref["ScenarioCharacterGraph"] = graph_payload
+        self._state_ref["ScenarioCharacterGraphSync"] = bool(
+            scenario.get("ScenarioCharacterGraphSync")
+        )
+
         if isinstance(layout, list):
             self._state_ref["_SceneLayout"] = copy.deepcopy(layout)
         else:

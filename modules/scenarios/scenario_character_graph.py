@@ -109,6 +109,12 @@ class ScenarioCharacterGraphEditor(CharacterGraphEditor):
             command=self.start_link_creation,
             **button_kwargs,
         ).pack(side="left", padx=5)
+        ctk.CTkButton(
+            toolbar,
+            text="+/-",
+            command=self.toggle_nodes_collapsed,
+            **button_kwargs,
+        ).pack(side="left", padx=5)
 
     def _autosave_graph(self):
         return
