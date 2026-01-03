@@ -2497,7 +2497,8 @@ class ScenarioBuilderWizard(ctk.CTkToplevel):
             if sync_graph:
                 try:
                     sync_scenario_graph_to_global(
-                        self.wizard_state.get("ScenarioCharacterGraph") or {}
+                        self.wizard_state.get("ScenarioCharacterGraph") or {},
+                        title,
                     )
                 except Exception as exc:  # pragma: no cover - defensive path
                     log_exception(

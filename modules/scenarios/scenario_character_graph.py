@@ -11,7 +11,7 @@ from modules.characters.character_graph_editor import (
     DEFAULT_CHARACTER_GRAPH_PATH,
 )
 from modules.characters.graph_tabs.importer import merge_graph_into
-from modules.characters.graph_tabs.model import ensure_graph_tabs, get_active_tab
+from modules.characters.graph_tabs.model import build_default_tab, ensure_graph_tabs
 from modules.generic.generic_editor_window import GenericEditorWindow
 from modules.helpers.config_helper import ConfigHelper
 from modules.helpers.logging_helper import log_exception
@@ -362,7 +362,11 @@ class ScenarioCharacterGraphEditor(CharacterGraphEditor):
         return False
 
 
-def sync_scenario_graph_to_global(scenario_graph, graph_path=DEFAULT_CHARACTER_GRAPH_PATH):
+def sync_scenario_graph_to_global(
+    scenario_graph,
+    scenario_name,
+    graph_path=DEFAULT_CHARACTER_GRAPH_PATH,
+):
     if not isinstance(scenario_graph, dict):
         return False
     if not scenario_graph.get("nodes"):
@@ -380,7 +384,29 @@ def sync_scenario_graph_to_global(scenario_graph, graph_path=DEFAULT_CHARACTER_G
     base_graph.setdefault("nodes", []).extend(merge_result.imported_nodes)
     base_graph.setdefault("links", []).extend(_dedupe_links(base_graph, merge_result.imported_links))
     base_graph.setdefault("shapes", []).extend(merge_result.imported_shapes)
-    _add_nodes_to_active_tab(base_graph, merge_result.imported_node_tags)
+
+    scenario_tab = next(
+        (tab for tab in base_graph.get("tabs", []) if tab.get("name") == scenario_name),
+        None,
+    )
+    if scenario_tab is None:
+        scenario_tab = build_default_tab()
+        scenario_tab["name"] = scenario_name
+        scenario_tab["subsetDefinition"] = {
+            "mode": "subset",
+            "node_tags": list(merge_result.imported_node_tags),
+        }
+        base_graph.setdefault("tabs", []).append(scenario_tab)
+    else:
+        subset = scenario_tab.get("subsetDefinition") or {}
+        existing_tags = set(subset.get("node_tags") or [])
+        existing_tags.update(merge_result.imported_node_tags)
+        scenario_tab["subsetDefinition"] = {
+            "mode": "subset",
+            "node_tags": list(existing_tags),
+        }
+    if scenario_tab.get("id"):
+        base_graph["active_tab_id"] = scenario_tab["id"]
 
     ensure_graph_tabs(base_graph)
     os.makedirs(os.path.dirname(graph_path), exist_ok=True)
@@ -554,16 +580,3 @@ def _normalize_link_tags(link):
             node2_tag = f"pc_{link['pc_name2'].replace(' ', '_')}"
     return node1_tag, node2_tag
 
-
-def _add_nodes_to_active_tab(graph, node_tags):
-    if not node_tags:
-        return
-    active_tab = get_active_tab(graph)
-    subset = active_tab.get("subsetDefinition") or {}
-    if subset.get("mode") == "all":
-        return
-    existing_tags = set(subset.get("node_tags") or [])
-    existing_tags.update(node_tags)
-    subset["mode"] = "subset"
-    subset["node_tags"] = list(existing_tags)
-    active_tab["subsetDefinition"] = subset
