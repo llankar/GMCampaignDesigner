@@ -1641,7 +1641,7 @@ class CharacterGraphEditor(ctk.CTkFrame):
     def draw_arrowhead(self, start_x, start_y, end_x, end_y, node_tag, color):
         arrow_length = 16
         arrow_width = 18
-        angle = math.atan2(end_y - start_y, end_x - start_x)
+        angle = math.atan2(start_y - end_y, start_x - end_x)
         left, top, right, bottom = self.node_bboxes.get(
             node_tag, (start_x - 50, start_y - 25, start_x + 50, start_y + 25)
         )
