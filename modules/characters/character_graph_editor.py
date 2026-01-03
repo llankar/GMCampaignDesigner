@@ -1145,7 +1145,7 @@ class CharacterGraphEditor(ctk.CTkFrame):
         for link in affected_links:
             self.draw_one_link(link)
 
-        self.canvas.tag_lower("link")
+        self.canvas.tag_raise("link")
         self.canvas.tag_raise("arrowhead")
         self.canvas.tag_raise("link_text")
     
@@ -1583,7 +1583,9 @@ class CharacterGraphEditor(ctk.CTkFrame):
     def draw_all_links(self, links):
         for link in links:
             self.draw_one_link(link)
-        self.canvas.tag_lower("link")
+        self.canvas.tag_raise("link")
+        self.canvas.tag_raise("arrowhead")
+        self.canvas.tag_raise("link_text")
 
     # ─────────────────────────────────────────────────────────────────────────
     # FUNCTION: draw_one_link
