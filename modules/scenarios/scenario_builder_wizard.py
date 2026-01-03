@@ -1862,6 +1862,7 @@ class CharacterRelationsStep(WizardStep):
             on_entity_added=self._on_entity_added,
             on_entity_removed=self._on_entity_removed,
             background_style="scene_flow",
+            node_style="modern",
         )
         self.graph_editor.grid(row=0, column=0, sticky="nsew")
 
