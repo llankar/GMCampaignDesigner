@@ -81,10 +81,11 @@ class CharacterGraphEditor(ctk.CTkFrame):
             "npc": self.npc_wrapper,
             "pc": self.pc_wrapper,
         }
-        self.entity_records = {
-            "npc": {npc["Name"]: npc for npc in self.npc_wrapper.load_items()},
-            "pc": {pc["Name"]: pc for pc in self.pc_wrapper.load_items()},
-        }
+        self.entity_records = {"npc": {}, "pc": {}}
+        self.entity_records_normalized = {"npc": {}, "pc": {}}
+        for etype in self.allowed_entity_types:
+            if etype in self.entity_records:
+                self._refresh_entity_records(etype)
         self.graph_path = graph_path or DEFAULT_CHARACTER_GRAPH_PATH
         self.canvas_scale = 1.0
         self.zoom_factor = 1.1
@@ -221,17 +222,69 @@ class CharacterGraphEditor(ctk.CTkFrame):
         subset["node_tags"] = node_tags
         active_tab["subsetDefinition"] = subset
 
+    def _normalize_entity_name(self, name):
+        """Return a lenient, lowercased name key resilient to extra spaces/punctuation."""
+        if name is None:
+            return ""
+        text = str(name)
+        # Unify dash variants and dots, collapse whitespace, strip punctuation and spaces.
+        text = (
+            text.replace("\u2013", "-")
+            .replace("\u2014", "-")
+            .replace(".", " ")
+        )
+        text = " ".join(text.split())  # collapse whitespace
+        text = text.strip(" ,;:!-–—\t\r\n")
+        return text.lower()
+
+    def _normalize_entity_key(self, entity_type, entity_name):
+        return (entity_type, self._normalize_entity_name(entity_name))
+
+    def _find_tag_for_entity(self, tag_lookup, entity_type, entity_name):
+        """Lookup a tag using forgiving name matching (handles trailing spaces/dots/variants)."""
+        norm = self._normalize_entity_name(entity_name)
+        tag = tag_lookup.get((entity_type, norm))
+        if tag:
+            return tag
+        # Fallback: partial match either way (covers extra descriptors).
+        for (etype, key_norm), candidate_tag in tag_lookup.items():
+            if etype != entity_type:
+                continue
+            if norm.startswith(key_norm) or key_norm.startswith(norm):
+                return candidate_tag
+        return None
+
     def _get_entity_record(self, entity_type, entity_name):
+        if not entity_name:
+            return None
         records = self.entity_records.get(entity_type, {})
-        return records.get(entity_name)
+        if entity_name in records:
+            return records.get(entity_name)
+        norm = self._normalize_entity_name(entity_name)
+        norm_records = self.entity_records_normalized.get(entity_type, {})
+        if norm in norm_records:
+            return norm_records.get(norm)
+        for key_norm, record in norm_records.items():
+            if norm.startswith(key_norm) or key_norm.startswith(norm):
+                return record
+        return None
 
     def _refresh_entity_records(self, entity_type):
         wrapper = self.entity_wrappers.get(entity_type)
         if not wrapper:
             return
-        self.entity_records[entity_type] = {
-            item["Name"]: item for item in wrapper.load_items()
-        }
+        records = {}
+        normalized = {}
+        for item in wrapper.load_items():
+            name = item.get("Name")
+            if not name:
+                continue
+            records[name] = item
+            norm = self._normalize_entity_name(name)
+            if norm and norm not in normalized:
+                normalized[norm] = item
+        self.entity_records[entity_type] = records
+        self.entity_records_normalized[entity_type] = normalized
 
     def _entity_type_to_table(self, entity_type):
         if entity_type == "npc":
@@ -261,6 +314,9 @@ class CharacterGraphEditor(ctk.CTkFrame):
             name = record.get("Name")
             if name:
                 self.entity_records.setdefault(entity_type, {})[name] = record
+                norm = self._normalize_entity_name(name)
+                if norm:
+                    self.entity_records_normalized.setdefault(entity_type, {})[norm] = record
 
     def _get_node_entity_info(self, tag):
         node = self._get_node_by_tag(tag)
@@ -393,13 +449,26 @@ class CharacterGraphEditor(ctk.CTkFrame):
                 self._save_entity_record(entity_type2, record2)
 
     def _rebuild_links_from_entities(self):
-        tag_lookup = {
-            (node.get("entity_type"), node.get("entity_name")): node.get("tag")
-            for node in self.graph.get("nodes", [])
-        }
+        tag_lookup = {}
+        for node in self.graph.get("nodes", []):
+            if not isinstance(node, dict):
+                continue
+            entity_type = node.get("entity_type")
+            entity_name = node.get("entity_name")
+            tag = node.get("tag")
+            if not tag:
+                continue
+            key = self._normalize_entity_key(entity_type, entity_name)
+            if key not in tag_lookup:
+                tag_lookup[key] = tag
         rebuilt_links = []
         seen = set()
-        for (entity_type, entity_name), tag in tag_lookup.items():
+        for node in self.graph.get("nodes", []):
+            if not isinstance(node, dict):
+                continue
+            entity_type = node.get("entity_type")
+            entity_name = node.get("entity_name")
+            tag = self._find_tag_for_entity(tag_lookup, entity_type, entity_name)
             if not tag:
                 continue
             record = self._get_entity_record(entity_type, entity_name)
@@ -411,7 +480,7 @@ class CharacterGraphEditor(ctk.CTkFrame):
                 target_type = link.get("target_type")
                 target_name = link.get("target_name")
                 label = link.get("label") or ""
-                target_tag = tag_lookup.get((target_type, target_name))
+                target_tag = self._find_tag_for_entity(tag_lookup, target_type, target_name)
                 if not target_tag:
                     continue
                 link_key = tuple(sorted((tag, target_tag))) + (label,)
@@ -437,10 +506,18 @@ class CharacterGraphEditor(ctk.CTkFrame):
         return tuple(sorted((tag1, tag2))) + (label,)
 
     def _merge_links_from_entities(self):
-        tag_lookup = {
-            (node.get("entity_type"), node.get("entity_name")): node.get("tag")
-            for node in self.graph.get("nodes", [])
-        }
+        tag_lookup = {}
+        for node in self.graph.get("nodes", []):
+            if not isinstance(node, dict):
+                continue
+            entity_type = node.get("entity_type")
+            entity_name = node.get("entity_name")
+            tag = node.get("tag")
+            if not tag:
+                continue
+            key = self._normalize_entity_key(entity_type, entity_name)
+            if key not in tag_lookup:
+                tag_lookup[key] = tag
         if not tag_lookup:
             return False
         existing_links = [link for link in self.graph.get("links", []) if isinstance(link, dict)]
@@ -450,7 +527,12 @@ class CharacterGraphEditor(ctk.CTkFrame):
             if link.get("node1_tag") and link.get("node2_tag")
         }
         new_links = []
-        for (entity_type, entity_name), tag in tag_lookup.items():
+        for node in self.graph.get("nodes", []):
+            if not isinstance(node, dict):
+                continue
+            entity_type = node.get("entity_type")
+            entity_name = node.get("entity_name")
+            tag = self._find_tag_for_entity(tag_lookup, entity_type, entity_name)
             if not tag:
                 continue
             record = self._get_entity_record(entity_type, entity_name)
@@ -462,7 +544,7 @@ class CharacterGraphEditor(ctk.CTkFrame):
                 target_type = link.get("target_type")
                 target_name = link.get("target_name")
                 label = link.get("label") or ""
-                target_tag = tag_lookup.get((target_type, target_name))
+                target_tag = self._find_tag_for_entity(tag_lookup, target_type, target_name)
                 if not target_tag:
                     continue
                 link_data = {

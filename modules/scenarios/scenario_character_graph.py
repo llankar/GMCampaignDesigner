@@ -304,11 +304,18 @@ class ScenarioCharacterGraphEditor(CharacterGraphEditor):
         return export_graph
 
     def _merge_links_from_entities(self):
-        tag_lookup = {
-            (node.get("entity_type"), node.get("entity_name")): node.get("tag")
-            for node in self.graph.get("nodes", [])
-            if isinstance(node, dict)
-        }
+        tag_lookup = {}
+        for node in self.graph.get("nodes", []):
+            if not isinstance(node, dict):
+                continue
+            entity_type = node.get("entity_type")
+            entity_name = node.get("entity_name")
+            tag = node.get("tag")
+            if not tag:
+                continue
+            key = self._normalize_entity_key(entity_type, entity_name)
+            if key not in tag_lookup:
+                tag_lookup[key] = tag
         if not tag_lookup:
             return False
         existing_links = [link for link in self.graph.get("links", []) if isinstance(link, dict)]
@@ -318,7 +325,12 @@ class ScenarioCharacterGraphEditor(CharacterGraphEditor):
             if link.get("node1_tag") and link.get("node2_tag")
         }
         new_links = []
-        for (entity_type, entity_name), tag in tag_lookup.items():
+        for node in self.graph.get("nodes", []):
+            if not isinstance(node, dict):
+                continue
+            entity_type = node.get("entity_type")
+            entity_name = node.get("entity_name")
+            tag = self._find_tag_for_entity(tag_lookup, entity_type, entity_name)
             if not tag:
                 continue
             record = self._get_entity_record(entity_type, entity_name)
@@ -330,7 +342,7 @@ class ScenarioCharacterGraphEditor(CharacterGraphEditor):
                 target_type = link.get("target_type")
                 target_name = link.get("target_name")
                 label = link.get("label") or ""
-                target_tag = tag_lookup.get((target_type, target_name))
+                target_tag = self._find_tag_for_entity(tag_lookup, target_type, target_name)
                 if not target_tag:
                     continue
                 link_data = {

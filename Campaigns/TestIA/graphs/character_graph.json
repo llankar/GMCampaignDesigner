@@ -4,8 +4,8 @@
       "entity_type": "npc",
       "entity_name": "Commander Voss – head of the imperial guard",
       "tag": "npc_Commander_Voss_–_head_of_the_imperial_guard",
-      "x": 513.398818181818,
-      "y": 295.2214545454545,
+      "x": 479.43782699999974,
+      "y": 268.1527559999998,
       "color": "#1D3572",
       "collapsed": true
     },
@@ -13,8 +13,8 @@
       "entity_type": "npc",
       "entity_name": "Captain Aileen – guard captain guarding the banquet",
       "tag": "npc_Captain_Aileen_–_guard_captain_guarding_the_banquet",
-      "x": 787.217,
-      "y": 317.03963636363636,
+      "x": 843.8898270000001,
+      "y": 297.1927559999999,
       "color": "#1D3572",
       "collapsed": true
     },
@@ -22,17 +22,17 @@
       "entity_type": "pc",
       "entity_name": "Lolo",
       "tag": "pc_Lolo",
-      "x": 618.0351818181819,
-      "y": 229.31236363636367,
+      "x": 659.7088269999999,
+      "y": 190.42775600000004,
       "color": "#1D3572",
-      "collapsed": false
+      "collapsed": true
     },
     {
       "entity_type": "pc",
       "entity_name": "Titi",
       "tag": "pc_Titi",
-      "x": 898.4897272727271,
-      "y": 236.94872727272718,
+      "x": 866.9938269999998,
+      "y": 216.5917559999998,
       "color": "#1D3572",
       "collapsed": true
     },
@@ -40,8 +40,8 @@
       "entity_type": "npc",
       "entity_name": "Commander Voss – head of the imperial guard",
       "tag": "npc_Commander_Voss_–_head_of_the_imperial_guard_1",
-      "x": 557.9442727272726,
-      "y": 297.0396363636364,
+      "x": 538.7278269999998,
+      "y": 270.5727560000001,
       "color": "#1D3572",
       "collapsed": true
     },
@@ -49,8 +49,8 @@
       "entity_type": "npc",
       "entity_name": "Captain Voss",
       "tag": "npc_Captain_Voss",
-      "x": 1206.8533636363636,
-      "y": 541.4032727272727,
+      "x": 1402.4258270000005,
+      "y": 595.820756,
       "color": "#1D3572",
       "collapsed": true
     },
@@ -58,8 +58,8 @@
       "entity_type": "npc",
       "entity_name": "Cultist Leader",
       "tag": "npc_Cultist_Leader",
-      "x": 646.0,
-      "y": 535.0,
+      "x": 655.93,
+      "y": 587.2980000000001,
       "color": "#1D3572",
       "collapsed": true
     },
@@ -67,8 +67,8 @@
       "entity_type": "pc",
       "entity_name": "Lolo",
       "tag": "pc_Lolo_1",
-      "x": 575.0,
-      "y": 228.0,
+      "x": 540.429,
+      "y": 127.68099999999998,
       "color": "#1D3572",
       "collapsed": true
     },
@@ -76,8 +76,8 @@
       "entity_type": "npc",
       "entity_name": "Captain Jaxon",
       "tag": "npc_Captain_Jaxon",
-      "x": 580.0,
-      "y": 510.0,
+      "x": 496.08399999999995,
+      "y": 559.023,
       "color": "#1D3572",
       "collapsed": true
     },
@@ -85,8 +85,8 @@
       "entity_type": "npc",
       "entity_name": "Nebula Guardian",
       "tag": "npc_Nebula_Guardian",
-      "x": 844.0,
-      "y": 515.0,
+      "x": 780.4680000000001,
+      "y": 557.678,
       "color": "#1D3572",
       "collapsed": true
     },
@@ -94,8 +94,8 @@
       "entity_type": "npc",
       "entity_name": "Captain Aileen",
       "tag": "npc_Captain_Aileen",
-      "x": 821.0,
-      "y": 540.0,
+      "x": 1548.855,
+      "y": 417.953,
       "color": "#1D3572",
       "collapsed": false
     },
@@ -103,19 +103,148 @@
       "entity_type": "npc",
       "entity_name": "Emperor Varn ",
       "tag": "npc_Emperor_Varn_",
-      "x": 732.0,
-      "y": 316.0,
+      "x": 550.396,
+      "y": 172.8089999999999,
       "collapsed": true,
       "color": "#1D3572"
+    },
+    {
+      "entity_type": "pc",
+      "entity_name": "Lolo",
+      "tag": "pc_Lolo_2",
+      "x": 498.0,
+      "y": 248.0,
+      "collapsed": false,
+      "color": "#1D3572"
+    },
+    {
+      "entity_type": "npc",
+      "entity_name": "Commander Voss ",
+      "tag": "npc_Commander_Voss_",
+      "x": 907.0,
+      "y": 175.0,
+      "collapsed": true,
+      "color": "#1D3572"
+    },
+    {
+      "entity_type": "npc",
+      "entity_name": "Dr. Elara Kline",
+      "tag": "npc_Dr._Elara_Kline",
+      "x": 200,
+      "y": 200,
+      "color": "#1D3572",
+      "collapsed": true
+    },
+    {
+      "entity_type": "npc",
+      "entity_name": "Cultist Leader",
+      "tag": "npc_Cultist_Leader_1",
+      "x": 378.0,
+      "y": 139.0,
+      "color": "#1D3572",
+      "collapsed": true
+    },
+    {
+      "entity_type": "npc",
+      "entity_name": "Nebula Guardian",
+      "tag": "npc_Nebula_Guardian_1",
+      "x": 746.0,
+      "y": 275.0,
+      "color": "#1D3572",
+      "collapsed": true
+    },
+    {
+      "entity_type": "npc",
+      "entity_name": "Colonist Crew Member",
+      "tag": "npc_Colonist_Crew_Member",
+      "x": 920,
+      "y": 200,
+      "color": "#1D3572",
+      "collapsed": true
+    },
+    {
+      "entity_type": "npc",
+      "entity_name": "Galactic Federation Officer",
+      "tag": "npc_Galactic_Federation_Officer",
+      "x": 200,
+      "y": 380,
+      "color": "#1D3572",
+      "collapsed": true
+    },
+    {
+      "entity_type": "npc",
+      "entity_name": "Commander Voss",
+      "tag": "npc_Commander_Voss",
+      "x": 1140.0,
+      "y": 550.0,
+      "color": "#1D3572",
+      "collapsed": true
+    },
+    {
+      "entity_type": "npc",
+      "entity_name": "Null Syndicate Enforcer",
+      "tag": "npc_Null_Syndicate_Enforcer",
+      "x": 680,
+      "y": 380,
+      "color": "#1D3572",
+      "collapsed": true
+    },
+    {
+      "entity_type": "npc",
+      "entity_name": "Dr. Lyra Mendez",
+      "tag": "npc_Dr._Lyra_Mendez",
+      "x": 920,
+      "y": 380,
+      "color": "#1D3572",
+      "collapsed": true
+    },
+    {
+      "entity_type": "npc",
+      "entity_name": "Mara the Smuggler",
+      "tag": "npc_Mara_the_Smuggler",
+      "x": 200,
+      "y": 560,
+      "color": "#1D3572",
+      "collapsed": true
+    },
+    {
+      "entity_type": "npc",
+      "entity_name": "Zorik the AI",
+      "tag": "npc_Zorik_the_AI",
+      "x": 440,
+      "y": 560,
+      "color": "#1D3572",
+      "collapsed": true
+    },
+    {
+      "entity_type": "npc",
+      "entity_name": "Captain Aileen",
+      "tag": "npc_Captain_Aileen_1",
+      "x": 821.0,
+      "y": 784.0,
+      "color": "#1D3572",
+      "collapsed": false
+    },
+    {
+      "entity_type": "npc",
+      "entity_name": "Emperor Varn",
+      "tag": "npc_Emperor_Varn",
+      "x": 839.0,
+      "y": 554.0,
+      "color": "#1D3572",
+      "collapsed": true
+    },
+    {
+      "entity_type": "npc",
+      "entity_name": "Captain Voss",
+      "tag": "npc_Captain_Voss_1",
+      "x": 554.0,
+      "y": 789.0,
+      "color": "#1D3572",
+      "collapsed": true
     }
   ],
   "links": [
-    {
-      "node1_tag": "pc_Lolo_1",
-      "node2_tag": "pc_Titi",
-      "text": "observe",
-      "arrow_mode": "both"
-    },
     {
       "node1_tag": "pc_Lolo_1",
       "node2_tag": "npc_Cultist_Leader",
@@ -129,7 +258,103 @@
       "arrow_mode": "both"
     },
     {
-      "node1_tag": "pc_Lolo_1",
+      "node1_tag": "npc_Captain_Voss",
+      "node2_tag": "npc_Captain_Aileen_–_guard_captain_guarding_the_banquet",
+      "text": "ex lovers",
+      "arrow_mode": "both"
+    },
+    {
+      "node1_tag": "npc_Captain_Voss",
+      "node2_tag": "npc_Captain_Aileen",
+      "text": "ex lovers",
+      "arrow_mode": "both"
+    },
+    {
+      "node1_tag": "pc_Lolo_2",
+      "node2_tag": "npc_Cultist_Leader",
+      "text": "hate",
+      "arrow_mode": "both"
+    },
+    {
+      "node1_tag": "pc_Lolo_2",
+      "node2_tag": "npc_Captain_Jaxon",
+      "text": "like",
+      "arrow_mode": "both"
+    },
+    {
+      "node1_tag": "pc_Lolo_2",
+      "node2_tag": "npc_Nebula_Guardian",
+      "text": "hate",
+      "arrow_mode": "both"
+    },
+    {
+      "node1_tag": "npc_Emperor_Varn_",
+      "node2_tag": "npc_Commander_Voss_",
+      "text": "commands",
+      "arrow_mode": "end"
+    },
+    {
+      "node1_tag": "npc_Captain_Voss",
+      "node2_tag": "npc_Commander_Voss_",
+      "text": "father and son",
+      "arrow_mode": "both"
+    },
+    {
+      "node1_tag": "npc_Captain_Voss_1",
+      "node2_tag": "npc_Captain_Aileen_1",
+      "text": "ex lovers",
+      "arrow_mode": "both"
+    },
+    {
+      "node1_tag": "pc_Lolo_2",
+      "node2_tag": "npc_Cultist_Leader_1",
+      "text": "hate",
+      "arrow_mode": "both"
+    },
+    {
+      "node1_tag": "pc_Lolo_2",
+      "node2_tag": "npc_Nebula_Guardian_1",
+      "text": "hate",
+      "arrow_mode": "both"
+    },
+    {
+      "node1_tag": "npc_Captain_Voss_1",
+      "node2_tag": "npc_Captain_Aileen_–_guard_captain_guarding_the_banquet",
+      "text": "ex lovers",
+      "arrow_mode": "both"
+    },
+    {
+      "node1_tag": "npc_Captain_Voss_1",
+      "node2_tag": "npc_Commander_Voss_",
+      "text": "father and son",
+      "arrow_mode": "both"
+    },
+    {
+      "node1_tag": "npc_Commander_Voss_–_head_of_the_imperial_guard",
+      "node2_tag": "npc_Emperor_Varn_",
+      "text": "commands",
+      "arrow_mode": "end"
+    },
+    {
+      "node1_tag": "npc_Commander_Voss_–_head_of_the_imperial_guard",
+      "node2_tag": "npc_Captain_Voss",
+      "text": "father and son",
+      "arrow_mode": "both"
+    },
+    {
+      "node1_tag": "pc_Lolo",
+      "node2_tag": "npc_Cultist_Leader",
+      "text": "hate",
+      "arrow_mode": "both"
+    },
+    {
+      "node1_tag": "pc_Lolo",
+      "node2_tag": "npc_Captain_Jaxon",
+      "text": "like",
+      "arrow_mode": "both"
+    },
+    {
+      "node1_tag": "pc_Lolo",
       "node2_tag": "npc_Nebula_Guardian",
       "text": "hate",
       "arrow_mode": "both"
@@ -141,15 +366,9 @@
       "arrow_mode": "both"
     },
     {
-      "node1_tag": "npc_Captain_Voss",
-      "node2_tag": "npc_Captain_Aileen_–_guard_captain_guarding_the_banquet",
-      "text": "ex lovers",
-      "arrow_mode": "both"
-    },
-    {
-      "node1_tag": "npc_Captain_Voss",
-      "node2_tag": "npc_Captain_Aileen",
-      "text": "ex lovers",
+      "node1_tag": "npc_Zorik_the_AI",
+      "node2_tag": "npc_Emperor_Varn_",
+      "text": "spies each other",
       "arrow_mode": "both"
     }
   ],
@@ -169,9 +388,17 @@
       "subsetDefinition": {
         "mode": "subset",
         "node_tags": [
-          "npc_Captain_Voss",
+          "npc_Emperor_Varn_",
+          "npc_Nebula_Guardian_1",
           "npc_Captain_Aileen",
-          "npc_Emperor_Varn_"
+          "npc_Commander_Voss_",
+          "npc_Null_Syndicate_Enforcer",
+          "npc_Mara_the_Smuggler",
+          "npc_Galactic_Federation_Officer",
+          "npc_Dr._Elara_Kline",
+          "npc_Dr._Lyra_Mendez",
+          "npc_Captain_Voss",
+          "npc_Zorik_the_AI"
         ]
       },
       "layoutPrefs": {}
@@ -182,8 +409,8 @@
       "subsetDefinition": {
         "mode": "subset",
         "node_tags": [
-          "pc_Lolo",
-          "pc_Titi"
+          "pc_Titi",
+          "pc_Lolo_2"
         ]
       },
       "layoutPrefs": {}
@@ -195,12 +422,11 @@
         "mode": "subset",
         "node_tags": [
           "pc_Lolo_1",
-          "npc_Captain_Jaxon",
-          "npc_Nebula_Guardian"
+          "npc_Captain_Jaxon"
         ]
       },
       "layoutPrefs": {}
     }
   ],
-  "active_tab_id": "f3c309c5fa5644cba825b822a9070bfd"
+  "active_tab_id": "b773554d5a604599880120c96d087f8b"
 }
