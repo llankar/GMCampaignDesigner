@@ -192,6 +192,7 @@ class ScenarioCharacterGraphEditor(CharacterGraphEditor):
         self.graph = graph
 
         seen = set()
+        tag_mapping = {}
         for node in self.graph["nodes"]:
             if not isinstance(node, dict):
                 continue
@@ -205,14 +206,16 @@ class ScenarioCharacterGraphEditor(CharacterGraphEditor):
             entity_type = node.get("entity_type", "npc")
             entity_name = node.get("entity_name", "")
             base = f"{entity_type}_{entity_name.replace(' ', '_')}"
-            tag = node.get("tag", base)
-            if tag in seen:
+            original_tag = node.get("tag", base)
+            tag = original_tag
+            if original_tag in seen:
                 index = 1
                 while f"{base}_{index}" in seen:
                     index += 1
                 tag = f"{base}_{index}"
             node["tag"] = tag
             seen.add(tag)
+            tag_mapping[original_tag] = tag
             node.setdefault("x", 200)
             node.setdefault("y", 200)
             node.setdefault("color", "#1D3572")
@@ -238,6 +241,10 @@ class ScenarioCharacterGraphEditor(CharacterGraphEditor):
                     link["node2_tag"] = f"pc_{link['pc_name2'].replace(' ', '_')}"
                     link.pop("pc_name1", None)
                     link.pop("pc_name2", None)
+            if link.get("node1_tag") in tag_mapping:
+                link["node1_tag"] = tag_mapping[link["node1_tag"]]
+            if link.get("node2_tag") in tag_mapping:
+                link["node2_tag"] = tag_mapping[link["node2_tag"]]
             link.setdefault("arrow_mode", "both")
 
         if self.graph["nodes"]:
