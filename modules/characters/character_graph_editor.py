@@ -1106,14 +1106,16 @@ class CharacterGraphEditor(ctk.CTkFrame):
                     tag2 = link.get("node2_tag")
                     x1, y1 = self.node_positions.get(tag1, (0, 0))
                     x2, y2 = self.node_positions.get(tag2, (0, 0))
+                    start_x, start_y = self._get_edge_point(tag1, x2, y2)
+                    end_x, end_y = self._get_edge_point(tag2, x1, y1)
                     link_color, line_width = self._get_link_style(link)
 
                     # Update line coordinates directly
-                    self.canvas.coords(canvas_ids["line"], x1, y1, x2, y2)
+                    self.canvas.coords(canvas_ids["line"], start_x, start_y, end_x, end_y)
                     self.canvas.itemconfig(canvas_ids["line"], fill=link_color, width=line_width)
 
                     # Update text position
-                    mid_x, mid_y = (x1 + x2) / 2, (y1 + y2) / 2
+                    mid_x, mid_y = (start_x + end_x) / 2, (start_y + end_y) / 2
                     self.canvas.coords(canvas_ids["text"], mid_x, mid_y)
 
                     # Delete old arrowheads
@@ -1124,10 +1126,10 @@ class CharacterGraphEditor(ctk.CTkFrame):
                     # Redraw arrowheads at new position
                     arrow_mode = link.get("arrow_mode", "end")
                     if arrow_mode in ("start", "both"):
-                        arrow_id = self.draw_arrowhead(x1, y1, x2, y2, tag1, link_color)
+                        arrow_id = self.draw_arrowhead(tag1, x2, y2, link_color)
                         canvas_ids["arrows"].append(arrow_id)
                     if arrow_mode in ("end", "both"):
-                        arrow_id = self.draw_arrowhead(x2, y2, x1, y1, tag2, link_color)
+                        arrow_id = self.draw_arrowhead(tag2, x1, y1, link_color)
                         canvas_ids["arrows"].append(arrow_id)
 
     
@@ -1594,13 +1596,15 @@ class CharacterGraphEditor(ctk.CTkFrame):
         tag2 = link.get("node2_tag")
         x1, y1 = self.node_positions.get(tag1, (0, 0))
         x2, y2 = self.node_positions.get(tag2, (0, 0))
+        start_x, start_y = self._get_edge_point(tag1, x2, y2)
+        end_x, end_y = self._get_edge_point(tag2, x1, y1)
 
         link_color, line_width = self._get_link_style(link)
         line_id = self.canvas.create_line(
-            x1,
-            y1,
-            x2,
-            y2,
+            start_x,
+            start_y,
+            end_x,
+            end_y,
             fill=link_color,
             width=line_width,
             tags=("link",),
@@ -1609,11 +1613,11 @@ class CharacterGraphEditor(ctk.CTkFrame):
 
         arrow_ids = []
         if arrow_mode in ("start", "both"):
-            arrow_ids.append(self.draw_arrowhead(x1, y1, x2, y2, tag1, link_color))
+            arrow_ids.append(self.draw_arrowhead(tag1, x2, y2, link_color))
         if arrow_mode in ("end", "both"):
-            arrow_ids.append(self.draw_arrowhead(x2, y2, x1, y1, tag2, link_color))
+            arrow_ids.append(self.draw_arrowhead(tag2, x1, y1, link_color))
 
-        mid_x, mid_y = (x1 + x2) / 2, (y1 + y2) / 2
+        mid_x, mid_y = (start_x + end_x) / 2, (start_y + end_y) / 2
         scale = self.canvas_scale
         font_size = max(1, int(10 * scale))
 
@@ -1635,30 +1639,38 @@ class CharacterGraphEditor(ctk.CTkFrame):
 
 
     # ─────────────────────────────────────────────────────────────────────────
+    # FUNCTION: _get_edge_point
+    # Returns the point where a link should touch the edge of a node's bounding box.
+    # ─────────────────────────────────────────────────────────────────────────
+    def _get_edge_point(self, node_tag, target_x, target_y):
+        center_x, center_y = self.node_positions.get(node_tag, (0, 0))
+        bbox = self.node_bboxes.get(node_tag)
+        if not bbox:
+            return center_x, center_y
+        left, top, right, bottom = bbox
+        half_w = (right - left) / 2
+        half_h = (bottom - top) / 2
+        dx = target_x - center_x
+        dy = target_y - center_y
+        if abs(dx) < 1e-6 and abs(dy) < 1e-6:
+            return center_x, center_y
+        if abs(dx) < 1e-6:
+            scale = half_h / max(abs(dy), 1e-6)
+        elif abs(dy) < 1e-6:
+            scale = half_w / max(abs(dx), 1e-6)
+        else:
+            scale = min(half_w / abs(dx), half_h / abs(dy))
+        return center_x + dx * scale, center_y + dy * scale
+
+    # ─────────────────────────────────────────────────────────────────────────
     # FUNCTION: draw_arrowhead
     # Draws a triangular arrowhead near a node, offset outside the node's bounding box.
     # ─────────────────────────────────────────────────────────────────────────
-    def draw_arrowhead(self, start_x, start_y, end_x, end_y, node_tag, color):
+    def draw_arrowhead(self, node_tag, target_x, target_y, color):
         arrow_length = 16
         arrow_width = 18
-        angle = math.atan2(start_y - end_y, start_x - end_x)
-        left, top, right, bottom = self.node_bboxes.get(
-            node_tag, (start_x - 50, start_y - 25, start_x + 50, start_y + 25)
-        )
-        half_w = (right - left) / 2
-        half_h = (bottom - top) / 2
-        dx = math.cos(angle)
-        dy = math.sin(angle)
-        if abs(dx) < 1e-6:
-            edge_distance = half_h / max(abs(dy), 1e-6)
-        elif abs(dy) < 1e-6:
-            edge_distance = half_w / max(abs(dx), 1e-6)
-        else:
-            edge_distance = min(half_w / abs(dx), half_h / abs(dy))
-        padding = 6
-        arrow_offset = max(edge_distance - padding, 0)
-        arrow_apex_x = start_x + arrow_offset * math.cos(angle)
-        arrow_apex_y = start_y + arrow_offset * math.sin(angle)
+        arrow_apex_x, arrow_apex_y = self._get_edge_point(node_tag, target_x, target_y)
+        angle = math.atan2(arrow_apex_y - target_y, arrow_apex_x - target_x)
         base_x = arrow_apex_x - arrow_length * math.cos(angle)
         base_y = arrow_apex_y - arrow_length * math.sin(angle)
         perp_x = -math.sin(angle)
@@ -1969,7 +1981,9 @@ class CharacterGraphEditor(ctk.CTkFrame):
             tag2 = link.get("node2_tag")
             x1, y1 = self.node_positions.get(tag1, (0, 0))
             x2, y2 = self.node_positions.get(tag2, (0, 0))
-            distance = self.distance_point_to_line(x, y, x1, y1, x2, y2)
+            start_x, start_y = self._get_edge_point(tag1, x2, y2)
+            end_x, end_y = self._get_edge_point(tag2, x1, y1)
+            distance = self.distance_point_to_line(x, y, start_x, start_y, end_x, end_y)
             if distance < threshold:
                 return link
         return None
