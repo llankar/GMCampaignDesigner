@@ -67,6 +67,7 @@ class CharacterGraphEditor(ctk.CTkFrame):
         faction_wrapper: GenericModelWrapper,
         allowed_entity_types=None,
         graph_path=None,
+        background_style="scene_flow",
         *args,
         **kwargs,
     ):
@@ -89,6 +90,7 @@ class CharacterGraphEditor(ctk.CTkFrame):
         self.graph_path = graph_path or DEFAULT_CHARACTER_GRAPH_PATH
         self.canvas_scale = 1.0
         self.zoom_factor = 1.1
+        self.background_style = (background_style or "scene_flow").lower()
         # Graph structure to hold nodes and links
         self.graph = {
             "nodes": [],
@@ -112,6 +114,9 @@ class CharacterGraphEditor(ctk.CTkFrame):
         self.node_holder_images = {}  # PhotoImage refs for post-it & overlay images
         self._grid_tile_cache = {}
         self._scene_flow_tile = None
+        self._corkboard_base = None
+        self._corkboard_photo = None
+        self._corkboard_id = None
         # Variables for selection and dragging
         self.selected_node = None
         self.selected_items = []  # All canvas items belonging to the selected node
@@ -126,7 +131,8 @@ class CharacterGraphEditor(ctk.CTkFrame):
         self.init_toolbar()
         self.canvas_frame = ctk.CTkFrame(self)
         self.canvas_frame.pack(fill="both", expand=True)
-        self.canvas = ctk.CTkCanvas(self.canvas_frame, bg=SCENE_FLOW_BG, highlightthickness=0)
+        canvas_bg = SCENE_FLOW_BG if self.background_style == "scene_flow" else "#2B2B2B"
+        self.canvas = ctk.CTkCanvas(self.canvas_frame, bg=canvas_bg, highlightthickness=0)
         self.h_scrollbar = ttk.Scrollbar(self.canvas_frame, orient="horizontal", command=self.canvas.xview)
         self.v_scrollbar = ttk.Scrollbar(self.canvas_frame, orient="vertical", command=self.canvas.yview)
         self.canvas.configure(xscrollcommand=self.h_scrollbar.set, yscrollcommand=self.v_scrollbar.set)
@@ -1431,7 +1437,7 @@ class CharacterGraphEditor(ctk.CTkFrame):
 
 
     
-        # — ADDED: draw the corkboard background once canvas exists
+        # — ADDED: draw the scene flow background once canvas exists
     def _apply_scene_flow_background(self, width=None, height=None):
         if not hasattr(self, "canvas"):
             return
@@ -1447,12 +1453,48 @@ class CharacterGraphEditor(ctk.CTkFrame):
             self._scene_flow_tile = tile
         self.canvas.tag_lower("scene_flow_bg")
 
+    def _apply_corkboard_background(self, width=None, height=None):
+        if not hasattr(self, "canvas"):
+            return
+        background_path = os.path.join("assets", "images", "corkboard_bg.png")
+        if not os.path.exists(background_path):
+            return
+        width = width or max(self.canvas.winfo_width(), 1)
+        height = height or max(self.canvas.winfo_height(), 1)
+        if self._corkboard_base is None:
+            self._corkboard_base = Image.open(background_path)
+        zoom_factor = 2
+        target_width = max(int(width), 1920) * zoom_factor
+        target_height = max(int(height), 1080) * zoom_factor
+        resized = self._corkboard_base.resize(
+            (target_width, target_height),
+            Image.Resampling.LANCZOS,
+        )
+        self._corkboard_photo = ImageTk.PhotoImage(resized, master=self.canvas)
+        center_x = width // 2
+        center_y = height // 2
+        if self._corkboard_id is None:
+            self._corkboard_id = self.canvas.create_image(
+                center_x,
+                center_y,
+                image=self._corkboard_photo,
+                anchor="center",
+                tags="background",
+            )
+        else:
+            self.canvas.itemconfig(self._corkboard_id, image=self._corkboard_photo)
+            self.canvas.coords(self._corkboard_id, center_x, center_y)
+        self.canvas.tag_lower("background")
+
     def _on_canvas_configure(self, event):
         """
         Whenever the canvas is resized (or we manually call this),
         redraw the background to fill the full width/height.
         """
-        self._apply_scene_flow_background(event.width, event.height)
+        if self.background_style == "corkboard":
+            self._apply_corkboard_background(event.width, event.height)
+        else:
+            self._apply_scene_flow_background(event.width, event.height)
     # ─────────────────────────────────────────────────────────────────────────
     # FUNCTION: draw_nodes
     # Iterates over all nodes in the graph, draws their rectangles, portraits, and labels,
@@ -2205,7 +2247,10 @@ class CharacterGraphEditor(ctk.CTkFrame):
         #self.canvas.delete("link_text")
         # ── 1) Remove everything except the scene flow background ──
         #    we keep only items tagged “background”
-        self._apply_scene_flow_background()
+        if self.background_style == "corkboard":
+            self._apply_corkboard_background()
+        else:
+            self._apply_scene_flow_background()
         for item in self.canvas.find_all():
             if "background" not in self.canvas.gettags(item):
                 self.canvas.delete(item)

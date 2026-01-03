@@ -2518,6 +2518,7 @@ class GMScreenView(ctk.CTkFrame):
             self.wrappers["NPCs"],
             self.wrappers["PCs"],
             self.wrappers["Factions"],
+            background_style="corkboard",
         )
         graph_editor.pack(fill="both", expand=True)
         frame.graph_editor = graph_editor  # Save a reference for state management
