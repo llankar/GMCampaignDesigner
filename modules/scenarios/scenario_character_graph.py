@@ -389,6 +389,50 @@ def build_scenario_graph_with_links(
     base_graph.setdefault("links", [])
     base_graph.setdefault("shapes", [])
     ensure_graph_tabs(base_graph)
+    if not base_graph["nodes"]:
+        added_nodes = []
+        seen_tags = set()
+        for entity_type, names in (("npc", scenario_npcs), ("pc", scenario_pcs)):
+            for name in names or []:
+                if not name:
+                    continue
+                base = f"{entity_type}_{name.replace(' ', '_')}"
+                tag = base
+                index = 1
+                while tag in seen_tags:
+                    tag = f"{base}_{index}"
+                    index += 1
+                node = {
+                    "entity_type": entity_type,
+                    "entity_name": name,
+                    "tag": tag,
+                    "x": 200,
+                    "y": 200,
+                    "color": "#1D3572",
+                    "collapsed": True,
+                }
+                base_graph["nodes"].append(node)
+                added_nodes.append(node)
+                seen_tags.add(tag)
+        _layout_new_scenario_nodes(base_graph, added_nodes)
+
+    node_tags = {
+        node.get("tag") for node in base_graph.get("nodes", []) if isinstance(node, dict)
+    }
+    filtered_links = []
+    for link in base_graph.get("links", []):
+        if not isinstance(link, dict):
+            continue
+        node1_tag, node2_tag = _normalize_link_tags(link)
+        if not node1_tag or not node2_tag:
+            continue
+        if node1_tag not in node_tags or node2_tag not in node_tags:
+            continue
+        link["node1_tag"] = node1_tag
+        link["node2_tag"] = node2_tag
+        link.setdefault("arrow_mode", "both")
+        filtered_links.append(link)
+    base_graph["links"] = filtered_links
     return base_graph
 
 
