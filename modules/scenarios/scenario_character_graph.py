@@ -383,18 +383,42 @@ def build_scenario_graph_with_links(
     scenario_pcs,
     graph_path=DEFAULT_CHARACTER_GRAPH_PATH,
 ):
+    def _collect_entities_from_nodes(nodes):
+        entities = set()
+        for node in nodes:
+            if not isinstance(node, dict):
+                continue
+            entity_type = node.get("entity_type")
+            entity_name = node.get("entity_name")
+            if not entity_type or not entity_name:
+                if "npc_name" in node:
+                    entity_type = "npc"
+                    entity_name = node.get("npc_name")
+                elif "pc_name" in node:
+                    entity_type = "pc"
+                    entity_name = node.get("pc_name")
+            if entity_type and entity_name:
+                entities.add((entity_type, entity_name))
+        return entities
+
     base_graph = copy.deepcopy(scenario_graph) if isinstance(scenario_graph, dict) else {}
     base_graph.setdefault("nodes", [])
     base_graph.setdefault("links", [])
     base_graph.setdefault("shapes", [])
     ensure_graph_tabs(base_graph)
 
-    scenario_entities = {
-        ("npc", name) for name in (scenario_npcs or []) if isinstance(name, str) and name.strip()
-    }
-    scenario_entities.update(
-        ("pc", name) for name in (scenario_pcs or []) if isinstance(name, str) and name.strip()
-    )
+    scenario_entities = _collect_entities_from_nodes(base_graph.get("nodes", []))
+    wizard_entities = set()
+    if scenario_npcs:
+        wizard_entities.update(
+            ("npc", name) for name in scenario_npcs if isinstance(name, str) and name.strip()
+        )
+    if scenario_pcs:
+        wizard_entities.update(
+            ("pc", name) for name in scenario_pcs if isinstance(name, str) and name.strip()
+        )
+    if wizard_entities:
+        scenario_entities.update(wizard_entities)
     if not scenario_entities:
         return base_graph
 
