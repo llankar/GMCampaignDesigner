@@ -68,6 +68,7 @@ class CharacterGraphEditor(ctk.CTkFrame):
         allowed_entity_types=None,
         graph_path=None,
         background_style="corkboard",
+        node_style="postit",
         *args,
         **kwargs,
     ):
@@ -91,6 +92,7 @@ class CharacterGraphEditor(ctk.CTkFrame):
         self.canvas_scale = 1.0
         self.zoom_factor = 1.1
         self.background_style = (background_style or "scene_flow").lower()
+        self.node_style = (node_style or "postit").lower()
         # Graph structure to hold nodes and links
         self.graph = {
             "nodes": [],
@@ -145,12 +147,12 @@ class CharacterGraphEditor(ctk.CTkFrame):
         # — ADDED: Post-it style assets
         postit_path = os.path.join("assets", "images", "post-it.png")
         pin_path    = os.path.join("assets", "images", "thumbtack.png")
-        if os.path.exists(postit_path):
+        if self.node_style == "postit" and os.path.exists(postit_path):
             self.postit_base = Image.open(postit_path).convert("RGBA")
         else:
             self.postit_base = None
 
-        if os.path.exists(pin_path):
+        if self.node_style == "postit" and os.path.exists(pin_path):
             pin_img = Image.open(pin_path)
             size = int(32 * self.canvas_scale)
             pin_img = pin_img.resize((size, size), Image.Resampling.LANCZOS)
@@ -1502,8 +1504,27 @@ class CharacterGraphEditor(ctk.CTkFrame):
     # ─────────────────────────────────────────────────────────────────────────
     def draw_nodes(self, nodes):
         scale = self.canvas_scale
-        GAP = int(5 * scale)
-        PAD = int(10 * scale)
+        node_style = (self.node_style or "postit").lower()
+        GAP = int((6 if node_style == "modern" else 5) * scale)
+        PAD = int((14 if node_style == "modern" else 10) * scale)
+
+        def draw_rounded_panel(x1, y1, x2, y2, radius, **kwargs):
+            radius = max(0, int(radius))
+            points = [
+                x1 + radius, y1,
+                x2 - radius, y1,
+                x2, y1,
+                x2, y1 + radius,
+                x2, y2 - radius,
+                x2, y2,
+                x2 - radius, y2,
+                x1 + radius, y2,
+                x1, y2,
+                x1, y2 - radius,
+                x1, y1 + radius,
+                x1, y1,
+            ]
+            return self.canvas.create_polygon(points, smooth=True, **kwargs)
 
         # Helper to measure wrapped text height
         def measure_text_height(text, font, wrap_width):
@@ -1542,6 +1563,8 @@ class CharacterGraphEditor(ctk.CTkFrame):
             # ── Font definitions ─────────────────────────────────────
             title_font = ("Arial", max(1, int(10 * scale)), "bold")
             body_font  = ("Arial", max(1, int(9  * scale)))
+            title_color = "#f0f4ff" if node_style == "modern" else "black"
+            body_color = "#c7d2e3" if node_style == "modern" else "black"
 
             # ── Prepare title & body text ────────────────────────────
             title_text = entity_name
@@ -1583,7 +1606,7 @@ class CharacterGraphEditor(ctk.CTkFrame):
                     self.node_images[tag] = portrait_img
 
                 # ── Compute wrap width & measure text heights ────────────
-                wrap_width = max(p_w, int(150 * scale)) - 2 * PAD
+                wrap_width = max(p_w, int(160 * scale if node_style == "modern" else 150 * scale)) - 2 * PAD
                 title_h = measure_text_height(title_text, title_font, wrap_width)
                 body_h = measure_text_height(body_text, body_font, wrap_width) if body_text else 0
 
@@ -1599,31 +1622,57 @@ class CharacterGraphEditor(ctk.CTkFrame):
                 min_w = content_w + 2 * PAD
                 min_h = content_h + 2 * PAD
 
-            # ── 1) Draw the post-it background ───────────────────────
-            if self.postit_base:
-                ow, oh = self.postit_base.size
-                if is_collapsed:
-                    node_w, node_h = int(min_w), int(min_h)
-                else:
-                    sf = max(min_w / ow, min_h / oh)
-                    node_w, node_h = int(ow * sf), int(oh * sf)
-                bg_img = self.postit_base.resize((node_w, node_h), Image.Resampling.LANCZOS)
-                bg_photo = ImageTk.PhotoImage(bg_img, master=self.canvas)
-                self.node_holder_images[tag] = bg_photo
-                self.canvas.create_image(
-                    x, y,
-                    image=bg_photo,
-                    anchor="center",
-                    tags=(tag, "node_bg", "node")
+            # ── 1) Draw the node background ──────────────────────────
+            if node_style == "modern":
+                node_w, node_h = min_w, min_h
+                shadow_offset = max(2, int(4 * scale))
+                corner_radius = max(6, int(12 * scale))
+                draw_rounded_panel(
+                    x - node_w / 2 + shadow_offset,
+                    y - node_h / 2 + shadow_offset,
+                    x + node_w / 2 + shadow_offset,
+                    y + node_h / 2 + shadow_offset,
+                    corner_radius,
+                    fill="#0f131a",
+                    outline="",
+                    tags=(tag, "node_bg", "node"),
+                )
+                draw_rounded_panel(
+                    x - node_w / 2,
+                    y - node_h / 2,
+                    x + node_w / 2,
+                    y + node_h / 2,
+                    corner_radius,
+                    fill="#1f2430",
+                    outline="#2f3747",
+                    width=max(1, int(1 * scale)),
+                    tags=(tag, "node_bg", "node"),
                 )
             else:
-                node_w, node_h = min_w, min_h
+                if self.postit_base:
+                    ow, oh = self.postit_base.size
+                    if is_collapsed:
+                        node_w, node_h = int(min_w), int(min_h)
+                    else:
+                        sf = max(min_w / ow, min_h / oh)
+                        node_w, node_h = int(ow * sf), int(oh * sf)
+                    bg_img = self.postit_base.resize((node_w, node_h), Image.Resampling.LANCZOS)
+                    bg_photo = ImageTk.PhotoImage(bg_img, master=self.canvas)
+                    self.node_holder_images[tag] = bg_photo
+                    self.canvas.create_image(
+                        x, y,
+                        image=bg_photo,
+                        anchor="center",
+                        tags=(tag, "node_bg", "node")
+                    )
+                else:
+                    node_w, node_h = min_w, min_h
 
             # ── 2) Draw the thumbtack pin ────────────────────────────
-            if self.pin_image:
+            if node_style == "postit" and self.pin_image:
                 self.canvas.create_image(
                     x,
-                    y - node_h // 2 - int(8 * scale)-5,
+                    y - node_h // 2 - int(8 * scale) - 5,
                     image=self.pin_image,
                     anchor="n",
                     tags=(tag, "node_fg", "node")
@@ -1646,7 +1695,7 @@ class CharacterGraphEditor(ctk.CTkFrame):
                     x, current_y,
                     text=title_text,
                     font=title_font,
-                    fill="black",
+                    fill=title_color,
                     width=wrap_width,
                     anchor="n",
                     justify="center",
@@ -1662,7 +1711,7 @@ class CharacterGraphEditor(ctk.CTkFrame):
                     x, current_y,
                     text=body_text,
                     font=body_font,
-                    fill="black",
+                    fill=body_color,
                     width=wrap_width,
                     anchor="n",
                     justify="center",
@@ -1680,8 +1729,8 @@ class CharacterGraphEditor(ctk.CTkFrame):
                 toggle_y - toggle_radius,
                 toggle_x + toggle_radius,
                 toggle_y + toggle_radius,
-                fill="#2B2B2B",
-                outline="#1B1B1B",
+                fill="#2B2B2B" if node_style != "modern" else "#1b2230",
+                outline="#1B1B1B" if node_style != "modern" else "#2f3747",
                 tags=(tag, "node_fg", "node", "collapse_toggle")
             )
             self.canvas.create_text(
@@ -1689,7 +1738,7 @@ class CharacterGraphEditor(ctk.CTkFrame):
                 toggle_y,
                 text=toggle_symbol,
                 font=("Arial", max(1, int(10 * scale)), "bold"),
-                fill="white",
+                fill="white" if node_style != "modern" else "#f0f4ff",
                 tags=(tag, "node_fg", "node", "collapse_toggle")
             )
 

@@ -28,6 +28,7 @@ class ScenarioCharacterGraphEditor(CharacterGraphEditor):
         graph_data=None,
         on_entity_added=None,
         on_entity_removed=None,
+        node_style=None,
         *args,
         **kwargs,
     ):
@@ -41,6 +42,7 @@ class ScenarioCharacterGraphEditor(CharacterGraphEditor):
             faction_wrapper=faction_wrapper,
             allowed_entity_types=("npc", "pc"),
             graph_path=graph_path,
+            node_style=node_style,
             *args,
             **kwargs,
         )
@@ -579,4 +581,3 @@ def _normalize_link_tags(link):
             node1_tag = f"pc_{link['pc_name1'].replace(' ', '_')}"
             node2_tag = f"pc_{link['pc_name2'].replace(' ', '_')}"
     return node1_tag, node2_tag
-
