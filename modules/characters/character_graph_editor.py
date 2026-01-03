@@ -1647,9 +1647,16 @@ class CharacterGraphEditor(ctk.CTkFrame):
         )
         half_w = (right - left) / 2
         half_h = (bottom - top) / 2
-        node_radius = math.sqrt(half_w**2 + half_h**2)
-        arrow_offset_extra = -20
-        arrow_offset = node_radius + arrow_offset_extra
+        dx = math.cos(angle)
+        dy = math.sin(angle)
+        if abs(dx) < 1e-6:
+            edge_distance = half_h / max(abs(dy), 1e-6)
+        elif abs(dy) < 1e-6:
+            edge_distance = half_w / max(abs(dx), 1e-6)
+        else:
+            edge_distance = min(half_w / abs(dx), half_h / abs(dy))
+        padding = 6
+        arrow_offset = max(edge_distance - padding, 0)
         arrow_apex_x = start_x + arrow_offset * math.cos(angle)
         arrow_apex_y = start_y + arrow_offset * math.sin(angle)
         base_x = arrow_apex_x - arrow_length * math.cos(angle)
