@@ -19,6 +19,10 @@ from modules.helpers.portrait_helper import primary_portrait, resolve_portrait_p
 from modules.helpers.template_loader import load_template
 from modules.npcs import npc_opener
 from modules.pcs import pc_opener
+from modules.scenarios.scene_flow_rendering import (
+    SCENE_FLOW_BG,
+    apply_scene_flow_canvas_styling,
+)
 from modules.ui.image_viewer import show_portrait
 from modules.characters.graph_tabs import (
     ManageGraphTabsDialog,
@@ -105,6 +109,8 @@ class CharacterGraphEditor(ctk.CTkFrame):
         self.node_bboxes = {}     # Bounding boxes for nodes (used for arrow offsets)
         self.shape_counter = 0  # For unique shape tags
         self.node_holder_images = {}  # PhotoImage refs for post-it & overlay images
+        self._grid_tile_cache = {}
+        self._scene_flow_tile = None
         # Variables for selection and dragging
         self.selected_node = None
         self.selected_items = []  # All canvas items belonging to the selected node
@@ -119,7 +125,7 @@ class CharacterGraphEditor(ctk.CTkFrame):
         self.init_toolbar()
         self.canvas_frame = ctk.CTkFrame(self)
         self.canvas_frame.pack(fill="both", expand=True)
-        self.canvas = ctk.CTkCanvas(self.canvas_frame, bg="#2B2B2B", highlightthickness=0)
+        self.canvas = ctk.CTkCanvas(self.canvas_frame, bg=SCENE_FLOW_BG, highlightthickness=0)
         self.h_scrollbar = ttk.Scrollbar(self.canvas_frame, orient="horizontal", command=self.canvas.xview)
         self.v_scrollbar = ttk.Scrollbar(self.canvas_frame, orient="vertical", command=self.canvas.yview)
         self.canvas.configure(xscrollcommand=self.h_scrollbar.set, yscrollcommand=self.v_scrollbar.set)
@@ -132,8 +138,6 @@ class CharacterGraphEditor(ctk.CTkFrame):
         # — ADDED: Post-it style assets
         postit_path = os.path.join("assets", "images", "post-it.png")
         pin_path    = os.path.join("assets", "images", "thumbtack.png")
-        bg_path     = os.path.join("assets", "images", "corkboard_bg.png")
-
         if os.path.exists(postit_path):
             self.postit_base = Image.open(postit_path).convert("RGBA")
         else:
@@ -147,7 +151,7 @@ class CharacterGraphEditor(ctk.CTkFrame):
         else:
             self.pin_image = None
 
-        # draw corkboard background once the canvas exists
+        # draw scene flow background once the canvas exists
         self.canvas.bind("<Configure>", self._on_canvas_configure)
         # Bind mouse events for dragging and context menus
         self.canvas.bind("<Button-1>", self.start_drag)
@@ -1102,9 +1106,11 @@ class CharacterGraphEditor(ctk.CTkFrame):
                     tag2 = link.get("node2_tag")
                     x1, y1 = self.node_positions.get(tag1, (0, 0))
                     x2, y2 = self.node_positions.get(tag2, (0, 0))
+                    link_color, line_width = self._get_link_style(link)
 
                     # Update line coordinates directly
                     self.canvas.coords(canvas_ids["line"], x1, y1, x2, y2)
+                    self.canvas.itemconfig(canvas_ids["line"], fill=link_color, width=line_width)
 
                     # Update text position
                     mid_x, mid_y = (x1 + x2) / 2, (y1 + y2) / 2
@@ -1118,10 +1124,10 @@ class CharacterGraphEditor(ctk.CTkFrame):
                     # Redraw arrowheads at new position
                     arrow_mode = link.get("arrow_mode", "end")
                     if arrow_mode in ("start", "both"):
-                        arrow_id = self.draw_arrowhead(x1, y1, x2, y2, tag1)
+                        arrow_id = self.draw_arrowhead(x1, y1, x2, y2, tag1, link_color)
                         canvas_ids["arrows"].append(arrow_id)
                     if arrow_mode in ("end", "both"):
-                        arrow_id = self.draw_arrowhead(x2, y2, x1, y1, tag2)
+                        arrow_id = self.draw_arrowhead(x2, y2, x1, y1, tag2, link_color)
                         canvas_ids["arrows"].append(arrow_id)
 
     
@@ -1342,29 +1348,27 @@ class CharacterGraphEditor(ctk.CTkFrame):
 
     
         # — ADDED: draw the corkboard background once canvas exists
+    def _apply_scene_flow_background(self, width=None, height=None):
+        if not hasattr(self, "canvas"):
+            return
+        width = width or max(self.canvas.winfo_width(), 1)
+        height = height or max(self.canvas.winfo_height(), 1)
+        tile = apply_scene_flow_canvas_styling(
+            self.canvas,
+            tile_cache=self._grid_tile_cache,
+            extent_width=width,
+            extent_height=height,
+        )
+        if tile is not None:
+            self._scene_flow_tile = tile
+        self.canvas.tag_lower("scene_flow_bg")
+
     def _on_canvas_configure(self, event):
         """
         Whenever the canvas is resized (or we manually call this),
         redraw the background to fill the full width/height.
         """
-        bg_path = os.path.join("assets", "images", "corkboard_bg.png")
-        if os.path.exists(bg_path):
-            # Load & resize the corkboard to exactly event.width×event.height
-            img = Image.open(bg_path)
-            img = img.resize((event.width, event.height), Image.Resampling.LANCZOS)
-            self.background_photo = ImageTk.PhotoImage(img, master=self.canvas)
-
-            # Remove any old background image
-            self.canvas.delete("background")
-
-            # Draw the new one, always tagged "background"
-            self.background_id = self.canvas.create_image(
-                0, 0,
-                image=self.background_photo,
-                anchor="nw",
-                tags="background"
-            )
-            self.canvas.tag_lower("background")
+        self._apply_scene_flow_background(event.width, event.height)
     # ─────────────────────────────────────────────────────────────────────────
     # FUNCTION: draw_nodes
     # Iterates over all nodes in the graph, draws their rectangles, portraits, and labels,
@@ -1591,14 +1595,23 @@ class CharacterGraphEditor(ctk.CTkFrame):
         x1, y1 = self.node_positions.get(tag1, (0, 0))
         x2, y2 = self.node_positions.get(tag2, (0, 0))
 
-        line_id = self.canvas.create_line(x1, y1, x2, y2, fill="#5BB8FF", tags=("link",))
+        link_color, line_width = self._get_link_style(link)
+        line_id = self.canvas.create_line(
+            x1,
+            y1,
+            x2,
+            y2,
+            fill=link_color,
+            width=line_width,
+            tags=("link",),
+        )
         arrow_mode = link.get("arrow_mode", "end")
 
         arrow_ids = []
         if arrow_mode in ("start", "both"):
-            arrow_ids.append(self.draw_arrowhead(x1, y1, x2, y2, tag1))
+            arrow_ids.append(self.draw_arrowhead(x1, y1, x2, y2, tag1, link_color))
         if arrow_mode in ("end", "both"):
-            arrow_ids.append(self.draw_arrowhead(x2, y2, x1, y1, tag2))
+            arrow_ids.append(self.draw_arrowhead(x2, y2, x1, y1, tag2, link_color))
 
         mid_x, mid_y = (x1 + x2) / 2, (y1 + y2) / 2
         scale = self.canvas_scale
@@ -1625,8 +1638,9 @@ class CharacterGraphEditor(ctk.CTkFrame):
     # FUNCTION: draw_arrowhead
     # Draws a triangular arrowhead near a node, offset outside the node's bounding box.
     # ─────────────────────────────────────────────────────────────────────────
-    def draw_arrowhead(self, start_x, start_y, end_x, end_y, node_tag):
-        arrow_length = 10
+    def draw_arrowhead(self, start_x, start_y, end_x, end_y, node_tag, color):
+        arrow_length = 16
+        arrow_width = 18
         angle = math.atan2(end_y - start_y, end_x - start_x)
         left, top, right, bottom = self.node_bboxes.get(
             node_tag, (start_x - 50, start_y - 25, start_x + 50, start_y + 25)
@@ -1638,16 +1652,22 @@ class CharacterGraphEditor(ctk.CTkFrame):
         arrow_offset = node_radius + arrow_offset_extra
         arrow_apex_x = start_x + arrow_offset * math.cos(angle)
         arrow_apex_y = start_y + arrow_offset * math.sin(angle)
+        base_x = arrow_apex_x - arrow_length * math.cos(angle)
+        base_y = arrow_apex_y - arrow_length * math.sin(angle)
+        perp_x = -math.sin(angle)
+        perp_y = math.cos(angle)
+        left_x = base_x + (arrow_width / 2) * perp_x
+        left_y = base_y + (arrow_width / 2) * perp_y
+        right_x = base_x - (arrow_width / 2) * perp_x
+        right_y = base_y - (arrow_width / 2) * perp_y
 
         # RETURN the polygon ID so it can be deleted later
         return self.canvas.create_polygon(
             arrow_apex_x, arrow_apex_y,
-            arrow_apex_x + arrow_length * math.cos(angle + math.pi / 6),
-            arrow_apex_y + arrow_length * math.sin(angle + math.pi / 6),
-            arrow_apex_x + arrow_length * math.cos(angle - math.pi / 6),
-            arrow_apex_y + arrow_length * math.sin(angle - math.pi / 6),
-            fill="#5BB8FF",
-            outline="white",
+            left_x, left_y,
+            right_x, right_y,
+            fill=color,
+            outline="",
             tags=("link", "arrowhead")
     )
 
@@ -2080,8 +2100,9 @@ class CharacterGraphEditor(ctk.CTkFrame):
         #self.canvas.delete("shape")
         #self.canvas.delete("link")
         #self.canvas.delete("link_text")
-        # ── 1) Remove everything except the corkboard background ──
+        # ── 1) Remove everything except the scene flow background ──
         #    we keep only items tagged “background”
+        self._apply_scene_flow_background()
         for item in self.canvas.find_all():
             if "background" not in self.canvas.gettags(item):
                 self.canvas.delete(item)
@@ -2115,6 +2136,12 @@ class CharacterGraphEditor(ctk.CTkFrame):
                 self.canvas.tag_raise("shape", "background")
             else:
                 self.canvas.tag_raise("shape")
+
+    def _get_link_style(self, link):
+        is_selected = bool(self.selected_link and self._link_matches(link, self.selected_link))
+        if is_selected:
+            return "#5bb8ff", 3
+        return "#2f4c6f", 2
 
 
     def start_drag(self, event):
