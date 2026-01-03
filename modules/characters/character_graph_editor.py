@@ -67,7 +67,7 @@ class CharacterGraphEditor(ctk.CTkFrame):
         faction_wrapper: GenericModelWrapper,
         allowed_entity_types=None,
         graph_path=None,
-        background_style="scene_flow",
+        background_style="corkboard",
         *args,
         **kwargs,
     ):

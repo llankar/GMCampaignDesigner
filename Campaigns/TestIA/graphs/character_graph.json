@@ -242,6 +242,123 @@
       "y": 789.0,
       "color": "#1D3572",
       "collapsed": true
+    },
+    {
+      "entity_type": "npc",
+      "entity_name": "Mara the Smuggler",
+      "tag": "npc_Mara_the_Smuggler_1",
+      "x": 200,
+      "y": 200,
+      "color": "#1D3572",
+      "collapsed": true
+    },
+    {
+      "entity_type": "npc",
+      "entity_name": "Zorik the AI",
+      "tag": "npc_Zorik_the_AI_1",
+      "x": 440,
+      "y": 200,
+      "color": "#1D3572",
+      "collapsed": true
+    },
+    {
+      "entity_type": "npc",
+      "entity_name": "Captain Voss",
+      "tag": "npc_Captain_Voss_2",
+      "x": 680,
+      "y": 200,
+      "color": "#1D3572",
+      "collapsed": true
+    },
+    {
+      "entity_type": "npc",
+      "entity_name": "Dr. Lyra Mendez",
+      "tag": "npc_Dr._Lyra_Mendez_1",
+      "x": 986.0,
+      "y": 339.0,
+      "color": "#1D3572",
+      "collapsed": true
+    },
+    {
+      "entity_type": "npc",
+      "entity_name": "Null Syndicate Enforcer",
+      "tag": "npc_Null_Syndicate_Enforcer_1",
+      "x": 200,
+      "y": 380,
+      "color": "#1D3572",
+      "collapsed": true
+    },
+    {
+      "entity_type": "npc",
+      "entity_name": "Captain Aileen",
+      "tag": "npc_Captain_Aileen_2",
+      "x": 440,
+      "y": 380,
+      "color": "#1D3572",
+      "collapsed": true
+    },
+    {
+      "entity_type": "npc",
+      "entity_name": "Commander Voss",
+      "tag": "npc_Commander_Voss_1",
+      "x": 680,
+      "y": 380,
+      "color": "#1D3572",
+      "collapsed": true
+    },
+    {
+      "entity_type": "npc",
+      "entity_name": "Emperor Varn",
+      "tag": "npc_Emperor_Varn_1",
+      "x": 887.0,
+      "y": 56.0,
+      "color": "#1D3572",
+      "collapsed": true
+    },
+    {
+      "entity_type": "npc",
+      "entity_name": "Dr. Elara Kline",
+      "tag": "npc_Dr._Elara_Kline_1",
+      "x": 200,
+      "y": 560,
+      "color": "#1D3572",
+      "collapsed": true
+    },
+    {
+      "entity_type": "npc",
+      "entity_name": "Cultist Leader",
+      "tag": "npc_Cultist_Leader_2",
+      "x": 440,
+      "y": 560,
+      "color": "#1D3572",
+      "collapsed": true
+    },
+    {
+      "entity_type": "npc",
+      "entity_name": "Nebula Guardian",
+      "tag": "npc_Nebula_Guardian_2",
+      "x": 680,
+      "y": 560,
+      "color": "#1D3572",
+      "collapsed": true
+    },
+    {
+      "entity_type": "npc",
+      "entity_name": "Colonist Crew Member",
+      "tag": "npc_Colonist_Crew_Member_1",
+      "x": 920,
+      "y": 560,
+      "color": "#1D3572",
+      "collapsed": true
+    },
+    {
+      "entity_type": "npc",
+      "entity_name": "Galactic Federation Officer",
+      "tag": "npc_Galactic_Federation_Officer_1",
+      "x": 200,
+      "y": 740,
+      "color": "#1D3572",
+      "collapsed": true
     }
   ],
   "links": [
@@ -370,6 +487,30 @@
       "node2_tag": "npc_Emperor_Varn_",
       "text": "spies each other",
       "arrow_mode": "both"
+    },
+    {
+      "node1_tag": "npc_Zorik_the_AI_1",
+      "node2_tag": "npc_Emperor_Varn_1",
+      "text": "spies each other",
+      "arrow_mode": "both"
+    },
+    {
+      "node1_tag": "npc_Captain_Voss_2",
+      "node2_tag": "npc_Captain_Aileen_2",
+      "text": "ex lovers",
+      "arrow_mode": "both"
+    },
+    {
+      "node1_tag": "npc_Captain_Voss_2",
+      "node2_tag": "npc_Commander_Voss_1",
+      "text": "father and son",
+      "arrow_mode": "both"
+    },
+    {
+      "node1_tag": "npc_Commander_Voss_1",
+      "node2_tag": "npc_Emperor_Varn_1",
+      "text": "commands",
+      "arrow_mode": "end"
     }
   ],
   "shapes": [],
@@ -426,7 +567,30 @@
         ]
       },
       "layoutPrefs": {}
+    },
+    {
+      "id": "8fadddf9e5e84e14a68c5581ae622f25",
+      "name": "The Void Market",
+      "subsetDefinition": {
+        "mode": "subset",
+        "node_tags": [
+          "npc_Mara_the_Smuggler_1",
+          "npc_Zorik_the_AI_1",
+          "npc_Captain_Voss_2",
+          "npc_Dr._Lyra_Mendez_1",
+          "npc_Null_Syndicate_Enforcer_1",
+          "npc_Captain_Aileen_2",
+          "npc_Commander_Voss_1",
+          "npc_Emperor_Varn_1",
+          "npc_Dr._Elara_Kline_1",
+          "npc_Cultist_Leader_2",
+          "npc_Nebula_Guardian_2",
+          "npc_Colonist_Crew_Member_1",
+          "npc_Galactic_Federation_Officer_1"
+        ]
+      },
+      "layoutPrefs": {}
     }
   ],
-  "active_tab_id": "b773554d5a604599880120c96d087f8b"
+  "active_tab_id": "8fadddf9e5e84e14a68c5581ae622f25"
 }
