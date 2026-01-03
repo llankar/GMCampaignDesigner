@@ -337,6 +337,44 @@
 
             // 5) draw links with glow + black text-shadow
             function drawLinks() {
+                function intersectionWithRect(cx, cy, tx, ty, rect) {
+                    const dx = tx - cx;
+                    const dy = ty - cy;
+                    if (dx === 0 && dy === 0) {
+                        return { x: cx, y: cy };
+                    }
+                    const candidates = [];
+                    if (dx !== 0) {
+                        const tLeft = (rect.left - cx) / dx;
+                        const yLeft = cy + tLeft * dy;
+                        if (tLeft >= 0 && yLeft >= rect.top && yLeft <= rect.bottom) {
+                            candidates.push({ t: tLeft, x: rect.left, y: yLeft });
+                        }
+                        const tRight = (rect.right - cx) / dx;
+                        const yRight = cy + tRight * dy;
+                        if (tRight >= 0 && yRight >= rect.top && yRight <= rect.bottom) {
+                            candidates.push({ t: tRight, x: rect.right, y: yRight });
+                        }
+                    }
+                    if (dy !== 0) {
+                        const tTop = (rect.top - cy) / dy;
+                        const xTop = cx + tTop * dx;
+                        if (tTop >= 0 && xTop >= rect.left && xTop <= rect.right) {
+                            candidates.push({ t: tTop, x: xTop, y: rect.top });
+                        }
+                        const tBottom = (rect.bottom - cy) / dy;
+                        const xBottom = cx + tBottom * dx;
+                        if (tBottom >= 0 && xBottom >= rect.left && xBottom <= rect.right) {
+                            candidates.push({ t: tBottom, x: xBottom, y: rect.bottom });
+                        }
+                    }
+                    if (!candidates.length) {
+                        return { x: cx, y: cy };
+                    }
+                    const best = candidates.reduce((acc, cur) => (cur.t < acc.t ? cur : acc));
+                    return { x: best.x, y: best.y };
+                }
+
                 clearLinks();
                 svg.setAttribute('width', board.scrollWidth);
                 svg.setAttribute('height', board.scrollHeight);
@@ -349,10 +387,28 @@
                     if (!a || !b) return;
                     const ra = a.getBoundingClientRect(),
                         rb = b.getBoundingClientRect(),
-                        x1 = ra.left - bb.left + ra.width / 2,
-                        y1 = ra.top - bb.top + ra.height / 2,
-                        x2 = rb.left - bb.left + rb.width / 2,
-                        y2 = rb.top - bb.top + rb.height / 2;
+                        rectA = {
+                            left: ra.left - bb.left,
+                            right: ra.right - bb.left,
+                            top: ra.top - bb.top,
+                            bottom: ra.bottom - bb.top,
+                        },
+                        rectB = {
+                            left: rb.left - bb.left,
+                            right: rb.right - bb.left,
+                            top: rb.top - bb.top,
+                            bottom: rb.bottom - bb.top,
+                        },
+                        caX = (rectA.left + rectA.right) / 2,
+                        caY = (rectA.top + rectA.bottom) / 2,
+                        cbX = (rectB.left + rectB.right) / 2,
+                        cbY = (rectB.top + rectB.bottom) / 2,
+                        start = intersectionWithRect(caX, caY, cbX, cbY, rectA),
+                        end = intersectionWithRect(cbX, cbY, caX, caY, rectB),
+                        x1 = start.x,
+                        y1 = start.y,
+                        x2 = end.x,
+                        y2 = end.y;
 
                     // glow line
                     const glow = document.createElementNS('http://www.w3.org/2000/svg', 'line');
