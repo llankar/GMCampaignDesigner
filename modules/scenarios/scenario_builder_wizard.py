@@ -1801,20 +1801,25 @@ class EntityLinkingStep(WizardStep):
 class CharacterRelationsStep(WizardStep):
     def __init__(self, master, npc_wrapper, pc_wrapper, faction_wrapper):
         super().__init__(master)
-        self.grid_rowconfigure(1, weight=1)
+        self.grid_rowconfigure(0, weight=1)
         self.grid_columnconfigure(0, weight=1)
         self._state_ref = None
 
-        header = ctk.CTkFrame(self)
-        header.grid(row=0, column=0, sticky="ew", padx=20, pady=(20, 10))
+        root = ctk.CTkFrame(self, fg_color="transparent")
+        root.grid(row=0, column=0, sticky="nsew")
+        root.grid_rowconfigure(1, weight=1)
+        root.grid_columnconfigure(0, weight=1)
+
+        header = ctk.CTkFrame(root, fg_color="#101827", corner_radius=14)
+        header.grid(row=0, column=0, sticky="ew", padx=12, pady=(12, 6))
         header.grid_columnconfigure(0, weight=1)
 
         ctk.CTkLabel(
             header,
             text="Character Relationships",
-            font=ctk.CTkFont(size=16, weight="bold"),
+            font=ctk.CTkFont(size=15, weight="bold"),
             anchor="w",
-        ).grid(row=0, column=0, sticky="w", padx=12, pady=(10, 4))
+        ).grid(row=0, column=0, sticky="w", padx=16, pady=(12, 4))
 
         ctk.CTkLabel(
             header,
@@ -1825,7 +1830,8 @@ class CharacterRelationsStep(WizardStep):
             text_color="#9db4d1",
             anchor="w",
             justify="left",
-        ).grid(row=1, column=0, sticky="w", padx=12, pady=(0, 10))
+            wraplength=420,
+        ).grid(row=1, column=0, sticky="w", padx=16, pady=(0, 10))
 
         self.sync_to_global_var = ctk.BooleanVar(value=False)
         self.sync_switch = ctk.CTkSwitch(
@@ -1833,7 +1839,7 @@ class CharacterRelationsStep(WizardStep):
             text="Sync to global character graph",
             variable=self.sync_to_global_var,
         )
-        self.sync_switch.grid(row=0, column=1, padx=12, pady=(10, 0), sticky="e")
+        self.sync_switch.grid(row=0, column=1, padx=16, pady=(12, 0), sticky="e")
 
         self.sync_hint = ctk.CTkLabel(
             header,
@@ -1841,17 +1847,22 @@ class CharacterRelationsStep(WizardStep):
             text_color="#9db4d1",
             anchor="e",
         )
-        self.sync_hint.grid(row=1, column=1, padx=12, pady=(0, 10), sticky="e")
+        self.sync_hint.grid(row=1, column=1, padx=16, pady=(0, 10), sticky="e")
+
+        graph_container = ctk.CTkFrame(root, fg_color="transparent")
+        graph_container.grid(row=1, column=0, sticky="nsew", padx=12, pady=(0, 12))
+        graph_container.grid_rowconfigure(0, weight=1)
+        graph_container.grid_columnconfigure(0, weight=1)
 
         self.graph_editor = ScenarioCharacterGraphEditor(
-            self,
+            graph_container,
             npc_wrapper=npc_wrapper,
             pc_wrapper=pc_wrapper,
             faction_wrapper=faction_wrapper,
             on_entity_added=self._on_entity_added,
             on_entity_removed=self._on_entity_removed,
         )
-        self.graph_editor.grid(row=1, column=0, sticky="nsew", padx=20, pady=(0, 20))
+        self.graph_editor.grid(row=0, column=0, sticky="nsew")
 
     def set_state_binding(self, state, on_state_change=None):
         self._state_ref = state
