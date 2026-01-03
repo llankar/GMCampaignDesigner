@@ -2165,9 +2165,20 @@ class CharacterGraphEditor(ctk.CTkFrame):
     def add_shape(self, shape_type):
         x, y = 200, 200
         width, height = 120, 80
+        active_tab = get_active_tab(self.graph)
+        tab_id = active_tab.get("id") if active_tab else None
         tag = f"shape_{self.shape_counter}"
         self.shape_counter += 1
-        shape = {"type": shape_type, "x": x, "y": y, "w": width, "h": height, "color": "lightgray", "tag": tag}
+        shape = {
+            "type": shape_type,
+            "x": x,
+            "y": y,
+            "w": width,
+            "h": height,
+            "color": "lightgray",
+            "tag": tag,
+            "tab_id": tab_id,
+        }
         self.graph["shapes"].append(shape)
         self.shapes[tag] = shape
         self.draw_shape(shape)
@@ -2201,9 +2212,15 @@ class CharacterGraphEditor(ctk.CTkFrame):
         shape["canvas_id"] = shape_id
 
     def draw_all_shapes(self):
-        # Sort shapes based on the stored z-index.
+        # Only draw shapes for the active tab (unless tab_id is missing).
+        active_tab = get_active_tab(self.graph)
+        active_id = active_tab.get("id") if active_tab else None
+        self.shapes = {}
         shapes_sorted = sorted(self.graph.get("shapes", []), key=lambda s: s.get("z", 0))
         for shape in shapes_sorted:
+            tab_id = shape.get("tab_id")
+            if tab_id and active_id and tab_id != active_id:
+                continue
             self.shapes[shape["tag"]] = shape
             self.draw_shape(shape)
 

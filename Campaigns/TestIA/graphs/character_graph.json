@@ -513,7 +513,28 @@
       "arrow_mode": "end"
     }
   ],
-  "shapes": [],
+  "shapes": [
+    {
+      "type": "rectangle",
+      "x": 200,
+      "y": 200,
+      "w": 120,
+      "h": 80,
+      "color": "blue",
+      "tag": "shape_3",
+      "tab_id": "8fadddf9e5e84e14a68c5581ae622f25"
+    },
+    {
+      "type": "oval",
+      "x": 987.0,
+      "y": 338.0,
+      "w": 120,
+      "h": 80,
+      "color": "lightgray",
+      "tag": "shape_4",
+      "tab_id": "8fadddf9e5e84e14a68c5581ae622f25"
+    }
+  ],
   "tabs": [
     {
       "id": "a4414b1f3ada4fa6a91309ce04353284",
