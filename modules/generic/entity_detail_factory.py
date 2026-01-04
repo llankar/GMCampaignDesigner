@@ -959,15 +959,22 @@ def insert_list_longtext(
             btn.pack(fill="x", expand=True)
 
 @log_function
-def _collect_character_relationships():
+def _collect_character_relationships(scenario_npcs=None):
     relationships = []
     seen = set()
+    scenario_npc_set = None
+    if scenario_npcs:
+        scenario_npc_set = {str(name).strip().lower() for name in scenario_npcs if str(name).strip()}
     for entity_label, table_key in (("NPCs", "npcs"), ("PCs", "pcs")):
+        if scenario_npc_set is not None and entity_label != "NPCs":
+            continue
         wrapper = GenericModelWrapper(table_key)
         records = wrapper.load_items()
         for record in records:
             source_name = str(record.get("Name") or "").strip()
             if not source_name:
+                continue
+            if scenario_npc_set is not None and source_name.lower() not in scenario_npc_set:
                 continue
             links = record.get("Links")
             if not isinstance(links, list):
@@ -990,6 +997,12 @@ def _collect_character_relationships():
                     or ""
                 ).strip()
                 if not target_name:
+                    continue
+                if (
+                    scenario_npc_set is not None
+                    and target_type_raw == "npc"
+                    and target_name.lower() not in scenario_npc_set
+                ):
                     continue
                 relation_text = str(
                     link.get("label")
@@ -1197,7 +1210,7 @@ def create_scenario_detail_frame(entity_type, scenario_item, master, open_entity
     insert_relationship_table(
         frame,
         "Relationship Table",
-        _collect_character_relationships(),
+        _collect_character_relationships(scenario_item.get("NPCs")),
         open_entity_callback,
     )
 
