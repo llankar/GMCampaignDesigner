@@ -1098,9 +1098,11 @@ def create_scenario_detail_frame(entity_type, scenario_item, master, open_entity
 
     content_frame = ctk.CTkFrame(layout, fg_color="transparent")
     content_frame.grid(row=0, column=1, sticky="nsew")
+    content_frame.grid_rowconfigure(0, weight=1)
+    content_frame.grid_columnconfigure(0, weight=1)
 
     scrollable_frame = ctk.CTkScrollableFrame(content_frame)
-    scrollable_frame.pack(fill="both", expand=True)
+    scrollable_frame.grid(row=0, column=0, sticky="nsew")
 
     def _get_section_frame(section_name):
         section_frame = sections.get(section_name)

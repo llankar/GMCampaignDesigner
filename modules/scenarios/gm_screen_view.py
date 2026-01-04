@@ -215,7 +215,7 @@ class GMScreenView(ctk.CTkFrame):
         self.layout_status_label.pack(side="right", padx=8, pady=5)
 
         # Main content area for scenario details
-        self.content_area = ctk.CTkScrollableFrame(self)
+        self.content_area = ctk.CTkFrame(self)
         self.content_area.pack(fill="both", expand=True)
         self._initialize_context_menu()
 
