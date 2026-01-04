@@ -32,6 +32,7 @@ from modules.helpers.logging_helper import (
     log_module_import,
 )
 from modules.scenarios.scene_flow_viewer import create_scene_flow_frame
+from modules.ui.vertical_section_tabs import VerticalSectionTabs
 
 log_module_import(__name__)
 
@@ -1043,6 +1044,11 @@ def create_scenario_detail_frame(entity_type, scenario_item, master, open_entity
     frame = ctk.CTkFrame(master)
     frame.pack(fill="both", expand=True, padx=20, pady=10)
     gm_view_instance = getattr(open_entity_callback, "__self__", None)
+    sections = {}
+    pinned_sections = set()
+    active_section = None
+    section_order = ["Summary", "Scenes", "NPCs", "Creatures", "Places", "Secrets", "Notes"]
+    section_names = []
     def rebuild_frame(updated_item):
         # 1) Destroy the old frame
         frame.destroy()
@@ -1080,17 +1086,66 @@ def create_scenario_detail_frame(entity_type, scenario_item, master, open_entity
     if gm_view_instance is not None:
         frame.bind("<Button-3>", gm_view_instance._show_context_menu)
         frame.bind("<Control-Button-1>", gm_view_instance._show_context_menu)
-        
-    ttk.Separator(frame, orient="horizontal").pack(fill="x", pady=1)
-    # ——— HEADER ———
+
+    layout = ctk.CTkFrame(frame, fg_color="transparent")
+    layout.pack(fill="both", expand=True)
+    layout.grid_columnconfigure(0, weight=0)
+    layout.grid_columnconfigure(1, weight=1)
+    layout.grid_rowconfigure(0, weight=1)
+
+    nav_frame = ctk.CTkFrame(layout, width=220)
+    nav_frame.grid(row=0, column=0, sticky="ns", padx=(0, 12))
+
+    content_frame = ctk.CTkFrame(layout, fg_color="transparent")
+    content_frame.grid(row=0, column=1, sticky="nsew")
+
+    scrollable_frame = ctk.CTkScrollableFrame(content_frame)
+    scrollable_frame.pack(fill="both", expand=True)
+
+    def _get_section_frame(section_name):
+        section_frame = sections.get(section_name)
+        if section_frame is None:
+            section_frame = ctk.CTkFrame(scrollable_frame, fg_color="transparent")
+            sections[section_name] = section_frame
+        return section_frame
+
+    def _apply_section_visibility():
+        visible_sections = set(pinned_sections)
+        if active_section:
+            visible_sections.add(active_section)
+
+        for name in section_names:
+            section_frame = sections.get(name)
+            if section_frame is not None:
+                section_frame.pack_forget()
+
+        for name in section_names:
+            if name in visible_sections:
+                sections[name].pack(fill="x", expand=True, padx=10, pady=(0, 12))
+
+    def show_section(section_name):
+        nonlocal active_section
+        active_section = section_name
+        _apply_section_visibility()
+
+    def _toggle_pin(section_name, var):
+        if var.get():
+            pinned_sections.add(section_name)
+        else:
+            pinned_sections.discard(section_name)
+        _apply_section_visibility()
+
+    summary_section = _get_section_frame("Summary")
+    ttk.Separator(summary_section, orient="horizontal").pack(fill="x", pady=1)
+    CTkLabel(summary_section, text="Summary", font=("Arial", 18, "bold"))\
+        .pack(anchor="w", pady=(0, 6))
     CTkLabel(
-        frame,
+        summary_section,
         text=format_multiline_text(scenario_item.get("Summary", "")),
         font=("Arial", 16),
         wraplength=1620,
         justify="left"
     ).pack(fill="x", pady=(0, 15))
-    ttk.Separator(frame, orient="horizontal").pack(fill="x", pady=10)
 
     # ——— BODY — prepare fields in the custom order ———
     tpl = load_template(entity_type.lower())
@@ -1113,17 +1168,29 @@ def create_scenario_detail_frame(entity_type, scenario_item, master, open_entity
     if gm_view_instance and hasattr(gm_view_instance, "reset_scene_widgets"):
         gm_view_instance.reset_scene_widgets()
 
+    section_map = {
+        "Summary": "Summary",
+        "Scenes": "Scenes",
+        "NPCs": "NPCs",
+        "Creatures": "Creatures",
+        "Places": "Places",
+        "Secrets": "Secrets",
+        "Notes": "Notes",
+    }
+
     # render in that order
     for field in ordered_fields:
         name  = field["name"]
         ftype = field["type"]
         value = scenario_item.get(name) or ""
+        section_name = section_map.get(name, "Notes")
+        section_frame = _get_section_frame(section_name)
 
         if ftype == "text":
-            insert_text(frame, name, value)
+            insert_text(section_frame, name, value)
         elif ftype == "list_longtext":
             if name == "Scenes" and gm_view_instance is not None:
-                scenes_container = ctk.CTkFrame(frame, fg_color="transparent")
+                scenes_container = ctk.CTkFrame(section_frame, fg_color="transparent")
                 scenes_container.pack(fill="both", expand=True, padx=10, pady=(10, 2))
 
                 header_row = ctk.CTkFrame(scenes_container, fg_color="transparent")
@@ -1180,7 +1247,7 @@ def create_scenario_detail_frame(entity_type, scenario_item, master, open_entity
                 _toggle_scene_view("Scene Flow")
             else:
                 insert_list_longtext(
-                    frame,
+                    section_frame,
                     name,
                     value,
                     open_entity_callback,
@@ -1188,12 +1255,12 @@ def create_scenario_detail_frame(entity_type, scenario_item, master, open_entity
                     gm_view=gm_view_instance,
                 )
         elif ftype == "longtext":
-            insert_longtext(frame, name, value)
+            insert_longtext(section_frame, name, value)
         elif ftype == "list":
             linked = field.get("linked_type")
             items  = value if isinstance(value, list) else []
             if linked == "NPCs":
-                insert_npc_table(frame, "NPCs", items, open_entity_callback)
+                insert_npc_table(section_frame, "NPCs", items, open_entity_callback)
             elif linked == "Creatures":
                 filtered_creatures = [
                     creature for creature in items
@@ -1201,34 +1268,33 @@ def create_scenario_detail_frame(entity_type, scenario_item, master, open_entity
                 ]
                 if not filtered_creatures:
                     continue
-                insert_creature_table(frame, "Creatures", filtered_creatures, open_entity_callback)
+                insert_creature_table(section_frame, "Creatures", filtered_creatures, open_entity_callback)
             elif linked == "Places":
-                insert_places_table(frame, "Places", items, open_entity_callback)
+                insert_places_table(section_frame, "Places", items, open_entity_callback)
             else:
-                insert_links(frame, name, items, linked, open_entity_callback)
+                insert_links(section_frame, name, items, linked, open_entity_callback)
 
     insert_relationship_table(
-        frame,
+        _get_section_frame("NPCs"),
         "Relationship Table",
         _collect_character_relationships(scenario_item.get("NPCs")),
         open_entity_callback,
     )
 
-    ttk.Separator(frame, orient="horizontal").pack(fill="x", pady=1)
-    CTkLabel(frame, text="Secrets", font=("Arial", 18))\
-    .pack(anchor="w", pady=(0, 5))
+    secrets_section = _get_section_frame("Secrets")
+    ttk.Separator(secrets_section, orient="horizontal").pack(fill="x", pady=1)
+    CTkLabel(secrets_section, text="Secrets", font=("Arial", 18, "bold"))\
+        .pack(anchor="w", pady=(0, 5))
     CTkLabel(
-        frame,
+        secrets_section,
         text=format_multiline_text(scenario_item.get("Secrets", "")),
         font=("Arial", 16),
         wraplength=1620,
         justify="left"
     ).pack(fill="x", pady=(0, 15))
-    ttk.Separator(frame, orient="horizontal").pack(fill="x", pady=10)
 
     if gm_view_instance and hasattr(gm_view_instance, "register_note_widget"):
-        notes_section = ctk.CTkFrame(frame, fg_color="transparent")
-        notes_section.pack(fill="both", expand=True, padx=10, pady=(0, 10))
+        notes_section = _get_section_frame("Notes")
         ctk.CTkLabel(
             notes_section,
             text="GM Notes",
@@ -1257,6 +1323,30 @@ def create_scenario_detail_frame(entity_type, scenario_item, master, open_entity
         note_box = CTkTextbox(notes_section, wrap="word", height=160)
         note_box.pack(fill="both", expand=True)
         gm_view_instance.register_note_widget(note_box)
+
+    section_names = [name for name in section_order if name in sections]
+    for name in sections:
+        if name not in section_names:
+            section_names.append(name)
+
+    tabs = VerticalSectionTabs(nav_frame, section_names, show_section)
+    tabs.pack(fill="x", padx=8, pady=8)
+
+    pin_label = CTkLabel(nav_frame, text="Pin sections", font=("Arial", 12, "bold"))
+    pin_label.pack(anchor="w", padx=10, pady=(10, 4))
+    for section_name in section_names:
+        pin_var = tk.BooleanVar(value=False)
+        toggle = ctk.CTkCheckBox(
+            nav_frame,
+            text=section_name,
+            variable=pin_var,
+            command=lambda name=section_name, var=pin_var: _toggle_pin(name, var),
+        )
+        toggle.pack(anchor="w", padx=10, pady=2)
+
+    if section_names:
+        tabs.set_active(section_names[0])
+        show_section(section_names[0])
     return frame
 
 @log_function
