@@ -1128,12 +1128,16 @@ def create_scenario_detail_frame(entity_type, scenario_item, master, open_entity
         active_section = section_name
         _apply_section_visibility()
 
-    def _toggle_pin(section_name, var):
-        if var.get():
-            pinned_sections.add(section_name)
-        else:
+    tabs = None
+
+    def _toggle_pin(section_name):
+        if section_name in pinned_sections:
             pinned_sections.discard(section_name)
+        else:
+            pinned_sections.add(section_name)
         _apply_section_visibility()
+        if tabs is not None:
+            tabs.set_pinned(pinned_sections)
 
     summary_section = _get_section_frame("Summary")
     ttk.Separator(summary_section, orient="horizontal").pack(fill="x", pady=1)
@@ -1329,20 +1333,9 @@ def create_scenario_detail_frame(entity_type, scenario_item, master, open_entity
         if name not in section_names:
             section_names.append(name)
 
-    tabs = VerticalSectionTabs(nav_frame, section_names, show_section)
+    tabs = VerticalSectionTabs(nav_frame, section_names, show_section, on_pin_toggle=_toggle_pin)
     tabs.pack(fill="x", padx=8, pady=8)
-
-    pin_label = CTkLabel(nav_frame, text="Pin sections", font=("Arial", 12, "bold"))
-    pin_label.pack(anchor="w", padx=10, pady=(10, 4))
-    for section_name in section_names:
-        pin_var = tk.BooleanVar(value=False)
-        toggle = ctk.CTkCheckBox(
-            nav_frame,
-            text=section_name,
-            variable=pin_var,
-            command=lambda name=section_name, var=pin_var: _toggle_pin(name, var),
-        )
-        toggle.pack(anchor="w", padx=10, pady=2)
+    tabs.set_pinned(pinned_sections)
 
     if section_names:
         tabs.set_active(section_names[0])
