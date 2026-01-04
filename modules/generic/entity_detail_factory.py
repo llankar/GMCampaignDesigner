@@ -165,6 +165,66 @@ def insert_links(parent, header, items, linked_type, open_entity_callback):
 
 
 @log_function
+def insert_relationship_table(parent, header, relationships, open_entity_callback):
+    if not relationships:
+        return
+
+    ctk.CTkLabel(parent, text=f"{header}:", font=("Arial", 14, "bold")).pack(anchor="w", padx=10, pady=(6, 2))
+
+    table = ctk.CTkFrame(parent)
+    table.pack(fill="x", padx=10, pady=(0, 6))
+
+    for idx in range(3):
+        table.grid_columnconfigure(idx, weight=1)
+
+    headers = ["Source", "Relationship", "Target"]
+    for col, title in enumerate(headers):
+        CTkLabel(table, text=title, font=("Arial", 12, "bold"))\
+            .grid(row=0, column=col, padx=6, pady=2, sticky="w")
+
+    for row_idx, relationship in enumerate(relationships, start=1):
+        source_name = relationship.get("source_name", "")
+        relation_text = relationship.get("relation_text", "")
+        target_name = relationship.get("target_name", "")
+
+        source_label = CTkLabel(
+            table,
+            text=source_name,
+            text_color="#00BFFF",
+            cursor="hand2",
+            font=("Arial", 12, "underline"),
+        )
+        source_label.grid(row=row_idx, column=0, padx=6, pady=2, sticky="w")
+        if open_entity_callback:
+            source_type = relationship.get("source_type", "NPCs")
+            source_label.bind(
+                "<Button-1>",
+                lambda _event=None, t=source_type, n=source_name: open_entity_callback(t, n),
+            )
+
+        CTkLabel(
+            table,
+            text=relation_text,
+            font=("Arial", 12),
+        ).grid(row=row_idx, column=1, padx=6, pady=2, sticky="w")
+
+        target_label = CTkLabel(
+            table,
+            text=target_name,
+            text_color="#00BFFF",
+            cursor="hand2",
+            font=("Arial", 12, "underline"),
+        )
+        target_label.grid(row=row_idx, column=2, padx=6, pady=2, sticky="w")
+        if open_entity_callback:
+            target_type = relationship.get("target_type", "NPCs")
+            target_label.bind(
+                "<Button-1>",
+                lambda _event=None, t=target_type, n=target_name: open_entity_callback(t, n),
+            )
+
+
+@log_function
 def open_entity_tab(entity_type, name, master):
     log_info(f"Opening entity tab for {entity_type}: {name}", func_name="open_entity_tab")
     """
@@ -899,6 +959,68 @@ def insert_list_longtext(
             btn.pack(fill="x", expand=True)
 
 @log_function
+def _collect_character_relationships():
+    relationships = []
+    seen = set()
+    for entity_label, table_key in (("NPCs", "npcs"), ("PCs", "pcs")):
+        wrapper = GenericModelWrapper(table_key)
+        records = wrapper.load_items()
+        for record in records:
+            source_name = str(record.get("Name") or "").strip()
+            if not source_name:
+                continue
+            links = record.get("Links")
+            if not isinstance(links, list):
+                continue
+            for link in links:
+                if not isinstance(link, dict):
+                    continue
+                target_type_raw = str(
+                    link.get("target_type")
+                    or link.get("TargetType")
+                    or link.get("targetType")
+                    or ""
+                ).lower()
+                if target_type_raw not in {"npc", "pc"}:
+                    continue
+                target_name = str(
+                    link.get("target_name")
+                    or link.get("TargetName")
+                    or link.get("target")
+                    or ""
+                ).strip()
+                if not target_name:
+                    continue
+                relation_text = str(
+                    link.get("label")
+                    or link.get("Label")
+                    or link.get("text")
+                    or ""
+                ).strip()
+                relation_text = relation_text or "(unspecified)"
+                target_type = "NPCs" if target_type_raw == "npc" else "PCs"
+                key = (entity_label, source_name, relation_text, target_type, target_name)
+                if key in seen:
+                    continue
+                seen.add(key)
+                relationships.append({
+                    "source_type": entity_label,
+                    "source_name": source_name,
+                    "relation_text": relation_text,
+                    "target_type": target_type,
+                    "target_name": target_name,
+                })
+
+    relationships.sort(
+        key=lambda entry: (
+            entry.get("source_name", "").lower(),
+            entry.get("target_name", "").lower(),
+            entry.get("relation_text", "").lower(),
+        )
+    )
+    return relationships
+
+@log_function
 def create_scenario_detail_frame(entity_type, scenario_item, master, open_entity_callback=None):
     """
     Build a scrollable detail view for a scenario with:
@@ -1071,6 +1193,13 @@ def create_scenario_detail_frame(entity_type, scenario_item, master, open_entity
                 insert_places_table(frame, "Places", items, open_entity_callback)
             else:
                 insert_links(frame, name, items, linked, open_entity_callback)
+
+    insert_relationship_table(
+        frame,
+        "Relationship Table",
+        _collect_character_relationships(),
+        open_entity_callback,
+    )
 
     ttk.Separator(frame, orient="horizontal").pack(fill="x", pady=1)
     CTkLabel(frame, text="Secrets", font=("Arial", 18))\
