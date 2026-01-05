@@ -27,6 +27,7 @@ from modules.helpers.logging_helper import (
     log_module_import,
 )
 from modules.scenarios.gm_layout_manager import GMScreenLayoutManager
+from modules.scenarios.gm_screen_shell import GMScreenShell
 from modules.maps.world_map_view import WorldMapPanel
 from modules.maps.controllers.display_map_controller import DisplayMapController
 from modules.scenarios.scene_flow_viewer import create_scene_flow_frame, scene_flow_content_factory
@@ -134,9 +135,19 @@ class GMScreenView(ctk.CTkFrame):
         self.dragging = None                 # ← new: holds (tab_name, start_x)
         self.current_layout_name = None
 
+        self.shell = GMScreenShell(
+            self,
+            scenario_item=self.scenario,
+            entity_wrappers=self.wrappers,
+            open_entity_callback=self.open_entity_tab,
+            open_entity_list_callback=self.open_selection_window,
+            on_scene_selected=self.set_active_scene,
+            on_edit_current_entity=self._edit_current_entity,
+        )
+        self.shell.pack(fill="both", expand=True)
+
         # A container to hold both the scrollable tab area and the plus button
-        self.tab_bar_container = ctk.CTkFrame(self, height=60)
-        self.tab_bar_container.pack(side="top", fill="x")
+        self.tab_bar_container = self.shell.workspace_panel.tab_bar_container
 
         # The scrollable canvas for tabs
         self.tab_bar_canvas = ctk.CTkCanvas(self.tab_bar_container, height=40, highlightthickness=0, bg="#2B2B2B")
@@ -215,8 +226,7 @@ class GMScreenView(ctk.CTkFrame):
         self.layout_status_label.pack(side="right", padx=8, pady=5)
 
         # Main content area for scenario details
-        self.content_area = ctk.CTkFrame(self)
-        self.content_area.pack(fill="both", expand=True)
+        self.content_area = self.shell.workspace_panel.content_area
         self.content_area._scrollable_frame = self.content_area
         self._initialize_context_menu()
 
@@ -2196,12 +2206,12 @@ class GMScreenView(ctk.CTkFrame):
             if target_host == "rich":
                 # Hide scroll area and show rich host
                 try:
-                    self.content_area.pack_forget()
+                self.content_area.pack_forget()
                 except Exception:
                     pass
                 host = self._rich_host if getattr(self, "_rich_host", None) else None
                 if host is None or not host.winfo_exists():
-                    self._rich_host = ctk.CTkFrame(self)
+                    self._rich_host = ctk.CTkFrame(self.shell.workspace_panel)
                     host = self._rich_host
                 host.pack(fill="both", expand=True)
             else:
@@ -2221,6 +2231,11 @@ class GMScreenView(ctk.CTkFrame):
                     self.after(60, lambda cf=frame: self._sync_fullbleed_now(cf))
                 except Exception:
                     pass
+        if self.shell and getattr(self.shell, "inspector_panel", None):
+            try:
+                self.shell.inspector_panel.set_focus(name, self.tabs[name].get("meta"))
+            except Exception:
+                pass
 
     def add_new_tab(self):
         log_info("Opening entity selection for new tab", func_name="GMScreenView.add_new_tab")
