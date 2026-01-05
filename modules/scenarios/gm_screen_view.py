@@ -40,6 +40,7 @@ from modules.objects.loot_generator_panel import LootGeneratorPanel
 from modules.scenarios.random_tables_panel import RandomTablesPanel
 from modules.whiteboard.controllers.whiteboard_controller import WhiteboardController
 from modules.puzzles.puzzle_display_window import create_puzzle_display_frame
+from modules.ui.gm_screen.command_palette import CommandPalette, CommandPaletteItem
 
 log_module_import(__name__)
 
@@ -84,6 +85,8 @@ class GMScreenView(ctk.CTkFrame):
         self._ctrl_shift_C_binding = None
         self._ctrl_shift_c_release_binding = None
         self._ctrl_shift_C_release_binding = None
+        self._ctrl_k_binding = None
+        self._ctrl_K_binding = None
         self.bind("<Destroy>", self._on_destroy, add="+")
         self._setup_toplevel_shortcuts()
 
@@ -169,7 +172,14 @@ class GMScreenView(ctk.CTkFrame):
             self.tab_bar,
             text="+",
             width=40,
-            command=self.add_new_tab
+            command=self.open_command_palette
+        )
+
+        self.palette_button = ctk.CTkButton(
+            self.tab_bar,
+            text="⌘K",
+            width=50,
+            command=self.open_command_palette,
         )
         
         self.random_button = ctk.CTkButton(
@@ -178,6 +188,7 @@ class GMScreenView(ctk.CTkFrame):
             width=40,
             command=self._add_random_entity
         )
+        self.palette_button.pack(side="left", padx=2, pady=5)
         self.random_button.pack(side="left", padx=2, pady=5)
         self.add_button.pack(side="left", padx=2, pady=5)
 
@@ -444,6 +455,8 @@ class GMScreenView(ctk.CTkFrame):
             self._ctrl_shift_C_release_binding = top.bind(
                 "<Control-Shift-KeyRelease-C>", self.open_chatbot, add="+"
             )
+            self._ctrl_k_binding = top.bind("<Control-k>", self.open_command_palette, add="+")
+            self._ctrl_K_binding = top.bind("<Control-K>", self.open_command_palette, add="+")
         except Exception:
             self._bound_shortcut_owner = None
             self._ctrl_f_binding = None
@@ -452,6 +465,8 @@ class GMScreenView(ctk.CTkFrame):
             self._ctrl_shift_C_binding = None
             self._ctrl_shift_c_release_binding = None
             self._ctrl_shift_C_release_binding = None
+            self._ctrl_k_binding = None
+            self._ctrl_K_binding = None
 
     def _teardown_toplevel_shortcuts(self):
         top = self._bound_shortcut_owner
@@ -470,6 +485,10 @@ class GMScreenView(ctk.CTkFrame):
                 top.unbind("<Control-Shift-KeyRelease-c>", self._ctrl_shift_c_release_binding)
             if self._ctrl_shift_C_release_binding:
                 top.unbind("<Control-Shift-KeyRelease-C>", self._ctrl_shift_C_release_binding)
+            if self._ctrl_k_binding:
+                top.unbind("<Control-k>", self._ctrl_k_binding)
+            if self._ctrl_K_binding:
+                top.unbind("<Control-K>", self._ctrl_K_binding)
         except Exception:
             pass
         finally:
@@ -480,6 +499,8 @@ class GMScreenView(ctk.CTkFrame):
             self._ctrl_F_binding = None
             self._ctrl_shift_c_release_binding = None
             self._ctrl_shift_C_release_binding = None
+            self._ctrl_k_binding = None
+            self._ctrl_K_binding = None
 
     def _on_destroy(self, event=None):
         if event is not None and event.widget is not self:
@@ -729,6 +750,53 @@ class GMScreenView(ctk.CTkFrame):
 
         # 10) Double-click also selects
         listbox.bind("<Double-Button-1>", on_select)
+
+    def _build_command_palette_items(self):
+        items = []
+
+        def add_item(category, label, action, keywords=()):
+            items.append(CommandPaletteItem(label=label, category=category, action=action, keywords=keywords))
+
+        add_item("Tools", "Map Tool", lambda: self.open_map_tool_tab(), keywords=("maps",))
+        add_item("Tools", "Loot Generator", lambda: self.open_loot_generator_tab(), keywords=("loot", "items"))
+        add_item("Tools", "Random Tables", lambda: self.open_random_tables_tab(), keywords=("tables", "random"))
+        add_item("Tools", "Whiteboard", lambda: self.open_whiteboard_tab(), keywords=("notes", "draw"))
+        add_item("Tools", "Plot Twists", lambda: self.open_plot_twist_popup(), keywords=("twists", "plot"))
+        add_item("Tools", "Puzzle Display", lambda: self._select_puzzle_for_display(), keywords=("puzzle",))
+        add_item("Tools", "Open Chatbot", lambda: self.open_chatbot(), keywords=("chat", "assistant"))
+
+        add_item("Views", "World Map", lambda: self.open_world_map_tab(), keywords=("map",))
+        add_item("Views", "Scene Flow", lambda: self.open_scene_flow_tab(), keywords=("scenes",))
+        add_item("Views", "Character Graph", lambda: self.open_selection_window("Character Graph"), keywords=("npc", "pc"))
+        add_item("Views", "Scenario Graph Editor", lambda: self.open_selection_window("Scenario Graph Editor"))
+        add_item("Views", "Note Tab", lambda: self.open_selection_window("Note Tab"), keywords=("notes",))
+
+        for entity_type in self.templates.keys():
+            add_item(
+                "Entities",
+                entity_type,
+                lambda et=entity_type: self.open_selection_window(et),
+                keywords=(entity_type.lower(),),
+            )
+
+        return items
+
+    def open_command_palette(self, event=None):
+        try:
+            if not int(self.winfo_exists()):
+                return
+        except tk.TclError:
+            return
+
+        try:
+            host = self.winfo_toplevel()
+        except tk.TclError:
+            return
+
+        if host is None:
+            return
+
+        CommandPalette(host, self._build_command_palette_items())
 
     def open_chatbot(self, event=None):
         try:
@@ -2223,8 +2291,8 @@ class GMScreenView(ctk.CTkFrame):
                     pass
 
     def add_new_tab(self):
-        log_info("Opening entity selection for new tab", func_name="GMScreenView.add_new_tab")
-        self._show_add_menu()
+        log_info("Opening command palette for new tab", func_name="GMScreenView.add_new_tab")
+        self.open_command_palette()
 
     def _show_add_menu(self):
         button = self.add_button
