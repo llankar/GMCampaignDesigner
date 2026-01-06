@@ -1,10 +1,9 @@
 import re
 import os
-import json
 import customtkinter as ctk
 from tkinter import messagebox, filedialog
 import threading
-from modules.helpers.text_helpers import format_longtext, ai_text_to_rtf_json
+from modules.helpers.text_helpers import ai_text_to_rtf_json
 from modules.generic.generic_model_wrapper import GenericModelWrapper
 from modules.ai.local_ai_client import LocalAIClient
 from modules.helpers.importing.merge_helper import merge_with_confirmation
@@ -18,6 +17,12 @@ from modules.helpers.logging_helper import (
 )
 from modules.helpers.pdf_review_dialog import PDFReviewDialog
 from modules.scenarios.processing.chunking import summarize_chunks
+from modules.scenarios.processing.ai_scenario_importer import (
+    extract_entities,
+    expand_scenes,
+    expand_summary,
+    request_outline,
+)
 
 log_module_import(__name__)
 
@@ -44,38 +49,6 @@ def remove_emojis(text):
     cleaned = emoji_pattern.sub(r'', text)
    #logging.debug("Emojis removed.")
     return cleaned
-
-@log_function
-def parse_json_relaxed(s: str):
-    """Try to parse JSON from a possibly noisy AI response (module-level helper)."""
-    if not s:
-        raise RuntimeError("Empty AI response")
-    s = s.strip()
-    # Remove markdown fences if present
-    if s.startswith("```"):
-        s = re.sub(r"^```(json)?", "", s, flags=re.IGNORECASE).strip()
-        s = s.rstrip("`").strip()
-    # Try direct
-    try:
-        return json.loads(s)
-    except Exception:
-        pass
-    # Find first JSON object or array
-    start = None
-    for i, ch in enumerate(s):
-        if ch in '{[':
-            start = i
-            break
-    if start is not None:
-        tail = s[start:]
-        # Try progressively trimming
-        for j in range(len(tail), max(len(tail)-2000, 0), -1):
-            chunk = tail[:j]
-            try:
-                return json.loads(chunk)
-            except Exception:
-                continue
-    raise RuntimeError("Failed to parse JSON from AI response")
 
 @log_function
 def import_formatted_scenario(text):
@@ -278,6 +251,13 @@ class ScenarioImportWindow(ctk.CTkToplevel):
         self.btn_import_pdf.pack(side="left", padx=5)
         self.btn_ai_parse_text = ctk.CTkButton(btn_row, text="AI Parse Text", command=self.ai_parse_textarea)
         self.btn_ai_parse_text.pack(side="left", padx=5)
+        self.multiple_scenarios_var = ctk.BooleanVar(value=False)
+        self.chk_multiple_scenarios = ctk.CTkCheckBox(
+            btn_row,
+            text="Multiple scenarios",
+            variable=self.multiple_scenarios_var,
+        )
+        self.chk_multiple_scenarios.pack(side="left", padx=5)
         self.btn_save_pasted = ctk.CTkButton(btn_row, text="Save Pasted Scenario", command=self.import_scenario)
         self.btn_save_pasted.pack(side="right", padx=5)
 
@@ -353,7 +333,12 @@ class ScenarioImportWindow(ctk.CTkToplevel):
                     selected_text = self._review_extracted_pages(pages, os.path.basename(pdf_path))
                     if not selected_text:
                         return
-                    self._ai_extract_and_import(selected_text, source_label=os.path.basename(pdf_path))
+                    multiple_scenarios = bool(self.multiple_scenarios_var.get())
+                    self._ai_extract_and_import(
+                        selected_text,
+                        source_label=os.path.basename(pdf_path),
+                        multiple_scenarios=multiple_scenarios,
+                    )
                     if pdf_hash:
                         PDFHashTracker.record_import(pdf_hash, pdf_path)
                 except Exception as e:
@@ -377,7 +362,12 @@ class ScenarioImportWindow(ctk.CTkToplevel):
             self._busy(True)
             def worker():
                 try:
-                    self._ai_extract_and_import(text, source_label="Pasted Text")
+                    multiple_scenarios = bool(self.multiple_scenarios_var.get())
+                    self._ai_extract_and_import(
+                        text,
+                        source_label="Pasted Text",
+                        multiple_scenarios=multiple_scenarios,
+                    )
                 except Exception as e:
                     self._error("AI Parse Error", str(e))
                 finally:
@@ -422,7 +412,7 @@ class ScenarioImportWindow(ctk.CTkToplevel):
         event.wait()
         return selection["text"]
         
-    def _ai_extract_and_import(self, raw_text: str, source_label: str = ""):
+    def _ai_extract_and_import(self, raw_text: str, source_label: str = "", multiple_scenarios: bool = False):
         log_info(f"Running AI extraction for {source_label or 'input'}", func_name="ScenarioImportWindow._ai_extract_and_import")
         """
         Multi-phase AI extraction to improve depth, especially Scenario Summary and Scenes.
@@ -482,226 +472,158 @@ class ScenarioImportWindow(ctk.CTkToplevel):
             ]
         )
 
-        # -------- Phase 1: Outline --------
-        outline_schema = {
-            "Title": "text",
-            "Summary": "short text (3-5 sentences)",
-            "Scenes": [{"Title": "text", "Gist": "1-3 sentences"}],
-            "NPCs": ["Name"],
-            "Places": ["Name"]
-        }
-        prompt_outline = (
-            "You are an assistant that extracts a high-level scenario outline from RPG source text.\n"
-            "Return STRICT JSON only, no prose.\n\n"
-            f"Source: {source_label}\n"
-            "Use the provided chunk summaries (with token ranges) as your evidence.\n"
-            "If uncertain, prefer omitting details over inventing them.\n\n"
-            f"Chunk map:\n{chunk_range_hint or 'No chunk metadata available.'}\n\n"
-            "JSON schema:\n" + json.dumps(outline_schema, ensure_ascii=False, indent=2) + "\n\n"
-            "Notes: Use only info from the text. If uncertain, omit.\n"
-            "Now outline this text (summaries stitched from the source):\n" + compressed_context
+        self._set_status("Analyzing text with AI (phase 1/4)...")
+        outlines = request_outline(
+            client,
+            compressed_context,
+            chunk_range_hint,
+            source_label or "Unknown",
+            multiple_scenarios,
         )
-        outline_raw = client.chat([
-            {"role": "system", "content": "Extract concise scenario outlines as strict JSON."},
-            {"role": "user", "content": prompt_outline}
-        ])
-        outline = parse_json_relaxed(outline_raw)
-        if not isinstance(outline, dict):
-            raise RuntimeError("AI did not return a JSON object for outline")
+        if not outlines:
+            raise RuntimeError("AI did not return any scenarios to import")
 
-        title = outline.get("Title") or "Unnamed Scenario"
-        summary_draft = outline.get("Summary") or ""
-        outline_scenes = outline.get("Scenes") or []
+        total_scenarios = len(outlines)
+        for idx, outline in enumerate(outlines, start=1):
+            title = outline.get("Title") or f"Unnamed Scenario {idx}"
+            summary_draft = outline.get("Summary") or ""
+            outline_scenes = outline.get("Scenes") or []
 
-        # -------- Phase 2: Expand Summary --------
-        self._set_status("Analyzing text with AI (phase 2/4)...")
-        prompt_summary = (
-            "Rewrite the following scenario summary into a richer, evocative, GM-friendly 2–4 paragraph summary.\n"
-            "- Keep it consistent with the source text.\n"
-            "- Avoid rules jargon.\n"
-            "Return PLAIN TEXT only.\n\n"
-            f"Title: {title}\n"
-            f"Chunk map for traceability:\n{chunk_range_hint or 'No chunk metadata available.'}\n\n"
-            "Current summary (from outline):\n" + (summary_draft or "") + "\n\n"
-            "Reference context (stitched summaries):\n" + compressed_context
-        )
-        summary_expanded = client.chat([
-            {"role": "system", "content": "You write compelling GM-facing RPG summaries. Return plain text."},
-            {"role": "user", "content": prompt_summary}
-        ])
-        # Clean potential code fences/backticks
-        if summary_expanded and summary_expanded.strip().startswith("```"):
-            summary_expanded = re.sub(r"^```(?:[a-zA-Z]+)?", "", summary_expanded, flags=re.IGNORECASE).strip().rstrip("`").strip()
-        summary_expanded = summary_expanded.strip()
-
-        # -------- Phase 3: Expand Scenes --------
-        self._set_status("Analyzing text with AI (phase 3/4)...")
-        scenes_schema = {"Scenes": [{"Title": "text", "Text": "multi-paragraph detailed scene"}]}
-        prompt_scenes = (
-            "Using the outline below and the source text, produce detailed scene writeups.\n"
-            "For each scene, include a 1–2 paragraph overview plus bullet points for: key beats, conflicts/obstacles, clues/hooks, transitions, important locations, and involved NPCs.\n"
-            "Return STRICT JSON only with this schema:\n" + json.dumps(scenes_schema, ensure_ascii=False, indent=2) + "\n\n"
-            f"Title: {title}\n"
-            "Outline scenes:\n" + json.dumps(outline_scenes, ensure_ascii=False, indent=2) + "\n\n"
-            f"Chunk map for traceability:\n{chunk_range_hint or 'No chunk metadata available.'}\n\n"
-            "Source context (summarized chunks):\n" + compressed_context
-        )
-        scenes_raw = client.chat([
-            {"role": "system", "content": "Expand scene stubs into detailed, game-usable scenes as strict JSON."},
-            {"role": "user", "content": prompt_scenes}
-        ])
-        scenes_obj = parse_json_relaxed(scenes_raw)
-        if not isinstance(scenes_obj, dict) or not isinstance(scenes_obj.get("Scenes"), list):
-            raise RuntimeError("AI did not return a JSON object with Scenes")
-        scenes_expanded_list = []
-        for sc in scenes_obj.get("Scenes", []) or []:
-            if isinstance(sc, dict):
-                txt = sc.get("Text") or ""
-                if isinstance(txt, dict) and "text" in txt:
-                    txt = txt.get("text", "")
-                scenes_expanded_list.append(ai_text_to_rtf_json(str(txt).strip()))
-
-        # -------- Phase 4: Entities (NPCs/Creatures/Places/Factions) --------
-        self._set_status("Analyzing text with AI (phase 4/4)...")
-        entities_schema = {
-            "npcs": [
-                {"Name": "text", "Role": "text", "Description": "longtext", "Secret": "longtext", "Factions": ["Name"], "Portrait": "text(optional)"}
-            ],
-            "creatures": [
-                {"Name": "text", "Type": "text", "Description": "longtext", "Weakness": "longtext", "Powers": "longtext", "Stats": "longtext", "Background": "longtext"}
-            ],
-            "places": [
-                {"Name": "text", "Description": "longtext", "Secrets": "longtext(optional)"}
-            ],
-            "factions": [
-                {"Name": "text", "Description": "longtext(optional)"}
-            ]
-        }
-        prompt_entities = (
-            "Extract RPG entities from the text. Output STRICT JSON only, matching the schema below.\n"
-            "If stats are present (even from other systems), convert into concise creature 'Stats' similar to examples. Do not invent facts.\n\n"
-            "Schema:\n" + json.dumps(entities_schema, ensure_ascii=False, indent=2) + "\n\n"
-            "Examples of desired 'Stats' formatting from the active DB:\n" + json.dumps(stats_examples, ensure_ascii=False, indent=2) + "\n\n"
-            f"Chunk map for traceability:\n{chunk_range_hint or 'No chunk metadata available.'}\n\n"
-            "Text to analyze (summarized chunks):\n" + compressed_context
-        )
-        entities_raw = client.chat([
-            {"role": "system", "content": "Extract structured entities (NPCs, creatures, places, factions) as strict JSON."},
-            {"role": "user", "content": prompt_entities}
-        ])
-        entities = parse_json_relaxed(entities_raw)
-        if not isinstance(entities, dict):
-            raise RuntimeError("AI did not return a JSON object for entities")
-
-        # ---------- Merge into DB ----------
-        def to_longtext(val):
-            if isinstance(val, dict) and "text" in val:
-                return val
-            return ai_text_to_rtf_json(str(val) if val is not None else "")
-
-        # Scenario
-        self._set_status("Merging scenarios into database...")
-        current_scenarios = scenarios_wrapper.load_items()
-        scenario_item = {
-            "Title": title,
-            "Summary": to_longtext(summary_expanded or summary_draft or ""),
-            "Secrets": to_longtext(""),
-            "Scenes": scenes_expanded_list,
-            "Places": entities.get("places", []) and [p.get("Name", "") for p in entities.get("places", []) if isinstance(p, dict)] or (outline.get("Places") or []),
-            "NPCs": entities.get("npcs", []) and [n.get("Name", "") for n in entities.get("npcs", []) if isinstance(n, dict)] or (outline.get("NPCs") or []),
-            "Creatures": [c.get("Name", "") for c in entities.get("creatures", []) if isinstance(c, dict)],
-            "Factions": [f.get("Name", "") for f in entities.get("factions", []) if isinstance(f, dict)],
-            "Objects": []
-        }
-        merged_scenarios = merge_with_confirmation(
-            current_scenarios,
-            [scenario_item],
-            key_field="Title",
-            entity_label="scenarios",
-        )
-        scenarios_wrapper.save_items(merged_scenarios)
-
-        # NPCs
-        self._set_status("Merging NPCs into database...")
-        if isinstance(entities.get("npcs"), list):
-            current_items = npcs_wrapper.load_items()
-            new_items = []
-            for n in entities.get("npcs"):
-                if not isinstance(n, dict):
-                    continue
-                item = {
-                    "Name": n.get("Name", "Unnamed"),
-                    "Role": n.get("Role", ""),
-                    "Description": to_longtext(n.get("Description", "")),
-                    "Secret": to_longtext(n.get("Secret", "")),
-                    "Quote": n.get("Quote"),
-                    "RoleplayingCues": to_longtext(n.get("RoleplayingCues", "None")),
-                    "Personality": to_longtext(n.get("Personality", "None")),
-                    "Motivation": to_longtext(n.get("Motivation", "None")),
-                    "Background": to_longtext(n.get("Background", "None")),
-                    "Traits": to_longtext(n.get("Traits", "None")),
-                    "Genre": n.get("Genre", ""),
-                    "Factions": n.get("Factions", []),
-                    "Objects": n.get("Objects", []),
-                    "Portrait": n.get("Portrait", "")
-                }
-                new_items.append(item)
-            merged_npcs = merge_with_confirmation(
-                current_items,
-                new_items,
-                key_field="Name",
-                entity_label="NPCs",
+            self._set_status(f"Analyzing text with AI (phase 2/4, scenario {idx}/{total_scenarios})...")
+            summary_expanded = expand_summary(
+                client,
+                title,
+                summary_draft,
+                compressed_context,
+                chunk_range_hint,
             )
-            npcs_wrapper.save_items(merged_npcs)
 
-        # Creatures
-        self._set_status("Merging creatures into database...")
-        if isinstance(entities.get("creatures"), list):
-            current_items = creatures_wrapper.load_items()
-            new_items = []
-            for c in entities.get("creatures"):
-                if not isinstance(c, dict):
-                    continue
-                stats_val = c.get("Stats", "")
-                stats_norm = stats_val if (isinstance(stats_val, dict) and "text" in stats_val) else to_longtext(stats_val)
-                item = {
-                    "Name": c.get("Name", "Unnamed"),
-                    "Type": c.get("Type", ""),
-                    "Description": to_longtext(c.get("Description", "")),
-                    "Weakness": to_longtext(c.get("Weakness", "")),
-                    "Powers": to_longtext(c.get("Powers", "")),
-                    "Stats": stats_norm,
-                    "Background": to_longtext(c.get("Background", "")),
-                    "Genre": c.get("Genre", "Modern Fantasy"),
-                    "Portrait": c.get("Portrait", "")
-                }
-                new_items.append(item)
-            creatures_wrapper.save_items(current_items + new_items)
-
-        # Places
-        self._set_status("Merging places into database...")
-        if isinstance(entities.get("places"), list):
-            current_items = places_wrapper.load_items()
-            new_items = []
-            for p in entities.get("places"):
-                if not isinstance(p, dict):
-                    continue
-                item = {
-                    "Name": p.get("Name", "Unnamed"),
-                    "Description": to_longtext(p.get("Description", "")),
-                    "NPCs": p.get("NPCs", []),
-                    "PlayerDisplay": p.get("PlayerDisplay", False),
-                    "Secrets": to_longtext(p.get("Secrets", "")),
-                    "Portrait": p.get("Portrait", "")
-                }
-                new_items.append(item)
-            merged_places = merge_with_confirmation(
-                current_items,
-                new_items,
-                key_field="Name",
-                entity_label="places",
+            self._set_status(f"Analyzing text with AI (phase 3/4, scenario {idx}/{total_scenarios})...")
+            scenes_expanded_text = expand_scenes(
+                client,
+                title,
+                outline_scenes,
+                compressed_context,
+                chunk_range_hint,
             )
-            places_wrapper.save_items(merged_places)
+            scenes_expanded_list = [ai_text_to_rtf_json(text) for text in scenes_expanded_text]
+
+            self._set_status(f"Analyzing text with AI (phase 4/4, scenario {idx}/{total_scenarios})...")
+            entities = extract_entities(
+                client,
+                compressed_context,
+                chunk_range_hint,
+                stats_examples,
+            )
+
+            def to_longtext(val):
+                if isinstance(val, dict) and "text" in val:
+                    return val
+                return ai_text_to_rtf_json(str(val) if val is not None else "")
+
+            # Scenario
+            self._set_status(f"Merging scenarios into database ({idx}/{total_scenarios})...")
+            current_scenarios = scenarios_wrapper.load_items()
+            scenario_item = {
+                "Title": title,
+                "Summary": to_longtext(summary_expanded or summary_draft or ""),
+                "Secrets": to_longtext(""),
+                "Scenes": scenes_expanded_list,
+                "Places": entities.get("places", []) and [p.get("Name", "") for p in entities.get("places", []) if isinstance(p, dict)] or (outline.get("Places") or []),
+                "NPCs": entities.get("npcs", []) and [n.get("Name", "") for n in entities.get("npcs", []) if isinstance(n, dict)] or (outline.get("NPCs") or []),
+                "Creatures": [c.get("Name", "") for c in entities.get("creatures", []) if isinstance(c, dict)],
+                "Factions": [f.get("Name", "") for f in entities.get("factions", []) if isinstance(f, dict)],
+                "Objects": []
+            }
+            merged_scenarios = merge_with_confirmation(
+                current_scenarios,
+                [scenario_item],
+                key_field="Title",
+                entity_label="scenarios",
+            )
+            scenarios_wrapper.save_items(merged_scenarios)
+
+            # NPCs
+            self._set_status(f"Merging NPCs into database ({idx}/{total_scenarios})...")
+            if isinstance(entities.get("npcs"), list):
+                current_items = npcs_wrapper.load_items()
+                new_items = []
+                for n in entities.get("npcs"):
+                    if not isinstance(n, dict):
+                        continue
+                    item = {
+                        "Name": n.get("Name", "Unnamed"),
+                        "Role": n.get("Role", ""),
+                        "Description": to_longtext(n.get("Description", "")),
+                        "Secret": to_longtext(n.get("Secret", "")),
+                        "Quote": n.get("Quote"),
+                        "RoleplayingCues": to_longtext(n.get("RoleplayingCues", "None")),
+                        "Personality": to_longtext(n.get("Personality", "None")),
+                        "Motivation": to_longtext(n.get("Motivation", "None")),
+                        "Background": to_longtext(n.get("Background", "None")),
+                        "Traits": to_longtext(n.get("Traits", "None")),
+                        "Genre": n.get("Genre", ""),
+                        "Factions": n.get("Factions", []),
+                        "Objects": n.get("Objects", []),
+                        "Portrait": n.get("Portrait", "")
+                    }
+                    new_items.append(item)
+                merged_npcs = merge_with_confirmation(
+                    current_items,
+                    new_items,
+                    key_field="Name",
+                    entity_label="NPCs",
+                )
+                npcs_wrapper.save_items(merged_npcs)
+
+            # Creatures
+            self._set_status(f"Merging creatures into database ({idx}/{total_scenarios})...")
+            if isinstance(entities.get("creatures"), list):
+                current_items = creatures_wrapper.load_items()
+                new_items = []
+                for c in entities.get("creatures"):
+                    if not isinstance(c, dict):
+                        continue
+                    stats_val = c.get("Stats", "")
+                    stats_norm = stats_val if (isinstance(stats_val, dict) and "text" in stats_val) else to_longtext(stats_val)
+                    item = {
+                        "Name": c.get("Name", "Unnamed"),
+                        "Type": c.get("Type", ""),
+                        "Description": to_longtext(c.get("Description", "")),
+                        "Weakness": to_longtext(c.get("Weakness", "")),
+                        "Powers": to_longtext(c.get("Powers", "")),
+                        "Stats": stats_norm,
+                        "Background": to_longtext(c.get("Background", "")),
+                        "Genre": c.get("Genre", "Modern Fantasy"),
+                        "Portrait": c.get("Portrait", "")
+                    }
+                    new_items.append(item)
+                creatures_wrapper.save_items(current_items + new_items)
+
+            # Places
+            self._set_status(f"Merging places into database ({idx}/{total_scenarios})...")
+            if isinstance(entities.get("places"), list):
+                current_items = places_wrapper.load_items()
+                new_items = []
+                for p in entities.get("places"):
+                    if not isinstance(p, dict):
+                        continue
+                    item = {
+                        "Name": p.get("Name", "Unnamed"),
+                        "Description": to_longtext(p.get("Description", "")),
+                        "NPCs": p.get("NPCs", []),
+                        "PlayerDisplay": p.get("PlayerDisplay", False),
+                        "Secrets": to_longtext(p.get("Secrets", "")),
+                        "Portrait": p.get("Portrait", "")
+                    }
+                    new_items.append(item)
+                merged_places = merge_with_confirmation(
+                    current_items,
+                    new_items,
+                    key_field="Name",
+                    entity_label="places",
+                )
+                places_wrapper.save_items(merged_places)
 
         messagebox.showinfo("Imported", "AI multi-phase import completed and merged into the database.")
         self._set_status("Import complete.")
@@ -727,7 +649,12 @@ class ScenarioImportWindow(ctk.CTkToplevel):
                     self.progress.stop()
                 # Toggle buttons
                 state = "disabled" if on else "normal"
-                for b in (self.btn_import_pdf, self.btn_ai_parse_text, self.btn_save_pasted):
+                for b in (
+                    self.btn_import_pdf,
+                    self.btn_ai_parse_text,
+                    self.btn_save_pasted,
+                    self.chk_multiple_scenarios,
+                ):
                     try:
                         b.configure(state=state)
                     except Exception:
@@ -744,4 +671,3 @@ class ScenarioImportWindow(ctk.CTkToplevel):
 
     def _error(self, title: str, msg: str):
         self.after(0, lambda: messagebox.showerror(title, msg))
-
