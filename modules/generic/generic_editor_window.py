@@ -322,6 +322,7 @@ class GenericEditorWindow(ctk.CTkToplevel):
         self.template = template
         self.saved = False
         self.model_wrapper = model_wrapper
+        self.creation_mode = creation_mode
         self.field_widgets = {}
         self._file_field_info = {}
         
@@ -1449,6 +1450,12 @@ class GenericEditorWindow(ctk.CTkToplevel):
 
     # === Sauvegarde ===
     def save(self):
+        if self.creation_mode and not self._has_required_name():
+            messagebox.showerror(
+                "Missing Name",
+                "Please enter a name before saving this new item.",
+            )
+            return
         for field in self.template["fields"]:
             field_name = str(field.get("name", ""))
             field_type = str(field.get("type", "")).lower()
@@ -1539,6 +1546,15 @@ class GenericEditorWindow(ctk.CTkToplevel):
                 self.item[field_name] = value
         self.saved = True
         self.destroy()
+
+    def _has_required_name(self):
+        key_field = self.model_wrapper._infer_key_field()
+        widget = self.field_widgets.get(key_field)
+        if widget is None:
+            return bool(str(self.item.get(key_field, "")).strip())
+        if hasattr(widget, "get"):
+            return bool(str(widget.get()).strip())
+        return bool(str(self.item.get(key_field, "")).strip())
 
     def create_portrait_field(self, field):
         frame = ctk.CTkFrame(self.scroll_frame)
