@@ -280,26 +280,32 @@ def _on_display_map(self, entity_type, map_name): # entity_type here is the map'
                     self.current_map["Image"] = new_storage_path
                 map_normalized = True
     self._video_current_frame_pil = None
-    if full_image_path and os.path.isfile(full_image_path) and is_video_path(full_image_path):
-        try:
-            player = CanvasVideoBackgroundPlayer(self, full_image_path)
-            self._video_bg_player = player
-            vw, vh = player.size
-            if vw <= 0 or vh <= 0:
-                vw, vh = 1280, 720
-            # Create a placeholder so dimensions are available to rest of pipeline
-            self.base_img = Image.new("RGBA", (vw, vh), (0, 0, 0, 255))
-        except Exception:
-            # Fallback to static load if video init fails
-            try:
-                self.base_img = Image.open(full_image_path).convert("RGBA")
-            except Exception:
-                messagebox.showerror(
-                    "Map Image Missing",
-                    f"The map image for '{map_name}' could not be found."
+    video_probe_path = full_image_path or image_path
+    is_video_file = bool(video_probe_path and is_video_path(video_probe_path))
+    if is_video_file:
+        if not full_image_path or not os.path.isfile(full_image_path):
+            messagebox.showerror(
+                "Video Error",
+                f"Unable to open video: {image_path or 'Unknown video path'}",
             )
             self.base_img = Image.new("RGBA", (1280, 720), (0, 0, 0, 255))
-        self._video_bg_player = None
+            self._video_bg_player = None
+        else:
+            try:
+                player = CanvasVideoBackgroundPlayer(self, full_image_path)
+                self._video_bg_player = player
+                vw, vh = player.size
+                if vw <= 0 or vh <= 0:
+                    vw, vh = 1280, 720
+                # Create a placeholder so dimensions are available to rest of pipeline
+                self.base_img = Image.new("RGBA", (vw, vh), (0, 0, 0, 255))
+            except Exception as exc:
+                messagebox.showerror(
+                    "Video Error",
+                    f"Unable to open video: {exc}",
+                )
+                self.base_img = Image.new("RGBA", (1280, 720), (0, 0, 0, 255))
+                self._video_bg_player = None
     else:
         try:
             self.base_img = Image.open(full_image_path).convert("RGBA")
@@ -364,8 +370,13 @@ def _on_display_map(self, entity_type, map_name): # entity_type here is the map'
     try:
         if getattr(self, "_video_bg_player", None):
             self._video_bg_player.start()
-    except Exception:
-        pass
+    except Exception as exc:
+        messagebox.showerror(
+            "Video Error",
+            f"Unable to open video: {exc}",
+        )
+        self._video_bg_player = None
+        self.base_img = Image.new("RGBA", (1280, 720), (0, 0, 0, 255))
 
     # 4) Clear out any old tokens from both canvases
     removed_items = len(getattr(self, "tokens", []))
