@@ -101,12 +101,36 @@ class ConfigHelper:
         if cls._campaign_config is None or mtime != cls._campaign_mtime:
             cfg = configparser.ConfigParser()
             if mtime is not None:
-                cfg.read(path)
+                try:
+                    cfg.read(path, encoding="utf-8")
+                except configparser.ParsingError as error:
+                    cleaned_text = cls._sanitize_ini(path)
+                    if cleaned_text is not None:
+                        cfg.read_string(cleaned_text)
+                    print(f"Warning: campaign settings file '{path}' has invalid lines and was sanitized: {error}")
                 cls._campaign_mtime = mtime
             else:
                 cls._campaign_mtime = None
             cls._campaign_config = cfg
         return cls._campaign_config
+
+    @staticmethod
+    def _sanitize_ini(path: str) -> Union[str, None]:
+        """Remove invalid empty-key assignments from an INI file."""
+        try:
+            with open(path, "r", encoding="utf-8") as file_handle:
+                lines = file_handle.readlines()
+        except OSError as error:
+            print(f"Warning: unable to read campaign settings file '{path}': {error}")
+            return None
+
+        cleaned_lines = []
+        for line in lines:
+            stripped = line.lstrip()
+            if stripped.startswith("="):
+                continue
+            cleaned_lines.append(line)
+        return "".join(cleaned_lines)
 
 
 # Late import to avoid circular dependency with logging_helper
