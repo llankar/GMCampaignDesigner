@@ -116,6 +116,8 @@ class GenericListSelectionView(ctk.CTkFrame):
         # Bind double-click event and initial refresh
         self.tree.bind("<Double-1>", self.on_double_click)
         self.tree.bind("<<TreeviewSelect>>", self._on_tree_select_change)
+        self.tree.bind("<Control-a>", self._on_select_all)
+        self.tree.bind("<Control-A>", self._on_select_all)
         self.refresh_list()
 
         button_label = "Add Selected" if self.allow_multi_select else "Open Selected"
@@ -259,6 +261,14 @@ class GenericListSelectionView(ctk.CTkFrame):
 
     def sanitize_id(self, s):
         return re.sub(r'[^a-zA-Z0-9]+', '_', str(s)).strip('_')
+
+    def _on_select_all(self, _event=None):
+        if not self.allow_multi_select:
+            return "break"
+        item_ids = self.tree.get_children()
+        if item_ids:
+            self.tree.selection_set(item_ids)
+        return "break"
 
     def _on_tree_select_change(self, _event=None):
         current_ids = set(self.tree.selection())
