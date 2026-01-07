@@ -61,6 +61,7 @@ from modules.ui.portrait_importer import PortraitImporter
 from modules.helpers.portrait_helper import parse_portrait_value, serialize_portrait_value
 from modules.ui.system_selector_dialog import CampaignSystemSelectorDialog
 from modules.ui.database_manager_dialog import DatabaseManagerDialog
+from modules.ui.system_manager_dialog import SystemManagerDialog
 
 from modules.generic.generic_list_view import GenericListView
 from modules.generic.generic_model_wrapper import GenericModelWrapper
@@ -299,6 +300,7 @@ class MainWindow(ctk.CTk):
             "audio_controls": "sound_manager_icon.png",
             "scene_flow_viewer": "scenes_flow_icon.png",
             "create_random_table"   : "random_table_icon.png",
+            "system_manager": "database_icon.png",
         }
 
         # Entity-specific icons come from metadata; keep base ones separate.
@@ -323,6 +325,20 @@ class MainWindow(ctk.CTk):
             log_exception(f"Failed to open Custom Fields Editor: {e}",
                           func_name="main_window.MainWindow.open_custom_fields_editor")
             messagebox.showerror("Error", f"Failed to open Custom Fields Editor:\n{e}")
+
+    def open_system_manager_dialog(self):
+        try:
+            log_info("Opening System Manager dialog", func_name="main_window.MainWindow.open_system_manager_dialog")
+            dialog = SystemManagerDialog(self)
+            dialog.transient(self)
+            dialog.lift()
+            dialog.focus_force()
+        except Exception as exc:
+            log_exception(
+                f"Failed to open System Manager dialog: {exc}",
+                func_name="main_window.MainWindow.open_system_manager_dialog",
+            )
+            messagebox.showerror("Error", f"Failed to open System Manager dialog:\n{exc}")
 
     def open_cross_campaign_asset_library(self):
         try:
@@ -793,6 +809,7 @@ class MainWindow(ctk.CTk):
             ("swarm_path", "Set SwarmUI Path", self.select_swarmui_path),
             ("customize_fields", "Customize Fields", self.open_custom_fields_editor),
             ("new_entity_type", "New Entity Type", self.open_new_entity_type_dialog),
+            ("system_manager", "Manage Campaign Systems", self.open_system_manager_dialog),
             ("db_export", "Create Campaign Backup", self.prompt_campaign_backup),
             ("db_import", "Restore Campaign Backup", self.prompt_campaign_restore),
             ("asset_library", "Cross-campaign Asset Library", self.open_cross_campaign_asset_library),
