@@ -31,6 +31,7 @@ from modules.generic.cross_campaign_asset_service import (
 )
 from modules.generic.github_gallery_client import GalleryBundleSummary, GithubGalleryClient
 from modules.helpers.config_helper import ConfigHelper
+from modules.helpers.checkbox_dialog import CheckboxDialog
 from modules.helpers.logging_helper import log_exception, log_info, log_warning
 from modules.helpers.portrait_helper import primary_portrait
 from modules.helpers.secret_helper import decrypt_secret, encrypt_secret
@@ -383,6 +384,20 @@ class CrossCampaignAssetLibraryWindow(ctk.CTkToplevel):
             messagebox.showinfo("No Selection", "Select at least one asset to export.")
             return
 
+        options_dialog = CheckboxDialog(
+            self,
+            title="Export Options",
+            message="Choose optional content to include in this export bundle:",
+            checkbox_label="Include campaign systems",
+            default=True,
+            confirm_label="Continue",
+            cancel_label="Cancel",
+        )
+        self.wait_window(options_dialog)
+        if options_dialog.result is None:
+            return
+        include_systems = options_dialog.result
+
         default_name = f"asset_bundle_{self.selected_campaign.name.replace(' ', '_')}.zip"
         destination = filedialog.asksaveasfilename(
             title="Export Asset Bundle",
@@ -399,6 +414,7 @@ class CrossCampaignAssetLibraryWindow(ctk.CTkToplevel):
                 self.selected_campaign,
                 selections,
                 include_database=False,
+                include_systems=include_systems,
                 progress_callback=callback,
             )
 
@@ -406,6 +422,9 @@ class CrossCampaignAssetLibraryWindow(ctk.CTkToplevel):
             lines = [f"Saved to: {manifest.get('archive_path')}"]
             for entity_type, meta in manifest.get("entities", {}).items():
                 lines.append(f"{entity_type.title()}: {meta.get('count', 0)}")
+            systems_meta = manifest.get("systems")
+            if isinstance(systems_meta, dict):
+                lines.append(f"Systems: {systems_meta.get('count', 0)}")
             return "\n".join(lines)
 
         self._run_progress_task("Exporting Assets", worker, "Asset bundle created successfully.", detail)
@@ -474,6 +493,7 @@ class CrossCampaignAssetLibraryWindow(ctk.CTkToplevel):
                     self.selected_campaign,
                     selections,
                     include_database=publishing_full_campaign,
+                    include_systems=True,
                     progress_callback=callback,
                 )
                 return self.gallery_client.publish_bundle(
@@ -578,7 +598,10 @@ class CrossCampaignAssetLibraryWindow(ctk.CTkToplevel):
             (
                 f"Assets imported: {summary.get('imported', 0)}\n"
                 f"Assets updated: {summary.get('updated', 0)}\n"
-                f"Assets skipped: {summary.get('skipped', 0)}"
+                f"Assets skipped: {summary.get('skipped', 0)}\n"
+                f"Systems imported: {summary.get('systems_imported', 0)}\n"
+                f"Systems updated: {summary.get('systems_updated', 0)}\n"
+                f"Systems skipped: {summary.get('systems_skipped', 0)}"
             ),
         )
 
@@ -627,7 +650,10 @@ class CrossCampaignAssetLibraryWindow(ctk.CTkToplevel):
                 return (
                     f"Imported: {summary.get('imported', 0)}\n"
                     f"Updated: {summary.get('updated', 0)}\n"
-                    f"Skipped: {summary.get('skipped', 0)}"
+                    f"Skipped: {summary.get('skipped', 0)}\n"
+                    f"Systems imported: {summary.get('systems_imported', 0)}\n"
+                    f"Systems updated: {summary.get('systems_updated', 0)}\n"
+                    f"Systems skipped: {summary.get('systems_skipped', 0)}"
                 )
 
             def finalize(result):

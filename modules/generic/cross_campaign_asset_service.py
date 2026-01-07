@@ -66,6 +66,7 @@ class BundleAnalysis:
     duplicates: Dict[str, List[str]]
     database: Optional[dict] = None
     world_maps: Optional[Dict[str, dict]] = None
+    systems: Optional[List[dict]] = None
 
 
 def _resolve_active_campaign() -> CampaignDatabase:
@@ -133,6 +134,46 @@ def load_entities(entity_type: str, db_path: Path) -> List[dict]:
 def save_entities(entity_type: str, db_path: Path, items: List[dict], *, replace: bool = True) -> None:
     wrapper = GenericModelWrapper(entity_type, db_path=str(db_path))
     wrapper.save_items(items, replace=replace)
+
+
+def _ensure_campaign_systems_table(conn: sqlite3.Connection) -> None:
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS campaign_systems (
+            slug TEXT PRIMARY KEY,
+            label TEXT NOT NULL,
+            default_formula TEXT,
+            supported_faces_json TEXT,
+            analyzer_config_json TEXT
+        )
+        """
+    )
+
+
+def _load_campaign_systems(db_path: Path) -> List[dict]:
+    if not db_path.exists():
+        return []
+    conn = sqlite3.connect(str(db_path))
+    conn.row_factory = sqlite3.Row
+    try:
+        cursor = conn.execute(
+            """
+            SELECT slug, label, default_formula, supported_faces_json, analyzer_config_json
+            FROM campaign_systems
+            ORDER BY slug
+            """
+        )
+        return [dict(row) for row in cursor.fetchall()]
+    except sqlite3.OperationalError as exc:
+        if "no such table" in str(exc).lower():
+            log_warning(
+                f"Skipping campaign systems export from {db_path}: {exc}",
+                func_name="modules.generic.cross_campaign_asset_service._load_campaign_systems",
+            )
+            return []
+        raise
+    finally:
+        conn.close()
 
 
 def _determine_record_key(record: dict) -> str:
@@ -474,6 +515,7 @@ def export_bundle(
     selected_records: Dict[str, List[dict]],
     *,
     include_database: bool = False,
+    include_systems: bool = True,
     progress_callback=None,
 ) -> dict:
     destination = destination.resolve()
@@ -540,6 +582,16 @@ def export_bundle(
 
             if entity_type == "maps":
                 bundled_world_maps.update(_collect_world_map_entries(records, source_campaign.root))
+
+        if include_systems:
+            systems = _load_campaign_systems(source_campaign.db_path)
+            systems_path = temp_root / "data" / "campaign_systems.json"
+            with systems_path.open("w", encoding="utf-8") as fh:
+                json.dump(systems, fh, indent=2, ensure_ascii=False)
+            manifest["systems"] = {
+                "count": len(systems),
+                "data_path": "data/campaign_systems.json",
+            }
 
         if bundled_world_maps:
             world_map_path = temp_root / "data" / "world_maps.json"
@@ -680,6 +732,23 @@ def analyze_bundle(bundle_path: Path, target_db: Path) -> BundleAnalysis:
                             func_name="modules.generic.cross_campaign_asset_service.analyze_bundle",
                         )
 
+        systems_manifest = manifest.get("systems")
+        systems: Optional[List[dict]] = None
+        if isinstance(systems_manifest, dict):
+            data_file = systems_manifest.get("data_path") or systems_manifest.get("path")
+            if data_file:
+                file_path = temp_dir / data_file
+                if file_path.exists():
+                    try:
+                        payload = json.loads(file_path.read_text(encoding="utf-8"))
+                        if isinstance(payload, list):
+                            systems = payload
+                    except json.JSONDecodeError as exc:
+                        log_exception(
+                            f"Failed to parse campaign systems data {data_file}: {exc}",
+                            func_name="modules.generic.cross_campaign_asset_service.analyze_bundle",
+                        )
+
         return BundleAnalysis(
             manifest=manifest,
             data_by_type=data_by_type,
@@ -688,6 +757,7 @@ def analyze_bundle(bundle_path: Path, target_db: Path) -> BundleAnalysis:
             duplicates=duplicates,
             database=database_entry,
             world_maps=world_maps or None,
+            systems=systems,
         )
     except Exception:
         shutil.rmtree(temp_dir, ignore_errors=True)
@@ -772,7 +842,14 @@ def apply_import(
     replacements: Dict[str, str] = {}
 
     assets_dir = Path(analysis.temp_dir)
-    summary: Dict[str, int] = {"imported": 0, "skipped": 0, "updated": 0}
+    summary: Dict[str, int] = {
+        "imported": 0,
+        "skipped": 0,
+        "updated": 0,
+        "systems_imported": 0,
+        "systems_skipped": 0,
+        "systems_updated": 0,
+    }
 
     try:
         total_assets = len(analysis.assets) or 1
@@ -819,6 +896,51 @@ def apply_import(
                     summary["imported"] += 1
 
             save_entities(entity_type, target_campaign.db_path, list(merged.values()), replace=False)
+
+        if analysis.systems:
+            conn = sqlite3.connect(str(target_campaign.db_path))
+            try:
+                _ensure_campaign_systems_table(conn)
+                conn.row_factory = sqlite3.Row
+                existing_slugs = {
+                    row["slug"]
+                    for row in conn.execute("SELECT slug FROM campaign_systems").fetchall()
+                    if row["slug"]
+                }
+                for system in analysis.systems:
+                    slug = str(system.get("slug") or "").strip()
+                    if not slug:
+                        continue
+                    label = system.get("label")
+                    default_formula = system.get("default_formula")
+                    supported_faces_json = system.get("supported_faces_json")
+                    analyzer_config_json = system.get("analyzer_config_json")
+                    if slug in existing_slugs:
+                        if not overwrite:
+                            summary["systems_skipped"] += 1
+                            continue
+                        conn.execute(
+                            """
+                            UPDATE campaign_systems
+                            SET label = ?, default_formula = ?, supported_faces_json = ?, analyzer_config_json = ?
+                            WHERE slug = ?
+                            """,
+                            (label, default_formula, supported_faces_json, analyzer_config_json, slug),
+                        )
+                        summary["systems_updated"] += 1
+                    else:
+                        conn.execute(
+                            """
+                            INSERT INTO campaign_systems (
+                                slug, label, default_formula, supported_faces_json, analyzer_config_json
+                            ) VALUES (?, ?, ?, ?, ?)
+                            """,
+                            (slug, label, default_formula, supported_faces_json, analyzer_config_json),
+                        )
+                        summary["systems_imported"] += 1
+                conn.commit()
+            finally:
+                conn.close()
 
         if analysis.world_maps:
             rewritten_world_maps = _rewrite_world_map_entries(analysis.world_maps, replacements)
