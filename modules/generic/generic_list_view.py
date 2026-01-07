@@ -579,6 +579,8 @@ class GenericListView(ctk.CTkFrame):
         self.tree.bind("<Control-c>", lambda e: self.copy_item(self.tree.focus()))
         self.tree.bind("<Control-v>", lambda e: self.paste_item(self.tree.focus() or None))
         self.tree.bind("<<TreeviewSelect>>", self._on_tree_selection_changed)
+        self.tree.bind("<Control-a>", self._on_select_all)
+        self.tree.bind("<Control-A>", self._on_select_all)
         self.dragging_iid = None
         self.dragging_column = None
         self._drag_start_row = None
@@ -639,7 +641,12 @@ class GenericListView(ctk.CTkFrame):
 
         self.refresh_list()
         self._update_view_toggle_state()
-
+    
+    def _on_select_all(self, _event=None):
+        item_ids = self.tree.get_children()
+        if item_ids:
+            self.tree.selection_set(item_ids)
+        return "break"
     def _hide_search_frame(self):
         if getattr(self, "search_frame", None) and self.search_frame.winfo_manager():
             self.search_frame.pack_forget()
