@@ -1,4 +1,4 @@
-"""Dialog window that embeds a webview for browsing free image libraries."""
+"""Dialog window that launches a webview for browsing free image libraries."""
 
 from __future__ import annotations
 
@@ -6,16 +6,16 @@ import tkinter as tk
 from urllib.parse import quote_plus
 
 import customtkinter as ctk
-from tkinterweb import HtmlFrame
 
 from modules.helpers.logging_helper import log_exception, log_module_import
 from modules.helpers.window_helper import position_window_at_top
+from modules.ui.webview_window import open_browser_window
 
 log_module_import(__name__)
 
 
 class ImageBrowserDialog(ctk.CTkToplevel):
-    """Display an embedded webview for free image search."""
+    """Display a webview window for free image search."""
 
     _PROVIDER_URLS: dict[str, str] = {
         "unsplash": "https://unsplash.com/s/photos/{query}",
@@ -39,8 +39,6 @@ class ImageBrowserDialog(ctk.CTkToplevel):
 
         self._search_query = search_query
         self._provider = provider.lower().strip()
-        self._webview: HtmlFrame | None = None
-
         self._build_ui()
         self._load_initial_page()
 
@@ -71,14 +69,26 @@ class ImageBrowserDialog(ctk.CTkToplevel):
         )
         helper.grid(row=1, column=0, sticky="w", pady=(6, 10))
 
-        webview_host = ctk.CTkFrame(container)
-        webview_host.grid(row=2, column=0, sticky="nsew")
-        webview_host.grid_rowconfigure(0, weight=1)
-        webview_host.grid_columnconfigure(0, weight=1)
+        description = ctk.CTkLabel(
+            container,
+            text=(
+                "Cette fenêtre ouvre un navigateur intégré (JavaScript activé) "
+                "dans une nouvelle fenêtre."
+            ),
+            wraplength=760,
+            justify="left",
+            anchor="w",
+        )
+        description.grid(row=2, column=0, sticky="w", pady=(0, 12))
 
-        webview = HtmlFrame(webview_host)
-        webview.grid(row=0, column=0, sticky="nsew")
-        self._webview = webview
+        open_button = ctk.CTkButton(
+            container,
+            text="Open Image Browser",
+            command=self._load_initial_page,
+        )
+        open_button.grid(row=3, column=0, sticky="w")
+
+        container.grid_rowconfigure(3, weight=1)
 
     def _resolve_search_url(self) -> str:
         template = self._PROVIDER_URLS.get(self._provider)
@@ -88,11 +98,9 @@ class ImageBrowserDialog(ctk.CTkToplevel):
         return template.format(query=query)
 
     def _load_initial_page(self) -> None:
-        if self._webview is None:
-            return
         url = self._resolve_search_url()
         try:
-            self._webview.load_website(url)
+            open_browser_window("Image Browser", url)
         except Exception as exc:  # pragma: no cover - UI fallback
             log_exception(
                 f"Unable to load webview for {url}: {exc}",
