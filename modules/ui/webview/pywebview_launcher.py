@@ -56,6 +56,17 @@ def _webkit_available() -> bool:
     return _module_available("objc") or _module_available("AppKit")
 
 
+def _resource_root() -> Path:
+    bundle_root = getattr(sys, "_MEIPASS", None)
+    if bundle_root:
+        return Path(bundle_root) / "modules" / "ui" / "webview"
+    return Path(__file__).resolve().parent
+
+
+def _resource_path(*parts: str) -> Path:
+    return _resource_root().joinpath(*parts)
+
+
 def select_gui() -> str | None:
     if sys.platform.startswith("win"):
         preferred_guis = [("edgechromium", _edgechromium_available)]
@@ -86,7 +97,7 @@ def select_gui() -> str | None:
 
 def main() -> None:
     args = parse_args()
-    template_path = Path(__file__).resolve().parent / "templates" / "browser_shell.html"
+    template_path = _resource_path("templates", "browser_shell.html")
     shell_url = f"{template_path.as_uri()}?{urlencode({'target': args.url})}"
     webview.settings["OPEN_DEVTOOLS_IN_DEBUG"] = False
     webview.create_window(
