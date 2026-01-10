@@ -73,6 +73,12 @@ def select_gui() -> str | None:
 
 def main() -> None:
     args = parse_args()
+    webview.settings.update(
+        {
+            "ALLOW_CONTEXT_MENU": True,
+            "ALLOW_CLIPBOARD": True,
+        }
+    )
     webview.create_window(
         args.title,
         args.url,
