@@ -162,6 +162,14 @@ def _lazy_book_importers():
     return extract_text_from_book, prepare_books_from_directory, prepare_books_from_files
 
 
+def _lazy_text_import_windows():
+    from modules.creatures.creature_importer import CreatureImportWindow
+    from modules.objects.object_importer import ObjectImportWindow
+    from modules.scenarios.scenario_importer import ScenarioImportWindow
+
+    return ScenarioImportWindow, CreatureImportWindow, ObjectImportWindow
+
+
 def _lazy_book_viewer():
     from modules.books.book_viewer import open_book_viewer
 
@@ -445,6 +453,12 @@ class GenericListView(ctk.CTkFrame):
         ctk.CTkButton(self.search_frame, text="Merge Duplicates",
             command=self.merge_duplicate_entities)\
         .pack(side="left", padx=5)
+        if self.model_wrapper.entity_type in ("scenarios", "creatures", "objects"):
+            ctk.CTkButton(
+                self.search_frame,
+                text="Import Text",
+                command=self.open_text_import_dialog,
+            ).pack(side="left", padx=5)
         if self.model_wrapper.entity_type == "objects":
             self.ai_categorize_button = ctk.CTkButton(
                 self.search_frame,
@@ -3224,6 +3238,19 @@ class GenericListView(ctk.CTkFrame):
             messagebox.showerror("Import Folder", f"Failed to prepare books:\n{exc}")
             return
         self._persist_imported_books(records)
+
+    def open_text_import_dialog(self):
+        entity_type = self.model_wrapper.entity_type
+        if entity_type not in ("scenarios", "creatures", "objects"):
+            return
+        log_info("Opening text import dialog", func_name="GenericListView.open_text_import_dialog")
+        ScenarioImportWindow, CreatureImportWindow, ObjectImportWindow = _lazy_text_import_windows()
+        if entity_type == "scenarios":
+            ScenarioImportWindow(self)
+        elif entity_type == "creatures":
+            CreatureImportWindow(self)
+        else:
+            ObjectImportWindow(self)
 
     def _persist_imported_books(self, records):
         records = [rec for rec in records if isinstance(rec, dict)]
