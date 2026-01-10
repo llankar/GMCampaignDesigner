@@ -15,7 +15,7 @@ log_module_import(__name__)
 
 
 class ImageBrowserDialog(ctk.CTkToplevel):
-    """Display a pywebview window for free image search."""
+    """Display an optional dialog that launches a webview for free image search."""
 
     _PROVIDER_URLS: dict[str, str] = {
         "unsplash": "https://unsplash.com/s/photos/{query}",
@@ -86,12 +86,17 @@ class ImageBrowserDialog(ctk.CTkToplevel):
         )
         open_button.grid(row=3, column=0, sticky="w")
 
-    def _resolve_search_url(self) -> str:
-        template = self._PROVIDER_URLS.get(self._provider)
+    @staticmethod
+    def build_search_url(query: str, provider: str = "unsplash") -> str:
+        provider_key = (provider or "").lower().strip()
+        template = ImageBrowserDialog._PROVIDER_URLS.get(provider_key)
         if not template:
-            template = self._PROVIDER_URLS["unsplash"]
-        query = quote_plus(self._search_query.strip() or "portrait")
-        return template.format(query=query)
+            template = ImageBrowserDialog._PROVIDER_URLS["unsplash"]
+        encoded_query = quote_plus((query or "").strip() or "portrait")
+        return template.format(query=encoded_query)
+
+    def _resolve_search_url(self) -> str:
+        return self.build_search_url(self._search_query, self._provider)
 
     def _load_initial_page(self) -> None:
         url = self._resolve_search_url()
