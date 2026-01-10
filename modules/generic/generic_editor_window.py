@@ -32,6 +32,7 @@ from modules.helpers.portrait_helper import (
     serialize_portrait_value,
 )
 from modules.helpers.logging_helper import (
+    log_exception,
     log_function,
     log_info,
     log_methods,
@@ -39,6 +40,7 @@ from modules.helpers.logging_helper import (
     log_module_import,
 )
 from modules.ui.image_browser_dialog import ImageBrowserDialog
+from modules.ui.webview.pywebview_client import PyWebviewClient
 
 log_module_import(__name__)
 
@@ -1608,7 +1610,18 @@ class GenericEditorWindow(ctk.CTkToplevel):
 
     def open_portrait_image_browser(self):
         query = self._resolve_portrait_search_query()
-        ImageBrowserDialog(self, search_query=query)
+        url = ImageBrowserDialog.build_search_url(query)
+        try:
+            PyWebviewClient(title="Image Browser").open(url)
+        except Exception as exc:
+            log_exception(
+                f"Unable to open image browser for {url}: {exc}",
+                func_name="GenericEditorWindow.open_portrait_image_browser",
+            )
+            messagebox.showerror(
+                "Image Browser",
+                "Impossible d’ouvrir la page d’images. Vérifiez la connexion puis réessayez.",
+            )
 
     def _resolve_portrait_search_query(self):
         key_field = self.model_wrapper._infer_key_field()
