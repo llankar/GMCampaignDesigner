@@ -38,6 +38,7 @@ from modules.helpers.logging_helper import (
     log_warning,
     log_module_import,
 )
+from modules.ui.image_browser_dialog import ImageBrowserDialog
 
 log_module_import(__name__)
 
@@ -1589,12 +1590,35 @@ class GenericEditorWindow(ctk.CTkToplevel):
         button_frame.pack(pady=5)
 
         ctk.CTkButton(button_frame, text="Add Portrait(s)", command=self.select_portrait).pack(side="left", padx=5)
+        ctk.CTkButton(button_frame, text="Search Images", command=self.open_portrait_image_browser).pack(side="left", padx=5)
         ctk.CTkButton(button_frame, text="Paste Portrait", command=self.paste_portrait_from_clipboard).pack(side="left", padx=5)
         ctk.CTkButton(button_frame, text="Create Portrait with description", command=self.create_portrait_with_swarmui).pack(side="left", padx=5)
         ctk.CTkButton(button_frame, text="Set Primary", command=self.set_primary_portrait).pack(side="left", padx=5)
         ctk.CTkButton(button_frame, text="Remove Selected", command=self.remove_selected_portrait).pack(side="left", padx=5)
 
+        helper_label = ctk.CTkLabel(
+            frame,
+            text="Copiez l’image puis utilisez ‘Paste Portrait’.",
+            font=ctk.CTkFont(size=12, slant="italic"),
+            anchor="w",
+        )
+        helper_label.pack(fill="x", padx=5, pady=(0, 5))
+
         self._update_portrait_preview(primary_only=True)
+
+    def open_portrait_image_browser(self):
+        query = self._resolve_portrait_search_query()
+        ImageBrowserDialog(self, search_query=query)
+
+    def _resolve_portrait_search_query(self):
+        key_field = self.model_wrapper._infer_key_field()
+        widget = self.field_widgets.get(key_field)
+        name = ""
+        if hasattr(widget, "get"):
+            name = str(widget.get()).strip()
+        if not name:
+            name = str(self.item.get(key_field) or self.item.get("Name") or "").strip()
+        return name or "fantasy portrait"
 
     def paste_portrait_from_clipboard(self):
         """Paste image from clipboard and set as entity portrait.
