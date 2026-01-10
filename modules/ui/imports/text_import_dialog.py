@@ -17,6 +17,7 @@ from modules.ui.imports.text_import_mappings import (
     extract_default_name,
     list_target_labels,
     target_for_label,
+    target_for_slug,
 )
 
 log_module_import(__name__)
@@ -30,17 +31,22 @@ class TextImportDialog(ctk.CTkToplevel):
         *,
         source_text: str,
         source_url: str | None = None,
+        default_target_slug: str | None = None,
         on_complete=None,
     ):
         super().__init__(master)
         self.source_text = source_text or ""
         self.source_url = source_url or ""
+        self.default_target_slug = default_target_slug
         self.on_complete = on_complete
         self._init_state()
         self._build_ui()
 
     def _init_state(self):
-        self.target_var = ctk.StringVar(value=list_target_labels()[0])
+        default_label = None
+        if self.default_target_slug:
+            default_label = target_for_slug(self.default_target_slug).label
+        self.target_var = ctk.StringVar(value=default_label or list_target_labels()[0])
         self.name_var = ctk.StringVar(
             value=extract_default_name(self.source_text, self.source_url)
         )
