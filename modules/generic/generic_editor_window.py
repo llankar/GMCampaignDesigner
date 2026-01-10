@@ -4,6 +4,7 @@ import requests
 import subprocess
 import time
 import shutil
+from urllib.parse import quote_plus
 from modules.helpers import text_helpers
 from modules.helpers.rich_text_editor import RichTextEditor
 from modules.helpers.window_helper import position_window_at_top
@@ -1610,6 +1611,7 @@ class GenericEditorWindow(ctk.CTkToplevel):
 
     def open_portrait_image_browser(self):
         query = self._resolve_portrait_search_query()
+        query = quote_plus(query) 
         url = ImageBrowserDialog.build_search_url(query)
         try:
             PyWebviewClient(title="Image Browser").open(url)

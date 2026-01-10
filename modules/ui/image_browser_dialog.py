@@ -18,7 +18,7 @@ class ImageBrowserDialog(ctk.CTkToplevel):
     """Display an optional dialog that launches a webview for free image search."""
 
     _PROVIDER_URLS: dict[str, str] = {
-        "unsplash": "https://www.google.com/search?tbm=isch&q={query}",
+        "unsplash": "https://www.google.com/search?tbm=isch&q={query}&tbs=isz:l",
         "pexels": "https://www.pexels.com/search/{query}/",
         "pixabay": "https://pixabay.com/images/search/{query}/",
         "wikimedia": "https://commons.wikimedia.org/w/index.php?search={query}",
