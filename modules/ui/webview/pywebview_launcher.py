@@ -5,9 +5,22 @@ from __future__ import annotations
 import argparse
 import importlib.util
 import sys
+from pathlib import Path
+from urllib.parse import urlencode
 
 import webview
 
+from modules.helpers.logging_helper import log_info, log_module_import
+
+log_module_import(__name__)
+
+
+class BrowserShellApi:
+    def import_selection(self, selection: str, url: str) -> None:
+        log_info(
+            f"Selection imported from {url or 'unknown URL'}: {selection}",
+            func_name="BrowserShellApi.import_selection",
+        )
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Launch a pywebview browser window")
@@ -73,16 +86,19 @@ def select_gui() -> str | None:
 
 def main() -> None:
     args = parse_args()
-    webview.settings['OPEN_DEVTOOLS_IN_DEBUG'] = False
+    template_path = Path(__file__).resolve().parent / "templates" / "browser_shell.html"
+    shell_url = f"{template_path.as_uri()}?{urlencode({'target': args.url})}"
+    webview.settings["OPEN_DEVTOOLS_IN_DEBUG"] = False
     webview.create_window(
         args.title,
-        args.url,
+        shell_url,
         width=args.width,
         height=args.height,
         min_size=(args.min_width, args.min_height),
         resizable=True,
+        js_api=BrowserShellApi(),
     )
-    webview.start(gui=select_gui(),debug=True)
+    webview.start(gui=select_gui(), debug=True)
 
 
 if __name__ == "__main__":
