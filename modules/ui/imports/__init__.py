@@ -6,6 +6,7 @@ from modules.ui.imports.text_import_mappings import (
     extract_default_name,
     list_target_labels,
     target_for_label,
+    target_for_slug,
 )
 
 __all__ = [
@@ -16,4 +17,5 @@ __all__ = [
     "extract_default_name",
     "list_target_labels",
     "target_for_label",
+    "target_for_slug",
 ]

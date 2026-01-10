@@ -162,12 +162,10 @@ def _lazy_book_importers():
     return extract_text_from_book, prepare_books_from_directory, prepare_books_from_files
 
 
-def _lazy_text_import_windows():
-    from modules.creatures.creature_importer import CreatureImportWindow
-    from modules.objects.object_importer import ObjectImportWindow
-    from modules.scenarios.scenario_importer import ScenarioImportWindow
+def _lazy_text_import_dialog():
+    from modules.ui.imports import TextImportDialog
 
-    return ScenarioImportWindow, CreatureImportWindow, ObjectImportWindow
+    return TextImportDialog
 
 
 def _lazy_book_viewer():
@@ -3244,13 +3242,19 @@ class GenericListView(ctk.CTkFrame):
         if entity_type not in ("scenarios", "creatures", "objects"):
             return
         log_info("Opening text import dialog", func_name="GenericListView.open_text_import_dialog")
-        ScenarioImportWindow, CreatureImportWindow, ObjectImportWindow = _lazy_text_import_windows()
-        if entity_type == "scenarios":
-            ScenarioImportWindow(self)
-        elif entity_type == "creatures":
-            CreatureImportWindow(self)
-        else:
-            ObjectImportWindow(self)
+        source_text = ""
+        try:
+            source_text = self.clipboard_get()
+        except tk.TclError:
+            source_text = ""
+        TextImportDialog = _lazy_text_import_dialog()
+        dialog = TextImportDialog(
+            self,
+            source_text=source_text,
+            default_target_slug=entity_type,
+            on_complete=lambda _: self.reload_from_db(),
+        )
+        dialog.focus_force()
 
     def _persist_imported_books(self, records):
         records = [rec for rec in records if isinstance(rec, dict)]

@@ -33,6 +33,13 @@ TARGETS = (
         notes_field="Notes",
     ),
     TextImportTarget(
+        label="Créature",
+        slug="creatures",
+        name_field="Name",
+        description_field="Description",
+        notes_field="Notes",
+    ),
+    TextImportTarget(
         label="Objet",
         slug="objects",
         name_field="Name",
@@ -56,6 +63,13 @@ def list_target_labels() -> list[str]:
 def target_for_label(label: str) -> TextImportTarget:
     for target in TARGETS:
         if target.label == label:
+            return target
+    return TARGETS[0]
+
+
+def target_for_slug(slug: str) -> TextImportTarget:
+    for target in TARGETS:
+        if target.slug == slug:
             return target
     return TARGETS[0]
 
