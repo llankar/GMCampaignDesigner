@@ -73,12 +73,7 @@ def select_gui() -> str | None:
 
 def main() -> None:
     args = parse_args()
-    webview.settings.update(
-        {
-            "ALLOW_CONTEXT_MENU": True,
-            "ALLOW_CLIPBOARD": True,
-        }
-    )
+    webview.settings['OPEN_DEVTOOLS_IN_DEBUG'] = False
     webview.create_window(
         args.title,
         args.url,
@@ -87,7 +82,7 @@ def main() -> None:
         min_size=(args.min_width, args.min_height),
         resizable=True,
     )
-    webview.start(gui=select_gui())
+    webview.start(gui=select_gui(),debug=True)
 
 
 if __name__ == "__main__":
