@@ -1,0 +1,109 @@
+"""Dialog window that embeds a webview for browsing free image libraries."""
+
+from __future__ import annotations
+
+import tkinter as tk
+from urllib.parse import quote_plus
+
+import customtkinter as ctk
+from tkinterweb import HtmlFrame
+
+from modules.helpers.logging_helper import log_exception, log_module_import
+from modules.helpers.window_helper import position_window_at_top
+
+log_module_import(__name__)
+
+
+class ImageBrowserDialog(ctk.CTkToplevel):
+    """Display an embedded webview for free image search."""
+
+    _PROVIDER_URLS: dict[str, str] = {
+        "unsplash": "https://unsplash.com/s/photos/{query}",
+        "pexels": "https://www.pexels.com/search/{query}/",
+        "pixabay": "https://pixabay.com/images/search/{query}/",
+        "wikimedia": "https://commons.wikimedia.org/w/index.php?search={query}",
+    }
+
+    def __init__(
+        self,
+        master: tk.Misc | None = None,
+        *,
+        search_query: str = "fantasy portrait",
+        provider: str = "unsplash",
+    ) -> None:
+        super().__init__(master)
+        self.title("Image Browser")
+        self.geometry("1100x760")
+        self.minsize(900, 620)
+        position_window_at_top(self)
+
+        self._search_query = search_query
+        self._provider = provider.lower().strip()
+        self._webview: HtmlFrame | None = None
+
+        self._build_ui()
+        self._load_initial_page()
+
+        self.bind("<Escape>", lambda _event: self.destroy())
+        self.transient(master)
+        self.lift()
+        self.focus_force()
+
+    def _build_ui(self) -> None:
+        container = ctk.CTkFrame(self)
+        container.pack(fill="both", expand=True, padx=14, pady=14)
+        container.grid_columnconfigure(0, weight=1)
+        container.grid_rowconfigure(2, weight=1)
+
+        title = ctk.CTkLabel(
+            container,
+            text="Browse free image libraries",
+            font=ctk.CTkFont(size=18, weight="bold"),
+            anchor="w",
+        )
+        title.grid(row=0, column=0, sticky="w")
+
+        helper = ctk.CTkLabel(
+            container,
+            text="Copiez l’image puis utilisez ‘Paste Portrait’.",
+            font=ctk.CTkFont(size=12, slant="italic"),
+            anchor="w",
+        )
+        helper.grid(row=1, column=0, sticky="w", pady=(6, 10))
+
+        webview_host = ctk.CTkFrame(container)
+        webview_host.grid(row=2, column=0, sticky="nsew")
+        webview_host.grid_rowconfigure(0, weight=1)
+        webview_host.grid_columnconfigure(0, weight=1)
+
+        webview = HtmlFrame(webview_host)
+        webview.grid(row=0, column=0, sticky="nsew")
+        self._webview = webview
+
+    def _resolve_search_url(self) -> str:
+        template = self._PROVIDER_URLS.get(self._provider)
+        if not template:
+            template = self._PROVIDER_URLS["unsplash"]
+        query = quote_plus(self._search_query.strip() or "portrait")
+        return template.format(query=query)
+
+    def _load_initial_page(self) -> None:
+        if self._webview is None:
+            return
+        url = self._resolve_search_url()
+        try:
+            self._webview.load_website(url)
+        except Exception as exc:  # pragma: no cover - UI fallback
+            log_exception(
+                f"Unable to load webview for {url}: {exc}",
+                func_name="ImageBrowserDialog._load_initial_page",
+            )
+            error_label = ctk.CTkLabel(
+                self,
+                text=(
+                    "Impossible d’ouvrir la page d’images. "
+                    "Vérifiez la connexion puis réessayez."
+                ),
+                text_color="#ffb4b4",
+            )
+            error_label.pack(pady=12)
