@@ -5,7 +5,15 @@ a = Analysis(
     ['main_window.py'],
     pathex=[],
     binaries=[],
-    datas=[('assets', 'assets'), ('config', 'config'), ('static', 'static'), ('scripts', 'scripts')],
+    datas=[
+        ('assets', 'assets'),
+        ('config', 'config'),
+        ('static', 'static'),
+        ('scripts', 'scripts'),
+        ('modules/ui/webview/templates/browser_shell.html', 'modules/ui/webview/templates'),
+        ('modules/ui/webview/static/browser_shell.css', 'modules/ui/webview/static'),
+        ('modules/ui/webview/static/browser_shell.js', 'modules/ui/webview/static'),
+    ],
     hiddenimports=[],
     hookspath=[],
     hooksconfig={},
@@ -80,4 +88,3 @@ coll = COLLECT(
     upx_exclude=[],
     name='RPGCampaignManager',
 )
-
