@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Navigateur intégré</title>
+  <link rel="stylesheet" href="../static/browser_shell.css" />
+</head>
+<body>
+  <header class="toolbar">
+    <div class="toolbar__left">
+      <span class="toolbar__label">Adresse</span>
+      <input id="address-input" class="toolbar__input" type="text" />
+      <button id="go-button" class="toolbar__button" type="button">Aller</button>
+    </div>
+    <div class="toolbar__right">
+      <span id="status-message" class="toolbar__status" aria-live="polite"></span>
+      <button id="import-button" class="toolbar__button toolbar__button--primary" type="button">
+        Importer
+      </button>
+    </div>
+  </header>
+  <main class="content">
+    <iframe
+      id="target-frame"
+      title="Page cible"
+      class="content__frame"
+      referrerpolicy="no-referrer"
+    ></iframe>
+  </main>
+  <script src="../static/browser_shell.js"></script>
+</body>
+</html>
