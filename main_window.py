@@ -81,6 +81,7 @@ from db.db import initialize_db, ensure_entity_schema
 from modules.factions.faction_graph_editor import FactionGraphEditor
 from modules.whiteboard.controllers.whiteboard_controller import WhiteboardController
 from modules.pcs.display_pcs import display_pcs_in_banner
+from modules.pcs.pcs_window import open_pcs_window
 from modules.generic.generic_list_selection_view import GenericListSelectionView
 from modules.maps.controllers.display_map_controller import DisplayMapController
 from modules.maps.world_map_view import WorldMapWindow
@@ -298,6 +299,7 @@ class MainWindow(ctk.CTk):
             "dice_roller": "dice_roller_icon.png",
             "dice_bar": "dice_roller_icon.png",
             "audio_controls": "sound_manager_icon.png",
+            "pcs_window": "pc_icon.png",
             "scene_flow_viewer": "scenes_flow_icon.png",
             "create_random_table"   : "random_table_icon.png",
             "system_manager": "database_icon.png",
@@ -647,6 +649,29 @@ class MainWindow(ctk.CTk):
         if event.widget is self._system_selector_dialog:
             self._system_selector_dialog = None
 
+    def _pcs_window_is_open(self) -> bool:
+        window = getattr(self, "_pcs_window", None)
+        return bool(window is not None and window.winfo_exists())
+
+    def open_pcs_window(self):
+        existing = getattr(self, "_pcs_window", None)
+        if existing is not None and existing.winfo_exists():
+            try:
+                existing.lift()
+                existing.focus_force()
+            except Exception:
+                pass
+            return
+
+        def _on_close():
+            self._pcs_window = None
+
+        self._pcs_window = open_pcs_window(
+            self,
+            pc_wrapper=self.pc_wrapper,
+            on_close=_on_close,
+        )
+
     def _on_theme_changed(self, _theme_key: str) -> None:
         # Reapply palette and rebuild widgets that used tokenized colors
         # Track which floating windows are currently open so we can recreate them
@@ -837,6 +862,7 @@ class MainWindow(ctk.CTk):
             ("import_creatures_pdf", "Import Creatures from PDF", self.open_creature_importer),
             ("import_objects_pdf", "Import Equipment from PDF", self.open_object_importer),
             ("gm_screen", "Open GM Screen", self.open_gm_screen),
+            ("pcs_window", "Open PC Banner Window", self.open_pcs_window),
             ("export_scenarios", "Export Scenarios", self.preview_and_export_scenarios),
             ("export_foundry", "Export Scenarios for Foundry", self.export_foundry),
             ("generate_portraits", "Generate Portraits", self.generate_missing_portraits),
@@ -1082,13 +1108,14 @@ class MainWindow(ctk.CTk):
                     self.inner_content_frame.grid(row=1, column=0, sticky="nsew")
                 except Exception:
                     pass
-                try:
-                    display_pcs_in_banner(
-                        self.banner_frame,
-                        {pc["Name"]: pc for pc in self.pc_wrapper.load_items()}
-                    )
-                except Exception:
-                    pass
+                if not self._pcs_window_is_open():
+                    try:
+                        display_pcs_in_banner(
+                            self.banner_frame,
+                            {pc["Name"]: pc for pc in self.pc_wrapper.load_items()}
+                        )
+                    except Exception:
+                        pass
                 self.inner_content_frame.grid_rowconfigure(0, weight=1)
                 self.inner_content_frame.grid_columnconfigure(0, weight=1)
                 self.content_frame.grid_rowconfigure(0, weight=0)
@@ -1127,13 +1154,14 @@ class MainWindow(ctk.CTk):
                     self.inner_content_frame.grid(row=1, column=0, sticky="nsew")
                 except Exception:
                     pass
-                try:
-                    display_pcs_in_banner(
-                        self.banner_frame,
-                        {pc["Name"]: pc for pc in self.pc_wrapper.load_items()}
-                    )
-                except Exception:
-                    pass
+                if not self._pcs_window_is_open():
+                    try:
+                        display_pcs_in_banner(
+                            self.banner_frame,
+                            {pc["Name"]: pc for pc in self.pc_wrapper.load_items()}
+                        )
+                    except Exception:
+                        pass
                 self.inner_content_frame.grid_rowconfigure(0, weight=1)
                 self.inner_content_frame.grid_columnconfigure(0, weight=1)
                 self.content_frame.grid_rowconfigure(0, weight=0)
@@ -1162,10 +1190,11 @@ class MainWindow(ctk.CTk):
             else:
                 self.banner_frame.grid(row=0, column=0, sticky="ew")
                 self.inner_content_frame.grid(row=1, column=0, sticky="nsew")
-                display_pcs_in_banner(
-                    self.banner_frame,
-                    {pc["Name"]: pc for pc in self.pc_wrapper.load_items()}
-                )
+                if not self._pcs_window_is_open():
+                    display_pcs_in_banner(
+                        self.banner_frame,
+                        {pc["Name"]: pc for pc in self.pc_wrapper.load_items()}
+                    )
                 self.inner_content_frame.grid_rowconfigure(0, weight=1)
                 self.inner_content_frame.grid_columnconfigure(0, weight=1)
                 self.content_frame.grid_rowconfigure(0, weight=0)
@@ -1275,8 +1304,9 @@ class MainWindow(ctk.CTk):
 
             self.banner_frame.grid(row=0, column=0, sticky="ew")
             self.inner_content_frame.grid(row=1, column=0, sticky="nsew")
-            pcs_items = {pc["Name"]: pc for pc in self.pc_wrapper.load_items()}
-            display_pcs_in_banner(self.banner_frame, pcs_items)
+            if not self._pcs_window_is_open():
+                pcs_items = {pc["Name"]: pc for pc in self.pc_wrapper.load_items()}
+                display_pcs_in_banner(self.banner_frame, pcs_items)
 
             # ✅ CRITICAL FIX: make inner_content_frame fully expandable
             self.inner_content_frame.grid_rowconfigure(0, weight=1)
@@ -1849,9 +1879,10 @@ class MainWindow(ctk.CTk):
             # banner_frame was destroyed (or never created): re-create it
             self.banner_frame = self._create_banner_frame()
             self.banner_frame.pack(fill='x')
-        pcs_items = {pc["Name"]: pc for pc in self.pc_wrapper.load_items()}
-        if pcs_items:
-            display_pcs_in_banner(self.banner_frame, pcs_items)
+        if not self._pcs_window_is_open():
+            pcs_items = {pc["Name"]: pc for pc in self.pc_wrapper.load_items()}
+            if pcs_items:
+                display_pcs_in_banner(self.banner_frame, pcs_items)
 
         # 4) Prepare inner content area
         self.inner_content_frame.grid(row=1, column=0, sticky="nsew")
