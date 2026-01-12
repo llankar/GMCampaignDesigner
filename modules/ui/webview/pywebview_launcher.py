@@ -4,7 +4,12 @@ from __future__ import annotations
 
 import argparse
 import importlib.util
+import json
 import sys
+from dataclasses import dataclass
+from datetime import datetime
+from pathlib import Path
+from urllib.parse import quote
 
 import webview
 
@@ -13,12 +18,33 @@ from modules.helpers.logging_helper import log_info, log_module_import
 log_module_import(__name__)
 
 
+@dataclass(slots=True)
 class BrowserShellApi:
+    selection_output: str | None = None
+
     def import_selection(self, selection: str, url: str) -> None:
         log_info(
             f"Selection imported from {url or 'unknown URL'}: {selection}",
             func_name="BrowserShellApi.import_selection",
         )
+        if not self.selection_output:
+            return
+        payload = {
+            "selection": selection,
+            "url": url,
+            "received_at": datetime.utcnow().isoformat(timespec="seconds"),
+        }
+        try:
+            Path(self.selection_output).write_text(
+                json.dumps(payload, ensure_ascii=False),
+                encoding="utf-8",
+            )
+        except Exception as exc:
+            log_info(
+                f"Unable to persist selection: {exc}",
+                func_name="BrowserShellApi.import_selection",
+            )
+
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Launch a pywebview browser window")
@@ -28,7 +54,23 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--height", type=int, default=760, help="Window height")
     parser.add_argument("--min-width", type=int, default=900, help="Minimum window width")
     parser.add_argument("--min-height", type=int, default=620, help="Minimum window height")
+    parser.add_argument(
+        "--shell",
+        action="store_true",
+        help="Open the internal browser shell template",
+    )
+    parser.add_argument(
+        "--selection-output",
+        help="Optional file path to write the selected text payload",
+    )
     return parser.parse_args()
+
+
+def _build_shell_url(target_url: str) -> str:
+    template_path = Path(__file__).resolve().parent / "templates" / "browser_shell.html"
+    template_uri = template_path.as_uri()
+    encoded_target = quote(target_url, safe="")
+    return f"{template_uri}?target={encoded_target}"
 
 
 def _module_available(module_name: str) -> bool:
@@ -85,15 +127,17 @@ def select_gui() -> str | None:
 def main() -> None:
     args = parse_args()
     webview.settings["OPEN_DEVTOOLS_IN_DEBUG"] = False
+    api = BrowserShellApi(selection_output=args.selection_output)
+    url = _build_shell_url(args.url) if args.shell else args.url
     webview.create_window(
         args.title,
-        args.url,
+        url,
         width=args.width,
         height=args.height,
         min_size=(args.min_width, args.min_height),
         resizable=True,
-        js_api=BrowserShellApi(),
     )
+    webview.expose(api.import_selection)
     webview.start(gui=select_gui(), debug=True)
 
 

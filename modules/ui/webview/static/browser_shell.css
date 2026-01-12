@@ -89,6 +89,11 @@ body {
   min-height: 1.1em;
 }
 
+.toolbar__helper {
+  font-size: 0.8rem;
+  color: var(--toolbar-muted);
+}
+
 .content {
   flex: 1;
   background: #0f1118;
