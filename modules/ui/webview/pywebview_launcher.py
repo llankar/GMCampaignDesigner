@@ -136,8 +136,8 @@ def main() -> None:
         height=args.height,
         min_size=(args.min_width, args.min_height),
         resizable=True,
+        js_api=api,
     )
-    webview.expose(api.import_selection)
     webview.start(gui=select_gui(), debug=True)
 
 
