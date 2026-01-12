@@ -2,7 +2,6 @@ const addressInput = document.getElementById("address-input");
 const goButton = document.getElementById("go-button");
 const importButton = document.getElementById("import-button");
 const statusMessage = document.getElementById("status-message");
-const targetFrame = document.getElementById("target-frame");
 
 const status = {
   set(message, isError = false) {
@@ -21,15 +20,7 @@ const getTargetFromQuery = () => {
 };
 
 const resolveFrameUrl = () => {
-  try {
-    const frameUrl = targetFrame.contentWindow?.location?.href;
-    if (frameUrl) {
-      return frameUrl;
-    }
-  } catch (error) {
-    // Ignore cross-origin access errors.
-  }
-  return targetFrame.src;
+  return window.location.href;
 };
 
 const navigateTo = (url) => {
@@ -38,7 +29,7 @@ const navigateTo = (url) => {
     return;
   }
   status.clear();
-  targetFrame.src = url;
+  window.location.assign(url);
   addressInput.value = url;
 };
 
