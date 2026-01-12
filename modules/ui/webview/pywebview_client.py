@@ -28,12 +28,10 @@ class PyWebviewClient:
     ) -> None:
         args = [
             sys.executable,
-            "-m",
-            "modules.ui.webview.pywebview_launcher",
             url,
             "--title",
             self.title,
-            "--width",
+               "--width",
             str(self.width),
             "--height",
             str(self.height),
@@ -42,6 +40,11 @@ class PyWebviewClient:
             "--min-height",
             str(self.min_height),
         ]
+        if getattr(sys, "frozen", False):
+            args.insert(1, "--webview")
+        else:
+            args.insert(1, "-m")
+            args.insert(2, "modules.ui.webview.pywebview_launcher")
         if use_shell:
             args.append("--shell")
         if selection_output:

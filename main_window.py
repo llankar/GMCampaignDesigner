@@ -3409,7 +3409,12 @@ class MainWindow(ctk.CTk):
         self._map_tool_window = top
 
 if __name__ == "__main__":
-    if "--apply-update" in sys.argv:
+    if "--webview" in sys.argv:
+        sys.argv.remove("--webview")
+        from modules.ui.webview import pywebview_launcher
+
+        pywebview_launcher.main()
+    elif "--apply-update" in sys.argv:
         sys.argv.remove("--apply-update")
         from scripts import apply_update as _apply_update
 

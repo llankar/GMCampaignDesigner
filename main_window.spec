@@ -14,7 +14,7 @@ a = Analysis(
         ('modules/ui/webview/static/browser_shell.css', 'modules/ui/webview/static'),
         ('modules/ui/webview/static/browser_shell.js', 'modules/ui/webview/static'),
     ],
-    hiddenimports=[],
+    hiddenimports=['modules.ui.webview.pywebview_launcher'],
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],
