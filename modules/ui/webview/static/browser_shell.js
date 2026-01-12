@@ -16,7 +16,15 @@ const status = {
 
 const getTargetFromQuery = () => {
   const params = new URLSearchParams(window.location.search);
-  return params.get("target") || "";
+  const target = params.get("target") || "";
+  if (!target) {
+    return "";
+  }
+  try {
+    return decodeURIComponent(target);
+  } catch (error) {
+    return target;
+  }
 };
 
 const resolveFrameUrl = () => {
