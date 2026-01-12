@@ -14,69 +14,82 @@ const status = {
   },
 };
 
-const getTargetFromQuery = () => {
-  const params = new URLSearchParams(window.location.search);
-  const target = params.get("target") || "";
-  if (!target) {
-    return "";
+const waitForApi = () =>
+  new Promise((resolve) => {
+    if (window.pywebview?.api) {
+      resolve();
+      return;
+    }
+    window.addEventListener("pywebviewready", () => resolve(), { once: true });
+  });
+
+const setInitialTarget = async () => {
+  await waitForApi();
+  if (!window.pywebview?.api?.get_initial_target) {
+    return;
   }
   try {
-    return decodeURIComponent(target);
+    const target = await window.pywebview.api.get_initial_target();
+    if (target) {
+      addressInput.value = target;
+    }
   } catch (error) {
-    return target;
+    status.set("Unable to read initial address.", true);
   }
 };
 
-const resolveFrameUrl = () => {
-  return window.location.href;
-};
-
-const navigateTo = (url) => {
+const navigateTo = async (url) => {
   if (!url) {
-    status.set("Adresse manquante.", true);
+    status.set("Missing address.", true);
+    return;
+  }
+  await waitForApi();
+  if (!window.pywebview?.api?.navigate) {
+    status.set("API unavailable.", true);
     return;
   }
   status.clear();
-  window.location.assign(url);
-  addressInput.value = url;
+  try {
+    const response = await window.pywebview.api.navigate(url);
+    addressInput.value = url;
+    if (response?.ok === false) {
+      status.set(response.message || "Unable to open address.", true);
+    }
+  } catch (error) {
+    status.set("Unable to open address.", true);
+  }
 };
 
 const sendSelection = async () => {
-  const selection = window.getSelection()?.toString() ?? "";
-  const trimmed = selection.trim();
-  if (!trimmed) {
-    status.set("Sélection vide.", true);
+  await waitForApi();
+  if (!window.pywebview?.api?.import_selection) {
+    status.set("API unavailable.", true);
     return;
   }
-
-  const currentUrl = resolveFrameUrl();
-  if (window.pywebview?.api?.import_selection) {
-    try {
-      await window.pywebview.api.import_selection(trimmed, currentUrl);
-      status.set("Sélection envoyée.");
-    } catch (error) {
-      status.set("Impossible d’envoyer la sélection.", true);
+  try {
+    const response = await window.pywebview.api.import_selection();
+    if (response?.ok) {
+      status.set(response.message || "Selection sent.");
+    } else {
+      status.set(response?.message || "Unable to send selection.", true);
     }
-  } else {
-    status.set("API indisponible.", true);
+  } catch (error) {
+    status.set("Unable to send selection.", true);
   }
 };
 
-const initialTarget = getTargetFromQuery();
-if (initialTarget) {
-  navigateTo(initialTarget);
-}
+setInitialTarget();
 
 addressInput.addEventListener("keydown", (event) => {
   if (event.key === "Enter") {
-    navigateTo(addressInput.value.trim());
+    void navigateTo(addressInput.value.trim());
   }
 });
 
 goButton.addEventListener("click", () => {
-  navigateTo(addressInput.value.trim());
+  void navigateTo(addressInput.value.trim());
 });
 
 importButton.addEventListener("click", () => {
-  sendSelection();
+  void sendSelection();
 });

@@ -460,11 +460,6 @@ class GenericListView(ctk.CTkFrame):
         if self.model_wrapper.entity_type in ("scenarios", "creatures", "objects"):
             ctk.CTkButton(
                 self.search_frame,
-                text="Import Text",
-                command=self.open_text_import_dialog,
-            ).pack(side="left", padx=5)
-            ctk.CTkButton(
-                self.search_frame,
                 text="Import Text (Web)",
                 command=self.open_web_text_import_dialog,
             ).pack(side="left", padx=5)

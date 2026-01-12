@@ -53,7 +53,7 @@ class TextImportDialog(ctk.CTkToplevel):
 
     def _build_ui(self):
         self.title("Import de texte")
-        self.geometry("920x820")
+        self.geometry("920x920")
         self.minsize(900, 780)
         self.transient(self.master)
         self.lift()

@@ -19,9 +19,9 @@ class ImageBrowserDialog(ctk.CTkToplevel):
 
     _PROVIDER_URLS: dict[str, str] = {
         "unsplash": "https://www.google.com/search?tbm=isch&q={query}&tbs=isz:l",
-        "pexels": "https://www.pexels.com/search/{query}/",
-        "pixabay": "https://pixabay.com/images/search/{query}/",
-        "wikimedia": "https://commons.wikimedia.org/w/index.php?search={query}",
+        "pexels": "https://www.google.com/search?tbm=isch&q={query}&tbs=isz:l",
+        "pixabay": "https://www.google.com/search?tbm=isch&q={query}&tbs=isz:l",
+        "wikimedia": "https://www.google.com/search?tbm=isch&q={query}&tbs=isz:l",
     }
 
     def __init__(

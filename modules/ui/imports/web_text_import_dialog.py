@@ -24,7 +24,7 @@ log_module_import(__name__)
 
 @log_methods
 class WebTextImportDialog(ctk.CTkToplevel):
-    _SEARCH_URL = "https://duckduckgo.com/?q={query}"
+    _SEARCH_URL = "https://www.google.com/search?q={query}"
     _DEFAULT_QUERY = "fantasy lore"
 
     def __init__(
