@@ -727,6 +727,51 @@ class MainWindow(ctk.CTk):
         except Exception:
             pass
 
+        try:
+            tokens = theme_manager.get_tokens(_theme_key)
+            self._refresh_theme_buttons(tokens)
+        except Exception:
+            pass
+
+    def _refresh_theme_buttons(self, tokens: dict) -> None:
+        button_fg = tokens.get("button_fg")
+        button_hover = tokens.get("button_hover")
+        button_border = tokens.get("button_border")
+        if not (button_fg or button_hover or button_border):
+            return
+
+        def _walk(widget):
+            yield widget
+            for child in widget.winfo_children():
+                yield from _walk(child)
+
+        root = self.winfo_toplevel()
+        roots = []
+        if root is not None:
+            roots.append(root)
+            for child in root.winfo_children():
+                if isinstance(child, (ctk.CTkToplevel, tk.Toplevel)):
+                    roots.append(child)
+        if not roots:
+            roots = [self]
+
+        for root_widget in roots:
+            for widget in _walk(root_widget):
+                if not isinstance(widget, ctk.CTkButton):
+                    continue
+                try:
+                    updates = {}
+                    if button_fg is not None:
+                        updates["fg_color"] = button_fg
+                    if button_hover is not None:
+                        updates["hover_color"] = button_hover
+                    if button_border is not None:
+                        updates["border_color"] = button_border
+                    if updates:
+                        widget.configure(**updates)
+                except Exception:
+                    continue
+
     def create_accordion_sidebar(self):
         container = getattr(self, "sidebar_sections_container", None)
         if container is None:

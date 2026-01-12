@@ -58,6 +58,23 @@ def apply_theme(theme: str | None = None) -> None:
             ctk.set_default_color_theme("green")
         else:
             ctk.set_default_color_theme("blue")
+        try:
+            from customtkinter.windows.widgets.theme import ThemeManager
+
+            tokens = get_tokens(key)
+            button_theme = ThemeManager.theme.get("CTkButton")
+            if button_theme:
+                button_fg = tokens.get("button_fg")
+                button_hover = tokens.get("button_hover")
+                button_border = tokens.get("button_border")
+                if button_fg:
+                    button_theme["fg_color"] = [button_fg, button_fg]
+                if button_hover:
+                    button_theme["hover_color"] = [button_hover, button_hover]
+                if button_border:
+                    button_theme["border_color"] = [button_border, button_border]
+        except Exception:
+            pass
         log_info(f"Applied UI theme: {key}", func_name="theme_manager.apply_theme")
     except Exception as exc:
         log_warning(
