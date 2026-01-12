@@ -19,7 +19,13 @@ class PyWebviewClient:
     min_width: int = 900
     min_height: int = 620
 
-    def open(self, url: str) -> None:
+    def open(
+        self,
+        url: str,
+        *,
+        use_shell: bool = False,
+        selection_output: str | None = None,
+    ) -> None:
         args = [
             sys.executable,
             "-m",
@@ -36,6 +42,10 @@ class PyWebviewClient:
             "--min-height",
             str(self.min_height),
         ]
+        if use_shell:
+            args.append("--shell")
+        if selection_output:
+            args.extend(["--selection-output", selection_output])
         try:
             subprocess.Popen(args)
         except Exception as exc:  # pragma: no cover - UI fallback

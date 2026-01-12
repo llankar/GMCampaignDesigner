@@ -168,6 +168,12 @@ def _lazy_text_import_dialog():
     return TextImportDialog
 
 
+def _lazy_web_text_import_dialog():
+    from modules.ui.imports import WebTextImportDialog
+
+    return WebTextImportDialog
+
+
 def _lazy_book_viewer():
     from modules.books.book_viewer import open_book_viewer
 
@@ -456,6 +462,11 @@ class GenericListView(ctk.CTkFrame):
                 self.search_frame,
                 text="Import Text",
                 command=self.open_text_import_dialog,
+            ).pack(side="left", padx=5)
+            ctk.CTkButton(
+                self.search_frame,
+                text="Import Text (Web)",
+                command=self.open_web_text_import_dialog,
             ).pack(side="left", padx=5)
         if self.model_wrapper.entity_type == "objects":
             self.ai_categorize_button = ctk.CTkButton(
@@ -3251,6 +3262,22 @@ class GenericListView(ctk.CTkFrame):
         dialog = TextImportDialog(
             self,
             source_text=source_text,
+            default_target_slug=entity_type,
+            on_complete=lambda _: self.reload_from_db(),
+        )
+        dialog.focus_force()
+
+    def open_web_text_import_dialog(self):
+        entity_type = self.model_wrapper.entity_type
+        if entity_type not in ("scenarios", "creatures", "objects"):
+            return
+        log_info(
+            "Opening web text import dialog",
+            func_name="GenericListView.open_web_text_import_dialog",
+        )
+        WebTextImportDialog = _lazy_web_text_import_dialog()
+        dialog = WebTextImportDialog(
+            self,
             default_target_slug=entity_type,
             on_complete=lambda _: self.reload_from_db(),
         )
