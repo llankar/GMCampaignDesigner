@@ -276,6 +276,18 @@ def ensure_dirs():
 
 def grab_widget_screenshot(widget, name: str):
     # Update geometry and bring to front
+    top = None
+    try:
+        top = widget.winfo_toplevel()
+        if top is not None:
+            top.lift()
+            top.focus_force()
+            try:
+                top.attributes("-topmost", True)
+            except Exception:
+                pass
+    except Exception:
+        top = None
     widget.update_idletasks()
     widget.update()
     # Compute absolute screen bbox
@@ -316,6 +328,12 @@ def grab_widget_screenshot(widget, name: str):
         return img_path
     except Exception:
         return None
+    finally:
+        if top is not None:
+            try:
+                top.attributes("-topmost", False)
+            except Exception:
+                pass
 
 
 
@@ -331,6 +349,8 @@ def screenshot_app_views():
         from modules.generic.entity_detail_factory import create_scenario_detail_frame
         from modules.generic.custom_fields_editor import CustomFieldsEditor
         from modules.generic.generic_editor_window import GenericEditorWindow
+        from modules.pcs.display_pcs import display_pcs_in_banner
+        from modules.generic.generic_list_selection_view import GenericListSelectionView
     except Exception:
         return {}
 
@@ -383,10 +403,55 @@ def screenshot_app_views():
 
     capture_sidebar_sections()
 
+    def ensure_pc_banner():
+        try:
+            app.banner_frame.grid(row=0, column=0, sticky="ew")
+            app.inner_content_frame.grid(row=1, column=0, sticky="nsew")
+        except Exception:
+            pass
+        try:
+            app.content_frame.grid_rowconfigure(0, weight=0)
+            app.content_frame.grid_rowconfigure(1, weight=1)
+        except Exception:
+            pass
+        app.banner_visible = True
+        try:
+            for child in app.banner_frame.winfo_children():
+                child.destroy()
+        except Exception:
+            pass
+        pcs_items = {}
+        try:
+            pcs_items = {pc.get("Name") or f"PC {idx}": pc for idx, pc in enumerate(app.pc_wrapper.load_items(), 1)}
+        except Exception:
+            pcs_items = {}
+        try:
+            display_pcs_in_banner(app.banner_frame, pcs_items)
+        except Exception:
+            pass
+        try:
+            app.move_current_view()
+        except Exception:
+            pass
+        app.update_idletasks()
+        app.update()
+
+    # Let delayed startup hooks finish, then reset banner/content layout.
+    time.sleep(1.0)
+    app.update_idletasks()
+    app.update()
+    try:
+        app.clear_current_content()
+    except Exception:
+        pass
+    ensure_pc_banner()
+
     for ent in ["scenarios", "pcs", "npcs", "creatures", "factions", "places", "objects", "informations", "clues", "books", "maps"]:
         try:
+            ensure_pc_banner()
             app.open_entity(ent)
             app.update()
+            ensure_pc_banner()
             shots[f"entity_{ent}"] = str(grab_widget_screenshot(app, f"entity_{ent}") or "")
         except Exception:
             pass
@@ -649,6 +714,7 @@ def screenshot_app_views():
     try:
         app.open_whiteboard()
         app.update(); app.update_idletasks()
+        ensure_pc_banner()
         shots["whiteboard"] = str(grab_widget_screenshot(app, "whiteboard") or "")
     except Exception:
         pass
@@ -739,8 +805,29 @@ def screenshot_app_views():
         pass
 
     try:
+        try:
+            app._prime_content_frames_for_gm_screen()
+        except Exception:
+            pass
         app.open_gm_screen()
         app.update()
+        ensure_pc_banner()
+        try:
+            list_selection = None
+            for child in app.inner_content_frame.winfo_children():
+                if isinstance(child, GenericListSelectionView):
+                    list_selection = child
+                    break
+            if list_selection is not None:
+                items = list_selection.tree.get_children()
+                if items:
+                    list_selection.tree.selection_set(items[0])
+                    list_selection.tree.focus(items[0])
+                    list_selection.open_selected()
+                    app.update(); app.update_idletasks()
+                    ensure_pc_banner()
+        except Exception:
+            pass
         shots["gm_screen"] = str(grab_widget_screenshot(app, "gm_screen") or "")
     except Exception:
         pass
@@ -991,8 +1078,13 @@ def build_user_manual(shots, menu_data, py_files):
             'Switch between campaign databases and configure global integrations.',
             [
                 '<b>Change Data Storage</b>: Open the database manager to select, create, or browse for campaign files.',
-                '<b>Set SwarmUI Path</b>: Point the portrait generator at your SwarmUI installation.',
+                '<b>Switch System</b>: Choose the rules system and visual theme for this campaign.',
+                '<b>Manage Campaign Systems</b>: Edit system dice defaults, supported faces, and analyzer config.',
                 '<b>Customize Fields</b>: Open the custom field editor (see Editor Tools).',
+                '<b>New Entity Type</b>: Add custom entities and templates.',
+                '<b>Create/Restore Campaign Backup</b>: Save or recover a full campaign archive.',
+                '<b>Cross-campaign Asset Library</b>: Export/import NPCs, Objects, and Maps with media bundles.',
+                '<b>Set SwarmUI Path</b>: Point the portrait generator at your SwarmUI installation.',
             ],
             'accordion_data_system',
         ),
@@ -1019,8 +1111,9 @@ def build_user_manual(shots, menu_data, py_files):
             'Launch helper tools for session prep and presentation.',
             [
                 '<b>Generate Scenario</b>, <b>Scenario Builder Wizard</b>, and <b>AI Wizard</b>: Automate outline or content generation.',
-                '<b>Import Scenario</b>: Map external documents into campaign data.',
-                '<b>GM Screen</b>, <b>Scene Flow Viewer</b>, <b>World Map</b>, and <b>Map Tool</b>: Present scenario details or share battle/world maps.',
+                '<b>Import Scenario</b>, <b>Import Creatures from PDF</b>, and <b>Import Equipment from PDF</b>: Convert external sources into campaign data.',
+                '<b>GM Screen</b>, <b>Scene Flow Viewer</b>, <b>World Map</b>, <b>Map Tool</b>, and <b>Whiteboard</b>: Present and prep live session visuals.',
+                '<b>Portrait tools</b>: Generate portraits (SwarmUI), auto-associate NPC portraits, or import folders of art.',
                 '<b>Dice Bar</b> and <b>Open Dice Roller</b>: Quick always-on-top roller and full formula roller.',
                 '<b>Sound &amp; Music Manager</b> and <b>Audio Controls Bar</b>: Organize playlists and control playback.',
                 '<b>Export Scenarios</b> / <b>Export for Foundry</b>: Produce shareable outputs.',
@@ -1033,14 +1126,15 @@ def build_user_manual(shots, menu_data, py_files):
         "<html><head><meta charset='utf-8'><title>GMCampaignDesigner User Manual</title>",
         "<link rel='stylesheet' href='user-manual.css'></head><body>",
         "<header><h1>GMCampaignDesigner User Manual</h1></header>",
-        "<nav><a href='#getting-started'>Getting Started</a><a href='#sidebar-accordion'>Sidebar Accordion</a><a href='#entity-managers'>Entity Managers</a><a href='#detail-windows'>Detail Windows</a><a href='#editor-tools'>Editor Tools</a><a href='#graph-editors'>Graph Editors</a><a href='#gm-screen'>GM Screen</a><a href='#scenario-tools'>Scenario Tools</a><a href='#scene-flow'>Scene Flow</a><a href='#map-tool'>Map Tool</a><a href='#whiteboard'>Whiteboard</a><a href='#world-map'>World Map</a><a href='#dice-roller'>Dice Roller</a><a href='#audio-&-music'>Audio &amp; Music</a><a href='#books'>Books</a><a href='#tips'>Tips</a></nav><div class='container'>"
+        "<nav><a href='#getting-started'>Getting Started</a><a href='#sidebar-accordion'>Sidebar Accordion</a><a href='#systems-&-data'>Systems &amp; Data</a><a href='#entity-managers'>Entity Managers</a><a href='#detail-windows'>Detail Windows</a><a href='#editor-tools'>Editor Tools</a><a href='#random-tables'>Random Tables</a><a href='#graph-editors'>Graph Editors</a><a href='#gm-screen'>GM Screen</a><a href='#scenario-tools'>Scenario Tools</a><a href='#scene-flow'>Scene Flow</a><a href='#map-tool'>Map Tool</a><a href='#whiteboard'>Whiteboard</a><a href='#world-map'>World Map</a><a href='#dice-roller'>Dice Roller</a><a href='#audio-&-music'>Audio &amp; Music</a><a href='#books'>Books</a><a href='#web-viewer'>Web Viewer</a><a href='#keyboard-shortcuts'>Keyboard Shortcuts</a><a href='#tips'>Tips</a></nav><div class='container'>"
     ]
 
     parts.append(section('Getting Started',
         "<ul>"
         "<li>Launch the app: <code>python main_window.py</code>.</li>"
         "<li>Open <b>Data & System &rarr; Change Data Storage</b> to launch the database manager and choose or create a campaign.</li>"
-        "<li>Populate PCs, NPCs, Creatures, Places, Objects, Informations, Clues, and Maps.</li>"
+        "<li>Use <b>Switch System</b> (top of the sidebar) to choose the campaign rules system and a visual theme.</li>"
+        "<li>Populate PCs, NPCs, Creatures, Places, Objects, Informations, Clues, Maps, and Books.</li>"
         "</ul>" + img('main_window', 'Main window overview')
     ))
 
@@ -1053,6 +1147,19 @@ def build_user_manual(shots, menu_data, py_files):
         accordion_html.append("<ul>" + ''.join(f"<li>{item}</li>" for item in bullet_points) + "</ul>")
         accordion_html.append(img(shot_key, f"{title} section"))
     parts.append(section('Sidebar Accordion', ''.join(accordion_html)))
+
+    parts.append(section('Systems & Data',
+        "<p>System selection, backups, and campaign-wide configuration live in the sidebar header and the <b>Data &amp; System</b> accordion.</p>"
+        "<ul>"
+        "<li><b>Switch System:</b> Pick the active rules system and visual theme; the theme colors update all windows and the PC banner.</li>"
+        "<li><b>Manage Campaign Systems:</b> Create, duplicate, and edit systems (default dice formula, supported faces, analyzer config).</li>"
+        "<li><b>Change Data Storage:</b> Choose or create campaign database files.</li>"
+        "<li><b>Customize Fields</b> and <b>New Entity Type</b>: Tailor entity schemas or define new entity types.</li>"
+        "<li><b>Campaign Backups:</b> Create a full archive of the database and assets, or restore from a backup file.</li>"
+        "<li><b>Cross-campaign Asset Library:</b> Export/import NPCs, Objects, and Maps with media bundles; optional online gallery publishing.</li>"
+        "<li><b>Set SwarmUI Path:</b> Point portrait generation to your SwarmUI install.</li>"
+        "</ul>"
+    ))
 
     ent_menu_html = ''.join(f"<li>{item}</li>" for item in entity_menu) if entity_menu else ''
     clues_html = ''
@@ -1072,19 +1179,22 @@ def build_user_manual(shots, menu_data, py_files):
         "<ul>",
         "<li><b>Quick edit:</b> Double-click a row to launch the Generic Editor window. Use the toolbar buttons to add new entries.</li>",
         "<li><b>Right-click options:</b> Duplicate, delete, recolor rows, show portraits, export data, or send a card to the second screen." + ("<ul>" + ent_menu_html + "</ul>" if ent_menu_html else "") + "</li>",
-        "<li><b>Import/Export:</b> Use the dedicated buttons to load or save JSON, or open the AI Wizard for assisted authoring.</li>",
+        "<li><b>Import/Export:</b> Use JSON import/export, the AI Wizard for assisted authoring, or Import Text (Web) for scenarios, creatures, and objects.</li>",
+        "<li><b>AI tools:</b> The AI Wizard can generate NPCs, scenarios, and beats with consistency checks; Objects also support AI Categorize for quick classification.</li>",
+        "<li><b>Bulk media:</b> Maps can import folders of images; Books can import PDFs or directories of PDFs.</li>",
         "<li><b>Second screen:</b> Display selected fields on a player-facing monitor from the context menu.</li>",
         "</ul>",
+        "<p><b>Web text import:</b> Click <i>Import Text (Web)</i> to open the embedded browser, select text on a page, then click Import (or press <code>Ctrl+Shift+I</code>) to open the mapping dialog.</p>",
         clues_html,
         ''.join(img(f"entity_{k}", f"{k.title()} manager") for k in [
-            'scenarios', 'pcs', 'npcs', 'creatures', 'factions', 'places', 'objects', 'informations', 'clues', 'maps'
+            'scenarios', 'pcs', 'npcs', 'creatures', 'factions', 'places', 'objects', 'informations', 'clues', 'maps', 'books'
         ])
     ]
     entity_body = ''.join(part for part in entity_parts if part)
     parts.append(section('Entity Managers', entity_body))
 
     detail_body = ''.join([
-        "<p><b>EntityDetailFactory</b> renders rich detail viewsâ€”used inside the GM Screen and any pop-out detail window. Select a scenario and choose <i>Open in GM Screen</i> (from the scenario list) or open the GM Screen from Utilities, then pick a tab to see the structured layout with collapsible scenes, linked NPC tables, and quick navigation.</p>",
+        "<p><b>EntityDetailFactory</b> renders rich detail views used inside the GM Screen and any pop-out detail window. Select a scenario and choose <i>Open in GM Screen</i> (from the scenario list) or open the GM Screen from Utilities, then pick a tab to see the structured layout with collapsible scenes, linked NPC tables, and quick navigation.</p>",
         "<p>The preview below shows the standalone layout with an <b>Edit</b> button that reopens the Generic Editor for the same record.</p>",
         img('scenario_detail', 'Scenario detail view')
     ])
@@ -1098,11 +1208,21 @@ def build_user_manual(shots, menu_data, py_files):
         "<li><b>Linked lists:</b> Multiselect comboboxes let you associate NPCs, Places, Factions, and more.</li>",
         "<li><b>Portraits & files:</b> Manage artwork attachments directly from the editor.</li>",
         "</ul>",
+        "<p><b>Portrait workflow:</b> Add multiple portraits, set a primary portrait, search the web for images, paste from the clipboard, or generate art via SwarmUI (requires the SwarmUI path in Data &amp; System).</p>",
         img('scenario_editor', 'Generic Editor window'),
         "<p>Use <b>Data & System &rarr; Customize Fields</b> to tailor the schema per entity. The editor below lets you add new fields, set types, and choose linked entities.</p>",
         img('custom_fields_editor', 'Custom Fields Editor')
     ])
     parts.append(section('Editor Tools', editor_body))
+
+    parts.append(section('Random Tables',
+        "<p>Create and roll random tables for inspiration or procedural prep. You can open the editor from <b>Relations &amp; Graphs &rarr; Create Random Table</b>, or add a Random Tables panel inside the GM Screen.</p>"
+        "<ul>"
+        "<li><b>Browse &amp; filter:</b> Filter by category, style, or tag and preview table metadata.</li>"
+        "<li><b>Rolls:</b> Roll once or multiple times; results are stored in a running history.</li>"
+        "<li><b>Edit &amp; import:</b> Edit tables, import entries from text, or jump to the built-in Plot Twists table.</li>"
+        "</ul>"
+    ))
 
     ge_node_html = ''.join(f"<li>{i}</li>" for i in node_items) if node_items else ''
     ge_link_html = ''
@@ -1125,6 +1245,11 @@ def build_user_manual(shots, menu_data, py_files):
 
     parts.append(section('GM Screen',
         "<p>The GM Screen consolidates scenario prep: select a scenario to open tabs for NPCs, Places, scenes, and notes. Use <code>Ctrl+F</code> for instant search, toggle the PC banner for quick reference, and click any linked entity to open its detail frame.</p>"
+        "<ul>"
+        "<li><b>PC banner:</b> A one-line, scrollable summary of the party that follows the active theme.</li>"
+        "<li><b>Panels:</b> Add panels such as Scene Flow, Random Tables, or World Map via the layout manager.</li>"
+        "<li><b>Quick navigation:</b> Collapsible scenes, linked tables, and detail pop-outs keep prep focused.</li>"
+        "</ul>"
         + img('gm_screen', 'GM Screen overview')
     ))
 
@@ -1134,6 +1259,7 @@ def build_user_manual(shots, menu_data, py_files):
         "<li><b>Scenario Builder Wizard:</b> Plan scenes step-by-step, link NPCs/Places/Maps, and preview a scene flow before saving.</li>"
         "<li><b>Scenario Generator:</b> Configure prompts and let the AI draft outline sections you can review and tweak.</li>"
         "<li><b>Scenario Importer:</b> Map headings from external documents into template fields before saving.</li>"
+        "<li><b>PDF Importers:</b> Utilities include Creature and Equipment importers that extract entries from PDFs with a review step.</li>"
         "</ul>"
         + img('scenario_builder', 'Scenario Builder Wizard') + img('scenario_generator', 'Scenario Generator') + img('scenario_importer', 'Scenario Importer')
     ))
@@ -1246,10 +1372,38 @@ def build_user_manual(shots, menu_data, py_files):
         "</ul>"
         + img('entity_books', 'Books Manager') + img('book_viewer', 'Book Viewer')
     ))
+
+    parts.append(section('Web Viewer',
+        "<p>The project includes a lightweight web server for remote viewing and collaboration.</p>"
+        "<ul>"
+        "<li><b>Start:</b> Run <code>python -m modules.web.GM_webviewer</code> (or <code>start_webserver.sh</code> on Linux/macOS).</li>"
+        "<li><b>Login:</b> Register an account, then browse NPCs, Places, Factions, News, Journals, and Clues.</li>"
+        "<li><b>Clues board:</b> Drag clues, create links, and save positions.</li>"
+        "<li><b>Media:</b> Portraits and uploaded assets are served from the active campaign.</li>"
+        "</ul>"
+    ))
+
+    parts.append(section('Keyboard Shortcuts',
+        "<ul>"
+        "<li><b>F1</b>: Open GM Screen.</li>"
+        "<li><b>F2</b>: Open Map Tool.</li>"
+        "<li><b>F3</b>: Open Whiteboard.</li>"
+        "<li><b>F4</b>: Open Scenario Builder Wizard.</li>"
+        "<li><b>F5</b>: Open World Map.</li>"
+        "<li><b>F6</b>: Change Data Storage.</li>"
+        "<li><b>F7</b>: Open Sound &amp; Music Manager.</li>"
+        "<li><b>F8</b>: Open Dice Roller.</li>"
+        "<li><b>F12</b>: Exit the app.</li>"
+        "<li><b>Ctrl+F</b>: Search inside the GM Screen.</li>"
+        "<li><b>Ctrl+Shift+I</b>: Send selected text from the Web Text Import browser.</li>"
+        "</ul>"
+    ))
     parts.append(section('Tips',
         "<div class='tip'><b>Screenshots:</b> Run <code>python scripts/generate_docs.py</code> to refresh this manual after UI changes.</div>"
         "<div class='tip'><b>Exports:</b> Use <i>Export Scenarios</i> or <i>Export for Foundry</i> (Utilities section) to share content.</div>"
         "<div class='tip'><b>Portrait workflow:</b> Generate or link portraits from the Utilities section; double-click a portrait in any list to pop it out.</div>"
+        "<div class='tip'><b>AI settings:</b> Configure the local AI endpoint in <code>config/config.ini</code> under the <code>[AI]</code> section.</div>"
+        "<div class='tip'><b>Logging:</b> Enable logs in <code>config/config.ini</code> to troubleshoot AI imports and automated workflows.</div>"
     ))
 
     parts.append("</div></body></html>")
