@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import importlib.util
 import json
+import os
 import sys
 from dataclasses import dataclass
 from datetime import datetime
@@ -359,6 +360,26 @@ def select_gui() -> str | None:
     return "tk"
 
 
+def _default_storage_path() -> str:
+    if sys.platform.startswith("win"):
+        base_dir = os.environ.get("LOCALAPPDATA") or os.environ.get("APPDATA")
+        if base_dir:
+            return str(Path(base_dir) / "GMCampaignDesigner" / "webview")
+        return str(Path.home() / "AppData" / "Local" / "GMCampaignDesigner" / "webview")
+    if sys.platform == "darwin":
+        return str(
+            Path.home()
+            / "Library"
+            / "Application Support"
+            / "GMCampaignDesigner"
+            / "webview"
+        )
+    base_dir = os.environ.get("XDG_STATE_HOME") or os.environ.get("XDG_DATA_HOME")
+    if base_dir:
+        return str(Path(base_dir) / "gmcampaigndesigner" / "webview")
+    return str(Path.home() / ".local" / "share" / "gmcampaigndesigner" / "webview")
+
+
 def main() -> None:
     args = parse_args()
     webview.settings["OPEN_DEVTOOLS_IN_DEBUG"] = False
@@ -385,7 +406,12 @@ def main() -> None:
             resizable=True,
             js_api=api,
         )
-    webview.start(gui=select_gui(), debug=True)
+    webview.start(
+        gui=select_gui(),
+        debug=True,
+        private_mode=False,
+        storage_path=_default_storage_path(),
+    )
 
 
 if __name__ == "__main__":
