@@ -36,6 +36,7 @@ from modules.ui.chatbot_dialog import (
     open_chatbot_dialog,
     _DEFAULT_NAME_FIELD_OVERRIDES as CHATBOT_NAME_OVERRIDES,
 )
+from modules.ui.webview.gm_browser_tab import create_gm_browser_frame
 from modules.objects.loot_generator_panel import LootGeneratorPanel
 from modules.scenarios.random_tables_panel import RandomTablesPanel
 from modules.whiteboard.controllers.whiteboard_controller import WhiteboardController
@@ -185,6 +186,7 @@ class GMScreenView(ctk.CTkFrame):
             "World Map",
             "Map Tool",
             "Scene Flow",
+            "Web Browser",
             "Loot Generator",
             "Whiteboard",
             "Random Tables",
@@ -1245,6 +1247,13 @@ class GMScreenView(ctk.CTkFrame):
                     meta["state"] = frame.get_state()
                 else:
                     meta.pop("state", None)
+            elif meta.get("kind") == "web_browser":
+                frame = tab_info.get("content_frame")
+                url = getattr(frame, "current_url", "")
+                if url:
+                    meta["url"] = url
+                else:
+                    meta.pop("url", None)
             elif meta.get("kind") == "whiteboard":
                 meta.pop("controller", None)
             layout_tabs.append(meta)
@@ -1460,6 +1469,8 @@ class GMScreenView(ctk.CTkFrame):
             self.open_loot_generator_tab(title=title or "Loot Generator")
         elif kind == "random_tables":
             self.open_random_tables_tab(title=title or "Random Tables", initial_state=tab_def.get("state"))
+        elif kind == "web_browser":
+            self.open_web_browser_tab(title=title or "Web Browser", url=tab_def.get("url"))
         elif kind == "whiteboard":
             self.open_whiteboard_tab(title=title or "Whiteboard")
         elif kind == "puzzle_display":
@@ -1945,6 +1956,27 @@ class GMScreenView(ctk.CTkFrame):
             layout_meta={"kind": "scene_flow", "scenario_title": scenario_title, "host": "rich"},
         )
 
+    def open_web_browser_tab(self, title=None, url=None):
+        """Open an embedded web browser inside a GM-screen tab."""
+        if getattr(self, "_rich_host", None) is None or not self._rich_host.winfo_exists():
+            self._rich_host = ctk.CTkFrame(self)
+
+        container = create_gm_browser_frame(self._rich_host, initial_url=url)
+        self._make_fullbleed(container)
+
+        def factory(master, initial_url=url):
+            host_parent = master if master is not None else self._rich_host
+            frame = create_gm_browser_frame(host_parent, initial_url=initial_url)
+            self._make_fullbleed(frame)
+            return frame
+
+        self.add_tab(
+            title or "Web Browser",
+            container,
+            content_factory=factory,
+            layout_meta={"kind": "web_browser", "url": url, "host": "rich"},
+        )
+
 
     def open_loot_generator_tab(self, title=None):
         """Open the embedded loot generator inside the GM screen."""
@@ -2255,6 +2287,9 @@ class GMScreenView(ctk.CTkFrame):
             return
         elif entity_type == "Scene Flow":
             self.open_scene_flow_tab()
+            return
+        elif entity_type == "Web Browser":
+            self.open_web_browser_tab()
             return
         elif entity_type == "Loot Generator":
             self.open_loot_generator_tab()
