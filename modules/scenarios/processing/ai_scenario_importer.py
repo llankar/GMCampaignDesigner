@@ -71,6 +71,7 @@ def request_outline(client, compressed_context: str, chunk_range_hint: str, sour
         f"{prompt_prefix}"
         f"Source: {source_label}\n"
         "Use the provided chunk summaries (with token ranges) as your evidence.\n"
+        "Keep the original language.\n\n"
         "If uncertain, prefer omitting details over inventing them.\n\n"
         f"Chunk map:\n{chunk_range_hint or 'No chunk metadata available.'}\n\n"
         "JSON schema:\n" + json.dumps(outline_schema, ensure_ascii=False, indent=2) + "\n\n"
@@ -103,6 +104,7 @@ def request_outline(client, compressed_context: str, chunk_range_hint: str, sour
 def expand_summary(client, title: str, summary_draft: str, compressed_context: str, chunk_range_hint: str) -> str:
     prompt_summary = (
         "Rewrite the following scenario summary into a richer, evocative, GM-friendly 2–4 paragraph summary.\n"
+        "- Keep the original language.\n\n"
         "- Keep it consistent with the source text.\n"
         "- Avoid rules jargon.\n"
         "Return PLAIN TEXT only.\n\n"
@@ -124,6 +126,7 @@ def expand_scenes(client, title: str, outline_scenes, compressed_context: str, c
     scenes_schema = {"Scenes": [{"Title": "text", "Text": "multi-paragraph detailed scene"}]}
     prompt_scenes = (
         "Using the outline below and the source text, produce detailed scene writeups.\n"
+        "Keep the original language.\n\n"
         "For each scene, include a 1–2 paragraph overview plus bullet points for: key beats, conflicts/obstacles, clues/hooks, transitions, important locations, and involved NPCs.\n"
         "Return STRICT JSON only with this schema:\n" + json.dumps(scenes_schema, ensure_ascii=False, indent=2) + "\n\n"
         f"Title: {title}\n"
@@ -178,6 +181,7 @@ def extract_entities(client, compressed_context: str, chunk_range_hint: str, sta
     }
     prompt_entities = (
         "Extract RPG entities from the text. Output STRICT JSON only, matching the schema below.\n"
+        "Keep the original language.\n\n"
         "If stats are present (even from other systems), convert into concise creature 'Stats' similar to examples. Do not invent facts.\n\n"
         "Schema:\n" + json.dumps(entities_schema, ensure_ascii=False, indent=2) + "\n\n"
         "Examples of desired 'Stats' formatting from the active DB:\n" + json.dumps(stats_examples, ensure_ascii=False, indent=2) + "\n\n"
