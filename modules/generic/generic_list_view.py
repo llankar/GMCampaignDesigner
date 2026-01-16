@@ -2854,6 +2854,11 @@ class GenericListView(ctk.CTkFrame):
             state=(tk.NORMAL if self.copied_items else tk.DISABLED),
             command=lambda: self.paste_item(iid)
         )
+        if item and self.model_wrapper.entity_type == "npcs":
+            menu.add_command(
+                label="Turn to PC",
+                command=lambda: self.turn_npc_to_pc(iid),
+            )
         menu.add_command(
             label="Delete",
             command=lambda: self.delete_item(iid)
@@ -3013,6 +3018,41 @@ class GenericListView(ctk.CTkFrame):
             if self.shelf_view:
                 self.shelf_view.refresh_selection()
             self._update_bulk_controls()
+
+    def turn_npc_to_pc(self, iid):
+        if self.model_wrapper.entity_type != "npcs":
+            return
+        targets = self._resolve_action_target_bases(iid)
+        if not targets:
+            return
+        log_info(
+            f"Turning NPCs into PCs: {targets}",
+            func_name="GenericListView.turn_npc_to_pc",
+        )
+        npc_items = []
+        remaining_items = []
+        for item in self.items:
+            base_id = self._get_base_id(item)
+            if base_id in targets:
+                npc_items.append(item)
+            else:
+                remaining_items.append(item)
+        if not npc_items:
+            return
+        pc_wrapper = GenericModelWrapper("pcs")
+        pc_items = pc_wrapper.load_items()
+        for item in npc_items:
+            pc_items.append(copy.deepcopy(item))
+        pc_wrapper.save_items(pc_items)
+
+        for base_id in targets:
+            if base_id in self.row_colors:
+                self._save_row_color(base_id, None)
+        self.items = remaining_items
+        self.selected_iids.difference_update(targets)
+        self.model_wrapper.save_items(self.items)
+        self._save_list_order()
+        self.filter_items(self.search_var.get())
 
     def open_in_gm_screen(self, iid):
         log_info(f"Opening {self.model_wrapper.entity_type} in GM screen: {iid}", func_name="GenericListView.open_in_gm_screen")
