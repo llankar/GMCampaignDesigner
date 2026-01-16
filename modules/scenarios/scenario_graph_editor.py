@@ -1024,6 +1024,22 @@ class ScenarioGraphEditor(ctk.CTkFrame):
         except ValueError:
             return str(text)
 
+    def _dedupe_display_lines(self, lines):
+        if not lines:
+            return []
+        deduped = []
+        seen = set()
+        for line in lines:
+            cleaned = re.sub(r"\s+", " ", str(line or "")).strip()
+            if not cleaned:
+                continue
+            key = cleaned.lower()
+            if key in seen:
+                continue
+            seen.add(key)
+            deduped.append(cleaned)
+        return deduped
+
     def _estimate_scene_card_dimensions(
         self,
         text: str,
@@ -1043,6 +1059,7 @@ class ScenarioGraphEditor(ctk.CTkFrame):
 
         bullet_lines, truncated = self._summarize_scene_text(text, max_lines=4)
         bullet_lines = [self._truncate_line(line, 96) for line in bullet_lines]
+        bullet_lines = self._dedupe_display_lines(bullet_lines)
         more_line_needed = truncated
         if more_line_needed and len(bullet_lines) >= 4:
             bullet_lines = bullet_lines[:3]
@@ -3155,6 +3172,7 @@ class ScenarioGraphEditor(ctk.CTkFrame):
 
         bullet_lines, truncated = self._summarize_scene_text(full_text, max_lines=4)
         bullet_lines = [self._truncate_line(line, 96) for line in bullet_lines]
+        bullet_lines = self._dedupe_display_lines(bullet_lines)
         more_line_needed = truncated
         if more_line_needed and len(bullet_lines) >= 4:
             bullet_lines = bullet_lines[:3]
