@@ -83,13 +83,14 @@ def summarize_chunks(
             "Summarize the following RPG source text chunk.\n"
             "Return 3-6 sentences focusing on concrete events, NPCs, places, and clues.\n"
             "Do not invent facts; rely only on this chunk.\n\n"
+            "Keep the original language.\n\n"
             f"Source: {source_label}\n"
             f"Chunk label: {chunk.label} (tokens {chunk.start_token}-{chunk.end_token})\n"
             f"Text:\n{chunk.text}"
         )
         try:
             summary = client.chat([
-                {"role": "system", "content": "Summarize RPG source text chunks succinctly."},
+                {"role": "system", "content": "Summarize RPG source text chunks succinctly. "},
                 {"role": "user", "content": prompt},
             ])
         except Exception as exc:
