@@ -489,6 +489,12 @@ class GenericListView(ctk.CTkFrame):
             ctk.CTkButton(self.search_frame, text="AI Wizard",
                           command=self.open_ai_wizard)\
                 .pack(side="left", padx=5)
+        if self.model_wrapper.entity_type in ("pcs", "npcs"):
+            ctk.CTkButton(
+                self.search_frame,
+                text="Create Factions",
+                command=self.create_factions_from_entities,
+            ).pack(side="left", padx=5)
         ctk.CTkButton(self.search_frame, text="Auto Generate",
             command=self.open_auto_generation)\
         .pack(side="left", padx=5)
@@ -3213,6 +3219,69 @@ class GenericListView(ctk.CTkFrame):
         messagebox.showinfo(
             "Merge Complete",
             f"Merged {len(duplicates)} groups and removed {removed_count} duplicate entries.",
+        )
+
+    def _iter_faction_names(self, item):
+        raw = item.get("Factions") or []
+        if isinstance(raw, str):
+            values = [raw]
+        elif isinstance(raw, (list, tuple, set)):
+            values = list(raw)
+        elif isinstance(raw, dict):
+            values = [raw]
+        else:
+            values = []
+        for value in values:
+            if isinstance(value, dict):
+                name = value.get("Name") or value.get("text")
+            else:
+                name = value
+            if name is None:
+                continue
+            name = str(name).strip()
+            if name:
+                yield name
+
+    def create_factions_from_entities(self):
+        if self.model_wrapper.entity_type not in ("pcs", "npcs"):
+            return
+        log_info(
+            f"Creating factions from {self.model_wrapper.entity_type}",
+            func_name="GenericListView.create_factions_from_entities",
+        )
+        source_items = self.model_wrapper.load_items()
+        if not source_items:
+            messagebox.showinfo(
+                "Create Factions",
+                "No entries were found to scan for factions.",
+            )
+            return
+        faction_wrapper = GenericModelWrapper("factions")
+        faction_items = faction_wrapper.load_items()
+        existing = {
+            self._normalize_unique_value(item.get("Name"))
+            for item in faction_items
+            if item.get("Name")
+        }
+        created = 0
+        for item in source_items:
+            for name in self._iter_faction_names(item):
+                key = self._normalize_unique_value(name)
+                if not key or key in existing:
+                    continue
+                faction_items.append({"Name": name})
+                existing.add(key)
+                created += 1
+        if not created:
+            messagebox.showinfo(
+                "Create Factions",
+                "No new factions were found in the selected entries.",
+            )
+            return
+        faction_wrapper.save_items(faction_items)
+        messagebox.showinfo(
+            "Create Factions",
+            f"Created {created} faction(s).",
         )
 
     def import_map_directory(self):
