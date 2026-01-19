@@ -23,6 +23,7 @@ class DossierExportOptions:
     layout_key: str
     pagination_mode: str
     include_toc: bool
+    include_branding: bool
     output_mode: str
     output_format: str
     output_target: str
@@ -200,7 +201,7 @@ def _add_table_of_contents(document, groups: list[EntityGroup], preset) -> None:
 def _build_document(groups: list[EntityGroup], options: DossierExportOptions) -> Document:
     theme_key = get_theme()
     document = Document()
-    preset = apply_layout(document, options.layout_key)
+    preset = apply_layout(document, options.layout_key, options.include_branding)
     theme_meta = apply_dossier_theme(document, theme_key)
 
     document.add_heading("Campaign Dossier", level=1)
@@ -276,7 +277,7 @@ def export_campaign_dossier(options: DossierExportOptions) -> list[str]:
             fields = template.get("fields", [])
             for record in group.items:
                 document = Document()
-                preset = apply_layout(document, options.layout_key)
+                preset = apply_layout(document, options.layout_key, options.include_branding)
                 apply_dossier_theme(document, get_theme())
                 document.add_heading(group.label, level=2)
                 document.add_heading(

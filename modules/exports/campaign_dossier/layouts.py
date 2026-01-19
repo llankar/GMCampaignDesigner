@@ -47,30 +47,33 @@ LAYOUT_PRESETS = (
         width_in=8.5,
         height_in=11.0,
         margin_in=0.6,
-        header_text="Binder Reference",
-        footer_text="GMCampaignDesigner",
         min_font_size_pt=11,
         paragraph_space_before_pt=2,
         paragraph_space_after_pt=3,
         line_spacing=1.15,
-        entity_label_format="{entity}: {name}",
     ),
 )
 
 DEFAULT_LAYOUT_KEY = "pocket_4x6"
+DEFAULT_BRANDING_HEADER = "Binder Reference"
+DEFAULT_BRANDING_FOOTER = "GMCampaignDesigner"
 
 
 def get_layout_presets() -> dict[str, LayoutPreset]:
     return {preset.key: preset for preset in LAYOUT_PRESETS}
 
 
-def _apply_header_footer(section, preset: LayoutPreset) -> None:
-    if preset.header_text:
+def _apply_header_footer(section, preset: LayoutPreset, include_branding: bool) -> None:
+    if not include_branding:
+        return
+    header_text = preset.header_text or DEFAULT_BRANDING_HEADER
+    footer_text = preset.footer_text or DEFAULT_BRANDING_FOOTER
+    if header_text:
         header_paragraph = section.header.paragraphs[0]
-        header_paragraph.text = preset.header_text
-    if preset.footer_text:
+        header_paragraph.text = header_text
+    if footer_text:
         footer_paragraph = section.footer.paragraphs[0]
-        footer_paragraph.text = preset.footer_text
+        footer_paragraph.text = footer_text
 
 
 def _apply_document_style(document, preset: LayoutPreset) -> None:
@@ -93,7 +96,7 @@ def format_entity_label(preset: LayoutPreset, entity_label: str, name: str) -> s
     return name
 
 
-def apply_layout(document, preset_key: str) -> LayoutPreset:
+def apply_layout(document, preset_key: str, include_branding: bool = False) -> LayoutPreset:
     presets = get_layout_presets()
     preset = presets.get(preset_key) or presets[DEFAULT_LAYOUT_KEY]
     section = document.sections[0]
@@ -103,6 +106,6 @@ def apply_layout(document, preset_key: str) -> LayoutPreset:
     section.bottom_margin = Inches(preset.margin_in)
     section.left_margin = Inches(preset.margin_in)
     section.right_margin = Inches(preset.margin_in)
-    _apply_header_footer(section, preset)
+    _apply_header_footer(section, preset, include_branding)
     _apply_document_style(document, preset)
     return preset
