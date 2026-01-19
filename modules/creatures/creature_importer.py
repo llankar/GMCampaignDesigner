@@ -4,7 +4,6 @@ import threading
 import customtkinter as ctk
 from tkinter import messagebox, filedialog
 
-from modules.helpers.text_helpers import ai_text_to_rtf_json
 from modules.generic.generic_model_wrapper import GenericModelWrapper
 from modules.ai.local_ai_client import LocalAIClient
 from modules.helpers.logging_helper import (
@@ -15,41 +14,15 @@ from modules.helpers.logging_helper import (
     log_warning,
 )
 from modules.helpers.pdf_review_dialog import PDFReviewDialog
+from modules.importers.pdf_entity_importer import parse_json_relaxed, to_longtext
+from modules.npcs.npc_importer import (
+    build_npc_prompt,
+    import_npc_records,
+    import_npcs_from_json,
+    normalize_npc_payload,
+)
 
 log_module_import(__name__)
-
-
-@log_function
-def parse_json_relaxed(payload: str):
-    """Parse JSON from a possibly noisy AI response."""
-    if not payload:
-        raise RuntimeError("Empty AI response")
-    text = payload.strip()
-    if text.startswith("```"):
-        # Strip optional markdown fences
-        import re as _re
-
-        text = _re.sub(r"^```(json)?", "", text, flags=_re.IGNORECASE).strip()
-        text = text.rstrip("`").strip()
-    try:
-        return json.loads(text)
-    except Exception:
-        pass
-    start = None
-    for idx, ch in enumerate(text):
-        if ch in "[{":
-            start = idx
-            break
-    if start is None:
-        raise RuntimeError("Failed to locate JSON in response")
-    snippet = text[start:]
-    for end in range(len(snippet), max(len(snippet) - 2000, 0), -1):
-        try:
-            return json.loads(snippet[:end])
-        except Exception:
-            continue
-    raise RuntimeError("Failed to parse JSON from AI response")
-
 
 def _normalize_creature_payload(payload):
     """Return the creature list from various payload shapes."""
@@ -61,18 +34,6 @@ def _normalize_creature_payload(payload):
             if isinstance(value, list):
                 return value
     raise ValueError("Payload must be a list of creatures or contain a 'creatures' array")
-
-
-def _to_longtext(value):
-    """Convert plain strings into the rich-text JSON structure used by the DB."""
-    if isinstance(value, dict) and "text" in value:
-        return value
-    if isinstance(value, (list, dict)):
-        try:
-            value = json.dumps(value, ensure_ascii=False, indent=2)
-        except Exception:
-            value = str(value)
-    return ai_text_to_rtf_json(str(value) if value is not None else "")
 
 
 @log_function
@@ -91,11 +52,11 @@ def import_creature_records(payload) -> int:
         item = {
             "Name": raw.get("Name", "Unnamed"),
             "Type": raw.get("Type", ""),
-            "Description": _to_longtext(raw.get("Description", "")),
-            "Weakness": _to_longtext(raw.get("Weakness", "")),
-            "Powers": _to_longtext(raw.get("Powers", "")),
-            "Stats": _to_longtext(raw.get("Stats", "")),
-            "Background": _to_longtext(raw.get("Background", "")),
+            "Description": to_longtext(raw.get("Description", "")),
+            "Weakness": to_longtext(raw.get("Weakness", "")),
+            "Powers": to_longtext(raw.get("Powers", "")),
+            "Stats": to_longtext(raw.get("Stats", "")),
+            "Background": to_longtext(raw.get("Background", "")),
             "Genre": raw.get("Genre", ""),
             "Portrait": raw.get("Portrait", ""),
         }
@@ -120,17 +81,29 @@ class CreatureImportWindow(ctk.CTkToplevel):
 
     def __init__(self, master=None):
         super().__init__(master)
+        self.import_mode = ctk.StringVar(value="Creature")
         self.title("Import Creatures from PDF")
         self.geometry("600x600")
         self.transient(master)
         self.grab_set()
         self.focus_force()
 
-        instruction = ctk.CTkLabel(
+        mode_row = ctk.CTkFrame(self)
+        mode_row.pack(fill="x", padx=10, pady=(10, 0))
+        ctk.CTkLabel(mode_row, text="Import Mode:").pack(side="left", padx=(0, 8))
+        self.mode_selector = ctk.CTkSegmentedButton(
+            mode_row,
+            values=["Creature", "NPC"],
+            variable=self.import_mode,
+            command=self._on_mode_change,
+        )
+        self.mode_selector.pack(side="left")
+
+        self.instruction_label = ctk.CTkLabel(
             self,
             text="Paste creature text/JSON or import a PDF to extract creatures via AI.",
         )
-        instruction.pack(pady=(10, 0), padx=10)
+        self.instruction_label.pack(pady=(10, 0), padx=10)
 
         self.textbox = ctk.CTkTextbox(self, wrap="word", height=400, fg_color="#2B2B2B", text_color="white")
         self.textbox.pack(fill="both", expand=True, padx=10, pady=10)
@@ -151,16 +124,52 @@ class CreatureImportWindow(ctk.CTkToplevel):
         self.status_label = ctk.CTkLabel(status_row, text="Idle")
         self.status_label.pack(side="right", padx=(8, 0))
 
+        self._on_mode_change()
+
+    def _get_mode_config(self) -> dict:
+        mode = self.import_mode.get()
+        if mode == "NPC":
+            return {
+                "label": "NPC",
+                "plural": "NPCs",
+                "slug": "npcs",
+            }
+        return {
+            "label": "Creature",
+            "plural": "Creatures",
+            "slug": "creatures",
+        }
+
+    def _on_mode_change(self, *_):
+        config = self._get_mode_config()
+        self.title(f"Import {config['plural']} from PDF")
+        self.instruction_label.configure(
+            text=(
+                f"Paste {config['label'].lower()} text/JSON or import a PDF to extract "
+                f"{config['plural'].lower()} via AI."
+            )
+        )
+
     def import_pasted_json(self):
+        config = self._get_mode_config()
         text = self.textbox.get("1.0", "end-1c").strip()
         if not text:
-            messagebox.showwarning("No Data", "Please paste JSON describing creatures first.")
+            messagebox.showwarning(
+                "No Data",
+                f"Please paste JSON describing {config['plural'].lower()} first.",
+            )
             return
         try:
-            self._set_status("Importing creatures from JSON...")
+            self._set_status(f"Importing {config['plural'].lower()} from JSON...")
             self._busy(True)
-            count = import_creatures_from_json(text)
-            messagebox.showinfo("Success", f"Imported {count} creature(s) from pasted JSON.")
+            if config["slug"] == "npcs":
+                count = import_npcs_from_json(text)
+            else:
+                count = import_creatures_from_json(text)
+            messagebox.showinfo(
+                "Success",
+                f"Imported {count} {config['label'].lower()}(s) from pasted JSON.",
+            )
         except Exception as exc:
             messagebox.showerror("Import Error", str(exc))
         finally:
@@ -168,9 +177,10 @@ class CreatureImportWindow(ctk.CTkToplevel):
             self._set_status("Idle")
 
     def import_pdf_via_ai(self):
+        config = self._get_mode_config()
         try:
             path = filedialog.askopenfilename(
-                title="Select Creature PDF",
+                title=f"Select {config['label']} PDF",
                 filetypes=[("PDF Files", "*.pdf"), ("All Files", "*.*")],
             )
         except Exception as exc:
@@ -200,9 +210,13 @@ class CreatureImportWindow(ctk.CTkToplevel):
         threading.Thread(target=worker, daemon=True).start()
 
     def ai_parse_textarea(self):
+        config = self._get_mode_config()
         raw = self.textbox.get("1.0", "end-1c").strip()
         if not raw:
-            messagebox.showwarning("No Text", "Please paste creature source text first.")
+            messagebox.showwarning(
+                "No Text",
+                f"Please paste {config['label'].lower()} source text first.",
+            )
             return
 
         def worker():
@@ -257,9 +271,31 @@ class CreatureImportWindow(ctk.CTkToplevel):
         return selection["text"]
 
     def _ai_extract_and_import(self, raw_text: str, source_label: str = ""):
-        log_info(f"Running creature AI import for {source_label or 'input'}", func_name="CreatureImportWindow._ai_extract_and_import")
+        config = self._get_mode_config()
+        log_info(
+            f"Running {config['label'].lower()} AI import for {source_label or 'input'}",
+            func_name="CreatureImportWindow._ai_extract_and_import",
+        )
         self._set_status("Contacting AI...")
         client = LocalAIClient()
+
+        if config["slug"] == "npcs":
+            prompt = build_npc_prompt(raw_text, source_label)
+            response = client.chat([
+                {"role": "system", "content": "Extract structured NPC information as strict JSON."},
+                {"role": "user", "content": prompt},
+            ])
+            parsed = parse_json_relaxed(response)
+            npcs = normalize_npc_payload(parsed)
+            count = import_npc_records(npcs)
+
+            pretty = json.dumps({"npcs": npcs}, ensure_ascii=False, indent=2)
+            self._set_text(pretty)
+            self._info(
+                "Import Complete",
+                f"Imported {count} NPC(s) from {source_label or 'AI input'}.",
+            )
+            return
 
         wrapper = GenericModelWrapper("creatures")
         existing = wrapper.load_items()
@@ -314,7 +350,10 @@ class CreatureImportWindow(ctk.CTkToplevel):
 
         pretty = json.dumps({"creatures": creatures}, ensure_ascii=False, indent=2)
         self._set_text(pretty)
-        self._info("Import Complete", f"Imported {count} creature(s) from {source_label or 'AI input'}.")
+        self._info(
+            "Import Complete",
+            f"Imported {count} creature(s) from {source_label or 'AI input'}.",
+        )
 
     def _set_text(self, value: str):
         def _do():
@@ -341,7 +380,7 @@ class CreatureImportWindow(ctk.CTkToplevel):
                 else:
                     self.progress.stop()
                 state = "disabled" if active else "normal"
-                for btn in (self.btn_import_pdf, self.btn_ai_parse, self.btn_import_text):
+                for btn in (self.btn_import_pdf, self.btn_ai_parse, self.btn_import_text, self.mode_selector):
                     try:
                         btn.configure(state=state)
                     except Exception:
