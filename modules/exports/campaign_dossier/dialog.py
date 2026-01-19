@@ -16,7 +16,7 @@ class CampaignDossierExportDialog(ctk.CTkToplevel):
         self.resizable(False, False)
 
         self.layout_var = tk.StringVar(value=DEFAULT_LAYOUT_KEY)
-        self.pagination_var = tk.StringVar(value="entity")
+        self.pagination_var = tk.StringVar(value="section")
         self.output_mode_var = tk.StringVar(value="single")
         self.format_var = tk.StringVar(value="docx")
         self.include_toc_var = tk.BooleanVar(value=True)
@@ -59,9 +59,15 @@ class CampaignDossierExportDialog(ctk.CTkToplevel):
         ).pack(anchor="w")
         ctk.CTkRadioButton(
             pagination_frame,
-            text="Section per page",
+            text="Section per page (multiple entities)",
             variable=self.pagination_var,
             value="section",
+        ).pack(anchor="w")
+        ctk.CTkRadioButton(
+            pagination_frame,
+            text="Continuous (no forced breaks)",
+            variable=self.pagination_var,
+            value="continuous",
         ).pack(anchor="w")
 
         output_mode_frame = ctk.CTkFrame(container, fg_color="transparent")
