@@ -12,7 +12,7 @@ class CampaignDossierExportDialog(ctk.CTkToplevel):
     def __init__(self, master):
         super().__init__(master)
         self.title("Export Campaign Dossier")
-        self.geometry("460x420")
+        self.geometry("460x460")
         self.resizable(False, False)
 
         self.layout_var = tk.StringVar(value=DEFAULT_LAYOUT_KEY)
@@ -20,6 +20,7 @@ class CampaignDossierExportDialog(ctk.CTkToplevel):
         self.output_mode_var = tk.StringVar(value="single")
         self.format_var = tk.StringVar(value="docx")
         self.include_toc_var = tk.BooleanVar(value=True)
+        self.include_branding_var = tk.BooleanVar(value=False)
 
         container = ctk.CTkFrame(self)
         container.pack(fill="both", expand=True, padx=16, pady=16)
@@ -99,6 +100,11 @@ class CampaignDossierExportDialog(ctk.CTkToplevel):
             text="Include table of contents",
             variable=self.include_toc_var,
         ).pack(anchor="w")
+        ctk.CTkCheckBox(
+            toc_frame,
+            text="Include binder branding (header/footer)",
+            variable=self.include_branding_var,
+        ).pack(anchor="w", pady=(4, 0))
 
         button_row = ctk.CTkFrame(container, fg_color="transparent")
         button_row.pack(fill="x", pady=(8, 0))
@@ -130,6 +136,7 @@ class CampaignDossierExportDialog(ctk.CTkToplevel):
             layout_key=self.layout_var.get(),
             pagination_mode=self.pagination_var.get(),
             include_toc=self.include_toc_var.get(),
+            include_branding=self.include_branding_var.get(),
             output_mode=output_mode,
             output_format=output_format,
             output_target=target,
