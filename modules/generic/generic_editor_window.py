@@ -1552,7 +1552,23 @@ class GenericEditorWindow(ctk.CTkToplevel):
         self.destroy()
 
     def _has_required_name(self):
-        key_field = self.model_wrapper._infer_key_field()
+        key_field = None
+        template_fields = None
+        if isinstance(self.template, dict):
+            template_fields = self.template.get("fields")
+        if isinstance(template_fields, list) and template_fields:
+            for field in template_fields:
+                if not isinstance(field, dict):
+                    continue
+                field_name = field.get("name")
+                if not field_name:
+                    continue
+                if field_name in {"Portrait", "Image", "Audio"}:
+                    continue
+                key_field = field_name
+                break
+        if not key_field:
+            key_field = self.model_wrapper._infer_key_field()
         widget = self.field_widgets.get(key_field)
         if widget is None:
             return bool(str(self.item.get(key_field, "")).strip())
