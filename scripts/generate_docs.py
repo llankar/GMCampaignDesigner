@@ -1111,7 +1111,7 @@ def build_user_manual(shots, menu_data, py_files):
             'Launch helper tools for session prep and presentation.',
             [
                 '<b>Generate Scenario</b>, <b>Scenario Builder Wizard</b>, and <b>AI Wizard</b>: Automate outline or content generation.',
-                '<b>Import Scenario</b>, <b>Import Creatures from PDF</b>, and <b>Import Equipment from PDF</b>: Convert external sources into campaign data.',
+                '<b>Import Scenario</b>, <b>Import NPCs/Creatures from PDF</b>, and <b>Import Equipment from PDF</b>: Convert external sources into campaign data.',
                 '<b>GM Screen</b>, <b>Scene Flow Viewer</b>, <b>World Map</b>, <b>Map Tool</b>, and <b>Whiteboard</b>: Present and prep live session visuals.',
                 '<b>Portrait tools</b>: Generate portraits (SwarmUI), auto-associate NPC portraits, or import folders of art.',
                 '<b>Dice Bar</b> and <b>Open Dice Roller</b>: Quick always-on-top roller and full formula roller.',

@@ -879,7 +879,7 @@ class MainWindow(ctk.CTk):
             ("generate_scenario", "Generate Scenario", self.open_scenario_generator),
             ("scenario_builder", "Scenario Builder Wizard", self.open_scenario_builder),
             ("import_scenario", "Import Scenario", self.open_scenario_importer),
-            ("import_creatures_pdf", "Import Creatures from PDF", self.open_creature_importer),
+            ("import_creatures_pdf", "Import NPCs/Creatures from PDF", self.open_creature_importer),
             ("import_objects_pdf", "Import Equipment from PDF", self.open_object_importer),
             ("gm_screen", "Open GM Screen", self.open_gm_screen),
             ("export_scenarios", "Export Scenarios", self.preview_and_export_scenarios),
