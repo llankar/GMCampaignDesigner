@@ -24,13 +24,19 @@ THEME_STYLES = {
     },
 }
 
+MIN_FONT_SIZE_PT = 14
+
+
+def _apply_font_size(font, size_pt: float) -> None:
+    font.size = Pt(max(size_pt, MIN_FONT_SIZE_PT))
+
 
 def apply_dossier_theme(document, theme_key: str) -> dict:
     style = THEME_STYLES.get(theme_key) or THEME_STYLES[THEME_DEFAULT]
 
     normal = document.styles["Normal"]
     normal.font.name = style["font"]
-    normal.font.size = Pt(9)
+    _apply_font_size(normal.font, 9)
 
     for level in range(1, 4):
         style_name = f"Heading {level}"
@@ -41,10 +47,10 @@ def apply_dossier_theme(document, theme_key: str) -> dict:
         heading.font.name = style["heading_font"]
         heading.font.color.rgb = style["accent"]
         if level == 1:
-            heading.font.size = Pt(16)
+            _apply_font_size(heading.font, 16)
         elif level == 2:
-            heading.font.size = Pt(12)
+            _apply_font_size(heading.font, 12)
         else:
-            heading.font.size = Pt(10)
+            _apply_font_size(heading.font, 10)
 
     return style

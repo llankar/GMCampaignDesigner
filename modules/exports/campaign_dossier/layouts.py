@@ -57,6 +57,7 @@ LAYOUT_PRESETS = (
 DEFAULT_LAYOUT_KEY = "pocket_4x6"
 DEFAULT_BRANDING_HEADER = "Binder Reference"
 DEFAULT_BRANDING_FOOTER = "GMCampaignDesigner"
+MIN_FONT_SIZE_PT = 14
 
 
 def get_layout_presets() -> dict[str, LayoutPreset]:
@@ -80,7 +81,7 @@ def _apply_document_style(document, preset: LayoutPreset) -> None:
     if preset.min_font_size_pt is None:
         return
     normal_style = document.styles["Normal"]
-    normal_style.font.size = Pt(preset.min_font_size_pt)
+    normal_style.font.size = Pt(max(preset.min_font_size_pt, MIN_FONT_SIZE_PT))
     paragraph_format = normal_style.paragraph_format
     if preset.paragraph_space_before_pt is not None:
         paragraph_format.space_before = Pt(preset.paragraph_space_before_pt)
