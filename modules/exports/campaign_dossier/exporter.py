@@ -11,6 +11,7 @@ from docx.shared import Pt
 from modules.generic.generic_model_wrapper import GenericModelWrapper
 from modules.helpers.logging_helper import log_warning
 from modules.helpers.template_loader import load_entity_definitions, load_template, list_known_entities
+from modules.helpers.text_helpers import deserialize_possible_json, normalize_rtf_json
 from modules.helpers.theme_manager import get_theme
 
 from modules.exports.campaign_dossier.layouts import apply_layout, format_entity_label
@@ -49,16 +50,94 @@ def _sanitize_filename(value: str) -> str:
     return safe or "entity"
 
 
+def _normalize_rtf_payload(value) -> dict:
+    parsed = deserialize_possible_json(value)
+    if isinstance(parsed, dict):
+        normalized = normalize_rtf_json(parsed)
+        return {
+            "text": str(normalized.get("text", "")),
+            "formatting": normalized.get("formatting", {}) or {},
+        }
+    return {"text": str(parsed or ""), "formatting": {}}
+
+
+def _format_rtf_runs(text: str, formatting: dict) -> list[tuple[str, dict]]:
+    if not formatting:
+        return [(text, {})]
+
+    opens: dict[int, list[str]] = {}
+    closes: dict[int, list[str]] = {}
+    for tag in ("bold", "italic", "underline"):
+        ranges = formatting.get(tag, []) or []
+        for start, end in ranges:
+            try:
+                start_index = int(start)
+                end_index = int(end)
+            except (TypeError, ValueError):
+                continue
+            start_index = max(0, min(start_index, len(text)))
+            end_index = max(start_index, min(end_index, len(text)))
+            if start_index == end_index:
+                continue
+            opens.setdefault(start_index, []).append(tag)
+            closes.setdefault(end_index, []).append(tag)
+
+    segments: list[tuple[str, dict]] = []
+    active: set[str] = set()
+    current: list[str] = []
+
+    for index, char in enumerate(text):
+        if index in closes or index in opens:
+            if current:
+                segments.append(
+                    (
+                        "".join(current),
+                        {
+                            "bold": "bold" in active,
+                            "italic": "italic" in active,
+                            "underline": "underline" in active,
+                        },
+                    )
+                )
+                current = []
+            for tag in closes.get(index, []):
+                active.discard(tag)
+            for tag in opens.get(index, []):
+                active.add(tag)
+        current.append(char)
+
+    if current:
+        segments.append(
+            (
+                "".join(current),
+                {
+                    "bold": "bold" in active,
+                    "italic": "italic" in active,
+                    "underline": "underline" in active,
+                },
+            )
+        )
+    return segments
+
+
 def _format_field_value(value) -> list[tuple[str, dict]]:
     if value is None:
         return []
+    value = deserialize_possible_json(value)
     if isinstance(value, dict):
-        text = value.get("text")
-        if text is not None:
-            return [(str(text), value.get("formatting") or {})]
+        if "text" in value or "formatting" in value:
+            payload = _normalize_rtf_payload(value)
+            return _format_rtf_runs(payload.get("text", ""), payload.get("formatting", {}))
         return [(str(value), {})]
     if isinstance(value, list):
-        return [("\n".join(str(item) for item in value if item is not None), {})]
+        segments: list[tuple[str, dict]] = []
+        for item in value:
+            item_segments = _format_field_value(deserialize_possible_json(item))
+            if item_segments:
+                if segments:
+                    segments.append(("\n", {}))
+                segments.extend(item_segments)
+        return segments
     return [(str(value), {})]
 
 
