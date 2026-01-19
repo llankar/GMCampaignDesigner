@@ -82,7 +82,7 @@ class CreatureImportWindow(ctk.CTkToplevel):
     def __init__(self, master=None):
         super().__init__(master)
         self.import_mode = ctk.StringVar(value="Creature")
-        self.title("Import Creatures from PDF")
+        self.title("Import NPCs/Creatures from PDF")
         self.geometry("600x600")
         self.transient(master)
         self.grab_set()
