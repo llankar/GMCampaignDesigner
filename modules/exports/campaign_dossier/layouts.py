@@ -57,7 +57,7 @@ LAYOUT_PRESETS = (
 DEFAULT_LAYOUT_KEY = "pocket_4x6"
 DEFAULT_BRANDING_HEADER = "Binder Reference"
 DEFAULT_BRANDING_FOOTER = "GMCampaignDesigner"
-MIN_FONT_SIZE_PT = 1
+MIN_FONT_SIZE_PT = 14
 
 
 def get_layout_presets() -> dict[str, LayoutPreset]:

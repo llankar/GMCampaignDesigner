@@ -24,7 +24,7 @@ THEME_STYLES = {
     },
 }
 
-MIN_FONT_SIZE_PT = 1
+MIN_FONT_SIZE_PT = 14
 
 
 def _apply_font_size(font, size_pt: float) -> None:
