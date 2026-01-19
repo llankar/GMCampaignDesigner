@@ -34,8 +34,9 @@ def apply_dossier_theme(document, theme_key: str) -> dict:
 
     for level in range(1, 4):
         style_name = f"Heading {level}"
-        heading = document.styles.get(style_name)
-        if heading is None:
+        try:
+            heading = document.styles[style_name]
+        except KeyError:
             continue
         heading.font.name = style["heading_font"]
         heading.font.color.rgb = style["accent"]
