@@ -79,6 +79,12 @@ from modules.generic.cross_campaign_asset_library import CrossCampaignAssetLibra
 from modules.exports.campaign_dossier.dialog import (
     open_campaign_dossier_exporter as open_campaign_dossier_exporter_dialog,
 )
+from modules.exports.campaign_dossier.layouts import (
+    DEFAULT_LAYOUT_KEY,
+    apply_layout,
+    format_entity_label,
+    get_layout_presets,
+)
 from modules.helpers import text_helpers, dice_markup
 from db.db import initialize_db, ensure_entity_schema
 from modules.factions.faction_graph_editor import FactionGraphEditor
@@ -2955,23 +2961,41 @@ class MainWindow(ctk.CTk):
             return
         selection_window = Toplevel()
         selection_window.title("Select Scenarios to Export")
-        selection_window.geometry("400x300")
+        selection_window.geometry("420x360")
         listbox = Listbox(selection_window, selectmode="multiple", height=15)
         listbox.pack(fill="both", expand=True, padx=10, pady=10)
         scenario_titles = [scenario.get("Title", "Unnamed Scenario") for scenario in scenario_items]
         for title in scenario_titles:
             listbox.insert("end", title)
+        layout_var = tk.StringVar(value=DEFAULT_LAYOUT_KEY)
+        layout_frame = ctk.CTkFrame(selection_window, fg_color="transparent")
+        layout_frame.pack(fill="x", padx=10, pady=(0, 10))
+        ctk.CTkLabel(layout_frame, text="Layout preset:").pack(side="left")
+        presets = get_layout_presets()
+        preset_labels = {preset.label: preset.key for preset in presets.values()}
+        preset_label_list = list(preset_labels.keys())
+        default_label = next(
+            (label for label, key in preset_labels.items() if key == DEFAULT_LAYOUT_KEY),
+            preset_label_list[0],
+        )
+        layout_menu = ctk.CTkOptionMenu(
+            layout_frame,
+            values=preset_label_list,
+            command=lambda label: layout_var.set(preset_labels[label]),
+        )
+        layout_menu.set(default_label)
+        layout_menu.pack(side="right", fill="x", expand=True, padx=(8, 0))
         def export_selected():
             selected_indices = listbox.curselection()
             if not selected_indices:
                 messagebox.showwarning("No Selection", "Please select at least one scenario to export.")
                 return
             selected_scenarios = [scenario_items[i] for i in selected_indices]
-            self.preview_and_save(selected_scenarios)
+            self.preview_and_save(selected_scenarios, layout_var.get())
             selection_window.destroy()
         ctk.CTkButton(selection_window, text="Export Selected", command=export_selected).pack(pady=5)
 
-    def preview_and_save(self, selected_scenarios):
+    def preview_and_save(self, selected_scenarios, layout_key=DEFAULT_LAYOUT_KEY):
         creature_items = {creature["Name"]: creature for creature in self.creature_wrapper.load_items()}
         place_items = {place["Name"]: place for place in self.place_wrapper.load_items()}
         npc_items = {npc["Name"]: npc for npc in self.npc_wrapper.load_items()}
@@ -2985,13 +3009,14 @@ class MainWindow(ctk.CTk):
             return
 
         doc = Document()
+        preset = apply_layout(doc, layout_key)
         doc.add_heading("Campaign Scenarios", level=1)
         for scenario in selected_scenarios:
             title = scenario.get("Title", "Unnamed Scenario")
             summary = scenario.get("Summary", "No description provided.")
             secrets = scenario.get("Secrets", "No secrets provided.")
 
-            doc.add_heading(title, level=2)
+            doc.add_heading(format_entity_label(preset, "Scenario", title), level=2)
             doc.add_heading("Summary", level=3)
             if isinstance(summary, dict):
                 p = doc.add_paragraph()

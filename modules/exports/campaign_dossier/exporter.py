@@ -13,7 +13,7 @@ from modules.helpers.logging_helper import log_warning
 from modules.helpers.template_loader import load_entity_definitions, load_template, list_known_entities
 from modules.helpers.theme_manager import get_theme
 
-from modules.exports.campaign_dossier.layouts import apply_layout
+from modules.exports.campaign_dossier.layouts import apply_layout, format_entity_label
 from modules.exports.campaign_dossier.templates import apply_dossier_theme
 
 
@@ -106,19 +106,22 @@ def _collect_entities() -> list[EntityGroup]:
     return groups
 
 
-def _add_table_of_contents(document, groups: list[EntityGroup]) -> None:
+def _add_table_of_contents(document, groups: list[EntityGroup], preset) -> None:
     document.add_heading("Table of Contents", level=1)
     for group in groups:
         document.add_paragraph(group.label, style="List Bullet")
         for record in group.items:
-            document.add_paragraph(_normalize_name(record), style="List Bullet 2")
+            document.add_paragraph(
+                format_entity_label(preset, group.label, _normalize_name(record)),
+                style="List Bullet 2",
+            )
     document.add_page_break()
 
 
 def _build_document(groups: list[EntityGroup], options: DossierExportOptions) -> Document:
     theme_key = get_theme()
     document = Document()
-    apply_layout(document, options.layout_key)
+    preset = apply_layout(document, options.layout_key)
     theme_meta = apply_dossier_theme(document, theme_key)
 
     document.add_heading("Campaign Dossier", level=1)
@@ -128,7 +131,7 @@ def _build_document(groups: list[EntityGroup], options: DossierExportOptions) ->
 
     if options.include_toc:
         document.add_page_break()
-        _add_table_of_contents(document, groups)
+        _add_table_of_contents(document, groups, preset)
 
     for group_index, group in enumerate(groups):
         document.add_heading(group.label, level=2)
@@ -136,7 +139,10 @@ def _build_document(groups: list[EntityGroup], options: DossierExportOptions) ->
         fields = template.get("fields", [])
 
         for record_index, record in enumerate(group.items):
-            document.add_heading(_normalize_name(record), level=3)
+            document.add_heading(
+                format_entity_label(preset, group.label, _normalize_name(record)),
+                level=3,
+            )
             _add_entity_section(document, record, fields)
             is_last_record = record_index == len(group.items) - 1
             is_last_group = group_index == len(groups) - 1
@@ -191,10 +197,13 @@ def export_campaign_dossier(options: DossierExportOptions) -> list[str]:
             fields = template.get("fields", [])
             for record in group.items:
                 document = Document()
-                apply_layout(document, options.layout_key)
+                preset = apply_layout(document, options.layout_key)
                 apply_dossier_theme(document, get_theme())
                 document.add_heading(group.label, level=2)
-                document.add_heading(_normalize_name(record), level=3)
+                document.add_heading(
+                    format_entity_label(preset, group.label, _normalize_name(record)),
+                    level=3,
+                )
                 _add_entity_section(document, record, fields)
                 docx_path = _resolve_output_path(group_dir, _normalize_name(record), "docx")
                 _save_docx(document, docx_path)
