@@ -162,7 +162,9 @@ def _add_field_paragraph(document, label: str, value) -> None:
 
 
 def _add_entity_section(document, record: dict, fields: Iterable[dict]) -> None:
-    for field in fields:
+    for index, field in enumerate(fields):
+        if index == 0:
+            continue
         name = field.get("name")
         if not name:
             continue
