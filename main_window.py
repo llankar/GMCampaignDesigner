@@ -76,6 +76,9 @@ from modules.scenarios.scenario_builder_wizard import ScenarioBuilderWizard
 from modules.scenarios.random_tables_editor import RandomTableEditorDialog
 from modules.generic.export_for_foundry import preview_and_export_foundry
 from modules.generic.cross_campaign_asset_library import CrossCampaignAssetLibraryWindow
+from modules.exports.campaign_dossier.dialog import (
+    open_campaign_dossier_exporter as open_campaign_dossier_exporter_dialog,
+)
 from modules.helpers import text_helpers, dice_markup
 from db.db import initialize_db, ensure_entity_schema
 from modules.factions.faction_graph_editor import FactionGraphEditor
@@ -278,6 +281,7 @@ class MainWindow(ctk.CTk):
             "customize_fields": "customize_fields.png",
             "new_entity_type": "customize_fields.png",
             "export_scenarios": "export_icon.png",
+            "export_campaign_dossier": "export_icon.png",
             "asset_library": "icons/save.png",
             "gm_screen": "gm_screen_icon.png",
             "character_graph": "npc_graph_icon.png",
@@ -883,6 +887,7 @@ class MainWindow(ctk.CTk):
             ("import_objects_pdf", "Import Equipment from PDF", self.open_object_importer),
             ("gm_screen", "Open GM Screen", self.open_gm_screen),
             ("export_scenarios", "Export Scenarios", self.preview_and_export_scenarios),
+            ("export_campaign_dossier", "Export Entire Campaign (Dossier Binder)", self.open_campaign_dossier_exporter),
             ("export_foundry", "Export Scenarios for Foundry", self.export_foundry),
             ("generate_portraits", "Generate Portraits", self.generate_missing_portraits),
             ("associate_portraits", "Associate NPC Portraits", self.associate_npc_portraits),
@@ -3078,6 +3083,9 @@ class MainWindow(ctk.CTk):
                     p.add_run(str(description))
         doc.save(file_path)
         messagebox.showinfo("Export Successful", f"Scenario exported successfully to:\n{file_path}")
+
+    def open_campaign_dossier_exporter(self):
+        open_campaign_dossier_exporter_dialog(self)
 
     def apply_formatting(self, run, formatting):
         if formatting.get('bold'):
