@@ -50,7 +50,7 @@ def add_confidential_header(document, theme_meta: dict) -> None:
     _apply_font_size(run, 8)
 
 
-def add_cover_page(document, theme_meta: dict) -> None:
+def add_cover_page(document, theme_meta: dict, campaign_name: str) -> None:
     section = document.sections[0]
     available_width = section.page_width - section.left_margin - section.right_margin
     stamp_path = _asset_path(COVER_STAMP_ASSET)
@@ -63,17 +63,11 @@ def add_cover_page(document, theme_meta: dict) -> None:
 
     title = document.add_paragraph()
     title.alignment = WD_ALIGN_PARAGRAPH.CENTER
-    title_run = title.add_run("Campaign Dossier")
+    cover_title = campaign_name.strip() or "Campaign Dossier"
+    title_run = title.add_run(cover_title)
     title_run.bold = True
     title_run.font.name = theme_meta["heading_font"]
     _apply_font_size(title_run, 28)
-
-    subtitle = document.add_paragraph()
-    subtitle.alignment = WD_ALIGN_PARAGRAPH.CENTER
-    subtitle_run = subtitle.add_run(f"Theme: {theme_meta.get('name', 'Dossier')}")
-    subtitle_run.font.name = theme_meta["font"]
-    subtitle_run.font.color.rgb = theme_meta["accent"]
-    _apply_font_size(subtitle_run, 12)
 
     confidential = document.add_paragraph()
     confidential.alignment = WD_ALIGN_PARAGRAPH.CENTER

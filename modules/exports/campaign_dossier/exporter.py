@@ -5,8 +5,12 @@ import os
 from dataclasses import dataclass
 from typing import Iterable
 
-from docx import Document
+from pathlib import Path
 
+from docx import Document
+from docx.shared import Pt
+
+from modules.helpers.config_helper import ConfigHelper
 from modules.generic.generic_model_wrapper import GenericModelWrapper
 from modules.helpers.logging_helper import log_warning
 from modules.helpers.template_loader import load_entity_definitions, load_template, list_known_entities
@@ -204,6 +208,17 @@ def _add_table_of_contents(document, groups: list[EntityGroup], preset) -> None:
     document.add_page_break()
 
 
+def _campaign_name() -> str:
+    campaign_dir = Path(ConfigHelper.get_campaign_dir())
+    return campaign_dir.name
+
+
+def _style_group_heading(paragraph) -> None:
+    for run in paragraph.runs:
+        run.bold = True
+        run.font.size = Pt(16)
+
+
 def _build_document(groups: list[EntityGroup], options: DossierExportOptions) -> Document:
     theme_key = get_theme()
     document = Document()
@@ -211,7 +226,7 @@ def _build_document(groups: list[EntityGroup], options: DossierExportOptions) ->
     theme_meta = apply_dossier_theme(document, theme_key)
 
     add_confidential_header(document, theme_meta)
-    add_cover_page(document, theme_meta)
+    add_cover_page(document, theme_meta, _campaign_name())
 
     if options.include_toc:
         _add_table_of_contents(document, groups, preset)
@@ -219,7 +234,8 @@ def _build_document(groups: list[EntityGroup], options: DossierExportOptions) ->
     for group_index, group in enumerate(groups):
         if group_index > 0:
             add_section_divider(document)
-        document.add_heading(group.label, level=2)
+        heading = document.add_heading(group.label, level=2)
+        _style_group_heading(heading)
         template = load_template(group.slug)
         fields = template.get("fields", [])
 
@@ -285,7 +301,8 @@ def export_campaign_dossier(options: DossierExportOptions) -> list[str]:
                 preset = apply_layout(document, options.layout_key, options.include_branding)
                 theme_meta = apply_dossier_theme(document, get_theme())
                 add_confidential_header(document, theme_meta)
-                document.add_heading(group.label, level=2)
+                heading = document.add_heading(group.label, level=2)
+                _style_group_heading(heading)
                 document.add_heading(
                     format_entity_label(preset, group.label, _normalize_name(record)),
                     level=3,
