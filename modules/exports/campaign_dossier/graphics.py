@@ -9,8 +9,8 @@ from docx.shared import Pt
 
 MIN_FONT_SIZE_PT = 14
 
-COVER_STAMP_ASSET = os.path.join("images", "postage-stamp.png")
-SECTION_DIVIDER_ASSET = os.path.join("images", "doodle_symbol.png")
+COVER_STAMP_ASSET = os.path.join("images", "Dossier_image.png")
+SECTION_DIVIDER_ASSET = os.path.join("images", "Dossier_Chapter.png")
 
 
 def _repo_root() -> str:
