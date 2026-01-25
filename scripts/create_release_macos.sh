@@ -62,14 +62,32 @@ resolve_version() {
 }
 
 resolve_internal_assets_dir() {
-  local dist_root="dist/RPGCampaignManager"
-  local app_bundle_resources="dist/RPGCampaignManager/RPGCampaignManager.app/Contents/Resources"
-  local legacy_app_resources="dist/RPGCampaignManager.app/Contents/Resources"
-  local candidate_roots=(
-    "$dist_root"
-    "$app_bundle_resources"
-    "$legacy_app_resources"
+  local candidate_roots=()
+  local dist_root="dist"
+
+  candidate_roots+=(
+    "dist/RPGCampaignManager"
+    "dist/RPGCampaignManager/RPGCampaignManager.app/Contents/Resources"
+    "dist/RPGCampaignManager.app/Contents/Resources"
   )
+
+  if [[ -d "$dist_root" ]]; then
+    local entry
+    for entry in "$dist_root"/*; do
+      [[ -d "$entry" ]] || continue
+      candidate_roots+=("$entry")
+      local app_bundle
+      for app_bundle in "$entry"/*.app; do
+        [[ -d "$app_bundle/Contents/Resources" ]] || continue
+        candidate_roots+=("$app_bundle/Contents/Resources")
+      done
+    done
+    local legacy_bundle
+    for legacy_bundle in "$dist_root"/*.app; do
+      [[ -d "$legacy_bundle/Contents/Resources" ]] || continue
+      candidate_roots+=("$legacy_bundle/Contents/Resources")
+    done
+  fi
 
   for root in "${candidate_roots[@]}"; do
     if [[ -d "$root/_internal/assets" ]]; then
@@ -82,7 +100,7 @@ resolve_internal_assets_dir() {
     fi
   done
 
-  fail "Expected assets directory not found in dist output. Looked for '_internal/assets' or 'assets' under '$dist_root', '$app_bundle_resources', or '$legacy_app_resources'."
+  fail "Expected assets directory not found in dist output. Looked for '_internal/assets' or 'assets' under dist outputs."
 }
 
 clean_dist() {
@@ -105,27 +123,39 @@ clean_dist() {
 }
 
 resolve_dist_roots() {
-  local dist_root="dist/RPGCampaignManager"
-  local app_resources="dist/RPGCampaignManager/RPGCampaignManager.app/Contents/Resources"
-  local legacy_app_resources="dist/RPGCampaignManager.app/Contents/Resources"
-
-  if [[ -d "$app_resources" ]]; then
-    # macOS .app bundle output: treat Resources as the root for bundled content.
-    printf '%s\n' "$app_resources"
-    return
-  fi
-
-  if [[ -d "$legacy_app_resources" ]]; then
-    printf '%s\n' "$legacy_app_resources"
-    return
-  fi
+  local dist_root="dist"
 
   if [[ -d "$dist_root" ]]; then
-    printf '%s\n' "$dist_root"
-    return
+    local entry
+    for entry in "$dist_root"/*; do
+      [[ -d "$entry" ]] || continue
+      local app_bundle
+      for app_bundle in "$entry"/*.app; do
+        if [[ -d "$app_bundle/Contents/Resources" ]]; then
+          printf '%s\n' "$app_bundle/Contents/Resources"
+          return
+        fi
+      done
+    done
+
+    local legacy_bundle
+    for legacy_bundle in "$dist_root"/*.app; do
+      if [[ -d "$legacy_bundle/Contents/Resources" ]]; then
+        printf '%s\n' "$legacy_bundle/Contents/Resources"
+        return
+      fi
+    done
+
+    for entry in "$dist_root"/*; do
+      [[ -d "$entry" ]] || continue
+      if [[ -d "$entry/_internal" || -d "$entry/assets" ]]; then
+        printf '%s\n' "$entry"
+        return
+      fi
+    done
   fi
 
-  fail "Expected dist output not found. Looked for '$dist_root', '$app_resources', or '$legacy_app_resources'."
+  fail "Expected dist output not found under '$dist_root'."
 }
 
 copy_checked_dir() {
@@ -194,27 +224,37 @@ create_release_zip() {
   local version="$1"
   local release_dir="release"
   local zip_name="GMCampaignDesigner-${version}-macos.zip"
-  local app_bundle="dist/RPGCampaignManager/RPGCampaignManager.app"
-  local legacy_app_bundle="dist/RPGCampaignManager.app"
   local dist_root
+  local app_bundle
+  local app_found=""
 
   # Naming choice: GMCampaignDesigner matches the repository/project name.
   mkdir -p "$release_dir"
 
-  if [[ -d "$app_bundle" ]]; then
-    log "Packaging macOS app bundle with ditto"
-    ditto -c -k --sequesterRsrc --keepParent "$app_bundle" "$release_dir/$zip_name"
+  if [[ -d "dist" ]]; then
+    for app_bundle in dist/*/*.app dist/*.app; do
+      [[ -d "$app_bundle" ]] || continue
+      log "Packaging macOS app bundle with ditto"
+      ditto -c -k --sequesterRsrc --keepParent "$app_bundle" "$release_dir/$zip_name"
+      app_found="yes"
+      break
+    done
+  fi
+
+  if [[ -n "$app_found" ]]; then
     return
   fi
 
-  if [[ -d "$legacy_app_bundle" ]]; then
-    log "Packaging macOS app bundle with ditto"
-    ditto -c -k --sequesterRsrc --keepParent "$legacy_app_bundle" "$release_dir/$zip_name"
-    return
+  if [[ -d "dist/RPGCampaignManager" ]]; then
+    dist_root="dist/RPGCampaignManager"
+  elif [[ -d "dist" ]]; then
+    for dist_root in dist/*; do
+      [[ -d "$dist_root" ]] || continue
+      break
+    done
   fi
 
-  dist_root="dist/RPGCampaignManager"
-  if [[ -d "$dist_root" ]]; then
+  if [[ -n "${dist_root:-}" && -d "$dist_root" ]]; then
     log "Packaging dist folder with zip"
     (cd "$dist_root" && zip -r "../$release_dir/$zip_name" .)
     return
