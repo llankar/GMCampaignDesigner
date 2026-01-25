@@ -106,6 +106,10 @@ GMCampaignDesigner2 is licensed under the GPL-3.0 License. See the LICENSE file 
 Acknowledgements
 Special thanks to the contributors and open-source community who help improve and maintain GMCampaignDesigner2. Your support makes continuous innovation possible!
 
+Build macOS
+-----------
+See [docs/build_macos.md](docs/build_macos.md) for local and GitHub Actions instructions, including the artifact naming and download location.
+
 Enabling Application Logs
 -------------------------
 Detailed logs can help troubleshoot AI imports and other automated workflows. To enable them:
