@@ -62,45 +62,28 @@ resolve_version() {
 }
 
 resolve_internal_assets_dir() {
-  local candidate_roots=()
   local dist_root="dist"
+  local assets_dir
 
-  candidate_roots+=(
-    "dist/RPGCampaignManager"
-    "dist/RPGCampaignManager/RPGCampaignManager.app/Contents/Resources"
-    "dist/RPGCampaignManager.app/Contents/Resources"
-  )
-
-  if [[ -d "$dist_root" ]]; then
-    local entry
-    for entry in "$dist_root"/*; do
-      [[ -d "$entry" ]] || continue
-      candidate_roots+=("$entry")
-      local app_bundle
-      for app_bundle in "$entry"/*.app; do
-        [[ -d "$app_bundle/Contents/Resources" ]] || continue
-        candidate_roots+=("$app_bundle/Contents/Resources")
-      done
-    done
-    local legacy_bundle
-    for legacy_bundle in "$dist_root"/*.app; do
-      [[ -d "$legacy_bundle/Contents/Resources" ]] || continue
-      candidate_roots+=("$legacy_bundle/Contents/Resources")
-    done
+  if [[ ! -d "$dist_root" ]]; then
+    fail "Expected dist output not found under '$dist_root'."
   fi
 
-  for root in "${candidate_roots[@]}"; do
-    if [[ -d "$root/_internal/assets" ]]; then
-      printf '%s\n' "$root/_internal/assets"
-      return
-    fi
-    if [[ -d "$root/assets" ]]; then
-      printf '%s\n' "$root/assets"
-      return
-    fi
-  done
+  assets_dir="$(
+    find "$dist_root" -type d \( \
+      -path "*/_internal/assets" \
+      -o -path "*/Contents/Resources/_internal/assets" \
+      -o -path "*/Contents/Resources/assets" \
+      -o -path "*/assets" \
+    \) -print | head -n 1
+  )"
 
-  fail "Expected assets directory not found in dist output. Looked for '_internal/assets' or 'assets' under dist outputs."
+  if [[ -n "$assets_dir" ]]; then
+    printf '%s\n' "$assets_dir"
+    return
+  fi
+
+  fail "Expected assets directory not found in dist output. Searched for '_internal/assets' or 'assets' within '$dist_root'."
 }
 
 clean_dist() {
@@ -124,6 +107,7 @@ clean_dist() {
 
 resolve_dist_roots() {
   local dist_root="dist"
+  local candidate_root
 
   if [[ -d "$dist_root" ]]; then
     local entry
@@ -146,13 +130,15 @@ resolve_dist_roots() {
       fi
     done
 
-    for entry in "$dist_root"/*; do
-      [[ -d "$entry" ]] || continue
-      if [[ -d "$entry/_internal" || -d "$entry/assets" ]]; then
-        printf '%s\n' "$entry"
-        return
-      fi
-    done
+    candidate_root="$(
+      find "$dist_root" -mindepth 1 -maxdepth 2 -type d \( \
+        -path "*/_internal" -o -path "*/assets" \
+      \) -print | head -n 1
+    )"
+    if [[ -n "$candidate_root" ]]; then
+      printf '%s\n' "$(dirname "$candidate_root")"
+      return
+    fi
   fi
 
   fail "Expected dist output not found under '$dist_root'."
