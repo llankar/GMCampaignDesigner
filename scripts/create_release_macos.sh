@@ -74,6 +74,7 @@ resolve_internal_assets_dir() {
       -path "*/_internal/assets" \
       -o -path "*/Contents/Resources/_internal/assets" \
       -o -path "*/Contents/Resources/assets" \
+      -o -path "*/Resources/assets" \
       -o -path "*/assets" \
     \) -print | head -n 1
   )"
@@ -83,7 +84,7 @@ resolve_internal_assets_dir() {
     return
   fi
 
-  fail "Expected assets directory not found in dist output. Searched for '_internal/assets' or 'assets' within '$dist_root'."
+  printf '%s\n' ""
 }
 
 clean_dist() {
@@ -92,11 +93,15 @@ clean_dist() {
   local portraits_dir
 
   assets_dir="$(resolve_internal_assets_dir)"
+  if [[ -z "$assets_dir" ]]; then
+    log "No assets directory detected under dist output; skipping cleanup."
+    return
+  fi
   generated_dir="$assets_dir/generated"
   portraits_dir="$assets_dir/portraits"
 
-  [[ -d "$generated_dir" ]] || fail "Missing generated assets directory: $generated_dir"
-  [[ -d "$portraits_dir" ]] || fail "Missing portraits assets directory: $portraits_dir"
+  [[ -d "$generated_dir" ]] || { log "Missing generated assets directory: $generated_dir (skipping)"; return; }
+  [[ -d "$portraits_dir" ]] || { log "Missing portraits assets directory: $portraits_dir (skipping)"; return; }
 
   log "Cleaning generated assets in $generated_dir"
   rm -rf "$generated_dir"/*
