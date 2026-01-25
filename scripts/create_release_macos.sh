@@ -21,8 +21,20 @@ extract_version_from_file() {
   local version
 
   version="$(
-    sed -nE "s/.*StringStruct\('(?:FileVersion|ProductVersion)',\s*'([^']+)'\).*/\1/p" "$version_file" \
-      | head -n 1
+    python3 - "$version_file" <<'PY'
+import re
+import sys
+
+version_file = sys.argv[1]
+pattern = re.compile(r"StringStruct\('(FileVersion|ProductVersion)',\s*'([^']+)'\)")
+
+with open(version_file, 'r', encoding='utf-8', errors='ignore') as handle:
+    for line in handle:
+        match = pattern.search(line)
+        if match:
+            print(match.group(2))
+            sys.exit(0)
+PY
   )"
 
   if [[ -n "$version" ]]; then
@@ -192,11 +204,11 @@ main() {
   version="$(resolve_version)"
   log "Using version: $version"
 
-  log "Cleaning dist artifacts"
-  clean_dist
-
   log "Building PyInstaller bundle"
   build_pyinstaller
+
+  log "Cleaning dist artifacts"
+  clean_dist
 
   log "Copying dist assets"
   copy_dist
