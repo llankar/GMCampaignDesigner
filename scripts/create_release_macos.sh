@@ -63,20 +63,26 @@ resolve_version() {
 
 resolve_internal_assets_dir() {
   local dist_root="dist/RPGCampaignManager"
-  local app_resources="dist/RPGCampaignManager.app/Contents/Resources"
+  local app_bundle_resources="dist/RPGCampaignManager/RPGCampaignManager.app/Contents/Resources"
+  local legacy_app_resources="dist/RPGCampaignManager.app/Contents/Resources"
+  local candidate_roots=(
+    "$dist_root"
+    "$app_bundle_resources"
+    "$legacy_app_resources"
+  )
 
-  if [[ -d "$dist_root/_internal/assets" ]]; then
-    printf '%s\n' "$dist_root/_internal/assets"
-    return
-  fi
+  for root in "${candidate_roots[@]}"; do
+    if [[ -d "$root/_internal/assets" ]]; then
+      printf '%s\n' "$root/_internal/assets"
+      return
+    fi
+    if [[ -d "$root/assets" ]]; then
+      printf '%s\n' "$root/assets"
+      return
+    fi
+  done
 
-  if [[ -d "$app_resources/_internal/assets" ]]; then
-    # PyInstaller can emit a .app bundle on macOS; use Resources for its internal payload.
-    printf '%s\n' "$app_resources/_internal/assets"
-    return
-  fi
-
-  fail "Expected internal assets directory not found in dist output. Looked for '$dist_root/_internal/assets' or '$app_resources/_internal/assets'."
+  fail "Expected assets directory not found in dist output. Looked for '_internal/assets' or 'assets' under '$dist_root', '$app_bundle_resources', or '$legacy_app_resources'."
 }
 
 clean_dist() {
@@ -100,12 +106,8 @@ clean_dist() {
 
 resolve_dist_roots() {
   local dist_root="dist/RPGCampaignManager"
-  local app_resources="dist/RPGCampaignManager.app/Contents/Resources"
-
-  if [[ -d "$dist_root" ]]; then
-    printf '%s\n' "$dist_root"
-    return
-  fi
+  local app_resources="dist/RPGCampaignManager/RPGCampaignManager.app/Contents/Resources"
+  local legacy_app_resources="dist/RPGCampaignManager.app/Contents/Resources"
 
   if [[ -d "$app_resources" ]]; then
     # macOS .app bundle output: treat Resources as the root for bundled content.
@@ -113,7 +115,17 @@ resolve_dist_roots() {
     return
   fi
 
-  fail "Expected dist output not found. Looked for '$dist_root' or '$app_resources'."
+  if [[ -d "$legacy_app_resources" ]]; then
+    printf '%s\n' "$legacy_app_resources"
+    return
+  fi
+
+  if [[ -d "$dist_root" ]]; then
+    printf '%s\n' "$dist_root"
+    return
+  fi
+
+  fail "Expected dist output not found. Looked for '$dist_root', '$app_resources', or '$legacy_app_resources'."
 }
 
 copy_checked_dir() {
@@ -139,9 +151,11 @@ copy_dist() {
   local internal_root
 
   dist_root="$(resolve_dist_roots)"
-  internal_root="$dist_root/_internal"
-
-  [[ -d "$internal_root" ]] || fail "Internal dist directory missing: $internal_root"
+  if [[ -d "$dist_root/_internal" ]]; then
+    internal_root="$dist_root/_internal"
+  else
+    internal_root="$dist_root"
+  fi
 
   log "Copying assets to $dist_root"
   copy_checked_dir "assets" "$dist_root"
@@ -158,21 +172,30 @@ copy_dist() {
   log "Copying modules to $internal_root"
   copy_checked_dir "modules" "$internal_root"
 
-  log "Copying version.txt to $dist_root and $internal_root"
+  log "Copying version.txt to $dist_root"
   copy_checked_file "version.txt" "$dist_root"
-  copy_checked_file "version.txt" "$internal_root"
+  if [[ "$internal_root" != "$dist_root" ]]; then
+    log "Copying version.txt to $internal_root"
+    copy_checked_file "version.txt" "$internal_root"
+  fi
 }
 
 build_pyinstaller() {
-  # Assumption: main_window.spec is the macOS PyInstaller spec file.
-  pyinstaller --noconfirm --clean main_window.spec
+  local spec_file="main_window_macos.spec"
+
+  if [[ ! -f "$spec_file" ]]; then
+    spec_file="main_window.spec"
+  fi
+
+  pyinstaller --noconfirm --clean "$spec_file"
 }
 
 create_release_zip() {
   local version="$1"
   local release_dir="release"
   local zip_name="GMCampaignDesigner-${version}-macos.zip"
-  local app_bundle="dist/RPGCampaignManager.app"
+  local app_bundle="dist/RPGCampaignManager/RPGCampaignManager.app"
+  local legacy_app_bundle="dist/RPGCampaignManager.app"
   local dist_root
 
   # Naming choice: GMCampaignDesigner matches the repository/project name.
@@ -181,6 +204,12 @@ create_release_zip() {
   if [[ -d "$app_bundle" ]]; then
     log "Packaging macOS app bundle with ditto"
     ditto -c -k --sequesterRsrc --keepParent "$app_bundle" "$release_dir/$zip_name"
+    return
+  fi
+
+  if [[ -d "$legacy_app_bundle" ]]; then
+    log "Packaging macOS app bundle with ditto"
+    ditto -c -k --sequesterRsrc --keepParent "$legacy_app_bundle" "$release_dir/$zip_name"
     return
   fi
 
