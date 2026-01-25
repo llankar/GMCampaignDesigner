@@ -276,11 +276,11 @@ main() {
   log "Building PyInstaller bundle"
   build_pyinstaller
 
-  log "Cleaning dist artifacts"
-  clean_dist
-
   log "Copying dist assets"
   copy_dist
+
+  log "Cleaning dist artifacts"
+  clean_dist
 
   log "Creating release zip"
   create_release_zip "$version"
