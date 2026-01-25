@@ -84,7 +84,7 @@ soundfile==0.13.1
 soupsieve==2.6
 spandrel==0.4.1
 sympy==1.13.1
-tkinterweb==3.24.0
+tkinterweb==3.24.15
 pywebview==5.1
 tokenizers==0.21.1
 toml==0.10.2
