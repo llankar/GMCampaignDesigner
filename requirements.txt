@@ -88,10 +88,16 @@ tkinterweb==3.24.15
 pywebview==5.1
 tokenizers==0.21.1
 toml==0.10.2
-torch==2.6.0+cu126
-torchaudio==2.6.0+cu126
+torch==2.6.0+cu126; platform_system == "Linux" and platform_machine == "x86_64"
+torch==2.6.0; platform_system == "Darwin"
+torch==2.6.0; platform_system == "Windows"
+torchaudio==2.6.0+cu126; platform_system == "Linux" and platform_machine == "x86_64"
+torchaudio==2.6.0; platform_system == "Darwin"
+torchaudio==2.6.0; platform_system == "Windows"
 torchsde==0.2.6
-torchvision==0.21.0+cu126
+torchvision==0.21.0+cu126; platform_system == "Linux" and platform_machine == "x86_64"
+torchvision==0.21.0; platform_system == "Darwin"
+torchvision==0.21.0; platform_system == "Windows"
 tqdm==4.67.1
 trampoline==0.1.2
 transformers==4.49.0
