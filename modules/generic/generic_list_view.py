@@ -1475,10 +1475,10 @@ class GenericListView(ctk.CTkFrame):
     def _resolve_media_path(self, media_path):
         if not media_path:
             return None
-        if os.path.isabs(media_path) and os.path.exists(media_path):
-            return media_path
-        candidate = os.path.join(ConfigHelper.get_campaign_dir(), media_path)
-        return candidate if os.path.exists(candidate) else None
+        primary_path = primary_portrait(media_path)
+        if not primary_path:
+            return None
+        return resolve_portrait_candidate(primary_path, ConfigHelper.get_campaign_dir())
 
     def _load_grid_image(self, item):
         media_value = ""
