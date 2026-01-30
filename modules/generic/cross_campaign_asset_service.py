@@ -97,7 +97,7 @@ def list_sibling_campaigns(include_current: bool = False) -> List[CampaignDataba
         if not db_files:
             continue
         for db_path in db_files:
-            if not include_current and db_path.resolve() == active.db_path.resolve():
+            if db_path.resolve() == active.db_path.resolve():
                 continue
             candidates.append(
                 CampaignDatabase(name=f"{entry.name} ({db_path.name})", root=entry.resolve(), db_path=db_path.resolve())
