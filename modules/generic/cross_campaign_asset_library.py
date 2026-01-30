@@ -185,11 +185,15 @@ class CrossCampaignAssetLibraryWindow(ctk.CTkToplevel):
             btn.destroy()
         self.campaign_buttons.clear()
 
-        self.source_campaigns = list_sibling_campaigns(include_current=False)
+        self.source_campaigns = list_sibling_campaigns(include_current=True)
+        active_db_path = self.active_campaign.db_path.resolve() if self.active_campaign else None
         for index, campaign in enumerate(self.source_campaigns):
+            label = campaign.name
+            if active_db_path and campaign.db_path.resolve() == active_db_path:
+                label = f"{label} (Current)"
             btn = ctk.CTkButton(
                 self.campaign_list,
-                text=campaign.name,
+                text=label,
                 command=lambda c=campaign: self.select_campaign(c),
                 anchor="w",
             )
