@@ -25,6 +25,27 @@ from modules.ui.chatbot_dialog import (
     _DEFAULT_NAME_FIELD_OVERRIDES as CHATBOT_NAME_OVERRIDES,
 )
 from modules.maps.views.world_map_toolbar_view import build_world_map_toolbar
+from modules.maps.views.toolbar_view import (
+    _change_brush,
+    _on_brush_shape_change,
+    _on_brush_size_change,
+    _update_fog_button_states,
+)
+from modules.maps.services.fog_manager import _set_fog
+from modules.maps.services.world_map_fog_service import (
+    apply_world_map_fog_rectangle,
+    clear_fog_rectangle_preview,
+    clear_world_map_fog,
+    init_world_map_fog,
+    load_world_map_fog,
+    paint_world_map_fog,
+    push_fog_history,
+    reset_world_map_fog,
+    save_world_map_fog,
+    undo_world_map_fog,
+    update_fog_rectangle_preview,
+    update_world_map_fog_canvas,
+)
 from modules.scenarios.plot_twist_panel import PlotTwistPanel
 from modules.helpers.logging_helper import (
     log_debug,
@@ -138,6 +159,7 @@ class WorldMapPanel(ctk.CTkFrame):
         self._player_view_token_images: list[ImageTk.PhotoImage] = []
 
         self._suppress_map_change = False
+        init_world_map_fog(self)
 
         self._build_layout()
 
@@ -194,6 +216,12 @@ class WorldMapPanel(ctk.CTkFrame):
         self.canvas.bind("<ButtonPress-2>", self._on_pan_start)
         self.canvas.bind("<B2-Motion>", self._on_pan_move)
         self.canvas.bind("<ButtonRelease-2>", self._on_pan_end)
+        self.canvas.bind("<ButtonPress-1>", self._on_canvas_press, add="+")
+        self.canvas.bind("<B1-Motion>", self._on_canvas_drag, add="+")
+        self.canvas.bind("<ButtonRelease-1>", self._on_canvas_release, add="+")
+        root = self.winfo_toplevel()
+        root.bind_all("<Control-z>", lambda e: self.undo_fog(e), add="+")
+        root.bind_all("<Control-Z>", lambda e: self.undo_fog(e), add="+")
 
         self.inspector_container = ctk.CTkFrame(workspace, fg_color="#11182A", corner_radius=18, width=380)
         self.inspector_container.grid(row=0, column=1, sticky="nsew")
@@ -582,6 +610,7 @@ class WorldMapPanel(ctk.CTkFrame):
             self._suppress_map_change = False
 
         self._load_base_image()
+        load_world_map_fog(self)
         self.tokens = self._deserialize_tokens(entry)
         self._draw_scene()
         self._clear_inspector()
@@ -897,6 +926,7 @@ class WorldMapPanel(ctk.CTkFrame):
             self.current_world_map.pop("view_state", None)
         self.world_maps[self.current_map_name] = self.current_world_map
         self._save_world_map_store()
+        save_world_map_fog(self)
         log_debug("World map tokens saved", func_name="WorldMapWindow._persist_tokens")
 
     def _load_base_image(self) -> None:
@@ -931,6 +961,7 @@ class WorldMapPanel(ctk.CTkFrame):
             return
 
         self.canvas.delete("all")
+        self.mask_id = None
         base_w, base_h = self.base_image.size
         if base_w <= 0 or base_h <= 0:
             return
@@ -956,6 +987,7 @@ class WorldMapPanel(ctk.CTkFrame):
         )
         self.base_photo = ImageTk.PhotoImage(resized)
         self.canvas.create_image(offset_x, offset_y, anchor="nw", image=self.base_photo)
+        update_world_map_fog_canvas(self, resample=Image.LANCZOS)
 
         for token in self.tokens:
             self._draw_token(token)
@@ -1307,6 +1339,8 @@ class WorldMapPanel(ctk.CTkFrame):
     def _on_token_press(self, event, token: dict) -> None:
         if event is None:
             return
+        if self.fog_mode:
+            return "break"
         self.selected_token = token
         token["drag_anchor"] = (event.x, event.y)
         if token.get("type") == "map":
@@ -1317,6 +1351,8 @@ class WorldMapPanel(ctk.CTkFrame):
     def _on_token_drag(self, event, token: dict) -> None:
         if event is None or "drag_anchor" not in token or not self.render_params:
             return
+        if self.fog_mode:
+            return "break"
         scale, offset_x, offset_y, base_w, base_h = self.render_params
         radius = token.get("size", 120) * scale / 2
         x = max(offset_x + radius, min(offset_x + base_w * scale - radius, event.x))
@@ -1331,14 +1367,20 @@ class WorldMapPanel(ctk.CTkFrame):
         token["x_norm"] = (x - offset_x) / (base_w * scale)
         token["y_norm"] = (y - offset_y) / (base_h * scale)
     def _on_token_release(self, _event, token: dict) -> None:
+        if self.fog_mode:
+            return "break"
         token.pop("drag_anchor", None)
         self._persist_tokens()
 
     def _on_token_double_click(self, _event, token: dict) -> None:
+        if self.fog_mode:
+            return "break"
         if token.get("type") == "map":
             self.navigate_to_map(token.get("linked_map"))
 
     def _delete_selected_token(self, _event=None) -> None:
+        if self.fog_mode:
+            return "break"
         token = self.selected_token
         if not token:
             return
@@ -1354,6 +1396,8 @@ class WorldMapPanel(ctk.CTkFrame):
     def _show_token_menu(self, event, token: dict) -> None:
         if event is None:
             return
+        if self.fog_mode:
+            return "break"
         menu = tk.Menu(self.canvas, tearoff=0)
         menu.add_command(label="Resize?", command=lambda: self._prompt_resize(token))
         menu.add_command(label="Change Color", command=lambda: self._prompt_token_color(token))
@@ -1367,6 +1411,57 @@ class WorldMapPanel(ctk.CTkFrame):
             menu.tk_popup(event.x_root, event.y_root)
         finally:
             menu.grab_release()
+
+    def _on_canvas_press(self, event) -> str | None:
+        if self.fog_mode in ("add", "rem"):
+            if not self._fog_action_active:
+                push_fog_history(self)
+                self._fog_action_active = True
+            paint_world_map_fog(self, event)
+            return "break"
+        if self.fog_mode in ("add_rect", "rem_rect"):
+            if not self._fog_action_active:
+                push_fog_history(self)
+                self._fog_action_active = True
+            self._fog_rect_start_world = self._fog_event_to_world(event)
+            clear_fog_rectangle_preview(self)
+            return "break"
+        return None
+
+    def _on_canvas_drag(self, event) -> str | None:
+        if self.fog_mode in ("add", "rem"):
+            paint_world_map_fog(self, event)
+            return "break"
+        if self.fog_mode in ("add_rect", "rem_rect") and self._fog_rect_start_world is not None:
+            update_fog_rectangle_preview(self, event)
+            return "break"
+        return None
+
+    def _on_canvas_release(self, event) -> str | None:
+        if self.fog_mode in ("add", "rem"):
+            if self._fog_action_active:
+                self._fog_action_active = False
+            return "break"
+        if (
+            self.fog_mode in ("add_rect", "rem_rect")
+            and self._fog_rect_start_world is not None
+        ):
+            end_world = self._fog_event_to_world(event)
+            apply_world_map_fog_rectangle(self, self._fog_rect_start_world, end_world)
+            self._fog_rect_start_world = None
+            clear_fog_rectangle_preview(self)
+            if self._fog_action_active:
+                self._fog_action_active = False
+            return "break"
+        return None
+
+    def _fog_event_to_world(self, event):
+        if not self.render_params:
+            return None
+        scale, offset_x, offset_y, _, _ = self.render_params
+        if scale == 0:
+            return None
+        return (event.x - offset_x) / scale, (event.y - offset_y) / scale
 
     def _prompt_resize(self, token: dict) -> None:
         initial = int(token.get('size', 120))
@@ -1726,7 +1821,7 @@ class WorldMapPanel(ctk.CTkFrame):
         offset_y = (canvas_h - scaled_h) / 2 + pan_y
 
         frame = self.base_image.copy()
-        fog = self._load_current_map_fog_mask()
+        fog = self.mask_img or self._load_current_map_fog_mask()
         if fog is not None:
             fog_mask = fog.resize((base_w, base_h), Image.LANCZOS)
             frame.alpha_composite(fog_mask)
@@ -1758,6 +1853,8 @@ class WorldMapPanel(ctk.CTkFrame):
             return None
         record = self.maps_wrapper_data.get(self.current_map_name) or {}
         fog_rel = str(record.get("FogMaskPath") or "").strip()
+        if not fog_rel and isinstance(self.current_world_map, dict):
+            fog_rel = str(self.current_world_map.get("fog_mask_path") or "").strip()
         if not fog_rel:
             return None
         fog_path = fog_rel if os.path.isabs(fog_rel) else os.path.join(ConfigHelper.get_campaign_dir(), fog_rel)
@@ -2349,6 +2446,17 @@ class WorldMapPanel(ctk.CTkFrame):
                 func_name="WorldMapPanel.open_chatbot",
             )
         return "break" if event else None
+
+
+WorldMapPanel._change_brush = _change_brush
+WorldMapPanel._on_brush_shape_change = _on_brush_shape_change
+WorldMapPanel._on_brush_size_change = _on_brush_size_change
+WorldMapPanel._update_fog_button_states = _update_fog_button_states
+WorldMapPanel._set_fog = _set_fog
+WorldMapPanel._clear_fog_rectangle_preview = clear_fog_rectangle_preview
+WorldMapPanel.clear_fog = clear_world_map_fog
+WorldMapPanel.reset_fog = reset_world_map_fog
+WorldMapPanel.undo_fog = undo_world_map_fog
 
 
 class WorldMapWindow(ctk.CTkToplevel):
