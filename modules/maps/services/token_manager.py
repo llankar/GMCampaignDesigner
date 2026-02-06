@@ -332,6 +332,7 @@ def add_token(self, path, entity_type, entity_name, entity_record=None):
         "hover_textbox": None,
         "hover_visible": False,
         "hover_bbox": None,
+        "player_visible": True,
     }
 
     self.tokens.append(token)
@@ -425,6 +426,7 @@ def _copy_token(self, event=None):
         "defense_value": t.get("defense_value"),
         "defense_label": t.get("defense_label", ""),
         "entity_record": copy.deepcopy(t.get("entity_record")) if t.get("entity_record") else None,
+        "player_visible": bool(t.get("player_visible", True)),
     }
 
 def _paste_token(self, event=None):
@@ -467,6 +469,7 @@ def _paste_token(self, event=None):
         "defense_value": defense_value,
         "defense_label": defense_label,
         "entity_record": entity_record,
+        "player_visible": bool(c.get("player_visible", True)),
     }
 
     # Add it to your tokens list, then persist & re-draw everything
@@ -660,6 +663,7 @@ def _persist_tokens(self):
                     "defense_value": t.get("defense_value"),
                     "defense_label": t.get("defense_label", ""),
                     "border_color":   t.get("border_color", "#0000ff"),
+                    "player_visible": bool(t.get("player_visible", True)),
                 })
             elif item_type in ["rectangle", "oval"]:
                 item_data.update({

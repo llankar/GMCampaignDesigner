@@ -4349,6 +4349,11 @@ class DisplayMapController:
             command=lambda: self._prompt_change_token_border_color(valid_tokens),
         )
 
+        menu.add_command(
+            label=("Hide from Players" if any(bool(t.get("player_visible", True)) for t in valid_tokens) else "Show to Players"),
+            command=lambda: self._toggle_tokens_player_visibility(valid_tokens),
+        )
+
         menu.add_separator()
         menu.add_command(
             label=f"Copy Token{plural}",
@@ -4410,6 +4415,22 @@ class DisplayMapController:
             menu.tk_popup(event.x_root, event.y_root)
         except tk.TclError as e:
             print(f"Error displaying token menu: {e}")
+
+    def _toggle_tokens_player_visibility(self, tokens):
+        changed = False
+        for token in tokens:
+            if not isinstance(token, dict) or token.get("type") != "token":
+                continue
+            token["player_visible"] = not bool(token.get("player_visible", True))
+            changed = True
+        if not changed:
+            return
+        self._update_canvas_images()
+        if getattr(self, "fs_canvas", None) and self.fs_canvas.winfo_exists():
+            self._update_fullscreen_map()
+        if getattr(self, "_web_server_thread", None):
+            self._update_web_display_map()
+        self._persist_tokens()
 
     def _show_portraits_for_tokens(self, tokens):
         for token in tokens:

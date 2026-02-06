@@ -130,6 +130,9 @@ class WorldMapPanel(ctk.CTkFrame):
         self.pan_y = 0.0
         self._pan_anchor: tuple[float, float, float, float] | None = None
         self._pending_view_state: dict | None = None
+        self._player_view_window = None
+        self._player_view_canvas = None
+        self._player_view_photo = None
 
         self._suppress_map_change = False
 
@@ -209,6 +212,15 @@ class WorldMapPanel(ctk.CTkFrame):
 
         self.save_button = ctk.CTkButton(toolbar, text="Save", width=120, command=self._persist_tokens)
         self.save_button.pack(side="right", padx=12)
+
+        self.player_view_button = ctk.CTkButton(
+            toolbar,
+            text="Open Player Display",
+            width=170,
+            command=self.open_player_display,
+            state=ctk.DISABLED,
+        )
+        self.player_view_button.pack(side="right", padx=(0, 12))
 
         self.map_tool_button = ctk.CTkButton(
             toolbar,
@@ -342,6 +354,15 @@ class WorldMapPanel(ctk.CTkFrame):
             state=ctk.DISABLED,
         )
         self.highlight_button.pack(side="right")
+
+        self.toggle_visibility_button = ctk.CTkButton(
+            self.quick_actions_frame,
+            text="Hide from Players",
+            width=150,
+            command=self._toggle_selected_player_visibility,
+            state=ctk.DISABLED,
+        )
+        self.toggle_visibility_button.pack(side="right", padx=(0, 8))
 
         self.plot_twist_section = ctk.CTkFrame(self.inspector_container, fg_color="transparent")
         self.plot_twist_section.pack(fill="x", padx=16, pady=(0, 12))
@@ -653,6 +674,8 @@ class WorldMapPanel(ctk.CTkFrame):
             return
         state = ctk.NORMAL if self.current_map_name else ctk.DISABLED
         self.map_tool_button.configure(state=state)
+        if hasattr(self, "player_view_button"):
+            self.player_view_button.configure(state=state)
 
     def _open_in_map_tool(self) -> None:
         target_map = None
@@ -854,6 +877,7 @@ class WorldMapPanel(ctk.CTkFrame):
             "image_path": self._resolve_map_image(record) if entity_type == "Map" else None,
             "linked_map": record.get("Name") if entity_type == "Map" else None,
             "color": _TOKEN_COLORS.get(entity_type, "#FFFFFF"),
+            "player_visible": True,
         }
 
     def _deserialize_tokens(self, entry: dict) -> list[dict]:
@@ -895,6 +919,7 @@ class WorldMapPanel(ctk.CTkFrame):
                     'image_path': value.get('image_path'),
                     'linked_map': value.get('linked_map'),
                     'color': value.get('color', _TOKEN_COLORS.get(entity_type, '#FFFFFF')),
+                    'player_visible': bool(value.get('player_visible', True)),
                 }
             )
         if legacy_source and raw and entry.get('tokens') is None:
@@ -923,6 +948,7 @@ class WorldMapPanel(ctk.CTkFrame):
                     "image_path": token.get("image_path"),
                     "linked_map": token.get("linked_map"),
                     "color": token.get("color"),
+                    "player_visible": bool(token.get("player_visible", True)),
                 }
             )
         self.current_world_map["tokens"] = serialized
@@ -995,6 +1021,8 @@ class WorldMapPanel(ctk.CTkFrame):
 
         for token in self.tokens:
             self._draw_token(token)
+
+        self._update_player_display()
 
     def _apply_pending_view_state(self, base_scale: float, base_w: int, base_h: int) -> None:
         view_state = self._pending_view_state
@@ -1368,6 +1396,10 @@ class WorldMapPanel(ctk.CTkFrame):
         menu = tk.Menu(self.canvas, tearoff=0)
         menu.add_command(label="Resize?", command=lambda: self._prompt_resize(token))
         menu.add_command(label="Change Color", command=lambda: self._prompt_token_color(token))
+        menu.add_command(
+            label=("Hide from Players" if bool(token.get("player_visible", True)) else "Show to Players"),
+            command=lambda: self._toggle_token_player_visibility(token),
+        )
         menu.add_separator()
         menu.add_command(label="Delete", command=lambda: self._delete_token(token))
         try:
@@ -1439,6 +1471,7 @@ class WorldMapPanel(ctk.CTkFrame):
         )
         self._inspector_token = None
         self._update_color_swatch(None)
+        self._update_visibility_button(None)
         self._set_quick_actions_state(False)
         self._configure_inspector_actions(None)
 
@@ -1614,6 +1647,130 @@ class WorldMapPanel(ctk.CTkFrame):
             hover_color=normalized,
             border_color=border,
         )
+
+    def _update_visibility_button(self, token: dict | None) -> None:
+        button = getattr(self, "toggle_visibility_button", None)
+        if not button:
+            return
+        if not token:
+            button.configure(state=ctk.DISABLED, text="Hide from Players")
+            return
+        visible = bool(token.get("player_visible", True))
+        button.configure(state=ctk.NORMAL, text=("Hide from Players" if visible else "Show to Players"))
+
+    def _toggle_selected_player_visibility(self) -> None:
+        token = self._inspector_token or self.selected_token
+        if not token:
+            return
+        self._toggle_token_player_visibility(token)
+
+    def _toggle_token_player_visibility(self, token: dict) -> None:
+        if token not in self.tokens:
+            return
+        token["player_visible"] = not bool(token.get("player_visible", True))
+        if self._inspector_token is token:
+            self._update_visibility_button(token)
+        self._draw_scene()
+        self._persist_tokens()
+
+    def open_player_display(self) -> None:
+        if not self.current_map_name or not self.base_image:
+            return
+        existing = getattr(self, "_player_view_window", None)
+        if existing is not None:
+            try:
+                if existing.winfo_exists():
+                    existing.lift()
+                    existing.focus_force()
+                    self._update_player_display()
+                    return
+            except tk.TclError:
+                pass
+
+        win = ctk.CTkToplevel(self)
+        win.title(f"Player Display - {self.current_map_name}")
+        win.geometry("1280x720")
+        canvas = tk.Canvas(win, bg="#000000", highlightthickness=0, relief="flat")
+        canvas.pack(fill="both", expand=True)
+
+        self._player_view_window = win
+        self._player_view_canvas = canvas
+        self._player_view_photo = None
+
+        def _on_close():
+            self.close_player_display()
+
+        win.protocol("WM_DELETE_WINDOW", _on_close)
+        canvas.bind("<Configure>", lambda _e: self._update_player_display())
+        self._update_player_display()
+
+    def close_player_display(self) -> None:
+        window = getattr(self, "_player_view_window", None)
+        self._player_view_window = None
+        self._player_view_canvas = None
+        self._player_view_photo = None
+        if window is not None:
+            try:
+                if window.winfo_exists():
+                    window.destroy()
+            except tk.TclError:
+                pass
+
+    def _update_player_display(self) -> None:
+        window = getattr(self, "_player_view_window", None)
+        canvas = getattr(self, "_player_view_canvas", None)
+        if not window or not canvas or not self.base_image:
+            return
+        try:
+            if not window.winfo_exists() or not canvas.winfo_exists():
+                return
+        except tk.TclError:
+            return
+
+        w = max(1, canvas.winfo_width())
+        h = max(1, canvas.winfo_height())
+        if w <= 1 or h <= 1:
+            return
+
+        frame = self.base_image.copy()
+        draw = ImageDraw.Draw(frame)
+        bw, bh = frame.size
+        for token in self.tokens:
+            if not bool(token.get("player_visible", True)):
+                continue
+            x = float(token.get("x_norm", 0.5)) * bw
+            y = float(token.get("y_norm", 0.5)) * bh
+            r = max(10, int(token.get("size", 40) * 0.35))
+            draw.ellipse((x-r, y-r, x+r, y+r), outline=token.get("color") or "#ffffff", width=3)
+
+        fog = self._load_current_map_fog_mask()
+        if fog is not None:
+            fog_mask = fog.resize((bw, bh), Image.LANCZOS)
+            frame.alpha_composite(fog_mask)
+
+        scale = min(w / bw, h / bh)
+        rw = max(1, int(bw * scale))
+        rh = max(1, int(bh * scale))
+        img = frame.resize((rw, rh), Image.LANCZOS)
+        self._player_view_photo = ImageTk.PhotoImage(img)
+        canvas.delete("all")
+        canvas.create_image((w-rw)//2, (h-rh)//2, anchor="nw", image=self._player_view_photo)
+
+    def _load_current_map_fog_mask(self) -> Image.Image | None:
+        if not self.current_map_name:
+            return None
+        record = self.maps_wrapper_data.get(self.current_map_name) or {}
+        fog_rel = str(record.get("FogMaskPath") or "").strip()
+        if not fog_rel:
+            return None
+        fog_path = fog_rel if os.path.isabs(fog_rel) else os.path.join(ConfigHelper.get_campaign_dir(), fog_rel)
+        if not os.path.exists(fog_path):
+            return None
+        try:
+            fog_img = Image.open(fog_path).convert("RGBA")
+        except Exception:
+            return None
+        return fog_img
 
     def _prompt_token_color(self, token: dict) -> None:
         if not token:
@@ -2175,6 +2332,7 @@ class WorldMapPanel(ctk.CTkFrame):
                 except Exception:
                     pass
         self._chatbot_bindings = []
+        self.close_player_display()
         return
 
     def open_chatbot(self, event=None):

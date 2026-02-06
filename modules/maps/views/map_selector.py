@@ -551,7 +551,8 @@ def _on_display_map(self, entity_type, map_name): # entity_type here is the map'
                 "max_hp":       rec.get("max_hp", 10),
                 "hp_label_id":  None,                        
                 "hp_entry":     None,                        
-                "hp_entry_id":  None
+                "hp_entry_id":  None,
+                "player_visible": bool(rec.get("player_visible", True)),
             })
         elif item_type_from_rec in ["rectangle", "oval"]:
             item_data.update({
