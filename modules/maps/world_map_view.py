@@ -1824,6 +1824,11 @@ class WorldMapPanel(ctk.CTkFrame):
         fog = self.mask_img or self._load_current_map_fog_mask()
         if fog is not None:
             fog_mask = fog.resize((base_w, base_h), Image.LANCZOS)
+            if fog_mask.mode != "RGBA":
+                fog_mask = fog_mask.convert("RGBA")
+            _, _, _, alpha_channel = fog_mask.split()
+            processed_alpha = alpha_channel.point(lambda a: 255 if a > 0 else 0)
+            fog_mask.putalpha(processed_alpha)
             frame.alpha_composite(fog_mask)
 
         resized = frame.resize(
