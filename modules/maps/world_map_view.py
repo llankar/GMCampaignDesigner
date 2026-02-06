@@ -8,6 +8,7 @@ import tkinter as tk
 from tkinter import messagebox, simpledialog, colorchooser
 import customtkinter as ctk
 from PIL import Image, ImageTk, ImageDraw, ImageOps
+from screeninfo import get_monitors
 
 from db.db import get_connection, ensure_entity_schema
 
@@ -1647,9 +1648,16 @@ class WorldMapPanel(ctk.CTkFrame):
             except tk.TclError:
                 pass
 
+        monitors = get_monitors()
+        if not monitors:
+            log_warning("No monitors detected for player display", func_name="WorldMapPanel.open_player_display")
+            return
+        target = monitors[1] if len(monitors) > 1 else monitors[0]
+
         win = ctk.CTkToplevel(self)
         win.title(f"Player Display - {self.current_map_name}")
-        win.geometry("1280x720")
+        win.geometry(f"{target.width}x{target.height}+{target.x}+{target.y}")
+        win.resizable(True, True)
         canvas = tk.Canvas(win, bg="#000000", highlightthickness=0, relief="flat")
         canvas.pack(fill="both", expand=True)
 
