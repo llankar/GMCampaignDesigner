@@ -370,7 +370,10 @@ class WorldMapPanel(ctk.CTkFrame):
 
         self._tab_frames: dict[str, ctk.CTkFrame] = {}
         for name in ("Summary", "Notes", "Characters"):
-            frame = ctk.CTkFrame(self.tab_content_container, fg_color="transparent")
+            if name == "Summary":
+                frame = ctk.CTkScrollableFrame(self.tab_content_container, fg_color="transparent")
+            else:
+                frame = ctk.CTkFrame(self.tab_content_container, fg_color="transparent")
             self._tab_frames[name] = frame
 
         self.summary_container = self._tab_frames["Summary"]
