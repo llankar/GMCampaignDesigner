@@ -156,6 +156,7 @@ class WorldMapPanel(ctk.CTkFrame):
         self._player_view_window = None
         self._player_view_canvas = None
         self._player_view_photo = None
+        self._player_view_fog_photo = None
         self._player_view_token_images: list[ImageTk.PhotoImage] = []
 
         self._suppress_map_change = False
@@ -1759,6 +1760,7 @@ class WorldMapPanel(ctk.CTkFrame):
         self._player_view_window = win
         self._player_view_canvas = canvas
         self._player_view_photo = None
+        self._player_view_fog_photo = None
 
         def _on_close():
             self.close_player_display()
@@ -1772,6 +1774,7 @@ class WorldMapPanel(ctk.CTkFrame):
         self._player_view_window = None
         self._player_view_canvas = None
         self._player_view_photo = None
+        self._player_view_fog_photo = None
         if window is not None:
             try:
                 if window.winfo_exists():
@@ -1822,6 +1825,7 @@ class WorldMapPanel(ctk.CTkFrame):
 
         frame = self.base_image.copy()
         fog = self.mask_img or self._load_current_map_fog_mask()
+        fog_mask = None
         if fog is not None:
             fog_mask = fog.resize((base_w, base_h), Image.LANCZOS)
             if fog_mask.mode != "RGBA":
@@ -1829,7 +1833,6 @@ class WorldMapPanel(ctk.CTkFrame):
             _, _, _, alpha_channel = fog_mask.split()
             processed_alpha = alpha_channel.point(lambda a: 255 if a > 0 else 0)
             fog_mask.putalpha(processed_alpha)
-            frame.alpha_composite(fog_mask)
 
         resized = frame.resize(
             (max(1, int(round(scaled_w))), max(1, int(round(scaled_h)))),
@@ -1838,6 +1841,7 @@ class WorldMapPanel(ctk.CTkFrame):
 
         self._player_view_photo = ImageTk.PhotoImage(resized)
         self._player_view_token_images = []
+        self._player_view_fog_photo = None
         canvas.delete("all")
         canvas.create_image(offset_x, offset_y, anchor="nw", image=self._player_view_photo)
 
@@ -1852,6 +1856,14 @@ class WorldMapPanel(ctk.CTkFrame):
                 interactive=False,
                 image_store=self._player_view_token_images,
             )
+
+        if fog_mask is not None:
+            fog_overlay = fog_mask.resize(
+                (max(1, int(round(scaled_w))), max(1, int(round(scaled_h)))),
+                Image.LANCZOS,
+            )
+            self._player_view_fog_photo = ImageTk.PhotoImage(fog_overlay)
+            canvas.create_image(offset_x, offset_y, anchor="nw", image=self._player_view_fog_photo)
 
     def _load_current_map_fog_mask(self) -> Image.Image | None:
         if not self.current_map_name:
