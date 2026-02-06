@@ -385,6 +385,8 @@ def _describe_remote_tokens(self, render_offset=None):
     for idx, token in enumerate(getattr(self, 'tokens', []) or []):
         if str(token.get('type', 'token')).lower() != 'token':
             continue
+        if not bool(token.get('player_visible', True)):
+            continue
         if str(token.get('entity_type', '')).upper() != 'PC':
             continue
         remote_id = token.get('remote_id') or f"pc-{idx}-{token.get('entity_id') or token.get('entity_type') or 'token'}"
@@ -440,6 +442,8 @@ def _render_map_image(self):
         if item_type == 'marker':
             continue
         if item_type == 'token':
+            if not bool(item.get('player_visible', True)):
+                continue
             source = item.get('source_image')
             pil = item.get('pil_image')
             size_px = item.get('size')

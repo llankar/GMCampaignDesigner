@@ -88,6 +88,8 @@ def _update_fullscreen_map(self):
             continue
 
         if item_type == "token":
+            if not bool(item.get('player_visible', True)):
+                continue
             source = item.get('source_image')
             pil = item.get('pil_image')
             size_px = item.get('size')
