@@ -23,6 +23,7 @@ from modules.ui.chatbot_dialog import (
     open_chatbot_dialog,
     _DEFAULT_NAME_FIELD_OVERRIDES as CHATBOT_NAME_OVERRIDES,
 )
+from modules.maps.views.world_map_toolbar_view import build_world_map_toolbar
 from modules.scenarios.plot_twist_panel import PlotTwistPanel
 from modules.helpers.logging_helper import (
     log_debug,
@@ -133,6 +134,7 @@ class WorldMapPanel(ctk.CTkFrame):
         self._player_view_window = None
         self._player_view_canvas = None
         self._player_view_photo = None
+        self._player_view_token_images: list[ImageTk.PhotoImage] = []
 
         self._suppress_map_change = False
 
@@ -166,72 +168,7 @@ class WorldMapPanel(ctk.CTkFrame):
     # Layout helpers
     # ------------------------------------------------------------------
     def _build_layout(self) -> None:
-        toolbar = ctk.CTkFrame(self, fg_color="#101429")
-        toolbar.pack(side="top", fill="x", padx=12, pady=(12, 0))
-
-        left_group = ctk.CTkFrame(toolbar, fg_color="transparent")
-        left_group.pack(side="left", padx=8, pady=8)
-
-        selector_row = ctk.CTkFrame(left_group, fg_color="transparent")
-        selector_row.pack(side="top", fill="x")
-
-        ctk.CTkLabel(selector_row, text="Map:", font=("Segoe UI", 14, "bold")).pack(side="left", padx=(4, 6))
-        self.map_selector = ctk.CTkOptionMenu(
-            selector_row,
-            values=self.map_names,
-            command=self._on_map_selected,
-            width=240,
-        )
-        self.map_selector.pack(side="left", padx=(0, 12))
-
-        self.set_default_button = ctk.CTkButton(
-            selector_row,
-            text="Set as default",
-            width=140,
-            command=self._set_default_map,
-        )
-        self.set_default_button.pack(side="left", padx=(0, 12))
-
-        self.back_button = ctk.CTkButton(
-            selector_row,
-            text="Back",
-            width=120,
-            command=self.navigate_back,
-            state=ctk.DISABLED,
-        )
-        self.back_button.pack(side="left", padx=(0, 12))
-
-        entity_group = ctk.CTkFrame(toolbar, fg_color="transparent")
-        entity_group.pack(side="left", padx=8, pady=8)
-
-        ctk.CTkButton(entity_group, text="Add NPC", command=lambda: self._open_picker("NPC")).pack(side="left", padx=4)
-        ctk.CTkButton(entity_group, text="Add PC", command=lambda: self._open_picker("PC")).pack(side="left", padx=4)
-        ctk.CTkButton(entity_group, text="Add Creature", command=lambda: self._open_picker("Creature")).pack(side="left", padx=4)
-        ctk.CTkButton(entity_group, text="Add Place", command=lambda: self._open_picker("Place")).pack(side="left", padx=4)
-        ctk.CTkButton(entity_group, text="Add Map", command=lambda: self._open_picker("Map")).pack(side="left", padx=4)
-
-        self.save_button = ctk.CTkButton(toolbar, text="Save", width=120, command=self._persist_tokens)
-        self.save_button.pack(side="right", padx=12)
-
-        self.player_view_button = ctk.CTkButton(
-            toolbar,
-            text="Open Player Display",
-            width=170,
-            command=self.open_player_display,
-            state=ctk.DISABLED,
-        )
-        self.player_view_button.pack(side="right", padx=(0, 12))
-
-        self.map_tool_button = ctk.CTkButton(
-            toolbar,
-            text="Open in Map Tool",
-            width=160,
-            command=self._open_in_map_tool,
-            state=ctk.DISABLED,
-        )
-        self.map_tool_button.pack(side="right", padx=(0, 12))
-        self.chatbot_button = ctk.CTkButton(toolbar, text="Chatbot", width=140, command=self.open_chatbot)
-        self.chatbot_button.pack(side="right", padx=(0, 12))
+        build_world_map_toolbar(self)
 
         workspace = ctk.CTkFrame(self, fg_color="transparent")
         workspace.pack(fill="both", expand=True, padx=12, pady=12)
@@ -1157,7 +1094,26 @@ class WorldMapPanel(ctk.CTkFrame):
     def _draw_token(self, token: dict) -> None:
         if not self.render_params:
             return
-        scale, offset_x, offset_y, base_w, base_h = self.render_params
+        self._draw_token_on_canvas(
+            self.canvas,
+            token,
+            self.render_params,
+            interactive=True,
+            image_store=None,
+        )
+
+    def _draw_token_on_canvas(
+        self,
+        canvas: tk.Canvas,
+        token: dict,
+        render_params: tuple[float, float, float, int, int],
+        *,
+        interactive: bool,
+        image_store: list[ImageTk.PhotoImage] | None,
+    ) -> None:
+        if not render_params:
+            return
+        scale, offset_x, offset_y, base_w, base_h = render_params
         x = offset_x + token.get("x_norm", 0.5) * base_w * scale
         y = offset_y + token.get("y_norm", 0.5) * base_h * scale
         size = max(48, int(token.get("size", 120) * scale))
@@ -1165,8 +1121,8 @@ class WorldMapPanel(ctk.CTkFrame):
         image = self._resolve_token_image(token, size)
         radius = size // 2
         canvas_ids: list[int] = []
-        image_id = self.canvas.create_image(x, y, image=image, anchor="center")
-        label_id = self.canvas.create_text(
+        image_id = canvas.create_image(x, y, image=image, anchor="center")
+        label_id = canvas.create_text(
             x,
             y + radius + 18,
             text=token.get("entity_id", ""),
@@ -1182,7 +1138,7 @@ class WorldMapPanel(ctk.CTkFrame):
             if token.get("_has_portrait_image"):
                 half_size = size / 2
                 margin = border_width / 2
-                border_id = self.canvas.create_rectangle(
+                border_id = canvas.create_rectangle(
                     int(round(x - half_size - margin)),
                     int(round(y - half_size - margin)),
                     int(round(x + half_size + margin)),
@@ -1191,7 +1147,7 @@ class WorldMapPanel(ctk.CTkFrame):
                     width=border_width,
                 )
             else:
-                border_id = self.canvas.create_oval(
+                border_id = canvas.create_oval(
                     x - radius,
                     y - radius,
                     x + radius,
@@ -1199,39 +1155,43 @@ class WorldMapPanel(ctk.CTkFrame):
                     outline=border_color,
                     width=border_width,
                 )
-            self.canvas.tag_raise(border_id, image_id)
+            canvas.tag_raise(border_id, image_id)
             canvas_ids.append(border_id)
 
-        self.canvas.tag_raise(label_id)
-        token["canvas_ids"] = canvas_ids
-        token["tk_image"] = image
+        canvas.tag_raise(label_id)
+        if interactive:
+            token["canvas_ids"] = canvas_ids
+            token["tk_image"] = image
+        if image_store is not None:
+            image_store.append(image)
 
-        for cid in canvas_ids:
-            self.canvas.tag_bind(
-                cid,
-                "<ButtonPress-1>",
-                lambda e=None, t=token: self._on_token_press(e, t),
-            )
-            self.canvas.tag_bind(
-                cid,
-                "<B1-Motion>",
-                lambda e=None, t=token: self._on_token_drag(e, t),
-            )
-            self.canvas.tag_bind(
-                cid,
-                "<ButtonRelease-1>",
-                lambda e=None, t=token: self._on_token_release(e, t),
-            )
-            self.canvas.tag_bind(
-                cid,
-                "<Double-Button-1>",
-                lambda e=None, t=token: self._on_token_double_click(e, t),
-            )
-            self.canvas.tag_bind(
-                cid,
-                "<Button-3>",
-                lambda e=None, t=token: self._show_token_menu(e, t),
-            )
+        if interactive:
+            for cid in canvas_ids:
+                canvas.tag_bind(
+                    cid,
+                    "<ButtonPress-1>",
+                    lambda e=None, t=token: self._on_token_press(e, t),
+                )
+                canvas.tag_bind(
+                    cid,
+                    "<B1-Motion>",
+                    lambda e=None, t=token: self._on_token_drag(e, t),
+                )
+                canvas.tag_bind(
+                    cid,
+                    "<ButtonRelease-1>",
+                    lambda e=None, t=token: self._on_token_release(e, t),
+                )
+                canvas.tag_bind(
+                    cid,
+                    "<Double-Button-1>",
+                    lambda e=None, t=token: self._on_token_double_click(e, t),
+                )
+                canvas.tag_bind(
+                    cid,
+                    "<Button-3>",
+                    lambda e=None, t=token: self._show_token_menu(e, t),
+                )
     def _create_token_pil_image(self, token: dict, size: int) -> Image.Image:
         token["_uses_pin_image"] = False
         token["_has_portrait_image"] = False
@@ -1727,34 +1687,63 @@ class WorldMapPanel(ctk.CTkFrame):
         except tk.TclError:
             return
 
-        w = max(1, canvas.winfo_width())
-        h = max(1, canvas.winfo_height())
-        if w <= 1 or h <= 1:
+        canvas_w = max(1, canvas.winfo_width())
+        canvas_h = max(1, canvas.winfo_height())
+        if canvas_w <= 1 or canvas_h <= 1:
             return
 
+        base_w, base_h = self.base_image.size
+        if base_w <= 0 or base_h <= 0:
+            return
+
+        base_scale = min(canvas_w / base_w, canvas_h / base_h)
+        view_state = self._capture_view_state()
+        zoom = self._clamp_zoom(view_state.get("zoom", self.zoom) if view_state else self.zoom)
+        pan_x = self.pan_x
+        pan_y = self.pan_y
+        if view_state:
+            pan_norm = view_state.get("pan_norm")
+            if isinstance(pan_norm, (list, tuple)) and len(pan_norm) >= 2:
+                try:
+                    pan_x = float(pan_norm[0]) * base_w * base_scale
+                    pan_y = float(pan_norm[1]) * base_h * base_scale
+                except (TypeError, ValueError):
+                    pan_x = 0.0
+                    pan_y = 0.0
+
+        scale = base_scale * zoom
+        scaled_w = base_w * scale
+        scaled_h = base_h * scale
+        offset_x = (canvas_w - scaled_w) / 2 + pan_x
+        offset_y = (canvas_h - scaled_h) / 2 + pan_y
+
         frame = self.base_image.copy()
-        draw = ImageDraw.Draw(frame)
-        bw, bh = frame.size
+        fog = self._load_current_map_fog_mask()
+        if fog is not None:
+            fog_mask = fog.resize((base_w, base_h), Image.LANCZOS)
+            frame.alpha_composite(fog_mask)
+
+        resized = frame.resize(
+            (max(1, int(round(scaled_w))), max(1, int(round(scaled_h)))),
+            Image.LANCZOS,
+        )
+
+        self._player_view_photo = ImageTk.PhotoImage(resized)
+        self._player_view_token_images = []
+        canvas.delete("all")
+        canvas.create_image(offset_x, offset_y, anchor="nw", image=self._player_view_photo)
+
+        render_params = (scale, offset_x, offset_y, base_w, base_h)
         for token in self.tokens:
             if not bool(token.get("player_visible", True)):
                 continue
-            x = float(token.get("x_norm", 0.5)) * bw
-            y = float(token.get("y_norm", 0.5)) * bh
-            r = max(10, int(token.get("size", 40) * 0.35))
-            draw.ellipse((x-r, y-r, x+r, y+r), outline=token.get("color") or "#ffffff", width=3)
-
-        fog = self._load_current_map_fog_mask()
-        if fog is not None:
-            fog_mask = fog.resize((bw, bh), Image.LANCZOS)
-            frame.alpha_composite(fog_mask)
-
-        scale = min(w / bw, h / bh)
-        rw = max(1, int(bw * scale))
-        rh = max(1, int(bh * scale))
-        img = frame.resize((rw, rh), Image.LANCZOS)
-        self._player_view_photo = ImageTk.PhotoImage(img)
-        canvas.delete("all")
-        canvas.create_image((w-rw)//2, (h-rh)//2, anchor="nw", image=self._player_view_photo)
+            self._draw_token_on_canvas(
+                canvas,
+                token,
+                render_params,
+                interactive=False,
+                image_store=self._player_view_token_images,
+            )
 
     def _load_current_map_fog_mask(self) -> Image.Image | None:
         if not self.current_map_name:
