@@ -1159,6 +1159,13 @@ class WorldMapPanel(ctk.CTkFrame):
         radius = size // 2
         canvas_ids: list[int] = []
         image_id = canvas.create_image(x, y, image=image, anchor="center")
+        label_shadow_id = canvas.create_text(
+            x + 1,
+            y + radius + 19,
+            text=token.get("entity_id", ""),
+            fill="#0B0B0B",
+            font=("Segoe UI", 12, "bold"),
+        )
         label_id = canvas.create_text(
             x,
             y + radius + 18,
@@ -1167,7 +1174,7 @@ class WorldMapPanel(ctk.CTkFrame):
             font=("Segoe UI", 12, "bold"),
         )
 
-        canvas_ids.extend([image_id, label_id])
+        canvas_ids.extend([image_id, label_shadow_id, label_id])
 
         if not token.get("_uses_pin_image"):
             border_color = self._resolve_token_color(token)
