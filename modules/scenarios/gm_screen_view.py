@@ -2429,7 +2429,7 @@ class GMScreenView(ctk.CTkFrame):
         template = self.templates[entity_type]
         portrait_path = primary_portrait(entity.get("Portrait"))
         resolved_portrait = resolve_portrait_path(portrait_path, ConfigHelper.get_campaign_dir())
-        if (entity_type in {"NPCs", "PCs", "Creatures"}) and resolved_portrait and os.path.exists(resolved_portrait):
+        if (entity_type in {"NPCs", "PCs", "Creatures", "Factions"}) and resolved_portrait and os.path.exists(resolved_portrait):
             img = Image.open(resolved_portrait)
             img = img.resize((200, 200), Image.Resampling.LANCZOS)
             ctk_image = ctk.CTkImage(light_image=img, size=(200, 200))
@@ -2444,7 +2444,7 @@ class GMScreenView(ctk.CTkFrame):
         for field in template["fields"]:
             field_name = field["name"]
             field_type = field["type"]
-            if (entity_type == "NPCs" or entity_type == "PCs" or entity_type == "Creatures") and field_name == "Portrait":
+            if (entity_type in {"NPCs", "PCs", "Creatures", "Factions"}) and field_name == "Portrait":
                 continue
             if field_type == "longtext":
                 self.insert_longtext(frame, field_name, entity.get(field_name, ""))

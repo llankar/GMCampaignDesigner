@@ -1469,9 +1469,9 @@ def create_entity_detail_frame(entity_type, entity, master, open_entity_callback
     # This local cache is used for portrait images (if any).
     content_frame.portrait_images = {}
 
-    # If entity_type is "NPCs" and the entity has a valid Portrait, load and show it.
+    # If the entity has a valid Portrait, load and show it for portrait-capable types.
     portrait_path = primary_portrait(entity.get("Portrait"))
-    if (entity_type in {"NPCs", "PCs", "Creatures"}) :
+    if (entity_type in {"NPCs", "PCs", "Creatures", "Factions"}):
         resolved_portrait = resolve_portrait_path(portrait_path, ConfigHelper.get_campaign_dir())
         if resolved_portrait and os.path.exists(resolved_portrait):
             try:
@@ -1499,7 +1499,7 @@ def create_entity_detail_frame(entity_type, entity, master, open_entity_callback
         field_name = field["name"]
         field_type = field["type"]
         # Skip the Portrait field if already handled.
-        if (entity_type == "NPCs" or entity_type == "PCs" or entity_type == "Creatures") and field_name == "Portrait":
+        if (entity_type in {"NPCs", "PCs", "Creatures", "Factions"}) and field_name == "Portrait":
             continue
         if field_type == "longtext":
             insert_longtext(content_frame, field_name, entity.get(field_name, ""))
