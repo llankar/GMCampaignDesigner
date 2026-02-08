@@ -662,6 +662,7 @@ class PortraitImporter:
             ("places", "Name"),
             ("objects", "Name"),
             ("clues", "Name"),
+            ("factions", "Name"),
         ]
         display_names = {
             "npcs": "NPCs",
@@ -670,6 +671,7 @@ class PortraitImporter:
             "places": "Places",
             "objects": "Objects",
             "clues": "Clues",
+            "factions": "Factions",
         }
 
         def compute_matches(normalized_name: str) -> list[dict]:

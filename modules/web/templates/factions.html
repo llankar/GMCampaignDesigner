@@ -56,7 +56,6 @@
                         id: 'n' + i,
                         label: n.name,
                         color: n.color || '#888',
-                        // no portraits, but Cytoscape style can still reference this
                         portrait: n.portrait,
                         background: n.background
                     },
@@ -79,13 +78,20 @@
                             selector: 'node',
                             style: {
                                 'shape': 'roundrectangle',
-                                'background-color': 'data(color)',
+                                'background-image': 'data(portrait)',
+                                'background-fit': 'cover',
+                                'background-color': '#ccc',
+                                'border-color': 'data(color)',
+                                'border-width': 3,
                                 'label': 'data(label)',
                                 'text-valign': 'center',
                                 'text-halign': 'center',
                                 'width': 100,
-                                'height': 50,
-                                'font-size': 12
+                                'height': 100,
+                                'font-size': 12,
+                                'text-background-color': '#fff',
+                                'text-background-opacity': 0.8,
+                                'text-background-padding': 2
                             }
                         },
                         {

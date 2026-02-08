@@ -760,9 +760,30 @@ def faction_graph():
         return jsonify(error="Graph file not found"), 404
     with open(path, encoding='utf-8') as f:
         data = json.load(f)
+    faction_wrapper = GenericModelWrapper("factions")
+    faction_map = {item.get("Name"): item for item in faction_wrapper.load_items()}
     for node in data.get("nodes", []):
-        node["portrait"] = FALLBACK_PORTRAIT
-        node["background"] = node.get("description", "(No description)")
+        name = node.get("name", "").strip()
+        record = faction_map.get(name)
+        portrait_src = ""
+        if record:
+            portrait_src = primary_portrait(record.get("Portrait", "")).strip()
+        if portrait_src:
+            node["portrait"] = f"/portraits/{os.path.basename(portrait_src)}"
+        else:
+            node["portrait"] = FALLBACK_PORTRAIT
+        background = ""
+        if record:
+            for key in ("Description", "Secrets", "Notes", "Background"):
+                value = record.get(key)
+                if value:
+                    background = value
+                    break
+        if not background:
+            background = node.get("description", "(No description)")
+        node["background"] = (
+            format_multiline_text(background) if background else "(No description)"
+        )
     return jsonify(data)
 
 
