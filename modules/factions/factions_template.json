@@ -2,6 +2,7 @@
   "fields": [
       {"name": "Name", "type": "text"},
       {"name": "Description", "type": "longtext"},
-      {"name": "Secrets", "type": "longtext"}
+      {"name": "Secrets", "type": "longtext"},
+      {"name": "Portrait", "type": "text"}
   ]
 }
