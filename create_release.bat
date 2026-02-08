@@ -77,11 +77,7 @@ REM ===== Build release notes with commit list since previous tag =====
 set "NOTES_FILE=docs/release-notes.md"
 set "TMP_NOTES=%TEMP%\release-notes-%TAG%.md"
 if exist "%TMP_NOTES%" del "%TMP_NOTES%"
-if exist "%NOTES_FILE%" (
-  copy /y "%NOTES_FILE%" "%TMP_NOTES%" >nul
-) else (
-  echo GMCampaignDesigner %TAG%>"%TMP_NOTES%"
-)
+echo GMCampaignDesigner %TAG%>"%TMP_NOTES%"
 
 REM Find previous tag (if any)
 set "PREV_TAG="
@@ -93,10 +89,10 @@ if not defined PREV_TAG (
 echo.>>"%TMP_NOTES%"
 if defined PREV_TAG (
   echo Commits since %PREV_TAG%:>>"%TMP_NOTES%"
-  git log --pretty=format:"- %%s (%%h)" %PREV_TAG%..%TAG% >>"%TMP_NOTES%"
+  git log -n 200 --pretty=format:"- %%s (%%h)" %PREV_TAG%..HEAD >>"%TMP_NOTES%"
 ) else (
   echo Commits in %TAG%:>>"%TMP_NOTES%"
-  git log --pretty=format:"- %%s (%%h)" %TAG% >>"%TMP_NOTES%"
+  git log -n 200 --pretty=format:"- %%s (%%h)" %TAG% >>"%TMP_NOTES%"
 )
 echo.>>"%TMP_NOTES%"
 
@@ -108,6 +104,7 @@ if errorlevel 1 goto :err
 
 REM ===== If release exists: edit + clobber asset; else: create =====
 gh release view "%TAG%" >nul 2>nul
+
 if errorlevel 1 (
   echo [INFO] Release %TAG% not found. Creating...
   gh release create "%TAG%" "%ZIP%" --title "GMCampaignDesigner %TAG%" --notes-file "%TMP_NOTES%" || exit /b 1
