@@ -15,7 +15,7 @@ from modules.helpers.logging_helper import (
 
 log_module_import(__name__)
 
-# max size for the popup (same as in generic_list_view)
+# max size fallback for the popup (same as in generic_list_view)
 MAX_PORTRAIT_SIZE = (1024, 1024)
 
 @log_function
@@ -55,20 +55,21 @@ def show_portrait(path, title=None):
         tk.messagebox.showerror("Error", f"Failed to load image: {e}")
         return
 
-    # scale down if too large
-    ow, oh = img.size
-    mw, mh = MAX_PORTRAIT_SIZE
-    scale = min(mw/ow, mh/oh, 1)
-    if scale < 1:
-        img = img.resize((int(ow*scale), int(oh*scale)),
-                        Image.Resampling.LANCZOS)
-
-    photo = ImageTk.PhotoImage(img)
-
     # pick a monitor (second if available)
     monitors = _get_monitors()
     target = monitors[1] if len(monitors) > 1 else monitors[0]
     sx, sy, sw, sh = target
+
+    # scale down if too large (prefer available screen size, fallback to MAX_PORTRAIT_SIZE)
+    ow, oh = img.size
+    title_padding = 100 if title else 40
+    max_w = min(MAX_PORTRAIT_SIZE[0], int(sw * 0.9))
+    max_h = min(MAX_PORTRAIT_SIZE[1], int(sh * 0.9) - title_padding)
+    scale = min(max_w / ow, max_h / oh, 1)
+    if scale < 1:
+        img = img.resize((int(ow * scale), int(oh * scale)), Image.Resampling.LANCZOS)
+
+    photo = ImageTk.PhotoImage(img)
 
     win = ctk.CTkToplevel()
     win.title(title or os.path.basename(resolved))
