@@ -63,8 +63,12 @@ def show_portrait(path, title=None):
     # scale down if too large (prefer available screen size, fallback to MAX_PORTRAIT_SIZE)
     ow, oh = img.size
     title_padding = 100 if title else 40
-    max_w = min(MAX_PORTRAIT_SIZE[0], int(sw * 0.9))
-    max_h = min(MAX_PORTRAIT_SIZE[1], int(sh * 0.9) - title_padding)
+    screen_w = int(sw * 0.9)
+    screen_h = int(sh * 0.9) - title_padding
+    if screen_w <= 0 or screen_h <= 0:
+        max_w, max_h = MAX_PORTRAIT_SIZE
+    else:
+        max_w, max_h = screen_w, screen_h
     scale = min(max_w / ow, max_h / oh, 1)
     if scale < 1:
         img = img.resize((int(ow * scale), int(oh * scale)), Image.Resampling.LANCZOS)
