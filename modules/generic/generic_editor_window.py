@@ -2260,8 +2260,16 @@ class GenericEditorWindow(ctk.CTkToplevel):
         portrait_folder.mkdir(parents=True, exist_ok=True)
 
         npc_name = self.item.get('Name', 'Unnamed').replace(' ', '_')
+        source_stem = os.path.splitext(os.path.basename(src_path))[0]
+        sanitized_stem = ''.join(
+            char if char.isalnum() or char in {'_', '-'} else '_'
+            for char in source_stem
+        )
+        if not sanitized_stem:
+            sanitized_stem = 'portrait'
         ext = os.path.splitext(src_path)[-1].lower()
-        dest_filename = f"{npc_name}_{id(self)}{ext}"
+        unique_stamp = time.time_ns()
+        dest_filename = f"{npc_name}_{sanitized_stem}_{unique_stamp}{ext}"
         dest_path = portrait_folder / dest_filename
         shutil.copy(src_path, dest_path)
 
