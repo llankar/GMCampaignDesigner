@@ -49,7 +49,6 @@ class AppMenuBar:
         file_menu.add_separator()
         file_menu.add_command(label="Export Scenarios", command=self.app.preview_and_export_scenarios)
         file_menu.add_command(label="Export Campaign Dossier", command=self.app.open_campaign_dossier_exporter)
-        file_menu.add_command(label="Export to Foundry", command=self.app.export_foundry)
         file_menu.add_separator()
         file_menu.add_command(label="Quit", command=self.app.destroy, accelerator="F12")
         self.menu.add_cascade(label="File", menu=file_menu)
