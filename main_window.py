@@ -62,6 +62,7 @@ from modules.helpers.portrait_helper import parse_portrait_value, serialize_port
 from modules.ui.system_selector_dialog import CampaignSystemSelectorDialog
 from modules.ui.database_manager_dialog import DatabaseManagerDialog
 from modules.ui.system_manager_dialog import SystemManagerDialog
+from modules.ui.menu_bar import AppMenuBar
 
 from modules.generic.generic_list_view import GenericListView
 from modules.generic.generic_model_wrapper import GenericModelWrapper
@@ -136,6 +137,7 @@ class MainWindow(ctk.CTk):
         position_window_at_top(self)
         self.set_window_icon()
         self.create_layout()
+        self.create_menu_bar()
         self.sidebar_default_width = 220
         self._sidebar_collapsed = False
         self._sidebar_animating = False
@@ -278,6 +280,10 @@ class MainWindow(ctk.CTk):
     def create_layout(self):
         self.main_frame = ctk.CTkFrame(self)
         self.main_frame.pack(fill="both", expand=True)
+
+    def create_menu_bar(self):
+        self.menu_bar = AppMenuBar(self)
+        self.menu_bar.attach()
 
     def load_icons(self):
         log_debug("Loading sidebar icons", func_name="main_window.MainWindow.load_icons")
