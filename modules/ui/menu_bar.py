@@ -10,6 +10,7 @@ class AppMenuBar:
     def __init__(self, app):
         self.app = app
         self.menu = tk.Menu(app)
+        self._submenus: list[tk.Menu] = []
         self._apply_menu_theme(self.menu)
         self._build()
 
@@ -41,15 +42,21 @@ class AppMenuBar:
         )
 
     def _build(self):
+        self._submenus = []
         self._add_file_menu()
         self._add_campaign_menu()
         self._add_tools_menu()
         self._add_view_menu()
         self._add_help_menu()
 
+    def _new_submenu(self) -> tk.Menu:
+        submenu = tk.Menu(self.menu, tearoff=0)
+        self._apply_menu_theme(submenu)
+        self._submenus.append(submenu)
+        return submenu
+
     def _add_file_menu(self):
-        file_menu = tk.Menu(self.menu, tearoff=0)
-        self._apply_menu_theme(file_menu)
+        file_menu = self._new_submenu()
         file_menu.add_command(label="Change Database", command=self.app.change_database_storage, accelerator="F6")
         file_menu.add_separator()
         file_menu.add_command(label="Create Backup", command=self.app.prompt_campaign_backup)
@@ -62,8 +69,7 @@ class AppMenuBar:
         self.menu.add_cascade(label="File", menu=file_menu)
 
     def _add_campaign_menu(self):
-        campaign_menu = tk.Menu(self.menu, tearoff=0)
-        self._apply_menu_theme(campaign_menu)
+        campaign_menu = self._new_submenu()
         campaign_menu.add_command(label="Campaign Workshop", command=self.app.refresh_entities)
         campaign_menu.add_command(label="GM Screen", command=self.app.open_gm_screen, accelerator="F1")
         campaign_menu.add_command(label="World Map", command=self.app.open_world_map, accelerator="F5")
@@ -75,8 +81,7 @@ class AppMenuBar:
         self.menu.add_cascade(label="Campaign", menu=campaign_menu)
 
     def _add_tools_menu(self):
-        tools_menu = tk.Menu(self.menu, tearoff=0)
-        self._apply_menu_theme(tools_menu)
+        tools_menu = self._new_submenu()
         tools_menu.add_command(label="Generate Scenario", command=self.app.open_scenario_generator)
         tools_menu.add_command(label="Scenario Builder", command=self.app.open_scenario_builder, accelerator="F4")
         tools_menu.add_command(label="Import Scenario", command=self.app.open_scenario_importer)
@@ -91,8 +96,7 @@ class AppMenuBar:
         self.menu.add_cascade(label="GM Tools", menu=tools_menu)
 
     def _add_view_menu(self):
-        view_menu = tk.Menu(self.menu, tearoff=0)
-        self._apply_menu_theme(view_menu)
+        view_menu = self._new_submenu()
         view_menu.add_command(label="Show Audio Bar", command=self.app.open_audio_bar)
         view_menu.add_command(label="Show Dice Bar", command=self.app.open_dice_bar)
         view_menu.add_command(label="Select System", command=self.app.open_system_selector)
@@ -101,8 +105,7 @@ class AppMenuBar:
         self.menu.add_cascade(label="View", menu=view_menu)
 
     def _add_help_menu(self):
-        help_menu = tk.Menu(self.menu, tearoff=0)
-        self._apply_menu_theme(help_menu)
+        help_menu = self._new_submenu()
         help_menu.add_command(
             label="Shortcuts",
             command=lambda: messagebox.showinfo(
@@ -122,3 +125,13 @@ class AppMenuBar:
 
     def attach(self):
         self.app.configure(menu=self.menu)
+
+    def refresh_theme(self):
+        """Re-apply colors after a theme change."""
+        self._apply_menu_theme(self.menu)
+        for submenu in self._submenus:
+            try:
+                self._apply_menu_theme(submenu)
+            except Exception:
+                pass
+        self.attach()
