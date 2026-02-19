@@ -24,17 +24,22 @@ class PresetsPanel(ctk.CTkFrame):
 
         ctk.CTkLabel(self, text="Presets", font=("Segoe UI", 15, "bold")).pack(anchor="w", padx=8, pady=(8, 4))
 
-        self._name = ctk.StringVar(value="Combat")
-        self._seconds = ctk.StringVar(value="360")
-        self._mode = ctk.StringVar(value="countdown")
-        self._repeat = ctk.BooleanVar(value=False)
+        # NOTE:
+        # Keep tkinter widget internals untouched: CTkFrame inherits the tkinter
+        # `_name` attribute used during widget destruction. Overwriting `_name`
+        # with a StringVar breaks shutdown (`TypeError: unhashable type:
+        # 'StringVar'` when Tk checks `self._name in self.master.children`).
+        self._preset_name_var = ctk.StringVar(value="Combat")
+        self._seconds_var = ctk.StringVar(value="360")
+        self._mode_var = ctk.StringVar(value="countdown")
+        self._repeat_var = ctk.BooleanVar(value=False)
 
         form = ctk.CTkFrame(self)
         form.pack(fill="x", padx=8, pady=(0, 6))
-        ctk.CTkEntry(form, textvariable=self._name, placeholder_text="Preset name").pack(fill="x", padx=6, pady=(6, 4))
-        ctk.CTkEntry(form, textvariable=self._seconds, placeholder_text="Duration seconds").pack(fill="x", padx=6, pady=4)
-        ctk.CTkSegmentedButton(form, values=["countdown", "stopwatch"], variable=self._mode).pack(fill="x", padx=6, pady=4)
-        ctk.CTkCheckBox(form, text="Repeat auto", variable=self._repeat).pack(anchor="w", padx=6, pady=(2, 6))
+        ctk.CTkEntry(form, textvariable=self._preset_name_var, placeholder_text="Preset name").pack(fill="x", padx=6, pady=(6, 4))
+        ctk.CTkEntry(form, textvariable=self._seconds_var, placeholder_text="Duration seconds").pack(fill="x", padx=6, pady=4)
+        ctk.CTkSegmentedButton(form, values=["countdown", "stopwatch"], variable=self._mode_var).pack(fill="x", padx=6, pady=4)
+        ctk.CTkCheckBox(form, text="Repeat auto", variable=self._repeat_var).pack(anchor="w", padx=6, pady=(2, 6))
 
         buttons = ctk.CTkFrame(self, fg_color="transparent")
         buttons.pack(fill="x", padx=8, pady=(0, 6))
@@ -62,14 +67,14 @@ class PresetsPanel(ctk.CTkFrame):
 
     def _save_current(self) -> None:
         try:
-            duration = max(0.0, float(self._seconds.get() or 0))
+            duration = max(0.0, float(self._seconds_var.get() or 0))
         except Exception:
             duration = 0.0
         preset = self._timer_service.save_preset(
-            name=self._name.get().strip() or "Preset",
-            mode=self._mode.get(),
+            name=self._preset_name_var.get().strip() or "Preset",
+            mode=self._mode_var.get(),
             duration=duration,
-            repeat=bool(self._repeat.get()),
+            repeat=bool(self._repeat_var.get()),
         )
         self._selected_preset_id = preset.id
         self.refresh()
