@@ -408,6 +408,39 @@ class SceneFlowViewerFrame(ScenarioGraphEditor):
         expanded = bool(getattr(self.detail_expand_toggle, "get", lambda: False)())
         self._set_detail_panel_expanded(expanded)
 
+    def _place_detail_overlay(self) -> None:  # type: ignore[override]
+        """Keep scene details stretched to the full viewer width.
+
+        For this dedicated viewer window, the details panel should always use the
+        full horizontal space. The expand/collapse toggle now only changes the
+        panel height.
+        """
+
+        self.update_idletasks()
+        placement_parent = self.main_container if hasattr(self, "main_container") else self
+        width = max(1, int(placement_parent.winfo_width()))
+        height = max(1, int(placement_parent.winfo_height()))
+
+        overlay_w = width
+        if self._detail_panel_expanded:
+            overlay_h = int(height * self.detail_overlay_expanded_height_ratio)
+            y = max(0, (height - overlay_h) // 2)
+        else:
+            overlay_h = int(height * self.detail_overlay_height_ratio)
+            y = max(0, height - overlay_h)
+
+        overlay_h = max(1, overlay_h)
+
+        self.detail_overlay.configure(width=overlay_w, height=overlay_h)
+        self.detail_overlay.place(in_=placement_parent, x=0, y=y)
+        self.detail_overlay.lift()
+
+        wrap_length = max(10, overlay_w - 2 * self.detail_panel_padding)
+        if hasattr(self, "detail_panel_title"):
+            self.detail_panel_title.configure(wraplength=wrap_length)
+        if hasattr(self, "detail_panel_meta"):
+            self.detail_panel_meta.configure(wraplength=wrap_length)
+
     # ------------------------------------------------------------------
     # Visual styling adjustments
     # ------------------------------------------------------------------
