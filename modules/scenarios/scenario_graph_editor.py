@@ -834,8 +834,9 @@ class ScenarioGraphEditor(ctk.CTkFrame):
 
     def _place_detail_overlay(self):
         self.update_idletasks()
-        width = max(1, int(self.winfo_width()))
-        height = max(1, int(self.winfo_height()))
+        placement_parent = self.main_container if hasattr(self, "main_container") else self
+        width = max(1, int(placement_parent.winfo_width()))
+        height = max(1, int(placement_parent.winfo_height()))
         if self._detail_panel_expanded:
             overlay_w = int(width * self.detail_overlay_expanded_width_ratio)
             overlay_h = int(height * self.detail_overlay_expanded_height_ratio)
@@ -847,9 +848,18 @@ class ScenarioGraphEditor(ctk.CTkFrame):
             x = 0
             y = max(0, height - overlay_h)
 
-        self.detail_overlay.configure(width=max(1, overlay_w), height=max(1, overlay_h))
-        self.detail_overlay.place(x=x, y=y)
+        overlay_w = max(1, overlay_w)
+        overlay_h = max(1, overlay_h)
+
+        self.detail_overlay.configure(width=overlay_w, height=overlay_h)
+        self.detail_overlay.place(in_=placement_parent, x=x, y=y, width=overlay_w, height=overlay_h)
         self.detail_overlay.lift()
+
+        wrap_length = max(10, overlay_w - 2 * self.detail_panel_padding)
+        if hasattr(self, "detail_panel_title"):
+            self.detail_panel_title.configure(wraplength=wrap_length)
+        if hasattr(self, "detail_panel_meta"):
+            self.detail_panel_meta.configure(wraplength=wrap_length)
 
     def _on_detail_overlay_parent_resize(self, _event=None):
         if self._detail_panel_visible:
