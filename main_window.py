@@ -102,6 +102,7 @@ from modules.dice.dice_bar_window import DiceBarWindow
 from modules.audio.audio_bar_window import AudioBarWindow
 from modules.audio.audio_controller import get_audio_controller
 from modules.audio.sound_manager_window import SoundManagerWindow
+from modules.timer.ui.timer_window import TimerWindow
 
 initialize_logging()
 log_module_import(__name__)
@@ -156,6 +157,7 @@ class MainWindow(ctk.CTk):
         self.audio_controller = get_audio_controller()
         self.sound_manager_window = None
         self.audio_bar_window = None
+        self.timer_window = None
         self.portrait_importer = PortraitImporter(self)
         self._asset_library_window = None
         self._busy_modal = None
@@ -900,6 +902,7 @@ class MainWindow(ctk.CTk):
             ("whiteboard", "Whiteboard", self.open_whiteboard),
             ("audio_controls", "Sound & Music Manager", self.open_sound_manager),
             ("dice_roller", "Open Dice Roller", self.open_dice_roller),
+            ("session_timers", "Open Session Timers", self.open_timer_window),
         ]
 
         make_section(container, "Data & System", data_system)
@@ -3353,6 +3356,21 @@ class MainWindow(ctk.CTk):
             return
         if event.widget is self.dice_roller_window:
             self.dice_roller_window = None
+
+    def open_timer_window(self):
+        try:
+            window = self.timer_window
+            if window is None or not window.winfo_exists():
+                self.timer_window = TimerWindow(self)
+                self.timer_window.bind("<Destroy>", self._on_timer_window_destroyed)
+            self.timer_window.lift()
+            self.timer_window.focus_force()
+        except Exception as exc:
+            messagebox.showerror("Error", f"Failed to open Session Timers:\n{exc}")
+
+    def _on_timer_window_destroyed(self, event=None):
+        if event is None or event.widget is self.timer_window:
+            self.timer_window = None
 
     def open_whiteboard(self):
         log_info("Opening Whiteboard", func_name="main_window.MainWindow.open_whiteboard")
