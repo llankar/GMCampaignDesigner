@@ -3380,9 +3380,8 @@ class MainWindow(ctk.CTk):
     def open_timer_window(self):
         try:
             window = self.timer_window
-            if window is None or not window.winfo_exists():
+            if window is None:
                 self.timer_window = TimerWindow(self)
-                self.timer_window.bind("<Destroy>", self._on_timer_window_destroyed)
                 window = self.timer_window
             if hasattr(window, "show"):
                 window.show()
