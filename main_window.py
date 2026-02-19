@@ -716,6 +716,11 @@ class MainWindow(ctk.CTk):
         except Exception:
             pass
         try:
+            if getattr(self, "menu_bar", None) is not None:
+                self.menu_bar.refresh_theme()
+        except Exception:
+            pass
+        try:
             # Recreate sidebar so header bands and borders update
             self.create_sidebar(force=True)
         except Exception:
