@@ -17,9 +17,17 @@ class AppMenuBar:
         """Apply app-consistent colors and fonts to Tk menus."""
         tokens = theme_manager.get_tokens()
         menu_fg = "#E8EEF6"
-        menu_bg = tokens.get("panel_alt_bg", "#132133")
+        menu_bg = tokens.get("sidebar_header_bg", tokens.get("panel_alt_bg", "#132133"))
         active_bg = tokens.get("button_fg", "#0077CC")
         active_fg = "#FFFFFF"
+
+        # Some Tk builds ignore per-widget menu colors for the top menubar.
+        # Registering option defaults helps keep the menubar aligned with the
+        # currently selected in-app theme.
+        self.app.option_add("*Menu.background", menu_bg)
+        self.app.option_add("*Menu.foreground", menu_fg)
+        self.app.option_add("*Menu.activeBackground", active_bg)
+        self.app.option_add("*Menu.activeForeground", active_fg)
 
         menu_widget.configure(
             bg=menu_bg,
