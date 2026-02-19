@@ -847,7 +847,8 @@ class ScenarioGraphEditor(ctk.CTkFrame):
             x = 0
             y = max(0, height - overlay_h)
 
-        self.detail_overlay.place(x=x, y=y, width=max(1, overlay_w), height=max(1, overlay_h))
+        self.detail_overlay.configure(width=max(1, overlay_w), height=max(1, overlay_h))
+        self.detail_overlay.place(x=x, y=y)
         self.detail_overlay.lift()
 
     def _on_detail_overlay_parent_resize(self, _event=None):
