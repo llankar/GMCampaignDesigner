@@ -17,10 +17,10 @@ class TimerWindow:
     def __init__(self, parent):
         self._parent = parent
         self._timer_service = get_timer_service(scheduler=parent)
-        self._timer_service.subscribe(self._on_timers_changed)
-
         self._timer_id: Optional[str] = None
         self._last_duration_seconds: float = 300.0
+
+        self._timer_service.subscribe(self._on_timers_changed)
 
         self.control = TimerControlWindow(
             parent,
