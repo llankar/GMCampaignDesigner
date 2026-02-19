@@ -310,6 +310,7 @@ class MainWindow(ctk.CTk):
             "dice_roller": "dice_roller_icon.png",
             "dice_bar": "dice_roller_icon.png",
             "audio_controls": "sound_manager_icon.png",
+            "session_timers": "dice_roller_icon.png",
             "scene_flow_viewer": "scenes_flow_icon.png",
             "create_random_table"   : "random_table_icon.png",
             "system_manager": "database_icon.png",
@@ -564,6 +565,7 @@ class MainWindow(ctk.CTk):
             )
             system_button.pack(pady=(0, 6))
             self.system_button = system_button
+
 
             self.sidebar_sections_container = ctk.CTkFrame(self.sidebar_inner, fg_color="transparent")
             self.sidebar_sections_container.pack(fill="both", expand=True, padx=5, pady=5)
@@ -1383,11 +1385,29 @@ class MainWindow(ctk.CTk):
             return self.inner_content_frame
         else:
             return self.content_frame
+
     def create_exit_button(self):
-        exit_button = ctk.CTkButton(self, text="✕", command=self.destroy,
-                                    fg_color="red", hover_color="#AA0000",
-                                    width=20, height=20, corner_radius=15)
-        exit_button.place(relx=0.9999, rely=0.01, anchor="ne")
+        self.timer_mj_button = ctk.CTkButton(
+            self,
+            text="Timer MJ",
+            command=self.open_timer_window,
+            width=90,
+            height=24,
+            corner_radius=15,
+        )
+        self.timer_mj_button.place(relx=0.955, rely=0.01, anchor="ne")
+
+        self.exit_button = ctk.CTkButton(
+            self,
+            text="✕",
+            command=self.destroy,
+            fg_color="red",
+            hover_color="#AA0000",
+            width=20,
+            height=20,
+            corner_radius=15,
+        )
+        self.exit_button.place(relx=0.9999, rely=0.01, anchor="ne")
 
     def _apply_cursor_recursive(self, widget, cursor):
         try:
@@ -3363,8 +3383,13 @@ class MainWindow(ctk.CTk):
             if window is None or not window.winfo_exists():
                 self.timer_window = TimerWindow(self)
                 self.timer_window.bind("<Destroy>", self._on_timer_window_destroyed)
-            self.timer_window.lift()
-            self.timer_window.focus_force()
+                window = self.timer_window
+            if hasattr(window, "show"):
+                window.show()
+            else:
+                window.deiconify()
+                window.lift()
+                window.focus_force()
         except Exception as exc:
             messagebox.showerror("Error", f"Failed to open Session Timers:\n{exc}")
 
