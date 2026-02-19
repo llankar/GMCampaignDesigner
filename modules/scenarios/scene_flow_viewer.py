@@ -112,6 +112,11 @@ class SceneFlowViewerFrame(ScenarioGraphEditor):
         except Exception:
             pass
 
+        try:
+            self.main_container.bind("<Configure>", self._on_scene_flow_container_resized, add="+")
+        except Exception:
+            pass
+
     # ------------------------------------------------------------------
     # Portrait handling
     # ------------------------------------------------------------------
@@ -395,8 +400,14 @@ class SceneFlowViewerFrame(ScenarioGraphEditor):
             th = int(self.toolbar.winfo_height()) if hasattr(self, "toolbar") else 0
             if w > 1 and h > 1:
                 canvas.configure(width=w, height=max(1, h - th))
+                if getattr(self, "_detail_panel_visible", False):
+                    self._place_detail_overlay()
         except Exception:
             pass
+
+    def _on_scene_flow_container_resized(self, _event=None) -> None:
+        if getattr(self, "_detail_panel_visible", False):
+            self._place_detail_overlay()
 
     def _toggle_detail_panel(self, *_args) -> None:
         if getattr(self.detail_toggle, "get", lambda: True)():
@@ -418,7 +429,13 @@ class SceneFlowViewerFrame(ScenarioGraphEditor):
 
         self.update_idletasks()
         placement_parent = self.main_container if hasattr(self, "main_container") else self
-        width = max(1, int(placement_parent.winfo_width()))
+
+        # In some host layouts, main_container width lags one geometry cycle,
+        # making the overlay appear narrower than the visible viewer. Prefer
+        # the frame width when it is available.
+        frame_width = int(self.winfo_width()) if int(self.winfo_width()) > 1 else 0
+        container_width = int(placement_parent.winfo_width()) if int(placement_parent.winfo_width()) > 1 else 0
+        width = max(1, frame_width, container_width)
         height = max(1, int(placement_parent.winfo_height()))
 
         overlay_w = width
