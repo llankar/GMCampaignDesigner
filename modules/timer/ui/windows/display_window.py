@@ -8,6 +8,8 @@ class TimerDisplayWindow(ctk.CTkToplevel):
         super().__init__(parent)
         self._drag_offset_x = 0
         self._drag_offset_y = 0
+        self._blink_job = None
+        self._blink_state = False
 
         self.title("Timer")
         self.geometry("260x90")
@@ -51,9 +53,28 @@ class TimerDisplayWindow(ctk.CTkToplevel):
     def set_time(self, text: str) -> None:
         self._clock_label.configure(text=text)
 
+    def start_finished_blink(self) -> None:
+        if self._blink_job is not None:
+            return
+        self._blink_state = False
+        self._run_blink()
+
+    def stop_finished_blink(self) -> None:
+        if self._blink_job is not None:
+            self.after_cancel(self._blink_job)
+            self._blink_job = None
+        self._clock_label.configure(text_color="#ff2b2b")
+
+    def _run_blink(self) -> None:
+        self._blink_state = not self._blink_state
+        color = "#ffffff" if self._blink_state else "#ff2b2b"
+        self._clock_label.configure(text_color=color)
+        self._blink_job = self.after(420, self._run_blink)
+
     def show(self) -> None:
         self.deiconify()
         self.lift()
 
     def hide(self) -> None:
+        self.stop_finished_blink()
         self.withdraw()

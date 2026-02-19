@@ -6,6 +6,7 @@ import customtkinter as ctk
 
 from modules.timer import get_timer_service
 from modules.timer.models import TimerState
+from modules.timer.ui.alerts import TimerAlerts
 from modules.timer.ui.windows.control_window import TimerControlWindow
 from modules.timer.ui.windows.display_window import TimerDisplayWindow
 from modules.timer.ui.windows.time_format import format_seconds, parse_time_to_seconds
@@ -19,8 +20,10 @@ class TimerWindow:
         self._timer_service = get_timer_service(scheduler=parent)
         self._timer_id: Optional[str] = None
         self._last_duration_seconds: float = 300.0
+        self._alerts = TimerAlerts(parent, sound_enabled=True)
 
         self._timer_service.subscribe(self._on_timers_changed)
+        self._timer_service.subscribe_finished(self._on_timer_finished)
 
         self.control = TimerControlWindow(
             parent,
@@ -63,6 +66,7 @@ class TimerWindow:
         self._timer_id = timer.id
         self._timer_service.start(timer.id)
 
+        self.display.stop_finished_blink()
         self.control.withdraw()
         self.display.show()
 
@@ -72,6 +76,7 @@ class TimerWindow:
             return
         self._timer_service.stop(timer.id)
         self._timer_service.reset(timer.id)
+        self.display.stop_finished_blink()
         self.display.hide()
 
     def _pause(self) -> None:
@@ -100,12 +105,23 @@ class TimerWindow:
             timer = next((item for item in timers if item.id == self._timer_id), None)
         if not timer:
             return
+        if timer.mode == "countdown" and timer.running and timer.remaining > 0:
+            self.display.stop_finished_blink()
         text = format_seconds(timer.remaining)
         self.display.set_time(text)
         self.control.time_var.set(text)
 
+
+    def _on_timer_finished(self, timer: TimerState) -> None:
+        if timer.id != self._timer_id:
+            return
+        self.display.show()
+        self.display.start_finished_blink()
+        self._alerts.notify_finished(timer.name)
+
     def destroy(self) -> None:
         self._timer_service.unsubscribe(self._on_timers_changed)
+        self._timer_service.unsubscribe_finished(self._on_timer_finished)
         for window in (self.control, self.display):
             if isinstance(window, ctk.CTkToplevel) and window.winfo_exists():
                 window.destroy()
