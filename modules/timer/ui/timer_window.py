@@ -9,14 +9,26 @@ from modules.timer.models import TimerPreset, TimerState
 from modules.timer.ui.alerts import TimerAlerts
 from modules.timer.ui.history_panel import HistoryPanel
 from modules.timer.ui.presets_panel import PresetsPanel
+from modules.timer.ui.overlay_style import (
+    CLOCK_FONT,
+    OVERLAY_ALPHA_FALLBACK,
+    OVERLAY_BORDER_COLOR,
+    OVERLAY_GEOMETRY,
+    OVERLAY_TRANSPARENT_KEY,
+    STATUS_FONT,
+    TITLE_FONT,
+)
 
 
 class TimerWindow(ctk.CTkToplevel):
     def __init__(self, parent):
         super().__init__(parent)
         self.title("Session Timers")
-        self.geometry("1180x720")
+        self.geometry(OVERLAY_GEOMETRY)
+        self.minsize(360, 220)
         self.attributes("-topmost", True)
+        self.configure(fg_color=OVERLAY_TRANSPARENT_KEY)
+        self._apply_transparency()
 
         self._timer_service = get_timer_service(scheduler=parent)
         self._alerts = TimerAlerts(self)
@@ -28,47 +40,50 @@ class TimerWindow(ctk.CTkToplevel):
         self._timer_service.subscribe_finished(self._on_timer_finished)
         self.protocol("WM_DELETE_WINDOW", self._on_close)
 
+    def _apply_transparency(self) -> None:
+        try:
+            self.wm_attributes("-transparentcolor", OVERLAY_TRANSPARENT_KEY)
+        except Exception:
+            self.attributes("-alpha", OVERLAY_ALPHA_FALLBACK)
+
     def _build_layout(self) -> None:
-        left = ctk.CTkFrame(self)
-        left.pack(side="left", fill="both", expand=True, padx=8, pady=8)
+        container = ctk.CTkFrame(self, fg_color="transparent")
+        container.pack(fill="both", expand=True, padx=6, pady=6)
 
-        right = ctk.CTkFrame(self)
-        right.pack(side="right", fill="y", padx=(0, 8), pady=8)
+        self._build_create_controls(container)
+        self._build_actions(container)
 
-        self._build_create_controls(left)
-        self._build_actions(left)
+        self._timers_scroll = ctk.CTkScrollableFrame(container, fg_color="transparent")
+        self._timers_scroll.pack(fill="both", expand=True, padx=2, pady=(2, 4))
 
-        self._timers_scroll = ctk.CTkScrollableFrame(left)
-        self._timers_scroll.pack(fill="both", expand=True, padx=6, pady=(4, 6))
+        self._queue_label = ctk.CTkLabel(container, text="Queue: none", anchor="w")
+        self._queue_label.pack(fill="x", padx=4, pady=(0, 4))
 
-        self._queue_label = ctk.CTkLabel(left, text="Queue: none", anchor="w")
-        self._queue_label.pack(fill="x", padx=8, pady=(0, 6))
+        self._presets_panel = PresetsPanel(container, self._timer_service, self._create_from_preset)
+        self._presets_panel.pack(fill="x", padx=2, pady=(0, 4))
 
-        self._presets_panel = PresetsPanel(right, self._timer_service, self._create_from_preset)
-        self._presets_panel.pack(fill="x", padx=8, pady=(8, 6))
-
-        self._history_panel = HistoryPanel(right)
-        self._history_panel.pack(fill="both", expand=True, padx=8, pady=(0, 8))
+        self._history_panel = HistoryPanel(container)
+        self._history_panel.pack_forget()
 
     def _build_create_controls(self, parent) -> None:
-        box = ctk.CTkFrame(parent)
-        box.pack(fill="x", padx=6, pady=(6, 4))
+        box = ctk.CTkFrame(parent, fg_color="transparent")
+        box.pack(fill="x", padx=2, pady=(2, 2))
 
         self._new_name = ctk.StringVar(value="Timer")
         self._new_duration = ctk.StringVar(value="300")
         self._new_mode = ctk.StringVar(value="countdown")
         self._new_repeat = ctk.BooleanVar(value=False)
 
-        ctk.CTkLabel(box, text="Create timer", font=("Segoe UI", 14, "bold")).pack(anchor="w", padx=8, pady=(6, 4))
-        ctk.CTkEntry(box, textvariable=self._new_name, placeholder_text="Timer name").pack(fill="x", padx=8, pady=4)
-        ctk.CTkEntry(box, textvariable=self._new_duration, placeholder_text="Duration (seconds)").pack(fill="x", padx=8, pady=4)
-        ctk.CTkSegmentedButton(box, values=["countdown", "stopwatch"], variable=self._new_mode).pack(fill="x", padx=8, pady=4)
-        ctk.CTkCheckBox(box, text="Repeat auto", variable=self._new_repeat).pack(anchor="w", padx=8, pady=4)
-        ctk.CTkButton(box, text="Add timer", command=self._create_timer).pack(fill="x", padx=8, pady=(4, 8))
+        ctk.CTkLabel(box, text="Create timer", font=("Segoe UI", 12, "bold")).pack(anchor="w", padx=4, pady=(2, 2))
+        ctk.CTkEntry(box, textvariable=self._new_name, placeholder_text="Timer name").pack(fill="x", padx=4, pady=2)
+        ctk.CTkEntry(box, textvariable=self._new_duration, placeholder_text="Duration (seconds)").pack(fill="x", padx=4, pady=2)
+        ctk.CTkSegmentedButton(box, values=["countdown", "stopwatch"], variable=self._new_mode).pack(fill="x", padx=4, pady=2)
+        ctk.CTkCheckBox(box, text="Repeat auto", variable=self._new_repeat).pack(anchor="w", padx=4, pady=2)
+        ctk.CTkButton(box, text="Add timer", command=self._create_timer).pack(fill="x", padx=4, pady=(2, 2))
 
     def _build_actions(self, parent) -> None:
-        row = ctk.CTkFrame(parent)
-        row.pack(fill="x", padx=6, pady=(0, 4))
+        row = ctk.CTkFrame(parent, fg_color="transparent")
+        row.pack(fill="x", padx=2, pady=(0, 2))
 
         buttons = [
             ("Start", self._start_selected),
@@ -86,7 +101,7 @@ class TimerWindow(ctk.CTkToplevel):
         ]
         for idx, (label, callback) in enumerate(buttons):
             btn = ctk.CTkButton(row, text=label, command=callback)
-            btn.grid(row=idx // 4, column=idx % 4, sticky="ew", padx=4, pady=4)
+            btn.grid(row=idx // 4, column=idx % 4, sticky="ew", padx=2, pady=2)
         for col in range(4):
             row.grid_columnconfigure(col, weight=1)
 
@@ -195,17 +210,17 @@ class TimerWindow(ctk.CTkToplevel):
         self._presets_panel.refresh()
 
     def _build_timer_row(self, timer: TimerState) -> ctk.CTkFrame:
-        frame = ctk.CTkFrame(self._timers_scroll)
-        frame.pack(fill="x", padx=4, pady=4)
+        frame = ctk.CTkFrame(self._timers_scroll, fg_color="transparent")
+        frame.pack(fill="x", padx=2, pady=2)
 
-        title = ctk.CTkLabel(frame, text=timer.name, font=("Segoe UI", 14, "bold"))
-        title.grid(row=0, column=0, sticky="w", padx=8, pady=(6, 0))
+        title = ctk.CTkLabel(frame, text=timer.name, font=TITLE_FONT)
+        title.grid(row=0, column=0, sticky="w", padx=4, pady=(2, 0))
 
-        status = ctk.CTkLabel(frame, text="", font=("Segoe UI", 12))
-        status.grid(row=0, column=1, sticky="e", padx=8, pady=(6, 0))
+        status = ctk.CTkLabel(frame, text="", font=STATUS_FONT)
+        status.grid(row=0, column=1, sticky="e", padx=4, pady=(2, 0))
 
-        clock = ctk.CTkLabel(frame, text="00:00:00", font=("Consolas", 22, "bold"))
-        clock.grid(row=1, column=0, columnspan=2, sticky="ew", padx=8, pady=(0, 6))
+        clock = ctk.CTkLabel(frame, text="00:00:00", font=CLOCK_FONT)
+        clock.grid(row=1, column=0, columnspan=2, sticky="ew", padx=4, pady=(0, 2))
 
         frame.grid_columnconfigure(0, weight=1)
         frame.bind("<Button-1>", lambda _e, t_id=timer.id: self._select_timer(t_id))
@@ -225,7 +240,7 @@ class TimerWindow(ctk.CTkToplevel):
         frame._status.configure(text=f"{status}{repeat}")
         frame._clock.configure(text=self._format_seconds(timer.remaining))
         selected = timer.id == self._selected_timer_id
-        frame.configure(border_width=2 if selected else 0, border_color="#4c8bf5")
+        frame.configure(border_width=2 if selected else 0, border_color=OVERLAY_BORDER_COLOR)
 
     def _select_timer(self, timer_id: str) -> None:
         self._selected_timer_id = timer_id
