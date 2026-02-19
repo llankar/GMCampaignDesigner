@@ -19,6 +19,7 @@ class TkAfterScheduler(Protocol):
 
 
 TimerSubscriber = Callable[[List[TimerState]], None]
+TimerFinishedSubscriber = Callable[[TimerState], None]
 
 
 class TimerService:
@@ -36,6 +37,7 @@ class TimerService:
         self._order: List[str] = []
         self._presets: Dict[str, TimerPreset] = {}
         self._subscribers: Set[TimerSubscriber] = set()
+        self._finished_subscribers: Set[TimerFinishedSubscriber] = set()
 
         self._after_id: Optional[str] = None
         self._last_tick_ts: Optional[float] = None
@@ -52,6 +54,12 @@ class TimerService:
 
     def unsubscribe(self, callback: TimerSubscriber) -> None:
         self._subscribers.discard(callback)
+
+    def subscribe_finished(self, callback: TimerFinishedSubscriber) -> None:
+        self._finished_subscribers.add(callback)
+
+    def unsubscribe_finished(self, callback: TimerFinishedSubscriber) -> None:
+        self._finished_subscribers.discard(callback)
 
     def create_timer(
         self,
@@ -138,6 +146,22 @@ class TimerService:
         self._persist_and_publish()
         return replace(timer)
 
+    def delete_timer(self, timer_id: str) -> bool:
+        if timer_id not in self._timers:
+            return False
+        self._timers.pop(timer_id, None)
+        self._order = [existing_id for existing_id in self._order if existing_id != timer_id]
+        self._persist_and_publish()
+        return True
+
+    def set_repeat(self, timer_id: str, repeat: bool) -> Optional[TimerState]:
+        timer = self._timers.get(timer_id)
+        if timer is None:
+            return None
+        timer.repeat = bool(repeat)
+        self._persist_and_publish()
+        return replace(timer)
+
     def add_time(self, timer_id: str, delta_seconds: float) -> Optional[TimerState]:
         timer = self._timers.get(timer_id)
         if timer is None:
@@ -201,6 +225,13 @@ class TimerService:
         self._persist_and_publish()
         return replace(preset)
 
+    def delete_preset(self, preset_id: str) -> bool:
+        if preset_id not in self._presets:
+            return False
+        self._presets.pop(preset_id, None)
+        self._persist_and_publish()
+        return True
+
     def _load_persisted_state(self) -> None:
         timers, presets = self._persistence.load()
         for timer in timers:
@@ -230,6 +261,7 @@ class TimerService:
                     else:
                         timer.running = False
                         timer.paused = False
+                        self._notify_finished(timer)
                 changed = True
             else:
                 timer.remaining += delta
@@ -240,6 +272,7 @@ class TimerService:
                         timer.remaining = timer.duration
                         timer.running = False
                         timer.paused = False
+                        self._notify_finished(timer)
                 changed = True
 
         if changed:
@@ -275,3 +308,8 @@ class TimerService:
             assert self._scheduler is not None
             self._scheduler.after_cancel(self._after_id)
             self._after_id = None
+
+    def _notify_finished(self, timer: TimerState) -> None:
+        snapshot = replace(timer)
+        for callback in list(self._finished_subscribers):
+            callback(snapshot)
