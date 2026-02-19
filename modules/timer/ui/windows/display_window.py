@@ -30,7 +30,7 @@ class TimerDisplayWindow(ctk.CTkToplevel):
             container,
             text="00:00:00",
             text_color="#ff2b2b",
-            font=("Consolas", 44, "bold"),
+            font=("Consolas", 20, "bold"),
         )
         self._clock_label.pack(fill="both", expand=True)
 
