@@ -852,7 +852,7 @@ class ScenarioGraphEditor(ctk.CTkFrame):
         overlay_h = max(1, overlay_h)
 
         self.detail_overlay.configure(width=overlay_w, height=overlay_h)
-        self.detail_overlay.place(in_=placement_parent, x=x, y=y, width=overlay_w, height=overlay_h)
+        self.detail_overlay.place(in_=placement_parent, x=x, y=y)
         self.detail_overlay.lift()
 
         wrap_length = max(10, overlay_w - 2 * self.detail_panel_padding)
