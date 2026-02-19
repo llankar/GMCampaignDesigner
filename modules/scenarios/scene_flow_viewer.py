@@ -166,6 +166,15 @@ class SceneFlowViewerFrame(ScenarioGraphEditor):
         self.detail_toggle.pack(side="right", padx=(0, 8))
         self.detail_toggle.select()
 
+        self.detail_expand_toggle = ctk.CTkSwitch(
+            toolbar,
+            text="Expand/Collapse",
+            command=self._toggle_detail_panel_mode,
+            onvalue=True,
+            offvalue=False,
+        )
+        self.detail_expand_toggle.pack(side="right", padx=(0, 8))
+
         # Fit mode selector (initial zoom)
         fit_label = ctk.CTkLabel(toolbar, text="Fit:")
         fit_label.pack(side="right", padx=(8, 4))
@@ -394,6 +403,10 @@ class SceneFlowViewerFrame(ScenarioGraphEditor):
             self._show_detail_panel()
         else:
             self._hide_detail_panel()
+
+    def _toggle_detail_panel_mode(self, *_args) -> None:
+        expanded = bool(getattr(self.detail_expand_toggle, "get", lambda: False)())
+        self._set_detail_panel_expanded(expanded)
 
     # ------------------------------------------------------------------
     # Visual styling adjustments
