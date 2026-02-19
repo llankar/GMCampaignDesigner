@@ -104,7 +104,7 @@ class AppMenuBar:
 
     def _add_file_menu(self):
         file_menu = self._new_submenu()
-        file_menu.add_command(label="Change Database\tF6", command=self.app.change_database_storage)
+        file_menu.add_command(label="Change Database\t F6", command=self.app.change_database_storage)
         file_menu.add_separator()
         file_menu.add_command(label="Create Backup", command=self.app.prompt_campaign_backup)
         file_menu.add_command(label="Restore Backup", command=self.app.prompt_campaign_restore)
@@ -112,14 +112,14 @@ class AppMenuBar:
         file_menu.add_command(label="Export Scenarios", command=self.app.preview_and_export_scenarios)
         file_menu.add_command(label="Export Campaign Dossier", command=self.app.open_campaign_dossier_exporter)
         file_menu.add_separator()
-        file_menu.add_command(label="Quit\tF12", command=self.app.destroy)
+        file_menu.add_command(label="Quit\t F12", command=self.app.destroy)
         self._add_menu_button("File", file_menu)
 
     def _add_campaign_menu(self):
         campaign_menu = self._new_submenu()
         campaign_menu.add_command(label="Campaign Workshop", command=self.app.refresh_entities)
-        campaign_menu.add_command(label="GM Screen\tF1", command=self.app.open_gm_screen)
-        campaign_menu.add_command(label="World Map\tF5", command=self.app.open_world_map)
+        campaign_menu.add_command(label="GM Screen\t F1", command=self.app.open_gm_screen)
+        campaign_menu.add_command(label="World Map\t F5", command=self.app.open_world_map)
         campaign_menu.add_separator()
         campaign_menu.add_command(label="Character Graph", command=self.app.open_character_graph_editor)
         campaign_menu.add_command(label="Faction Graph", command=self.app.open_faction_graph_editor)
@@ -130,15 +130,15 @@ class AppMenuBar:
     def _add_tools_menu(self):
         tools_menu = self._new_submenu()
         tools_menu.add_command(label="Generate Scenario", command=self.app.open_scenario_generator)
-        tools_menu.add_command(label="Scenario Builder\tF4", command=self.app.open_scenario_builder)
+        tools_menu.add_command(label="Scenario Builder\t F4", command=self.app.open_scenario_builder)
         tools_menu.add_command(label="Import Scenario", command=self.app.open_scenario_importer)
         tools_menu.add_command(label="Import Creatures (PDF)", command=self.app.open_creature_importer)
         tools_menu.add_command(label="Import Objects (PDF)", command=self.app.open_object_importer)
         tools_menu.add_separator()
-        tools_menu.add_command(label="Map Tool\tF2", command=self.app.map_tool)
-        tools_menu.add_command(label="Whiteboard\tF3", command=self.app.open_whiteboard)
-        tools_menu.add_command(label="Dice\tF8", command=self.app.open_dice_roller)
-        tools_menu.add_command(label="Sound & Music\tF7", command=self.app.open_sound_manager)
+        tools_menu.add_command(label="Map Tool\t F2", command=self.app.map_tool)
+        tools_menu.add_command(label="Whiteboard\t F3", command=self.app.open_whiteboard)
+        tools_menu.add_command(label="Dice\t F8", command=self.app.open_dice_roller)
+        tools_menu.add_command(label="Sound & Music\t F7", command=self.app.open_sound_manager)
         tools_menu.add_command(label="Session Timers", command=self.app.open_timer_window)
         self._add_menu_button("GM Tools", tools_menu)
 
