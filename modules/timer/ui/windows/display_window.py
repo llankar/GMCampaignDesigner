@@ -1,12 +1,15 @@
 from __future__ import annotations
 
+from typing import Callable, Optional
+
 import customtkinter as ctk
 
 
 class TimerDisplayWindow(ctk.CTkToplevel):
-    def __init__(self, parent):
+    def __init__(self, parent, on_open_controls: Optional[Callable[[], None]] = None):
         super().__init__(parent)
         self._drag_offset_x = 0
+        self._on_open_controls = on_open_controls
         self._drag_offset_y = 0
         self._blink_job = None
         self._blink_state = False
@@ -36,6 +39,8 @@ class TimerDisplayWindow(ctk.CTkToplevel):
 
         self._bind_dragging(container)
         self._bind_dragging(self._clock_label)
+        self._bind_open_controls(container)
+        self._bind_open_controls(self._clock_label)
 
     def _bind_dragging(self, widget) -> None:
         widget.bind("<ButtonPress-1>", self._on_drag_start)
@@ -49,6 +54,13 @@ class TimerDisplayWindow(ctk.CTkToplevel):
         new_x = event.x_root - self._drag_offset_x
         new_y = event.y_root - self._drag_offset_y
         self.geometry(f"+{new_x}+{new_y}")
+
+    def _bind_open_controls(self, widget) -> None:
+        widget.bind("<Double-Button-1>", self._on_open_controls_requested)
+
+    def _on_open_controls_requested(self, _event) -> None:
+        if self._on_open_controls is not None:
+            self._on_open_controls()
 
     def set_time(self, text: str) -> None:
         self._clock_label.configure(text=text)

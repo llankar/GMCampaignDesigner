@@ -35,7 +35,7 @@ class TimerWindow:
             on_add_minute=lambda: self._adjust(60),
             on_close=self._close_control,
         )
-        self.display = TimerDisplayWindow(parent)
+        self.display = TimerDisplayWindow(parent, on_open_controls=self._open_controls_from_display)
         self.display.hide()
 
     def show(self) -> None:
@@ -43,6 +43,9 @@ class TimerWindow:
 
     def _close_control(self) -> None:
         self.control.withdraw()
+
+    def _open_controls_from_display(self) -> None:
+        self.control.show()
 
     def _ensure_timer(self) -> Optional[TimerState]:
         if self._timer_id:
