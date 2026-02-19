@@ -39,7 +39,10 @@ class ConfigHelper:
     def get(cls, section, key, fallback=None):
         cls.load_config()
         try:
-            return cls._config.get(section, key, fallback=fallback)
+            value = cls._config.get(section, key, raw=True, fallback=fallback)
+            if isinstance(value, list):
+                return "\n".join(str(item) for item in value)
+            return value
         except Exception as e:
             print(f"Config error: [{section}] {key} â€” {e}")
             return fallback
