@@ -208,6 +208,9 @@ TAG_UNDERSCORE_COLLAPSE_PATTERN = re.compile(r"_+")
 
 DETAIL_PANEL_WIDTH = 350
 DETAIL_PANEL_PADDING = 12
+DETAIL_OVERLAY_HEIGHT_RATIO = 0.4
+DETAIL_OVERLAY_EXPANDED_WIDTH_RATIO = 0.86
+DETAIL_OVERLAY_EXPANDED_HEIGHT_RATIO = 0.86
 
 
 def clean_longtext(data, max_length=2000):
@@ -267,7 +270,11 @@ class ScenarioGraphEditor(ctk.CTkFrame):
 
         self.detail_panel_width = DETAIL_PANEL_WIDTH
         self.detail_panel_padding = DETAIL_PANEL_PADDING
+        self.detail_overlay_height_ratio = DETAIL_OVERLAY_HEIGHT_RATIO
+        self.detail_overlay_expanded_width_ratio = DETAIL_OVERLAY_EXPANDED_WIDTH_RATIO
+        self.detail_overlay_expanded_height_ratio = DETAIL_OVERLAY_EXPANDED_HEIGHT_RATIO
         self._detail_panel_visible = True
+        self._detail_panel_expanded = False
 
         # Tooltip state for scene entity portraits
         self._entity_tooltip_window = None
@@ -289,14 +296,13 @@ class ScenarioGraphEditor(ctk.CTkFrame):
 
         self.canvas_frame = ctk.CTkFrame(self.main_container)
         self.canvas_frame.grid(row=0, column=0, sticky="nsew")
-        self.detail_panel = ctk.CTkFrame(self.main_container, fg_color="#1B1D23", corner_radius=0)
-        self.detail_panel.grid(row=0, column=1, sticky="nsew")
-        self.detail_panel.configure(width=self.detail_panel_width)
-        self.detail_panel.grid_propagate(False)
+        self.detail_overlay = ctk.CTkFrame(self, fg_color="#111827", corner_radius=10, border_width=1, border_color="#334155")
+        self.detail_panel = ctk.CTkFrame(self.detail_overlay, fg_color="#1B1D23", corner_radius=0)
+        self.detail_panel.pack(fill="both", expand=True, padx=1, pady=1)
+        self.detail_overlay.place_forget()
 
         self.main_container.grid_rowconfigure(0, weight=1)
         self.main_container.grid_columnconfigure(0, weight=1)
-        self.main_container.grid_columnconfigure(1, weight=0, minsize=self.detail_panel_width)
 
         self.canvas = ctk.CTkCanvas(self.canvas_frame, bg="#2B2B2B", highlightthickness=0)
         self.h_scrollbar = ttk.Scrollbar(self.canvas_frame, orient="horizontal", command=self.canvas.xview)
@@ -359,6 +365,7 @@ class ScenarioGraphEditor(ctk.CTkFrame):
         self.canvas.bind("<Button-2>", self._start_canvas_pan)
         self.canvas.bind("<B2-Motion>", self._do_canvas_pan)
         self.canvas.bind("<ButtonRelease-2>", self._end_canvas_pan)
+        self.bind("<Configure>", self._on_detail_overlay_parent_resize, add="+")
 
     def _sanitize_tag_component(self, value):
         text = str(value or "")
@@ -806,10 +813,8 @@ class ScenarioGraphEditor(ctk.CTkFrame):
     def _show_detail_panel(self):
         if self._detail_panel_visible:
             return
-        self.detail_panel.grid(row=0, column=1, sticky="nsew")
-        self.detail_panel.configure(width=self.detail_panel_width)
-        self.main_container.grid_columnconfigure(1, weight=0, minsize=self.detail_panel_width)
-        wrap_length = max(10, self.detail_panel_width - 2 * self.detail_panel_padding)
+        self._place_detail_overlay()
+        wrap_length = max(10, self.detail_panel.winfo_width() - 2 * self.detail_panel_padding)
         if hasattr(self, "detail_panel_title"):
             self.detail_panel_title.configure(wraplength=wrap_length)
         if hasattr(self, "detail_panel_meta"):
@@ -819,9 +824,35 @@ class ScenarioGraphEditor(ctk.CTkFrame):
     def _hide_detail_panel(self):
         if not self._detail_panel_visible:
             return
-        self.detail_panel.grid_remove()
-        self.main_container.grid_columnconfigure(1, weight=0, minsize=0)
+        self.detail_overlay.place_forget()
         self._detail_panel_visible = False
+
+    def _set_detail_panel_expanded(self, expanded):
+        self._detail_panel_expanded = bool(expanded)
+        if self._detail_panel_visible:
+            self._place_detail_overlay()
+
+    def _place_detail_overlay(self):
+        self.update_idletasks()
+        width = max(1, int(self.winfo_width()))
+        height = max(1, int(self.winfo_height()))
+        if self._detail_panel_expanded:
+            overlay_w = int(width * self.detail_overlay_expanded_width_ratio)
+            overlay_h = int(height * self.detail_overlay_expanded_height_ratio)
+            x = max(0, (width - overlay_w) // 2)
+            y = max(0, (height - overlay_h) // 2)
+        else:
+            overlay_w = width
+            overlay_h = int(height * self.detail_overlay_height_ratio)
+            x = 0
+            y = max(0, height - overlay_h)
+
+        self.detail_overlay.place(x=x, y=y, width=max(1, overlay_w), height=max(1, overlay_h))
+        self.detail_overlay.lift()
+
+    def _on_detail_overlay_parent_resize(self, _event=None):
+        if self._detail_panel_visible:
+            self._place_detail_overlay()
 
     def _clear_detail_panel(self):
         self.active_detail_scene_tag = None
