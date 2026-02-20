@@ -1123,7 +1123,7 @@ def create_scenario_detail_frame(entity_type, scenario_item, master, open_entity
 
         for name in section_names:
             if name in visible_sections:
-                sections[name].pack(fill="x", expand=True, padx=10, pady=(0, 12))
+                sections[name].pack(fill="both", expand=True, padx=10, pady=(0, 12))
 
     def show_section(section_name):
         nonlocal active_section
@@ -1228,7 +1228,7 @@ def create_scenario_detail_frame(entity_type, scenario_item, master, open_entity
                     show_header=False,
                 )
 
-                flow_container = ctk.CTkFrame(scenes_container, fg_color="transparent", height=520)
+                flow_container = ctk.CTkFrame(scenes_container, fg_color="transparent")
                 flow_container.pack_propagate(False)
                 scenario_title = str(
                     scenario_item.get("Title") or scenario_item.get("Name") or ""
@@ -1239,18 +1239,69 @@ def create_scenario_detail_frame(entity_type, scenario_item, master, open_entity
                 )
                 scene_flow_frame.pack(fill="both", expand=True)
 
+                def _sync_scene_flow_height(_event=None):
+                    target_height = 520
+                    try:
+                        viewport = getattr(gm_view_instance, "content_area", None)
+                        if viewport is not None and viewport.winfo_exists():
+                            viewport.update_idletasks()
+                            scenes_container.update_idletasks()
+                            header_row.update_idletasks()
+
+                            viewport_h = int(viewport.winfo_height())
+                            viewport_top = int(viewport.winfo_rooty())
+                            viewport_bottom = viewport_top + max(1, viewport_h)
+                            section_top = int(scenes_container.winfo_rooty())
+                            header_h = int(header_row.winfo_height())
+
+                            # Visible vertical space from under the local header to
+                            # the bottom of the GM viewport, with a safety margin.
+                            visible_space = viewport_bottom - section_top - header_h - 36
+                            if visible_space > 1:
+                                target_height = max(320, min(900, visible_space))
+                        else:
+                            top = frame.winfo_toplevel()
+                            top.update_idletasks()
+                            top_h = int(top.winfo_height())
+                            if top_h > 1:
+                                target_height = max(320, min(900, top_h - 360))
+                    except Exception:
+                        pass
+
+                    try:
+                        flow_container.configure(height=target_height)
+                    except Exception:
+                        return
+
+                    try:
+                        scene_flow_frame._on_layout_resize()
+                    except Exception:
+                        pass
+
                 def _toggle_scene_view(selected_view=None):
                     selection = selected_view or view_var.get()
                     if selection == "Scene Flow":
                         list_container.pack_forget()
-                        flow_container.pack(fill="both", expand=True, padx=10, pady=(6, 0))
+                        flow_container.pack(fill="x", expand=False, padx=10, pady=(6, 0))
+                        _sync_scene_flow_height()
                         scene_flow_frame.after_idle(scene_flow_frame._on_layout_resize)
                     else:
                         flow_container.pack_forget()
                         list_container.pack(fill="x", expand=True)
 
+                try:
+                    if hasattr(gm_view_instance, "content_area") and gm_view_instance.content_area.winfo_exists():
+                        gm_view_instance.content_area.bind("<Configure>", _sync_scene_flow_height, add="+")
+                except Exception:
+                    pass
+                try:
+                    scenes_container.bind("<Configure>", _sync_scene_flow_height, add="+")
+                except Exception:
+                    pass
+
                 view_toggle.configure(command=_toggle_scene_view)
                 _toggle_scene_view("Scene Flow")
+                scene_flow_frame.after(80, _sync_scene_flow_height)
             else:
                 insert_list_longtext(
                     section_frame,

@@ -231,7 +231,11 @@ class GMScreenView(ctk.CTkFrame):
         if not container or not container.winfo_exists():
             return
         try:
-            viewport = self.content_area if hasattr(self, "content_area") else self
+            rich_host = getattr(self, "_rich_host", None)
+            if rich_host is not None and rich_host.winfo_exists() and container.master == rich_host:
+                viewport = rich_host
+            else:
+                viewport = self.content_area if hasattr(self, "content_area") else self
             viewport.update_idletasks()
             w = int(viewport.winfo_width())
             h = int(viewport.winfo_height())
@@ -1776,11 +1780,15 @@ class GMScreenView(ctk.CTkFrame):
         occupy all available space. This syncs the container size to the
         viewport on resize.
         """
-        # Measure against the visible viewport (the CTkScrollableFrame itself),
-        # not its inner _scrollable_frame (which tracks content height and can
-        # collapse after adding short views like the map selector).
+        # Measure against whichever host currently owns this container.
+        # Rich tabs (scene flow/map/world map/whiteboard) live under `_rich_host`,
+        # while scroll tabs live under `content_area`.
         try:
-            viewport = self.content_area if hasattr(self, "content_area") else self
+            rich_host = getattr(self, "_rich_host", None)
+            if rich_host is not None and rich_host.winfo_exists() and container.master == rich_host:
+                viewport = rich_host
+            else:
+                viewport = self.content_area if hasattr(self, "content_area") else self
         except Exception:
             viewport = self
 
@@ -1925,6 +1933,7 @@ class GMScreenView(ctk.CTkFrame):
         if getattr(self, "_rich_host", None) is None or not self._rich_host.winfo_exists():
             self._rich_host = ctk.CTkFrame(self)
         container = ctk.CTkFrame(self._rich_host)
+        self._make_fullbleed(container)
         viewer = create_scene_flow_frame(container, scenario_title=scenario_title)
         viewer.pack(fill="both", expand=True)
         container.scene_flow_viewer = viewer
@@ -1933,6 +1942,7 @@ class GMScreenView(ctk.CTkFrame):
 
         def factory(master, _title=scenario_title):
             c = ctk.CTkFrame(self._rich_host)
+            self._make_fullbleed(c)
             v = create_scene_flow_frame(c, scenario_title=_title)
             v.pack(fill="both", expand=True)
             c.scene_flow_viewer = v
@@ -2215,7 +2225,13 @@ class GMScreenView(ctk.CTkFrame):
 
             frame = tab["content_frame"]
             frame.pack(fill="both", expand=True)
-            if target_host != "rich":
+            if target_host == "rich":
+                try:
+                    self._sync_fullbleed_now(frame)
+                    self.after(60, lambda cf=frame: self._sync_fullbleed_now(cf))
+                except Exception:
+                    pass
+            else:
                 try:
                     self._sync_fullbleed_now(frame)
                     self.after(60, lambda cf=frame: self._sync_fullbleed_now(cf))

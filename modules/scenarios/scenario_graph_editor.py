@@ -932,7 +932,7 @@ class ScenarioGraphEditor(ctk.CTkFrame):
             payload = {
                 "title": node.get("name"),
                 "display_name": node.get("name"),
-                "text": data.get("Text") or data.get("text") or "",
+                "text": data.get("FullText") or data.get("Text") or data.get("text") or "",
                 "entities": data.get("Entities") or [],
                 "source_entry": data.get("SourceEntry") or {},
                 "color": node.get("color"),
@@ -1901,7 +1901,25 @@ class ScenarioGraphEditor(ctk.CTkFrame):
         else:
             raw_text = str(entry)
 
-        cleaned_text = clean_longtext(raw_text, max_length=1600).strip()
+        # Keep full scene text for the detail panel and preserve line breaks.
+        deserialized_text = deserialize_possible_json(raw_text)
+        if isinstance(deserialized_text, Mapping):
+            candidate = deserialized_text.get("text") or deserialized_text.get("Text")
+            candidate = deserialize_possible_json(candidate)
+            if isinstance(candidate, str):
+                cleaned_text = candidate
+            elif isinstance(candidate, (list, tuple, set)):
+                cleaned_text = "\n".join(str(item).strip() for item in candidate if str(item).strip())
+            else:
+                cleaned_text = str(candidate or "")
+        elif isinstance(deserialized_text, (list, tuple, set)):
+            cleaned_text = "\n".join(str(item).strip() for item in deserialized_text if str(item).strip())
+        else:
+            cleaned_text = str(deserialized_text if deserialized_text is not None else raw_text)
+
+        cleaned_text = cleaned_text.replace("\r\n", "\n").replace("\r", "\n").strip()
+        if len(cleaned_text) > 200000:
+            cleaned_text = cleaned_text[:200000].rstrip() + "..."
         lines = [line.strip() for line in cleaned_text.splitlines() if line.strip()]
 
         title_text = ""
@@ -1921,13 +1939,6 @@ class ScenarioGraphEditor(ctk.CTkFrame):
             body_text = "\n".join(lines).strip()
         else:
             body_text = cleaned_text
-
-        if len(body_text) > 1200:
-            trimmed = body_text[:1200]
-            cut = trimmed.rfind(" ")
-            if cut > 900:
-                trimmed = trimmed[:cut]
-            body_text = trimmed.rstrip() + "..."
 
         if not title_text:
             title_text = f"Scene {index + 1}"

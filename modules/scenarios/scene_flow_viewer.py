@@ -1,4 +1,5 @@
 import tkinter as tk
+from tkinter import ttk
 from typing import Callable, Dict, Optional, Sequence
 
 import customtkinter as ctk
@@ -103,6 +104,9 @@ class SceneFlowViewerFrame(ScenarioGraphEditor):
             **kwargs,
         )
 
+        self._configure_detail_overlay_layout()
+        self._hide_detail_header_rows()
+        self._force_scrollable_detail_text()
         self._apply_scene_flow_styling()
         self._populate_scenario_menu()
 
@@ -114,6 +118,146 @@ class SceneFlowViewerFrame(ScenarioGraphEditor):
 
         try:
             self.main_container.bind("<Configure>", self._on_scene_flow_container_resized, add="+")
+        except Exception:
+            pass
+
+    def _configure_detail_overlay_layout(self) -> None:
+        """Reset detail overlay geometry so placement starts from a known state."""
+        try:
+            self.detail_overlay.place_forget()
+        except Exception:
+            pass
+
+    def _hide_detail_header_rows(self) -> None:
+        """Give the detail text area more space by removing header/meta rows."""
+        for attr_name in ("detail_panel_title", "detail_panel_meta"):
+            widget = getattr(self, attr_name, None)
+            if widget is None:
+                continue
+            try:
+                widget.pack_forget()
+            except Exception:
+                pass
+        try:
+            # Remove extra top gap reserved for the hidden header rows.
+            self.detail_content_container.pack_configure(pady=(0, self.detail_panel_padding))
+        except Exception:
+            pass
+
+    def _force_scrollable_detail_text(self) -> None:
+        """Use textbox-based detail rendering to guarantee vertical scrolling."""
+        try:
+            self._rich_renderer_available = False
+        except Exception:
+            pass
+        if getattr(self, "detail_html_label", None) is not None:
+            try:
+                self.detail_html_label.pack_forget()
+                self.detail_html_label.destroy()
+            except Exception:
+                pass
+            self.detail_html_label = None
+        try:
+            self._create_plain_textbox()
+        except Exception:
+            pass
+
+    def _create_plain_textbox(self) -> None:  # type: ignore[override]
+        """Create a text area with an always-visible vertical scrollbar."""
+        if (
+            getattr(self, "_detail_text_wrapper", None) is None
+            or not int(self._detail_text_wrapper.winfo_exists())
+        ):
+            wrapper = ctk.CTkFrame(self.detail_content_container, fg_color="transparent")
+            text_widget = tk.Text(
+                wrapper,
+                wrap="word",
+                relief="flat",
+                borderwidth=0,
+                highlightthickness=0,
+                padx=8,
+                pady=8,
+                background="#1B1D23",
+                foreground="#F8FAFC",
+                insertbackground="#F8FAFC",
+            )
+            scrollbar = ttk.Scrollbar(wrapper, orient="vertical", command=text_widget.yview)
+            text_widget.configure(yscrollcommand=scrollbar.set)
+
+            def _scroll_units(units: int):
+                try:
+                    text_widget.yview_scroll(units, "units")
+                except Exception:
+                    pass
+                return "break"
+
+            def _on_mousewheel(event):
+                delta = int(getattr(event, "delta", 0))
+                if delta != 0:
+                    # Windows/macOS style wheel events.
+                    units = -max(1, abs(delta) // 120) if delta > 0 else max(1, abs(delta) // 120)
+                    return _scroll_units(units)
+                # Linux style wheel buttons.
+                num = int(getattr(event, "num", 0))
+                if num == 4:
+                    return _scroll_units(-1)
+                if num == 5:
+                    return _scroll_units(1)
+                return "break"
+
+            # Keep scrolling local to the detail text instead of bubbling to canvas.
+            text_widget.bind("<MouseWheel>", _on_mousewheel, add="+")
+            text_widget.bind("<Button-4>", _on_mousewheel, add="+")
+            text_widget.bind("<Button-5>", _on_mousewheel, add="+")
+            scrollbar.bind("<MouseWheel>", _on_mousewheel, add="+")
+            scrollbar.bind("<Button-4>", _on_mousewheel, add="+")
+            scrollbar.bind("<Button-5>", _on_mousewheel, add="+")
+
+            # Read-only behavior while keeping scrolling/selection interactive.
+            text_widget.bind("<Key>", lambda _event: "break", add="+")
+            text_widget.bind("<<Paste>>", lambda _event: "break", add="+")
+            text_widget.bind("<<Cut>>", lambda _event: "break", add="+")
+
+            text_widget.pack(side="left", fill="both", expand=True)
+            scrollbar.pack(side="right", fill="y")
+
+            self._detail_text_wrapper = wrapper
+            self._detail_text_scrollbar = scrollbar
+            self.detail_textbox = text_widget
+
+        if not self._detail_text_wrapper.winfo_manager():
+            self._detail_text_wrapper.pack(fill="both", expand=True)
+            self._detail_text_wrapper.pack_configure(pady=(0, 8))
+
+        if self.detail_textbox is not None:
+            self.detail_textbox.configure(state="disabled")
+
+    def _update_detail_text(self, html_text, plain_text) -> None:  # type: ignore[override]
+        """Always render scene detail text in the scrollable textbox."""
+        if self.detail_textbox is None or not int(self.detail_textbox.winfo_exists()):
+            self._create_plain_textbox()
+        if self.detail_textbox is None:
+            return
+
+        if self.detail_html_label is not None and self.detail_html_label.winfo_manager():
+            try:
+                self.detail_html_label.pack_forget()
+            except Exception:
+                pass
+
+        text_value = plain_text if isinstance(plain_text, str) else str(plain_text or "")
+        text_value = text_value.replace("\r\n", "\n").replace("\r", "\n")
+        if text_value and not text_value.endswith("\n"):
+            text_value += "\n"
+        # Keep one extra blank line so the final content line is fully readable
+        # when scrolled to the bottom edge.
+        text_value += "\n"
+        self.detail_textbox.configure(state="normal")
+        self.detail_textbox.delete("1.0", "end")
+        self.detail_textbox.insert("1.0", text_value)
+        self.detail_textbox.configure(state="disabled")
+        try:
+            self.detail_textbox.yview_moveto(0.0)
         except Exception:
             pass
 
@@ -289,13 +433,7 @@ class SceneFlowViewerFrame(ScenarioGraphEditor):
         try:
             canvas.update_idletasks()
             cw = int(canvas.winfo_width())
-            # Account for toolbar height to compute available space
-            th = 0
-            try:
-                th = int(self.toolbar.winfo_height()) if hasattr(self, "toolbar") else 0
-            except Exception:
-                th = 0
-            ch = int(self.winfo_height()) - th if int(self.winfo_height()) > 1 else int(canvas.winfo_height())
+            ch = int(canvas.winfo_height())
         except Exception:
             return
         if cw <= 1 or ch <= 1:
@@ -389,21 +527,8 @@ class SceneFlowViewerFrame(ScenarioGraphEditor):
             return None
 
     def _on_layout_resize(self, _event=None) -> None:
-        """Keep the canvas height matched to available space under the toolbar."""
-        canvas = getattr(self, "canvas", None)
-        if not canvas:
-            return
-        try:
-            self.update_idletasks()
-            w = int(self.winfo_width())
-            h = int(self.winfo_height())
-            th = int(self.toolbar.winfo_height()) if hasattr(self, "toolbar") else 0
-            if w > 1 and h > 1:
-                canvas.configure(width=w, height=max(1, h - th))
-                if getattr(self, "_detail_panel_visible", False):
-                    self._place_detail_overlay()
-        except Exception:
-            pass
+        if getattr(self, "_detail_panel_visible", False):
+            self._place_detail_overlay()
 
     def _on_scene_flow_container_resized(self, _event=None) -> None:
         if getattr(self, "_detail_panel_visible", False):
@@ -419,44 +544,60 @@ class SceneFlowViewerFrame(ScenarioGraphEditor):
         expanded = bool(getattr(self.detail_expand_toggle, "get", lambda: False)())
         self._set_detail_panel_expanded(expanded)
 
+    def _show_detail_panel(self) -> None:  # type: ignore[override]
+        if self._detail_panel_visible:
+            return
+        self._detail_panel_visible = True
+        self._place_detail_overlay()
+
+    def _compute_detail_panel_height(self, container_h: Optional[int] = None) -> int:
+        container = self.main_container if hasattr(self, "main_container") else self
+        if container_h is None:
+            container_h = int(container.winfo_height()) if int(container.winfo_height()) > 1 else 0
+        if container_h <= 0:
+            toolbar_h = int(self.toolbar.winfo_height()) if hasattr(self, "toolbar") else 0
+            container_h = max(1, int(self.winfo_height()) - toolbar_h)
+        ratio = (
+            self.detail_overlay_expanded_height_ratio
+            if self._detail_panel_expanded
+            else self.detail_overlay_height_ratio
+        )
+        preferred_h = max(1, int(container_h * ratio))
+        min_h = min(container_h, 120)
+        max_h = max(1, container_h - 80)
+        if max_h < min_h:
+            min_h = max_h
+        #return max(1, min(max_h, max(min_h, preferred_h)))
+        return 400
+
     def _place_detail_overlay(self) -> None:  # type: ignore[override]
-        """Keep scene details stretched to the full viewer width.
-
-        For this dedicated viewer window, the details panel should always use the
-        full horizontal space. The expand/collapse toggle now only changes the
-        panel height.
-        """
-
-        self.update_idletasks()
+        """Dock details at the bottom with full-width placement."""
         placement_parent = self.main_container if hasattr(self, "main_container") else self
+        try:
+            placement_parent.update_idletasks()
+        except Exception:
+            pass
 
-        # In some host layouts, main_container width lags one geometry cycle,
-        # making the overlay appear narrower than the visible viewer. Prefer
-        # the frame width when it is available.
-        frame_width = int(self.winfo_width()) if int(self.winfo_width()) > 1 else 0
-        container_width = int(placement_parent.winfo_width()) if int(placement_parent.winfo_width()) > 1 else 0
-        width = max(1, frame_width, container_width)
-        height = max(1, int(placement_parent.winfo_height()))
+        parent_h = max(1, int(placement_parent.winfo_height()))
+        parent_w = max(1, int(placement_parent.winfo_width()))
+        overlay_h = self._compute_detail_panel_height(parent_h)
+        y = max(0, parent_h - overlay_h)
 
-        overlay_w = width
-        if self._detail_panel_expanded:
-            overlay_h = int(height * self.detail_overlay_expanded_height_ratio)
-            y = max(0, (height - overlay_h) // 2)
-        else:
-            overlay_h = int(height * self.detail_overlay_height_ratio)
-            y = max(0, height - overlay_h)
-
-        overlay_h = max(1, overlay_h)
-
-        self.detail_overlay.configure(width=overlay_w, height=overlay_h)
-        self.detail_overlay.place(in_=placement_parent, x=0, y=y)
+        self.detail_overlay.configure(height=overlay_h)
+        self.detail_overlay.place(in_=placement_parent, x=0, y=y, relwidth=1.0)
         self.detail_overlay.lift()
 
-        wrap_length = max(10, overlay_w - 2 * self.detail_panel_padding)
+        wrap_length = max(10, parent_w - 2 * self.detail_panel_padding)
         if hasattr(self, "detail_panel_title"):
             self.detail_panel_title.configure(wraplength=wrap_length)
         if hasattr(self, "detail_panel_meta"):
             self.detail_panel_meta.configure(wraplength=wrap_length)
+
+    def _hide_detail_panel(self) -> None:  # type: ignore[override]
+        if not self._detail_panel_visible:
+            return
+        self.detail_overlay.place_forget()
+        self._detail_panel_visible = False
 
     # ------------------------------------------------------------------
     # Visual styling adjustments
