@@ -53,7 +53,7 @@ class TimerWindow:
                 if timer.id == self._timer_id:
                     return timer
 
-        timer = self._timer_service.create_timer(name="Timer MJ", mode="countdown", duration=self._last_duration_seconds)
+        timer = self._timer_service.create_timer(name="Timer", mode="countdown", duration=self._last_duration_seconds)
         self._timer_id = timer.id
         return timer
 
@@ -65,7 +65,7 @@ class TimerWindow:
             return
 
         self._timer_service.delete_timer(timer.id)
-        timer = self._timer_service.create_timer(name="Timer MJ", mode="countdown", duration=duration)
+        timer = self._timer_service.create_timer(name="Timer", mode="countdown", duration=duration)
         self._timer_id = timer.id
         self._timer_service.start(timer.id)
 

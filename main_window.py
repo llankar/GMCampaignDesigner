@@ -1400,7 +1400,7 @@ class MainWindow(ctk.CTk):
     def create_exit_button(self):
         self.timer_mj_button = ctk.CTkButton(
             self,
-            text="Timer MJ",
+            text="Timer",
             command=self.open_timer_window,
             width=90,
             height=24,
