@@ -162,6 +162,30 @@ class SceneFlowViewerFrame(ScenarioGraphEditor):
         except Exception:
             pass
 
+    def _resolve_detail_text_font(self):
+        """Return the CTk theme font used across the app for body text."""
+        cached_font = getattr(self, "_detail_text_font", None)
+        if cached_font is not None:
+            return cached_font
+
+        try:
+            label_font = self.detail_panel_meta.cget("font")
+            if isinstance(label_font, ctk.CTkFont):
+                self._detail_text_font = ctk.CTkFont(
+                    family=label_font.cget("family"),
+                    size=label_font.cget("size"),
+                    weight=label_font.cget("weight"),
+                    slant=label_font.cget("slant"),
+                    underline=bool(label_font.cget("underline")),
+                    overstrike=bool(label_font.cget("overstrike")),
+                )
+                return self._detail_text_font
+        except Exception:
+            pass
+
+        self._detail_text_font = ctk.CTkFont()
+        return self._detail_text_font
+
     def _create_plain_textbox(self) -> None:  # type: ignore[override]
         """Create a text area with an always-visible vertical scrollbar."""
         if (
@@ -169,12 +193,14 @@ class SceneFlowViewerFrame(ScenarioGraphEditor):
             or not int(self._detail_text_wrapper.winfo_exists())
         ):
             wrapper = ctk.CTkFrame(self.detail_content_container, fg_color="transparent")
+            text_font = self._resolve_detail_text_font()
             text_widget = tk.Text(
                 wrapper,
                 wrap="word",
                 relief="flat",
                 borderwidth=0,
                 highlightthickness=0,
+                font=text_font,
                 padx=8,
                 pady=8,
                 background="#1B1D23",
@@ -469,12 +495,16 @@ class SceneFlowViewerFrame(ScenarioGraphEditor):
 
         # Restrict the scrollregion to the visible content instead of the
         # background grid to avoid zooming out to the entire tiled canvas.
-        padding = 80
+        # Keep generous horizontal breathing room but avoid extra top padding
+        # so content is docked higher in the viewport.
+        padding_x = 80
+        padding_top = 0
+        padding_bottom = 24
         scroll_region = (
-            bbox[0] - padding,
-            bbox[1] - padding,
-            bbox[2] + padding,
-            bbox[3] + padding,
+            bbox[0] - padding_x,
+            bbox[1] - padding_top,
+            bbox[2] + padding_x,
+            bbox[3] + padding_bottom,
         )
         try:
             canvas.configure(scrollregion=scroll_region)
