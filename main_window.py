@@ -474,49 +474,6 @@ class MainWindow(ctk.CTk):
             self.sidebar_inner = ctk.CTkFrame(self.sidebar_frame, fg_color="transparent")
             self.sidebar_inner.pack(fill="both", expand=True, padx=5, pady=5)
 
-            # Ensure the banner toggle button persists if the sidebar is rebuilt
-            if hasattr(self, "banner_toggle_btn"):
-                existing_btn = self.banner_toggle_btn
-
-                try:
-                    exists = bool(existing_btn.winfo_exists())
-                except Exception:
-                    exists = False
-
-                # If the previous widget survived, simply re-place it; otherwise rebuild it
-                if not exists or existing_btn.master is not self.sidebar_inner:
-                    if exists:
-                        try:
-                            existing_btn.destroy()
-                        except Exception:
-                            pass
-                    self.banner_toggle_btn = ctk.CTkButton(
-                        self.sidebar_inner,
-                        text="▼",
-                        width=40,
-                        height=30,
-                        command=self._toggle_banner,
-                        fg_color="#555",
-                        hover_color="#777",
-                        font=("", 16),
-                    )
-                    self.banner_toggle_btn.place(relx=1.0, rely=0.0, anchor="ne")
-                else:
-                    try:
-                        manager_name = existing_btn.winfo_manager()
-                    except Exception:
-                        manager_name = ""
-                    if not manager_name:
-                        log_debug(
-                            "Banner toggle button lost geometry manager; reattaching.",
-                            func_name="main_window.MainWindow.create_sidebar",
-                        )
-                    # Calling place ensures the toggle reattaches to the refreshed sidebar
-                    try:
-                        existing_btn.place(relx=1.0, rely=0.0, anchor="ne")
-                    except Exception:
-                        pass
-
             # Logo
             logo_path = os.path.join("assets", "GMCampaignDesigner logo.png")
             if os.path.exists(logo_path):
@@ -1098,16 +1055,16 @@ class MainWindow(ctk.CTk):
         self.inner_content_frame = ctk.CTkFrame(self.content_frame, fg_color="#222")
 
         self.banner_toggle_btn = ctk.CTkButton(
-            self.content_frame,
+            self,
             text="▼",
             width=40,
-            height=30,
+            height=24,
             command=self._toggle_banner,
             fg_color="#555",
             hover_color="#777",
             font=("", 16)
         )
-        self.banner_toggle_btn.place(relx=1.0, rely=0.0, anchor="ne")
+        self.banner_toggle_btn.place(relx=0.907, rely=0.01, anchor="ne")
 
         self.banner_visible = False
         self.current_open_view = None
