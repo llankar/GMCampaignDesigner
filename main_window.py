@@ -1702,6 +1702,8 @@ class MainWindow(ctk.CTk):
         self.load_icons()
         self.init_wrappers()
         self.create_sidebar()
+        if getattr(self, "menu_bar", None) is not None:
+            self.menu_bar.rebuild()
 
 
     def open_faction_graph_editor(self):
