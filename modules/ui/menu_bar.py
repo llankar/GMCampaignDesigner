@@ -118,6 +118,14 @@ class AppMenuBar:
     def _add_campaign_menu(self):
         campaign_menu = self._new_submenu()
         campaign_menu.add_command(label="Campaign Workshop", command=self.app.refresh_entities)
+        campaign_menu.add_separator()
+        for slug, meta in getattr(self.app, "entity_definitions", {}).items():
+            label = meta.get("label") or slug.replace("_", " ").title()
+            campaign_menu.add_command(
+                label=f"Manage {label}",
+                command=lambda s=slug: self.app.open_entity(s),
+            )
+        campaign_menu.add_separator()
         campaign_menu.add_command(label="GM Screen\t F1", command=self.app.open_gm_screen)
         campaign_menu.add_command(label="World Map\t F5", command=self.app.open_world_map)
         campaign_menu.add_separator()
@@ -125,6 +133,7 @@ class AppMenuBar:
         campaign_menu.add_command(label="Faction Graph", command=self.app.open_faction_graph_editor)
         campaign_menu.add_command(label="Scenario Graph", command=self.app.open_scenario_graph_editor)
         campaign_menu.add_command(label="Scene Flow Viewer", command=self.app.open_scene_flow_viewer)
+        campaign_menu.add_command(label="Create Random Table", command=self.app.open_random_table_editor)
         self._add_menu_button("Campaign", campaign_menu)
 
     def _add_tools_menu(self):
@@ -134,6 +143,8 @@ class AppMenuBar:
         tools_menu.add_command(label="Import Scenario", command=self.app.open_scenario_importer)
         tools_menu.add_command(label="Import Creatures (PDF)", command=self.app.open_creature_importer)
         tools_menu.add_command(label="Import Objects (PDF)", command=self.app.open_object_importer)
+        tools_menu.add_command(label="Generate Portraits", command=self.app.generate_missing_portraits)
+        tools_menu.add_command(label="Import Portraits from Folder", command=self.app.import_portraits_from_directory)
         tools_menu.add_separator()
         tools_menu.add_command(label="Map Tool\t F2", command=self.app.map_tool)
         tools_menu.add_command(label="Whiteboard\t F3", command=self.app.open_whiteboard)
@@ -147,7 +158,11 @@ class AppMenuBar:
         view_menu.add_command(label="Show Audio Bar", command=self.app.open_audio_bar)
         view_menu.add_command(label="Show Dice Bar", command=self.app.open_dice_bar)
         view_menu.add_command(label="Select System", command=self.app.open_system_selector)
+        view_menu.add_command(label="Set SwarmUI Path", command=self.app.select_swarmui_path)
+        view_menu.add_command(label="Customize Fields", command=self.app.open_custom_fields_editor)
+        view_menu.add_command(label="New Entity Type", command=self.app.open_new_entity_type_dialog)
         view_menu.add_command(label="Manage Systems", command=self.app.open_system_manager_dialog)
+        view_menu.add_command(label="Cross-campaign Asset Library", command=self.app.open_cross_campaign_asset_library)
         view_menu.add_command(label="AI Settings", command=self.app.open_ai_settings)
         self._add_menu_button("View", view_menu)
 
