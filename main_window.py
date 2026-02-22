@@ -137,6 +137,7 @@ class MainWindow(ctk.CTk):
         position_window_at_top(self)
         self.set_window_icon()
         self.create_layout()
+        self.show_sidebar = False
         self.sidebar_default_width = 220
         self._sidebar_collapsed = False
         self._sidebar_animating = False
@@ -434,7 +435,20 @@ class MainWindow(ctk.CTk):
         return None
 
     def create_sidebar(self, force: bool = False):
-        first_time = not hasattr(self, "sidebar_frame") or force
+        if not self.show_sidebar:
+            existing_sidebar = getattr(self, "sidebar_frame", None)
+            if existing_sidebar is not None and existing_sidebar.winfo_exists():
+                try:
+                    existing_sidebar.destroy()
+                except Exception:
+                    pass
+            self.sidebar_frame = None
+            self.sidebar_inner = None
+            self.sidebar_sections_container = None
+            self._sidebar_pack_kwargs = None
+            return
+
+        first_time = getattr(self, "sidebar_frame", None) is None or force
 
         if first_time:
             self._ensure_sidebar_hotspot()
@@ -1084,7 +1098,7 @@ class MainWindow(ctk.CTk):
         self.inner_content_frame = ctk.CTkFrame(self.content_frame, fg_color="#222")
 
         self.banner_toggle_btn = ctk.CTkButton(
-            self.sidebar_inner,
+            self.content_frame,
             text="▼",
             width=40,
             height=30,
