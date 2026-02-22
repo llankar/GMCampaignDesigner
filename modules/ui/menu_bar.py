@@ -45,6 +45,11 @@ class AppMenuBar:
         )
 
     def _build(self):
+        for button in self._menu_buttons:
+            try:
+                button.destroy()
+            except Exception:
+                pass
         self._submenus.clear()
         self._menu_buttons.clear()
         self._button_menus.clear()
@@ -54,6 +59,11 @@ class AppMenuBar:
         self._add_tools_menu()
         self._add_view_menu()
         self._add_help_menu()
+
+    def rebuild(self):
+        """Rebuild menu contents when app state changes (e.g. entity types)."""
+        self._build()
+        self.refresh_theme()
 
     def _new_submenu(self) -> tk.Menu:
         submenu = tk.Menu(self._root_menu, tearoff=0)
