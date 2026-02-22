@@ -47,8 +47,9 @@ def display_pcs_in_banner(banner_frame, pcs_items):
     if available_width <= 1:
         available_width = 1200
 
-    card_width = 280
-    banner_visible_height = 230
+    banner_scale = 0.75
+    card_width = int(280 * banner_scale)
+    banner_visible_height = int(230 * banner_scale)
 
     tokens = theme_manager.get_tokens()
     banner_bg = "#2B2B2B"
@@ -121,7 +122,7 @@ def display_pcs_in_banner(banner_frame, pcs_items):
             fg_color=colors["header_bg"],
             corner_radius=8,
         )
-        header.pack(fill="x", padx=10, pady=(10, 6))
+        header.pack(fill="x", padx=8, pady=(8, 4))
         label = ctk.CTkLabel(
             header,
             text=name,
@@ -129,13 +130,13 @@ def display_pcs_in_banner(banner_frame, pcs_items):
             text_color=colors["text"],
             anchor="w",
         )
-        label.pack(fill="x", padx=10, pady=6)
+        label.pack(fill="x", padx=8, pady=5)
 
     def add_section(parent, title, content):
         if not content:
             return
         frame = ctk.CTkFrame(parent, fg_color="transparent")
-        frame.pack(fill="x", padx=10, pady=(0, 8))
+        frame.pack(fill="x", padx=8, pady=(0, 6))
         label_title = ctk.CTkLabel(
             frame,
             text=title.upper(),
@@ -151,7 +152,7 @@ def display_pcs_in_banner(banner_frame, pcs_items):
             text_color=colors["text"],
             anchor="w",
             justify="left",
-            wraplength=card_width - 24,
+            wraplength=card_width - 20,
         )
         label_content.pack(fill="x", pady=(2, 0))
 
@@ -163,7 +164,7 @@ def display_pcs_in_banner(banner_frame, pcs_items):
             border_width=1,
             border_color=colors["card_border"],
         )
-        pc_frame.grid(row=0, column=col_idx, sticky="nsew", padx=10, pady=10)
+        pc_frame.grid(row=0, column=col_idx, sticky="nsew", padx=8, pady=(0, 8))
 
         display_name = pc_data.get("Name") or pc_name
         add_header(pc_frame, display_name)

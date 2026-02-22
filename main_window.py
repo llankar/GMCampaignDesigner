@@ -1042,7 +1042,7 @@ class MainWindow(ctk.CTk):
 
     def create_content_area(self):
         self.content_frame = ctk.CTkFrame(self.main_frame)
-        self.content_frame.pack(side="right", fill="both", expand=True, padx=10, pady=10)
+        self.content_frame.pack(side="right", fill="both", expand=True, padx=10, pady=(0, 10))
 
         self.content_frame.grid_rowconfigure(0, weight=1)
         self.content_frame.grid_rowconfigure(1, weight=0)
