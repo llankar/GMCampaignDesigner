@@ -137,13 +137,13 @@ class MainWindow(ctk.CTk):
         position_window_at_top(self)
         self.set_window_icon()
         self.create_layout()
-        self.create_menu_bar()
         self.sidebar_default_width = 220
         self._sidebar_collapsed = False
         self._sidebar_animating = False
         self._sidebar_animation_job = None
         self._sidebar_pack_kwargs = None
         self.entity_definitions = load_entity_definitions()
+        self.create_menu_bar()
         self.entity_wrappers = {}
         self.load_icons()
         self.create_sidebar()
