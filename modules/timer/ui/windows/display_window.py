@@ -6,16 +6,22 @@ import customtkinter as ctk
 
 
 class TimerDisplayWindow(ctk.CTkToplevel):
-    def __init__(self, parent, on_open_controls: Optional[Callable[[], None]] = None):
+    def __init__(
+        self,
+        parent,
+        on_open_controls: Optional[Callable[[], None]] = None,
+        on_delete_timer: Optional[Callable[[], None]] = None,
+    ):
         super().__init__(parent)
         self._drag_offset_x = 0
         self._on_open_controls = on_open_controls
+        self._on_delete_timer = on_delete_timer
         self._drag_offset_y = 0
         self._blink_job = None
         self._blink_state = False
 
         self.title("Timer")
-        self.geometry("260x90")
+        self.geometry("260x116")
         self.resizable(False, False)
         self.overrideredirect(True)
         self.attributes("-topmost", True)
@@ -35,7 +41,15 @@ class TimerDisplayWindow(ctk.CTkToplevel):
             text_color="#ff2b2b",
             font=("Consolas", 20, "bold"),
         )
-        self._clock_label.pack(fill="both", expand=True)
+        self._clock_label.pack(fill="both", expand=True, pady=(0, 6))
+
+        self._delete_button = ctk.CTkButton(
+            container,
+            text="Delete",
+            width=80,
+            command=self._delete_timer,
+        )
+        self._delete_button.pack(pady=(0, 2))
 
         self._bind_dragging(container)
         self._bind_dragging(self._clock_label)
@@ -61,6 +75,10 @@ class TimerDisplayWindow(ctk.CTkToplevel):
     def _on_open_controls_requested(self, _event) -> None:
         if self._on_open_controls is not None:
             self._on_open_controls()
+
+    def _delete_timer(self) -> None:
+        if self._on_delete_timer is not None:
+            self._on_delete_timer()
 
     def set_time(self, text: str) -> None:
         self._clock_label.configure(text=text)
