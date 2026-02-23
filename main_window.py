@@ -1357,19 +1357,6 @@ class MainWindow(ctk.CTk):
             return self.content_frame
 
     def create_exit_button(self):
-        self.timer_mj_button = self.menu_bar.create_action_button(
-            text="Timer",
-            command=self.open_timer_window,
-            width=90,
-        )
-
-        self.banner_toggle_btn = self.menu_bar.create_action_button(
-            text="▼",
-            width=40,
-            command=self._toggle_banner,
-            font=("", 16),
-        )
-
         self.exit_button = self.menu_bar.create_action_button(
             text="✕",
             command=self.destroy,
@@ -1377,6 +1364,19 @@ class MainWindow(ctk.CTk):
             hover_color="#AA0000",
             width=20,
         )
+        self.timer_mj_button = self.menu_bar.create_action_button(
+            text="Timer",
+            command=self.open_timer_window,
+            width=90,
+        )
+        self.banner_toggle_btn = self.menu_bar.create_action_button(
+            text="▼",
+            width=40,
+            command=self._toggle_banner,
+            font=("", 16),
+        )
+
+       
 
     def _apply_cursor_recursive(self, widget, cursor):
         try:
