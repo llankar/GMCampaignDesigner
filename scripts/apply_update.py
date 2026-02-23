@@ -8,10 +8,12 @@ import sys
 import time
 import uuid
 from pathlib import Path
-from typing import Sequence, Set, Tuple
+from typing import Callable, Sequence, Set, Tuple
+
+ProgressCallback = Callable[[str, float], None]
 
 
-def parse_args() -> argparse.Namespace:
+def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Apply a staged GMCampaignDesigner update.")
     parser.add_argument("--source", required=True, help="Extracted release payload directory.")
     parser.add_argument("--target", required=True, help="Installation root to overwrite.")
@@ -25,44 +27,63 @@ def parse_args() -> argparse.Namespace:
         default=[],
         help="Temporary directory to delete once finished. May be provided multiple times.",
     )
-    return parser.parse_args()
+    return parser.parse_args(argv)
 
 
-def main() -> None:
-    args = parse_args()
+def apply_update(args: argparse.Namespace, progress_cb: ProgressCallback | None = None) -> None:
     source = Path(args.source).resolve()
     target = Path(args.target).resolve()
     if not source.exists():
-        raise SystemExit(f"Update payload not found: {source}")
+        raise RuntimeError(f"Update payload not found: {source}")
     if not target.exists():
-        raise SystemExit(f"Install target not found: {target}")
+        raise RuntimeError(f"Install target not found: {target}")
 
     preserved = {_normalize_preserve_path(value) for value in args.preserve}
+
+    _emit_progress(progress_cb, "Preparing update…", 0.0)
     if args.wait_for_pid:
-        _wait_for_pid(args.wait_for_pid, args.wait_timeout)
+        _wait_for_pid(args.wait_for_pid, args.wait_timeout, progress_cb)
 
-    print(f"Applying update from {source} to {target}")
-    _copy_release_tree(source, target, preserved)
+    _emit_progress(progress_cb, f"Applying update from {source} to {target}", 0.1)
+    _copy_release_tree(source, target, preserved, progress_cb)
 
+    _emit_progress(progress_cb, "Cleaning temporary files…", 0.9)
     for entry in args.cleanup_root:
         cleanup_root = Path(entry)
         shutil.rmtree(cleanup_root, ignore_errors=True)
 
     if args.restart_target:
+        _emit_progress(progress_cb, "Restarting application…", 0.97)
         try:
             subprocess.Popen([args.restart_target], close_fds=os.name != "nt")
         except Exception as exc:
-            print(f"Warning: unable to relaunch application: {exc}", file=sys.stderr)
-    print("Update applied successfully.")
+            raise RuntimeError(f"Unable to relaunch application: {exc}") from exc
+
+    _emit_progress(progress_cb, "Update applied successfully.", 1.0)
 
 
-def _wait_for_pid(pid: int, timeout: int) -> None:
-    deadline = time.time() + max(timeout, 0)
+def main(argv: Sequence[str] | None = None) -> int:
+    try:
+        args = parse_args(argv)
+        apply_update(args, progress_cb=lambda message, fraction: print(f"[{fraction:.0%}] {message}"))
+        return 0
+    except Exception as exc:
+        print(f"Update failed: {exc}", file=sys.stderr)
+        return 1
+
+
+def _wait_for_pid(pid: int, timeout: int, progress_cb: ProgressCallback | None = None) -> None:
+    timeout = max(timeout, 0)
+    deadline = time.time() + timeout
     while time.time() < deadline:
         if not _is_pid_alive(pid):
+            _emit_progress(progress_cb, "Waiting for app to close…", 0.1)
             return
+        elapsed = time.time() - (deadline - timeout) if timeout else 0.0
+        wait_fraction = min(1.0, (elapsed / timeout) if timeout else 0.0)
+        _emit_progress(progress_cb, "Waiting for app to close…", wait_fraction * 0.1)
         time.sleep(0.5)
-    raise SystemExit(f"Process {pid} did not exit within {timeout} seconds.")
+    raise RuntimeError(f"Process {pid} did not exit within {timeout} seconds.")
 
 
 def _is_pid_alive(pid: int) -> bool:
@@ -133,7 +154,34 @@ def _is_pid_alive_windows(pid: int) -> bool | None:
         kernel32.CloseHandle(handle)
 
 
-def _copy_release_tree(source: Path, target: Path, preserved: Set[Tuple[str, ...]]) -> None:
+def _count_files_to_copy(source: Path, preserved: Set[Tuple[str, ...]]) -> int:
+    total = 0
+    for root, dirs, files in os.walk(source):
+        root_path = Path(root)
+        rel_root = root_path.relative_to(source)
+        rel_root_parts = rel_root.parts
+        if _is_preserved(_normalize_parts(rel_root_parts), preserved):
+            dirs[:] = []
+            continue
+        for name in files:
+            rel_path = rel_root / name if rel_root_parts else Path(name)
+            if _is_preserved(_normalize_parts(rel_path.parts), preserved):
+                continue
+            total += 1
+    return total
+
+
+def _copy_release_tree(
+    source: Path,
+    target: Path,
+    preserved: Set[Tuple[str, ...]],
+    progress_cb: ProgressCallback | None = None,
+) -> None:
+    total_files = _count_files_to_copy(source, preserved)
+    copied = 0
+    copy_span_start = 0.1
+    copy_span_size = 0.8
+
     for root, dirs, files in os.walk(source):
         root_path = Path(root)
         rel_root = root_path.relative_to(source)
@@ -154,8 +202,16 @@ def _copy_release_tree(source: Path, target: Path, preserved: Set[Tuple[str, ...
                     shutil.rmtree(dest_file)
                 else:
                     _copy_file_with_replace(src_file, dest_file)
-                    continue
-            _copy_file_with_replace(src_file, dest_file)
+            else:
+                _copy_file_with_replace(src_file, dest_file)
+
+            copied += 1
+            copy_fraction = (copied / total_files) if total_files else 1.0
+            _emit_progress(
+                progress_cb,
+                f"Copying files… {copied}/{max(total_files, 1)}",
+                copy_span_start + (copy_fraction * copy_span_size),
+            )
 
 
 def _copy_file_with_replace(src_file: Path, dest_file: Path) -> None:
@@ -206,5 +262,12 @@ def _replace_with_retry(src: Path, dest: Path, attempts: int = 10, delay: float 
     raise PermissionError(f"Unable to replace {dest}")
 
 
+def _emit_progress(callback: ProgressCallback | None, message: str, fraction: float) -> None:
+    if callback is None:
+        return
+    bounded = max(0.0, min(1.0, float(fraction)))
+    callback(message, bounded)
+
+
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())

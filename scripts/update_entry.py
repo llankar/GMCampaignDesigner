@@ -1,12 +1,12 @@
 """Entry point for the frozen update helper executable."""
 
-from apply_update import main as _apply_update_main
+from updater_ui.controller import run_updater_app
 
 
-def main() -> None:
-    """Invoke the update application logic."""
-    _apply_update_main()
+def main() -> int:
+    """Invoke the updater UI controller."""
+    return run_updater_app()
 
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())
