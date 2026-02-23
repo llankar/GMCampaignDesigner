@@ -46,6 +46,7 @@ from modules.helpers.backup_helper import (
 from modules.helpers.swarmui_helper import get_available_models
 from modules.helpers.logging_helper import (
     initialize_logging,
+    install_global_exception_hooks,
     log_module_import,
     log_debug,
     log_exception,
@@ -106,6 +107,7 @@ from modules.audio.sound_manager_window import SoundManagerWindow
 from modules.timer.ui.timer_window import TimerWindow
 
 initialize_logging()
+install_global_exception_hooks()
 log_module_import(__name__)
 
 # Set up CustomTkinter appearance
