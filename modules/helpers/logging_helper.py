@@ -1,6 +1,9 @@
 import logging
 import os
 import inspect
+import sys
+import threading
+import traceback
 from functools import wraps
 from typing import Any, Callable, TypeVar, cast, Optional
 
@@ -12,6 +15,37 @@ _LOGGER: Optional[logging.Logger] = None
 _LAST_CONFIG: Optional[tuple[Any, ...]] = None
 _LOGGER_ENABLED: bool = False
 _ACTIVE_LOG_PATH: Optional[str] = None
+
+
+def _resolve_log_path(directory: str, filename: str) -> str:
+    resolved_dir = _resolve_directory(directory)
+    os.makedirs(resolved_dir, exist_ok=True)
+    if os.path.isabs(filename):
+        return filename
+    return os.path.join(resolved_dir, filename)
+
+
+def _append_fallback_error_log(message: str, *, exc_info: bool = False) -> None:
+    """Write critical diagnostics even when regular logging is disabled."""
+    from modules.helpers.config_helper import ConfigHelper
+
+    try:
+        directory = ConfigHelper.get("Logging", "directory", fallback="logs") or "logs"
+        filename = ConfigHelper.get("Logging", "filename", fallback="gmcampaigndesigner.log") or "gmcampaigndesigner.log"
+        log_path = _resolve_log_path(directory, filename)
+    except Exception:
+        fallback_dir = os.path.join(PROJECT_ROOT, "logs")
+        os.makedirs(fallback_dir, exist_ok=True)
+        log_path = os.path.join(fallback_dir, "gmcampaigndesigner.log")
+
+    try:
+        with open(log_path, "a", encoding="utf-8") as handle:
+            handle.write(f"[FALLBACK][ERROR] {message}\n")
+            if exc_info:
+                handle.write("".join(traceback.format_exc()))
+                handle.write("\n")
+    except Exception:
+        pass
 
 
 def _resolve_directory(directory: str) -> str:
@@ -47,13 +81,7 @@ def _refresh_logger() -> logging.Logger:
         _ACTIVE_LOG_PATH = None
 
         if enabled:
-            resolved_dir = _resolve_directory(directory)
-            os.makedirs(resolved_dir, exist_ok=True)
-
-            if os.path.isabs(filename):
-                log_path = filename
-            else:
-                log_path = os.path.join(resolved_dir, filename)
+            log_path = _resolve_log_path(directory, filename)
 
             level = getattr(logging, str(level_name).upper(), logging.INFO)
 
@@ -139,15 +167,49 @@ def log_warning(message: str, *, func_name: Optional[str] = None) -> None:
 
 
 def log_error(message: str, *, func_name: Optional[str] = None) -> None:
-    _log(logging.ERROR, message, func_name=func_name)
+    logger, enabled = ensure_logger()
+    if enabled:
+        name = func_name or _determine_caller()
+        logger.error("%s - %s", name, message)
+        return
+
+    name = func_name or _determine_caller()
+    _append_fallback_error_log(f"{name} - {message}")
 
 
 def log_exception(message: str, *, func_name: Optional[str] = None) -> None:
     logger, enabled = ensure_logger()
-    if not enabled:
-        return
     name = func_name or _determine_caller()
-    logger.exception("%s - %s", name, message)
+    if enabled:
+        logger.exception("%s - %s", name, message)
+        return
+    _append_fallback_error_log(f"{name} - {message}", exc_info=True)
+
+
+def _handle_uncaught_exception(exc_type, exc_value, exc_traceback) -> None:
+    if issubclass(exc_type, KeyboardInterrupt):
+        sys.__excepthook__(exc_type, exc_value, exc_traceback)
+        return
+    log_error(f"Uncaught exception: {exc_value}", func_name="global.excepthook")
+    _append_fallback_error_log(
+        "".join(traceback.format_exception(exc_type, exc_value, exc_traceback)).rstrip()
+    )
+
+
+def _handle_thread_exception(args: threading.ExceptHookArgs) -> None:
+    log_error(
+        f"Unhandled thread exception in {args.thread.name if args.thread else 'unknown-thread'}: {args.exc_value}",
+        func_name="global.threading_excepthook",
+    )
+    _append_fallback_error_log(
+        "".join(traceback.format_exception(args.exc_type, args.exc_value, args.exc_traceback)).rstrip()
+    )
+
+
+def install_global_exception_hooks() -> None:
+    sys.excepthook = _handle_uncaught_exception
+    if hasattr(threading, "excepthook"):
+        threading.excepthook = _handle_thread_exception
 
 
 
@@ -208,6 +270,7 @@ __all__ = [
     "ensure_logger",
     "get_active_log_path",
     "initialize_logging",
+    "install_global_exception_hooks",
     "is_logging_enabled",
     "log_debug",
     "log_error",
@@ -218,4 +281,3 @@ __all__ = [
     "log_methods",
     "log_warning",
 ]
-
