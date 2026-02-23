@@ -33,12 +33,12 @@ class TimerWindow:
             on_continue=self._continue,
             on_remove_minute=lambda: self._adjust(-60),
             on_add_minute=lambda: self._adjust(60),
+            on_delete_timer=self._delete_timer,
             on_close=self._close_control,
         )
         self.display = TimerDisplayWindow(
             parent,
             on_open_controls=self._open_controls_from_display,
-            on_delete_timer=self._delete_timer,
         )
         self.display.hide()
 
