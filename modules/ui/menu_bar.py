@@ -119,10 +119,15 @@ class AppMenuBar:
         file_menu.add_command(label="Create Backup", command=self.app.prompt_campaign_backup)
         file_menu.add_command(label="Restore Backup", command=self.app.prompt_campaign_restore)
         file_menu.add_separator()
-        file_menu.add_command(label="Export Scenarios", command=self.app.preview_and_export_scenarios)
-        file_menu.add_command(label="Export Campaign Dossier", command=self.app.open_campaign_dossier_exporter)
+        file_menu.add_command(label="Select System", command=self.app.open_system_selector)
+        file_menu.add_command(label="Set SwarmUI Path", command=self.app.select_swarmui_path)
+        file_menu.add_command(label="Customize Fields", command=self.app.open_custom_fields_editor)
+        file_menu.add_command(label="New Entity Type", command=self.app.open_new_entity_type_dialog)
+        file_menu.add_command(label="Manage Systems", command=self.app.open_system_manager_dialog)
+        file_menu.add_command(label="Cross-campaign Asset Library", command=self.app.open_cross_campaign_asset_library)
         file_menu.add_separator()
         file_menu.add_command(label="Quit\t F12", command=self.app.destroy)
+
         self._add_menu_button("File", file_menu)
 
     def _add_campaign_menu(self):
@@ -155,6 +160,8 @@ class AppMenuBar:
         tools_menu.add_command(label="Import Objects (PDF)", command=self.app.open_object_importer)
         tools_menu.add_command(label="Generate Portraits", command=self.app.generate_missing_portraits)
         tools_menu.add_command(label="Import Portraits from Folder", command=self.app.import_portraits_from_directory)
+        tools_menu.add_command(label="Export Scenarios", command=self.app.preview_and_export_scenarios)
+        tools_menu.add_command(label="Export Campaign Dossier", command=self.app.open_campaign_dossier_exporter)
         tools_menu.add_separator()
         tools_menu.add_command(label="Map Tool\t F2", command=self.app.map_tool)
         tools_menu.add_command(label="Whiteboard\t F3", command=self.app.open_whiteboard)
@@ -167,13 +174,6 @@ class AppMenuBar:
         view_menu = self._new_submenu()
         view_menu.add_command(label="Show Audio Bar", command=self.app.open_audio_bar)
         view_menu.add_command(label="Show Dice Bar", command=self.app.open_dice_bar)
-        view_menu.add_command(label="Select System", command=self.app.open_system_selector)
-        view_menu.add_command(label="Set SwarmUI Path", command=self.app.select_swarmui_path)
-        view_menu.add_command(label="Customize Fields", command=self.app.open_custom_fields_editor)
-        view_menu.add_command(label="New Entity Type", command=self.app.open_new_entity_type_dialog)
-        view_menu.add_command(label="Manage Systems", command=self.app.open_system_manager_dialog)
-        view_menu.add_command(label="Cross-campaign Asset Library", command=self.app.open_cross_campaign_asset_library)
-        view_menu.add_command(label="AI Settings", command=self.app.open_ai_settings)
         self._add_menu_button("View", view_menu)
 
     def _add_help_menu(self):
