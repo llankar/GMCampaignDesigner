@@ -1054,18 +1054,6 @@ class MainWindow(ctk.CTk):
         self.banner_frame.pack = lambda *args, **kwargs: self.banner_frame.grid(row=0, column=0, sticky="ew")
         self.inner_content_frame = ctk.CTkFrame(self.content_frame, fg_color="#222")
 
-        self.banner_toggle_btn = ctk.CTkButton(
-            self,
-            text="▼",
-            width=40,
-            height=24,
-            command=self._toggle_banner,
-            fg_color="#555",
-            hover_color="#777",
-            font=("", 16)
-        )
-        self.banner_toggle_btn.place(relx=0.907, rely=0.01, anchor="ne")
-
         self.banner_visible = False
         self.current_open_view = None
 
@@ -1369,27 +1357,26 @@ class MainWindow(ctk.CTk):
             return self.content_frame
 
     def create_exit_button(self):
-        self.timer_mj_button = ctk.CTkButton(
-            self,
+        self.timer_mj_button = self.menu_bar.create_action_button(
             text="Timer",
             command=self.open_timer_window,
             width=90,
-            height=24,
-            corner_radius=15,
         )
-        self.timer_mj_button.place(relx=0.955, rely=0.01, anchor="ne")
 
-        self.exit_button = ctk.CTkButton(
-            self,
+        self.banner_toggle_btn = self.menu_bar.create_action_button(
+            text="▼",
+            width=40,
+            command=self._toggle_banner,
+            font=("", 16),
+        )
+
+        self.exit_button = self.menu_bar.create_action_button(
             text="✕",
             command=self.destroy,
             fg_color="red",
             hover_color="#AA0000",
             width=20,
-            height=20,
-            corner_radius=15,
         )
-        self.exit_button.place(relx=0.9999, rely=0.01, anchor="ne")
 
     def _apply_cursor_recursive(self, widget, cursor):
         try:

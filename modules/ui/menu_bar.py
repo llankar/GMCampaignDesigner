@@ -17,6 +17,8 @@ class AppMenuBar:
         self._button_menus: list[tuple[ctk.CTkButton, tk.Menu]] = []
         self._open_menu: tk.Menu | None = None
         self.frame = ctk.CTkFrame(app, corner_radius=0, height=34)
+        self.actions_frame = ctk.CTkFrame(self.frame, fg_color="transparent")
+        self._action_buttons: list[ctk.CTkButton] = []
         self._build()
         self.refresh_theme()
 
@@ -198,7 +200,15 @@ class AppMenuBar:
     def attach(self):
         self.app.configure(menu="")
         self.frame.pack(side="top", fill="x", before=getattr(self.app, "main_frame", None))
+        self.actions_frame.pack(side="right", padx=(0, 8), pady=2)
         self.app.bind_all("<Button-1>", self._on_root_click, add="+")
+
+    def create_action_button(self, **kwargs) -> ctk.CTkButton:
+        """Create a compact action button aligned to the right side of the menu bar."""
+        button = ctk.CTkButton(self.actions_frame, height=24, corner_radius=12, **kwargs)
+        button.pack(side="right", padx=(6, 0))
+        self._action_buttons.append(button)
+        return button
 
     def refresh_theme(self):
         """Re-apply colors after a theme change."""
@@ -223,5 +233,16 @@ class AppMenuBar:
         for submenu in self._submenus:
             try:
                 self._apply_menu_theme(submenu)
+            except Exception:
+                pass
+
+        for button in self._action_buttons:
+            try:
+                if button.cget("fg_color") in ("", "transparent"):
+                    button.configure(fg_color=menu_bg)
+                if button.cget("hover_color") in ("", "transparent"):
+                    button.configure(hover_color=button_fg)
+                if button.cget("text_color") in ("", "transparent"):
+                    button.configure(text_color="#E8EEF6")
             except Exception:
                 pass
