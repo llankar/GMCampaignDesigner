@@ -15,11 +15,12 @@ class TimerControlWindow(ctk.CTkToplevel):
         on_continue: Callable[[], None],
         on_remove_minute: Callable[[], None],
         on_add_minute: Callable[[], None],
+        on_delete_timer: Callable[[], None],
         on_close: Callable[[], None],
     ):
         super().__init__(parent)
         self.title("Timer Controls")
-        self.geometry("280x155")
+        self.geometry("280x190")
         self.resizable(False, False)
         self.attributes("-topmost", True)
         self.protocol("WM_DELETE_WINDOW", on_close)
@@ -44,6 +45,8 @@ class TimerControlWindow(ctk.CTkToplevel):
         row3.pack(fill="x", pady=2)
         ctk.CTkButton(row3, text="Pause", command=on_pause, width=60).pack(side="left", expand=True, padx=2)
         ctk.CTkButton(row3, text="Continue", command=on_continue, width=60).pack(side="left", expand=True, padx=2)
+
+        ctk.CTkButton(frame, text="Delete", command=on_delete_timer).pack(fill="x", pady=(6, 0))
 
     def show(self) -> None:
         self.deiconify()
