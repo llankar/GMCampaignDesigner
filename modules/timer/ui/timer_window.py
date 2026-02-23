@@ -35,7 +35,11 @@ class TimerWindow:
             on_add_minute=lambda: self._adjust(60),
             on_close=self._close_control,
         )
-        self.display = TimerDisplayWindow(parent, on_open_controls=self._open_controls_from_display)
+        self.display = TimerDisplayWindow(
+            parent,
+            on_open_controls=self._open_controls_from_display,
+            on_delete_timer=self._delete_timer,
+        )
         self.display.hide()
 
     def show(self) -> None:
@@ -92,6 +96,13 @@ class TimerWindow:
         if timer:
             self._timer_service.resume(timer.id)
             self.display.show()
+
+    def _delete_timer(self) -> None:
+        if self._timer_id:
+            self._timer_service.delete_timer(self._timer_id)
+            self._timer_id = None
+        self.display.stop_finished_blink()
+        self.display.hide()
 
     def _adjust(self, seconds: float) -> None:
         timer = self._ensure_timer()
