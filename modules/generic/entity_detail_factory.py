@@ -1207,7 +1207,45 @@ def create_scenario_detail_frame(entity_type, scenario_item, master, open_entity
                     font=("Arial", 16, "bold"),
                 ).pack(side="left")
 
-                view_var = tk.StringVar(value="Scene Flow")
+                scenario_title = str(
+                    scenario_item.get("Title") or scenario_item.get("Name") or ""
+                ).strip()
+
+                def _extract_scene_text_length(entry):
+                    parsed_entry = deserialize_possible_json(entry)
+                    if isinstance(parsed_entry, dict):
+                        scene_dict = {key: deserialize_possible_json(val) for key, val in parsed_entry.items()}
+                        text_payload = scene_dict.get("Text") or scene_dict.get("text") or ""
+                    elif isinstance(parsed_entry, list):
+                        text_payload = parsed_entry
+                    else:
+                        text_payload = parsed_entry
+
+                    if isinstance(text_payload, list):
+                        text_payload = "\n".join(str(part) for part in text_payload if str(part).strip())
+                    return len(str(text_payload or "").strip())
+
+                long_text_threshold = 450
+                scene_entries = value if isinstance(value, list) else []
+                scene_lengths = [_extract_scene_text_length(entry) for entry in scene_entries]
+                average_scene_length = (
+                    sum(scene_lengths) / len(scene_lengths)
+                    if scene_lengths
+                    else 0
+                )
+                default_scene_view = "List" if average_scene_length > long_text_threshold else "Scene Flow"
+
+                persisted_scene_view = default_scene_view
+                if gm_view_instance is not None and hasattr(gm_view_instance, "layout_manager"):
+                    try:
+                        persisted_scene_view = (
+                            gm_view_instance.layout_manager.get_scene_view_mode(scenario_title)
+                            or default_scene_view
+                        )
+                    except Exception:
+                        persisted_scene_view = default_scene_view
+
+                view_var = tk.StringVar(value=persisted_scene_view)
                 view_toggle = ctk.CTkSegmentedButton(
                     header_row,
                     values=["List", "Scene Flow"],
@@ -1230,9 +1268,6 @@ def create_scenario_detail_frame(entity_type, scenario_item, master, open_entity
 
                 flow_container = ctk.CTkFrame(scenes_container, fg_color="transparent")
                 flow_container.pack_propagate(False)
-                scenario_title = str(
-                    scenario_item.get("Title") or scenario_item.get("Name") or ""
-                ).strip()
                 scene_flow_frame = create_scene_flow_frame(
                     flow_container,
                     scenario_title=scenario_title,
@@ -1280,6 +1315,10 @@ def create_scenario_detail_frame(entity_type, scenario_item, master, open_entity
 
                 def _toggle_scene_view(selected_view=None):
                     selection = selected_view or view_var.get()
+                    if selection not in {"List", "Scene Flow"}:
+                        selection = default_scene_view
+                    view_var.set(selection)
+
                     if selection == "Scene Flow":
                         list_container.pack_forget()
                         flow_container.pack(fill="x", expand=False, padx=10, pady=(6, 0))
@@ -1288,6 +1327,15 @@ def create_scenario_detail_frame(entity_type, scenario_item, master, open_entity
                     else:
                         flow_container.pack_forget()
                         list_container.pack(fill="x", expand=True)
+
+                    if gm_view_instance and hasattr(gm_view_instance, "layout_manager"):
+                        try:
+                            gm_view_instance.layout_manager.update_scenario_state(
+                                scenario_title,
+                                scene_view_mode=selection,
+                            )
+                        except Exception:
+                            pass
 
                 try:
                     if hasattr(gm_view_instance, "content_area") and gm_view_instance.content_area.winfo_exists():
@@ -1300,7 +1348,7 @@ def create_scenario_detail_frame(entity_type, scenario_item, master, open_entity
                     pass
 
                 view_toggle.configure(command=_toggle_scene_view)
-                _toggle_scene_view("Scene Flow")
+                _toggle_scene_view(persisted_scene_view)
                 scene_flow_frame.after(80, _sync_scene_flow_height)
             else:
                 insert_list_longtext(
