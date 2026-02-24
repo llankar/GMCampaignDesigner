@@ -383,23 +383,20 @@ def _copy_frozen_helper_dependencies(helper_path: Path, destination_root: Path) 
     if not parent.exists():
         return
 
-    candidates: list[Path] = []
-
     internal_dir = parent / "_internal"
     if internal_dir.exists():
-        candidates.append(internal_dir)
+        destination = destination_root / internal_dir.name
+        shutil.copytree(internal_dir, destination, dirs_exist_ok=True)
 
+    # Copy only helper sidecars (manifest/signature metadata). Copying every
+    # sibling file can include the running main executable, which is commonly
+    # locked on Windows and prevents launching the updater.
+    sidecar_prefix = f"{helper_path.name}."
     for entry in parent.iterdir():
-        if entry == helper_path or entry.name == "_internal":
+        if entry == helper_path or entry.name == "_internal" or entry.is_dir():
             continue
-        candidates.append(entry)
-
-    for candidate in candidates:
-        destination = destination_root / candidate.name
-        if candidate.is_dir():
-            shutil.copytree(candidate, destination, dirs_exist_ok=True)
-        elif candidate.is_file():
-            shutil.copy2(candidate, destination)
+        if entry.name.startswith(sidecar_prefix):
+            shutil.copy2(entry, destination_root / entry.name)
 
 
 log_module_import(__name__)
