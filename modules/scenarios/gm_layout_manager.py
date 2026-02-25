@@ -114,7 +114,21 @@ class GMScreenLayoutManager:
             return {}
         return json.loads(json.dumps(state))
 
-    def update_scenario_state(self, scenario_title: str, *, scenes: Optional[Dict[str, Any]] = None, notes: Optional[str] = None) -> None:
+    def get_scene_view_mode(self, scenario_title: str) -> Optional[str]:
+        state = self.get_scenario_state(scenario_title)
+        mode = state.get("scene_view_mode")
+        if mode in {"List", "Scene Flow"}:
+            return mode
+        return None
+
+    def update_scenario_state(
+        self,
+        scenario_title: str,
+        *,
+        scenes: Optional[Dict[str, Any]] = None,
+        notes: Optional[str] = None,
+        scene_view_mode: Optional[str] = None,
+    ) -> None:
         if not scenario_title:
             return
         store = self.data.setdefault("scenario_state", {})
@@ -133,10 +147,20 @@ class GMScreenLayoutManager:
             else:
                 entry.pop("notes", None)
 
+        if scene_view_mode is not None:
+            if scene_view_mode in {"List", "Scene Flow"}:
+                entry["scene_view_mode"] = scene_view_mode
+            else:
+                entry.pop("scene_view_mode", None)
+
         if not entry:
             store.pop(scenario_title, None)
 
         self._write()
+
+    def set_scene_view_mode(self, scenario_title: str, mode: Optional[str]) -> None:
+        normalized_mode = mode if mode in {"List", "Scene Flow"} else None
+        self.update_scenario_state(scenario_title, scene_view_mode=normalized_mode)
 
     # ------------------------------------------------------------------
     # Session settings (plot twist scheduler hours)
