@@ -1,0 +1,1 @@
+"""Scenario widgets package."""
