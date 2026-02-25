@@ -313,7 +313,7 @@ class CrossCampaignAssetLibraryWindow(ctk.CTkToplevel):
             self.preview_text.configure(state="normal")
             self.preview_text.delete("1.0", END)
             self.preview_text.configure(state="disabled")
-            self.preview_image_label.configure(image=None, text="")
+            self._update_preview_image_label(None, "")
             self._preview_image = None
             return
 
@@ -356,7 +356,7 @@ class CrossCampaignAssetLibraryWindow(ctk.CTkToplevel):
                     pil_image = Image.open(resolved)
                     pil_image.thumbnail((360, 360))
                     self._preview_image = ctk.CTkImage(light_image=pil_image, dark_image=pil_image, size=pil_image.size)
-                    self.preview_image_label.configure(image=self._preview_image, text="")
+                    self._update_preview_image_label(self._preview_image, "")
                     return
                 except Exception as exc:
                     log_warning(
@@ -364,8 +364,18 @@ class CrossCampaignAssetLibraryWindow(ctk.CTkToplevel):
                         func_name="modules.generic.cross_campaign_asset_library._set_preview",
                     )
 
-        self.preview_image_label.configure(image=None, text="No preview available")
+        self._update_preview_image_label(None, "No preview available")
         self._preview_image = None
+
+    def _update_preview_image_label(self, image: ctk.CTkImage | None, text: str):
+        """Safely update preview label image/text, even when old Tk image ids were GC'd."""
+        inner_label = getattr(self.preview_image_label, "_label", None)
+        if inner_label is not None:
+            try:
+                inner_label.configure(image="")
+            except Exception:
+                pass
+        self.preview_image_label.configure(image=image, text=text)
 
     def _resolve_asset_path(self, value: str) -> Path | None:
         if not value or not self.selected_campaign:
