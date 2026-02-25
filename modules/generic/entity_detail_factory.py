@@ -32,6 +32,7 @@ from modules.helpers.logging_helper import (
     log_module_import,
 )
 from modules.scenarios.scene_flow_viewer import create_scene_flow_frame
+from modules.scenarios.widgets.scene_body_sections import build_scene_body_sections
 from modules.ui.vertical_section_tabs import VerticalSectionTabs
 
 log_module_import(__name__)
@@ -744,131 +745,18 @@ def insert_list_longtext(
         outer.pack(fill="x", expand=True, padx=20, pady=4)
         body = ctk.CTkFrame(outer, fg_color="transparent")
 
-        body_label = ctk.CTkLabel(
+        scene_sections = build_scene_body_sections(
             body,
-            text=body_text or "(No scene notes)",
-            wraplength=0,
-            justify="left",
-            font=("Arial", 14),
+            body_text=body_text,
+            npc_names=npc_names,
+            creature_names=creature_names,
+            place_names=place_names,
+            map_names=map_names,
+            links=links,
+            open_entity_callback=open_entity_callback,
+            gm_view_ref=gm_view_ref,
         )
-        body_label.pack(fill="x", padx=12, pady=(6, 6))
-
-        def _make_entity_section(names, label_text):
-            if not names:
-                return
-            section = ctk.CTkFrame(body, fg_color="transparent")
-            section.pack(fill="x", padx=12, pady=(0, 4))
-            ctk.CTkLabel(section, text=f"{label_text}:", font=("Arial", 13, "bold"))\
-                .pack(anchor="w")
-            chips = ctk.CTkFrame(section, fg_color="transparent")
-            chips.pack(fill="x", padx=10, pady=(2, 0))
-            allow_entity_open = callable(open_entity_callback) and label_text != "Maps"
-            for name in names:
-                chip = ctk.CTkLabel(
-                    chips,
-                    text=name,
-                    text_color="#00BFFF" if allow_entity_open else "white",
-                    cursor="hand2" if allow_entity_open else "",
-                )
-                chip.pack(side="left", padx=4, pady=2)
-                if allow_entity_open:
-                    chip.bind(
-                        "<Button-1>",
-                        lambda _event=None, t=label_text, n=name: open_entity_callback(t, n)
-                    )
-
-        _make_entity_section(npc_names, "NPCs")
-        _make_entity_section(creature_names, "Creatures")
-        _make_entity_section(place_names, "Places")
-        
-        def _make_map_section(names):
-            if not names:
-                return
-            interactive = bool(gm_view_ref and hasattr(gm_view_ref, "open_map_tool"))
-            if not interactive:
-                _make_entity_section(names, "Maps")
-                return
-
-            section = ctk.CTkFrame(body, fg_color="transparent")
-            section.pack(fill="x", padx=12, pady=(0, 4))
-            ctk.CTkLabel(section, text="Maps:", font=("Arial", 13, "bold"))\
-                .pack(anchor="w")
-
-            gallery = ctk.CTkFrame(section, fg_color="transparent")
-            gallery.pack(fill="x", padx=10, pady=(2, 0))
-
-            has_thumbnail_provider = hasattr(gm_view_ref, "get_map_thumbnail")
-
-            for name in names:
-                display_name = name or "(Unnamed Map)"
-                tile = ctk.CTkFrame(gallery, fg_color="#2F2F2F", corner_radius=6)
-                tile.pack(side="left", padx=4, pady=4)
-                tile.configure(cursor="hand2")
-
-                thumbnail = None
-                if has_thumbnail_provider:
-                    try:
-                        thumbnail = gm_view_ref.get_map_thumbnail(name)
-                    except Exception:
-                        thumbnail = None
-
-                if thumbnail:
-                    img_label = CTkLabel(tile, image=thumbnail, text="")
-                    img_label.image = thumbnail
-                else:
-                    img_label = CTkLabel(
-                        tile,
-                        text="No Image",
-                        width=140,
-                        height=90,
-                        justify="center",
-                    )
-                img_label.pack(padx=6, pady=(6, 2))
-                img_label.configure(cursor="hand2")
-
-                name_label = CTkLabel(
-                    tile,
-                    text=display_name,
-                    wraplength=140,
-                    justify="center",
-                )
-                name_label.pack(padx=6, pady=(0, 6))
-                name_label.configure(cursor="hand2")
-
-                def _open_map(event, map_name=name):
-                    try:
-                        gm_view_ref.open_map_tool(map_name)
-                    except Exception:
-                        pass
-
-                tile.bind("<Button-1>", _open_map)
-                img_label.bind("<Button-1>", _open_map)
-                name_label.bind("<Button-1>", _open_map)
-
-        _make_map_section(map_names)
-
-        if links:
-            link_section = ctk.CTkFrame(body, fg_color="transparent")
-            link_section.pack(fill="x", padx=12, pady=(4, 6))
-            ctk.CTkLabel(link_section, text="Links:", font=("Arial", 13, "bold"))\
-                .pack(anchor="w")
-            for link in links:
-                text_val = str(link.get("text") or "").strip()
-                target_val = link.get("target")
-                if isinstance(target_val, (int, float)):
-                    target_display = f"Scene {int(target_val)}"
-                elif target_val:
-                    target_display = str(target_val)
-                else:
-                    target_display = "(unspecified)"
-                if not text_val:
-                    text_val = "(no link text)"
-                CTkLabel(
-                    link_section,
-                    text=f"• {text_val} → {target_display}",
-                    font=("Arial", 12),
-                    justify="left",
-                ).pack(anchor="w", padx=12, pady=1)
+        body_label = scene_sections["description_label"]
 
         expanded = ctk.BooleanVar(value=False)
         button_text = f"▶ Scene {idx}"
