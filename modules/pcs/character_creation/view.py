@@ -13,6 +13,7 @@ from .points import summarize_point_budgets
 from .progression import ADVANCEMENT_OPTIONS
 from .rules_engine import CharacterCreationError, build_character
 from .storage import CharacterDraftRepository
+from .storage.payload_normalizer import normalize_draft_payload_for_form
 
 
 class CharacterCreationView(ctk.CTkFrame):
@@ -281,20 +282,22 @@ class CharacterCreationView(ctk.CTkFrame):
         messagebox.showinfo("Character Creation", f"Personnage '{name}' chargé.")
 
     def _apply_payload(self, payload: dict):
-        for key, var in self.inputs.items():
-            var.set(str(payload.get(key, "")))
+        normalized_payload = normalize_draft_payload_for_form(payload)
 
-        favorites = set(payload.get("favorites") or [])
+        for key, var in self.inputs.items():
+            var.set(str(normalized_payload.get(key, "")))
+
+        favorites = set(normalized_payload.get("favorites") or [])
         for skill, var in self.favorite_vars.items():
             var.set(skill in favorites)
 
         for skill, var in self.skill_vars.items():
-            var.set(str((payload.get("skills") or {}).get(skill, 0)))
+            var.set(str((normalized_payload.get("skills") or {}).get(skill, 0)))
 
         for skill, var in self.bonus_skill_vars.items():
-            var.set(str((payload.get("bonus_skills") or {}).get(skill, 0)))
+            var.set(str((normalized_payload.get("bonus_skills") or {}).get(skill, 0)))
 
-        feats = payload.get("feats") or []
+        feats = normalized_payload.get("feats") or []
         for idx, (name, o1, o2, o3, lim) in enumerate(self.feat_widgets):
             feat = feats[idx] if idx < len(feats) else {}
             options = feat.get("options") or []
@@ -304,7 +307,7 @@ class CharacterCreationView(ctk.CTkFrame):
             o3.set(options[2] if len(options) > 2 else "")
             lim.set(feat.get("limitation", ""))
 
-        advancement_choices = payload.get("advancement_choices") or []
+        advancement_choices = normalized_payload.get("advancement_choices") or []
         self._render_advancement_rows()
         for idx, row in enumerate(self.advancement_rows):
             if idx >= len(advancement_choices):
