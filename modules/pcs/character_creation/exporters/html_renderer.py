@@ -53,6 +53,11 @@ def render_character_sheet_html(payload: dict, rules_result) -> str:
 
     advancements = int(payload.get("advancements") or 0)
     advancements_values = [f"{index:02d} {('■' if index <= advancements else '□')}" for index in range(1, 41)]
+    assets_values = [
+        f"Concept: {payload.get('concept', '').strip()}",
+        f"Défaut: {payload.get('flaw', '').strip()}",
+        f"Atout de groupe: {payload.get('group_asset', '').strip()}",
+    ]
 
     context = {
         "name": escape(payload.get("name", "")),
@@ -61,13 +66,13 @@ def render_character_sheet_html(payload: dict, rules_result) -> str:
         "rank_name": escape(str(_rule_attr(rules_result, "rank_name", ""))),
         "description": escape(payload.get("flaw", "")),
         "skills_rows": _build_skill_rows(skill_dice, favorites),
-        "assets_lines": _build_list_lines([], 12, with_box=True),
+        "assets_lines": _build_list_lines(assets_values, 12, with_box=True),
         "feats_lines": _build_list_lines(feats_names, 9),
         "armor": escape(armor),
         "protection": escape(str(payload.get("equipment_pe", {}).get("armor", ""))),
         "attacks_lines": _build_list_lines([], 4),
-        "profile_race": escape(payload.get("group_asset", "")),
-        "profile_gender": escape(payload.get("player", "")),
+        "profile_race": escape(""),
+        "profile_gender": escape(""),
         "profile_age": escape(""),
         "equipment_lines": _build_list_lines([equipment.get("weapon", ""), equipment.get("utility", "")], 6),
         "notes_lines": _build_list_lines([], 6),
