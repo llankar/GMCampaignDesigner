@@ -2535,9 +2535,14 @@ class MainWindow(ctk.CTk):
 
     def open_character_creation(self):
         self.clear_current_content()
-        container = ctk.CTkFrame(self.content_frame)
+        parent = self.get_content_container()
+        container = ctk.CTkFrame(parent)
         container.grid(row=0, column=0, sticky="nsew")
+        parent.grid_rowconfigure(0, weight=1)
+        parent.grid_columnconfigure(0, weight=1)
         CharacterCreationView(container).pack(fill="both", expand=True)
+        self.current_open_view = container
+        self.current_open_entity = None
 
     def open_random_table_editor(self):
         try:
