@@ -8,7 +8,7 @@ from tkinter import filedialog, messagebox
 import customtkinter as ctk
 
 from .constants import SKILLS
-from .exporters import BACKENDS, export_character_sheet
+from .exporters import export_character_sheet
 from .points import summarize_point_budgets
 from .rules_engine import CharacterCreationError, build_character
 
@@ -98,16 +98,7 @@ class CharacterCreationView(ctk.CTkFrame):
         export_row.grid(row=2, column=0, sticky="ew", padx=12, pady=(0, 12))
         export_row.grid_columnconfigure(2, weight=1)
 
-        ctk.CTkLabel(export_row, text="Backend:").grid(row=0, column=0, padx=(0, 6))
-        self.export_backend_var = tk.StringVar(value="fitz")
-        ctk.CTkOptionMenu(export_row, variable=self.export_backend_var, values=list(BACKENDS), width=110).grid(
-            row=0, column=1, padx=(0, 10)
-        )
-
-        self.export_html_only_var = tk.BooleanVar(value=False)
-        ctk.CTkCheckBox(export_row, text="Export HTML seul", variable=self.export_html_only_var).grid(
-            row=0, column=2, sticky="w"
-        )
+        ctk.CTkLabel(export_row, text="Export: HTML").grid(row=0, column=0, padx=(0, 6), sticky="w")
 
         btn = ctk.CTkButton(export_row, text="Exporter fiche", command=self.create_character_pdf)
         btn.grid(row=0, column=3, sticky="e", padx=(10, 0))
@@ -177,11 +168,11 @@ class CharacterCreationView(ctk.CTkFrame):
             messagebox.showerror("Character Creation", str(exc))
             return
 
-        backend = self.export_backend_var.get()
-        html_only = self.export_html_only_var.get()
+        backend = "html"
+        html_only = True
 
-        extension = ".html" if html_only else (".docx" if backend == "docx" else ".pdf")
-        kind = "HTML" if html_only else ("DOCX" if backend == "docx" else "PDF")
+        extension = ".html"
+        kind = "HTML"
         path = filedialog.asksaveasfilename(
             title="Exporter la fiche Savage Fate",
             defaultextension=extension,

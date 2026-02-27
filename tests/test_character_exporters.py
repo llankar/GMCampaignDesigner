@@ -1,6 +1,6 @@
 from types import SimpleNamespace
 
-from modules.pcs.character_creation.exporters import export_character_sheet
+from modules.pcs.character_creation.exporters import BACKENDS, export_character_sheet
 from modules.pcs.character_creation.exporters import html_renderer
 
 
@@ -28,7 +28,7 @@ def test_render_character_sheet_html_contains_core_fields():
 
     assert "Alya" in html
     assert "Combat" in html
-    assert "★" in html
+    assert "■" in html
     assert "Lame vive" in html
 
 
@@ -42,17 +42,9 @@ def test_export_character_sheet_html_only_writes_file(tmp_path):
     assert (tmp_path / "sheet.html").exists()
 
 
-def test_export_character_sheet_fallback_to_html_backend(monkeypatch, tmp_path):
-    monkeypatch.setattr(
-        "modules.pcs.character_creation.exporters._export_with_fitz",
-        lambda *_args, **_kwargs: (_ for _ in ()).throw(RuntimeError("fitz unavailable")),
-    )
-    monkeypatch.setattr(
-        "modules.pcs.character_creation.exporters._export_with_html",
-        lambda *_args, **_kwargs: str(tmp_path / "sheet.pdf"),
-    )
-
+def test_export_character_sheet_forces_html_backend(tmp_path):
     path, backend = export_character_sheet(_payload(), _rules(), str(tmp_path / "sheet.pdf"), backend="fitz")
 
+    assert BACKENDS == ("html",)
     assert backend == "html"
-    assert path.endswith("sheet.pdf")
+    assert path.endswith("sheet.html")
