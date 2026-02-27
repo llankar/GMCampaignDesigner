@@ -2,49 +2,130 @@
 <html lang="fr">
 <head>
   <meta charset="utf-8" />
-  <title>Savage Fate - $name</title>
+  <title>Fiche de personnage - $name</title>
   <style>
-    body { font-family: Arial, sans-serif; margin: 24px; color: #1f2937; }
-    h1, h2 { margin-bottom: 8px; }
-    h1 { font-size: 24px; }
-    h2 { margin-top: 22px; font-size: 18px; border-bottom: 1px solid #d1d5db; padding-bottom: 4px; }
-    .meta { margin: 0; line-height: 1.5; }
-    table { border-collapse: collapse; width: 100%; margin-top: 8px; }
-    th, td { border: 1px solid #d1d5db; padding: 6px 8px; font-size: 13px; text-align: left; }
-    .fav { width: 32px; text-align: center; }
-    ul { margin-top: 6px; }
-    .small { font-size: 12px; color: #4b5563; }
+    @page { size: A4; margin: 10mm; }
+    body { font-family: Arial, sans-serif; font-size: 12px; color: #111; margin: 0; }
+    .page { min-height: 270mm; page-break-after: always; padding: 4mm 2mm; }
+    .page:last-child { page-break-after: auto; }
+    .row { display: grid; grid-template-columns: 2fr 1fr; gap: 10px; }
+    .header-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; align-items: end; }
+    .field { border-bottom: 1px solid #333; min-height: 20px; display: flex; align-items: end; padding: 2px 0; }
+    .field strong { margin-right: 6px; }
+    .box-title { text-align: center; font-weight: 700; border-top: 2px solid #333; border-bottom: 2px solid #333; padding: 5px 0; margin: 10px 0 6px; }
+    .line-row { border-bottom: 1px solid #666; min-height: 22px; display: flex; align-items: center; gap: 8px; }
+    .line-box { font-size: 15px; width: 18px; text-align: center; }
+    table { width: 100%; border-collapse: collapse; }
+    th, td { border-bottom: 1px solid #666; height: 22px; }
+    th { text-align: left; border-top: 2px solid #333; border-bottom: 2px solid #333; }
+    .jet { width: 60px; text-align: center; }
+    .box { width: 24px; text-align: center; }
+    .small-card { border: 1px solid #ddd; background: #fafafa; padding: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.12); }
+    .health { margin-top: 8px; }
+    .health td:last-child, .health th:last-child { text-align: right; padding-right: 8px; }
+    .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .three-col { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; }
   </style>
 </head>
 <body>
-  <h1>Savage Fate - Character Creation</h1>
-  <p class="meta"><strong>Nom:</strong> $name</p>
-  <p class="meta"><strong>Joueur:</strong> $player</p>
-  <p class="meta"><strong>Concept:</strong> $concept</p>
-  <p class="meta"><strong>Défaut:</strong> $flaw</p>
-  <p class="meta"><strong>Atout de groupe:</strong> $group_asset</p>
-  <p class="meta"><strong>Rang:</strong> $rank_name (index $rank_index)</p>
-  <p class="meta"><strong>Blessures superficielles:</strong> $superficial_health</p>
+  <section class="page">
+    <div class="header-grid">
+      <div>
+        <div class="field"><strong>Joueur/Joueuse</strong>$player</div>
+        <div class="field"><strong>NOM</strong>$name</div>
+        <div class="field"><strong>Concept</strong>$concept</div>
+      </div>
+      <div>
+        <div class="field"><strong>RANG</strong>$rank_name</div>
+      </div>
+      <div class="small-card">
+        <strong>DESCRIPTION</strong>
+        <div class="line-row"><span>$description</span></div>
+        <div class="line-row"></div><div class="line-row"></div><div class="line-row"></div><div class="line-row"></div>
+      </div>
+    </div>
 
-  <h2>Compétences</h2>
-  <table>
-    <thead><tr><th class="fav">Fav</th><th>Compétence</th><th>Dé</th></tr></thead>
-    <tbody>
-      $skills_rows
-    </tbody>
-  </table>
+    <div class="row" style="margin-top:10px;">
+      <div>
+        <div class="two-col">
+          <div>
+            <div class="box-title">COMPÉTENCES</div>
+            <table>
+              <thead><tr><th class="box"></th><th>NOM</th><th class="jet">JET</th></tr></thead>
+              <tbody>
+                $skills_rows
+              </tbody>
+            </table>
+          </div>
+          <div>
+            <div class="box-title">ATOUTS</div>
+            $assets_lines
+          </div>
+        </div>
 
-  <h2>Prouesses</h2>
-  $feats_html
+        <div class="two-col" style="margin-top:12px;">
+          <div>
+            <div class="box-title">ARMURE</div>
+            <div class="line-row"><span>$armor</span></div>
+            <div class="line-row"></div>
+            <div class="line-row"></div>
+          </div>
+          <div>
+            <div class="box-title">PROTECTION</div>
+            <div class="line-row"><span>$protection</span></div>
+            <div class="line-row"></div>
+            <div class="line-row"></div>
+          </div>
+        </div>
 
-  <h2>Équipement</h2>
-  <ul>
-    <li>Arme ($weapon_pe PE): $weapon</li>
-    <li>Armure ($armor_pe PE): $armor</li>
-    <li>Utilitaire ($utility_pe PE): $utility</li>
-  </ul>
+        <div class="box-title">SANTÉ ET DOMMAGES</div>
+        <table class="health">
+          <tr><th>B. superficielles</th><th>10+rang</th></tr>
+          <tr><td>B. légères</td><td>8</td></tr>
+          <tr><td>B. modérées</td><td>12</td></tr>
+          <tr><td>B. graves</td><td>16</td></tr>
+        </table>
+      </div>
 
-  <h2>Avancements</h2>
-  <p class="small">$advancements_marks</p>
+      <div>
+        <div class="box-title">PROUESSES</div>
+        $feats_lines
+      </div>
+    </div>
+  </section>
+
+  <section class="page">
+    <div class="box-title">ATTAQUES</div>
+    <table>
+      <thead><tr><th>ARME</th><th class="jet">JET</th><th class="jet">DMG</th><th class="jet">PORTÉE</th><th>NOTES</th></tr></thead>
+      <tbody>
+        <tr><td colspan="5">$attacks_lines</td></tr>
+      </tbody>
+    </table>
+
+    <div class="row" style="margin-top:12px;">
+      <div>
+        <div class="small-card">
+          <strong>PROFIL</strong>
+          <div class="three-col" style="margin-top:8px;">
+            <div class="field"><strong>Race</strong>$profile_race</div>
+            <div class="field"><strong>Genre</strong>$profile_gender</div>
+            <div class="field"><strong>Âge</strong>$profile_age</div>
+          </div>
+        </div>
+
+        <div class="box-title" style="margin-top:12px;">ÉQUIPEMENT</div>
+        $equipment_lines
+
+        <div class="box-title" style="margin-top:12px;">NOTES</div>
+        $notes_lines
+      </div>
+
+      <div>
+        <div class="box-title">AVANCEMENTS</div>
+        $advancements_lines
+      </div>
+    </div>
+  </section>
 </body>
 </html>
