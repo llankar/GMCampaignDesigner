@@ -40,13 +40,32 @@ def _build_list_lines(values: list[str], total: int, with_box: bool = False) -> 
     return "\n".join(rows)
 
 
+def _format_feat_line(feat: dict) -> str:
+    name = (feat.get("name") or "").strip()
+    options = [str(option).strip() for option in (feat.get("options") or []) if str(option).strip()]
+    limitation = (feat.get("limitation") or "").strip()
+
+    parts: list[str] = []
+    if name:
+        parts.append(name)
+    if options:
+        parts.append(f"Options: {', '.join(options)}")
+    if limitation:
+        parts.append(f"Limitation: {limitation}")
+    return " | ".join(parts)
+
+
 def render_character_sheet_html(payload: dict, rules_result) -> str:
     template = Template(_TEMPLATE_PATH.read_text(encoding="utf-8"))
 
     favorites = set(payload.get("favorites") or [])
     skill_dice = _rule_attr(rules_result, "skill_dice", {}) or {}
     feats = payload.get("feats") or []
-    feats_names = [feat.get("name", "").strip() for feat in feats if feat.get("name", "").strip()]
+    feats_lines: list[str] = []
+    for feat in feats:
+        feat_line = _format_feat_line(feat)
+        if feat_line:
+            feats_lines.append(feat_line)
 
     equipment = payload.get("equipment") or {}
     armor = equipment.get("armor", "")
@@ -67,14 +86,16 @@ def render_character_sheet_html(payload: dict, rules_result) -> str:
         "description": escape(payload.get("flaw", "")),
         "skills_rows": _build_skill_rows(skill_dice, favorites),
         "assets_lines": _build_list_lines(assets_values, 12, with_box=True),
-        "feats_lines": _build_list_lines(feats_names, 9),
+        "feats_lines": _build_list_lines(feats_lines, 9),
         "armor": escape(armor),
         "protection": escape(str(payload.get("equipment_pe", {}).get("armor", ""))),
         "attacks_lines": _build_list_lines([], 4),
         "profile_race": escape(""),
         "profile_gender": escape(""),
         "profile_age": escape(""),
-        "equipment_lines": _build_list_lines([equipment.get("weapon", ""), equipment.get("utility", "")], 6),
+        "equipment_lines": _build_list_lines(
+            [equipment.get("weapon", ""), equipment.get("armor", ""), equipment.get("utility", "")], 6
+        ),
         "notes_lines": _build_list_lines([], 6),
         "advancements_lines": _build_list_lines(advancements_values, 40),
     }
