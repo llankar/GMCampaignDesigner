@@ -5,9 +5,9 @@ from __future__ import annotations
 from pathlib import Path
 
 try:
-    import pymupdf as fitz  # PyMuPDF modern import path
-except ImportError:  # pragma: no cover - compatibility for older environments
-    import fitz  # type: ignore[no-redef]
+    import fitz  # PyMuPDF legacy/public import path
+except ImportError:  # pragma: no cover - compatibility for newer environments
+    import pymupdf as fitz  # type: ignore[no-redef]
 
 
 def _write(page: fitz.Page, x: float, y: float, text: str, size: float = 10, bold: bool = False) -> None:
@@ -22,7 +22,7 @@ def export_character_pdf(character: dict, rules_result, output_path: str) -> str
     output = Path(output_path)
     output.parent.mkdir(parents=True, exist_ok=True)
 
-    doc = fitz.open()
+    doc = fitz.Document()
     page1 = doc.new_page(width=595, height=842)
     page2 = doc.new_page(width=595, height=842)
 
