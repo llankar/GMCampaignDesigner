@@ -4,10 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-try:
-    import fitz  # PyMuPDF legacy/public import path
-except ImportError:  # pragma: no cover - compatibility for newer environments
-    import pymupdf as fitz  # type: ignore[no-redef]
+import fitz  # PyMuPDF
 
 
 def _write(page: fitz.Page, x: float, y: float, text: str, size: float = 10, bold: bool = False) -> None:
@@ -22,7 +19,10 @@ def export_character_pdf(character: dict, rules_result, output_path: str) -> str
     output = Path(output_path)
     output.parent.mkdir(parents=True, exist_ok=True)
 
-    doc = fitz.Document()
+    doc = fitz.open()
+    if doc is None or not hasattr(doc, "new_page"):
+        raise RuntimeError("Impossible d'initialiser le document PDF via PyMuPDF.")
+
     page1 = doc.new_page(width=595, height=842)
     page2 = doc.new_page(width=595, height=842)
 
@@ -76,6 +76,8 @@ def export_character_pdf(character: dict, rules_result, output_path: str) -> str
         if y > 810:
             break
 
-    doc.save(str(output))
-    doc.close()
+    try:
+        doc.save(str(output))
+    finally:
+        doc.close()
     return str(output)
