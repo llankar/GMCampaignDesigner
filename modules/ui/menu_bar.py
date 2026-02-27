@@ -170,6 +170,7 @@ class AppMenuBar:
         tools_menu.add_command(label="Dice\t F8", command=self.app.open_dice_roller)
         tools_menu.add_command(label="Sound & Music\t F7", command=self.app.open_sound_manager)
         tools_menu.add_command(label="Session Timers", command=self.app.open_timer_window)
+        tools_menu.add_command(label="Character Creation", command=self.app.open_character_creation)
         self._add_menu_button("GM Tools", tools_menu)
 
     def _add_view_menu(self):
