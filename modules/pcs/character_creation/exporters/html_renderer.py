@@ -83,7 +83,7 @@ def render_character_sheet_html(payload: dict, rules_result) -> str:
         "player": escape(payload.get("player", "")),
         "concept": escape(payload.get("concept", "")),
         "rank_name": escape(str(_rule_attr(rules_result, "rank_name", ""))),
-        "description": escape(payload.get("flaw", "")),
+        "description": escape(""),
         "skills_rows": _build_skill_rows(skill_dice, favorites),
         "assets_lines": _build_list_lines(assets_values, 12, with_box=True),
         "feats_lines": _build_list_lines(feats_lines, 9),
