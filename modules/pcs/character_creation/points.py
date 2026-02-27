@@ -30,8 +30,8 @@ def compute_favorite_bonus(base_points: dict[str, int], favorites: list[str]) ->
 def summarize_point_budgets(base_points: dict[str, int], favorites: list[str], *, total_base_points: int = 15) -> dict[str, int]:
     """Return current point usage summary for UI display.
 
-    Favorite points are counted by consuming available free favorite points first,
-    then paid/base points.
+    Each favored point still consumes one base point. It also generates one bonus
+    point that must be applied to another favored skill.
     """
 
     normalized_points = {skill: max(0, int(value)) for skill, value in base_points.items()}
@@ -44,10 +44,9 @@ def summarize_point_budgets(base_points: dict[str, int], favorites: list[str], *
         free_favored_points = 0
         used_free_favored_points = 0
     else:
-        paid_favored_points = (favored_spent + 1) // 2
-        used_free_favored_points = favored_spent - paid_favored_points
-        free_favored_points = paid_favored_points
-        spent_base = (spent_total - favored_spent) + paid_favored_points
+        spent_base = spent_total
+        free_favored_points = favored_spent
+        used_free_favored_points = favored_spent
 
     return {
         "spent_base": spent_base,

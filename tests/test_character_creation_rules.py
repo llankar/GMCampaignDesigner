@@ -63,11 +63,10 @@ def test_favored_points_budget_summary_matches_rule():
     payload = _payload()
     summary = summarize_point_budgets(payload["skills"], payload["favorites"])
     expected_favored_spent = sum(payload["skills"][skill] for skill in payload["favorites"])
-    expected_paid_favored = (expected_favored_spent + 1) // 2
-    assert summary["spent_base"] == 15 - expected_favored_spent + expected_paid_favored
-    assert summary["remaining_base"] == 15 - summary["spent_base"]
-    assert summary["free_favored_points"] == expected_paid_favored
-    assert summary["used_free_favored_points"] == expected_favored_spent - expected_paid_favored
+    assert summary["spent_base"] == 15
+    assert summary["remaining_base"] == 0
+    assert summary["free_favored_points"] == expected_favored_spent
+    assert summary["used_free_favored_points"] == expected_favored_spent
 
 
 def test_favored_points_budget_summary_without_bonus_when_less_than_two_favorites():
