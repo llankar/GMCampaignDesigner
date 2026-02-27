@@ -27,12 +27,14 @@ def _payload():
         "Tir": 1,
         "Vol": 0,
     }
+    bonus_skills = {skill: 0 for skill in skills}
     return {
         "name": "Ayla",
         "concept": "Mage exilée",
         "flaw": "Impulsive",
         "favorites": ["Combat", "Perception", "Sorcellerie", "Athlétisme", "Enquête", "Tir"],
         "skills": skills,
+        "bonus_skills": bonus_skills,
         "advancements": 0,
         "feats": [
             {"name": "Invisibilité", "options": ["Effet", "Durée", "Bonus"], "limitation": "1/scène"},
@@ -44,7 +46,10 @@ def _payload():
 
 
 def test_build_character_ok():
-    result = build_character(_payload())
+    payload = _payload()
+    payload["bonus_skills"]["Combat"] = 2
+    payload["bonus_skills"]["Perception"] = 2
+    result = build_character(payload)
     assert result.rank_name == "Novice"
     assert result.skill_dice["Combat"].startswith("d")
 
@@ -61,19 +66,32 @@ def test_build_character_requires_six_favorites():
 
 def test_favored_points_budget_summary_matches_rule():
     payload = _payload()
-    summary = summarize_point_budgets(payload["skills"], payload["favorites"])
-    expected_favored_spent = sum(payload["skills"][skill] for skill in payload["favorites"])
-    expected_paid_favored_points = (expected_favored_spent + 1) // 2
-    assert summary["spent_base"] == 10
-    assert summary["remaining_base"] == 5
-    assert summary["free_favored_points"] == expected_paid_favored_points
-    assert summary["used_free_favored_points"] == expected_favored_spent - expected_paid_favored_points
-
-
-def test_favored_points_budget_summary_without_bonus_when_less_than_two_favorites():
-    payload = _payload()
-    payload["favorites"] = ["Combat"]
-    summary = summarize_point_budgets(payload["skills"], payload["favorites"])
+    payload["bonus_skills"]["Combat"] = 2
+    payload["bonus_skills"]["Perception"] = 2
+    summary = summarize_point_budgets(payload["skills"], payload["bonus_skills"], payload["favorites"])
+    expected_generated = sum(payload["skills"][skill] for skill in payload["favorites"])
     assert summary["spent_base"] == 15
-    assert summary["free_favored_points"] == 0
-    assert summary["used_free_favored_points"] == 0
+    assert summary["remaining_base"] == 0
+    assert summary["generated_bonus"] == expected_generated
+    assert summary["used_bonus"] == 4
+    assert summary["remaining_bonus"] == expected_generated - 4
+
+
+def test_bonus_points_cannot_exceed_generated_pool():
+    payload = _payload()
+    payload["bonus_skills"]["Combat"] = 20
+    try:
+        build_character(payload)
+        assert False, "Expected CharacterCreationError"
+    except CharacterCreationError as exc:
+        assert "Points bonus insuffisants" in str(exc)
+
+
+def test_bonus_points_only_on_favorites():
+    payload = _payload()
+    payload["bonus_skills"]["Artisanat"] = 1
+    try:
+        build_character(payload)
+        assert False, "Expected CharacterCreationError"
+    except CharacterCreationError as exc:
+        assert "compétences favorites" in str(exc)

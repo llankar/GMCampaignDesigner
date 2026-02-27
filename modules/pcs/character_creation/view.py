@@ -36,10 +36,11 @@ class CharacterCreationView(ctk.CTkFrame):
 
         self.favorite_vars = {}
         self.skill_vars = {}
-        ctk.CTkLabel(scroll, text="Compétences (15 points, 6 favorites)", font=("Arial", 14, "bold")).grid(
+        self.bonus_skill_vars = {}
+        ctk.CTkLabel(scroll, text="Compétences (15 points de base, 6 favorites)", font=("Arial", 14, "bold")).grid(
             row=3, column=0, columnspan=2, sticky="w", padx=6, pady=(10, 2)
         )
-        self.remaining_points_var = tk.StringVar(value="Points restants: 15 | Bonus favoris dispo: 0")
+        self.remaining_points_var = tk.StringVar(value="Base restants: 15 | Bonus restants: 0")
         ctk.CTkLabel(scroll, textvariable=self.remaining_points_var, font=("Arial", 12, "bold")).grid(
             row=4, column=0, columnspan=2, sticky="w", padx=6, pady=(0, 4)
         )
@@ -51,12 +52,21 @@ class CharacterCreationView(ctk.CTkFrame):
             ctk.CTkLabel(skill_frame, text=skill).grid(row=r, column=c, sticky="w", padx=(6, 2), pady=2)
             fav = tk.BooleanVar(value=i < 6)
             pts = tk.StringVar(value="0")
+            bonus_pts = tk.StringVar(value="0")
             self.favorite_vars[skill] = fav
             self.skill_vars[skill] = pts
+            self.bonus_skill_vars[skill] = bonus_pts
             ctk.CTkCheckBox(skill_frame, text="Fav", variable=fav, onvalue=True, offvalue=False).grid(row=r, column=c + 1)
-            ctk.CTkEntry(skill_frame, textvariable=pts, width=55).grid(row=r, column=c + 2, padx=(2, 10))
+            point_box = ctk.CTkFrame(skill_frame)
+            point_box.grid(row=r, column=c + 2, padx=(2, 10), pady=1, sticky="w")
+            ctk.CTkLabel(point_box, text="B", width=12).grid(row=0, column=0, padx=(2, 2))
+            ctk.CTkEntry(point_box, textvariable=pts, width=40).grid(row=0, column=1, padx=(0, 4))
+            ctk.CTkLabel(point_box, text="+", width=12).grid(row=0, column=2, padx=(0, 2))
+            ctk.CTkLabel(point_box, text="Bo", width=18).grid(row=0, column=3, padx=(0, 2))
+            ctk.CTkEntry(point_box, textvariable=bonus_pts, width=40).grid(row=0, column=4)
             fav.trace_add("write", self._update_remaining_points_marker)
             pts.trace_add("write", self._update_remaining_points_marker)
+            bonus_pts.trace_add("write", self._update_remaining_points_marker)
 
         ctk.CTkLabel(scroll, text="Prouesses", font=("Arial", 14, "bold")).grid(
             row=6, column=0, sticky="w", padx=6, pady=(10, 2)
@@ -132,6 +142,7 @@ class CharacterCreationView(ctk.CTkFrame):
             "advancements": int(self.inputs["advancements"].get() or 0),
             "favorites": favorites,
             "skills": {skill: int((var.get() or "0")) for skill, var in self.skill_vars.items()},
+            "bonus_skills": {skill: int((var.get() or "0")) for skill, var in self.bonus_skill_vars.items()},
             "feats": feats,
             "equipment": {
                 "weapon": self.inputs["weapon"].get().strip(),
@@ -153,11 +164,12 @@ class CharacterCreationView(ctk.CTkFrame):
 
     def _update_remaining_points_marker(self, *_args) -> None:
         base_points = {skill: self._safe_int(var.get()) for skill, var in self.skill_vars.items()}
+        bonus_points = {skill: self._safe_int(var.get()) for skill, var in self.bonus_skill_vars.items()}
         favorites = [skill for skill, var in self.favorite_vars.items() if var.get()]
-        summary = summarize_point_budgets(base_points, favorites)
+        summary = summarize_point_budgets(base_points, bonus_points, favorites)
         self.remaining_points_var.set(
-            f"Points restants: {summary['remaining_base']} | "
-            f"Bonus favoris dispo: {summary['free_favored_points']}"
+            f"Base restants: {summary['remaining_base']} | "
+            f"Bonus restants: {summary['remaining_bonus']}"
         )
 
     def create_character_pdf(self):

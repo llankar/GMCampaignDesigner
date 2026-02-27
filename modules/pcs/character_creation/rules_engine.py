@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from .constants import DIE_STEPS, RANK_TABLE, SKILLS
-from .points import compute_favorite_bonus
+from .points import summarize_point_budgets
 
 
 class CharacterCreationError(ValueError):
@@ -50,17 +50,30 @@ def build_character(character_input: dict) -> CharacterCreationResult:
             raise CharacterCreationError(f"Compétence favorite invalide: {skill}")
 
     base_points = {skill: int((character_input.get("skills") or {}).get(skill, 0)) for skill in SKILLS}
+    bonus_points = {skill: int((character_input.get("bonus_skills") or {}).get(skill, 0)) for skill in SKILLS}
+
     total_points = sum(base_points.values())
     if total_points != 15:
-        raise CharacterCreationError(f"La somme des points de compétence doit être 15 (actuel: {total_points}).")
+        raise CharacterCreationError(f"La somme des points de compétence de base doit être 15 (actuel: {total_points}).")
     for skill, points in base_points.items():
         if points < 0 or points > 5:
             raise CharacterCreationError(f"La compétence '{skill}' doit être entre 0 et 5 à la création.")
 
+    for skill, bonus in bonus_points.items():
+        if bonus < 0:
+            raise CharacterCreationError(f"Le bonus de compétence '{skill}' ne peut pas être négatif.")
+        if bonus > 0 and skill not in favorites:
+            raise CharacterCreationError(f"Les points bonus ne peuvent être investis que dans les compétences favorites ({skill}).")
+
+    summary = summarize_point_budgets(base_points, bonus_points, favorites)
+    if summary["used_bonus"] > summary["generated_bonus"]:
+        raise CharacterCreationError(
+            f"Points bonus insuffisants: {summary['used_bonus']} utilisés pour {summary['generated_bonus']} générés."
+        )
+
     advancements = int(character_input.get("advancements", 0))
     rank_name, rank_index, skill_cap_points = rank_from_advancements(advancements)
 
-    bonus_points = compute_favorite_bonus(base_points, favorites)
     effective_points = {skill: base_points[skill] + bonus_points.get(skill, 0) for skill in SKILLS}
 
     for skill, pts in effective_points.items():
