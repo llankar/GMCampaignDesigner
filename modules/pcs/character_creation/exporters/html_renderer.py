@@ -72,10 +72,12 @@ def render_character_sheet_html(payload: dict, rules_result) -> str:
 
     advancements = int(payload.get("advancements") or 0)
     advancements_values = [f"{index:02d} {('■' if index <= advancements else '□')}" for index in range(1, 41)]
+    extra_assets = _rule_attr(rules_result, "extra_assets", []) or []
     assets_values = [
         f"Concept: {payload.get('concept', '').strip()}",
         f"Défaut: {payload.get('flaw', '').strip()}",
         f"Atout de groupe: {payload.get('group_asset', '').strip()}",
+        *[str(asset).strip() for asset in extra_assets if str(asset).strip()],
     ]
 
     context = {
@@ -89,6 +91,7 @@ def render_character_sheet_html(payload: dict, rules_result) -> str:
         "feats_lines": _build_list_lines(feats_lines, 9),
         "armor": escape(armor),
         "protection": escape(str(payload.get("equipment_pe", {}).get("armor", ""))),
+        "superficial_health": escape(str(_rule_attr(rules_result, "superficial_health", ""))),
         "attacks_lines": _build_list_lines([], 4),
         "profile_race": escape(""),
         "profile_gender": escape(""),

@@ -20,7 +20,7 @@ def _payload():
 
 
 def _rules():
-    return SimpleNamespace(rank_name="Novice", rank_index=0, superficial_health=3, skill_dice={"Combat": "d6"})
+    return SimpleNamespace(rank_name="Novice", rank_index=0, superficial_health=15, skill_dice={"Combat": "d6"}, extra_assets=["Atout: Vigilance"])
 
 
 def test_render_character_sheet_html_contains_core_fields():
@@ -33,6 +33,8 @@ def test_render_character_sheet_html_contains_core_fields():
     assert "Concept: Rogue" in html
     assert "Défaut: Impulsive" in html
     assert "Atout de groupe: Safehouse" in html
+    assert "Atout: Vigilance" in html
+    assert "<th>B. superficielles</th><th>15</th>" in html
     assert "<strong>Race</strong></div>" in html
     assert "<strong>Genre</strong></div>" in html
 

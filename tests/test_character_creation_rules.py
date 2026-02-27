@@ -137,3 +137,40 @@ def test_limited_advancement_can_repeat_on_new_rank():
 
     result = build_character(payload)
     assert result.rank_name == "Expérimenté"
+
+
+def test_new_edge_advancement_adds_asset_line_in_result():
+    payload = _payload()
+    payload["advancements"] = 1
+    payload["advancement_choices"] = [{"type": "new_edge", "details": "Vigilance"}]
+
+    result = build_character(payload)
+    assert "Atout: Vigilance" in result.extra_assets
+
+
+def test_superficial_health_advancement_increases_total_health():
+    payload = _payload()
+    payload["advancements"] = 1
+    payload["advancement_choices"] = [{"type": "superficial_health", "details": "+5 blessures"}]
+
+    result = build_character(payload)
+    assert result.superficial_health == 15
+
+
+def test_skill_improvement_advancement_increases_skill_points():
+    payload = _payload()
+    payload["advancements"] = 1
+    payload["advancement_choices"] = [{"type": "skill_improvement", "details": "Combat, Perception"}]
+
+    result = build_character(payload)
+    assert result.effective_skill_points["Combat"] == payload["skills"]["Combat"] + 1
+    assert result.effective_skill_points["Perception"] == payload["skills"]["Perception"] + 1
+
+
+def test_new_skill_advancement_sets_skill_to_d4_minimum():
+    payload = _payload()
+    payload["advancements"] = 1
+    payload["advancement_choices"] = [{"type": "new_skill", "details": "Technologie"}]
+
+    result = build_character(payload)
+    assert result.effective_skill_points["Technologie"] == 1
