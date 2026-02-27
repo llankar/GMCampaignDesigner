@@ -95,3 +95,45 @@ def test_bonus_points_only_on_favorites():
         assert False, "Expected CharacterCreationError"
     except CharacterCreationError as exc:
         assert "compétences favorites" in str(exc)
+
+
+def test_advancement_choices_count_must_match_advancements():
+    payload = _payload()
+    payload["advancements"] = 2
+    payload["advancement_choices"] = [{"type": "new_edge", "details": "Atout social"}]
+
+    try:
+        build_character(payload)
+        assert False, "Expected CharacterCreationError"
+    except CharacterCreationError as exc:
+        assert "nombre de choix d'avancement" in str(exc)
+
+
+def test_limited_advancement_cannot_repeat_same_rank():
+    payload = _payload()
+    payload["advancements"] = 2
+    payload["advancement_choices"] = [
+        {"type": "new_edge", "details": "Atout #1"},
+        {"type": "new_edge", "details": "Atout #2"},
+    ]
+
+    try:
+        build_character(payload)
+        assert False, "Expected CharacterCreationError"
+    except CharacterCreationError as exc:
+        assert "une seule fois au rang" in str(exc)
+
+
+def test_limited_advancement_can_repeat_on_new_rank():
+    payload = _payload()
+    payload["advancements"] = 5
+    payload["advancement_choices"] = [
+        {"type": "new_edge", "details": "Novice"},
+        {"type": "equipment_points", "details": "Novice"},
+        {"type": "new_skill", "details": "Novice"},
+        {"type": "skill_improvement", "details": "Novice"},
+        {"type": "new_edge", "details": "Expérimenté"},
+    ]
+
+    result = build_character(payload)
+    assert result.rank_name == "Expérimenté"

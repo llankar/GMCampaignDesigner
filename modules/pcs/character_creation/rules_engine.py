@@ -21,6 +21,38 @@ class CharacterCreationResult:
     superficial_health: int
 
 
+LIMITED_ADVANCEMENT_TYPES = {
+    "new_edge",
+    "superficial_health",
+    "prowess_points",
+}
+
+
+def _validate_advancement_choices(advancements: int, choices: list[dict]) -> None:
+    if advancements <= 0:
+        return
+
+    if len(choices) != advancements:
+        raise CharacterCreationError(
+            f"Le nombre de choix d'avancement ({len(choices)}) doit être égal au total d'avancements ({advancements})."
+        )
+
+    per_rank_usage: dict[str, set[str]] = {}
+    for index, choice in enumerate(choices, start=1):
+        choice_type = (choice or {}).get("type", "").strip()
+        if not choice_type:
+            raise CharacterCreationError(f"L'avancement #{index} n'a pas de type sélectionné.")
+
+        rank_name, _, _ = rank_from_advancements(index)
+        if choice_type in LIMITED_ADVANCEMENT_TYPES:
+            used = per_rank_usage.setdefault(rank_name, set())
+            if choice_type in used:
+                raise CharacterCreationError(
+                    f"L'option '{choice_type}' ne peut être choisie qu'une seule fois au rang '{rank_name}'."
+                )
+            used.add(choice_type)
+
+
 def rank_from_advancements(advancements: int) -> tuple[str, int, int]:
     for idx, (start, end, rank_name, skill_cap_points) in enumerate(RANK_TABLE):
         if start <= advancements <= end:
@@ -72,6 +104,8 @@ def build_character(character_input: dict) -> CharacterCreationResult:
         )
 
     advancements = int(character_input.get("advancements", 0))
+    advancement_choices = character_input.get("advancement_choices") or []
+    _validate_advancement_choices(advancements, advancement_choices)
     rank_name, rank_index, skill_cap_points = rank_from_advancements(advancements)
 
     effective_points = {skill: base_points[skill] + bonus_points.get(skill, 0) for skill in SKILLS}
