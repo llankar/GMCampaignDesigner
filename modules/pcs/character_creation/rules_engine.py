@@ -144,7 +144,7 @@ def build_character(character_input: dict) -> CharacterCreationResult:
     if sum(pe_alloc.get(k, 0) for k in ("weapon", "armor", "utility")) != 3:
         raise CharacterCreationError("Les PE de départ doivent totaliser 3 (1/1/1).")
 
-    superficial_health = (10 if character_input.get("is_superhero") else 5) + 5 + progression_effects.superficial_health_bonus
+    superficial_health = (10 if character_input.get("is_superhero") else 5) + 5 + rank_index + progression_effects.superficial_health_bonus
 
     skill_dice = {skill: DIE_STEPS.get(points, "d12+4") for skill, points in effective_points.items()}
     return CharacterCreationResult(

@@ -6,6 +6,8 @@ from html import escape
 from pathlib import Path
 from string import Template
 
+from ..progression import ADVANCEMENT_OPTIONS
+
 _TEMPLATE_PATH = Path(__file__).resolve().parent.parent / "templates" / "character_sheet.html"
 
 
@@ -55,6 +57,37 @@ def _format_feat_line(feat: dict) -> str:
     return " | ".join(parts)
 
 
+def _build_advancement_lines(advancement_choices: list[dict], total_advancements: int) -> list[str]:
+    option_labels = {value: label for value, label in ADVANCEMENT_OPTIONS}
+    lines: list[str] = []
+
+    for index, raw_choice in enumerate(advancement_choices[:total_advancements], start=1):
+        choice = raw_choice or {}
+        choice_type = str(choice.get("type") or "").strip()
+        details = str(choice.get("details") or "").strip()
+        label = option_labels.get(choice_type, choice_type or "Option non définie")
+
+        line = f"{index:02d}. {label}"
+        if details:
+            line = f"{line} — {details}"
+        lines.append(line)
+
+    return lines
+
+
+def _advancement_assets(advancement_choices: list[dict]) -> list[str]:
+    lines: list[str] = []
+    for raw_choice in advancement_choices:
+        choice = raw_choice or {}
+        if str(choice.get("type") or "").strip() != "new_edge":
+            continue
+
+        details = str(choice.get("details") or "").strip()
+        if details:
+            lines.append(f"Atout: {details}")
+    return lines
+
+
 def render_character_sheet_html(payload: dict, rules_result) -> str:
     template = Template(_TEMPLATE_PATH.read_text(encoding="utf-8"))
 
@@ -71,13 +104,21 @@ def render_character_sheet_html(payload: dict, rules_result) -> str:
     armor = equipment.get("armor", "")
 
     advancements = int(payload.get("advancements") or 0)
-    advancements_values = [f"{index:02d} {('■' if index <= advancements else '□')}" for index in range(1, 41)]
+    advancement_choices = payload.get("advancement_choices") or []
+    advancements_values = _build_advancement_lines(advancement_choices, advancements)
+
     extra_assets = _rule_attr(rules_result, "extra_assets", []) or []
+    advancement_assets = _advancement_assets(advancement_choices)
+    merged_assets = list(extra_assets)
+    for asset in advancement_assets:
+        if asset not in merged_assets:
+            merged_assets.append(asset)
+
     assets_values = [
         f"Concept: {payload.get('concept', '').strip()}",
         f"Défaut: {payload.get('flaw', '').strip()}",
         f"Atout de groupe: {payload.get('group_asset', '').strip()}",
-        *[str(asset).strip() for asset in extra_assets if str(asset).strip()],
+        *[str(asset).strip() for asset in merged_assets if str(asset).strip()],
     ]
 
     context = {
