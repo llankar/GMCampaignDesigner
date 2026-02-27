@@ -92,6 +92,7 @@ from db.db import initialize_db, ensure_entity_schema
 from modules.factions.faction_graph_editor import FactionGraphEditor
 from modules.whiteboard.controllers.whiteboard_controller import WhiteboardController
 from modules.pcs.display_pcs import display_pcs_in_banner
+from modules.pcs.character_creation import CharacterCreationView
 from modules.generic.generic_list_selection_view import GenericListSelectionView
 from modules.maps.controllers.display_map_controller import DisplayMapController
 from modules.maps.world_map_view import WorldMapWindow
@@ -889,6 +890,7 @@ class MainWindow(ctk.CTk):
             ("audio_controls", "Sound & Music Manager", self.open_sound_manager),
             ("dice_roller", "Open Dice Roller", self.open_dice_roller),
             ("session_timers", "Open Session Timers", self.open_timer_window),
+            ("character_creation", "Character Creation", self.open_character_creation),
         ]
 
         make_section(container, "Data & System", data_system)
@@ -2530,6 +2532,12 @@ class MainWindow(ctk.CTk):
                 func_name="main_window.MainWindow.open_scenario_builder",
             )
             messagebox.showerror("Error", f"Failed to open Scenario Builder:\n{exc}")
+
+    def open_character_creation(self):
+        self.clear_current_content()
+        container = ctk.CTkFrame(self.content_frame)
+        container.grid(row=0, column=0, sticky="nsew")
+        CharacterCreationView(container).pack(fill="both", expand=True)
 
     def open_random_table_editor(self):
         try:
