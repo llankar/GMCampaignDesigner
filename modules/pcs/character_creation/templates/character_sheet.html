@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8" />
+  <title>Savage Fate - $name</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 24px; color: #1f2937; }
+    h1, h2 { margin-bottom: 8px; }
+    h1 { font-size: 24px; }
+    h2 { margin-top: 22px; font-size: 18px; border-bottom: 1px solid #d1d5db; padding-bottom: 4px; }
+    .meta { margin: 0; line-height: 1.5; }
+    table { border-collapse: collapse; width: 100%; margin-top: 8px; }
+    th, td { border: 1px solid #d1d5db; padding: 6px 8px; font-size: 13px; text-align: left; }
+    .fav { width: 32px; text-align: center; }
+    ul { margin-top: 6px; }
+    .small { font-size: 12px; color: #4b5563; }
+  </style>
+</head>
+<body>
+  <h1>Savage Fate - Character Creation</h1>
+  <p class="meta"><strong>Nom:</strong> $name</p>
+  <p class="meta"><strong>Joueur:</strong> $player</p>
+  <p class="meta"><strong>Concept:</strong> $concept</p>
+  <p class="meta"><strong>Défaut:</strong> $flaw</p>
+  <p class="meta"><strong>Atout de groupe:</strong> $group_asset</p>
+  <p class="meta"><strong>Rang:</strong> $rank_name (index $rank_index)</p>
+  <p class="meta"><strong>Blessures superficielles:</strong> $superficial_health</p>
+
+  <h2>Compétences</h2>
+  <table>
+    <thead><tr><th class="fav">Fav</th><th>Compétence</th><th>Dé</th></tr></thead>
+    <tbody>
+      $skills_rows
+    </tbody>
+  </table>
+
+  <h2>Prouesses</h2>
+  $feats_html
+
+  <h2>Équipement</h2>
+  <ul>
+    <li>Arme ($weapon_pe PE): $weapon</li>
+    <li>Armure ($armor_pe PE): $armor</li>
+    <li>Utilitaire ($utility_pe PE): $utility</li>
+  </ul>
+
+  <h2>Avancements</h2>
+  <p class="small">$advancements_marks</p>
+</body>
+</html>
