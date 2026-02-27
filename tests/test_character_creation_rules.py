@@ -157,6 +157,21 @@ def test_superficial_health_advancement_increases_total_health():
     assert result.superficial_health == 15
 
 
+def test_superficial_health_includes_rank_bonus():
+    payload = _payload()
+    payload["advancements"] = 4
+    payload["advancement_choices"] = [
+        {"type": "equipment_points", "details": "N1"},
+        {"type": "new_skill", "details": "Technologie"},
+        {"type": "skill_improvement", "details": "Combat, Perception"},
+        {"type": "superficial_health", "details": "+5 blessures"},
+    ]
+
+    result = build_character(payload)
+    assert result.rank_name == "Expérimenté"
+    assert result.superficial_health == 16
+
+
 def test_skill_improvement_advancement_increases_skill_points():
     payload = _payload()
     payload["advancements"] = 1
