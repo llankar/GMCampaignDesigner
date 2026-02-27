@@ -21,6 +21,7 @@ DIE_STEPS = {
 }
 
 RANK_TABLE = [
+    (-1, -1, "", 5),
     (0, 3, "Novice", 5),
     (4, 7, "Expérimenté", 5),
     (8, 11, "Vétéran", 6),
