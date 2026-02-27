@@ -6,6 +6,7 @@ from dataclasses import dataclass
 
 from .constants import DIE_STEPS, RANK_TABLE, SKILLS
 from .points import summarize_point_budgets
+from .progression import apply_advancement_effects
 
 
 class CharacterCreationError(ValueError):
@@ -19,6 +20,7 @@ class CharacterCreationResult:
     skill_dice: dict[str, str]
     effective_skill_points: dict[str, int]
     superficial_health: int
+    extra_assets: list[str]
 
 
 LIMITED_ADVANCEMENT_TYPES = {
@@ -109,6 +111,13 @@ def build_character(character_input: dict) -> CharacterCreationResult:
     rank_name, rank_index, skill_cap_points = rank_from_advancements(advancements)
 
     effective_points = {skill: base_points[skill] + bonus_points.get(skill, 0) for skill in SKILLS}
+    progression_effects = apply_advancement_effects(
+        base_skill_points=effective_points,
+        favorites=favorites,
+        advancement_choices=advancement_choices,
+        is_superhero=bool(character_input.get("is_superhero")),
+    )
+    effective_points = progression_effects.effective_skill_points
 
     for skill, pts in effective_points.items():
         if pts > skill_cap_points:
@@ -135,7 +144,7 @@ def build_character(character_input: dict) -> CharacterCreationResult:
     if sum(pe_alloc.get(k, 0) for k in ("weapon", "armor", "utility")) != 3:
         raise CharacterCreationError("Les PE de départ doivent totaliser 3 (1/1/1).")
 
-    superficial_health = (10 if character_input.get("is_superhero") else 5) + 5
+    superficial_health = (10 if character_input.get("is_superhero") else 5) + 5 + progression_effects.superficial_health_bonus
 
     skill_dice = {skill: DIE_STEPS.get(points, "d12+4") for skill, points in effective_points.items()}
     return CharacterCreationResult(
@@ -144,4 +153,5 @@ def build_character(character_input: dict) -> CharacterCreationResult:
         skill_dice=skill_dice,
         effective_skill_points=effective_points,
         superficial_health=superficial_health,
+        extra_assets=progression_effects.extra_assets,
     )
