@@ -1,4 +1,5 @@
 from modules.pcs.character_creation.rules_engine import CharacterCreationError, build_character
+from modules.pcs.character_creation.points import summarize_point_budgets
 
 
 def _payload():
@@ -56,3 +57,12 @@ def test_build_character_requires_six_favorites():
         assert False, "Expected CharacterCreationError"
     except CharacterCreationError:
         pass
+
+
+def test_favored_points_budget_summary_matches_rule():
+    payload = _payload()
+    summary = summarize_point_budgets(payload["skills"], payload["favorites"])
+    expected_favored_spent = sum(payload["skills"][skill] for skill in payload["favorites"])
+    assert summary["spent_base"] == 15
+    assert summary["remaining_base"] == 0
+    assert summary["free_favored_points"] == expected_favored_spent

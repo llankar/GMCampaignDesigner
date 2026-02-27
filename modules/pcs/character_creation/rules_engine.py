@@ -5,6 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from .constants import DIE_STEPS, RANK_TABLE, SKILLS
+from .points import compute_favorite_bonus
 
 
 class CharacterCreationError(ValueError):
@@ -28,25 +29,6 @@ def rank_from_advancements(advancements: int) -> tuple[str, int, int]:
         raise CharacterCreationError("Le nombre d'avancements ne peut pas être négatif.")
     return RANK_TABLE[-1][2], len(RANK_TABLE) - 1, RANK_TABLE[-1][3]
 
-
-def _compute_favorite_bonus(base_points: dict[str, int], favorites: list[str]) -> dict[str, int]:
-    bonuses = {skill: 0 for skill in base_points}
-    if not favorites:
-        return bonuses
-    ordered_favorites = [skill for skill in favorites if skill in base_points]
-    if len(ordered_favorites) < 2:
-        return bonuses
-
-    for source in ordered_favorites:
-        points_spent = max(0, base_points.get(source, 0))
-        for i in range(points_spent):
-            target_index = (ordered_favorites.index(source) + 1 + i) % len(ordered_favorites)
-            target = ordered_favorites[target_index]
-            if target == source:
-                target_index = (target_index + 1) % len(ordered_favorites)
-                target = ordered_favorites[target_index]
-            bonuses[target] += 1
-    return bonuses
 
 
 def build_character(character_input: dict) -> CharacterCreationResult:
@@ -78,7 +60,7 @@ def build_character(character_input: dict) -> CharacterCreationResult:
     advancements = int(character_input.get("advancements", 0))
     rank_name, rank_index, skill_cap_points = rank_from_advancements(advancements)
 
-    bonus_points = _compute_favorite_bonus(base_points, favorites)
+    bonus_points = compute_favorite_bonus(base_points, favorites)
     effective_points = {skill: base_points[skill] + bonus_points.get(skill, 0) for skill in SKILLS}
 
     for skill, pts in effective_points.items():

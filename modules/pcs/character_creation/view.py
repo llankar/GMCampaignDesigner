@@ -9,6 +9,7 @@ import customtkinter as ctk
 
 from .constants import SKILLS
 from .pdf_exporter import export_character_pdf
+from .points import summarize_point_budgets
 from .rules_engine import CharacterCreationError, build_character
 
 
@@ -38,8 +39,12 @@ class CharacterCreationView(ctk.CTkFrame):
         ctk.CTkLabel(scroll, text="Compétences (15 points, 6 favorites)", font=("Arial", 14, "bold")).grid(
             row=3, column=0, columnspan=2, sticky="w", padx=6, pady=(10, 2)
         )
+        self.remaining_points_var = tk.StringVar(value="Points restants: 15 | Bonus favoris dispo: 0")
+        ctk.CTkLabel(scroll, textvariable=self.remaining_points_var, font=("Arial", 12, "bold")).grid(
+            row=4, column=0, columnspan=2, sticky="w", padx=6, pady=(0, 4)
+        )
         skill_frame = ctk.CTkFrame(scroll)
-        skill_frame.grid(row=4, column=0, columnspan=2, sticky="ew", padx=6, pady=4)
+        skill_frame.grid(row=5, column=0, columnspan=2, sticky="ew", padx=6, pady=4)
         for i, skill in enumerate(SKILLS):
             r = i // 2
             c = (i % 2) * 3
@@ -50,14 +55,16 @@ class CharacterCreationView(ctk.CTkFrame):
             self.skill_vars[skill] = pts
             ctk.CTkCheckBox(skill_frame, text="Fav", variable=fav, onvalue=True, offvalue=False).grid(row=r, column=c + 1)
             ctk.CTkEntry(skill_frame, textvariable=pts, width=55).grid(row=r, column=c + 2, padx=(2, 10))
+            fav.trace_add("write", self._update_remaining_points_marker)
+            pts.trace_add("write", self._update_remaining_points_marker)
 
         ctk.CTkLabel(scroll, text="Prouesses", font=("Arial", 14, "bold")).grid(
-            row=5, column=0, sticky="w", padx=6, pady=(10, 2)
+            row=6, column=0, sticky="w", padx=6, pady=(10, 2)
         )
         self.feat_widgets = []
         for idx in range(2):
             box = ctk.CTkFrame(scroll)
-            box.grid(row=6 + idx, column=0, columnspan=2, sticky="ew", padx=6, pady=3)
+            box.grid(row=7 + idx, column=0, columnspan=2, sticky="ew", padx=6, pady=3)
             name = tk.StringVar(value=f"Prouesse {idx+1}")
             opt1 = tk.StringVar(value="")
             opt2 = tk.StringVar(value="")
@@ -76,14 +83,16 @@ class CharacterCreationView(ctk.CTkFrame):
             self.feat_widgets.append((name, opt1, opt2, opt3, lim))
 
         ctk.CTkLabel(scroll, text="Équipement", font=("Arial", 14, "bold")).grid(
-            row=8, column=0, sticky="w", padx=6, pady=(10, 2)
+            row=9, column=0, sticky="w", padx=6, pady=(10, 2)
         )
-        self._entry(scroll, "Arme", "weapon", 9, 0)
-        self._entry(scroll, "Armure", "armor", 9, 1)
-        self._entry(scroll, "Utilitaire", "utility", 10, 0)
-        self._entry(scroll, "PE Arme", "weapon_pe", 10, 1, default="1")
-        self._entry(scroll, "PE Armure", "armor_pe", 11, 0, default="1")
-        self._entry(scroll, "PE Utilitaire", "utility_pe", 11, 1, default="1")
+        self._entry(scroll, "Arme", "weapon", 10, 0)
+        self._entry(scroll, "Armure", "armor", 10, 1)
+        self._entry(scroll, "Utilitaire", "utility", 11, 0)
+        self._entry(scroll, "PE Arme", "weapon_pe", 11, 1, default="1")
+        self._entry(scroll, "PE Armure", "armor_pe", 12, 0, default="1")
+        self._entry(scroll, "PE Utilitaire", "utility_pe", 12, 1, default="1")
+
+        self._update_remaining_points_marker()
 
         btn = ctk.CTkButton(self, text="Générer fiche PDF", command=self.create_character_pdf)
         btn.grid(row=2, column=0, sticky="e", padx=12, pady=(0, 12))
@@ -129,6 +138,21 @@ class CharacterCreationView(ctk.CTkFrame):
                 "utility": int(self.inputs["utility_pe"].get() or 0),
             },
         }
+
+    def _safe_int(self, raw_value: str) -> int:
+        try:
+            return int((raw_value or "0").strip())
+        except ValueError:
+            return 0
+
+    def _update_remaining_points_marker(self, *_args) -> None:
+        base_points = {skill: self._safe_int(var.get()) for skill, var in self.skill_vars.items()}
+        favorites = [skill for skill, var in self.favorite_vars.items() if var.get()]
+        summary = summarize_point_budgets(base_points, favorites)
+        self.remaining_points_var.set(
+            f"Points restants: {summary['remaining_base']} | "
+            f"Bonus favoris dispo: {summary['free_favored_points']}"
+        )
 
     def create_character_pdf(self):
         try:

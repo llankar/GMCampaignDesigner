@@ -4,7 +4,10 @@ from __future__ import annotations
 
 from pathlib import Path
 
-import fitz
+try:
+    import pymupdf as fitz  # PyMuPDF modern import path
+except ImportError:  # pragma: no cover - compatibility for older environments
+    import fitz  # type: ignore[no-redef]
 
 
 def _write(page: fitz.Page, x: float, y: float, text: str, size: float = 10, bold: bool = False) -> None:
@@ -13,6 +16,9 @@ def _write(page: fitz.Page, x: float, y: float, text: str, size: float = 10, bol
 
 
 def export_character_pdf(character: dict, rules_result, output_path: str) -> str:
+    if not output_path:
+        raise ValueError("Chemin de sortie PDF invalide.")
+
     output = Path(output_path)
     output.parent.mkdir(parents=True, exist_ok=True)
 
