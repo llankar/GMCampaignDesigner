@@ -35,18 +35,20 @@ def summarize_point_budgets(base_points: dict[str, int], favorites: list[str], *
     """
 
     normalized_points = {skill: max(0, int(value)) for skill, value in base_points.items()}
-    spent_total = sum(normalized_points.values())
     ordered_favorites = [skill for skill in favorites if skill in normalized_points]
+    favorite_set = set(ordered_favorites)
     favored_spent = sum(normalized_points[skill] for skill in ordered_favorites)
+    non_favored_spent = sum(points for skill, points in normalized_points.items() if skill not in favorite_set)
 
     if len(ordered_favorites) < 2:
-        spent_base = spent_total
+        spent_base = non_favored_spent + favored_spent
         free_favored_points = 0
         used_free_favored_points = 0
     else:
-        spent_base = spent_total
-        free_favored_points = favored_spent
-        used_free_favored_points = favored_spent
+        paid_favored_points = (favored_spent + 1) // 2
+        spent_base = non_favored_spent + paid_favored_points
+        free_favored_points = paid_favored_points
+        used_free_favored_points = favored_spent - paid_favored_points
 
     return {
         "spent_base": spent_base,
