@@ -30,6 +30,11 @@ def test_render_character_sheet_html_contains_core_fields():
     assert "Combat" in html
     assert "■" in html
     assert "Lame vive" in html
+    assert "Concept: Rogue" in html
+    assert "Défaut: Impulsive" in html
+    assert "Atout de groupe: Safehouse" in html
+    assert "<strong>Race</strong></div>" in html
+    assert "<strong>Genre</strong></div>" in html
 
 
 def test_export_character_sheet_html_only_writes_file(tmp_path):
