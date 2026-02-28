@@ -8,6 +8,7 @@ import customtkinter as ctk
 
 OBJECT_TITLES = {"weapon": "Objet 1", "armor": "Objet 2", "utility": "Objet 3"}
 OBJECT_ORDER = ("weapon", "armor", "utility")
+MAX_OBJECTS_PER_ROW = 3
 FIELD_LABELS = {
     "damage": "Dommages",
     "pierce_armor": "Perce-armure",
@@ -27,7 +28,7 @@ class EquipmentEditor:
         self._on_change = on_change
         self._max_level_provider = max_level_provider
         self._columns: dict[str, dict] = {}
-        self._active_object_keys: list[str] = list(OBJECT_ORDER)
+        self._active_object_keys: list[str] = [OBJECT_ORDER[0]]
 
         self.frame = ctk.CTkFrame(parent)
         self.frame.grid(row=11, column=0, columnspan=2, sticky="ew", padx=6, pady=(4, 4))
@@ -44,13 +45,15 @@ class EquipmentEditor:
             row=0, column=1, sticky="e", padx=6, pady=4
         )
 
-        for col, object_key in enumerate(OBJECT_ORDER):
-            self._columns[object_key] = self._build_column(object_key, col)
+        for object_key in OBJECT_ORDER:
+            self._columns[object_key] = self._build_column(object_key)
             self.add_effect_row(object_key)
 
-    def _build_column(self, object_key: str, col: int) -> dict:
+        self._render_object_grid()
+
+    def _build_column(self, object_key: str) -> dict:
         box = ctk.CTkFrame(self.frame)
-        box.grid(row=1, column=col, sticky="nsew", padx=4, pady=4)
+        box.grid(row=1, column=0, sticky="nsew", padx=4, pady=4)
         box.grid_columnconfigure(0, weight=1)
 
         header = ctk.CTkFrame(box)
@@ -100,6 +103,7 @@ class EquipmentEditor:
         self._columns[next_key]["box"].grid()
         if not self._columns[next_key]["rows"]:
             self.add_effect_row(next_key)
+        self._render_object_grid()
         self._on_internal_change()
 
     def remove_object_slot(self, object_key: str) -> None:
@@ -113,9 +117,19 @@ class EquipmentEditor:
         for row in list(column["rows"]):
             row["frame"].destroy()
         column["rows"] = []
-        column["box"].grid_remove()
         self._active_object_keys = [key for key in self._active_object_keys if key != object_key]
+        self._render_object_grid()
         self._on_internal_change()
+
+    def _render_object_grid(self) -> None:
+        for index, object_key in enumerate(self._active_object_keys):
+            row = 1 + (index // MAX_OBJECTS_PER_ROW)
+            col = index % MAX_OBJECTS_PER_ROW
+            self._columns[object_key]["box"].grid(row=row, column=col, sticky="nsew", padx=4, pady=4)
+
+        for object_key, column in self._columns.items():
+            if object_key not in self._active_object_keys:
+                column["box"].grid_remove()
 
     def add_effect_row(self, object_key: str) -> None:
         column = self._columns[object_key]
@@ -277,13 +291,12 @@ class EquipmentEditor:
             active_keys = [OBJECT_ORDER[0]]
         self._active_object_keys = active_keys
         for object_key, column in self._columns.items():
-            if object_key in self._active_object_keys:
-                column["box"].grid()
-            else:
+            if object_key not in self._active_object_keys:
                 column["name_var"].set("")
                 for row in list(column["rows"]):
                     row["frame"].destroy()
                 column["rows"] = []
-                column["box"].grid_remove()
+
+        self._render_object_grid()
 
         self._on_internal_change()

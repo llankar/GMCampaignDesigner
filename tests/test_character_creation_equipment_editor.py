@@ -10,6 +10,7 @@ class _StubWidget:
 
     def grid(self, *args, **kwargs):
         self._grid_visible = True
+        self._grid_kwargs = kwargs
         return None
 
     def grid_remove(self):
@@ -117,6 +118,8 @@ def test_can_remove_effect_row_from_existing_object():
 def test_remove_and_readd_object_slot_updates_visibility_and_payload():
     _, editor = _build_editor()
 
+    editor.add_object_slot()
+
     editor._columns["armor"]["name_var"].set("Cuirasse")
     editor.remove_object_slot("armor")
 
@@ -133,8 +136,22 @@ def test_remove_and_readd_object_slot_updates_visibility_and_payload():
 def test_cannot_remove_last_object_slot():
     _, editor = _build_editor()
 
+    editor.add_object_slot()
+    editor.add_object_slot()
+
     editor.remove_object_slot("armor")
     editor.remove_object_slot("utility")
     editor.remove_object_slot("weapon")
 
     assert editor._active_object_keys == ["weapon"]
+
+
+def test_add_object_slot_activates_objects_in_order():
+    _, editor = _build_editor()
+
+    assert editor._active_object_keys == ["weapon"]
+
+    editor.add_object_slot()
+    editor.add_object_slot()
+
+    assert editor._active_object_keys == ["weapon", "armor", "utility"]
