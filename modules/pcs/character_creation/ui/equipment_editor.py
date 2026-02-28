@@ -215,6 +215,26 @@ class EquipmentEditor:
         self.add_effect_row(object_key)
         return object_key
 
+    def _ensure_object_slot_exists(self, object_key: str) -> None:
+        if object_key in self._columns:
+            return
+
+        if object_key.startswith("object_"):
+            _, _, suffix = object_key.partition("_")
+            try:
+                target_number = int(suffix)
+            except ValueError:
+                target_number = self._next_object_number
+
+            while self._next_object_number <= target_number:
+                self._create_object_slot()
+            return
+
+        OBJECT_TITLES[object_key] = f"Objet {self._next_object_number}"
+        self._next_object_number += 1
+        self._columns[object_key] = self._build_column(object_key)
+        self.add_effect_row(object_key)
+
     def _level_values_for(self, field: str) -> list[str]:
         max_level = max(self._max_level_provider(), 0)
         if field == "skill_bonus":
@@ -278,6 +298,9 @@ class EquipmentEditor:
         }
 
     def apply_payload(self, equipment: dict, purchases: dict) -> None:
+        for object_key in set(equipment.keys()) | set(purchases.keys()):
+            self._ensure_object_slot_exists(object_key)
+
         active_keys = []
         for object_key, column in self._columns.items():
             column["name_var"].set((equipment.get(object_key) or "").strip())

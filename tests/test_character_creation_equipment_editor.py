@@ -168,3 +168,28 @@ def test_add_object_slot_after_third_creates_new_row_with_new_object():
     assert editor._columns["object_4"]["box"]._grid_kwargs["row"] == 2
     assert editor._columns["object_4"]["box"]._grid_kwargs["column"] == 0
     assert len(editor._columns["object_4"]["rows"]) == 1
+
+def test_apply_payload_restores_dynamic_object_slots_from_saved_draft():
+    _, editor = _build_editor(max_level=4)
+
+    editor.apply_payload(
+        equipment={
+            "weapon": "Lame",
+            "object_4": "Totem",
+        },
+        purchases={
+            "weapon": {"damage": 1, "pierce_armor": 0, "special_effect": 0, "skill_bonus": 0},
+            "object_4": {
+                "damage": 0,
+                "pierce_armor": 0,
+                "armor": 0,
+                "special_effect": 2,
+                "skill_bonus": 0,
+            },
+        },
+    )
+
+    assert "object_4" in editor._columns
+    assert "object_4" in editor._active_object_keys
+    assert editor.get_equipment_names()["object_4"] == "Totem"
+    assert editor.get_purchase_payload()["object_4"]["special_effect"] == 2
