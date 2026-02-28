@@ -90,6 +90,54 @@ def _advancement_assets(advancement_choices: list[dict]) -> list[str]:
     return lines
 
 
+def _object_sort_key(object_key: str) -> tuple[int, str]:
+    if object_key == "weapon":
+        return (0, object_key)
+    if object_key == "armor":
+        return (1, object_key)
+    if object_key == "utility":
+        return (2, object_key)
+    if object_key.startswith("object_"):
+        suffix = object_key.split("_", 1)[-1]
+        if suffix.isdigit():
+            return (3 + int(suffix), object_key)
+    return (999, object_key)
+
+
+def _build_equipment_lines(payload: dict) -> list[str]:
+    equipment = payload.get("equipment") or {}
+    purchases = payload.get("equipment_purchases") or {}
+    lines: list[str] = []
+
+    for object_key in sorted(set(equipment) | set(purchases), key=_object_sort_key):
+        name = str(equipment.get(object_key, "") or "").strip()
+        stats = purchases.get(object_key) or {}
+        has_effect = any(int(stats.get(field, 0) or 0) > 0 for field in ("damage", "pierce_armor", "armor", "special_effect", "skill_bonus"))
+
+        if not name and not has_effect:
+            continue
+
+        display_name = name or object_key.replace("_", " ").title()
+        details: list[str] = []
+        if int(stats.get("damage", 0) or 0) > 0:
+            details.append(f"Dmg {int(stats['damage'])}")
+        if int(stats.get("pierce_armor", 0) or 0) > 0:
+            details.append(f"PA {int(stats['pierce_armor'])}")
+        if int(stats.get("armor", 0) or 0) > 0:
+            details.append(f"Armure {int(stats['armor'])}")
+        if int(stats.get("special_effect", 0) or 0) > 0:
+            details.append(f"Effet {int(stats['special_effect'])}")
+        if int(stats.get("skill_bonus", 0) or 0) > 0:
+            details.append(f"Bonus comp {int(stats['skill_bonus'])}")
+
+        if details:
+            lines.append(f"{display_name} ({', '.join(details)})")
+        else:
+            lines.append(display_name)
+
+    return lines
+
+
 def render_character_sheet_html(payload: dict, rules_result) -> str:
     template = Template(_TEMPLATE_PATH.read_text(encoding="utf-8"))
 
@@ -104,6 +152,7 @@ def render_character_sheet_html(payload: dict, rules_result) -> str:
 
     equipment = payload.get("equipment") or {}
     armor = equipment.get("armor", "")
+    equipment_lines = _build_equipment_lines(payload)
 
     advancements = int(payload.get("advancements") or 0)
     advancement_choices = payload.get("advancement_choices") or []
@@ -139,9 +188,7 @@ def render_character_sheet_html(payload: dict, rules_result) -> str:
         "profile_race": escape(""),
         "profile_gender": escape(""),
         "profile_age": escape(""),
-        "equipment_lines": _build_list_lines(
-            [equipment.get("weapon", ""), equipment.get("armor", ""), equipment.get("utility", "")], 6
-        ),
+        "equipment_lines": _build_list_lines(equipment_lines, max(6, len(equipment_lines))),
         "notes_lines": _build_list_lines([], 6),
         "advancements_lines": _build_list_lines(advancements_values, 40),
     }
