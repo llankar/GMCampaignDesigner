@@ -5,6 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from .constants import DIE_STEPS, RANK_TABLE, SKILLS
+from .equipment import EquipmentValidationError, validate_equipment
 from .points import summarize_point_budgets
 from .progression.rank_limits import (
     bonus_skill_points_from_advancements,
@@ -155,13 +156,10 @@ def build_character(character_input: dict) -> CharacterCreationResult:
                 f"La prouesse #{feat_index + 1} doit avoir {expected_points} point(s) de prouesse."
             )
 
-    equipment = character_input.get("equipment") or {}
-    for key in ("weapon", "armor", "utility"):
-        if key not in equipment:
-            raise CharacterCreationError("L'équipement doit contenir arme, armure et utilitaire.")
-    pe_alloc = {k: int(v) for k, v in (character_input.get("equipment_pe") or {}).items()}
-    if sum(pe_alloc.get(k, 0) for k in ("weapon", "armor", "utility")) != 3:
-        raise CharacterCreationError("Les PE de départ doivent totaliser 3 (1/1/1).")
+    try:
+        validate_equipment(character_input, advancements, advancement_choices)
+    except EquipmentValidationError as exc:
+        raise CharacterCreationError(str(exc)) from exc
 
     superficial_health = (10 if character_input.get("is_superhero") else 5) + 5 + rank_index + progression_effects.superficial_health_bonus
 
