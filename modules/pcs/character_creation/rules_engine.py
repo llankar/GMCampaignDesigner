@@ -11,7 +11,7 @@ from .progression.rank_limits import (
     max_favorite_skills,
     skill_cap_points_for_advancements,
 )
-from .progression import apply_advancement_effects
+from .progression import BASE_FEAT_COUNT, apply_advancement_effects, prowess_points_from_advancement_choices
 
 
 class CharacterCreationError(ValueError):
@@ -145,15 +145,26 @@ def build_character(character_input: dict) -> CharacterCreationResult:
             )
 
     feats = character_input.get("feats") or []
-    if len(feats) != 2:
-        raise CharacterCreationError("Il faut exactement 2 prouesses.")
-    for feat in feats:
+    prowess_budgets = prowess_points_from_advancement_choices(advancement_choices)
+    expected_feat_total = BASE_FEAT_COUNT + len(prowess_budgets)
+    if len(feats) != expected_feat_total:
+        raise CharacterCreationError(
+            f"Le nombre de prouesses doit être {expected_feat_total} (base {BASE_FEAT_COUNT} + {len(prowess_budgets)} via avancements)."
+        )
+    for feat_index, feat in enumerate(feats):
         options = feat.get("options") or []
         limitation = (feat.get("limitation") or "").strip()
         if len(options) != 3:
             raise CharacterCreationError("Chaque prouesse doit contenir exactement 3 options.")
         if not limitation:
             raise CharacterCreationError("Chaque prouesse doit définir une limitation.")
+
+        expected_points = 0 if feat_index < BASE_FEAT_COUNT else prowess_budgets[feat_index - BASE_FEAT_COUNT]
+        actual_points = int(feat.get("prowess_points", expected_points) or 0)
+        if actual_points != expected_points:
+            raise CharacterCreationError(
+                f"La prouesse #{feat_index + 1} doit avoir {expected_points} point(s) de prouesse."
+            )
 
     equipment = character_input.get("equipment") or {}
     for key in ("weapon", "armor", "utility"):
