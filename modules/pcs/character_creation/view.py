@@ -10,7 +10,7 @@ import customtkinter as ctk
 from .constants import SKILLS
 from .exporters import export_character_sheet
 from .points import summarize_point_budgets
-from .progression import ADVANCEMENT_OPTIONS
+from .progression import ADVANCEMENT_OPTIONS, BASE_FEAT_COUNT, prowess_points_from_advancement_choices
 from .progression.rank_limits import bonus_skill_points_from_advancements, max_favorite_skills
 from .rules_engine import CharacterCreationError, build_character
 from .storage import CharacterDraftRepository
@@ -97,36 +97,24 @@ class CharacterCreationView(ctk.CTkFrame):
         ctk.CTkLabel(scroll, text="Prouesses", font=("Arial", 14, "bold")).grid(
             row=8, column=0, sticky="w", padx=6, pady=(10, 2)
         )
+        self.feat_count_var = tk.StringVar(value=f"Nombre de prouesses: {BASE_FEAT_COUNT}")
+        ctk.CTkLabel(scroll, textvariable=self.feat_count_var, font=("Arial", 12, "bold")).grid(
+            row=8, column=1, sticky="e", padx=6, pady=(10, 2)
+        )
+        self.feat_frame = ctk.CTkFrame(scroll)
+        self.feat_frame.grid(row=9, column=0, columnspan=2, sticky="ew", padx=6, pady=3)
         self.feat_widgets = []
-        for idx in range(2):
-            box = ctk.CTkFrame(scroll)
-            box.grid(row=9 + idx, column=0, columnspan=2, sticky="ew", padx=6, pady=3)
-            name = tk.StringVar(value=f"Prouesse {idx+1}")
-            opt1 = tk.StringVar(value="")
-            opt2 = tk.StringVar(value="")
-            opt3 = tk.StringVar(value="")
-            lim = tk.StringVar(value="")
-            for lbl, var, row in (
-                ("Nom", name, 0),
-                ("Option 1", opt1, 1),
-                ("Option 2", opt2, 2),
-                ("Option 3", opt3, 3),
-                ("Limitation", lim, 4),
-            ):
-                ctk.CTkLabel(box, text=lbl).grid(row=row, column=0, sticky="w", padx=6, pady=2)
-                ctk.CTkEntry(box, textvariable=var).grid(row=row, column=1, sticky="ew", padx=6, pady=2)
-            box.grid_columnconfigure(1, weight=1)
-            self.feat_widgets.append((name, opt1, opt2, opt3, lim))
+        self._render_feat_rows([])
 
         ctk.CTkLabel(scroll, text="Équipement", font=("Arial", 14, "bold")).grid(
-            row=11, column=0, sticky="w", padx=6, pady=(10, 2)
+            row=10, column=0, sticky="w", padx=6, pady=(10, 2)
         )
-        self._entry(scroll, "Arme", "weapon", 12, 0)
-        self._entry(scroll, "Armure", "armor", 12, 1)
-        self._entry(scroll, "Utilitaire", "utility", 13, 0)
-        self._entry(scroll, "PE Arme", "weapon_pe", 13, 1, default="1")
-        self._entry(scroll, "PE Armure", "armor_pe", 14, 0, default="1")
-        self._entry(scroll, "PE Utilitaire", "utility_pe", 14, 1, default="1")
+        self._entry(scroll, "Arme", "weapon", 11, 0)
+        self._entry(scroll, "Armure", "armor", 11, 1)
+        self._entry(scroll, "Utilitaire", "utility", 12, 0)
+        self._entry(scroll, "PE Arme", "weapon_pe", 12, 1, default="1")
+        self._entry(scroll, "PE Armure", "armor_pe", 13, 0, default="1")
+        self._entry(scroll, "PE Utilitaire", "utility_pe", 13, 1, default="1")
 
         self._update_favorites_limit_ui()
         self._update_remaining_points_marker()
@@ -154,12 +142,17 @@ class CharacterCreationView(ctk.CTkFrame):
     def _build_payload(self) -> dict:
         favorites = [skill for skill, var in self.favorite_vars.items() if var.get()]
         feats = []
-        for name, o1, o2, o3, lim in self.feat_widgets:
+        for feat_widget in self.feat_widgets:
             feats.append(
                 {
-                    "name": name.get().strip(),
-                    "options": [o1.get().strip(), o2.get().strip(), o3.get().strip()],
-                    "limitation": lim.get().strip(),
+                    "name": feat_widget["name"].get().strip(),
+                    "options": [
+                        feat_widget["option_1"].get().strip(),
+                        feat_widget["option_2"].get().strip(),
+                        feat_widget["option_3"].get().strip(),
+                    ],
+                    "limitation": feat_widget["limitation"].get().strip(),
+                    "prowess_points": feat_widget["prowess_points"],
                 }
             )
         advancement_choices = []
@@ -197,6 +190,7 @@ class CharacterCreationView(ctk.CTkFrame):
     def _on_advancements_changed(self, *_args):
         self._update_favorites_limit_ui()
         self._render_advancement_rows()
+        self._render_feat_rows(self._collect_current_feats())
         self._update_remaining_points_marker()
 
     def _update_favorites_limit_ui(self) -> None:
@@ -205,6 +199,14 @@ class CharacterCreationView(ctk.CTkFrame):
         self.skills_header_var.set(f"Compétences (15 points de base, max favorites: {favorite_limit})")
 
     def _render_advancement_rows(self):
+        existing_choices = [
+            {
+                "type": row["type_var"].get().strip(),
+                "details": row["details_var"].get().strip(),
+            }
+            for row in self.advancement_rows
+        ]
+
         for widget in self.advancement_frame.winfo_children():
             widget.destroy()
         self.advancement_rows = []
@@ -225,18 +227,21 @@ class CharacterCreationView(ctk.CTkFrame):
             row_frame.grid_columnconfigure(1, weight=1)
             ctk.CTkLabel(row_frame, text=f"Avancement {idx + 1}").grid(row=0, column=0, sticky="w", padx=6, pady=4)
 
-            option_var = tk.StringVar(value=ADVANCEMENT_OPTIONS[0][0])
+            existing_choice = existing_choices[idx] if idx < len(existing_choices) else {}
+            initial_type = (existing_choice.get("type") or "").strip() or ADVANCEMENT_OPTIONS[0][0]
+            option_var = tk.StringVar(value=initial_type)
             option_map = {label: value for value, label in ADVANCEMENT_OPTIONS}
             choice = ctk.CTkComboBox(row_frame, values=list(option_map.keys()), state="readonly")
-            choice.set(ADVANCEMENT_OPTIONS[0][1])
+            choice.set({value: label for value, label in ADVANCEMENT_OPTIONS}.get(initial_type, ADVANCEMENT_OPTIONS[0][1]))
             choice.grid(row=0, column=1, sticky="ew", padx=6, pady=4)
 
             def _on_select(selected_label, var=option_var, mapping=option_map):
                 var.set(mapping.get(selected_label, ""))
 
             choice.configure(command=_on_select)
+            option_var.trace_add("write", self._on_advancement_choice_updated)
 
-            details_var = tk.StringVar(value="")
+            details_var = tk.StringVar(value=(existing_choice.get("details") or "").strip())
             ctk.CTkEntry(row_frame, textvariable=details_var, placeholder_text="Détails narratifs / mécaniques")\
                 .grid(row=1, column=0, columnspan=2, sticky="ew", padx=6, pady=(0, 6))
 
@@ -246,6 +251,75 @@ class CharacterCreationView(ctk.CTkFrame):
                     "details_var": details_var,
                     "combo": choice,
                     "label_map": {value: label for value, label in ADVANCEMENT_OPTIONS},
+                }
+            )
+
+    def _on_advancement_choice_updated(self, *_args):
+        self._render_feat_rows(self._collect_current_feats())
+        self._update_remaining_points_marker()
+
+    def _collect_current_feats(self) -> list[dict]:
+        return [
+            {
+                "name": widget["name"].get().strip(),
+                "options": [
+                    widget["option_1"].get().strip(),
+                    widget["option_2"].get().strip(),
+                    widget["option_3"].get().strip(),
+                ],
+                "limitation": widget["limitation"].get().strip(),
+            }
+            for widget in self.feat_widgets
+        ]
+
+    def _render_feat_rows(self, existing_feats: list[dict]) -> None:
+        for widget in self.feat_frame.winfo_children():
+            widget.destroy()
+        self.feat_widgets = []
+
+        advancement_choices = [
+            {
+                "type": row["type_var"].get().strip(),
+                "details": row["details_var"].get().strip(),
+            }
+            for row in self.advancement_rows
+        ]
+        prowess_budgets = prowess_points_from_advancement_choices(advancement_choices)
+        total_feats = BASE_FEAT_COUNT + len(prowess_budgets)
+        self.feat_count_var.set(f"Nombre de prouesses: {total_feats}")
+
+        for idx in range(total_feats):
+            feat = existing_feats[idx] if idx < len(existing_feats) else {}
+            prowess_points = 0 if idx < BASE_FEAT_COUNT else prowess_budgets[idx - BASE_FEAT_COUNT]
+
+            box = ctk.CTkFrame(self.feat_frame)
+            box.grid(row=idx, column=0, columnspan=2, sticky="ew", pady=3)
+            name = tk.StringVar(value=(feat.get("name") or f"Prouesse {idx + 1}").strip())
+            options = feat.get("options") or []
+            opt1 = tk.StringVar(value=options[0] if len(options) > 0 else "")
+            opt2 = tk.StringVar(value=options[1] if len(options) > 1 else "")
+            opt3 = tk.StringVar(value=options[2] if len(options) > 2 else "")
+            lim = tk.StringVar(value=(feat.get("limitation") or "").strip())
+
+            name_label = "Nom" if prowess_points <= 0 else f"Nom ({prowess_points} pt{'s' if prowess_points > 1 else ''} de prouesse)"
+            for lbl, var, row in (
+                (name_label, name, 0),
+                ("Option 1", opt1, 1),
+                ("Option 2", opt2, 2),
+                ("Option 3", opt3, 3),
+                ("Limitation", lim, 4),
+            ):
+                ctk.CTkLabel(box, text=lbl).grid(row=row, column=0, sticky="w", padx=6, pady=2)
+                ctk.CTkEntry(box, textvariable=var).grid(row=row, column=1, sticky="ew", padx=6, pady=2)
+            box.grid_columnconfigure(1, weight=1)
+            self.feat_widgets.append(
+                {
+                    "name": name,
+                    "option_1": opt1,
+                    "option_2": opt2,
+                    "option_3": opt3,
+                    "limitation": lim,
+                    "prowess_points": prowess_points,
                 }
             )
 
@@ -307,16 +381,6 @@ class CharacterCreationView(ctk.CTkFrame):
         for skill, var in self.bonus_skill_vars.items():
             var.set(str((normalized_payload.get("bonus_skills") or {}).get(skill, 0)))
 
-        feats = normalized_payload.get("feats") or []
-        for idx, (name, o1, o2, o3, lim) in enumerate(self.feat_widgets):
-            feat = feats[idx] if idx < len(feats) else {}
-            options = feat.get("options") or []
-            name.set(feat.get("name", ""))
-            o1.set(options[0] if len(options) > 0 else "")
-            o2.set(options[1] if len(options) > 1 else "")
-            o3.set(options[2] if len(options) > 2 else "")
-            lim.set(feat.get("limitation", ""))
-
         advancement_choices = normalized_payload.get("advancement_choices") or []
         self._render_advancement_rows()
         for idx, row in enumerate(self.advancement_rows):
@@ -327,6 +391,8 @@ class CharacterCreationView(ctk.CTkFrame):
             row["type_var"].set(choice_value)
             row["combo"].set(row["label_map"].get(choice_value, ADVANCEMENT_OPTIONS[0][1]))
             row["details_var"].set((entry.get("details") or "").strip())
+
+        self._render_feat_rows(normalized_payload.get("feats") or [])
 
         self._update_remaining_points_marker()
 

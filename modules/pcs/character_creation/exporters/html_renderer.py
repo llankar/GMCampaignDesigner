@@ -44,12 +44,14 @@ def _build_list_lines(values: list[str], total: int, with_box: bool = False) -> 
 
 def _format_feat_line(feat: dict) -> str:
     name = (feat.get("name") or "").strip()
+    prowess_points = int(feat.get("prowess_points") or 0)
     options = [str(option).strip() for option in (feat.get("options") or []) if str(option).strip()]
     limitation = (feat.get("limitation") or "").strip()
 
     parts: list[str] = []
     if name:
-        parts.append(name)
+        label = f"{name} ({prowess_points} pt{'s' if prowess_points > 1 else ''} de prouesse)" if prowess_points > 0 else name
+        parts.append(label)
     if options:
         parts.append(f"Options: {', '.join(options)}")
     if limitation:
