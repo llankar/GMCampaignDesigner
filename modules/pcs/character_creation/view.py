@@ -119,6 +119,7 @@ class CharacterCreationView(ctk.CTkFrame):
         for key in ("weapon", "armor", "utility", "weapon_pe", "armor_pe", "utility_pe"):
             self.inputs[key] = tk.StringVar(value="")
 
+        self.equipment_editor: EquipmentEditor | None = None
         self.equipment_editor = EquipmentEditor(
             scroll,
             on_change=self._update_equipment_points_marker,
@@ -435,6 +436,9 @@ class CharacterCreationView(ctk.CTkFrame):
         self._update_equipment_points_marker()
 
     def _update_equipment_points_marker(self, *_args) -> None:
+        if self.equipment_editor is None:
+            return
+
         advancement_choices = [
             {"type": row["type_var"].get().strip(), "details": row["details_var"].get().strip()}
             for row in self.advancement_rows
