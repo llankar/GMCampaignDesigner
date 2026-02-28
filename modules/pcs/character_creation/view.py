@@ -23,6 +23,7 @@ class CharacterCreationView(ctk.CTkFrame):
         super().__init__(parent)
         self.drafts = CharacterDraftRepository()
         self.advancement_rows = []
+        self._advancement_choices_cache: list[dict[str, str]] = []
         self.grid_rowconfigure(1, weight=1)
         self.grid_columnconfigure(0, weight=1)
 
@@ -200,13 +201,7 @@ class CharacterCreationView(ctk.CTkFrame):
         self.skills_header_var.set(f"Compétences (15 points de base, max favorites: {favorite_limit})")
 
     def _render_advancement_rows(self):
-        existing_choices = [
-            {
-                "type": row["type_var"].get().strip(),
-                "details": row["details_var"].get().strip(),
-            }
-            for row in self.advancement_rows
-        ]
+        existing_choices = self._collect_cached_advancement_choices()
 
         for widget in self.advancement_frame.winfo_children():
             widget.destroy()
@@ -214,7 +209,10 @@ class CharacterCreationView(ctk.CTkFrame):
 
         advancement_count = self._safe_int(self.inputs["advancements"].get())
         if advancement_count <= 0:
+            self._advancement_choices_cache = existing_choices
             return
+
+        self._advancement_choices_cache = existing_choices[:advancement_count]
 
         ctk.CTkLabel(
             self.advancement_frame,
@@ -228,7 +226,7 @@ class CharacterCreationView(ctk.CTkFrame):
             row_frame.grid_columnconfigure(1, weight=1)
             ctk.CTkLabel(row_frame, text=f"Avancement {idx + 1}").grid(row=0, column=0, sticky="w", padx=6, pady=4)
 
-            existing_choice = existing_choices[idx] if idx < len(existing_choices) else {}
+            existing_choice = self._advancement_choices_cache[idx] if idx < len(self._advancement_choices_cache) else {}
             initial_type = (existing_choice.get("type") or "").strip() or ADVANCEMENT_OPTIONS[0][0]
             option_var = tk.StringVar(value=initial_type)
             option_label_map = {value: label for value, label in ADVANCEMENT_OPTIONS}
@@ -264,6 +262,26 @@ class CharacterCreationView(ctk.CTkFrame):
                     "label_var": option_label_var,
                 }
             )
+
+    def _collect_cached_advancement_choices(self) -> list[dict[str, str]]:
+        if not self.advancement_rows:
+            return [
+                {
+                    "type": (choice.get("type") or "").strip(),
+                    "details": (choice.get("details") or "").strip(),
+                }
+                for choice in self._advancement_choices_cache
+            ]
+
+        choices = [
+            {
+                "type": row["type_var"].get().strip(),
+                "details": row["details_var"].get().strip(),
+            }
+            for row in self.advancement_rows
+        ]
+        self._advancement_choices_cache = choices
+        return choices
 
     def _on_advancement_choice_updated(self, *_args):
         self._render_feat_rows(self._collect_current_feats())
