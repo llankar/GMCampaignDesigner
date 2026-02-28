@@ -64,6 +64,31 @@ def test_build_character_requires_six_favorites():
         pass
 
 
+def test_build_character_enforces_rank_favorite_limit():
+    payload = _payload()
+    payload["advancements"] = 0
+    payload["favorites"] = payload["favorites"] + ["Survie"]
+    try:
+        build_character(payload)
+        assert False, "Expected CharacterCreationError"
+    except CharacterCreationError as exc:
+        assert "maximum de compétences favorites" in str(exc)
+
+
+def test_build_character_allows_seven_favorites_from_rank_three():
+    payload = _payload()
+    payload["advancements"] = 3
+    payload["favorites"] = payload["favorites"] + ["Survie"]
+    payload["advancement_choices"] = [
+        {"type": "equipment_points", "details": "N1"},
+        {"type": "new_edge", "details": "N2"},
+        {"type": "prowess_points", "details": "N3"},
+    ]
+
+    result = build_character(payload)
+    assert result.rank_name == "Novice"
+
+
 def test_favored_points_budget_summary_matches_rule():
     payload = _payload()
     payload["bonus_skills"]["Combat"] = 2
@@ -130,7 +155,7 @@ def test_limited_advancement_can_repeat_on_new_rank():
     payload["advancement_choices"] = [
         {"type": "new_edge", "details": "Novice"},
         {"type": "equipment_points", "details": "Novice"},
-        {"type": "new_skill", "details": "Novice"},
+        {"type": "skill_improvement", "details": "Novice"},
         {"type": "skill_improvement", "details": "Novice"},
         {"type": "new_edge", "details": "Expérimenté"},
     ]
@@ -154,7 +179,7 @@ def test_superficial_health_advancement_increases_total_health():
     payload["advancement_choices"] = [{"type": "superficial_health", "details": "+5 blessures"}]
 
     result = build_character(payload)
-    assert result.superficial_health == 15
+    assert result.superficial_health == 16
 
 
 def test_superficial_health_includes_rank_bonus():
@@ -162,14 +187,14 @@ def test_superficial_health_includes_rank_bonus():
     payload["advancements"] = 4
     payload["advancement_choices"] = [
         {"type": "equipment_points", "details": "N1"},
-        {"type": "new_skill", "details": "Technologie"},
+        {"type": "prowess_points", "details": "+2"},
         {"type": "skill_improvement", "details": "Combat, Perception"},
         {"type": "superficial_health", "details": "+5 blessures"},
     ]
 
     result = build_character(payload)
     assert result.rank_name == "Expérimenté"
-    assert result.superficial_health == 16
+    assert result.superficial_health == 17
 
 
 def test_skill_improvement_advancement_increases_skill_points():
@@ -182,10 +207,28 @@ def test_skill_improvement_advancement_increases_skill_points():
     assert result.effective_skill_points["Perception"] == payload["skills"]["Perception"] + 1
 
 
-def test_new_skill_advancement_sets_skill_to_d4_minimum():
+def test_skill_improvement_adds_bonus_skill_point_budget():
     payload = _payload()
     payload["advancements"] = 1
-    payload["advancement_choices"] = [{"type": "new_skill", "details": "Technologie"}]
+    payload["advancement_choices"] = [{"type": "skill_improvement", "details": "Combat, Perception"}]
+    payload["favorites"] = ["Artisanat", "Commandement", "Informatique", "Jeu", "Médecine", "Relation"]
+    payload["bonus_skills"]["Artisanat"] = 1
 
     result = build_character(payload)
-    assert result.effective_skill_points["Technologie"] == 1
+    assert result.effective_skill_points["Artisanat"] == 1
+
+
+def test_skill_cap_increases_with_advancement_thresholds():
+    payload = _payload()
+    payload["advancements"] = 5
+    payload["advancement_choices"] = [
+        {"type": "equipment_points", "details": "N1"},
+        {"type": "prowess_points", "details": "N2"},
+        {"type": "new_edge", "details": "N3"},
+        {"type": "equipment_points", "details": "N4"},
+        {"type": "skill_improvement", "details": "Combat"},
+    ]
+    payload["bonus_skills"]["Combat"] = 3
+
+    result = build_character(payload)
+    assert result.skill_dice["Combat"] == "d12+2"

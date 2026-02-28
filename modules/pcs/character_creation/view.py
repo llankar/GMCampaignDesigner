@@ -11,6 +11,7 @@ from .constants import SKILLS
 from .exporters import export_character_sheet
 from .points import summarize_point_budgets
 from .progression import ADVANCEMENT_OPTIONS
+from .progression.rank_limits import bonus_skill_points_from_advancements, max_favorite_skills
 from .rules_engine import CharacterCreationError, build_character
 from .storage import CharacterDraftRepository
 from .storage.payload_normalizer import normalize_draft_payload_for_form
@@ -61,7 +62,8 @@ class CharacterCreationView(ctk.CTkFrame):
         self.favorite_vars = {}
         self.skill_vars = {}
         self.bonus_skill_vars = {}
-        ctk.CTkLabel(scroll, text="Compétences (15 points de base, 6 favorites)", font=("Arial", 14, "bold")).grid(
+        self.skills_header_var = tk.StringVar(value="Compétences (15 points de base, max favorites: 6)")
+        ctk.CTkLabel(scroll, textvariable=self.skills_header_var, font=("Arial", 14, "bold")).grid(
             row=5, column=0, columnspan=2, sticky="w", padx=6, pady=(10, 2)
         )
         self.remaining_points_var = tk.StringVar(value="Base restants: 15 | Bonus restants: 0")
@@ -126,6 +128,7 @@ class CharacterCreationView(ctk.CTkFrame):
         self._entry(scroll, "PE Armure", "armor_pe", 14, 0, default="1")
         self._entry(scroll, "PE Utilitaire", "utility_pe", 14, 1, default="1")
 
+        self._update_favorites_limit_ui()
         self._update_remaining_points_marker()
         self._refresh_draft_selector()
         self._render_advancement_rows()
@@ -192,7 +195,14 @@ class CharacterCreationView(ctk.CTkFrame):
         }
 
     def _on_advancements_changed(self, *_args):
+        self._update_favorites_limit_ui()
         self._render_advancement_rows()
+        self._update_remaining_points_marker()
+
+    def _update_favorites_limit_ui(self) -> None:
+        advancement_count = self._safe_int(self.inputs["advancements"].get())
+        favorite_limit = max_favorite_skills(advancement_count)
+        self.skills_header_var.set(f"Compétences (15 points de base, max favorites: {favorite_limit})")
 
     def _render_advancement_rows(self):
         for widget in self.advancement_frame.winfo_children():
@@ -330,10 +340,25 @@ class CharacterCreationView(ctk.CTkFrame):
         base_points = {skill: self._safe_int(var.get()) for skill, var in self.skill_vars.items()}
         bonus_points = {skill: self._safe_int(var.get()) for skill, var in self.bonus_skill_vars.items()}
         favorites = [skill for skill, var in self.favorite_vars.items() if var.get()]
-        summary = summarize_point_budgets(base_points, bonus_points, favorites)
+        favorite_limit = max_favorite_skills(self._safe_int(self.inputs["advancements"].get()))
+        advancement_choices = []
+        for row in self.advancement_rows:
+            advancement_choices.append(
+                {
+                    "type": row["type_var"].get(),
+                    "details": row["details_var"].get().strip(),
+                }
+            )
+        summary = summarize_point_budgets(
+            base_points,
+            bonus_points,
+            favorites,
+            extra_generated_bonus=bonus_skill_points_from_advancements(advancement_choices),
+        )
         self.remaining_points_var.set(
             f"Base restants: {summary['remaining_base']} | "
-            f"Bonus restants: {summary['remaining_bonus']}"
+            f"Bonus restants: {summary['remaining_bonus']} | "
+            f"Favorites: {len(favorites)}/{favorite_limit}"
         )
 
     def create_character_pdf(self):

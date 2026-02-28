@@ -6,6 +6,11 @@ from dataclasses import dataclass
 
 from .constants import DIE_STEPS, RANK_TABLE, SKILLS
 from .points import summarize_point_budgets
+from .progression.rank_limits import (
+    bonus_skill_points_from_advancements,
+    max_favorite_skills,
+    skill_cap_points_for_advancements,
+)
 from .progression import apply_advancement_effects
 
 
@@ -74,10 +79,17 @@ def build_character(character_input: dict) -> CharacterCreationResult:
     if not concept or not flaw:
         raise CharacterCreationError("Concept et défaut sont obligatoires.")
 
+    advancements = int(character_input.get("advancements", 0))
+    favorite_limit = max_favorite_skills(advancements)
+
     favorites = character_input.get("favorites") or []
-    if len(favorites) != 6:
-        raise CharacterCreationError("Il faut exactement 6 compétences favorites.")
-    if len(set(favorites)) != 6:
+    if len(favorites) < 6:
+        raise CharacterCreationError("Il faut au minimum 6 compétences favorites.")
+    if len(favorites) > favorite_limit:
+        raise CharacterCreationError(
+            f"Le maximum de compétences favorites pour ce rang est {favorite_limit}."
+        )
+    if len(set(favorites)) != len(favorites):
         raise CharacterCreationError("Les compétences favorites doivent être uniques.")
     for skill in favorites:
         if skill not in SKILLS:
@@ -99,16 +111,23 @@ def build_character(character_input: dict) -> CharacterCreationResult:
         if bonus > 0 and skill not in favorites:
             raise CharacterCreationError(f"Les points bonus ne peuvent être investis que dans les compétences favorites ({skill}).")
 
-    summary = summarize_point_budgets(base_points, bonus_points, favorites)
+    advancement_choices = character_input.get("advancement_choices") or []
+    bonus_from_advancements = bonus_skill_points_from_advancements(advancement_choices)
+
+    summary = summarize_point_budgets(
+        base_points,
+        bonus_points,
+        favorites,
+        extra_generated_bonus=bonus_from_advancements,
+    )
     if summary["used_bonus"] > summary["generated_bonus"]:
         raise CharacterCreationError(
             f"Points bonus insuffisants: {summary['used_bonus']} utilisés pour {summary['generated_bonus']} générés."
         )
 
-    advancements = int(character_input.get("advancements", 0))
-    advancement_choices = character_input.get("advancement_choices") or []
     _validate_advancement_choices(advancements, advancement_choices)
-    rank_name, rank_index, skill_cap_points = rank_from_advancements(advancements)
+    rank_name, rank_index, _ = rank_from_advancements(advancements)
+    skill_cap_points = skill_cap_points_for_advancements(advancements)
 
     effective_points = {skill: base_points[skill] + bonus_points.get(skill, 0) for skill in SKILLS}
     progression_effects = apply_advancement_effects(
