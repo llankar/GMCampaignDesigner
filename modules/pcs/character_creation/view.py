@@ -8,6 +8,7 @@ from tkinter import filedialog, messagebox
 import customtkinter as ctk
 
 from .constants import SKILLS
+from .equipment import available_equipment_points, max_pe_per_object
 from .exporters import export_character_sheet
 from .points import summarize_point_budgets
 from .progression import ADVANCEMENT_OPTIONS, BASE_FEAT_COUNT, prowess_points_from_advancement_choices
@@ -111,6 +112,10 @@ class CharacterCreationView(ctk.CTkFrame):
         ctk.CTkLabel(scroll, text="Équipement", font=("Arial", 14, "bold")).grid(
             row=10, column=0, sticky="w", padx=6, pady=(10, 2)
         )
+        self.available_equipment_pe_var = tk.StringVar(value="PE disponibles: 3 | Plafond par objet: 1 | Restants: 0")
+        ctk.CTkLabel(scroll, textvariable=self.available_equipment_pe_var, font=("Arial", 12, "bold")).grid(
+            row=10, column=1, sticky="e", padx=6, pady=(10, 2)
+        )
         self._entry(scroll, "Arme", "weapon", 11, 0)
         self._entry(scroll, "Armure", "armor", 11, 1)
         self._entry(scroll, "Utilitaire", "utility", 12, 0)
@@ -118,8 +123,13 @@ class CharacterCreationView(ctk.CTkFrame):
         self._entry(scroll, "PE Armure", "armor_pe", 13, 0, default="1")
         self._entry(scroll, "PE Utilitaire", "utility_pe", 13, 1, default="1")
 
+        self.equipment_purchase_vars = self._build_equipment_purchase_inputs(scroll)
+        for key in ("weapon_pe", "armor_pe", "utility_pe"):
+            self.inputs[key].trace_add("write", self._update_equipment_points_marker)
+
         self._update_favorites_limit_ui()
         self._update_remaining_points_marker()
+        self._update_equipment_points_marker()
         self._refresh_draft_selector()
         self._render_advancement_rows()
 
@@ -187,6 +197,29 @@ class CharacterCreationView(ctk.CTkFrame):
                 "armor": int(self.inputs["armor_pe"].get() or 0),
                 "utility": int(self.inputs["utility_pe"].get() or 0),
             },
+            "equipment_purchases": {
+                "weapon": {
+                    "damage": int(self.equipment_purchase_vars["weapon"]["damage"].get() or 0),
+                    "pierce_armor": int(self.equipment_purchase_vars["weapon"]["pierce_armor"].get() or 0),
+                    "special_effect": int(self.equipment_purchase_vars["weapon"]["special_effect"].get() or 0),
+                    "skill_bonus": int(self.equipment_purchase_vars["weapon"]["skill_bonus"].get() or 0),
+                    "special_effect_details": self.equipment_purchase_vars["weapon"]["special_effect_details"].get().strip(),
+                    "skill_bonus_skill": self.equipment_purchase_vars["weapon"]["skill_bonus_skill"].get().strip(),
+                },
+                "armor": {
+                    "armor": int(self.equipment_purchase_vars["armor"]["armor"].get() or 0),
+                    "special_effect": int(self.equipment_purchase_vars["armor"]["special_effect"].get() or 0),
+                    "skill_bonus": int(self.equipment_purchase_vars["armor"]["skill_bonus"].get() or 0),
+                    "special_effect_details": self.equipment_purchase_vars["armor"]["special_effect_details"].get().strip(),
+                    "skill_bonus_skill": self.equipment_purchase_vars["armor"]["skill_bonus_skill"].get().strip(),
+                },
+                "utility": {
+                    "special_effect": int(self.equipment_purchase_vars["utility"]["special_effect"].get() or 0),
+                    "skill_bonus": int(self.equipment_purchase_vars["utility"]["skill_bonus"].get() or 0),
+                    "special_effect_details": self.equipment_purchase_vars["utility"]["special_effect_details"].get().strip(),
+                    "skill_bonus_skill": self.equipment_purchase_vars["utility"]["skill_bonus_skill"].get().strip(),
+                },
+            },
         }
 
     def _on_advancements_changed(self, *_args):
@@ -194,6 +227,7 @@ class CharacterCreationView(ctk.CTkFrame):
         self._render_advancement_rows()
         self._render_feat_rows(self._collect_current_feats())
         self._update_remaining_points_marker()
+        self._update_equipment_points_marker()
 
     def _update_favorites_limit_ui(self) -> None:
         advancement_count = self._safe_int(self.inputs["advancements"].get())
@@ -286,6 +320,56 @@ class CharacterCreationView(ctk.CTkFrame):
     def _on_advancement_choice_updated(self, *_args):
         self._render_feat_rows(self._collect_current_feats())
         self._update_remaining_points_marker()
+        self._update_equipment_points_marker()
+
+    def _build_equipment_purchase_inputs(self, parent) -> dict[str, dict[str, tk.StringVar]]:
+        block = ctk.CTkFrame(parent)
+        block.grid(row=14, column=0, columnspan=2, sticky="ew", padx=6, pady=(4, 4))
+        block.grid_columnconfigure((0, 1, 2), weight=1)
+
+        configs = {
+            "weapon": ("Arme", ["damage", "pierce_armor", "special_effect", "skill_bonus"]),
+            "armor": ("Armure", ["armor", "special_effect", "skill_bonus"]),
+            "utility": ("Utilitaire", ["special_effect", "skill_bonus"]),
+        }
+        labels = {
+            "damage": "Dommages (PE)",
+            "pierce_armor": "Perce-armure (PE)",
+            "special_effect": "Effet spécial (PE)",
+            "skill_bonus": "Bonus compétence (PE, palier de 2)",
+            "armor": "Armure (PE)",
+        }
+
+        values: dict[str, dict[str, tk.StringVar]] = {}
+        for col, (object_key, (title, fields)) in enumerate(configs.items()):
+            sub = ctk.CTkFrame(block)
+            sub.grid(row=0, column=col, sticky="nsew", padx=4, pady=4)
+            sub.grid_columnconfigure(0, weight=1)
+            ctk.CTkLabel(sub, text=title, font=("Arial", 12, "bold")).grid(row=0, column=0, sticky="w", padx=6, pady=(4, 2))
+
+            object_vars: dict[str, tk.StringVar] = {}
+            row_index = 1
+            for field in fields:
+                ctk.CTkLabel(sub, text=labels[field]).grid(row=row_index, column=0, sticky="w", padx=6, pady=(2, 0))
+                var = tk.StringVar(value="0")
+                ctk.CTkEntry(sub, textvariable=var).grid(row=row_index + 1, column=0, sticky="ew", padx=6, pady=(0, 2))
+                var.trace_add("write", self._update_equipment_points_marker)
+                object_vars[field] = var
+                row_index += 2
+
+            se_var = tk.StringVar(value="")
+            ctk.CTkLabel(sub, text="Description effet spécial").grid(row=row_index, column=0, sticky="w", padx=6, pady=(2, 0))
+            ctk.CTkEntry(sub, textvariable=se_var).grid(row=row_index + 1, column=0, sticky="ew", padx=6, pady=(0, 2))
+            object_vars["special_effect_details"] = se_var
+            row_index += 2
+
+            skill_var = tk.StringVar(value="")
+            ctk.CTkLabel(sub, text="Compétence ciblée (+1/2 PE)").grid(row=row_index, column=0, sticky="w", padx=6, pady=(2, 0))
+            ctk.CTkEntry(sub, textvariable=skill_var).grid(row=row_index + 1, column=0, sticky="ew", padx=6, pady=(0, 6))
+            object_vars["skill_bonus_skill"] = skill_var
+            values[object_key] = object_vars
+
+        return values
 
     def _collect_current_feats(self) -> list[dict]:
         return [
@@ -423,7 +507,30 @@ class CharacterCreationView(ctk.CTkFrame):
 
         self._render_feat_rows(normalized_payload.get("feats") or [])
 
+        equipment_purchases = normalized_payload.get("equipment_purchases") or {}
+        for object_key, object_vars in self.equipment_purchase_vars.items():
+            object_payload = equipment_purchases.get(object_key) or {}
+            for field, var in object_vars.items():
+                if field in ("special_effect_details", "skill_bonus_skill"):
+                    var.set(str(object_payload.get(field, "")))
+                else:
+                    var.set(str(object_payload.get(field, 0)))
+
         self._update_remaining_points_marker()
+        self._update_equipment_points_marker()
+
+    def _update_equipment_points_marker(self, *_args) -> None:
+        advancement_choices = [
+            {"type": row["type_var"].get().strip(), "details": row["details_var"].get().strip()}
+            for row in self.advancement_rows
+        ]
+        available = available_equipment_points(advancement_choices)
+        max_per_object = max_pe_per_object(self._safe_int(self.inputs["advancements"].get()))
+        allocated = sum(self._safe_int(self.inputs[key].get()) for key in ("weapon_pe", "armor_pe", "utility_pe"))
+        remaining = available - allocated
+        self.available_equipment_pe_var.set(
+            f"PE disponibles: {available} | Plafond par objet: {max_per_object} | Restants: {remaining}"
+        )
 
     def _safe_int(self, raw_value: str) -> int:
         try:
