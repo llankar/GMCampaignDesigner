@@ -7,25 +7,25 @@ def max_favorite_skills(advancements: int) -> int:
     """Return the maximum number of favorite skills allowed for the current advancement count."""
 
     bonus_favorites = 0
-    if advancements >= 3:
+    if advancements >= 7:
         bonus_favorites += 1
-    if advancements >= 11:
+    if advancements >= 40:
         bonus_favorites += 1
     return 6 + bonus_favorites
 
 
 def skill_cap_points_for_advancements(advancements: int) -> int:
     """Return max skill points by advancement thresholds."""
-
-    if advancements <= 2:
-        return 5
-    if advancements <= 4:
-        return 6
+    max = 9
     if advancements <= 7:
-        return 7
-    if advancements <= 10:
-        return 8
-    return 9
+        max = 5
+    if advancements <= 15:
+        max= 6
+    if advancements <= 27:
+        max= 7
+    if advancements <= 39:
+        max= 8
+    return max
 
 
 def bonus_skill_points_from_advancements(advancement_choices: list[dict]) -> int:
