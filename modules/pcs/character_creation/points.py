@@ -9,6 +9,7 @@ def summarize_point_budgets(
     favorites: list[str],
     *,
     total_base_points: int = 15,
+    extra_generated_bonus: int = 0,
 ) -> dict[str, int]:
     """Return point usage summary for UI display and validation hints."""
 
@@ -17,7 +18,7 @@ def summarize_point_budgets(
     favorite_set = {skill for skill in favorites if skill in normalized_base}
 
     spent_base = sum(normalized_base.values())
-    generated_bonus = sum(normalized_base.get(skill, 0) for skill in favorite_set)
+    generated_bonus = sum(normalized_base.get(skill, 0) for skill in favorite_set) + max(0, int(extra_generated_bonus))
     used_bonus = sum(normalized_bonus.values())
 
     return {

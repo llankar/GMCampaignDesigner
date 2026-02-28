@@ -15,5 +15,4 @@ ADVANCEMENT_OPTIONS = [
         "skill_improvement",
         "Amélioration de compétences : 2 favorites (+1 dé) ou 1 non-favorite (+1 dé)",
     ),
-    ("new_skill", "Nouvelle compétence : 1 compétence à d4"),
 ]
