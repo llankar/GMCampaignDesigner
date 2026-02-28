@@ -99,18 +99,7 @@ def build_character(character_input: dict) -> CharacterCreationResult:
     bonus_points = {skill: int((character_input.get("bonus_skills") or {}).get(skill, 0)) for skill in SKILLS}
 
     total_points = sum(base_points.values())
-    if total_points != 15:
-        raise CharacterCreationError(f"La somme des points de compétence de base doit être 15 (actuel: {total_points}).")
-    for skill, points in base_points.items():
-        if points < 0 or points > 5:
-            raise CharacterCreationError(f"La compétence '{skill}' doit être entre 0 et 5 à la création.")
-
-    for skill, bonus in bonus_points.items():
-        if bonus < 0:
-            raise CharacterCreationError(f"Le bonus de compétence '{skill}' ne peut pas être négatif.")
-        if bonus > 0 and skill not in favorites:
-            raise CharacterCreationError(f"Les points bonus ne peuvent être investis que dans les compétences favorites ({skill}).")
-
+        
     advancement_choices = character_input.get("advancement_choices") or []
     bonus_from_advancements = bonus_skill_points_from_advancements(advancement_choices)
 
