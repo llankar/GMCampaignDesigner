@@ -7,6 +7,7 @@ import tkinter as tk
 import customtkinter as ctk
 
 OBJECT_TITLES = {"weapon": "Objet 1", "armor": "Objet 2", "utility": "Objet 3"}
+OBJECT_ORDER = ("weapon", "armor", "utility")
 FIELD_LABELS = {
     "damage": "Dommages",
     "pierce_armor": "Perce-armure",
@@ -26,21 +27,42 @@ class EquipmentEditor:
         self._on_change = on_change
         self._max_level_provider = max_level_provider
         self._columns: dict[str, dict] = {}
+        self._active_object_keys: list[str] = list(OBJECT_ORDER)
 
         self.frame = ctk.CTkFrame(parent)
         self.frame.grid(row=11, column=0, columnspan=2, sticky="ew", padx=6, pady=(4, 4))
         self.frame.grid_columnconfigure((0, 1, 2), weight=1)
 
-        for col, object_key in enumerate(("weapon", "armor", "utility")):
+        controls = ctk.CTkFrame(self.frame)
+        controls.grid(row=0, column=0, columnspan=3, sticky="ew", padx=4, pady=(4, 0))
+        controls.grid_columnconfigure(0, weight=1)
+
+        ctk.CTkLabel(controls, text="Gestion des objets", font=("Arial", 12, "bold")).grid(
+            row=0, column=0, sticky="w", padx=6, pady=4
+        )
+        ctk.CTkButton(controls, text="+ Ajouter un objet", width=140, command=self.add_object_slot).grid(
+            row=0, column=1, sticky="e", padx=6, pady=4
+        )
+
+        for col, object_key in enumerate(OBJECT_ORDER):
             self._columns[object_key] = self._build_column(object_key, col)
             self.add_effect_row(object_key)
 
     def _build_column(self, object_key: str, col: int) -> dict:
         box = ctk.CTkFrame(self.frame)
-        box.grid(row=0, column=col, sticky="nsew", padx=4, pady=4)
+        box.grid(row=1, column=col, sticky="nsew", padx=4, pady=4)
         box.grid_columnconfigure(0, weight=1)
 
-        ctk.CTkLabel(box, text=OBJECT_TITLES[object_key], font=("Arial", 12, "bold")).grid(row=0, column=0, sticky="w", padx=6, pady=(4, 2))
+        header = ctk.CTkFrame(box)
+        header.grid(row=0, column=0, sticky="ew", padx=6, pady=(4, 2))
+        header.grid_columnconfigure(0, weight=1)
+        ctk.CTkLabel(header, text=OBJECT_TITLES[object_key], font=("Arial", 12, "bold")).grid(row=0, column=0, sticky="w")
+        ctk.CTkButton(
+            header,
+            text="Retirer",
+            width=90,
+            command=lambda key=object_key: self.remove_object_slot(key),
+        ).grid(row=0, column=1, sticky="e")
 
         name_var = tk.StringVar(value="")
         ctk.CTkLabel(box, text="Nom").grid(row=1, column=0, sticky="w", padx=6)
@@ -61,7 +83,39 @@ class EquipmentEditor:
         ctk.CTkLabel(box, textvariable=summary_var, justify="left", wraplength=280).grid(row=5, column=0, sticky="w", padx=6, pady=(0, 6))
 
         name_var.trace_add("write", self._on_internal_change)
-        return {"name_var": name_var, "rows_frame": rows_frame, "rows": [], "summary_var": summary_var}
+        return {
+            "box": box,
+            "name_var": name_var,
+            "rows_frame": rows_frame,
+            "rows": [],
+            "summary_var": summary_var,
+        }
+
+    def add_object_slot(self) -> None:
+        hidden = [key for key in OBJECT_ORDER if key not in self._active_object_keys]
+        if not hidden:
+            return
+        next_key = hidden[0]
+        self._active_object_keys.append(next_key)
+        self._columns[next_key]["box"].grid()
+        if not self._columns[next_key]["rows"]:
+            self.add_effect_row(next_key)
+        self._on_internal_change()
+
+    def remove_object_slot(self, object_key: str) -> None:
+        if object_key not in self._active_object_keys:
+            return
+        if len(self._active_object_keys) <= 1:
+            return
+
+        column = self._columns[object_key]
+        column["name_var"].set("")
+        for row in list(column["rows"]):
+            row["frame"].destroy()
+        column["rows"] = []
+        column["box"].grid_remove()
+        self._active_object_keys = [key for key in self._active_object_keys if key != object_key]
+        self._on_internal_change()
 
     def add_effect_row(self, object_key: str) -> None:
         column = self._columns[object_key]
@@ -89,6 +143,13 @@ class EquipmentEditor:
         level_combo.configure(command=lambda value, var=level_var: var.set(value))
         level_combo.grid(row=2, column=0, sticky="ew", padx=4, pady=(0, 4))
 
+        ctk.CTkButton(
+            row_box,
+            text="Retirer cet effet",
+            width=120,
+            command=lambda key=object_key, target=row_box: self.remove_effect_row(key, target),
+        ).grid(row=3, column=0, sticky="w", padx=4, pady=(0, 4))
+
         effect_var.trace_add("write", self._on_internal_change)
         level_var.trace_add("write", self._on_internal_change)
 
@@ -101,6 +162,21 @@ class EquipmentEditor:
                 "level_combo": level_combo,
             }
         )
+        self._on_internal_change()
+
+    def remove_effect_row(self, object_key: str, row_frame) -> None:
+        column = self._columns[object_key]
+        updated_rows = []
+        for row in column["rows"]:
+            if row["frame"] is row_frame:
+                row["frame"].destroy()
+                continue
+            updated_rows.append(row)
+        column["rows"] = updated_rows
+
+        for idx, row in enumerate(column["rows"]):
+            row["frame"].grid_configure(row=idx)
+
         self._on_internal_change()
 
     def _set_field_from_label(self, object_key: str, var: tk.StringVar, label: str) -> None:
@@ -143,6 +219,11 @@ class EquipmentEditor:
     def get_purchase_payload(self) -> dict[str, dict[str, int | str]]:
         payload: dict[str, dict[str, int | str]] = {}
         for object_key, column in self._columns.items():
+            if object_key not in self._active_object_keys:
+                payload[object_key] = {field: 0 for field in ALLOWED_FIELDS[object_key]}
+                payload[object_key]["special_effect_details"] = ""
+                payload[object_key]["skill_bonus_skill"] = ""
+                continue
             values: dict[str, int | str] = {field: 0 for field in ALLOWED_FIELDS[object_key]}
             for row in column["rows"]:
                 field = row["effect_var"].get()
@@ -165,6 +246,7 @@ class EquipmentEditor:
         }
 
     def apply_payload(self, equipment: dict, purchases: dict) -> None:
+        active_keys = []
         for object_key, column in self._columns.items():
             column["name_var"].set((equipment.get(object_key) or "").strip())
             for row in list(column["rows"]):
@@ -173,6 +255,10 @@ class EquipmentEditor:
 
             object_payload = purchases.get(object_key) or {}
             fields = [field for field in ALLOWED_FIELDS[object_key] if int(object_payload.get(field, 0) or 0) > 0]
+            object_name = (equipment.get(object_key) or "").strip()
+            if object_name or fields:
+                active_keys.append(object_key)
+
             if not fields:
                 fields = [ALLOWED_FIELDS[object_key][0]]
 
@@ -186,5 +272,18 @@ class EquipmentEditor:
                     value = "0"
                 row["level_var"].set(value)
                 row["level_combo"].set(value)
+
+        if not active_keys:
+            active_keys = [OBJECT_ORDER[0]]
+        self._active_object_keys = active_keys
+        for object_key, column in self._columns.items():
+            if object_key in self._active_object_keys:
+                column["box"].grid()
+            else:
+                column["name_var"].set("")
+                for row in list(column["rows"]):
+                    row["frame"].destroy()
+                column["rows"] = []
+                column["box"].grid_remove()
 
         self._on_internal_change()
