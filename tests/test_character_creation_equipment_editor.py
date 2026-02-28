@@ -155,3 +155,16 @@ def test_add_object_slot_activates_objects_in_order():
     editor.add_object_slot()
 
     assert editor._active_object_keys == ["weapon", "armor", "utility"]
+
+
+def test_add_object_slot_after_third_creates_new_row_with_new_object():
+    _, editor = _build_editor()
+
+    editor.add_object_slot()
+    editor.add_object_slot()
+    editor.add_object_slot()
+
+    assert editor._active_object_keys == ["weapon", "armor", "utility", "object_4"]
+    assert editor._columns["object_4"]["box"]._grid_kwargs["row"] == 2
+    assert editor._columns["object_4"]["box"]._grid_kwargs["column"] == 0
+    assert len(editor._columns["object_4"]["rows"]) == 1

@@ -21,6 +21,7 @@ ALLOWED_FIELDS = {
     "armor": ("armor", "special_effect", "skill_bonus"),
     "utility": ("special_effect", "skill_bonus"),
 }
+GENERIC_ALLOWED_FIELDS = ("damage", "pierce_armor", "armor", "special_effect", "skill_bonus")
 
 
 class EquipmentEditor:
@@ -29,6 +30,7 @@ class EquipmentEditor:
         self._max_level_provider = max_level_provider
         self._columns: dict[str, dict] = {}
         self._active_object_keys: list[str] = [OBJECT_ORDER[0]]
+        self._next_object_number = len(OBJECT_ORDER) + 1
 
         self.frame = ctk.CTkFrame(parent)
         self.frame.grid(row=11, column=0, columnspan=2, sticky="ew", padx=6, pady=(4, 4))
@@ -95,10 +97,11 @@ class EquipmentEditor:
         }
 
     def add_object_slot(self) -> None:
-        hidden = [key for key in OBJECT_ORDER if key not in self._active_object_keys]
-        if not hidden:
-            return
-        next_key = hidden[0]
+        hidden = [key for key in self._columns if key not in self._active_object_keys]
+        if hidden:
+            next_key = hidden[0]
+        else:
+            next_key = self._create_object_slot()
         self._active_object_keys.append(next_key)
         self._columns[next_key]["box"].grid()
         if not self._columns[next_key]["rows"]:
@@ -138,7 +141,7 @@ class EquipmentEditor:
         row_box.grid(row=row_index, column=0, sticky="ew", pady=3)
         row_box.grid_columnconfigure(0, weight=1)
 
-        field_choices = list(ALLOWED_FIELDS[object_key])
+        field_choices = list(self._allowed_fields_for(object_key))
         effect_var = tk.StringVar(value=field_choices[0])
         level_var = tk.StringVar(value="0")
 
@@ -194,8 +197,23 @@ class EquipmentEditor:
         self._on_internal_change()
 
     def _set_field_from_label(self, object_key: str, var: tk.StringVar, label: str) -> None:
-        mapping = {FIELD_LABELS[field]: field for field in ALLOWED_FIELDS[object_key]}
-        var.set(mapping.get(label, ALLOWED_FIELDS[object_key][0]))
+        allowed_fields = self._allowed_fields_for(object_key)
+        mapping = {FIELD_LABELS[field]: field for field in allowed_fields}
+        var.set(mapping.get(label, allowed_fields[0]))
+
+    def _allowed_fields_for(self, object_key: str) -> tuple[str, ...]:
+        return ALLOWED_FIELDS.get(object_key, GENERIC_ALLOWED_FIELDS)
+
+    def _object_title_for(self, object_key: str) -> str:
+        return OBJECT_TITLES.get(object_key, f"Objet {self._next_object_number - 1}")
+
+    def _create_object_slot(self) -> str:
+        object_key = f"object_{self._next_object_number}"
+        OBJECT_TITLES[object_key] = f"Objet {self._next_object_number}"
+        self._next_object_number += 1
+        self._columns[object_key] = self._build_column(object_key)
+        self.add_effect_row(object_key)
+        return object_key
 
     def _level_values_for(self, field: str) -> list[str]:
         max_level = max(self._max_level_provider(), 0)
@@ -217,9 +235,9 @@ class EquipmentEditor:
 
     def _update_summary(self, object_key: str) -> None:
         payload = self.get_purchase_payload()[object_key]
-        name = self._columns[object_key]["name_var"].get().strip() or OBJECT_TITLES[object_key]
+        name = self._columns[object_key]["name_var"].get().strip() or self._object_title_for(object_key)
         effects = []
-        for field in ALLOWED_FIELDS[object_key]:
+        for field in self._allowed_fields_for(object_key):
             value = int(payload.get(field, 0) or 0)
             if value > 0:
                 effects.append(f"{FIELD_LABELS[field]} {value}")
@@ -234,11 +252,11 @@ class EquipmentEditor:
         payload: dict[str, dict[str, int | str]] = {}
         for object_key, column in self._columns.items():
             if object_key not in self._active_object_keys:
-                payload[object_key] = {field: 0 for field in ALLOWED_FIELDS[object_key]}
+                payload[object_key] = {field: 0 for field in self._allowed_fields_for(object_key)}
                 payload[object_key]["special_effect_details"] = ""
                 payload[object_key]["skill_bonus_skill"] = ""
                 continue
-            values: dict[str, int | str] = {field: 0 for field in ALLOWED_FIELDS[object_key]}
+            values: dict[str, int | str] = {field: 0 for field in self._allowed_fields_for(object_key)}
             for row in column["rows"]:
                 field = row["effect_var"].get()
                 if field not in values:
@@ -255,7 +273,7 @@ class EquipmentEditor:
     def get_allocated_pe(self) -> dict[str, int]:
         payload = self.get_purchase_payload()
         return {
-            key: sum(int(payload[key].get(field, 0) or 0) for field in ALLOWED_FIELDS[key])
+            key: sum(int(payload[key].get(field, 0) or 0) for field in self._allowed_fields_for(key))
             for key in payload
         }
 
@@ -268,13 +286,13 @@ class EquipmentEditor:
             column["rows"] = []
 
             object_payload = purchases.get(object_key) or {}
-            fields = [field for field in ALLOWED_FIELDS[object_key] if int(object_payload.get(field, 0) or 0) > 0]
+            fields = [field for field in self._allowed_fields_for(object_key) if int(object_payload.get(field, 0) or 0) > 0]
             object_name = (equipment.get(object_key) or "").strip()
             if object_name or fields:
                 active_keys.append(object_key)
 
             if not fields:
-                fields = [ALLOWED_FIELDS[object_key][0]]
+                fields = [self._allowed_fields_for(object_key)[0]]
 
             for field in fields:
                 self.add_effect_row(object_key)

@@ -448,9 +448,12 @@ class CharacterCreationView(ctk.CTkFrame):
         allocated_map = self.equipment_editor.get_allocated_pe()
         allocated = sum(allocated_map.values())
         for key, value in allocated_map.items():
-            self.inputs[f"{key}_pe"].set(str(value))
+            pe_key = f"{key}_pe"
+            if pe_key in self.inputs:
+                self.inputs[pe_key].set(str(value))
         for key, value in self.equipment_editor.get_equipment_names().items():
-            self.inputs[key].set(value)
+            if key in self.inputs:
+                self.inputs[key].set(value)
         remaining = available - allocated
         self.available_equipment_pe_var.set(
             f"PE disponibles: {available} | Plafond par objet: {max_per_object} | Restants: {remaining}"
