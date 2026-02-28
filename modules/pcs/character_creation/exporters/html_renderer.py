@@ -86,7 +86,7 @@ def _advancement_assets(advancement_choices: list[dict]) -> list[str]:
 
         details = str(choice.get("details") or "").strip()
         if details:
-            lines.append(f"Atout: {details}")
+            lines.append(f"{details}")
     return lines
 
 
@@ -168,7 +168,7 @@ def render_character_sheet_html(payload: dict, rules_result) -> str:
     assets_values = [
         f"Concept: {payload.get('concept', '').strip()}",
         f"Défaut: {payload.get('flaw', '').strip()}",
-        f"Atout de groupe: {payload.get('group_asset', '').strip()}",
+        f"{payload.get('group_asset', '').strip()}",
         *[str(asset).strip() for asset in merged_assets if str(asset).strip()],
     ]
 

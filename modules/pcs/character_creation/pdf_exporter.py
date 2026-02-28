@@ -31,7 +31,7 @@ def export_character_pdf(character: dict, rules_result, output_path: str) -> str
     _write(page1, 40, 90, f"Joueur: {character.get('player', '')}", 12)
     _write(page1, 40, 110, f"Concept: {character.get('concept', '')}", 11)
     _write(page1, 40, 130, f"Défaut: {character.get('flaw', '')}", 11)
-    _write(page1, 40, 150, f"Atout de groupe: {character.get('group_asset', '')}", 11)
+    _write(page1, 40, 150, f"{character.get('group_asset', '')}", 11)
     _write(page1, 40, 170, f"Rang: {rules_result.rank_name} (index {rules_result.rank_index})", 11)
     _write(page1, 40, 190, f"Blessures superficielles: {rules_result.superficial_health}", 11)
 

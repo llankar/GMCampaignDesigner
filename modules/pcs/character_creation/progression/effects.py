@@ -52,7 +52,7 @@ def apply_advancement_effects(
 
         if choice_type == "new_edge":
             if details:
-                extra_assets.append(f"Atout: {details}")
+                extra_assets.append(f"{details}")
             else:
                 extra_assets.append("Atout supplémentaire")
 
