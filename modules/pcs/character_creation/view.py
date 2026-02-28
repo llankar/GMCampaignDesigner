@@ -12,9 +12,10 @@ from .exporters import export_character_sheet
 from .points import summarize_point_budgets
 from .progression import ADVANCEMENT_OPTIONS, BASE_FEAT_COUNT, prowess_points_from_advancement_choices
 from .progression.rank_limits import bonus_skill_points_from_advancements, max_favorite_skills
+from .progression.effects import apply_advancement_effects
 from .rules_engine import CharacterCreationError, build_character
 from .storage import CharacterDraftRepository
-from .ui import bind_advancement_type_and_label_vars
+from .ui import bind_advancement_type_and_label_vars, details_hint_for_advancement
 from .storage.payload_normalizer import normalize_draft_payload_for_form
 
 
@@ -69,10 +70,14 @@ class CharacterCreationView(ctk.CTkFrame):
         )
         self.remaining_points_var = tk.StringVar(value="Base restants: 15 | Bonus restants: 0")
         ctk.CTkLabel(scroll, textvariable=self.remaining_points_var, font=("Arial", 12, "bold")).grid(
-            row=6, column=0, columnspan=2, sticky="w", padx=6, pady=(0, 4)
+            row=6, column=0, columnspan=2, sticky="w", padx=6, pady=(0, 2)
+        )
+        self.projected_points_var = tk.StringVar(value="Projection avancements: —")
+        ctk.CTkLabel(scroll, textvariable=self.projected_points_var, font=("Arial", 11)).grid(
+            row=7, column=0, columnspan=2, sticky="w", padx=6, pady=(0, 4)
         )
         skill_frame = ctk.CTkFrame(scroll)
-        skill_frame.grid(row=7, column=0, columnspan=2, sticky="ew", padx=6, pady=4)
+        skill_frame.grid(row=8, column=0, columnspan=2, sticky="ew", padx=6, pady=4)
         for i, skill in enumerate(SKILLS):
             r = i // 2
             c = (i % 2) * 3
@@ -96,19 +101,19 @@ class CharacterCreationView(ctk.CTkFrame):
             bonus_pts.trace_add("write", self._update_remaining_points_marker)
 
         ctk.CTkLabel(scroll, text="Prouesses", font=("Arial", 14, "bold")).grid(
-            row=8, column=0, sticky="w", padx=6, pady=(10, 2)
+            row=9, column=0, sticky="w", padx=6, pady=(10, 2)
         )
         self.feat_count_var = tk.StringVar(value=f"Nombre de prouesses: {BASE_FEAT_COUNT}")
         ctk.CTkLabel(scroll, textvariable=self.feat_count_var, font=("Arial", 12, "bold")).grid(
-            row=8, column=1, sticky="e", padx=6, pady=(10, 2)
+            row=9, column=1, sticky="e", padx=6, pady=(10, 2)
         )
         self.feat_frame = ctk.CTkFrame(scroll)
-        self.feat_frame.grid(row=9, column=0, columnspan=2, sticky="ew", padx=6, pady=3)
+        self.feat_frame.grid(row=10, column=0, columnspan=2, sticky="ew", padx=6, pady=3)
         self.feat_widgets = []
         self._render_feat_rows([])
 
         ctk.CTkLabel(scroll, text="Équipement", font=("Arial", 14, "bold")).grid(
-            row=10, column=0, sticky="w", padx=6, pady=(10, 2)
+            row=11, column=0, sticky="w", padx=6, pady=(10, 2)
         )
         self._entry(scroll, "Arme", "weapon", 11, 0)
         self._entry(scroll, "Armure", "armor", 11, 1)
@@ -252,8 +257,19 @@ class CharacterCreationView(ctk.CTkFrame):
             choice.grid(row=0, column=1, sticky="ew", padx=6, pady=4)
 
             details_var = tk.StringVar(value=(existing_choice.get("details") or "").strip())
-            ctk.CTkEntry(row_frame, textvariable=details_var, placeholder_text="Détails narratifs / mécaniques")\
-                .grid(row=1, column=0, columnspan=2, sticky="ew", padx=6, pady=(0, 6))
+            ctk.CTkEntry(row_frame, textvariable=details_var, placeholder_text="Détails narratifs / mécaniques").grid(
+                row=1, column=0, columnspan=2, sticky="ew", padx=6, pady=(0, 2)
+            )
+            details_var.trace_add("write", self._update_remaining_points_marker)
+            hint_var = tk.StringVar(value=details_hint_for_advancement(option_var.get()))
+            ctk.CTkLabel(row_frame, textvariable=hint_var, font=("Arial", 10), text_color="gray60").grid(
+                row=2,
+                column=0,
+                columnspan=2,
+                sticky="w",
+                padx=6,
+                pady=(0, 6),
+            )
 
             self.advancement_rows.append(
                 {
@@ -262,12 +278,20 @@ class CharacterCreationView(ctk.CTkFrame):
                     "combo": choice,
                     "label_map": option_label_map,
                     "label_var": option_label_var,
+                    "hint_var": hint_var,
                 }
             )
 
     def _on_advancement_choice_updated(self, *_args):
+        self._update_advancement_hints()
         self._render_feat_rows(self._collect_current_feats())
         self._update_remaining_points_marker()
+
+    def _update_advancement_hints(self) -> None:
+        for row in self.advancement_rows:
+            hint_var = row.get("hint_var")
+            if hint_var is not None:
+                hint_var.set(details_hint_for_advancement(row["type_var"].get()))
 
     def _collect_current_feats(self) -> list[dict]:
         return [
@@ -437,6 +461,25 @@ class CharacterCreationView(ctk.CTkFrame):
             f"Bonus restants: {summary['remaining_bonus']} | "
             f"Favorites: {len(favorites)}/{favorite_limit}"
         )
+
+        effective_points = {skill: base_points.get(skill, 0) + bonus_points.get(skill, 0) for skill in SKILLS}
+        projected = apply_advancement_effects(
+            base_skill_points=effective_points,
+            favorites=favorites,
+            advancement_choices=advancement_choices,
+            is_superhero=False,
+        ).effective_skill_points
+        deltas = []
+        for skill in SKILLS:
+            before = effective_points.get(skill, 0)
+            after = projected.get(skill, 0)
+            if after != before:
+                deltas.append(f"{skill}: {before}→{after}")
+
+        if deltas:
+            self.projected_points_var.set("Projection avancements (temporaire): " + ", ".join(deltas))
+        else:
+            self.projected_points_var.set("Projection avancements (temporaire): aucune modification détectée")
 
     def create_character_pdf(self):
         try:

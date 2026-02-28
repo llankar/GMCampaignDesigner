@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import re
+import unicodedata
 
 from ..constants import SKILLS
 
@@ -18,18 +20,17 @@ def _extract_matching_skills(raw_details: str) -> list[str]:
     if not raw_details:
         return []
 
-    normalized_lookup = {skill.lower(): skill for skill in SKILLS}
-    separators = [",", ";", "/", "|", "+"]
-    tokens = [raw_details]
-    for separator in separators:
-        split_tokens: list[str] = []
-        for token in tokens:
-            split_tokens.extend(token.split(separator))
-        tokens = split_tokens
+    def normalize_token(token: str) -> str:
+        lowered = token.strip().lower()
+        normalized = unicodedata.normalize("NFKD", lowered)
+        return "".join(char for char in normalized if not unicodedata.combining(char))
+
+    normalized_lookup = {normalize_token(skill): skill for skill in SKILLS}
+    tokens = re.split(r"(?:\s*(?:,|;|/|\||\+)\s*|\set\s)", raw_details, flags=re.IGNORECASE)
 
     resolved: list[str] = []
     for token in tokens:
-        skill = normalized_lookup.get(token.strip().lower())
+        skill = normalized_lookup.get(normalize_token(token))
         if skill:
             resolved.append(skill)
     return resolved
