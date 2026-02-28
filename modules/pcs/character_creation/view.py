@@ -14,6 +14,7 @@ from .progression import ADVANCEMENT_OPTIONS, BASE_FEAT_COUNT, prowess_points_fr
 from .progression.rank_limits import bonus_skill_points_from_advancements, max_favorite_skills
 from .rules_engine import CharacterCreationError, build_character
 from .storage import CharacterDraftRepository
+from .ui import bind_advancement_type_and_label_vars
 from .storage.payload_normalizer import normalize_draft_payload_for_form
 
 
@@ -230,16 +231,25 @@ class CharacterCreationView(ctk.CTkFrame):
             existing_choice = existing_choices[idx] if idx < len(existing_choices) else {}
             initial_type = (existing_choice.get("type") or "").strip() or ADVANCEMENT_OPTIONS[0][0]
             option_var = tk.StringVar(value=initial_type)
-            option_map = {label: value for value, label in ADVANCEMENT_OPTIONS}
-            choice = ctk.CTkComboBox(row_frame, values=list(option_map.keys()), state="readonly")
-            choice.set({value: label for value, label in ADVANCEMENT_OPTIONS}.get(initial_type, ADVANCEMENT_OPTIONS[0][1]))
+            option_label_map = {value: label for value, label in ADVANCEMENT_OPTIONS}
+            option_value_map = {label: value for value, label in ADVANCEMENT_OPTIONS}
+            option_label_var = tk.StringVar(value=option_label_map.get(initial_type, ADVANCEMENT_OPTIONS[0][1]))
+
+            bind_advancement_type_and_label_vars(
+                type_var=option_var,
+                label_var=option_label_var,
+                label_to_value=option_value_map,
+                value_to_label=option_label_map,
+                on_type_updated=self._on_advancement_choice_updated,
+            )
+
+            choice = ctk.CTkComboBox(
+                row_frame,
+                variable=option_label_var,
+                values=list(option_value_map.keys()),
+                state="readonly",
+            )
             choice.grid(row=0, column=1, sticky="ew", padx=6, pady=4)
-
-            def _on_select(selected_label, var=option_var, mapping=option_map):
-                var.set(mapping.get(selected_label, ""))
-
-            choice.configure(command=_on_select)
-            option_var.trace_add("write", self._on_advancement_choice_updated)
 
             details_var = tk.StringVar(value=(existing_choice.get("details") or "").strip())
             ctk.CTkEntry(row_frame, textvariable=details_var, placeholder_text="Détails narratifs / mécaniques")\
@@ -250,7 +260,8 @@ class CharacterCreationView(ctk.CTkFrame):
                     "type_var": option_var,
                     "details_var": details_var,
                     "combo": choice,
-                    "label_map": {value: label for value, label in ADVANCEMENT_OPTIONS},
+                    "label_map": option_label_map,
+                    "label_var": option_label_var,
                 }
             )
 
@@ -389,7 +400,7 @@ class CharacterCreationView(ctk.CTkFrame):
             entry = advancement_choices[idx] or {}
             choice_value = (entry.get("type") or "").strip() or ADVANCEMENT_OPTIONS[0][0]
             row["type_var"].set(choice_value)
-            row["combo"].set(row["label_map"].get(choice_value, ADVANCEMENT_OPTIONS[0][1]))
+            row["label_var"].set(row["label_map"].get(choice_value, ADVANCEMENT_OPTIONS[0][1]))
             row["details_var"].set((entry.get("details") or "").strip())
 
         self._render_feat_rows(normalized_payload.get("feats") or [])
