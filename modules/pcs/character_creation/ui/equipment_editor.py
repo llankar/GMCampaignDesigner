@@ -25,7 +25,7 @@ GENERIC_ALLOWED_FIELDS = ("damage", "pierce_armor", "armor", "special_effect", "
 
 
 class EquipmentEditor:
-    def __init__(self, parent, on_change, max_level_provider):
+    def __init__(self, parent, on_change, max_level_provider, grid_row: int = 11):
         self._on_change = on_change
         self._max_level_provider = max_level_provider
         self._columns: dict[str, dict] = {}
@@ -33,7 +33,7 @@ class EquipmentEditor:
         self._next_object_number = len(OBJECT_ORDER) + 1
 
         self.frame = ctk.CTkFrame(parent)
-        self.frame.grid(row=11, column=0, columnspan=2, sticky="ew", padx=6, pady=(4, 4))
+        self.frame.grid(row=grid_row, column=0, columnspan=2, sticky="ew", padx=6, pady=(4, 4))
         self.frame.grid_columnconfigure((0, 1, 2), weight=1)
 
         controls = ctk.CTkFrame(self.frame)

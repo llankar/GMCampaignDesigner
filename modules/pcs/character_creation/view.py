@@ -114,15 +114,15 @@ class CharacterCreationView(ctk.CTkFrame):
         ctk.CTkButton(scroll, text="+ Ajouter une prouesse", width=170, command=self._add_feat_row).grid(
             row=9, column=1, sticky="e", padx=6, pady=(0, 4)
         )
-        self.prowess_editor = ProwessEditor(scroll, on_change=self._update_prowess_points_marker)
+        self.prowess_editor = ProwessEditor(scroll, on_change=self._update_prowess_points_marker, grid_row=10)
         self._render_feat_rows([])
 
         ctk.CTkLabel(scroll, text="Équipement", font=("Arial", 14, "bold")).grid(
-            row=10, column=0, sticky="w", padx=6, pady=(10, 2)
+            row=11, column=0, sticky="w", padx=6, pady=(10, 2)
         )
         self.available_equipment_pe_var = tk.StringVar(value="PE disponibles: 3 | Plafond par objet: 1 | Restants: 0")
         ctk.CTkLabel(scroll, textvariable=self.available_equipment_pe_var, font=("Arial", 12, "bold")).grid(
-            row=10, column=1, sticky="e", padx=6, pady=(10, 2)
+            row=11, column=1, sticky="e", padx=6, pady=(10, 2)
         )
         for key in ("weapon", "armor", "utility", "weapon_pe", "armor_pe", "utility_pe"):
             self.inputs[key] = tk.StringVar(value="")
@@ -132,6 +132,7 @@ class CharacterCreationView(ctk.CTkFrame):
             scroll,
             on_change=self._update_equipment_points_marker,
             max_level_provider=lambda: max_pe_per_object(self._safe_int(self.inputs["advancements"].get())),
+            grid_row=12,
         )
 
         self._update_favorites_limit_ui()
