@@ -6,25 +6,15 @@ import tkinter as tk
 
 import customtkinter as ctk
 
-PROWESS_OPTION_DEFINITIONS = [
-    ("Bonus dommages", "+3 à +7 CàC (+4 en risque) ou +2 à +6 à distance (+4 en risque)."),
-    ("Armure", "+3 Armure (max 2 fois, ou 4 fois pour Super Héros)."),
-    ("Perce Armure", "Ignore 3 d'armure (max 2 fois, ou 4 fois pour Super Héros)."),
-    ("Utilisation non conventionnelle", "Permet d'utiliser une compétence à la place d'une autre."),
-    ("Effet particulier", "Ajoute un effet particulier (invisibilité, feu, paralysie, etc.)."),
-    ("Durée étendue", "Un effet qui dure une scène."),
-    ("Portée étendue", "La prouesse fonctionne au-delà de la ligne de vue."),
-    ("Zone d'effet", "Affecte un groupe (bonus variable vs groupe)."),
-    ("Bonus aux jets", "+1 sur un jet (max 2 fois)."),
-    ("Limitation de l'effet", "Ajoute une contrainte (1/scène, atout, condition, etc.)."),
-    ("Compétence*", "D12 en compétence ou +2 après D12 (Super Héros uniquement)."),
-    ("Vitesse*", "Mouvement X2 puis jusqu'à des paliers extrêmes (Super Héros uniquement)."),
-]
+from .prowess.options import (
+    DEFAULT_OPTION_NAME,
+    PROWESS_OPTION_BY_LABEL,
+    PROWESS_OPTION_LABELS,
+    option_uses_variable_points,
+    parse_variable_points,
+)
 
-PROWESS_OPTION_LABELS = [f"{name} — {description}" for name, description in PROWESS_OPTION_DEFINITIONS]
-PROWESS_OPTION_BY_LABEL = {
-    label: name for label, (name, _description) in zip(PROWESS_OPTION_LABELS, PROWESS_OPTION_DEFINITIONS)
-}
+POINT_EFFECT_BY_LEVEL = {1: "+3", 2: "+5", 3: "+7"}
 
 
 class ProwessEditor:
@@ -54,7 +44,7 @@ class ProwessEditor:
         name_var = tk.StringVar(value=(feat.get("name") or f"Prouesse {idx + 1}").strip())
         ctk.CTkLabel(
             box,
-            text=("Nom" if prowess_points <= 0 else f"Nom ({prowess_points} pt{'s' if prowess_points > 1 else ''} de prouesse)"),
+            text="Nom",
         ).grid(row=0, column=0, sticky="w", padx=6, pady=2)
         ctk.CTkEntry(box, textvariable=name_var).grid(row=0, column=1, sticky="ew", padx=6, pady=2)
 
@@ -67,6 +57,8 @@ class ProwessEditor:
 
             option_label_var = tk.StringVar(value=option_label)
             option_detail_var = tk.StringVar(value=option_detail)
+            variable_points_var = tk.StringVar(value=str(parse_variable_points(option_detail)))
+
             ctk.CTkLabel(box, text=f"Option {option_idx + 1}").grid(row=option_idx + 1, column=0, sticky="w", padx=6, pady=2)
 
             row_box = ctk.CTkFrame(box)
@@ -75,22 +67,37 @@ class ProwessEditor:
 
             combo = ctk.CTkComboBox(row_box, values=PROWESS_OPTION_LABELS, variable=option_label_var, state="readonly")
             combo.grid(row=0, column=0, sticky="ew")
-            ctk.CTkEntry(
+
+            points_combo = ctk.CTkComboBox(row_box, values=["1", "2", "3"], variable=variable_points_var, state="readonly", width=70)
+            points_combo.grid(row=0, column=1, sticky="e", padx=(6, 0))
+            points_label = ctk.CTkLabel(row_box, text="pt")
+            points_label.grid(row=0, column=2, sticky="w", padx=(4, 0))
+
+            detail_entry = ctk.CTkEntry(
                 row_box,
                 textvariable=option_detail_var,
                 placeholder_text="Détails (facultatif)",
-            ).grid(row=1, column=0, sticky="ew", pady=(2, 0))
-
-            option_rows.append(
-                {
-                    "label_var": option_label_var,
-                    "detail_var": option_detail_var,
-                    "combo": combo,
-                }
             )
+            detail_entry.grid(row=1, column=0, columnspan=3, sticky="ew", pady=(2, 0))
+
+            row_data = {
+                "label_var": option_label_var,
+                "detail_var": option_detail_var,
+                "combo": combo,
+                "points_var": variable_points_var,
+                "points_combo": points_combo,
+                "points_label": points_label,
+            }
+            option_rows.append(row_data)
+
+            def _on_option_changed(*_args, row=row_data):
+                self._sync_variable_points_visibility(row)
+
+            option_label_var.trace_add("write", _on_option_changed)
+            self._sync_variable_points_visibility(row_data)
 
         limitation_var = tk.StringVar(value=(feat.get("limitation") or "").strip())
-        ctk.CTkLabel(box, text="Limitation").grid(row=4, column=0, sticky="w", padx=6, pady=2)
+        ctk.CTkLabel(box, text=f"Limitation | Points de prouesse utilisés: {prowess_points}").grid(row=4, column=0, sticky="w", padx=6, pady=2)
         ctk.CTkEntry(box, textvariable=limitation_var, placeholder_text="Texte libre").grid(
             row=4, column=1, sticky="ew", padx=6, pady=2
         )
@@ -108,9 +115,18 @@ class ProwessEditor:
             options = []
             for option_row in card["options"]:
                 option_label = option_row["label_var"].get()
-                option_name = PROWESS_OPTION_BY_LABEL.get(option_label, PROWESS_OPTION_DEFINITIONS[0][0])
+                option_name = PROWESS_OPTION_BY_LABEL.get(option_label, DEFAULT_OPTION_NAME)
                 detail = option_row["detail_var"].get().strip()
-                options.append(f"{option_name} : {detail}" if detail else option_name)
+
+                if option_uses_variable_points(option_name):
+                    points = parse_variable_points(option_row["points_var"].get())
+                    effect = POINT_EFFECT_BY_LEVEL[points]
+                    composed_detail = f"{points} pt ({effect})"
+                    if detail:
+                        composed_detail = f"{composed_detail} - {detail}"
+                    options.append(f"{option_name} : {composed_detail}")
+                else:
+                    options.append(f"{option_name} : {detail}" if detail else option_name)
 
             feats.append(
                 {
@@ -134,3 +150,14 @@ class ProwessEditor:
             return raw_value.strip(), ""
         option_name, option_detail = raw_value.split(":", 1)
         return option_name.strip(), option_detail.strip()
+
+    def _sync_variable_points_visibility(self, row_data: dict) -> None:
+        option_label = row_data["label_var"].get()
+        option_name = PROWESS_OPTION_BY_LABEL.get(option_label, DEFAULT_OPTION_NAME)
+        uses_variable_points = option_uses_variable_points(option_name)
+        if uses_variable_points:
+            row_data["points_combo"].grid()
+            row_data["points_label"].grid()
+        else:
+            row_data["points_combo"].grid_remove()
+            row_data["points_label"].grid_remove()

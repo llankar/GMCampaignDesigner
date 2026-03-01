@@ -101,8 +101,18 @@ class CharacterCreationView(ctk.CTkFrame):
             row=8, column=0, sticky="w", padx=6, pady=(10, 2)
         )
         self.feat_count_var = tk.StringVar(value=f"Nombre de prouesses: {BASE_FEAT_COUNT}")
-        ctk.CTkLabel(scroll, textvariable=self.feat_count_var, font=("Arial", 12, "bold")).grid(
-            row=8, column=1, sticky="e", padx=6, pady=(10, 2)
+        self.prowess_points_var = tk.StringVar(value="Points de prouesse (total/dispo): 0/0")
+        counters = ctk.CTkFrame(scroll)
+        counters.grid(row=8, column=1, sticky="e", padx=6, pady=(10, 2))
+        ctk.CTkLabel(counters, textvariable=self.feat_count_var, font=("Arial", 12, "bold")).grid(
+            row=0, column=0, sticky="e"
+        )
+        ctk.CTkLabel(counters, textvariable=self.prowess_points_var, font=("Arial", 12, "bold")).grid(
+            row=1, column=0, sticky="e"
+        )
+        self.extra_feat_count = 0
+        ctk.CTkButton(scroll, text="+ Ajouter une prouesse", width=170, command=self._add_feat_row).grid(
+            row=9, column=1, sticky="e", padx=6, pady=(0, 4)
         )
         self.prowess_editor = ProwessEditor(scroll)
         self._render_feat_rows([])
@@ -288,9 +298,18 @@ class CharacterCreationView(ctk.CTkFrame):
             for row in self.advancement_rows
         ]
         prowess_budgets = prowess_points_from_advancement_choices(advancement_choices)
-        total_feats = BASE_FEAT_COUNT + len(prowess_budgets)
+        points_total = sum(prowess_budgets)
+        extra_feats = getattr(self, "extra_feat_count", 0)
+        points_available = max(0, points_total - extra_feats)
+        total_feats = BASE_FEAT_COUNT + len(prowess_budgets) + extra_feats
         self.feat_count_var.set(f"Nombre de prouesses: {total_feats}")
+        if hasattr(self, "prowess_points_var"):
+            self.prowess_points_var.set(f"Points de prouesse (total/dispo): {points_total}/{points_available}")
         self.prowess_editor.set_feat_rows(total_feats, prowess_budgets, existing_feats)
+
+    def _add_feat_row(self) -> None:
+        self.extra_feat_count += 1
+        self._render_feat_rows(self._collect_current_feats())
 
     def _refresh_draft_selector(self):
         names = self.drafts.list_names()
@@ -361,7 +380,11 @@ class CharacterCreationView(ctk.CTkFrame):
             row["label_var"].set(row["label_map"].get(choice_value, ADVANCEMENT_OPTIONS[0][1]))
             row["details_var"].set((entry.get("details") or "").strip())
 
-        self._render_feat_rows(normalized_payload.get("feats") or [])
+        loaded_feats = normalized_payload.get("feats") or []
+        advancement_choices = normalized_payload.get("advancement_choices") or []
+        dynamic_feat_count = BASE_FEAT_COUNT + len(prowess_points_from_advancement_choices(advancement_choices))
+        self.extra_feat_count = max(0, len(loaded_feats) - dynamic_feat_count)
+        self._render_feat_rows(loaded_feats)
 
         self.equipment_editor.apply_payload(
             normalized_payload.get("equipment") or {},
