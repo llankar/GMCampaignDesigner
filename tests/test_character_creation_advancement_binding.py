@@ -70,8 +70,15 @@ def test_render_feat_rows_uses_updated_advancement_type_for_prowess_budget(monke
     monkeypatch.setattr(view_module, "BASE_FEAT_COUNT", 0)
 
     view = CharacterCreationView.__new__(CharacterCreationView)
-    view.feat_frame = types.SimpleNamespace(winfo_children=lambda: [])
-    view.feat_widgets = []
+    captured_rows = {}
+    view.prowess_editor = types.SimpleNamespace(
+        set_feat_rows=lambda total_feats, prowess_budgets, existing_feats: captured_rows.update({
+            "total_feats": total_feats,
+            "prowess_budgets": prowess_budgets,
+            "existing_feats": existing_feats,
+        }),
+        get_payload=lambda: [],
+    )
     view.feat_count_var = tk.StringVar(master=root, value="")
     view.advancement_rows = [
         {
@@ -83,3 +90,4 @@ def test_render_feat_rows_uses_updated_advancement_type_for_prowess_budget(monke
     view._render_feat_rows(existing_feats=[])
 
     assert captured["choices"][0]["type"] == "prowess_points"
+    assert captured_rows["total_feats"] == 0
