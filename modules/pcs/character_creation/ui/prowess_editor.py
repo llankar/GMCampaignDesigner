@@ -18,9 +18,9 @@ POINT_EFFECT_BY_LEVEL = {1: "+3", 2: "+5", 3: "+7"}
 
 
 class ProwessEditor:
-    def __init__(self, parent, on_change=None):
+    def __init__(self, parent, on_change=None, grid_row: int = 9):
         self.frame = ctk.CTkFrame(parent)
-        self.frame.grid(row=9, column=0, columnspan=2, sticky="ew", padx=6, pady=3)
+        self.frame.grid(row=grid_row, column=0, columnspan=2, sticky="ew", padx=6, pady=3)
         self._cards: list[dict] = []
         self._on_change = on_change
 
