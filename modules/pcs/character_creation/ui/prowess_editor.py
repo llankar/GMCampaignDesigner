@@ -159,7 +159,7 @@ class ProwessEditor:
             else:
                 option_row["remove_button"].grid()
 
-        prowess_points = max(0, len(card["options"]) - 1)
+        prowess_points = self._prowess_points_for_card(card)
         card["limitation_label_var"].set(f"Limitation | Points de prouesse utilisés: {prowess_points}")
 
     def get_payload(self) -> list[dict]:
@@ -186,13 +186,24 @@ class ProwessEditor:
                     "name": card["name_var"].get().strip(),
                     "options": options,
                     "limitation": card["limitation_var"].get().strip(),
-                    "prowess_points": max(0, len(card["options"]) - 1),
+                    "prowess_points": self._prowess_points_for_card(card),
                 }
             )
         return feats
 
     def get_total_spent_prowess_points(self) -> int:
-        return sum(max(0, len(card["options"]) - 1) for card in self._cards)
+        return sum(self._prowess_points_for_card(card) for card in self._cards)
+
+    def _prowess_points_for_card(self, card: dict) -> int:
+        total_option_cost = sum(self._prowess_cost_for_option_row(option_row) for option_row in card["options"])
+        return max(0, total_option_cost - 1)
+
+    def _prowess_cost_for_option_row(self, option_row: dict) -> int:
+        option_label = option_row["label_var"].get()
+        option_name = PROWESS_OPTION_BY_LABEL.get(option_label, DEFAULT_OPTION_NAME)
+        if option_uses_variable_points(option_name):
+            return parse_variable_points(option_row["points_var"].get())
+        return 1
 
     def _label_for_option(self, option_name: str) -> str:
         for label, name in PROWESS_OPTION_BY_LABEL.items():
