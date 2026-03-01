@@ -11,7 +11,7 @@ from .constants import SKILLS
 from .equipment import available_equipment_points, max_pe_per_object
 from .exporters import export_character_sheet
 from .points import summarize_point_budgets
-from .progression import ADVANCEMENT_OPTIONS, BASE_FEAT_COUNT, prowess_points_from_advancement_choices
+from .progression import ADVANCEMENT_OPTIONS, BASE_FEAT_COUNT, BASE_PROWESS_POINTS, prowess_points_from_advancement_choices
 from .progression.rank_limits import bonus_skill_points_from_advancements, max_favorite_skills
 from .rules_engine import CharacterCreationError, build_character
 from .storage import CharacterDraftRepository
@@ -101,7 +101,7 @@ class CharacterCreationView(ctk.CTkFrame):
             row=8, column=0, sticky="w", padx=6, pady=(10, 2)
         )
         self.feat_count_var = tk.StringVar(value=f"Nombre de prouesses: {BASE_FEAT_COUNT}")
-        self.prowess_points_var = tk.StringVar(value="Points de prouesse (total/dispo): 0/0")
+        self.prowess_points_var = tk.StringVar(value=f"Points de prouesse (total/dispo): {BASE_PROWESS_POINTS}/{BASE_PROWESS_POINTS}")
         counters = ctk.CTkFrame(scroll)
         counters.grid(row=8, column=1, sticky="e", padx=6, pady=(10, 2))
         ctk.CTkLabel(counters, textvariable=self.feat_count_var, font=("Arial", 12, "bold")).grid(
@@ -114,7 +114,7 @@ class CharacterCreationView(ctk.CTkFrame):
         ctk.CTkButton(scroll, text="+ Ajouter une prouesse", width=170, command=self._add_feat_row).grid(
             row=9, column=1, sticky="e", padx=6, pady=(0, 4)
         )
-        self.prowess_editor = ProwessEditor(scroll)
+        self.prowess_editor = ProwessEditor(scroll, on_change=self._update_prowess_points_marker)
         self._render_feat_rows([])
 
         ctk.CTkLabel(scroll, text="Équipement", font=("Arial", 14, "bold")).grid(
@@ -297,15 +297,28 @@ class CharacterCreationView(ctk.CTkFrame):
             }
             for row in self.advancement_rows
         ]
-        prowess_budgets = prowess_points_from_advancement_choices(advancement_choices)
-        points_total = sum(prowess_budgets)
+        points_total = BASE_PROWESS_POINTS + sum(prowess_points_from_advancement_choices(advancement_choices))
         extra_feats = getattr(self, "extra_feat_count", 0)
-        points_available = max(0, points_total - extra_feats)
-        total_feats = BASE_FEAT_COUNT + len(prowess_budgets) + extra_feats
+        total_feats = BASE_FEAT_COUNT + extra_feats
         self.feat_count_var.set(f"Nombre de prouesses: {total_feats}")
+        self.prowess_editor.set_feat_rows(total_feats, [], existing_feats)
+        self._update_prowess_points_marker()
+
+    def _update_prowess_points_marker(self) -> None:
+        advancement_choices = [
+            {
+                "type": row["type_var"].get().strip(),
+                "details": row["details_var"].get().strip(),
+            }
+            for row in self.advancement_rows
+        ]
+        points_total = BASE_PROWESS_POINTS + sum(prowess_points_from_advancement_choices(advancement_choices))
+        points_spent = 0
+        if hasattr(self, "prowess_editor") and hasattr(self.prowess_editor, "get_total_spent_prowess_points"):
+            points_spent = self.prowess_editor.get_total_spent_prowess_points()
+        points_available = points_total - points_spent
         if hasattr(self, "prowess_points_var"):
             self.prowess_points_var.set(f"Points de prouesse (total/dispo): {points_total}/{points_available}")
-        self.prowess_editor.set_feat_rows(total_feats, prowess_budgets, existing_feats)
 
     def _add_feat_row(self) -> None:
         self.extra_feat_count += 1
@@ -382,7 +395,7 @@ class CharacterCreationView(ctk.CTkFrame):
 
         loaded_feats = normalized_payload.get("feats") or []
         advancement_choices = normalized_payload.get("advancement_choices") or []
-        dynamic_feat_count = BASE_FEAT_COUNT + len(prowess_points_from_advancement_choices(advancement_choices))
+        dynamic_feat_count = BASE_FEAT_COUNT
         self.extra_feat_count = max(0, len(loaded_feats) - dynamic_feat_count)
         self._render_feat_rows(loaded_feats)
 

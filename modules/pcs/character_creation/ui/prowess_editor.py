@@ -18,12 +18,16 @@ POINT_EFFECT_BY_LEVEL = {1: "+3", 2: "+5", 3: "+7"}
 
 
 class ProwessEditor:
-    def __init__(self, parent):
+    def __init__(self, parent, on_change=None):
         self.frame = ctk.CTkFrame(parent)
         self.frame.grid(row=9, column=0, columnspan=2, sticky="ew", padx=6, pady=3)
         self._cards: list[dict] = []
+        self._on_change = on_change
 
-    def set_feat_rows(self, total_feats: int, prowess_budgets: list[int], existing_feats: list[dict]) -> None:
+    def set_feat_rows(self, total_feats: int, existing_feats: list[dict] | None = None, _legacy_existing_feats: list[dict] | None = None) -> None:
+        if _legacy_existing_feats is not None:
+            existing_feats = _legacy_existing_feats
+
         current_payload = self.get_payload()
         source_feats = existing_feats if existing_feats else current_payload
 
@@ -33,81 +37,130 @@ class ProwessEditor:
 
         for idx in range(total_feats):
             feat = source_feats[idx] if idx < len(source_feats) else {}
-            prowess_points = 0 if idx < (total_feats - len(prowess_budgets)) else prowess_budgets[idx - (total_feats - len(prowess_budgets))]
-            self._cards.append(self._build_feat_card(idx, feat, prowess_points))
+            self._cards.append(self._build_feat_card(idx, feat))
 
-    def _build_feat_card(self, idx: int, feat: dict, prowess_points: int) -> dict:
+    def _build_feat_card(self, idx: int, feat: dict) -> dict:
         box = ctk.CTkFrame(self.frame)
         box.grid(row=idx, column=0, sticky="ew", pady=3)
         box.grid_columnconfigure(1, weight=1)
 
         name_var = tk.StringVar(value=(feat.get("name") or f"Prouesse {idx + 1}").strip())
-        ctk.CTkLabel(
-            box,
-            text="Nom",
-        ).grid(row=0, column=0, sticky="w", padx=6, pady=2)
+        ctk.CTkLabel(box, text="Nom").grid(row=0, column=0, sticky="w", padx=6, pady=2)
         ctk.CTkEntry(box, textvariable=name_var).grid(row=0, column=1, sticky="ew", padx=6, pady=2)
 
-        options = feat.get("options") or []
+        options_container = ctk.CTkFrame(box)
+        options_container.grid(row=1, column=0, columnspan=2, sticky="ew", padx=6, pady=2)
+        options_container.grid_columnconfigure(0, weight=1)
+
         option_rows: list[dict] = []
-        for option_idx in range(3):
-            raw_value = options[option_idx] if option_idx < len(options) else ""
-            option_name, option_detail = self._split_option_value(raw_value)
-            option_label = self._label_for_option(option_name)
-
-            option_label_var = tk.StringVar(value=option_label)
-            option_detail_var = tk.StringVar(value=option_detail)
-            variable_points_var = tk.StringVar(value=str(parse_variable_points(option_detail)))
-
-            ctk.CTkLabel(box, text=f"Option {option_idx + 1}").grid(row=option_idx + 1, column=0, sticky="w", padx=6, pady=2)
-
-            row_box = ctk.CTkFrame(box)
-            row_box.grid(row=option_idx + 1, column=1, sticky="ew", padx=6, pady=2)
-            row_box.grid_columnconfigure(0, weight=1)
-
-            combo = ctk.CTkComboBox(row_box, values=PROWESS_OPTION_LABELS, variable=option_label_var, state="readonly")
-            combo.grid(row=0, column=0, sticky="ew")
-
-            points_combo = ctk.CTkComboBox(row_box, values=["1", "2", "3"], variable=variable_points_var, state="readonly", width=70)
-            points_combo.grid(row=0, column=1, sticky="e", padx=(6, 0))
-            points_label = ctk.CTkLabel(row_box, text="pt")
-            points_label.grid(row=0, column=2, sticky="w", padx=(4, 0))
-
-            detail_entry = ctk.CTkEntry(
-                row_box,
-                textvariable=option_detail_var,
-                placeholder_text="Détails (facultatif)",
-            )
-            detail_entry.grid(row=1, column=0, columnspan=3, sticky="ew", pady=(2, 0))
-
-            row_data = {
-                "label_var": option_label_var,
-                "detail_var": option_detail_var,
-                "combo": combo,
-                "points_var": variable_points_var,
-                "points_combo": points_combo,
-                "points_label": points_label,
-            }
-            option_rows.append(row_data)
-
-            def _on_option_changed(*_args, row=row_data):
-                self._sync_variable_points_visibility(row)
-
-            option_label_var.trace_add("write", _on_option_changed)
-            self._sync_variable_points_visibility(row_data)
+        options = feat.get("options") or []
+        if not options:
+            options = [""]
 
         limitation_var = tk.StringVar(value=(feat.get("limitation") or "").strip())
-        ctk.CTkLabel(box, text=f"Limitation | Points de prouesse utilisés: {prowess_points}").grid(row=4, column=0, sticky="w", padx=6, pady=2)
-        ctk.CTkEntry(box, textvariable=limitation_var, placeholder_text="Texte libre").grid(
-            row=4, column=1, sticky="ew", padx=6, pady=2
-        )
+        limitation_label_var = tk.StringVar(value="")
 
-        return {
+        card = {
             "name_var": name_var,
             "options": option_rows,
             "limitation_var": limitation_var,
-            "prowess_points": prowess_points,
+            "limitation_label_var": limitation_label_var,
+            "options_container": options_container,
+            "box": box,
         }
+
+        for raw_value in options:
+            self._append_option_row(card, raw_value)
+
+        add_option_button = ctk.CTkButton(
+            box,
+            text="+ Ajouter un bonus",
+            width=160,
+            command=lambda c=card: self._append_option_row(c, ""),
+        )
+        add_option_button.grid(row=2, column=0, sticky="w", padx=6, pady=(2, 2))
+
+        ctk.CTkLabel(box, textvariable=limitation_label_var).grid(row=3, column=0, sticky="w", padx=6, pady=2)
+        ctk.CTkEntry(box, textvariable=limitation_var, placeholder_text="Texte libre").grid(
+            row=3,
+            column=1,
+            sticky="ew",
+            padx=6,
+            pady=2,
+        )
+
+        self._refresh_feat_card_ui(card)
+        name_var.trace_add("write", lambda *_: self._notify_change())
+        limitation_var.trace_add("write", lambda *_: self._notify_change())
+        return card
+
+    def _append_option_row(self, card: dict, raw_value: str) -> None:
+        option_name, option_detail = self._split_option_value(raw_value)
+        option_label = self._label_for_option(option_name)
+
+        option_label_var = tk.StringVar(value=option_label)
+        option_detail_var = tk.StringVar(value=option_detail)
+        variable_points_var = tk.StringVar(value=str(parse_variable_points(option_detail)))
+
+        row_box = ctk.CTkFrame(card["options_container"])
+        row_box.grid_columnconfigure(0, weight=1)
+
+        combo = ctk.CTkComboBox(row_box, values=PROWESS_OPTION_LABELS, variable=option_label_var, state="readonly")
+        combo.grid(row=0, column=0, sticky="ew")
+
+        points_combo = ctk.CTkComboBox(row_box, values=["1", "2", "3"], variable=variable_points_var, state="readonly", width=70)
+        points_combo.grid(row=0, column=1, sticky="e", padx=(6, 0))
+        points_label = ctk.CTkLabel(row_box, text="pt")
+        points_label.grid(row=0, column=2, sticky="w", padx=(4, 0))
+
+        remove_button = ctk.CTkButton(row_box, text="Supprimer", width=95)
+        remove_button.grid(row=0, column=3, padx=(6, 0))
+
+        detail_entry = ctk.CTkEntry(
+            row_box,
+            textvariable=option_detail_var,
+            placeholder_text="Détails (facultatif)",
+        )
+        detail_entry.grid(row=1, column=0, columnspan=4, sticky="ew", pady=(2, 0))
+
+        row_data: dict = {
+            "label_var": option_label_var,
+            "detail_var": option_detail_var,
+            "combo": combo,
+            "points_var": variable_points_var,
+            "points_combo": points_combo,
+            "points_label": points_label,
+            "row_box": row_box,
+            "remove_button": remove_button,
+        }
+        remove_button.configure(command=lambda c=card, r=row_data: self._remove_option_row(c, r))
+        card["options"].append(row_data)
+
+        option_label_var.trace_add("write", lambda *_: self._on_option_updated(card, row_data))
+        option_detail_var.trace_add("write", lambda *_: self._notify_change())
+        variable_points_var.trace_add("write", lambda *_: self._notify_change())
+        self._on_option_updated(card, row_data)
+        self._refresh_feat_card_ui(card)
+        self._notify_change()
+
+    def _remove_option_row(self, card: dict, row_data: dict) -> None:
+        if len(card["options"]) <= 1:
+            return
+        row_data["row_box"].destroy()
+        card["options"] = [row for row in card["options"] if row is not row_data]
+        self._refresh_feat_card_ui(card)
+        self._notify_change()
+
+    def _refresh_feat_card_ui(self, card: dict) -> None:
+        for idx, option_row in enumerate(card["options"]):
+            option_row["row_box"].grid(row=idx, column=0, sticky="ew", pady=2)
+            if len(card["options"]) <= 1:
+                option_row["remove_button"].grid_remove()
+            else:
+                option_row["remove_button"].grid()
+
+        prowess_points = max(0, len(card["options"]) - 1)
+        card["limitation_label_var"].set(f"Limitation | Points de prouesse utilisés: {prowess_points}")
 
     def get_payload(self) -> list[dict]:
         feats = []
@@ -133,10 +186,13 @@ class ProwessEditor:
                     "name": card["name_var"].get().strip(),
                     "options": options,
                     "limitation": card["limitation_var"].get().strip(),
-                    "prowess_points": card["prowess_points"],
+                    "prowess_points": max(0, len(card["options"]) - 1),
                 }
             )
         return feats
+
+    def get_total_spent_prowess_points(self) -> int:
+        return sum(max(0, len(card["options"]) - 1) for card in self._cards)
 
     def _label_for_option(self, option_name: str) -> str:
         for label, name in PROWESS_OPTION_BY_LABEL.items():
@@ -161,3 +217,12 @@ class ProwessEditor:
         else:
             row_data["points_combo"].grid_remove()
             row_data["points_label"].grid_remove()
+
+    def _on_option_updated(self, card: dict, row_data: dict) -> None:
+        self._sync_variable_points_visibility(row_data)
+        self._refresh_feat_card_ui(card)
+        self._notify_change()
+
+    def _notify_change(self) -> None:
+        if callable(self._on_change):
+            self._on_change()

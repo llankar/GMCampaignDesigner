@@ -12,7 +12,7 @@ from .progression.rank_limits import (
     max_favorite_skills,
     skill_cap_points_for_advancements,
 )
-from .progression import BASE_FEAT_COUNT, apply_advancement_effects, prowess_points_from_advancement_choices
+from .progression import BASE_FEAT_COUNT, BASE_PROWESS_POINTS, apply_advancement_effects, prowess_points_from_advancement_choices
 
 
 class CharacterCreationError(ValueError):
@@ -136,25 +136,32 @@ def build_character(character_input: dict) -> CharacterCreationResult:
 
     feats = character_input.get("feats") or []
     prowess_budgets = prowess_points_from_advancement_choices(advancement_choices)
-    expected_feat_total = BASE_FEAT_COUNT + len(prowess_budgets)
-    if len(feats) != expected_feat_total:
+    available_prowess_points = BASE_PROWESS_POINTS + sum(prowess_budgets)
+    if len(feats) < BASE_FEAT_COUNT:
         raise CharacterCreationError(
-            f"Le nombre de prouesses doit être {expected_feat_total} (base {BASE_FEAT_COUNT} + {len(prowess_budgets)} via avancements)."
+            f"Le nombre de prouesses doit être au minimum {BASE_FEAT_COUNT}."
         )
+    spent_prowess_points = 0
     for feat_index, feat in enumerate(feats):
         options = feat.get("options") or []
         limitation = (feat.get("limitation") or "").strip()
-        if len(options) != 3:
-            raise CharacterCreationError("Chaque prouesse doit contenir exactement 3 options.")
+        if len(options) < 1:
+            raise CharacterCreationError("Chaque prouesse doit contenir au moins 1 bonus.")
         if not limitation:
             raise CharacterCreationError("Chaque prouesse doit définir une limitation.")
 
-        expected_points = 0 if feat_index < BASE_FEAT_COUNT else prowess_budgets[feat_index - BASE_FEAT_COUNT]
+        expected_points = max(0, len(options) - 1)
         actual_points = int(feat.get("prowess_points", expected_points) or 0)
         if actual_points != expected_points:
             raise CharacterCreationError(
-                f"La prouesse #{feat_index + 1} doit avoir {expected_points} point(s) de prouesse."
+                f"La prouesse #{feat_index + 1} a un total de points incohérent avec son nombre de bonus."
             )
+        spent_prowess_points += actual_points
+
+    if spent_prowess_points > available_prowess_points:
+        raise CharacterCreationError(
+            f"Points de prouesse insuffisants: {spent_prowess_points} utilisés pour {available_prowess_points} disponibles."
+        )
 
     try:
         validate_equipment(character_input, advancements, advancement_choices)
