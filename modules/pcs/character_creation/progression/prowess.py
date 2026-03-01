@@ -5,6 +5,7 @@ from __future__ import annotations
 from ..constants import RANK_TABLE
 
 BASE_FEAT_COUNT = 2
+BASE_PROWESS_POINTS = 6
 
 
 def rank_index_from_advancement_total(advancements: int) -> int:
