@@ -21,6 +21,8 @@ class ProwessEditor:
     def __init__(self, parent, on_change=None, grid_row: int = 9):
         self.frame = ctk.CTkFrame(parent)
         self.frame.grid(row=grid_row, column=0, columnspan=2, sticky="ew", padx=6, pady=3)
+        for column in range(3):
+            self.frame.grid_columnconfigure(column, weight=1)
         self._cards: list[dict] = []
         self._on_change = on_change
 
@@ -41,7 +43,9 @@ class ProwessEditor:
 
     def _build_feat_card(self, idx: int, feat: dict) -> dict:
         box = ctk.CTkFrame(self.frame)
-        box.grid(row=idx, column=0, sticky="ew", pady=3)
+        row = idx // 3
+        column = idx % 3
+        box.grid(row=row, column=column, sticky="nsew", padx=3, pady=3)
         box.grid_columnconfigure(1, weight=1)
 
         name_var = tk.StringVar(value=(feat.get("name") or f"Prouesse {idx + 1}").strip())
