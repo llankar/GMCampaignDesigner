@@ -15,7 +15,7 @@ from .progression import ADVANCEMENT_OPTIONS, BASE_FEAT_COUNT, prowess_points_fr
 from .progression.rank_limits import bonus_skill_points_from_advancements, max_favorite_skills
 from .rules_engine import CharacterCreationError, build_character
 from .storage import CharacterDraftRepository
-from .ui import EquipmentEditor, bind_advancement_type_and_label_vars
+from .ui import EquipmentEditor, ProwessEditor, bind_advancement_type_and_label_vars
 from .storage.payload_normalizer import normalize_draft_payload_for_form
 
 
@@ -104,9 +104,7 @@ class CharacterCreationView(ctk.CTkFrame):
         ctk.CTkLabel(scroll, textvariable=self.feat_count_var, font=("Arial", 12, "bold")).grid(
             row=8, column=1, sticky="e", padx=6, pady=(10, 2)
         )
-        self.feat_frame = ctk.CTkFrame(scroll)
-        self.feat_frame.grid(row=9, column=0, columnspan=2, sticky="ew", padx=6, pady=3)
-        self.feat_widgets = []
+        self.prowess_editor = ProwessEditor(scroll)
         self._render_feat_rows([])
 
         ctk.CTkLabel(scroll, text="Équipement", font=("Arial", 14, "bold")).grid(
@@ -152,20 +150,7 @@ class CharacterCreationView(ctk.CTkFrame):
 
     def _build_payload(self) -> dict:
         favorites = [skill for skill, var in self.favorite_vars.items() if var.get()]
-        feats = []
-        for feat_widget in self.feat_widgets:
-            feats.append(
-                {
-                    "name": feat_widget["name"].get().strip(),
-                    "options": [
-                        feat_widget["option_1"].get().strip(),
-                        feat_widget["option_2"].get().strip(),
-                        feat_widget["option_3"].get().strip(),
-                    ],
-                    "limitation": feat_widget["limitation"].get().strip(),
-                    "prowess_points": feat_widget["prowess_points"],
-                }
-            )
+        feats = self.prowess_editor.get_payload()
         advancement_choices = []
         for row in self.advancement_rows:
             advancement_choices.append(
@@ -292,24 +277,9 @@ class CharacterCreationView(ctk.CTkFrame):
         self._update_equipment_points_marker()
 
     def _collect_current_feats(self) -> list[dict]:
-        return [
-            {
-                "name": widget["name"].get().strip(),
-                "options": [
-                    widget["option_1"].get().strip(),
-                    widget["option_2"].get().strip(),
-                    widget["option_3"].get().strip(),
-                ],
-                "limitation": widget["limitation"].get().strip(),
-            }
-            for widget in self.feat_widgets
-        ]
+        return self.prowess_editor.get_payload()
 
     def _render_feat_rows(self, existing_feats: list[dict]) -> None:
-        for widget in self.feat_frame.winfo_children():
-            widget.destroy()
-        self.feat_widgets = []
-
         advancement_choices = [
             {
                 "type": row["type_var"].get().strip(),
@@ -320,41 +290,7 @@ class CharacterCreationView(ctk.CTkFrame):
         prowess_budgets = prowess_points_from_advancement_choices(advancement_choices)
         total_feats = BASE_FEAT_COUNT + len(prowess_budgets)
         self.feat_count_var.set(f"Nombre de prouesses: {total_feats}")
-
-        for idx in range(total_feats):
-            feat = existing_feats[idx] if idx < len(existing_feats) else {}
-            prowess_points = 0 if idx < BASE_FEAT_COUNT else prowess_budgets[idx - BASE_FEAT_COUNT]
-
-            box = ctk.CTkFrame(self.feat_frame)
-            box.grid(row=idx, column=0, columnspan=2, sticky="ew", pady=3)
-            name = tk.StringVar(value=(feat.get("name") or f"Prouesse {idx + 1}").strip())
-            options = feat.get("options") or []
-            opt1 = tk.StringVar(value=options[0] if len(options) > 0 else "")
-            opt2 = tk.StringVar(value=options[1] if len(options) > 1 else "")
-            opt3 = tk.StringVar(value=options[2] if len(options) > 2 else "")
-            lim = tk.StringVar(value=(feat.get("limitation") or "").strip())
-
-            name_label = "Nom" if prowess_points <= 0 else f"Nom ({prowess_points} pt{'s' if prowess_points > 1 else ''} de prouesse)"
-            for lbl, var, row in (
-                (name_label, name, 0),
-                ("Option 1", opt1, 1),
-                ("Option 2", opt2, 2),
-                ("Option 3", opt3, 3),
-                ("Limitation", lim, 4),
-            ):
-                ctk.CTkLabel(box, text=lbl).grid(row=row, column=0, sticky="w", padx=6, pady=2)
-                ctk.CTkEntry(box, textvariable=var).grid(row=row, column=1, sticky="ew", padx=6, pady=2)
-            box.grid_columnconfigure(1, weight=1)
-            self.feat_widgets.append(
-                {
-                    "name": name,
-                    "option_1": opt1,
-                    "option_2": opt2,
-                    "option_3": opt3,
-                    "limitation": lim,
-                    "prowess_points": prowess_points,
-                }
-            )
+        self.prowess_editor.set_feat_rows(total_feats, prowess_budgets, existing_feats)
 
     def _refresh_draft_selector(self):
         names = self.drafts.list_names()
