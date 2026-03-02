@@ -62,7 +62,7 @@ def test_get_total_spent_prowess_points_uses_variable_option_costs():
         }
     ]
 
-    assert editor.get_total_spent_prowess_points() == 5
+    assert editor.get_total_spent_prowess_points() == 6
 
 
 def test_refresh_feat_card_ui_updates_label_with_variable_option_costs():
@@ -78,5 +78,5 @@ def test_refresh_feat_card_ui_updates_label_with_variable_option_costs():
 
     editor._refresh_feat_card_ui(card)
 
-    assert card["limitation_label_var"].get().endswith("3")
+    assert card["limitation_label_var"].get().endswith("4")
 

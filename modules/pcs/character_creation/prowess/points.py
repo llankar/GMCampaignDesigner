@@ -37,7 +37,6 @@ def _option_cost_from_string(option_value: str) -> int:
 
 
 def calculate_feat_points_from_options(options: list[str]) -> int:
-    """Return spent prowess points for a feat (first option is free)."""
+    """Return spent prowess points for a feat (each option costs at least 1)."""
 
-    total_option_cost = sum(_option_cost_from_string(str(option)) for option in (options or []))
-    return max(0, total_option_cost - 1)
+    return sum(_option_cost_from_string(str(option)) for option in (options or []))

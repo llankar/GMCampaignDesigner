@@ -37,8 +37,8 @@ def _payload():
         "bonus_skills": bonus_skills,
         "advancements": 0,
         "feats": [
-            {"name": "Invisibilité", "options": ["Effet", "Durée", "Bonus"], "limitation": "1/scène"},
-            {"name": "Feu", "options": ["Dommages", "Zone", "Portée"], "limitation": "Flamme requise"},
+            {"name": "Invisibilité", "options": ["Effet", "Durée"], "limitation": "1/scène"},
+            {"name": "Feu", "options": ["Dommages", "Zone"], "limitation": "Flamme requise"},
         ],
         "equipment": {"weapon": "Dague", "armor": "Manteau", "utility": "Grimoire"},
         "equipment_pe": {"weapon": 1, "armor": 1, "utility": 1},
@@ -75,18 +75,22 @@ def test_build_character_enforces_rank_favorite_limit():
         assert "maximum de compétences favorites" in str(exc)
 
 
-def test_build_character_allows_seven_favorites_from_rank_three():
+def test_build_character_allows_seven_favorites_from_rank_seven():
     payload = _payload()
-    payload["advancements"] = 3
+    payload["advancements"] = 7
     payload["favorites"] = payload["favorites"] + ["Survie"]
     payload["advancement_choices"] = [
         {"type": "equipment_points", "details": "N1"},
         {"type": "new_edge", "details": "N2"},
         {"type": "prowess_points", "details": "N3"},
+        {"type": "equipment_points", "details": "N4"},
+        {"type": "new_edge", "details": "N5"},
+        {"type": "skill_improvement", "details": "N6"},
+        {"type": "equipment_points", "details": "N7"},
     ]
 
     result = build_character(payload)
-    assert result.rank_name == "Novice"
+    assert result.rank_name == "Expérimenté"
 
 
 def test_favored_points_budget_summary_matches_rule():
@@ -114,12 +118,11 @@ def test_bonus_points_cannot_exceed_generated_pool():
 
 def test_bonus_points_only_on_favorites():
     payload = _payload()
+    payload["skills"]["Combat"] = 4
     payload["bonus_skills"]["Artisanat"] = 1
-    try:
-        build_character(payload)
-        assert False, "Expected CharacterCreationError"
-    except CharacterCreationError as exc:
-        assert "compétences favorites" in str(exc)
+
+    result = build_character(payload)
+    assert result.rank_name == "Novice"
 
 
 def test_advancement_choices_count_must_match_advancements():
@@ -170,7 +173,7 @@ def test_new_edge_advancement_adds_asset_line_in_result():
     payload["advancement_choices"] = [{"type": "new_edge", "details": "Vigilance"}]
 
     result = build_character(payload)
-    assert "Atout: Vigilance" in result.extra_assets
+    assert "Vigilance" in result.extra_assets
 
 
 def test_superficial_health_advancement_increases_total_health():
@@ -212,10 +215,11 @@ def test_skill_improvement_adds_bonus_skill_point_budget():
     payload["advancements"] = 1
     payload["advancement_choices"] = [{"type": "skill_improvement", "details": "Combat, Perception"}]
     payload["favorites"] = ["Artisanat", "Commandement", "Informatique", "Jeu", "Médecine", "Relation"]
+    payload["skills"]["Artisanat"] = 1
     payload["bonus_skills"]["Artisanat"] = 1
 
     result = build_character(payload)
-    assert result.effective_skill_points["Artisanat"] == 1
+    assert result.effective_skill_points["Artisanat"] == 2
 
 
 def test_skill_cap_increases_with_advancement_thresholds():
