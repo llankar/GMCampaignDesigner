@@ -39,10 +39,11 @@ sys.modules.setdefault(
 from modules.pcs.character_creation.ui.prowess_editor import ProwessEditor
 
 
-def _row(root, label: str, points: str = "1") -> dict:
+def _row(root, label: str, points: str = "1", detail: str = "") -> dict:
     return {
         "label_var": tk.StringVar(master=root, value=label),
         "points_var": tk.StringVar(master=root, value=points),
+        "detail_var": tk.StringVar(master=root, value=detail),
         "row_box": _StubWidget(),
         "remove_button": _StubWidget(),
     }

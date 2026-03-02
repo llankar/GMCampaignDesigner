@@ -32,3 +32,20 @@ def test_normalizer_reads_legacy_equipement_keys():
     assert normalized["weapon_pe"] == 1
     assert normalized["armor_pe"] == 2
     assert normalized["utility_pe"] == 1
+
+
+def test_normalizer_recomputes_prowess_points_from_options():
+    payload = {
+        "feats": [
+            {
+                "name": "Attaque mystique",
+                "options": ["Bonus dommages : 3 pt (+7)", "Durée étendue"],
+                "limitation": "Concentration",
+                "prowess_points": 1,
+            }
+        ]
+    }
+
+    normalized = normalize_draft_payload_for_form(payload)
+
+    assert normalized["feats"][0]["prowess_points"] == 3
