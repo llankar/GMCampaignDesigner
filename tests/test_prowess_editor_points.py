@@ -36,14 +36,24 @@ sys.modules.setdefault(
     ),
 )
 
+from modules.pcs.character_creation.ui.prowess.options import PROWESS_OPTION_LABELS
 from modules.pcs.character_creation.ui.prowess_editor import ProwessEditor
 
 
-def _row(root, label: str, points: str = "1", detail: str = "") -> dict:
+def _label_for(prefix: str) -> str:
+    return next(label for label in PROWESS_OPTION_LABELS if label.startswith(prefix))
+
+
+def _row(root, label: str, points: str = "1", detail: str = "", mode: str = "Contact") -> dict:
     return {
-        "label_var": tk.StringVar(master=root, value=label),
+        "label_var": tk.StringVar(master=root, value=_label_for(label)),
         "points_var": tk.StringVar(master=root, value=points),
+        "damage_mode_var": tk.StringVar(master=root, value=mode),
         "detail_var": tk.StringVar(master=root, value=detail),
+        "points_combo": _StubWidget(),
+        "points_label": _StubWidget(),
+        "damage_mode_combo": _StubWidget(),
+        "detail_entry": _StubWidget(),
         "row_box": _StubWidget(),
         "remove_button": _StubWidget(),
     }
@@ -80,3 +90,34 @@ def test_refresh_feat_card_ui_updates_label_with_variable_option_costs():
 
     assert card["limitation_label_var"].get().endswith("4")
 
+
+def test_sync_variable_points_visibility_handles_bonus_damage_mode_widgets():
+    root = tk.Tcl()
+    editor = ProwessEditor.__new__(ProwessEditor)
+
+    bonus_row = _row(root, "Bonus dommages", "2", mode="Distance")
+    editor._sync_variable_points_visibility(bonus_row)
+    assert bonus_row["damage_mode_combo"]._grid_visible is True
+    assert bonus_row["detail_entry"]._grid_visible is False
+
+    armor_row = _row(root, "Armure", "2")
+    editor._sync_variable_points_visibility(armor_row)
+    assert armor_row["damage_mode_combo"]._grid_visible is False
+    assert armor_row["detail_entry"]._grid_visible is True
+
+
+def test_get_payload_serializes_bonus_damage_with_mode_and_scale():
+    root = tk.Tcl()
+    editor = ProwessEditor.__new__(ProwessEditor)
+    editor._cards = [
+        {
+            "name_var": tk.StringVar(master=root, value="Frappe précise"),
+            "options": [_row(root, "Bonus dommages", points="2", mode="Distance")],
+            "limitation_var": tk.StringVar(master=root, value=""),
+        }
+    ]
+
+    payload = editor.get_payload()
+
+    assert payload[0]["options"] == ["Bonus dommages : Distance, 2 pt (+4)"]
+    assert payload[0]["prowess_points"] == 2

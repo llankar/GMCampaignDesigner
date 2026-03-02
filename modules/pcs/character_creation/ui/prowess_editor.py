@@ -9,13 +9,19 @@ import customtkinter as ctk
 from ..prowess import calculate_feat_points_from_options
 from .prowess.options import (
     DEFAULT_OPTION_NAME,
+    BONUS_DAMAGE_MODES,
     PROWESS_OPTION_BY_LABEL,
     PROWESS_OPTION_LABELS,
     option_uses_variable_points,
+    parse_bonus_damage_detail,
     parse_variable_points,
 )
 
-POINT_EFFECT_BY_LEVEL = {1: "+3", 2: "+5", 3: "+7"}
+DAMAGE_EFFECT_BY_MODE = {
+    "Distance": {1: "+2", 2: "+4", 3: "+6"},
+    "Contact": {1: "+3", 2: "+5", 3: "+7"},
+}
+POINT_EFFECT_BY_LEVEL = DAMAGE_EFFECT_BY_MODE["Contact"]
 
 
 class ProwessEditor:
@@ -105,7 +111,9 @@ class ProwessEditor:
 
         option_label_var = tk.StringVar(value=option_label)
         option_detail_var = tk.StringVar(value=option_detail)
-        variable_points_var = tk.StringVar(value=str(parse_variable_points(option_detail)))
+        damage_mode, parsed_points = parse_bonus_damage_detail(option_detail)
+        variable_points_var = tk.StringVar(value=str(parsed_points))
+        damage_mode_var = tk.StringVar(value=damage_mode)
 
         row_box = ctk.CTkFrame(card["options_container"])
         row_box.grid_columnconfigure(0, weight=1)
@@ -118,15 +126,24 @@ class ProwessEditor:
         points_label = ctk.CTkLabel(row_box, text="pt")
         points_label.grid(row=0, column=2, sticky="w", padx=(4, 0))
 
+        damage_mode_combo = ctk.CTkComboBox(
+            row_box,
+            values=list(BONUS_DAMAGE_MODES),
+            variable=damage_mode_var,
+            state="readonly",
+            width=100,
+        )
+        damage_mode_combo.grid(row=0, column=3, sticky="e", padx=(6, 0))
+
         remove_button = ctk.CTkButton(row_box, text="Supprimer", width=95)
-        remove_button.grid(row=0, column=3, padx=(6, 0))
+        remove_button.grid(row=0, column=4, padx=(6, 0))
 
         detail_entry = ctk.CTkEntry(
             row_box,
             textvariable=option_detail_var,
             placeholder_text="Détails (facultatif)",
         )
-        detail_entry.grid(row=1, column=0, columnspan=4, sticky="ew", pady=(2, 0))
+        detail_entry.grid(row=1, column=0, columnspan=5, sticky="ew", pady=(2, 0))
 
         row_data: dict = {
             "label_var": option_label_var,
@@ -135,6 +152,9 @@ class ProwessEditor:
             "points_var": variable_points_var,
             "points_combo": points_combo,
             "points_label": points_label,
+            "damage_mode_var": damage_mode_var,
+            "damage_mode_combo": damage_mode_combo,
+            "detail_entry": detail_entry,
             "row_box": row_box,
             "remove_button": remove_button,
         }
@@ -144,6 +164,7 @@ class ProwessEditor:
         option_label_var.trace_add("write", lambda *_: self._on_option_updated(card, row_data))
         option_detail_var.trace_add("write", lambda *_: self._notify_change())
         variable_points_var.trace_add("write", lambda *_: self._notify_change())
+        damage_mode_var.trace_add("write", lambda *_: self._notify_change())
         self._on_option_updated(card, row_data)
         self._refresh_feat_card_ui(card)
         self._notify_change()
@@ -167,24 +188,44 @@ class ProwessEditor:
         prowess_points = self._prowess_points_for_card(card)
         card["limitation_label_var"].set(f"Limitation | Points de prouesse utilisés: {prowess_points}")
 
+    @staticmethod
+    def _option_mode_is_bonus_damage(option_name: str) -> bool:
+        return option_name == "Bonus dommages"
+
+    def _effect_for_option(self, option_name: str, points: int, damage_mode: str | None = None) -> str:
+        if self._option_mode_is_bonus_damage(option_name):
+            mode = damage_mode if damage_mode in BONUS_DAMAGE_MODES else BONUS_DAMAGE_MODES[0]
+            return DAMAGE_EFFECT_BY_MODE[mode][points]
+        return POINT_EFFECT_BY_LEVEL[points]
+
+    def _serialize_option_row(self, option_row: dict) -> str:
+        option_label = option_row["label_var"].get()
+        option_name = PROWESS_OPTION_BY_LABEL.get(option_label, DEFAULT_OPTION_NAME)
+        detail = option_row["detail_var"].get().strip()
+
+        if option_uses_variable_points(option_name):
+            points = parse_variable_points(option_row["points_var"].get())
+            if self._option_mode_is_bonus_damage(option_name):
+                mode = option_row["damage_mode_var"].get().strip()
+                if mode not in BONUS_DAMAGE_MODES:
+                    mode = BONUS_DAMAGE_MODES[0]
+                effect = self._effect_for_option(option_name, points, mode)
+                composed_detail = f"{mode}, {points} pt ({effect})"
+            else:
+                effect = self._effect_for_option(option_name, points)
+                composed_detail = f"{points} pt ({effect})"
+            if detail:
+                composed_detail = f"{composed_detail} - {detail}"
+            return f"{option_name} : {composed_detail}"
+
+        return f"{option_name} : {detail}" if detail else option_name
+
     def get_payload(self) -> list[dict]:
         feats = []
         for card in self._cards:
             options = []
             for option_row in card["options"]:
-                option_label = option_row["label_var"].get()
-                option_name = PROWESS_OPTION_BY_LABEL.get(option_label, DEFAULT_OPTION_NAME)
-                detail = option_row["detail_var"].get().strip()
-
-                if option_uses_variable_points(option_name):
-                    points = parse_variable_points(option_row["points_var"].get())
-                    effect = POINT_EFFECT_BY_LEVEL[points]
-                    composed_detail = f"{points} pt ({effect})"
-                    if detail:
-                        composed_detail = f"{composed_detail} - {detail}"
-                    options.append(f"{option_name} : {composed_detail}")
-                else:
-                    options.append(f"{option_name} : {detail}" if detail else option_name)
+                options.append(self._serialize_option_row(option_row))
 
             feats.append(
                 {
@@ -200,22 +241,7 @@ class ProwessEditor:
         return sum(self._prowess_points_for_card(card) for card in self._cards)
 
     def _prowess_points_for_card(self, card: dict) -> int:
-        serialized_options = []
-        for option_row in card["options"]:
-            option_label = option_row["label_var"].get()
-            option_name = PROWESS_OPTION_BY_LABEL.get(option_label, DEFAULT_OPTION_NAME)
-            detail = option_row["detail_var"].get().strip()
-
-            if option_uses_variable_points(option_name):
-                points = parse_variable_points(option_row["points_var"].get())
-                effect = POINT_EFFECT_BY_LEVEL[points]
-                composed_detail = f"{points} pt ({effect})"
-                if detail:
-                    composed_detail = f"{composed_detail} - {detail}"
-                serialized_options.append(f"{option_name} : {composed_detail}")
-            else:
-                serialized_options.append(f"{option_name} : {detail}" if detail else option_name)
-
+        serialized_options = [self._serialize_option_row(option_row) for option_row in card["options"]]
         return calculate_feat_points_from_options(serialized_options)
 
     def _prowess_cost_for_option_row(self, option_row: dict) -> int:
@@ -242,12 +268,21 @@ class ProwessEditor:
         option_label = row_data["label_var"].get()
         option_name = PROWESS_OPTION_BY_LABEL.get(option_label, DEFAULT_OPTION_NAME)
         uses_variable_points = option_uses_variable_points(option_name)
+        is_bonus_damage = self._option_mode_is_bonus_damage(option_name)
+
         if uses_variable_points:
             row_data["points_combo"].grid()
             row_data["points_label"].grid()
         else:
             row_data["points_combo"].grid_remove()
             row_data["points_label"].grid_remove()
+
+        if is_bonus_damage:
+            row_data["damage_mode_combo"].grid()
+            row_data["detail_entry"].grid_remove()
+        else:
+            row_data["damage_mode_combo"].grid_remove()
+            row_data["detail_entry"].grid()
 
     def _on_option_updated(self, card: dict, row_data: dict) -> None:
         self._sync_variable_points_visibility(row_data)
