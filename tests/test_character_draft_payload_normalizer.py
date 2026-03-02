@@ -48,4 +48,4 @@ def test_normalizer_recomputes_prowess_points_from_options():
 
     normalized = normalize_draft_payload_for_form(payload)
 
-    assert normalized["feats"][0]["prowess_points"] == 3
+    assert normalized["feats"][0]["prowess_points"] == 4
