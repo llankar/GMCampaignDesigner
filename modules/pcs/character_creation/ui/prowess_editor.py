@@ -25,13 +25,14 @@ POINT_EFFECT_BY_LEVEL = DAMAGE_EFFECT_BY_MODE["Contact"]
 
 
 class ProwessEditor:
-    def __init__(self, parent, on_change=None, grid_row: int = 9):
+    def __init__(self, parent, on_change=None, on_remove_feat=None, grid_row: int = 9):
         self.frame = ctk.CTkFrame(parent)
         self.frame.grid(row=grid_row, column=0, columnspan=2, sticky="ew", padx=6, pady=3)
         for column in range(3):
             self.frame.grid_columnconfigure(column, weight=1)
         self._cards: list[dict] = []
         self._on_change = on_change
+        self._on_remove_feat = on_remove_feat
 
     def set_feat_rows(self, total_feats: int, existing_feats: list[dict] | None = None, _legacy_existing_feats: list[dict] | None = None) -> None:
         if _legacy_existing_feats is not None:
@@ -71,6 +72,22 @@ class ProwessEditor:
         limitation_var = tk.StringVar(value=(feat.get("limitation") or "").strip())
         limitation_label_var = tk.StringVar(value="")
 
+        add_option_button = ctk.CTkButton(
+            box,
+            text="+ Ajouter un bonus",
+            width=160,
+            command=lambda: None,
+        )
+        add_option_button.grid(row=2, column=0, sticky="w", padx=6, pady=(2, 2))
+
+        remove_feat_button = ctk.CTkButton(
+            box,
+            text="Effacer prouesse",
+            width=160,
+            command=lambda: None,
+        )
+        remove_feat_button.grid(row=2, column=1, sticky="e", padx=6, pady=(2, 2))
+
         card = {
             "name_var": name_var,
             "options": option_rows,
@@ -78,18 +95,14 @@ class ProwessEditor:
             "limitation_label_var": limitation_label_var,
             "options_container": options_container,
             "box": box,
+            "remove_feat_button": remove_feat_button,
         }
+
+        add_option_button.configure(command=lambda c=card: self._append_option_row(c, ""))
+        remove_feat_button.configure(command=lambda c=card: self._request_feat_removal(c))
 
         for raw_value in options:
             self._append_option_row(card, raw_value)
-
-        add_option_button = ctk.CTkButton(
-            box,
-            text="+ Ajouter un bonus",
-            width=160,
-            command=lambda c=card: self._append_option_row(c, ""),
-        )
-        add_option_button.grid(row=2, column=0, sticky="w", padx=6, pady=(2, 2))
 
         ctk.CTkLabel(box, textvariable=limitation_label_var).grid(row=3, column=0, sticky="w", padx=6, pady=2)
         ctk.CTkEntry(box, textvariable=limitation_var, placeholder_text="Texte libre").grid(
@@ -178,6 +191,14 @@ class ProwessEditor:
         self._notify_change()
 
     def _refresh_feat_card_ui(self, card: dict) -> None:
+        remove_button = card.get("remove_feat_button")
+        cards = getattr(self, "_cards", [card])
+        if remove_button is not None:
+            if len(cards) <= 1:
+                remove_button.grid_remove()
+            else:
+                remove_button.grid()
+
         for idx, option_row in enumerate(card["options"]):
             option_row["row_box"].grid(row=idx, column=0, sticky="ew", pady=2)
             if len(card["options"]) <= 1:
@@ -187,6 +208,10 @@ class ProwessEditor:
 
         prowess_points = self._prowess_points_for_card(card)
         card["limitation_label_var"].set(f"Limitation | Points de prouesse utilisés: {prowess_points}")
+
+    def _request_feat_removal(self, card: dict) -> None:
+        if callable(self._on_remove_feat):
+            self._on_remove_feat(self._cards.index(card))
 
     @staticmethod
     def _option_mode_is_bonus_damage(option_name: str) -> bool:

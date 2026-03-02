@@ -121,3 +121,17 @@ def test_get_payload_serializes_bonus_damage_with_mode_and_scale():
 
     assert payload[0]["options"] == ["Bonus dommages : Distance, 2 pt (+4)"]
     assert payload[0]["prowess_points"] == 2
+
+
+def test_request_feat_removal_calls_callback_with_feat_index():
+    root = tk.Tcl()
+    captured: list[int] = []
+    editor = ProwessEditor.__new__(ProwessEditor)
+    editor._on_remove_feat = captured.append
+    card0 = {"name_var": tk.StringVar(master=root, value="Prouesse 1")}
+    card1 = {"name_var": tk.StringVar(master=root, value="Prouesse 2")}
+    editor._cards = [card0, card1]
+
+    editor._request_feat_removal(card1)
+
+    assert captured == [1]

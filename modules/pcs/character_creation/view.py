@@ -114,7 +114,12 @@ class CharacterCreationView(ctk.CTkFrame):
         ctk.CTkButton(scroll, text="+ Ajouter une prouesse", width=170, command=self._add_feat_row).grid(
             row=9, column=1, sticky="e", padx=6, pady=(0, 4)
         )
-        self.prowess_editor = ProwessEditor(scroll, on_change=self._update_prowess_points_marker, grid_row=10)
+        self.prowess_editor = ProwessEditor(
+            scroll,
+            on_change=self._update_prowess_points_marker,
+            on_remove_feat=self._remove_feat_row,
+            grid_row=10,
+        )
         self._render_feat_rows([])
 
         ctk.CTkLabel(scroll, text="Équipement", font=("Arial", 14, "bold")).grid(
@@ -324,6 +329,17 @@ class CharacterCreationView(ctk.CTkFrame):
     def _add_feat_row(self) -> None:
         self.extra_feat_count += 1
         self._render_feat_rows(self._collect_current_feats())
+
+    def _remove_feat_row(self, feat_index: int) -> None:
+        feats = self._collect_current_feats()
+        if not (0 <= feat_index < len(feats)):
+            return
+        if len(feats) <= 1:
+            return
+
+        feats.pop(feat_index)
+        self.extra_feat_count = max(0, len(feats) - BASE_FEAT_COUNT)
+        self._render_feat_rows(feats)
 
     def _refresh_draft_selector(self):
         names = self.drafts.list_names()
