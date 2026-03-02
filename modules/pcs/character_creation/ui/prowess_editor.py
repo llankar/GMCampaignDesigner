@@ -22,6 +22,7 @@ DAMAGE_EFFECT_BY_MODE = {
     "Contact": {1: "+3", 2: "+5", 3: "+7"},
 }
 POINT_EFFECT_BY_LEVEL = DAMAGE_EFFECT_BY_MODE["Contact"]
+ARMOR_EFFECT_BY_LEVEL = {1: "+3", 2: "+6", 3: "+9"}
 
 
 class ProwessEditor:
@@ -221,6 +222,8 @@ class ProwessEditor:
         if self._option_mode_is_bonus_damage(option_name):
             mode = damage_mode if damage_mode in BONUS_DAMAGE_MODES else BONUS_DAMAGE_MODES[0]
             return DAMAGE_EFFECT_BY_MODE[mode][points]
+        if option_name == "Armure":
+            return ARMOR_EFFECT_BY_LEVEL[points]
         return POINT_EFFECT_BY_LEVEL[points]
 
     def _serialize_option_row(self, option_row: dict) -> str:

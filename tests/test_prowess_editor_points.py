@@ -123,6 +123,23 @@ def test_get_payload_serializes_bonus_damage_with_mode_and_scale():
     assert payload[0]["prowess_points"] == 2
 
 
+def test_get_payload_serializes_armor_with_three_armor_per_point():
+    root = tk.Tcl()
+    editor = ProwessEditor.__new__(ProwessEditor)
+    editor._cards = [
+        {
+            "name_var": tk.StringVar(master=root, value="Carapace"),
+            "options": [_row(root, "Armure", points="2")],
+            "limitation_var": tk.StringVar(master=root, value=""),
+        }
+    ]
+
+    payload = editor.get_payload()
+
+    assert payload[0]["options"] == ["Armure : 2 pt (+6)"]
+    assert payload[0]["prowess_points"] == 2
+
+
 def test_request_feat_removal_calls_callback_with_feat_index():
     root = tk.Tcl()
     captured: list[int] = []
