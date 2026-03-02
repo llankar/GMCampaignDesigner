@@ -232,3 +232,27 @@ def test_skill_cap_increases_with_advancement_thresholds():
 
     result = build_character(payload)
     assert result.skill_dice["Combat"] == "d12+2"
+
+
+def test_build_character_validates_prowess_points_using_option_costs():
+    payload = _payload()
+    payload["feats"] = [
+        {
+            "name": "Maîtrise",
+            "options": ["Bonus dommages : 3 pt (+7)", "Durée étendue"],
+            "limitation": "Canalisation",
+            "prowess_points": 1,
+        },
+        {
+            "name": "Feu",
+            "options": ["Dommages", "Zone", "Portée"],
+            "limitation": "Flamme requise",
+            "prowess_points": 2,
+        },
+    ]
+
+    try:
+        build_character(payload)
+        assert False, "Expected CharacterCreationError"
+    except CharacterCreationError as exc:
+        assert "total de points incohérent" in str(exc)

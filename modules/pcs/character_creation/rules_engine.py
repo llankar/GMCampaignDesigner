@@ -13,6 +13,7 @@ from .progression.rank_limits import (
     skill_cap_points_for_advancements,
 )
 from .progression import BASE_FEAT_COUNT, BASE_PROWESS_POINTS, apply_advancement_effects, prowess_points_from_advancement_choices
+from .prowess import calculate_feat_points_from_options
 
 
 class CharacterCreationError(ValueError):
@@ -150,7 +151,7 @@ def build_character(character_input: dict) -> CharacterCreationResult:
         if not limitation:
             raise CharacterCreationError("Chaque prouesse doit définir une limitation.")
 
-        expected_points = max(0, len(options) - 1)
+        expected_points = calculate_feat_points_from_options(options)
         actual_points = int(feat.get("prowess_points", expected_points) or 0)
         if actual_points != expected_points:
             raise CharacterCreationError(
