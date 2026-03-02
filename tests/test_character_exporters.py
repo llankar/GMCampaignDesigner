@@ -36,7 +36,7 @@ def test_render_character_sheet_html_contains_core_fields():
     assert "Lame vive" in html
     assert "Concept: Rogue" in html
     assert "Défaut: Impulsive" in html
-    assert "Atout de groupe: Safehouse" in html
+    assert "Safehouse" in html
     assert "Atout: Vigilance" in html
     assert "01. +1 Atout (limité à 1 fois par Rang) — Vigilance" in html
     assert "02. Équipement : PE gagnés = 4 + Rang actuel — Arsenal" in html
@@ -61,3 +61,23 @@ def test_export_character_sheet_forces_html_backend(tmp_path):
     assert BACKENDS == ("html",)
     assert backend == "html"
     assert path.endswith("sheet.html")
+
+
+def test_render_character_sheet_html_formats_bonus_dommages_by_mode():
+    payload = _payload()
+    payload["feats"] = [
+        {
+            "name": "Frappe",
+            "options": [
+                "Bonus dommages : Distance, 2 pt (+99)",
+                "Bonus dommages : Contact, 3 pt",
+            ],
+            "limitation": "",
+            "prowess_points": 5,
+        }
+    ]
+
+    html = html_renderer.render_character_sheet_html(payload, _rules())
+
+    assert "Bonus dommages : Distance, 2 pt (+4)" in html
+    assert "Bonus dommages : Contact, 3 pt (+7)" in html

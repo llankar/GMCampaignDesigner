@@ -7,6 +7,7 @@ from pathlib import Path
 from string import Template
 
 from ..progression import ADVANCEMENT_OPTIONS
+from ..prowess.options import BONUS_DAMAGE_MODES, parse_bonus_damage_detail
 
 _TEMPLATE_PATH = Path(__file__).resolve().parent.parent / "templates" / "character_sheet.html"
 
@@ -42,10 +43,32 @@ def _build_list_lines(values: list[str], total: int, with_box: bool = False) -> 
     return "\n".join(rows)
 
 
+
+
+def _format_option_value(option: str) -> str:
+    option_text = str(option or "").strip()
+    if not option_text:
+        return ""
+
+    if not option_text.startswith("Bonus dommages"):
+        return option_text
+
+    if ":" not in option_text:
+        return option_text
+
+    option_name, option_detail = option_text.split(":", 1)
+    mode, points = parse_bonus_damage_detail(option_detail)
+    if mode not in BONUS_DAMAGE_MODES:
+        mode = BONUS_DAMAGE_MODES[0]
+    effect_scale = {"Distance": {1: "+2", 2: "+4", 3: "+6"}, "Contact": {1: "+3", 2: "+5", 3: "+7"}}
+    effect = effect_scale[mode][points]
+    return f"{option_name.strip()} : {mode}, {points} pt ({effect})"
+
 def _format_feat_line(feat: dict) -> str:
     name = (feat.get("name") or "").strip()
     prowess_points = int(feat.get("prowess_points") or 0)
-    options = [str(option).strip() for option in (feat.get("options") or []) if str(option).strip()]
+    options = [_format_option_value(option) for option in (feat.get("options") or [])]
+    options = [option for option in options if option]
     limitation = (feat.get("limitation") or "").strip()
 
     parts: list[str] = []
