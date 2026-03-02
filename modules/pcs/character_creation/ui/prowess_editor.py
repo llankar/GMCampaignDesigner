@@ -6,6 +6,7 @@ import tkinter as tk
 
 import customtkinter as ctk
 
+from ..prowess import calculate_feat_points_from_options
 from .prowess.options import (
     DEFAULT_OPTION_NAME,
     PROWESS_OPTION_BY_LABEL,
@@ -199,8 +200,23 @@ class ProwessEditor:
         return sum(self._prowess_points_for_card(card) for card in self._cards)
 
     def _prowess_points_for_card(self, card: dict) -> int:
-        total_option_cost = sum(self._prowess_cost_for_option_row(option_row) for option_row in card["options"])
-        return max(0, total_option_cost - 1)
+        serialized_options = []
+        for option_row in card["options"]:
+            option_label = option_row["label_var"].get()
+            option_name = PROWESS_OPTION_BY_LABEL.get(option_label, DEFAULT_OPTION_NAME)
+            detail = option_row["detail_var"].get().strip()
+
+            if option_uses_variable_points(option_name):
+                points = parse_variable_points(option_row["points_var"].get())
+                effect = POINT_EFFECT_BY_LEVEL[points]
+                composed_detail = f"{points} pt ({effect})"
+                if detail:
+                    composed_detail = f"{composed_detail} - {detail}"
+                serialized_options.append(f"{option_name} : {composed_detail}")
+            else:
+                serialized_options.append(f"{option_name} : {detail}" if detail else option_name)
+
+        return calculate_feat_points_from_options(serialized_options)
 
     def _prowess_cost_for_option_row(self, option_row: dict) -> int:
         option_label = option_row["label_var"].get()
