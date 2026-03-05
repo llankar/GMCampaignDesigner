@@ -1,16 +1,21 @@
-import calendar
 from datetime import date, timedelta
+import tkinter as tk
 
 import customtkinter as ctk
 
+from .calendar_grid_panel import CalendarGridPanel
+from .event_detail_panel import EventDetailPanel
+from .navigation_panel import NavigationPanel
+
 
 class CalendarWindow(ctk.CTkToplevel):
-    """Dedicated full calendar window supporting month/week/day navigation."""
+    """Dedicated full calendar window with split panels and callback-based interactions."""
 
     VIEW_MONTH = "month"
     VIEW_WEEK = "week"
     VIEW_DAY = "day"
-    SUPPORTED_VIEWS = {VIEW_MONTH, VIEW_WEEK, VIEW_DAY}
+    VIEW_TIMELINE = "timeline"
+    SUPPORTED_VIEWS = {VIEW_MONTH, VIEW_WEEK, VIEW_DAY, VIEW_TIMELINE}
 
     def __init__(
         self,
@@ -23,7 +28,7 @@ class CalendarWindow(ctk.CTkToplevel):
     ):
         super().__init__(master)
         self.title("Calendrier complet")
-        self.geometry("1100x760")
+        self.geometry("1250x760")
 
         self.get_events_for_day = get_events_for_day
         self.get_events_for_range = get_events_for_range
@@ -32,12 +37,12 @@ class CalendarWindow(ctk.CTkToplevel):
         self.active_date = initial_date or date.today()
         self.view_mode = self._normalize_view_mode(initial_view_mode)
         self.anchor_date = self.active_date
-
-        self._month_buttons = []
-        self._month_cell_dates = []
-        self._week_day_buttons = []
+        self.panel_filters = {"show_source": True}
+        self.is_detail_compact = False
 
         self._build_ui()
+        self._bind_responsive_events()
+
         self.protocol("WM_DELETE_WINDOW", self._close_window)
         self._render()
 
@@ -53,62 +58,62 @@ class CalendarWindow(ctk.CTkToplevel):
         return target_date - timedelta(days=target_date.weekday())
 
     def _build_ui(self):
-        self.grid_rowconfigure(1, weight=1)
+        self.grid_rowconfigure(0, weight=1)
         self.grid_columnconfigure(0, weight=1)
 
-        toolbar = ctk.CTkFrame(self)
-        toolbar.grid(row=0, column=0, sticky="ew", padx=12, pady=(12, 6))
-        toolbar.grid_columnconfigure(1, weight=1)
+        outer_pane = tk.PanedWindow(self, orient=tk.HORIZONTAL, sashrelief=tk.RAISED, sashwidth=6, bd=0)
+        outer_pane.grid(row=0, column=0, sticky="nsew", padx=10, pady=10)
 
-        nav = ctk.CTkFrame(toolbar, fg_color="transparent")
-        nav.grid(row=0, column=0, sticky="w")
-
-        ctk.CTkButton(nav, text="◀", width=34, command=self._go_previous).pack(side="left", padx=(0, 6))
-        ctk.CTkButton(nav, text="Aujourd'hui", width=90, command=self._jump_today).pack(side="left", padx=(0, 6))
-        ctk.CTkButton(nav, text="▶", width=34, command=self._go_next).pack(side="left")
-
-        self.period_label = ctk.CTkLabel(toolbar, text="", font=ctk.CTkFont(size=15, weight="bold"))
-        self.period_label.grid(row=0, column=1, sticky="w", padx=(8, 8))
-
-        self.view_mode_switch = ctk.CTkSegmentedButton(
-            toolbar,
-            values=["Mois", "Semaine", "Jour"],
-            command=self._on_mode_switch,
-            width=260,
+        self.navigation_panel = NavigationPanel(
+            outer_pane,
+            on_previous=self._go_previous,
+            on_next=self._go_next,
+            on_today=self._jump_today,
+            on_view_change=self.set_view_mode,
+            on_date_selected=self._select_day,
+            on_filter_changed=self._on_filters_changed,
         )
-        self.view_mode_switch.grid(row=0, column=2, sticky="e")
 
-        content = ctk.CTkFrame(self)
-        content.grid(row=1, column=0, sticky="nsew", padx=12, pady=(6, 12))
-        content.grid_rowconfigure(0, weight=1)
-        content.grid_columnconfigure(0, weight=3)
-        content.grid_columnconfigure(1, weight=2)
+        center_pane = tk.PanedWindow(outer_pane, orient=tk.HORIZONTAL, sashrelief=tk.RAISED, sashwidth=6, bd=0)
 
-        self.primary_frame = ctk.CTkFrame(content)
-        self.primary_frame.grid(row=0, column=0, sticky="nsew", padx=(0, 6))
-        self.primary_frame.grid_rowconfigure(0, weight=1)
-        self.primary_frame.grid_columnconfigure(0, weight=1)
-
-        details_frame = ctk.CTkFrame(content)
-        details_frame.grid(row=0, column=1, sticky="nsew", padx=(6, 0))
-        details_frame.grid_rowconfigure(1, weight=1)
-        details_frame.grid_columnconfigure(0, weight=1)
-
-        self.selection_label = ctk.CTkLabel(
-            details_frame,
-            text="",
-            anchor="w",
-            font=ctk.CTkFont(size=14, weight="bold"),
+        self.calendar_grid_panel = CalendarGridPanel(
+            center_pane,
+            get_events_for_day=self.get_events_for_day,
+            on_day_selected=self._select_day,
         )
-        self.selection_label.grid(row=0, column=0, sticky="ew", padx=10, pady=(10, 6))
 
-        self.events_text = ctk.CTkTextbox(details_frame)
-        self.events_text.grid(row=1, column=0, sticky="nsew", padx=10, pady=(0, 10))
-        self.events_text.configure(state="disabled")
+        self.event_detail_panel = EventDetailPanel(
+            center_pane,
+            on_compact_toggle=self._on_compact_toggle,
+            on_quick_edit=self._on_quick_edit,
+        )
 
-    def _on_mode_switch(self, value):
-        mapping = {"Mois": self.VIEW_MONTH, "Semaine": self.VIEW_WEEK, "Jour": self.VIEW_DAY}
-        self.set_view_mode(mapping.get(value, self.VIEW_MONTH))
+        outer_pane.add(self.navigation_panel, minsize=220, stretch="never")
+        outer_pane.add(center_pane, minsize=700, stretch="always")
+        center_pane.add(self.calendar_grid_panel, minsize=420, stretch="always")
+        center_pane.add(self.event_detail_panel, minsize=250, stretch="always")
+
+    def _bind_responsive_events(self):
+        self.bind("<Configure>", self._on_window_resized)
+
+    def _on_window_resized(self, event):
+        if event.widget is not self:
+            return
+        should_compact = event.width < 980
+        if should_compact != self.is_detail_compact:
+            self.is_detail_compact = should_compact
+            self.event_detail_panel.set_compact_mode(self.is_detail_compact)
+
+    def _on_filters_changed(self, filters):
+        self.panel_filters.update(filters)
+        self._render_detail_panel()
+
+    def _on_compact_toggle(self, is_compact):
+        self.is_detail_compact = bool(is_compact)
+
+    def _on_quick_edit(self, event, new_title):
+        event["title"] = new_title
+        self._render_detail_panel()
 
     def _go_previous(self):
         if self.view_mode == self.VIEW_MONTH:
@@ -173,115 +178,33 @@ class CalendarWindow(ctk.CTkToplevel):
         self._render()
         self._emit_state_change()
 
-    def _render(self):
-        self._render_view_mode_switch()
-
-        for child in self.primary_frame.winfo_children():
-            child.destroy()
-
-        if self.view_mode == self.VIEW_MONTH:
-            self._render_month_view()
-        elif self.view_mode == self.VIEW_WEEK:
-            self._render_week_view()
-        else:
-            self._render_day_view()
-
-        self._render_event_details()
-
-    def _render_view_mode_switch(self):
-        mapping = {
-            self.VIEW_MONTH: "Mois",
-            self.VIEW_WEEK: "Semaine",
-            self.VIEW_DAY: "Jour",
-        }
-        self.view_mode_switch.set(mapping[self.view_mode])
-
-    def _render_month_view(self):
-        self.period_label.configure(text=self.anchor_date.strftime("%B %Y").capitalize())
-
-        frame = ctk.CTkFrame(self.primary_frame)
-        frame.grid(row=0, column=0, sticky="nsew", padx=6, pady=6)
-
-        for col, label in enumerate(("L", "M", "M", "J", "V", "S", "D")):
-            ctk.CTkLabel(frame, text=label).grid(row=0, column=col, padx=2, pady=(4, 2), sticky="ew")
-
-        matrix = calendar.Calendar(firstweekday=0).monthdatescalendar(self.anchor_date.year, self.anchor_date.month)
-        self._month_cell_dates = matrix
-        self._month_buttons = []
-
-        for week_index, week in enumerate(matrix):
-            row_buttons = []
-            for day_index, day_date in enumerate(week):
-                is_current_month = day_date.month == self.anchor_date.month
-                is_selected = day_date == self.active_date
-                button = ctk.CTkButton(
-                    frame,
-                    text=str(day_date.day),
-                    width=42,
-                    height=34,
-                    fg_color=("#2f6cc0", "#2f6cc0") if is_selected else "transparent",
-                    text_color=("#1a1a1a", "#f0f0f0") if is_current_month else ("#999999", "#666666"),
-                    command=lambda w=week_index, d=day_index: self._select_month_cell(w, d),
-                )
-                button.grid(row=week_index + 1, column=day_index, padx=2, pady=2)
-                row_buttons.append(button)
-            self._month_buttons.append(row_buttons)
-
-    def _render_week_view(self):
-        start = self._start_of_week(self.anchor_date)
-        end = start + timedelta(days=6)
-        self.period_label.configure(text=f"Semaine du {start.strftime('%d/%m/%Y')} au {end.strftime('%d/%m/%Y')}")
-
-        frame = ctk.CTkFrame(self.primary_frame)
-        frame.grid(row=0, column=0, sticky="nsew", padx=6, pady=6)
-        frame.grid_columnconfigure(0, weight=1)
-
-        self._week_day_buttons = []
-        for offset in range(7):
-            day = start + timedelta(days=offset)
-            events = self.get_events_for_day(day)
-            marker = " •" if events else ""
-            label = f"{day.strftime('%A %d/%m')}{marker}".capitalize()
-            btn = ctk.CTkButton(
-                frame,
-                text=label,
-                anchor="w",
-                fg_color=("#2f6cc0", "#2f6cc0") if day == self.active_date else "transparent",
-                command=lambda current=day: self._select_day(current),
-            )
-            btn.grid(row=offset, column=0, sticky="ew", padx=6, pady=4)
-            self._week_day_buttons.append(btn)
-
-    def _render_day_view(self):
-        self.period_label.configure(text=self.anchor_date.strftime("%A %d %B %Y").capitalize())
-
-        frame = ctk.CTkFrame(self.primary_frame)
-        frame.grid(row=0, column=0, sticky="nsew", padx=6, pady=6)
-
-        events = self.get_events_for_day(self.active_date)
-        ctk.CTkLabel(
-            frame,
-            text=f"{len(events)} évènement(s) pour {self.active_date.strftime('%d/%m/%Y')}",
-            font=ctk.CTkFont(size=16, weight="bold"),
-        ).pack(anchor="w", padx=12, pady=12)
-
-        if not events:
-            ctk.CTkLabel(frame, text="Aucun évènement pour cette journée.").pack(anchor="w", padx=12, pady=(0, 12))
-
-    def _select_month_cell(self, week_index, day_index):
-        self._select_day(self._month_cell_dates[week_index][day_index])
-
     def _select_day(self, selected_date):
         self.active_date = selected_date
         self.anchor_date = selected_date
         self._render()
         self._emit_state_change()
 
-    def _render_event_details(self):
-        self.selection_label.configure(text=f"Jour sélectionné : {self.active_date.strftime('%A %d/%m/%Y').capitalize()}")
+    def _render(self):
+        self.navigation_panel.set_state(
+            active_date=self.active_date,
+            anchor_date=self.anchor_date,
+            view_mode=self.view_mode,
+        )
+        self.calendar_grid_panel.render(
+            view_mode=self.view_mode,
+            anchor_date=self.anchor_date,
+            active_date=self.active_date,
+        )
+        self._render_detail_panel()
+
+    def _render_detail_panel(self):
         events = self.get_events_for_day(self.active_date)
-        lines = self._format_event_lines(events)
-        self._set_textbox_lines(self.events_text, lines)
+        self.event_detail_panel.render(
+            active_date=self.active_date,
+            events=events,
+            show_source=bool(self.panel_filters.get("show_source", True)),
+        )
+        self.event_detail_panel.set_compact_mode(self.is_detail_compact)
 
     def _close_window(self):
         self.withdraw()
@@ -289,25 +212,3 @@ class CalendarWindow(ctk.CTkToplevel):
     def _emit_state_change(self):
         if callable(self.on_state_change):
             self.on_state_change(self.active_date, self.view_mode)
-
-    @staticmethod
-    def _format_event_lines(events):
-        if not events:
-            return ["Aucun évènement."]
-
-        lines = []
-        for event in events:
-            title = event.get("title", "Sans titre")
-            source = event.get("source")
-            if source:
-                lines.append(f"• {title} ({source})")
-            else:
-                lines.append(f"• {title}")
-        return lines
-
-    @staticmethod
-    def _set_textbox_lines(textbox, lines):
-        textbox.configure(state="normal")
-        textbox.delete("1.0", "end")
-        textbox.insert("1.0", "\n".join(lines))
-        textbox.configure(state="disabled")
