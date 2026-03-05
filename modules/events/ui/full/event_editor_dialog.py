@@ -13,7 +13,7 @@ class EventEditorDialog(ctk.CTkToplevel):
         super().__init__(master)
         self.title("Éditeur d'évènement")
         self.geometry("560x700")
-        self.resizable(False, False)
+        self.resizable(True, True)
 
         self._on_save = on_save
         self._initial = dict(initial_values or {})
@@ -26,41 +26,46 @@ class EventEditorDialog(ctk.CTkToplevel):
         self.grab_set()
 
     def _build_ui(self):
-        self.grid_columnconfigure(1, weight=1)
+        self.grid_rowconfigure(0, weight=1)
+        self.grid_columnconfigure(0, weight=1)
+
+        content = ctk.CTkScrollableFrame(self)
+        content.grid(row=0, column=0, padx=0, pady=0, sticky="nsew")
+        content.grid_columnconfigure(1, weight=1)
 
         row = 0
-        ctk.CTkLabel(self, text="Titre").grid(row=row, column=0, padx=12, pady=(16, 8), sticky="w")
-        self.title_entry = ctk.CTkEntry(self, placeholder_text="Titre de l'évènement")
+        ctk.CTkLabel(content, text="Titre").grid(row=row, column=0, padx=12, pady=(16, 8), sticky="w")
+        self.title_entry = ctk.CTkEntry(content, placeholder_text="Titre de l'évènement")
         self.title_entry.grid(row=row, column=1, padx=12, pady=(16, 8), sticky="ew")
 
         row += 1
-        ctk.CTkLabel(self, text="Date").grid(row=row, column=0, padx=12, pady=8, sticky="w")
-        self.date_entry = ctk.CTkEntry(self, placeholder_text="YYYY-MM-DD")
+        ctk.CTkLabel(content, text="Date").grid(row=row, column=0, padx=12, pady=8, sticky="w")
+        self.date_entry = ctk.CTkEntry(content, placeholder_text="YYYY-MM-DD")
         self.date_entry.grid(row=row, column=1, padx=12, pady=8, sticky="ew")
 
         row += 1
-        ctk.CTkLabel(self, text="Heure début").grid(row=row, column=0, padx=12, pady=8, sticky="w")
-        self.start_entry = ctk.CTkEntry(self, placeholder_text="HH:MM")
+        ctk.CTkLabel(content, text="Heure début").grid(row=row, column=0, padx=12, pady=8, sticky="w")
+        self.start_entry = ctk.CTkEntry(content, placeholder_text="HH:MM")
         self.start_entry.grid(row=row, column=1, padx=12, pady=8, sticky="ew")
 
         row += 1
-        ctk.CTkLabel(self, text="Heure fin").grid(row=row, column=0, padx=12, pady=8, sticky="w")
-        self.end_entry = ctk.CTkEntry(self, placeholder_text="HH:MM")
+        ctk.CTkLabel(content, text="Heure fin").grid(row=row, column=0, padx=12, pady=8, sticky="w")
+        self.end_entry = ctk.CTkEntry(content, placeholder_text="HH:MM")
         self.end_entry.grid(row=row, column=1, padx=12, pady=8, sticky="ew")
 
         row += 1
-        ctk.CTkLabel(self, text="Type").grid(row=row, column=0, padx=12, pady=8, sticky="w")
-        self.type_entry = ctk.CTkEntry(self, placeholder_text="Session / Rencontre / Quête...")
+        ctk.CTkLabel(content, text="Type").grid(row=row, column=0, padx=12, pady=8, sticky="w")
+        self.type_entry = ctk.CTkEntry(content, placeholder_text="Session / Rencontre / Quête...")
         self.type_entry.grid(row=row, column=1, padx=12, pady=8, sticky="ew")
 
         row += 1
-        ctk.CTkLabel(self, text="Statut").grid(row=row, column=0, padx=12, pady=8, sticky="w")
-        self.status_entry = ctk.CTkEntry(self, placeholder_text="Planifié / Confirmé / Terminé...")
+        ctk.CTkLabel(content, text="Statut").grid(row=row, column=0, padx=12, pady=8, sticky="w")
+        self.status_entry = ctk.CTkEntry(content, placeholder_text="Planifié / Confirmé / Terminé...")
         self.status_entry.grid(row=row, column=1, padx=12, pady=8, sticky="ew")
 
         row += 1
         self.place_selector = MultiLinkSelector(
-            self,
+            content,
             label="Places",
             load_options=lambda query: self._entity_link_service.search_entities("Places", query),
         )
@@ -68,7 +73,7 @@ class EventEditorDialog(ctk.CTkToplevel):
 
         row += 1
         self.npc_selector = MultiLinkSelector(
-            self,
+            content,
             label="NPCs",
             load_options=lambda query: self._entity_link_service.search_entities("NPCs", query),
         )
@@ -76,7 +81,7 @@ class EventEditorDialog(ctk.CTkToplevel):
 
         row += 1
         self.scenario_selector = MultiLinkSelector(
-            self,
+            content,
             label="Scenarios",
             load_options=lambda query: self._entity_link_service.search_entities("Scenarios", query),
         )
@@ -84,7 +89,7 @@ class EventEditorDialog(ctk.CTkToplevel):
 
         row += 1
         self.information_selector = MultiLinkSelector(
-            self,
+            content,
             label="Informations",
             load_options=lambda query: self._entity_link_service.search_entities("Informations", query),
         )
@@ -92,7 +97,8 @@ class EventEditorDialog(ctk.CTkToplevel):
 
         row += 1
         buttons = ctk.CTkFrame(self, fg_color="transparent")
-        buttons.grid(row=row, column=0, columnspan=2, padx=12, pady=(18, 12), sticky="e")
+        buttons.grid(row=1, column=0, padx=12, pady=(8, 12), sticky="ew")
+        buttons.grid_columnconfigure(0, weight=1)
         ctk.CTkButton(buttons, text="Annuler", fg_color="transparent", command=self.destroy).pack(side="right", padx=(6, 0))
         ctk.CTkButton(buttons, text="Créer", command=self._save).pack(side="right")
 
