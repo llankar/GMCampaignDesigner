@@ -66,6 +66,7 @@ from modules.ui.database_manager_dialog import DatabaseManagerDialog
 from modules.ui.system_manager_dialog import SystemManagerDialog
 from modules.ui.menu_bar import AppMenuBar
 from modules.events.ui.dock import CalendarDock
+from modules.events.ui.full import CalendarWindow
 
 from modules.generic.generic_list_view import GenericListView
 from modules.generic.generic_model_wrapper import GenericModelWrapper
@@ -137,6 +138,8 @@ class MainWindow(ctk.CTk):
         self.attributes("-fullscreen", True)
         self.current_open_view   = None
         self.current_open_entity = None    # ← initialize here to avoid AttributeError
+        self._calendar_full_window = None
+        self._calendar_ui_state = {"active_date": date.today(), "view_mode": "month"}
         initialize_db()
         log_info("Database initialization complete", func_name="main_window.MainWindow.__init__")
         position_window_at_top(self)
@@ -1082,6 +1085,38 @@ class MainWindow(ctk.CTk):
 
     def _on_calendar_date_selected(self, selected_date):
         self._refresh_calendar_dock(selected_date)
+        self.open_calendar_view(target_date=selected_date, view_mode=self._calendar_ui_state.get("view_mode", "month"))
+
+    def open_calendar_view(self, target_date=None, view_mode=None):
+        target = target_date or self._calendar_ui_state.get("active_date") or date.today()
+        mode = (view_mode or self._calendar_ui_state.get("view_mode") or "month")
+
+        window = getattr(self, "_calendar_full_window", None)
+        if window is None or not window.winfo_exists():
+            window = CalendarWindow(
+                self,
+                get_events_for_day=self._get_events_for_day,
+                get_events_for_range=self._get_events_for_range,
+                initial_date=target,
+                initial_view_mode=mode,
+                on_state_change=self._on_calendar_full_state_change,
+            )
+            self._calendar_full_window = window
+        else:
+            try:
+                window.deiconify()
+            except Exception:
+                pass
+
+        window.focus_date(target, view_mode=mode, auto_select=True)
+        window.lift()
+        window.focus_force()
+        self._on_calendar_full_state_change(window.active_date, window.view_mode)
+        return window
+
+    def _on_calendar_full_state_change(self, active_date, view_mode):
+        self._calendar_ui_state = {"active_date": active_date, "view_mode": view_mode}
+        self._refresh_calendar_dock(active_date)
 
     def _refresh_calendar_dock(self, selected_date=None):
         dock = getattr(self, "calendar_dock", None)
@@ -1096,6 +1131,13 @@ class MainWindow(ctk.CTk):
 
     def _get_events_for_day(self, target_date):
         return [event for event in self._collect_calendar_events() if event.get("date") == target_date]
+
+    def _get_events_for_range(self, start_date, end_date):
+        return [
+            event
+            for event in self._collect_calendar_events()
+            if event.get("date") is not None and start_date <= event["date"] <= end_date
+        ]
 
     def _get_upcoming_events(self, from_date, limit=12):
         upcoming = [
