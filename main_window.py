@@ -1055,16 +1055,8 @@ class MainWindow(ctk.CTk):
         self.content_frame.grid_columnconfigure(0, weight=1)
         self.content_frame.grid_columnconfigure(1, weight=0)
 
-        self.calendar_dock_toggle_btn = ctk.CTkButton(
-            self.content_frame,
-            text="Calendrier ◀",
-            width=120,
-            command=self._toggle_calendar_dock,
-        )
-        self.calendar_dock_toggle_btn.grid(row=0, column=1, sticky="ne", padx=(0, 8), pady=(8, 0))
-
         self.calendar_dock = CalendarDock(self.content_frame, on_date_selected=self._on_calendar_date_selected)
-        self.calendar_dock.grid(row=0, column=1, rowspan=2, sticky="nse", padx=(0, 8), pady=(44, 8))
+        self.calendar_dock.grid(row=0, column=1, rowspan=2, sticky="nse", padx=(0, 8), pady=(8, 8))
         self._calendar_dock_visible = True
 
         # ✅ Always explicitly create these initially:
@@ -1510,6 +1502,11 @@ class MainWindow(ctk.CTk):
             text="Timer",
             command=self.open_timer_window,
             width=90,
+        )
+        self.calendar_dock_toggle_btn = self.menu_bar.create_action_button(
+            text="Calendrier ◀",
+            command=self._toggle_calendar_dock,
+            width=130,
         )
         self.banner_toggle_btn = self.menu_bar.create_action_button(
             text="▼",
