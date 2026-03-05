@@ -2,18 +2,22 @@ from datetime import date
 
 import customtkinter as ctk
 
+from modules.events.services.entity_link_service import EntityLinkService
+from modules.events.ui.shared.multi_link_selector import MultiLinkSelector
+
 
 class EventEditorDialog(ctk.CTkToplevel):
     """Full editor for calendar events."""
 
-    def __init__(self, master, *, initial_values=None, on_save=None):
+    def __init__(self, master, *, initial_values=None, on_save=None, entity_link_service=None):
         super().__init__(master)
         self.title("Éditeur d'évènement")
-        self.geometry("520x420")
+        self.geometry("560x700")
         self.resizable(False, False)
 
         self._on_save = on_save
         self._initial = dict(initial_values or {})
+        self._entity_link_service = entity_link_service or EntityLinkService()
 
         self._build_ui()
         self._populate_fields()
@@ -55,6 +59,38 @@ class EventEditorDialog(ctk.CTkToplevel):
         self.status_entry.grid(row=row, column=1, padx=12, pady=8, sticky="ew")
 
         row += 1
+        self.place_selector = MultiLinkSelector(
+            self,
+            label="Places",
+            load_options=lambda query: self._entity_link_service.search_entities("Places", query),
+        )
+        self.place_selector.grid(row=row, column=0, columnspan=2, padx=12, pady=(8, 4), sticky="ew")
+
+        row += 1
+        self.npc_selector = MultiLinkSelector(
+            self,
+            label="NPCs",
+            load_options=lambda query: self._entity_link_service.search_entities("NPCs", query),
+        )
+        self.npc_selector.grid(row=row, column=0, columnspan=2, padx=12, pady=4, sticky="ew")
+
+        row += 1
+        self.scenario_selector = MultiLinkSelector(
+            self,
+            label="Scenarios",
+            load_options=lambda query: self._entity_link_service.search_entities("Scenarios", query),
+        )
+        self.scenario_selector.grid(row=row, column=0, columnspan=2, padx=12, pady=4, sticky="ew")
+
+        row += 1
+        self.information_selector = MultiLinkSelector(
+            self,
+            label="Informations",
+            load_options=lambda query: self._entity_link_service.search_entities("Informations", query),
+        )
+        self.information_selector.grid(row=row, column=0, columnspan=2, padx=12, pady=4, sticky="ew")
+
+        row += 1
         buttons = ctk.CTkFrame(self, fg_color="transparent")
         buttons.grid(row=row, column=0, columnspan=2, padx=12, pady=(18, 12), sticky="e")
         ctk.CTkButton(buttons, text="Annuler", fg_color="transparent", command=self.destroy).pack(side="right", padx=(6, 0))
@@ -73,6 +109,10 @@ class EventEditorDialog(ctk.CTkToplevel):
         self.end_entry.insert(0, self._initial.get("end_time", ""))
         self.type_entry.insert(0, self._initial.get("type", ""))
         self.status_entry.insert(0, self._initial.get("status", ""))
+        self.place_selector.set_values(self._initial.get("Places") or [])
+        self.npc_selector.set_values(self._initial.get("NPCs") or [])
+        self.scenario_selector.set_values(self._initial.get("Scenarios") or [])
+        self.information_selector.set_values(self._initial.get("Informations") or [])
 
     def _save(self):
         payload = {
@@ -82,6 +122,10 @@ class EventEditorDialog(ctk.CTkToplevel):
             "end_time": self.end_entry.get().strip(),
             "type": self.type_entry.get().strip(),
             "status": self.status_entry.get().strip(),
+            "Places": self.place_selector.get_values(),
+            "NPCs": self.npc_selector.get_values(),
+            "Scenarios": self.scenario_selector.get_values(),
+            "Informations": self.information_selector.get_values(),
         }
         if callable(self._on_save):
             self._on_save(payload)

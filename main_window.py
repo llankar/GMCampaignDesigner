@@ -67,6 +67,7 @@ from modules.ui.system_manager_dialog import SystemManagerDialog
 from modules.ui.menu_bar import AppMenuBar
 from modules.events.ui.dock import CalendarDock
 from modules.events.ui.full import CalendarWindow
+from modules.events.services.entity_link_service import EntityLinkService
 
 from modules.generic.generic_list_view import GenericListView
 from modules.generic.generic_model_wrapper import GenericModelWrapper
@@ -1101,6 +1102,8 @@ class MainWindow(ctk.CTk):
                 initial_date=target,
                 initial_view_mode=mode,
                 on_state_change=self._on_calendar_full_state_change,
+                on_open_entity=self._open_linked_calendar_entity,
+                entity_link_service=EntityLinkService(self.entity_wrappers),
             )
             self._calendar_full_window = window
         else:
@@ -1118,6 +1121,18 @@ class MainWindow(ctk.CTk):
     def _on_calendar_full_state_change(self, active_date, view_mode):
         self._calendar_ui_state = {"active_date": active_date, "view_mode": view_mode}
         self._refresh_calendar_dock(active_date)
+
+    def _open_linked_calendar_entity(self, entity_type, entity_name):
+        if not entity_type or not entity_name:
+            return
+
+        if getattr(self, "_gm_mode", False) and self.current_gm_view is not None:
+            self.current_gm_view.open_entity_tab(entity_type, entity_name)
+            return
+
+        from modules.generic.entity_detail_factory import open_entity_window
+
+        open_entity_window(entity_type, entity_name)
 
     def _refresh_calendar_dock(self, selected_date=None):
         dock = getattr(self, "calendar_dock", None)
@@ -1161,6 +1176,11 @@ class MainWindow(ctk.CTk):
         title = (payload.get("title") or "Nouvel évènement").strip()
 
         slug, wrapper = self._resolve_calendar_event_wrapper()
+        linked_places = payload.get("Places") or []
+        linked_npcs = payload.get("NPCs") or []
+        linked_scenarios = payload.get("Scenarios") or []
+        linked_informations = payload.get("Informations") or []
+
         event_item = {
             "Title": title,
             "Date": event_date.isoformat(),
@@ -1168,6 +1188,10 @@ class MainWindow(ctk.CTk):
             "EndTime": end_time,
             "Type": (payload.get("type") or "Session").strip(),
             "Status": (payload.get("status") or "Planifié").strip(),
+            "Places": linked_places,
+            "NPCs": linked_npcs,
+            "Scenarios": linked_scenarios,
+            "Informations": linked_informations,
             "Name": f"{title} {event_date.isoformat()} {start_time}".strip(),
         }
         try:
@@ -1181,6 +1205,10 @@ class MainWindow(ctk.CTk):
             "title": title,
             "time": start_time,
             "source": slug,
+            "Places": linked_places,
+            "NPCs": linked_npcs,
+            "Scenarios": linked_scenarios,
+            "Informations": linked_informations,
         }
 
     def _resolve_calendar_event_wrapper(self):
@@ -1246,6 +1274,10 @@ class MainWindow(ctk.CTk):
                         "time": self._extract_event_time(item),
                         "type": item.get("Type") or item.get("type") or "",
                         "status": item.get("Status") or item.get("status") or "",
+                        "Places": item.get("Places") or [],
+                        "NPCs": item.get("NPCs") or [],
+                        "Scenarios": item.get("Scenarios") or [],
+                        "Informations": item.get("Informations") or [],
                     }
                 )
 
