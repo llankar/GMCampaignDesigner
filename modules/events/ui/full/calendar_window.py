@@ -32,6 +32,7 @@ class CalendarWindow(ctk.CTkToplevel):
         super().__init__(master)
         self.title("Calendrier complet")
         self.geometry("1250x760")
+        self.transient(master)
 
         self.get_events_for_day = get_events_for_day
         self.get_events_for_range = get_events_for_range
@@ -48,7 +49,18 @@ class CalendarWindow(ctk.CTkToplevel):
         self._bind_responsive_events()
 
         self.protocol("WM_DELETE_WINDOW", self._close_window)
+        self.after_idle(self._raise_above_parent)
         self._render()
+
+    def _raise_above_parent(self):
+        """Ensure the calendar opens above the main window without staying always-on-top."""
+        try:
+            self.attributes("-topmost", True)
+            self.lift()
+            self.focus_force()
+            self.after(150, lambda: self.attributes("-topmost", False))
+        except Exception:
+            return
 
     @classmethod
     def _normalize_view_mode(cls, mode):
