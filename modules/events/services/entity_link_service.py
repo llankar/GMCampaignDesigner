@@ -8,8 +8,12 @@ class EntityLinkService:
 
     def __init__(self, wrappers=None):
         self._wrappers = wrappers if isinstance(wrappers, dict) else {}
+        self._entities_cache = {}
 
-    def list_entities(self, entity_type):
+    def list_entities(self, entity_type, force_refresh=False):
+        if not force_refresh and entity_type in self._entities_cache:
+            return list(self._entities_cache[entity_type])
+
         wrapper = self._resolve_wrapper(entity_type)
         if wrapper is None:
             return []
@@ -21,7 +25,9 @@ class EntityLinkService:
             if isinstance(value, str) and value.strip():
                 entities.append(value.strip())
 
-        return sorted(set(entities), key=str.lower)
+        values = sorted(set(entities), key=str.lower)
+        self._entities_cache[entity_type] = tuple(values)
+        return list(values)
 
     def search_entities(self, entity_type, query):
         values = self.list_entities(entity_type)
@@ -29,6 +35,12 @@ class EntityLinkService:
         if not text:
             return values
         return [name for name in values if text in name.lower()]
+
+    def invalidate_cache(self, entity_type=None):
+        if entity_type:
+            self._entities_cache.pop(entity_type, None)
+            return
+        self._entities_cache.clear()
 
     def _resolve_wrapper(self, entity_type):
         slug = self._slug_for(entity_type)

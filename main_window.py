@@ -141,6 +141,7 @@ class MainWindow(ctk.CTk):
         self.current_open_entity = None    # ← initialize here to avoid AttributeError
         self._calendar_full_window = None
         self._calendar_ui_state = {"active_date": date.today(), "view_mode": "month"}
+        self._calendar_events_cache = None
         initialize_db()
         log_info("Database initialization complete", func_name="main_window.MainWindow.__init__")
         position_window_at_top(self)
@@ -1146,6 +1147,9 @@ class MainWindow(ctk.CTk):
         dock.set_selected_date_events(reference_date, selected_events)
         dock.set_upcoming_events(upcoming_events)
 
+    def _invalidate_calendar_events_cache(self):
+        self._calendar_events_cache = None
+
     def _get_events_for_day(self, target_date):
         return [event for event in self._collect_calendar_events() if event.get("date") == target_date]
 
@@ -1201,6 +1205,7 @@ class MainWindow(ctk.CTk):
         except Exception:
             return None
 
+        self._invalidate_calendar_events_cache()
         self._refresh_calendar_dock(event_date)
         return {
             "date": event_date,
@@ -1258,6 +1263,7 @@ class MainWindow(ctk.CTk):
         except Exception:
             return False
 
+        self._invalidate_calendar_events_cache()
         self._refresh_calendar_dock(target)
         return True
 
@@ -1292,6 +1298,9 @@ class MainWindow(ctk.CTk):
         return fallback
 
     def _collect_calendar_events(self):
+        if self._calendar_events_cache is not None:
+            return [dict(event) for event in self._calendar_events_cache]
+
         wrappers = getattr(self, "entity_wrappers", {}) or {}
         ordered_slugs = sorted(wrappers.keys(), key=lambda slug: ("event" not in slug.lower(), slug))
         results = []
@@ -1332,7 +1341,8 @@ class MainWindow(ctk.CTk):
                 )
 
         results.sort(key=lambda row: (row["date"], row.get("time") or "", row["title"].lower()))
-        return results
+        self._calendar_events_cache = [dict(event) for event in results]
+        return [dict(event) for event in self._calendar_events_cache]
 
     @staticmethod
     def _extract_event_title(item, fallback="event"):
@@ -1823,6 +1833,7 @@ class MainWindow(ctk.CTk):
 
     def init_wrappers(self):
         self.entity_wrappers = build_entity_wrappers()
+        self._invalidate_calendar_events_cache()
 
         attr_map = {
             "places": ["place_wrapper"],

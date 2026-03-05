@@ -56,8 +56,8 @@ class EventEditorDialog(ctk.CTkToplevel):
 
         row += 1
         ctk.CTkLabel(content, text="Type").grid(row=row, column=0, padx=12, pady=8, sticky="w")
-        self.type_entry = ctk.CTkEntry(content, placeholder_text="Session / Rencontre / Quête...")
-        self.type_entry.grid(row=row, column=1, padx=12, pady=8, sticky="ew")
+        self.type_menu = ctk.CTkOptionMenu(content, values=event_type_labels())
+        self.type_menu.grid(row=row, column=1, padx=12, pady=8, sticky="ew")
 
         row += 1
         ctk.CTkLabel(content, text="Statut").grid(row=row, column=0, padx=12, pady=8, sticky="w")
