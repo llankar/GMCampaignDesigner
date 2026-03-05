@@ -34,6 +34,7 @@ from modules.helpers.logging_helper import (
 from modules.scenarios.scene_flow_viewer import create_scene_flow_frame
 from modules.scenarios.widgets.scene_body_sections import build_scene_body_sections
 from modules.ui.vertical_section_tabs import VerticalSectionTabs
+from modules.events.ui.shared.related_events_panel import RelatedEventsPanel
 
 log_module_import(__name__)
 
@@ -1286,6 +1287,15 @@ def create_scenario_detail_frame(entity_type, scenario_item, master, open_entity
         justify="left"
     ).pack(fill="x", pady=(0, 15))
 
+    if entity_type in {"Scenarios", "Places", "NPCs", "Informations"}:
+        related_events_panel = RelatedEventsPanel(
+            _get_section_frame("Notes"),
+            entity_type=entity_type,
+            entity_name=scenario_item.get("Title") or scenario_item.get("Name"),
+            on_open_entity=open_entity_callback,
+        )
+        related_events_panel.pack(fill="x", padx=10, pady=(0, 10))
+
     if gm_view_instance and hasattr(gm_view_instance, "register_note_widget"):
         notes_section = _get_section_frame("Notes")
         ctk.CTkLabel(
@@ -1496,6 +1506,15 @@ def create_entity_detail_frame(entity_type, entity, master, open_entity_callback
             linked_type = field.get("linked_type", None)
             if linked_type:
                 insert_links(content_frame, field_name, entity.get(field_name) or [], linked_type, open_entity_callback)
+
+    if entity_type in {"Scenarios", "Places", "NPCs", "Informations"}:
+        related_events_panel = RelatedEventsPanel(
+            content_frame,
+            entity_type=entity_type,
+            entity_name=entity.get("Title") or entity.get("Name"),
+            on_open_entity=open_entity_callback,
+        )
+        related_events_panel.pack(fill="x", padx=10, pady=(4, 10))
     # Return the scrollable container so that whoever creates the window or tab gets a frame with scrollbars.
     return content_frame
 

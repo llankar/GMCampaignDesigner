@@ -4,10 +4,13 @@ import customtkinter as ctk
 class EventDetailPanel(ctk.CTkFrame):
     """Selected-day details with compact mode and quick edit callback."""
 
-    def __init__(self, master, *, on_compact_toggle, on_quick_edit):
+    LINKED_TYPES = ("Places", "NPCs", "Scenarios", "Informations")
+
+    def __init__(self, master, *, on_compact_toggle, on_quick_edit, on_open_entity=None):
         super().__init__(master)
         self._on_compact_toggle = on_compact_toggle
         self._on_quick_edit = on_quick_edit
+        self._on_open_entity = on_open_entity
         self._is_compact = False
         self._events = []
 
@@ -20,9 +23,8 @@ class EventDetailPanel(ctk.CTkFrame):
         self.compact_toggle = ctk.CTkSwitch(self, text="Mode compact", command=self._toggle_compact)
         self.compact_toggle.grid(row=1, column=0, sticky="w", padx=10, pady=(0, 6))
 
-        self.events_text = ctk.CTkTextbox(self)
-        self.events_text.grid(row=2, column=0, sticky="nsew", padx=10, pady=(0, 8))
-        self.events_text.configure(state="disabled")
+        self.events_frame = ctk.CTkScrollableFrame(self)
+        self.events_frame.grid(row=2, column=0, sticky="nsew", padx=10, pady=(0, 8))
 
         self.editor_frame = ctk.CTkFrame(self)
         self.editor_frame.grid(row=3, column=0, sticky="ew", padx=10, pady=(0, 10))
@@ -39,27 +41,28 @@ class EventDetailPanel(ctk.CTkFrame):
     def set_compact_mode(self, compact):
         self._is_compact = bool(compact)
         if self._is_compact:
-            self.events_text.grid_remove()
+            self.events_frame.grid_remove()
             self.editor_frame.grid_remove()
             self.compact_toggle.select()
         else:
-            self.events_text.grid()
+            self.events_frame.grid()
             self.editor_frame.grid()
             self.compact_toggle.deselect()
 
     def render(self, *, active_date, events, show_source=True):
         self._events = list(events)
         self.selection_label.configure(text=f"Jour sélectionné : {active_date.strftime('%A %d/%m/%Y').capitalize()}")
-        lines = self._format_event_lines(self._events, show_source=show_source)
-        self._set_textbox_lines(lines)
+        self._render_events(show_source=show_source)
 
-    @staticmethod
-    def _format_event_lines(events, *, show_source):
-        if not events:
-            return ["Aucun évènement."]
+    def _render_events(self, *, show_source):
+        for child in self.events_frame.winfo_children():
+            child.destroy()
 
-        lines = []
-        for event in events:
+        if not self._events:
+            ctk.CTkLabel(self.events_frame, text="Aucun évènement.").pack(anchor="w", padx=4, pady=4)
+            return
+
+        for event in self._events:
             title = event.get("title", "Sans titre")
             source = event.get("source")
             details = []
@@ -71,17 +74,35 @@ class EventDetailPanel(ctk.CTkFrame):
                 details.append(str(event.get("status")))
 
             suffix = f" — {' / '.join(details)}" if details else ""
+            text = f"• {title}{suffix}"
             if source and show_source:
-                lines.append(f"• {title}{suffix} ({source})")
-            else:
-                lines.append(f"• {title}{suffix}")
-        return lines
+                text = f"{text} ({source})"
 
-    def _set_textbox_lines(self, lines):
-        self.events_text.configure(state="normal")
-        self.events_text.delete("1.0", "end")
-        self.events_text.insert("1.0", "\n".join(lines))
-        self.events_text.configure(state="disabled")
+            event_block = ctk.CTkFrame(self.events_frame)
+            event_block.pack(fill="x", pady=(0, 6), padx=2)
+            ctk.CTkLabel(event_block, text=text, anchor="w", justify="left").pack(anchor="w", padx=8, pady=(6, 2))
+
+            links_added = False
+            for linked_type in self.LINKED_TYPES:
+                linked_items = event.get(linked_type) or []
+                for linked_name in linked_items:
+                    links_added = True
+                    label = ctk.CTkLabel(
+                        event_block,
+                        text=f"↳ {linked_type[:-1]}: {linked_name}",
+                        text_color="#4da3ff",
+                        cursor="hand2",
+                        anchor="w",
+                    )
+                    label.pack(anchor="w", padx=18, pady=(0, 2))
+                    label.bind("<Button-1>", lambda _e, t=linked_type, n=linked_name: self._open_link(t, n))
+
+            if not links_added:
+                ctk.CTkLabel(event_block, text="↳ Aucun lien", anchor="w", text_color="gray").pack(anchor="w", padx=18, pady=(0, 4))
+
+    def _open_link(self, entity_type, entity_name):
+        if callable(self._on_open_entity):
+            self._on_open_entity(entity_type, entity_name)
 
     def _toggle_compact(self):
         self.set_compact_mode(bool(self.compact_toggle.get()))

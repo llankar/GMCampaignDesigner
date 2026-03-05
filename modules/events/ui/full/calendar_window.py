@@ -8,6 +8,7 @@ from .event_detail_panel import EventDetailPanel
 from .navigation_panel import NavigationPanel
 from .event_editor_dialog import EventEditorDialog
 from .quick_add_popover import QuickAddPopover
+from modules.events.services.entity_link_service import EntityLinkService
 
 
 class CalendarWindow(ctk.CTkToplevel):
@@ -28,6 +29,8 @@ class CalendarWindow(ctk.CTkToplevel):
         initial_date=None,
         initial_view_mode="month",
         on_state_change=None,
+        on_open_entity=None,
+        entity_link_service=None,
     ):
         super().__init__(master)
         self.title("Calendrier complet")
@@ -38,6 +41,9 @@ class CalendarWindow(ctk.CTkToplevel):
         self.get_events_for_range = get_events_for_range
         self.on_create_event = on_create_event
         self.on_state_change = on_state_change
+        self.on_open_entity = on_open_entity
+
+        self.entity_link_service = entity_link_service or EntityLinkService(getattr(master, "entity_wrappers", {}))
 
         self.active_date = initial_date or date.today()
         self.view_mode = self._normalize_view_mode(initial_view_mode)
@@ -104,6 +110,7 @@ class CalendarWindow(ctk.CTkToplevel):
             center_pane,
             on_compact_toggle=self._on_compact_toggle,
             on_quick_edit=self._on_quick_edit,
+            on_open_entity=self._on_open_entity,
         )
 
         outer_pane.add(self.navigation_panel, minsize=220, stretch="never")
@@ -135,6 +142,11 @@ class CalendarWindow(ctk.CTkToplevel):
         event["title"] = new_title
         self._render_detail_panel()
 
+
+    def _on_open_entity(self, entity_type, entity_name):
+        if callable(self.on_open_entity):
+            self.on_open_entity(entity_type, entity_name)
+
     def _on_new_event_shortcut(self, _event=None):
         self._open_full_editor()
 
@@ -146,7 +158,12 @@ class CalendarWindow(ctk.CTkToplevel):
         def _save_from_editor(payload):
             self._create_event(payload)
 
-        EventEditorDialog(self, initial_values=initial_values, on_save=_save_from_editor)
+        EventEditorDialog(
+            self,
+            initial_values=initial_values,
+            on_save=_save_from_editor,
+            entity_link_service=self.entity_link_service,
+        )
 
     def _on_calendar_cell_double_click(self, selected_date, start_time=None):
         self._select_day(selected_date)
