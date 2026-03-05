@@ -53,24 +53,14 @@ class CalendarDock(ctk.CTkFrame):
         events_frame = ctk.CTkFrame(self)
         events_frame.pack(fill="both", expand=True, padx=8, pady=(4, 8))
 
-        self.selected_title_label = ctk.CTkLabel(
-            events_frame,
-            text="Aujourd'hui",
-            anchor="w",
-            font=ctk.CTkFont(size=13, weight="bold"),
-        )
+        self.selected_title_label = ctk.CTkLabel(events_frame, text="Aujourd'hui", anchor="w", font=ctk.CTkFont(size=13, weight="bold"))
         self.selected_title_label.pack(fill="x", padx=8, pady=(8, 4))
 
         self.selected_events_box = ctk.CTkTextbox(events_frame, height=90)
         self.selected_events_box.pack(fill="x", padx=8, pady=(0, 8))
         self.selected_events_box.configure(state="disabled")
 
-        upcoming_label = ctk.CTkLabel(
-            events_frame,
-            text="Prochains évènements",
-            anchor="w",
-            font=ctk.CTkFont(size=13, weight="bold"),
-        )
+        upcoming_label = ctk.CTkLabel(events_frame, text="Prochains évènements", anchor="w", font=ctk.CTkFont(size=13, weight="bold"))
         upcoming_label.pack(fill="x", padx=8, pady=(4, 4))
 
         self.upcoming_events_box = ctk.CTkTextbox(events_frame, height=120)
@@ -130,21 +120,34 @@ class CalendarDock(ctk.CTkFrame):
         self._set_textbox_lines(self.upcoming_events_box, self._format_event_lines(events, include_date=True, empty_message="Aucun évènement à venir."))
 
     @staticmethod
-    def _format_event_lines(events, include_date=False, empty_message="Aucun évènement"):
+    def _event_badge(event):
+        event_date = event.get("date")
+        if event_date is None:
+            return "à venir"
+        today = date.today()
+        if event_date < today:
+            return "en retard"
+        if event_date == today:
+            return "aujourd'hui"
+        return "à venir"
+
+    @classmethod
+    def _format_event_lines(cls, events, include_date=False, empty_message="Aucun évènement"):
         if not events:
             return [empty_message]
 
         lines = []
         for event in events:
             title = event.get("title", "Sans titre")
+            badge = cls._event_badge(event)
             if include_date:
                 event_date = event.get("date")
                 if event_date:
-                    lines.append(f"• {event_date.strftime('%d/%m')} — {title}")
+                    lines.append(f"• {event_date.strftime('%d/%m')} — {title} [{badge}]")
                 else:
-                    lines.append(f"• {title}")
+                    lines.append(f"• {title} [{badge}]")
             else:
-                lines.append(f"• {title}")
+                lines.append(f"• {title} [{badge}]")
         return lines
 
     @staticmethod

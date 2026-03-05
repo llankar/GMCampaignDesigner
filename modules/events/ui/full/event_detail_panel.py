@@ -1,4 +1,8 @@
+from datetime import date
+
 import customtkinter as ctk
+
+from modules.events.models.event_types import get_event_type
 
 
 class EventDetailPanel(ctk.CTkFrame):
@@ -32,11 +36,7 @@ class EventDetailPanel(ctk.CTkFrame):
 
         self.quick_title_entry = ctk.CTkEntry(self.editor_frame, placeholder_text="Titre (édition rapide)")
         self.quick_title_entry.grid(row=0, column=0, sticky="ew", padx=(0, 6))
-        ctk.CTkButton(self.editor_frame, text="Enregistrer", width=110, command=self._emit_quick_edit).grid(
-            row=0,
-            column=1,
-            sticky="e",
-        )
+        ctk.CTkButton(self.editor_frame, text="Enregistrer", width=110, command=self._emit_quick_edit).grid(row=0, column=1, sticky="e")
 
     def set_compact_mode(self, compact):
         self._is_compact = bool(compact)
@@ -72,6 +72,7 @@ class EventDetailPanel(ctk.CTkFrame):
                 details.append(str(event.get("type")))
             if event.get("status"):
                 details.append(str(event.get("status")))
+            details.append(self._badge_text(event))
 
             suffix = f" — {' / '.join(details)}" if details else ""
             text = f"• {title}{suffix}"
@@ -80,25 +81,32 @@ class EventDetailPanel(ctk.CTkFrame):
 
             event_block = ctk.CTkFrame(self.events_frame)
             event_block.pack(fill="x", pady=(0, 6), padx=2)
-            ctk.CTkLabel(event_block, text=text, anchor="w", justify="left").pack(anchor="w", padx=8, pady=(6, 2))
+            event_type = get_event_type(event.get("type"))
+            ctk.CTkLabel(event_block, text=text, anchor="w", justify="left", text_color=event_type.color).pack(anchor="w", padx=8, pady=(6, 2))
 
             links_added = False
             for linked_type in self.LINKED_TYPES:
                 linked_items = event.get(linked_type) or []
                 for linked_name in linked_items:
                     links_added = True
-                    label = ctk.CTkLabel(
-                        event_block,
-                        text=f"↳ {linked_type[:-1]}: {linked_name}",
-                        text_color="#4da3ff",
-                        cursor="hand2",
-                        anchor="w",
-                    )
+                    label = ctk.CTkLabel(event_block, text=f"↳ {linked_type[:-1]}: {linked_name}", text_color="#4da3ff", cursor="hand2", anchor="w")
                     label.pack(anchor="w", padx=18, pady=(0, 2))
                     label.bind("<Button-1>", lambda _e, t=linked_type, n=linked_name: self._open_link(t, n))
 
             if not links_added:
                 ctk.CTkLabel(event_block, text="↳ Aucun lien", anchor="w", text_color="gray").pack(anchor="w", padx=18, pady=(0, 4))
+
+    @staticmethod
+    def _badge_text(event):
+        event_date = event.get("date")
+        if event_date is None:
+            return "à venir"
+        today = date.today()
+        if event_date < today:
+            return "en retard"
+        if event_date == today:
+            return "aujourd'hui"
+        return "à venir"
 
     def _open_link(self, entity_type, entity_name):
         if callable(self._on_open_entity):

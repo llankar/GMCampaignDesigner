@@ -3,39 +3,57 @@ from datetime import timedelta
 
 import customtkinter as ctk
 
+from modules.events.models.event_types import get_event_type
+
 
 class CalendarGridPanel(ctk.CTkFrame):
-    """Main calendar views: month, week, day and timeline."""
+    """Main calendar views: month, week, day, agenda and timeline."""
 
-    def __init__(self, master, *, get_events_for_day, on_day_selected, on_cell_double_click=None):
+    def __init__(
+        self,
+        master,
+        *,
+        get_events_for_day,
+        get_events_for_range,
+        on_day_selected,
+        on_cell_double_click=None,
+        on_event_moved=None,
+    ):
         super().__init__(master)
         self.get_events_for_day = get_events_for_day
+        self.get_events_for_range = get_events_for_range
         self._on_day_selected = on_day_selected
         self._on_cell_double_click = on_cell_double_click
+        self._on_event_moved = on_event_moved
 
         self.grid_rowconfigure(0, weight=1)
         self.grid_columnconfigure(0, weight=1)
 
         self._month_matrix = []
+        self._dragged_event = None
 
     @staticmethod
     def _start_of_week(target_date):
         return target_date - timedelta(days=target_date.weekday())
 
-    def render(self, *, view_mode, anchor_date, active_date):
+    def render(self, *, view_mode, anchor_date, active_date, filters=None, filter_predicate=None):
         for child in self.winfo_children():
             child.destroy()
 
-        if view_mode == "month":
-            self._render_month(anchor_date, active_date)
-        elif view_mode == "week":
-            self._render_week(anchor_date, active_date)
-        elif view_mode == "timeline":
-            self._render_timeline(active_date)
-        else:
-            self._render_day(active_date)
+        predicate = filter_predicate if callable(filter_predicate) else (lambda _event: True)
 
-    def _render_month(self, anchor_date, active_date):
+        if view_mode == "month":
+            self._render_month(anchor_date, active_date, predicate)
+        elif view_mode == "week":
+            self._render_week(anchor_date, active_date, predicate)
+        elif view_mode == "timeline":
+            self._render_timeline(active_date, predicate)
+        elif view_mode == "agenda":
+            self._render_agenda(active_date, filters or {}, predicate)
+        else:
+            self._render_day(active_date, predicate)
+
+    def _render_month(self, anchor_date, active_date, filter_predicate):
         frame = ctk.CTkFrame(self)
         frame.grid(row=0, column=0, sticky="nsew", padx=6, pady=6)
 
@@ -49,9 +67,11 @@ class CalendarGridPanel(ctk.CTkFrame):
             for day_idx, day_date in enumerate(week):
                 is_current_month = day_date.month == anchor_date.month
                 is_selected = day_date == active_date
+                day_events = [event for event in self.get_events_for_day(day_date) if filter_predicate(event)]
+                marker = " •" if day_events else ""
                 button = ctk.CTkButton(
                     frame,
-                    text=str(day_date.day),
+                    text=f"{day_date.day}{marker}",
                     width=42,
                     height=34,
                     fg_color=("#2f6cc0", "#2f6cc0") if is_selected else "transparent",
@@ -59,12 +79,10 @@ class CalendarGridPanel(ctk.CTkFrame):
                     command=lambda current=day_date: self._emit_day_selected(current),
                 )
                 button.grid(row=week_idx + 1, column=day_idx, padx=2, pady=2)
-                button.bind(
-                    "<Double-Button-1>",
-                    lambda _event, current=day_date: self._emit_cell_double_click(current),
-                )
+                button.bind("<Double-Button-1>", lambda _event, current=day_date: self._emit_cell_double_click(current))
+                button.bind("<ButtonRelease-1>", lambda _event, current=day_date: self._drop_event_on_day(current))
 
-    def _render_week(self, anchor_date, active_date):
+    def _render_week(self, anchor_date, active_date, filter_predicate):
         frame = ctk.CTkFrame(self)
         frame.grid(row=0, column=0, sticky="nsew", padx=6, pady=6)
         frame.grid_columnconfigure(0, weight=1)
@@ -72,7 +90,7 @@ class CalendarGridPanel(ctk.CTkFrame):
         start = self._start_of_week(anchor_date)
         for offset in range(7):
             day = start + timedelta(days=offset)
-            events = self.get_events_for_day(day)
+            events = [event for event in self.get_events_for_day(day) if filter_predicate(event)]
             marker = " •" if events else ""
             label = f"{day.strftime('%A %d/%m')}{marker}".capitalize()
             button = ctk.CTkButton(
@@ -84,12 +102,13 @@ class CalendarGridPanel(ctk.CTkFrame):
             )
             button.grid(row=offset, column=0, sticky="ew", padx=6, pady=4)
             button.bind("<Double-Button-1>", lambda _event, current=day: self._emit_cell_double_click(current))
+            button.bind("<ButtonRelease-1>", lambda _event, current=day: self._drop_event_on_day(current))
 
-    def _render_day(self, active_date):
+    def _render_day(self, active_date, filter_predicate):
         frame = ctk.CTkFrame(self)
         frame.grid(row=0, column=0, sticky="nsew", padx=6, pady=6)
 
-        events = self.get_events_for_day(active_date)
+        events = [event for event in self.get_events_for_day(active_date) if filter_predicate(event)]
         ctk.CTkLabel(
             frame,
             text=f"{len(events)} évènement(s) pour {active_date.strftime('%d/%m/%Y')}",
@@ -98,12 +117,16 @@ class CalendarGridPanel(ctk.CTkFrame):
 
         if not events:
             ctk.CTkLabel(frame, text="Aucun évènement pour cette journée.").pack(anchor="w", padx=12, pady=(0, 12))
+            return
 
-    def _render_timeline(self, active_date):
+        for event in events:
+            self._render_event_chip(frame, event)
+
+    def _render_timeline(self, active_date, filter_predicate):
         frame = ctk.CTkScrollableFrame(self)
         frame.grid(row=0, column=0, sticky="nsew", padx=6, pady=6)
 
-        events = self.get_events_for_day(active_date)
+        events = [event for event in self.get_events_for_day(active_date) if filter_predicate(event)]
         mapped = {str(event.get("time", "")): event for event in events}
         for hour in range(0, 24):
             key = f"{hour:02d}:00"
@@ -117,10 +140,74 @@ class CalendarGridPanel(ctk.CTkFrame):
                 command=lambda current=active_date: self._emit_day_selected(current),
             )
             button.pack(fill="x", padx=6, pady=2)
-            button.bind(
-                "<Double-Button-1>",
-                lambda _event, current=active_date, start_time=key: self._emit_cell_double_click(current, start_time),
-            )
+            button.bind("<Double-Button-1>", lambda _event, current=active_date, start_time=key: self._emit_cell_double_click(current, start_time))
+            button.bind("<ButtonRelease-1>", lambda _event, current=active_date, start_time=key: self._drop_event_on_day(current, start_time))
+
+    def _render_agenda(self, active_date, filters, filter_predicate):
+        frame = ctk.CTkScrollableFrame(self)
+        frame.grid(row=0, column=0, sticky="nsew", padx=6, pady=6)
+
+        window_days = int(filters.get("agenda_window_days") or 7)
+        start = active_date
+        end = active_date + timedelta(days=max(1, window_days) - 1)
+        events = [event for event in self.get_events_for_range(start, end) if filter_predicate(event)]
+
+        ctk.CTkLabel(
+            frame,
+            text=f"Agenda: {start.strftime('%d/%m')} → {end.strftime('%d/%m')} ({len(events)} évènement(s))",
+            font=ctk.CTkFont(size=15, weight="bold"),
+            anchor="w",
+        ).pack(fill="x", padx=8, pady=(6, 8))
+
+        if not events:
+            ctk.CTkLabel(frame, text="Aucun évènement sur la période.", anchor="w").pack(fill="x", padx=8, pady=6)
+            return
+
+        for event in sorted(events, key=lambda row: (row.get("date"), row.get("time") or "", row.get("title") or "")):
+            self._render_event_chip(frame, event, include_date=True)
+
+    def _render_event_chip(self, frame, event, include_date=False):
+        event_type = get_event_type(event.get("type"))
+        event_date = event.get("date")
+        date_prefix = f"[{event_date.strftime('%d/%m')}] " if include_date and event_date else ""
+        badge = self._timeline_badge(event)
+        details = " / ".join(part for part in [event.get("time") or "", event.get("status") or ""] if part)
+        text = f"{date_prefix}{event.get('title', 'Sans titre')}"
+        if details:
+            text = f"{text} — {details}"
+        text = f"{text} [{badge}]"
+
+        block = ctk.CTkFrame(frame)
+        block.pack(fill="x", padx=8, pady=4)
+        label = ctk.CTkLabel(block, text=text, anchor="w", justify="left", cursor="hand2", text_color=event_type.color)
+        label.pack(fill="x", padx=8, pady=6)
+        label.bind("<ButtonPress-1>", lambda _event, current=event: self._start_drag(current))
+
+    def _start_drag(self, event):
+        self._dragged_event = event
+
+    def _drop_event_on_day(self, target_date, target_time=None):
+        if not self._dragged_event:
+            return
+        moving = self._dragged_event
+        self._dragged_event = None
+        if callable(self._on_event_moved):
+            self._on_event_moved(moving, target_date, target_time)
+
+    @staticmethod
+    def _timeline_badge(event):
+        event_date = event.get("date")
+        if event_date is None:
+            return "à venir"
+
+        from datetime import date as _date
+
+        today = _date.today()
+        if event_date < today:
+            return "en retard"
+        if event_date == today:
+            return "aujourd'hui"
+        return "à venir"
 
     def _emit_day_selected(self, selected_date):
         if callable(self._on_day_selected):

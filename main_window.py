@@ -1099,6 +1099,7 @@ class MainWindow(ctk.CTk):
                 get_events_for_day=self._get_events_for_day,
                 get_events_for_range=self._get_events_for_range,
                 on_create_event=self._create_calendar_event,
+                on_update_event=self._update_calendar_event,
                 initial_date=target,
                 initial_view_mode=mode,
                 on_state_change=self._on_calendar_full_state_change,
@@ -1161,6 +1162,7 @@ class MainWindow(ctk.CTk):
             for event in self._collect_calendar_events()
             if event.get("date") is not None and event["date"] >= from_date
         ]
+        upcoming.sort(key=lambda row: (row["date"], row.get("time") or "", row.get("title") or ""))
         return upcoming[:limit]
 
     def _create_calendar_event(self, payload):
@@ -1210,6 +1212,54 @@ class MainWindow(ctk.CTk):
             "Scenarios": linked_scenarios,
             "Informations": linked_informations,
         }
+
+
+    def _update_calendar_event(self, event, target_date, target_time=None):
+        if not isinstance(event, dict):
+            return False
+
+        slug = event.get("source")
+        wrappers = getattr(self, "entity_wrappers", {}) or {}
+        wrapper = wrappers.get(slug)
+        if wrapper is None:
+            return False
+
+        target = self._parse_event_date(target_date) or date.today()
+        new_time = self._normalize_event_time(target_time, fallback=event.get("time") or "09:00")
+
+        try:
+            items = wrapper.load_items()
+        except Exception:
+            return False
+
+        title = str(event.get("title") or "").strip()
+        original_date = event.get("date")
+        original_time = self._normalize_event_time(event.get("time"), fallback="")
+
+        matched = None
+        for item in items:
+            item_title = self._extract_event_title(item, fallback=slug)
+            item_date = self._extract_event_date(item)
+            item_time = self._extract_event_time(item)
+            if item_title == title and item_date == original_date and item_time == original_time:
+                matched = item
+                break
+
+        if matched is None:
+            return False
+
+        matched["Date"] = target.isoformat()
+        matched["StartTime"] = new_time
+        if matched.get("Name"):
+            matched["Name"] = f"{title} {target.isoformat()} {new_time}".strip()
+
+        try:
+            wrapper.save_item(matched, key_field="Name")
+        except Exception:
+            return False
+
+        self._refresh_calendar_dock(target)
+        return True
 
     def _resolve_calendar_event_wrapper(self):
         wrappers = getattr(self, "entity_wrappers", {}) or {}
@@ -1281,7 +1331,7 @@ class MainWindow(ctk.CTk):
                     }
                 )
 
-        results.sort(key=lambda row: (row["date"], row["title"].lower()))
+        results.sort(key=lambda row: (row["date"], row.get("time") or "", row["title"].lower()))
         return results
 
     @staticmethod
