@@ -6,6 +6,7 @@ import customtkinter as ctk
 from .calendar_grid_panel import CalendarGridPanel
 from .event_detail_panel import EventDetailPanel
 from .navigation_panel import NavigationPanel
+from .quick_add_popover import QuickAddPopover
 
 
 class CalendarWindow(ctk.CTkToplevel):
@@ -22,6 +23,7 @@ class CalendarWindow(ctk.CTkToplevel):
         master,
         get_events_for_day,
         get_events_for_range,
+        on_create_event=None,
         initial_date=None,
         initial_view_mode="month",
         on_state_change=None,
@@ -32,6 +34,7 @@ class CalendarWindow(ctk.CTkToplevel):
 
         self.get_events_for_day = get_events_for_day
         self.get_events_for_range = get_events_for_range
+        self.on_create_event = on_create_event
         self.on_state_change = on_state_change
 
         self.active_date = initial_date or date.today()
@@ -80,6 +83,7 @@ class CalendarWindow(ctk.CTkToplevel):
             center_pane,
             get_events_for_day=self.get_events_for_day,
             on_day_selected=self._select_day,
+            on_cell_double_click=self._on_calendar_cell_double_click,
         )
 
         self.event_detail_panel = EventDetailPanel(
@@ -95,6 +99,8 @@ class CalendarWindow(ctk.CTkToplevel):
 
     def _bind_responsive_events(self):
         self.bind("<Configure>", self._on_window_resized)
+        self.bind("<KeyPress-n>", self._on_new_event_shortcut)
+        self.bind("<KeyPress-N>", self._on_new_event_shortcut)
 
     def _on_window_resized(self, event):
         if event.widget is not self:
@@ -114,6 +120,35 @@ class CalendarWindow(ctk.CTkToplevel):
     def _on_quick_edit(self, event, new_title):
         event["title"] = new_title
         self._render_detail_panel()
+
+    def _on_new_event_shortcut(self, _event=None):
+        self._open_quick_add(self.active_date)
+
+    def _on_calendar_cell_double_click(self, selected_date, start_time=None):
+        self._select_day(selected_date)
+        self._open_quick_add(selected_date, start_time=start_time)
+
+    def _open_quick_add(self, selected_date, start_time=None):
+        QuickAddPopover(
+            self,
+            initial_date=selected_date,
+            initial_start_time=start_time,
+            on_create=self._create_event,
+            on_more_options=self._create_event,
+        )
+
+    def _create_event(self, payload):
+        if not callable(self.on_create_event):
+            return
+        created = self.on_create_event(payload)
+        if not created:
+            return
+        created_date = created.get("date")
+        if created_date is not None:
+            self.active_date = created_date
+            self.anchor_date = created_date
+        self._render()
+        self._emit_state_change()
 
     def _go_previous(self):
         if self.view_mode == self.VIEW_MONTH:
