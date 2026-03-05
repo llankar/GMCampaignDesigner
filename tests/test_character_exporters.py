@@ -45,6 +45,15 @@ def test_render_character_sheet_html_contains_core_fields():
     assert "<strong>Genre</strong></div>" in html
 
 
+def test_render_character_sheet_html_supports_english_language():
+    html = html_renderer.render_character_sheet_html(_payload(), _rules(), language="en")
+
+    assert "Character sheet" in html
+    assert "Flaw: Impulsive" in html
+    assert ">SKILLS<" in html
+    assert "<th>Superficial wounds</th><th>15</th>" in html
+
+
 def test_export_character_sheet_html_only_writes_file(tmp_path):
     output = tmp_path / "sheet.pdf"
 
@@ -61,6 +70,16 @@ def test_export_character_sheet_forces_html_backend(tmp_path):
     assert BACKENDS == ("html",)
     assert backend == "html"
     assert path.endswith("sheet.html")
+
+
+def test_export_character_sheet_writes_english_html(tmp_path):
+    output = tmp_path / "sheet.pdf"
+
+    path, _ = export_character_sheet(_payload(), _rules(), str(output), language="en")
+
+    html = (tmp_path / "sheet.html").read_text(encoding="utf-8")
+    assert path.endswith("sheet.html")
+    assert "Character sheet" in html
 
 
 def test_render_character_sheet_html_formats_bonus_dommages_by_mode():

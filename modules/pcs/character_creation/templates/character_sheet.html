@@ -1,8 +1,8 @@
 <!doctype html>
-<html lang="fr">
+<html lang="$document_lang">
 <head>
   <meta charset="utf-8" />
-  <title>Fiche de personnage - $name</title>
+  <title>$title_label - $name</title>
   <style>
     @page { size: A4; margin: 10mm; }
     body { font-family: Arial, sans-serif; font-size: 12px; color: #111; margin: 0; }
@@ -36,15 +36,15 @@
         <div class="line-row"></div><div class="line-row"></div><div class="line-row"></div><div class="line-row"></div>
       </div>
       <div>
-        <div class="field"><strong>Joueur/Joueuse</strong>$player</div>
-        <div class="field"><strong>NOM</strong>$name</div>
+        <div class="field"><strong>$player_label</strong>$player</div>
+        <div class="field"><strong>$name_label</strong>$name</div>
         <div class="field"><strong>Concept</strong>$concept</div>
         <div class="field"></div>
         <div class="field"></div>
         <div class="field"></div>
       </div>
       <div>
-        <div class="field"><strong>RANG</strong>$rank_name</div>
+        <div class="field"><strong>$rank_label</strong>$rank_name</div>
         <div class="field"></div>
         <div class="field"></div>
         <div class="field"></div>
@@ -58,55 +58,55 @@
       <div>
         <div class="two-col">
           <div>
-            <div class="box-title">COMPÉTENCES</div>
+            <div class="box-title">$skills_label</div>
             <table>
-              <thead><tr><th class="box"></th><th>NOM</th><th class="jet">JET</th></tr></thead>
+              <thead><tr><th class="box"></th><th>$name_col_label</th><th class="jet">$roll_label</th></tr></thead>
               <tbody>
                 $skills_rows
               </tbody>
             </table>
           </div>
           <div>
-            <div class="box-title">ATOUTS</div>
+            <div class="box-title">$assets_label</div>
             $assets_lines
           </div>
         </div>
 
         <div class="two-col" style="margin-top:12px;">
           <div>
-            <div class="box-title">ARMURE</div>
+            <div class="box-title">$armor_label</div>
             <div class="line-row"><span>$armor</span></div>
             <div class="line-row"></div>
             <div class="line-row"></div>
           </div>
           <div>
-            <div class="box-title">PROTECTION</div>
+            <div class="box-title">$protection_label</div>
             <div class="line-row"><span>$protection</span></div>
             <div class="line-row"></div>
             <div class="line-row"></div>
           </div>
         </div>
 
-        <div class="box-title">SANTÉ ET DOMMAGES</div>
+        <div class="box-title">$health_and_damage_label</div>
         <table class="health">
-          <tr><th>B. superficielles</th><th>$superficial_health</th></tr>
-          <tr><td>B. légères</td><td>8</td></tr>
-          <tr><td>B. modérées</td><td>12</td></tr>
-          <tr><td>B. graves</td><td>16</td></tr>
+          <tr><th>$superficial_wounds_label</th><th>$superficial_health</th></tr>
+          <tr><td>$light_wounds_label</td><td>8</td></tr>
+          <tr><td>$moderate_wounds_label</td><td>12</td></tr>
+          <tr><td>$severe_wounds_label</td><td>16</td></tr>
         </table>
       </div>
 
       <div>
-        <div class="box-title">PROUESSES</div>
+        <div class="box-title">$prowess_label</div>
         $feats_lines
       </div>
     </div>
   </section>
 
   <section class="page">
-    <div class="box-title">ATTAQUES</div>
+    <div class="box-title">$attacks_label</div>
     <table>
-      <thead><tr><th>ARME</th><th class="jet">JET</th><th class="jet">DMG</th><th class="jet">PORTÉE</th><th>NOTES</th></tr></thead>
+      <thead><tr><th>$weapon_label</th><th class="jet">$roll_label</th><th class="jet">DMG</th><th class="jet">$range_label</th><th>$notes_label</th></tr></thead>
       <tbody>
         <tr><td colspan="5">$attacks_lines</td></tr>
       </tbody>
@@ -115,23 +115,23 @@
     <div class="row" style="margin-top:12px;">
       <div>
         <div class="small-card">
-          <strong>PROFIL</strong>
+          <strong>$profile_label</strong>
           <div class="three-col" style="margin-top:8px;">
             <div class="field"><strong>Race</strong>$profile_race</div>
             <div class="field"><strong>Genre</strong>$profile_gender</div>
-            <div class="field"><strong>Âge</strong>$profile_age</div>
+            <div class="field"><strong>$age_label</strong>$profile_age</div>
           </div>
         </div>
 
-        <div class="box-title" style="margin-top:12px;">ÉQUIPEMENT</div>
+        <div class="box-title" style="margin-top:12px;">$equipment_label</div>
         $equipment_lines
 
-        <div class="box-title" style="margin-top:12px;">NOTES</div>
+        <div class="box-title" style="margin-top:12px;">$notes_label</div>
         $notes_lines
       </div>
 
       <div>
-        <div class="box-title">AVANCEMENTS</div>
+        <div class="box-title">$advancements_label</div>
         $advancements_lines
       </div>
     </div>

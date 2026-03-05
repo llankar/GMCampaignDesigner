@@ -16,8 +16,8 @@ def _target_for_backend(output_path: str, export_html_only: bool) -> Path:
     return base.with_suffix(".html")
 
 
-def _export_with_html(payload: dict, rules_result, output_path: str, export_html_only: bool) -> str:
-    html = render_character_sheet_html(payload, rules_result)
+def _export_with_html(payload: dict, rules_result, output_path: str, export_html_only: bool, language: str) -> str:
+    html = render_character_sheet_html(payload, rules_result, language=language)
     target = _target_for_backend(output_path, export_html_only)
     target.parent.mkdir(parents=True, exist_ok=True)
     target.write_text(html, encoding="utf-8")
@@ -30,9 +30,10 @@ def export_character_sheet(
     output_path: str,
     backend: str = "html",
     export_html_only: bool = True,
+    language: str = "fr",
 ) -> tuple[str, str]:
     _ = backend
-    out = _export_with_html(payload, rules_result, output_path, export_html_only)
+    out = _export_with_html(payload, rules_result, output_path, export_html_only, language)
     return out, "html"
 
 

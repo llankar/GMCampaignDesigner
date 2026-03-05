@@ -6,6 +6,7 @@ from html import escape
 from pathlib import Path
 from string import Template
 
+from .i18n import get_export_labels, normalize_export_language
 from ..progression import ADVANCEMENT_OPTIONS
 from ..prowess.options import BONUS_DAMAGE_MODES, parse_bonus_damage_detail
 
@@ -64,7 +65,7 @@ def _format_option_value(option: str) -> str:
     effect = effect_scale[mode][points]
     return f"{option_name.strip()} : {mode}, {points} pt ({effect})"
 
-def _format_feat_line(feat: dict) -> str:
+def _format_feat_line(feat: dict, labels: dict[str, str]) -> str:
     name = (feat.get("name") or "").strip()
     prowess_points = int(feat.get("prowess_points") or 0)
     options = [_format_option_value(option) for option in (feat.get("options") or [])]
@@ -73,16 +74,21 @@ def _format_feat_line(feat: dict) -> str:
 
     parts: list[str] = []
     if name:
-        label = f"{name} ({prowess_points} pt{'s' if prowess_points > 1 else ''} de prouesse)" if prowess_points > 0 else name
+        points_suffix = labels["feat_points_plural"] if prowess_points > 1 else ""
+        label = (
+            f"{name} ({prowess_points} {labels['feat_points']}{points_suffix} {labels['of_prowess']})"
+            if prowess_points > 0
+            else name
+        )
         parts.append(label)
     if options:
-        parts.append(f"Options: {', '.join(options)}")
+        parts.append(f"{labels['options']}: {', '.join(options)}")
     if limitation:
-        parts.append(f"Limitation: {limitation}")
+        parts.append(f"{labels['limitation']}: {limitation}")
     return " | ".join(parts)
 
 
-def _build_advancement_lines(advancement_choices: list[dict], total_advancements: int) -> list[str]:
+def _build_advancement_lines(advancement_choices: list[dict], total_advancements: int, labels: dict[str, str]) -> list[str]:
     option_labels = {value: label for value, label in ADVANCEMENT_OPTIONS}
     lines: list[str] = []
 
@@ -90,7 +96,7 @@ def _build_advancement_lines(advancement_choices: list[dict], total_advancements
         choice = raw_choice or {}
         choice_type = str(choice.get("type") or "").strip()
         details = str(choice.get("details") or "").strip()
-        label = option_labels.get(choice_type, choice_type or "Option non définie")
+        label = option_labels.get(choice_type, choice_type or labels["undefined_option"])
 
         line = f"{index:02d}. {label}"
         if details:
@@ -127,7 +133,7 @@ def _object_sort_key(object_key: str) -> tuple[int, str]:
     return (999, object_key)
 
 
-def _build_equipment_lines(payload: dict) -> list[str]:
+def _build_equipment_lines(payload: dict, labels: dict[str, str]) -> list[str]:
     equipment = payload.get("equipment") or {}
     purchases = payload.get("equipment_purchases") or {}
     lines: list[str] = []
@@ -147,11 +153,11 @@ def _build_equipment_lines(payload: dict) -> list[str]:
         if int(stats.get("pierce_armor", 0) or 0) > 0:
             details.append(f"PA {int(stats['pierce_armor'])}")
         if int(stats.get("armor", 0) or 0) > 0:
-            details.append(f"Armure {int(stats['armor'])}")
+            details.append(f"{labels['armor_short']} {int(stats['armor'])}")
         if int(stats.get("special_effect", 0) or 0) > 0:
-            details.append(f"Effet {int(stats['special_effect'])}")
+            details.append(f"{labels['effect_short']} {int(stats['special_effect'])}")
         if int(stats.get("skill_bonus", 0) or 0) > 0:
-            details.append(f"Bonus comp {int(stats['skill_bonus'])}")
+            details.append(f"{labels['skill_bonus_short']} {int(stats['skill_bonus'])}")
 
         if details:
             lines.append(f"{display_name} ({', '.join(details)})")
@@ -161,25 +167,26 @@ def _build_equipment_lines(payload: dict) -> list[str]:
     return lines
 
 
-def render_character_sheet_html(payload: dict, rules_result) -> str:
+def render_character_sheet_html(payload: dict, rules_result, language: str = "fr") -> str:
     template = Template(_TEMPLATE_PATH.read_text(encoding="utf-8"))
+    labels = get_export_labels(language)
 
     favorites = set(payload.get("favorites") or [])
     skill_dice = _rule_attr(rules_result, "skill_dice", {}) or {}
     feats = payload.get("feats") or []
     feats_lines: list[str] = []
     for feat in feats:
-        feat_line = _format_feat_line(feat)
+        feat_line = _format_feat_line(feat, labels)
         if feat_line:
             feats_lines.append(feat_line)
 
     equipment = payload.get("equipment") or {}
     armor = equipment.get("armor", "")
-    equipment_lines = _build_equipment_lines(payload)
+    equipment_lines = _build_equipment_lines(payload, labels)
 
     advancements = int(payload.get("advancements") or 0)
     advancement_choices = payload.get("advancement_choices") or []
-    advancements_values = _build_advancement_lines(advancement_choices, advancements)
+    advancements_values = _build_advancement_lines(advancement_choices, advancements, labels)
 
     extra_assets = _rule_attr(rules_result, "extra_assets", []) or []
     advancement_assets = _advancement_assets(advancement_choices)
@@ -189,13 +196,38 @@ def render_character_sheet_html(payload: dict, rules_result) -> str:
             merged_assets.append(asset)
 
     assets_values = [
-        f"Concept: {payload.get('concept', '').strip()}",
-        f"Défaut: {payload.get('flaw', '').strip()}",
+        f"{labels['concept_prefix']}: {payload.get('concept', '').strip()}",
+        f"{labels['flaw_prefix']}: {payload.get('flaw', '').strip()}",
         f"{payload.get('group_asset', '').strip()}",
         *[str(asset).strip() for asset in merged_assets if str(asset).strip()],
     ]
 
     context = {
+        "document_lang": escape(normalize_export_language(language)),
+        "title_label": escape(labels["title"]),
+        "player_label": escape(labels["player"]),
+        "name_label": escape(labels["name"]),
+        "rank_label": escape(labels["rank"]),
+        "skills_label": escape(labels["skills"]),
+        "name_col_label": escape(labels["name_col"]),
+        "roll_label": escape(labels["roll"]),
+        "assets_label": escape(labels["assets"]),
+        "armor_label": escape(labels["armor"]),
+        "protection_label": escape(labels["protection"]),
+        "health_and_damage_label": escape(labels["health_and_damage"]),
+        "superficial_wounds_label": escape(labels["superficial_wounds"]),
+        "light_wounds_label": escape(labels["light_wounds"]),
+        "moderate_wounds_label": escape(labels["moderate_wounds"]),
+        "severe_wounds_label": escape(labels["severe_wounds"]),
+        "prowess_label": escape(labels["prowess"]),
+        "attacks_label": escape(labels["attacks"]),
+        "weapon_label": escape(labels["weapon"]),
+        "range_label": escape(labels["range"]),
+        "notes_label": escape(labels["notes"]),
+        "profile_label": escape(labels["profile"]),
+        "age_label": escape(labels["age"]),
+        "equipment_label": escape(labels["equipment"]),
+        "advancements_label": escape(labels["advancements"]),
         "name": escape(payload.get("name", "")),
         "player": escape(payload.get("player", "")),
         "concept": escape(payload.get("concept", "")),

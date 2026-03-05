@@ -36,25 +36,25 @@ class CharacterCreationView(ctk.CTkFrame):
         scroll.grid_columnconfigure((0, 1), weight=1)
 
         self.inputs = {}
-        self._entry(scroll, "Nom", "name", 0, 0)
-        self._entry(scroll, "Joueur", "player", 0, 1)
+        self._entry(scroll, "Name", "name", 0, 0)
+        self._entry(scroll, "Player", "player", 0, 1)
         self._entry(scroll, "Concept", "concept", 1, 0)
-        self._entry(scroll, "Défaut", "flaw", 1, 1)
-        self._entry(scroll, "Atout de groupe", "group_asset", 2, 0)
-        self._entry(scroll, "Avancements", "advancements", 2, 1, default="0")
+        self._entry(scroll, "Flaw", "flaw", 1, 1)
+        self._entry(scroll, "Group asset", "group_asset", 2, 0)
+        self._entry(scroll, "Advancements", "advancements", 2, 1, default="0")
         self.inputs["advancements"].trace_add("write", self._on_advancements_changed)
 
         draft_row = ctk.CTkFrame(scroll)
         draft_row.grid(row=3, column=0, columnspan=2, sticky="ew", padx=6, pady=(2, 6))
         draft_row.grid_columnconfigure(1, weight=1)
-        ctk.CTkLabel(draft_row, text="Personnage sauvegardé").grid(row=0, column=0, sticky="w", padx=(6, 4))
+        ctk.CTkLabel(draft_row, text="Saved character").grid(row=0, column=0, sticky="w", padx=(6, 4))
         self.draft_name_var = tk.StringVar(value="")
         self.draft_selector = ctk.CTkComboBox(draft_row, variable=self.draft_name_var, values=[], state="readonly")
         self.draft_selector.grid(row=0, column=1, sticky="ew", padx=4)
-        ctk.CTkButton(draft_row, text="Charger", width=90, command=self._load_selected_draft).grid(
+        ctk.CTkButton(draft_row, text="Load", width=90, command=self._load_selected_draft).grid(
             row=0, column=2, padx=4
         )
-        ctk.CTkButton(draft_row, text="Sauvegarder", width=110, command=self._save_current_draft).grid(
+        ctk.CTkButton(draft_row, text="Save", width=110, command=self._save_current_draft).grid(
             row=0, column=3, padx=(4, 6)
         )
 
@@ -65,11 +65,11 @@ class CharacterCreationView(ctk.CTkFrame):
         self.favorite_vars = {}
         self.skill_vars = {}
         self.bonus_skill_vars = {}
-        self.skills_header_var = tk.StringVar(value="Compétences (15 points de base, max favorites: 6)")
+        self.skills_header_var = tk.StringVar(value="Skills (15 base points, max favorites: 6)")
         ctk.CTkLabel(scroll, textvariable=self.skills_header_var, font=("Arial", 14, "bold")).grid(
             row=5, column=0, columnspan=2, sticky="w", padx=6, pady=(10, 2)
         )
-        self.remaining_points_var = tk.StringVar(value="Base restants: 15 | Bonus restants: 0")
+        self.remaining_points_var = tk.StringVar(value="Base remaining: 15 | Bonus remaining: 0")
         ctk.CTkLabel(scroll, textvariable=self.remaining_points_var, font=("Arial", 12, "bold")).grid(
             row=6, column=0, columnspan=2, sticky="w", padx=6, pady=(0, 4)
         )
@@ -97,11 +97,11 @@ class CharacterCreationView(ctk.CTkFrame):
             pts.trace_add("write", self._update_remaining_points_marker)
             bonus_pts.trace_add("write", self._update_remaining_points_marker)
 
-        ctk.CTkLabel(scroll, text="Prouesses", font=("Arial", 14, "bold")).grid(
+        ctk.CTkLabel(scroll, text="Prowess", font=("Arial", 14, "bold")).grid(
             row=8, column=0, sticky="w", padx=6, pady=(10, 2)
         )
-        self.feat_count_var = tk.StringVar(value=f"Nombre de prouesses: {BASE_FEAT_COUNT}")
-        self.prowess_points_var = tk.StringVar(value=f"Points de prouesse (total/dispo): {BASE_PROWESS_POINTS}/{BASE_PROWESS_POINTS}")
+        self.feat_count_var = tk.StringVar(value=f"Prowess count: {BASE_FEAT_COUNT}")
+        self.prowess_points_var = tk.StringVar(value=f"Prowess points (total/available): {BASE_PROWESS_POINTS}/{BASE_PROWESS_POINTS}")
         counters = ctk.CTkFrame(scroll)
         counters.grid(row=8, column=1, sticky="e", padx=6, pady=(10, 2))
         ctk.CTkLabel(counters, textvariable=self.feat_count_var, font=("Arial", 12, "bold")).grid(
@@ -111,7 +111,7 @@ class CharacterCreationView(ctk.CTkFrame):
             row=1, column=0, sticky="e"
         )
         self.extra_feat_count = 0
-        ctk.CTkButton(scroll, text="+ Ajouter une prouesse", width=170, command=self._add_feat_row).grid(
+        ctk.CTkButton(scroll, text="+ Add prowess", width=170, command=self._add_feat_row).grid(
             row=9, column=1, sticky="e", padx=6, pady=(0, 4)
         )
         self.prowess_editor = ProwessEditor(
@@ -122,10 +122,10 @@ class CharacterCreationView(ctk.CTkFrame):
         )
         self._render_feat_rows([])
 
-        ctk.CTkLabel(scroll, text="Équipement", font=("Arial", 14, "bold")).grid(
+        ctk.CTkLabel(scroll, text="Equipment", font=("Arial", 14, "bold")).grid(
             row=11, column=0, sticky="w", padx=6, pady=(10, 2)
         )
-        self.available_equipment_pe_var = tk.StringVar(value="PE disponibles: 3 | Plafond par objet: 1 | Restants: 0")
+        self.available_equipment_pe_var = tk.StringVar(value="Available EP: 3 | Cap per item: 1 | Remaining: 0")
         ctk.CTkLabel(scroll, textvariable=self.available_equipment_pe_var, font=("Arial", 12, "bold")).grid(
             row=11, column=1, sticky="e", padx=6, pady=(10, 2)
         )
@@ -151,8 +151,18 @@ class CharacterCreationView(ctk.CTkFrame):
         export_row.grid_columnconfigure(2, weight=1)
 
         ctk.CTkLabel(export_row, text="Export: HTML").grid(row=0, column=0, padx=(0, 6), sticky="w")
+        ctk.CTkLabel(export_row, text="Language").grid(row=0, column=1, padx=(0, 4), sticky="w")
+        self.export_language_label_var = tk.StringVar(value="Français")
+        self.export_language_selector = ctk.CTkComboBox(
+            export_row,
+            variable=self.export_language_label_var,
+            values=["Français", "English"],
+            state="readonly",
+            width=120,
+        )
+        self.export_language_selector.grid(row=0, column=2, padx=(0, 8), sticky="w")
 
-        btn = ctk.CTkButton(export_row, text="Exporter fiche", command=self.create_character_pdf)
+        btn = ctk.CTkButton(export_row, text="Export sheet", command=self.create_character_pdf)
         btn.grid(row=0, column=3, sticky="e", padx=(10, 0))
 
     def _entry(self, parent, label, key, row, col, default=""):
@@ -202,7 +212,7 @@ class CharacterCreationView(ctk.CTkFrame):
     def _update_favorites_limit_ui(self) -> None:
         advancement_count = self._safe_int(self.inputs["advancements"].get())
         favorite_limit = max_favorite_skills(advancement_count)
-        self.skills_header_var.set(f"Compétences (15 points de base, max favorites: {favorite_limit})")
+        self.skills_header_var.set(f"Skills (15 base points, max favorites: {favorite_limit})")
 
     def _render_advancement_rows(self):
         existing_choices = self._collect_cached_advancement_choices()
@@ -220,7 +230,7 @@ class CharacterCreationView(ctk.CTkFrame):
 
         ctk.CTkLabel(
             self.advancement_frame,
-            text="Choix des avancements",
+            text="Advancement choices",
             font=("Arial", 14, "bold"),
         ).grid(row=0, column=0, columnspan=2, sticky="w", padx=6, pady=(6, 2))
 
@@ -228,7 +238,7 @@ class CharacterCreationView(ctk.CTkFrame):
             row_frame = ctk.CTkFrame(self.advancement_frame)
             row_frame.grid(row=idx + 1, column=0, columnspan=2, sticky="ew", padx=6, pady=3)
             row_frame.grid_columnconfigure(1, weight=1)
-            ctk.CTkLabel(row_frame, text=f"Avancement {idx + 1}").grid(row=0, column=0, sticky="w", padx=6, pady=4)
+            ctk.CTkLabel(row_frame, text=f"Advancement {idx + 1}").grid(row=0, column=0, sticky="w", padx=6, pady=4)
 
             existing_choice = self._advancement_choices_cache[idx] if idx < len(self._advancement_choices_cache) else {}
             initial_type = (existing_choice.get("type") or "").strip() or ADVANCEMENT_OPTIONS[0][0]
@@ -254,7 +264,7 @@ class CharacterCreationView(ctk.CTkFrame):
             choice.grid(row=0, column=1, sticky="ew", padx=6, pady=4)
 
             details_var = tk.StringVar(value=(existing_choice.get("details") or "").strip())
-            ctk.CTkEntry(row_frame, textvariable=details_var, placeholder_text="Détails narratifs / mécaniques")\
+            ctk.CTkEntry(row_frame, textvariable=details_var, placeholder_text="Narrative / mechanical details")\
                 .grid(row=1, column=0, columnspan=2, sticky="ew", padx=6, pady=(0, 6))
 
             self.advancement_rows.append(
@@ -306,7 +316,7 @@ class CharacterCreationView(ctk.CTkFrame):
         points_total = BASE_PROWESS_POINTS + sum(prowess_points_from_advancement_choices(advancement_choices))
         extra_feats = getattr(self, "extra_feat_count", 0)
         total_feats = BASE_FEAT_COUNT + extra_feats
-        self.feat_count_var.set(f"Nombre de prouesses: {total_feats}")
+        self.feat_count_var.set(f"Prowess count: {total_feats}")
         self.prowess_editor.set_feat_rows(total_feats, [], existing_feats)
         self._update_prowess_points_marker()
 
@@ -324,7 +334,7 @@ class CharacterCreationView(ctk.CTkFrame):
             points_spent = self.prowess_editor.get_total_spent_prowess_points()
         points_available = points_total - points_spent
         if hasattr(self, "prowess_points_var"):
-            self.prowess_points_var.set(f"Points de prouesse (total/dispo): {points_total}/{points_available}")
+            self.prowess_points_var.set(f"Prowess points (total/available): {points_total}/{points_available}")
 
     def _add_feat_row(self) -> None:
         self.extra_feat_count += 1
@@ -355,33 +365,33 @@ class CharacterCreationView(ctk.CTkFrame):
         try:
             payload = self._build_payload()
         except ValueError:
-            messagebox.showerror("Character Creation", "Les champs numériques sont invalides.")
+            messagebox.showerror("Character Creation", "Numeric fields are invalid.")
             return
 
         name = (payload.get("name") or "").strip()
         if not name:
-            messagebox.showerror("Character Creation", "Le nom du personnage est obligatoire pour sauvegarder.")
+            messagebox.showerror("Character Creation", "Character name is required to save.")
             return
 
         self.drafts.save(name, payload)
         self._refresh_draft_selector()
         self.draft_selector.set(name)
         self.draft_name_var.set(name)
-        messagebox.showinfo("Character Creation", f"Personnage '{name}' sauvegardé dans la campagne courante.")
+        messagebox.showinfo("Character Creation", f"Character '{name}' saved in the current campaign.")
 
     def _load_selected_draft(self):
         name = (self.draft_name_var.get() or "").strip()
         if not name:
-            messagebox.showerror("Character Creation", "Sélectionnez un personnage à charger.")
+            messagebox.showerror("Character Creation", "Select a character to load.")
             return
 
         payload = self.drafts.load(name)
         if not payload:
-            messagebox.showerror("Character Creation", f"Impossible de charger '{name}'.")
+            messagebox.showerror("Character Creation", f"Unable to load '{name}'.")
             return
 
         self._apply_payload(payload)
-        messagebox.showinfo("Character Creation", f"Personnage '{name}' chargé.")
+        messagebox.showinfo("Character Creation", f"Character '{name}' loaded.")
 
     def _apply_payload(self, payload: dict):
         normalized_payload = normalize_draft_payload_for_form(payload)
@@ -445,7 +455,7 @@ class CharacterCreationView(ctk.CTkFrame):
                 self.inputs[key].set(value)
         remaining = available - allocated
         self.available_equipment_pe_var.set(
-            f"PE disponibles: {available} | Plafond par objet: {max_per_object} | Restants: {remaining}"
+            f"Available EP: {available} | Cap per item: {max_per_object} | Remaining: {remaining}"
         )
 
     def _safe_int(self, raw_value: str) -> int:
@@ -474,8 +484,8 @@ class CharacterCreationView(ctk.CTkFrame):
             extra_generated_bonus=bonus_skill_points_from_advancements(advancement_choices),
         )
         self.remaining_points_var.set(
-            f"Base restants: {summary['remaining_base']} | "
-            f"Bonus restants: {summary['remaining_bonus']} | "
+            f"Base remaining: {summary['remaining_base']} | "
+            f"Bonus remaining: {summary['remaining_bonus']} | "
             f"Favorites: {len(favorites)}/{favorite_limit}"
         )
 
@@ -492,8 +502,10 @@ class CharacterCreationView(ctk.CTkFrame):
 
         extension = ".html"
         kind = "HTML"
+        language = "fr" if self.export_language_label_var.get() == "Français" else "en"
+
         path = filedialog.asksaveasfilename(
-            title="Exporter la fiche Savage Fate",
+            title="Export Savage Fate sheet",
             defaultextension=extension,
             filetypes=[(kind, f"*{extension}")],
             initialfile=f"{payload['name'].replace(' ', '_')}_character_sheet{extension}",
@@ -508,9 +520,10 @@ class CharacterCreationView(ctk.CTkFrame):
                 path,
                 backend=backend,
                 export_html_only=html_only,
+                language=language,
             )
         except Exception as exc:
-            messagebox.showerror("Character Creation", f"Échec d'export:\n{exc}")
+            messagebox.showerror("Character Creation", f"Export failed:\n{exc}")
             return
 
-        messagebox.showinfo("Character Creation", f"Fiche générée via backend '{used_backend}':\n{out}")
+        messagebox.showinfo("Character Creation", f"Sheet generated via backend '{used_backend}':\n{out}")

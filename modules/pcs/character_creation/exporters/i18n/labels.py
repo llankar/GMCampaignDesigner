@@ -1,0 +1,91 @@
+"""Localized labels for character sheet HTML export."""
+
+from __future__ import annotations
+
+_LABELS = {
+    "fr": {
+        "lang": "fr",
+        "title": "Fiche de personnage",
+        "player": "Joueur/Joueuse",
+        "name": "NOM",
+        "rank": "RANG",
+        "skills": "COMPÉTENCES",
+        "name_col": "NOM",
+        "roll": "JET",
+        "assets": "ATOUTS",
+        "armor": "ARMURE",
+        "protection": "PROTECTION",
+        "health_and_damage": "SANTÉ ET DOMMAGES",
+        "superficial_wounds": "B. superficielles",
+        "light_wounds": "B. légères",
+        "moderate_wounds": "B. modérées",
+        "severe_wounds": "B. graves",
+        "prowess": "PROUESSES",
+        "attacks": "ATTAQUES",
+        "weapon": "ARME",
+        "range": "PORTÉE",
+        "notes": "NOTES",
+        "profile": "PROFIL",
+        "age": "Âge",
+        "equipment": "ÉQUIPEMENT",
+        "advancements": "AVANCEMENTS",
+        "concept_prefix": "Concept",
+        "flaw_prefix": "Défaut",
+        "undefined_option": "Option non définie",
+        "feat_points": "pt",
+        "feat_points_plural": "s",
+        "of_prowess": "de prouesse",
+        "options": "Options",
+        "limitation": "Limitation",
+        "armor_short": "Armure",
+        "effect_short": "Effet",
+        "skill_bonus_short": "Bonus comp",
+    },
+    "en": {
+        "lang": "en",
+        "title": "Character sheet",
+        "player": "Player",
+        "name": "NAME",
+        "rank": "RANK",
+        "skills": "SKILLS",
+        "name_col": "NAME",
+        "roll": "ROLL",
+        "assets": "ASSETS",
+        "armor": "ARMOR",
+        "protection": "PROTECTION",
+        "health_and_damage": "HEALTH AND DAMAGE",
+        "superficial_wounds": "Superficial wounds",
+        "light_wounds": "Light wounds",
+        "moderate_wounds": "Moderate wounds",
+        "severe_wounds": "Severe wounds",
+        "prowess": "PROWESS",
+        "attacks": "ATTACKS",
+        "weapon": "WEAPON",
+        "range": "RANGE",
+        "notes": "NOTES",
+        "profile": "PROFILE",
+        "age": "Age",
+        "equipment": "EQUIPMENT",
+        "advancements": "ADVANCEMENTS",
+        "concept_prefix": "Concept",
+        "flaw_prefix": "Flaw",
+        "undefined_option": "Undefined option",
+        "feat_points": "pt",
+        "feat_points_plural": "s",
+        "of_prowess": "of prowess",
+        "options": "Options",
+        "limitation": "Limitation",
+        "armor_short": "Armor",
+        "effect_short": "Effect",
+        "skill_bonus_short": "Skill bonus",
+    },
+}
+
+
+def normalize_export_language(language: str | None) -> str:
+    value = str(language or "fr").strip().lower()
+    return value if value in _LABELS else "fr"
+
+
+def get_export_labels(language: str | None) -> dict[str, str]:
+    return dict(_LABELS[normalize_export_language(language)])
