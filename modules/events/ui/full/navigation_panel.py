@@ -5,13 +5,14 @@ import customtkinter as ctk
 
 
 class NavigationPanel(ctk.CTkFrame):
-    """Navigation sidebar: quick date picker, view mode and simple filters."""
+    """Navigation sidebar: quick date picker, view mode and filters."""
 
     VIEW_LABELS = {
         "month": "Mois",
         "week": "Semaine",
         "day": "Jour",
         "timeline": "Timeline",
+        "agenda": "Agenda",
     }
 
     def __init__(
@@ -39,6 +40,9 @@ class NavigationPanel(ctk.CTkFrame):
         self._month_matrix = []
         self._active_date = date.today()
         self._anchor_date = self._active_date
+        self._type_options = [""]
+        self._entity_options = [""]
+        self._status_options = [""]
 
         self.grid_columnconfigure(0, weight=1)
         self.grid_rowconfigure(5, weight=1)
@@ -46,13 +50,7 @@ class NavigationPanel(ctk.CTkFrame):
         self._build_controls()
 
     def _build_controls(self):
-        ctk.CTkButton(self, text="Nouvel évènement", command=self._on_new_event).grid(
-            row=0,
-            column=0,
-            sticky="ew",
-            padx=10,
-            pady=(10, 6),
-        )
+        ctk.CTkButton(self, text="Nouvel évènement", command=self._on_new_event).grid(row=0, column=0, sticky="ew", padx=10, pady=(10, 6))
 
         nav = ctk.CTkFrame(self, fg_color="transparent")
         nav.grid(row=1, column=0, sticky="ew", padx=10, pady=(6, 8))
@@ -63,11 +61,7 @@ class NavigationPanel(ctk.CTkFrame):
         self.period_label = ctk.CTkLabel(self, text="", font=ctk.CTkFont(size=14, weight="bold"), anchor="w")
         self.period_label.grid(row=2, column=0, sticky="ew", padx=10)
 
-        self.view_mode_switch = ctk.CTkSegmentedButton(
-            self,
-            values=list(self.VIEW_LABELS.values()),
-            command=self._handle_view_change,
-        )
+        self.view_mode_switch = ctk.CTkSegmentedButton(self, values=list(self.VIEW_LABELS.values()), command=self._handle_view_change)
         self.view_mode_switch.grid(row=3, column=0, sticky="ew", padx=10, pady=(8, 10))
 
         cal_frame = ctk.CTkFrame(self)
@@ -79,24 +73,47 @@ class NavigationPanel(ctk.CTkFrame):
         for week_idx in range(6):
             row = []
             for day_idx in range(7):
-                btn = ctk.CTkButton(
-                    cal_frame,
-                    text="",
-                    width=28,
-                    height=26,
-                    fg_color="transparent",
-                    command=lambda w=week_idx, d=day_idx: self._select_cell(w, d),
-                )
+                btn = ctk.CTkButton(cal_frame, text="", width=28, height=26, fg_color="transparent", command=lambda w=week_idx, d=day_idx: self._select_cell(w, d))
                 btn.grid(row=week_idx + 1, column=day_idx, padx=2, pady=2)
                 row.append(btn)
             self._month_cells.append(row)
 
         filters = ctk.CTkFrame(self)
-        filters.grid(row=5, column=0, sticky="ew", padx=10, pady=(0, 10))
+        filters.grid(row=5, column=0, sticky="new", padx=10, pady=(0, 10))
         ctk.CTkLabel(filters, text="Filtres", anchor="w").pack(fill="x", padx=8, pady=(8, 4))
+
         self._source_filter = ctk.CTkCheckBox(filters, text="Afficher la source", command=self._emit_filter_change)
         self._source_filter.select()
-        self._source_filter.pack(anchor="w", padx=8, pady=(0, 8))
+        self._source_filter.pack(anchor="w", padx=8, pady=(0, 6))
+
+        self._search_entry = ctk.CTkEntry(filters, placeholder_text="Recherche instantanée")
+        self._search_entry.pack(fill="x", padx=8, pady=(0, 6))
+        self._search_entry.bind("<KeyRelease>", lambda _e: self._emit_filter_change())
+
+        self._type_menu = ctk.CTkOptionMenu(filters, values=["Tous types"], command=lambda _v: self._emit_filter_change())
+        self._type_menu.pack(fill="x", padx=8, pady=(0, 6))
+        self._type_menu.set("Tous types")
+
+        self._entity_menu = ctk.CTkOptionMenu(filters, values=["Toutes entités"], command=lambda _v: self._emit_filter_change())
+        self._entity_menu.pack(fill="x", padx=8, pady=(0, 6))
+        self._entity_menu.set("Toutes entités")
+
+        self._status_menu = ctk.CTkOptionMenu(filters, values=["Tous statuts"], command=lambda _v: self._emit_filter_change())
+        self._status_menu.pack(fill="x", padx=8, pady=(0, 6))
+        self._status_menu.set("Tous statuts")
+
+        self._agenda_window = ctk.CTkSegmentedButton(filters, values=["7 jours", "30 jours"], command=lambda _v: self._emit_filter_change())
+        self._agenda_window.pack(fill="x", padx=8, pady=(0, 8))
+        self._agenda_window.set("7 jours")
+
+    def set_filter_options(self, *, types, entities, statuses):
+        self._type_options = [""] + [item for item in types if item]
+        self._entity_options = [""] + [item for item in entities if item]
+        self._status_options = [""] + [item for item in statuses if item]
+
+        self._type_menu.configure(values=["Tous types"] + self._type_options[1:])
+        self._entity_menu.configure(values=["Toutes entités"] + self._entity_options[1:])
+        self._status_menu.configure(values=["Tous statuts"] + self._status_options[1:])
 
     def set_state(self, *, active_date, anchor_date, view_mode):
         self._active_date = active_date
@@ -141,5 +158,19 @@ class NavigationPanel(ctk.CTkFrame):
             self._on_date_selected(selected_date)
 
     def _emit_filter_change(self):
-        if callable(self._on_filter_changed):
-            self._on_filter_changed({"show_source": bool(self._source_filter.get())})
+        if not callable(self._on_filter_changed):
+            return
+
+        selected_type = self._type_menu.get()
+        selected_entity = self._entity_menu.get()
+        selected_status = self._status_menu.get()
+        self._on_filter_changed(
+            {
+                "show_source": bool(self._source_filter.get()),
+                "search_text": self._search_entry.get().strip(),
+                "type": "" if selected_type == "Tous types" else selected_type,
+                "entity": "" if selected_entity == "Toutes entités" else selected_entity,
+                "status": "" if selected_status == "Tous statuts" else selected_status,
+                "agenda_window_days": 30 if self._agenda_window.get() == "30 jours" else 7,
+            }
+        )

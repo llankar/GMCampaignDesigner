@@ -18,7 +18,8 @@ class CalendarWindow(ctk.CTkToplevel):
     VIEW_WEEK = "week"
     VIEW_DAY = "day"
     VIEW_TIMELINE = "timeline"
-    SUPPORTED_VIEWS = {VIEW_MONTH, VIEW_WEEK, VIEW_DAY, VIEW_TIMELINE}
+    VIEW_AGENDA = "agenda"
+    SUPPORTED_VIEWS = {VIEW_MONTH, VIEW_WEEK, VIEW_DAY, VIEW_TIMELINE, VIEW_AGENDA}
 
     def __init__(
         self,
@@ -26,6 +27,7 @@ class CalendarWindow(ctk.CTkToplevel):
         get_events_for_day,
         get_events_for_range,
         on_create_event=None,
+        on_update_event=None,
         initial_date=None,
         initial_view_mode="month",
         on_state_change=None,
@@ -40,6 +42,7 @@ class CalendarWindow(ctk.CTkToplevel):
         self.get_events_for_day = get_events_for_day
         self.get_events_for_range = get_events_for_range
         self.on_create_event = on_create_event
+        self.on_update_event = on_update_event
         self.on_state_change = on_state_change
         self.on_open_entity = on_open_entity
 
@@ -48,7 +51,14 @@ class CalendarWindow(ctk.CTkToplevel):
         self.active_date = initial_date or date.today()
         self.view_mode = self._normalize_view_mode(initial_view_mode)
         self.anchor_date = self.active_date
-        self.panel_filters = {"show_source": True}
+        self.panel_filters = {
+            "show_source": True,
+            "search_text": "",
+            "type": "",
+            "entity": "",
+            "status": "",
+            "agenda_window_days": 7,
+        }
         self.is_detail_compact = False
 
         self._build_ui()
@@ -102,8 +112,10 @@ class CalendarWindow(ctk.CTkToplevel):
         self.calendar_grid_panel = CalendarGridPanel(
             center_pane,
             get_events_for_day=self.get_events_for_day,
+            get_events_for_range=self.get_events_for_range,
             on_day_selected=self._select_day,
             on_cell_double_click=self._on_calendar_cell_double_click,
+            on_event_moved=self._on_event_moved,
         )
 
         self.event_detail_panel = EventDetailPanel(
@@ -133,7 +145,7 @@ class CalendarWindow(ctk.CTkToplevel):
 
     def _on_filters_changed(self, filters):
         self.panel_filters.update(filters)
-        self._render_detail_panel()
+        self._render()
 
     def _on_compact_toggle(self, is_compact):
         self.is_detail_compact = bool(is_compact)
@@ -141,6 +153,15 @@ class CalendarWindow(ctk.CTkToplevel):
     def _on_quick_edit(self, event, new_title):
         event["title"] = new_title
         self._render_detail_panel()
+
+    def _on_event_moved(self, event, target_date, target_time=None):
+        if not callable(self.on_update_event):
+            return
+        if self.on_update_event(event, target_date=target_date, target_time=target_time):
+            self.active_date = target_date
+            self.anchor_date = target_date
+            self._render()
+            self._emit_state_change()
 
 
     def _on_open_entity(self, entity_type, entity_name):
@@ -261,6 +282,20 @@ class CalendarWindow(ctk.CTkToplevel):
         self._emit_state_change()
 
     def _render(self):
+        filtered_events = self._filtered_events()
+        unique_types = sorted({str(event.get("type") or "").strip() for event in filtered_events if event.get("type")})
+        unique_statuses = sorted({str(event.get("status") or "").strip() for event in filtered_events if event.get("status")})
+        linked_entities = sorted(
+            {
+                linked
+                for event in filtered_events
+                for key in ("Places", "NPCs", "Scenarios", "Informations")
+                for linked in (event.get(key) or [])
+                if linked
+            }
+        )
+
+        self.navigation_panel.set_filter_options(types=unique_types, entities=linked_entities, statuses=unique_statuses)
         self.navigation_panel.set_state(
             active_date=self.active_date,
             anchor_date=self.anchor_date,
@@ -270,17 +305,53 @@ class CalendarWindow(ctk.CTkToplevel):
             view_mode=self.view_mode,
             anchor_date=self.anchor_date,
             active_date=self.active_date,
+            filters=self.panel_filters,
+            filter_predicate=self._passes_filters,
         )
         self._render_detail_panel()
 
     def _render_detail_panel(self):
-        events = self.get_events_for_day(self.active_date)
+        events = [event for event in self.get_events_for_day(self.active_date) if self._passes_filters(event)]
         self.event_detail_panel.render(
             active_date=self.active_date,
             events=events,
             show_source=bool(self.panel_filters.get("show_source", True)),
         )
         self.event_detail_panel.set_compact_mode(self.is_detail_compact)
+
+    def _filtered_events(self):
+        return [event for event in self.get_events_for_range(date.min, date.max) if self._passes_filters(event)]
+
+    def _passes_filters(self, event):
+        text = str(self.panel_filters.get("search_text") or "").strip().lower()
+        type_filter = str(self.panel_filters.get("type") or "").strip().lower()
+        entity_filter = str(self.panel_filters.get("entity") or "").strip().lower()
+        status_filter = str(self.panel_filters.get("status") or "").strip().lower()
+
+        if type_filter and type_filter != str(event.get("type") or "").strip().lower():
+            return False
+        if status_filter and status_filter != str(event.get("status") or "").strip().lower():
+            return False
+
+        linked = [
+            str(name).strip().lower()
+            for key in ("Places", "NPCs", "Scenarios", "Informations")
+            for name in (event.get(key) or [])
+        ]
+        if entity_filter and entity_filter not in linked:
+            return False
+
+        if text:
+            haystack = [
+                str(event.get("title") or "").lower(),
+                str(event.get("type") or "").lower(),
+                str(event.get("status") or "").lower(),
+                " ".join(linked),
+            ]
+            if text not in " ".join(haystack):
+                return False
+
+        return True
 
     def _close_window(self):
         self.withdraw()

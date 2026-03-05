@@ -3,6 +3,7 @@ from datetime import date
 import customtkinter as ctk
 
 from modules.events.services.entity_link_service import EntityLinkService
+from modules.events.models.event_types import event_type_labels
 from modules.events.ui.shared.multi_link_selector import MultiLinkSelector
 
 
@@ -50,8 +51,8 @@ class EventEditorDialog(ctk.CTkToplevel):
 
         row += 1
         ctk.CTkLabel(self, text="Type").grid(row=row, column=0, padx=12, pady=8, sticky="w")
-        self.type_entry = ctk.CTkEntry(self, placeholder_text="Session / Rencontre / Quête...")
-        self.type_entry.grid(row=row, column=1, padx=12, pady=8, sticky="ew")
+        self.type_menu = ctk.CTkOptionMenu(self, values=event_type_labels() + ["Autre"])
+        self.type_menu.grid(row=row, column=1, padx=12, pady=8, sticky="ew")
 
         row += 1
         ctk.CTkLabel(self, text="Statut").grid(row=row, column=0, padx=12, pady=8, sticky="w")
@@ -107,7 +108,8 @@ class EventEditorDialog(ctk.CTkToplevel):
 
         self.start_entry.insert(0, self._initial.get("start_time", ""))
         self.end_entry.insert(0, self._initial.get("end_time", ""))
-        self.type_entry.insert(0, self._initial.get("type", ""))
+        initial_type = self._initial.get("type", "Session") or "Session"
+        self.type_menu.set(initial_type)
         self.status_entry.insert(0, self._initial.get("status", ""))
         self.place_selector.set_values(self._initial.get("Places") or [])
         self.npc_selector.set_values(self._initial.get("NPCs") or [])
@@ -120,7 +122,7 @@ class EventEditorDialog(ctk.CTkToplevel):
             "date": self.date_entry.get().strip(),
             "start_time": self.start_entry.get().strip(),
             "end_time": self.end_entry.get().strip(),
-            "type": self.type_entry.get().strip(),
+            "type": self.type_menu.get().strip(),
             "status": self.status_entry.get().strip(),
             "Places": self.place_selector.get_values(),
             "NPCs": self.npc_selector.get_values(),
