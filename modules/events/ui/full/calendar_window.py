@@ -6,6 +6,7 @@ import customtkinter as ctk
 from .calendar_grid_panel import CalendarGridPanel
 from .event_detail_panel import EventDetailPanel
 from .navigation_panel import NavigationPanel
+from .event_editor_dialog import EventEditorDialog
 from .quick_add_popover import QuickAddPopover
 
 
@@ -69,6 +70,7 @@ class CalendarWindow(ctk.CTkToplevel):
 
         self.navigation_panel = NavigationPanel(
             outer_pane,
+            on_new_event=self._open_full_editor,
             on_previous=self._go_previous,
             on_next=self._go_next,
             on_today=self._jump_today,
@@ -122,7 +124,17 @@ class CalendarWindow(ctk.CTkToplevel):
         self._render_detail_panel()
 
     def _on_new_event_shortcut(self, _event=None):
-        self._open_quick_add(self.active_date)
+        self._open_full_editor()
+
+    def _open_full_editor(self):
+        initial_values = {
+            "date": self.active_date,
+        }
+
+        def _save_from_editor(payload):
+            self._create_event(payload)
+
+        EventEditorDialog(self, initial_values=initial_values, on_save=_save_from_editor)
 
     def _on_calendar_cell_double_click(self, selected_date, start_time=None):
         self._select_day(selected_date)

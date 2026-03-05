@@ -18,6 +18,7 @@ class NavigationPanel(ctk.CTkFrame):
         self,
         master,
         *,
+        on_new_event,
         on_previous,
         on_next,
         on_today,
@@ -26,6 +27,7 @@ class NavigationPanel(ctk.CTkFrame):
         on_filter_changed,
     ):
         super().__init__(master)
+        self._on_new_event = on_new_event
         self._on_previous = on_previous
         self._on_next = on_next
         self._on_today = on_today
@@ -44,24 +46,32 @@ class NavigationPanel(ctk.CTkFrame):
         self._build_controls()
 
     def _build_controls(self):
+        ctk.CTkButton(self, text="Nouvel évènement", command=self._on_new_event).grid(
+            row=0,
+            column=0,
+            sticky="ew",
+            padx=10,
+            pady=(10, 6),
+        )
+
         nav = ctk.CTkFrame(self, fg_color="transparent")
-        nav.grid(row=0, column=0, sticky="ew", padx=10, pady=(10, 8))
+        nav.grid(row=1, column=0, sticky="ew", padx=10, pady=(6, 8))
         ctk.CTkButton(nav, text="◀", width=34, command=self._on_previous).pack(side="left", padx=(0, 6))
         ctk.CTkButton(nav, text="Aujourd'hui", width=90, command=self._on_today).pack(side="left", padx=(0, 6))
         ctk.CTkButton(nav, text="▶", width=34, command=self._on_next).pack(side="left")
 
         self.period_label = ctk.CTkLabel(self, text="", font=ctk.CTkFont(size=14, weight="bold"), anchor="w")
-        self.period_label.grid(row=1, column=0, sticky="ew", padx=10)
+        self.period_label.grid(row=2, column=0, sticky="ew", padx=10)
 
         self.view_mode_switch = ctk.CTkSegmentedButton(
             self,
             values=list(self.VIEW_LABELS.values()),
             command=self._handle_view_change,
         )
-        self.view_mode_switch.grid(row=2, column=0, sticky="ew", padx=10, pady=(8, 10))
+        self.view_mode_switch.grid(row=3, column=0, sticky="ew", padx=10, pady=(8, 10))
 
         cal_frame = ctk.CTkFrame(self)
-        cal_frame.grid(row=3, column=0, sticky="ew", padx=10, pady=(0, 8))
+        cal_frame.grid(row=4, column=0, sticky="ew", padx=10, pady=(0, 8))
         for idx, label in enumerate(("L", "M", "M", "J", "V", "S", "D")):
             ctk.CTkLabel(cal_frame, text=label).grid(row=0, column=idx, padx=2, pady=(4, 2), sticky="ew")
 
@@ -82,7 +92,7 @@ class NavigationPanel(ctk.CTkFrame):
             self._month_cells.append(row)
 
         filters = ctk.CTkFrame(self)
-        filters.grid(row=4, column=0, sticky="ew", padx=10, pady=(0, 10))
+        filters.grid(row=5, column=0, sticky="ew", padx=10, pady=(0, 10))
         ctk.CTkLabel(filters, text="Filtres", anchor="w").pack(fill="x", padx=8, pady=(8, 4))
         self._source_filter = ctk.CTkCheckBox(filters, text="Afficher la source", command=self._emit_filter_change)
         self._source_filter.select()
