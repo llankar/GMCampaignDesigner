@@ -7,10 +7,11 @@ import customtkinter as ctk
 class CalendarGridPanel(ctk.CTkFrame):
     """Main calendar views: month, week, day and timeline."""
 
-    def __init__(self, master, *, get_events_for_day, on_day_selected):
+    def __init__(self, master, *, get_events_for_day, on_day_selected, on_cell_double_click=None):
         super().__init__(master)
         self.get_events_for_day = get_events_for_day
         self._on_day_selected = on_day_selected
+        self._on_cell_double_click = on_cell_double_click
 
         self.grid_rowconfigure(0, weight=1)
         self.grid_columnconfigure(0, weight=1)
@@ -48,7 +49,7 @@ class CalendarGridPanel(ctk.CTkFrame):
             for day_idx, day_date in enumerate(week):
                 is_current_month = day_date.month == anchor_date.month
                 is_selected = day_date == active_date
-                ctk.CTkButton(
+                button = ctk.CTkButton(
                     frame,
                     text=str(day_date.day),
                     width=42,
@@ -56,7 +57,12 @@ class CalendarGridPanel(ctk.CTkFrame):
                     fg_color=("#2f6cc0", "#2f6cc0") if is_selected else "transparent",
                     text_color=("#1a1a1a", "#f0f0f0") if is_current_month else ("#999999", "#666666"),
                     command=lambda current=day_date: self._emit_day_selected(current),
-                ).grid(row=week_idx + 1, column=day_idx, padx=2, pady=2)
+                )
+                button.grid(row=week_idx + 1, column=day_idx, padx=2, pady=2)
+                button.bind(
+                    "<Double-Button-1>",
+                    lambda _event, current=day_date: self._emit_cell_double_click(current),
+                )
 
     def _render_week(self, anchor_date, active_date):
         frame = ctk.CTkFrame(self)
@@ -69,13 +75,15 @@ class CalendarGridPanel(ctk.CTkFrame):
             events = self.get_events_for_day(day)
             marker = " •" if events else ""
             label = f"{day.strftime('%A %d/%m')}{marker}".capitalize()
-            ctk.CTkButton(
+            button = ctk.CTkButton(
                 frame,
                 text=label,
                 anchor="w",
                 fg_color=("#2f6cc0", "#2f6cc0") if day == active_date else "transparent",
                 command=lambda current=day: self._emit_day_selected(current),
-            ).grid(row=offset, column=0, sticky="ew", padx=6, pady=4)
+            )
+            button.grid(row=offset, column=0, sticky="ew", padx=6, pady=4)
+            button.bind("<Double-Button-1>", lambda _event, current=day: self._emit_cell_double_click(current))
 
     def _render_day(self, active_date):
         frame = ctk.CTkFrame(self)
@@ -101,14 +109,23 @@ class CalendarGridPanel(ctk.CTkFrame):
             key = f"{hour:02d}:00"
             event = mapped.get(key)
             title = event.get("title", "Libre") if event else "Libre"
-            ctk.CTkButton(
+            button = ctk.CTkButton(
                 frame,
                 text=f"{key}  —  {title}",
                 anchor="w",
                 fg_color="transparent",
                 command=lambda current=active_date: self._emit_day_selected(current),
-            ).pack(fill="x", padx=6, pady=2)
+            )
+            button.pack(fill="x", padx=6, pady=2)
+            button.bind(
+                "<Double-Button-1>",
+                lambda _event, current=active_date, start_time=key: self._emit_cell_double_click(current, start_time),
+            )
 
     def _emit_day_selected(self, selected_date):
         if callable(self._on_day_selected):
             self._on_day_selected(selected_date)
+
+    def _emit_cell_double_click(self, selected_date, start_time=None):
+        if callable(self._on_cell_double_click):
+            self._on_cell_double_click(selected_date, start_time)

@@ -1097,6 +1097,7 @@ class MainWindow(ctk.CTk):
                 self,
                 get_events_for_day=self._get_events_for_day,
                 get_events_for_range=self._get_events_for_range,
+                on_create_event=self._create_calendar_event,
                 initial_date=target,
                 initial_view_mode=mode,
                 on_state_change=self._on_calendar_full_state_change,
@@ -1147,6 +1148,71 @@ class MainWindow(ctk.CTk):
         ]
         return upcoming[:limit]
 
+    def _create_calendar_event(self, payload):
+        if not isinstance(payload, dict):
+            return None
+
+        event_date = self._parse_event_date(payload.get("date"))
+        if event_date is None:
+            event_date = date.today()
+
+        start_time = self._normalize_event_time(payload.get("start_time"))
+        end_time = self._normalize_event_time(payload.get("end_time"))
+        title = (payload.get("title") or "Nouvel évènement").strip()
+
+        slug, wrapper = self._resolve_calendar_event_wrapper()
+        event_item = {
+            "Title": title,
+            "Date": event_date.isoformat(),
+            "StartTime": start_time,
+            "EndTime": end_time,
+            "Type": (payload.get("type") or "Session").strip(),
+            "Status": (payload.get("status") or "Planifié").strip(),
+            "Name": f"{title} {event_date.isoformat()} {start_time}".strip(),
+        }
+        try:
+            wrapper.save_item(event_item, key_field="Name")
+        except Exception:
+            return None
+
+        self._refresh_calendar_dock(event_date)
+        return {
+            "date": event_date,
+            "title": title,
+            "time": start_time,
+            "source": slug,
+        }
+
+    def _resolve_calendar_event_wrapper(self):
+        wrappers = getattr(self, "entity_wrappers", {}) or {}
+        event_slug = next((slug for slug in wrappers if "event" in slug.lower()), None)
+        if event_slug is None:
+            event_slug = "scenarios"
+
+        wrapper = wrappers.get(event_slug)
+        if wrapper is None:
+            wrapper = GenericModelWrapper(event_slug)
+            self.entity_wrappers[event_slug] = wrapper
+        return event_slug, wrapper
+
+    @staticmethod
+    def _normalize_event_time(value, fallback="09:00"):
+        if value is None:
+            return fallback
+        text = str(value).strip()
+        if not text:
+            return fallback
+
+        if len(text) == 5 and text[2] == ":":
+            return text
+
+        for pattern in ("%H:%M:%S", "%H:%M"):
+            try:
+                return datetime.strptime(text, pattern).strftime("%H:%M")
+            except ValueError:
+                continue
+        return fallback
+
     def _collect_calendar_events(self):
         wrappers = getattr(self, "entity_wrappers", {}) or {}
         ordered_slugs = sorted(wrappers.keys(), key=lambda slug: ("event" not in slug.lower(), slug))
@@ -1172,7 +1238,16 @@ class MainWindow(ctk.CTk):
                 if identity in seen:
                     continue
                 seen.add(identity)
-                results.append({"date": event_date, "title": title, "source": slug})
+                results.append(
+                    {
+                        "date": event_date,
+                        "title": title,
+                        "source": slug,
+                        "time": self._extract_event_time(item),
+                        "type": item.get("Type") or item.get("type") or "",
+                        "status": item.get("Status") or item.get("status") or "",
+                    }
+                )
 
         results.sort(key=lambda row: (row["date"], row["title"].lower()))
         return results
@@ -1206,6 +1281,14 @@ class MainWindow(ctk.CTk):
             if parsed is not None:
                 return parsed
         return None
+
+    @staticmethod
+    def _extract_event_time(item):
+        for key in ("StartTime", "start_time", "startTime", "Time", "time"):
+            if key not in item:
+                continue
+            return MainWindow._normalize_event_time(item.get(key), fallback="")
+        return ""
 
     @staticmethod
     def _parse_event_date(value):

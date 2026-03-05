@@ -62,10 +62,19 @@ class EventDetailPanel(ctk.CTkFrame):
         for event in events:
             title = event.get("title", "Sans titre")
             source = event.get("source")
+            details = []
+            if event.get("time"):
+                details.append(str(event.get("time")))
+            if event.get("type"):
+                details.append(str(event.get("type")))
+            if event.get("status"):
+                details.append(str(event.get("status")))
+
+            suffix = f" — {' / '.join(details)}" if details else ""
             if source and show_source:
-                lines.append(f"• {title} ({source})")
+                lines.append(f"• {title}{suffix} ({source})")
             else:
-                lines.append(f"• {title}")
+                lines.append(f"• {title}{suffix}")
         return lines
 
     def _set_textbox_lines(self, lines):
