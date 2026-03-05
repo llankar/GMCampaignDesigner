@@ -4,6 +4,7 @@ import json
 import sqlite3
 import subprocess
 import time
+from datetime import date, datetime
 import requests
 import shutil
 import re
@@ -64,6 +65,7 @@ from modules.ui.system_selector_dialog import CampaignSystemSelectorDialog
 from modules.ui.database_manager_dialog import DatabaseManagerDialog
 from modules.ui.system_manager_dialog import SystemManagerDialog
 from modules.ui.menu_bar import AppMenuBar
+from modules.events.ui.dock import CalendarDock
 
 from modules.generic.generic_list_view import GenericListView
 from modules.generic.generic_model_wrapper import GenericModelWrapper
@@ -1051,6 +1053,19 @@ class MainWindow(ctk.CTk):
         self.content_frame.grid_rowconfigure(0, weight=1)
         self.content_frame.grid_rowconfigure(1, weight=0)
         self.content_frame.grid_columnconfigure(0, weight=1)
+        self.content_frame.grid_columnconfigure(1, weight=0)
+
+        self.calendar_dock_toggle_btn = ctk.CTkButton(
+            self.content_frame,
+            text="Calendrier ◀",
+            width=120,
+            command=self._toggle_calendar_dock,
+        )
+        self.calendar_dock_toggle_btn.grid(row=0, column=1, sticky="ne", padx=(0, 8), pady=(8, 0))
+
+        self.calendar_dock = CalendarDock(self.content_frame, on_date_selected=self._on_calendar_date_selected)
+        self.calendar_dock.grid(row=0, column=1, rowspan=2, sticky="nse", padx=(0, 8), pady=(44, 8))
+        self._calendar_dock_visible = True
 
         # ✅ Always explicitly create these initially:
         self.banner_frame = ctk.CTkFrame(self.content_frame, height=150, fg_color="#444")
@@ -1060,6 +1075,129 @@ class MainWindow(ctk.CTk):
 
         self.banner_visible = False
         self.current_open_view = None
+
+    def _toggle_calendar_dock(self):
+        if self._calendar_dock_visible:
+            self.calendar_dock.grid_remove()
+            self._calendar_dock_visible = False
+            self.calendar_dock_toggle_btn.configure(text="Calendrier ▶")
+            return
+
+        self.calendar_dock.grid()
+        self._calendar_dock_visible = True
+        self.calendar_dock_toggle_btn.configure(text="Calendrier ◀")
+        self._refresh_calendar_dock(self.calendar_dock.selected_date)
+
+    def _on_calendar_date_selected(self, selected_date):
+        self._refresh_calendar_dock(selected_date)
+
+    def _refresh_calendar_dock(self, selected_date=None):
+        dock = getattr(self, "calendar_dock", None)
+        if dock is None:
+            return
+
+        reference_date = selected_date or dock.selected_date or date.today()
+        selected_events = self._get_events_for_day(reference_date)
+        upcoming_events = self._get_upcoming_events(reference_date)
+        dock.set_selected_date_events(reference_date, selected_events)
+        dock.set_upcoming_events(upcoming_events)
+
+    def _get_events_for_day(self, target_date):
+        return [event for event in self._collect_calendar_events() if event.get("date") == target_date]
+
+    def _get_upcoming_events(self, from_date, limit=12):
+        upcoming = [
+            event
+            for event in self._collect_calendar_events()
+            if event.get("date") is not None and event["date"] >= from_date
+        ]
+        return upcoming[:limit]
+
+    def _collect_calendar_events(self):
+        wrappers = getattr(self, "entity_wrappers", {}) or {}
+        ordered_slugs = sorted(wrappers.keys(), key=lambda slug: ("event" not in slug.lower(), slug))
+        results = []
+        seen = set()
+
+        for slug in ordered_slugs:
+            wrapper = wrappers.get(slug)
+            if wrapper is None:
+                continue
+            try:
+                items = wrapper.load_items()
+            except Exception:
+                continue
+
+            for item in items:
+                event_date = self._extract_event_date(item)
+                if event_date is None:
+                    continue
+
+                title = self._extract_event_title(item, fallback=slug)
+                identity = (event_date.isoformat(), title, slug)
+                if identity in seen:
+                    continue
+                seen.add(identity)
+                results.append({"date": event_date, "title": title, "source": slug})
+
+        results.sort(key=lambda row: (row["date"], row["title"].lower()))
+        return results
+
+    @staticmethod
+    def _extract_event_title(item, fallback="event"):
+        for key in ("Title", "title", "Name", "name", "Event", "event"):
+            value = item.get(key)
+            if isinstance(value, str) and value.strip():
+                return value.strip()
+        return f"{fallback.title()}"
+
+    @staticmethod
+    def _extract_event_date(item):
+        candidate_keys = (
+            "Date",
+            "date",
+            "StartDate",
+            "start_date",
+            "startDate",
+            "Datetime",
+            "datetime",
+            "When",
+            "when",
+        )
+
+        for key in candidate_keys:
+            if key not in item:
+                continue
+            parsed = MainWindow._parse_event_date(item.get(key))
+            if parsed is not None:
+                return parsed
+        return None
+
+    @staticmethod
+    def _parse_event_date(value):
+        if value is None:
+            return None
+        if isinstance(value, datetime):
+            return value.date()
+        if isinstance(value, date):
+            return value
+        if isinstance(value, str):
+            text = value.strip()
+            if not text:
+                return None
+
+            normalized = text.replace("Z", "+00:00")
+            try:
+                return datetime.fromisoformat(normalized).date()
+            except ValueError:
+                pass
+
+            for pattern in ("%Y-%m-%d", "%d/%m/%Y", "%d-%m-%Y", "%m/%d/%Y"):
+                try:
+                    return datetime.strptime(text, pattern).date()
+                except ValueError:
+                    continue
+        return None
 
     def _prime_content_frames_for_gm_screen(self):
         """Normalize banner/content grid so GM Screen layout starts in a known state."""
@@ -1504,6 +1642,7 @@ class MainWindow(ctk.CTk):
                 setattr(self, attr, wrapper)
 
         log_info("Entity wrappers initialized", func_name="main_window.MainWindow.init_wrappers")
+        self._refresh_calendar_dock()
 
     def _normalize_entity_media_paths(self):
         """Ensure stored portrait/image paths are relative within the campaign."""
