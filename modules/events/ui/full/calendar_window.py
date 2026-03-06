@@ -123,6 +123,7 @@ class CalendarWindow(ctk.CTkToplevel):
             on_cell_click=self._on_calendar_cell_click,
             on_cell_double_click=self._on_calendar_cell_double_click,
             on_event_moved=self._on_event_moved,
+            on_event_click=self._on_calendar_event_click,
         )
 
         self.event_detail_panel = EventDetailPanel(
@@ -177,6 +178,11 @@ class CalendarWindow(ctk.CTkToplevel):
             self._render()
             self._emit_state_change()
 
+    def _on_calendar_event_click(self, event):
+        if not isinstance(event, dict):
+            return
+        self._open_event_editor(event)
+
 
     def _on_open_entity(self, entity_type, entity_name):
         if callable(self.on_open_entity):
@@ -199,6 +205,45 @@ class CalendarWindow(ctk.CTkToplevel):
             on_save=_save_from_editor,
             entity_link_service=self.entity_link_service,
         )
+
+    def _open_event_editor(self, event):
+        initial_values = {
+            "title": event.get("title") or "",
+            "date": event.get("date"),
+            "start_time": event.get("time") or "",
+            "end_time": event.get("end_time") or "",
+            "type": event.get("type") or "Session",
+            "color": event.get("color") or "",
+            "status": event.get("status") or "",
+            "Places": event.get("Places") or [],
+            "NPCs": event.get("NPCs") or [],
+            "Scenarios": event.get("Scenarios") or [],
+            "Informations": event.get("Informations") or [],
+        }
+
+        def _save_from_editor(payload):
+            self._update_event(event, payload)
+
+        EventEditorDialog(
+            self,
+            initial_values=initial_values,
+            on_save=_save_from_editor,
+            entity_link_service=self.entity_link_service,
+            save_label="Enregistrer",
+        )
+
+    def _update_event(self, event, payload):
+        if not callable(self.on_update_event):
+            return
+
+        new_date = payload.get("date")
+        if self.on_update_event(event, target_date=new_date, payload=payload):
+            resolved_date = payload.get("date")
+            if isinstance(resolved_date, date):
+                self.active_date = resolved_date
+                self.anchor_date = resolved_date
+            self._render()
+            self._emit_state_change()
 
     def _on_calendar_cell_click(self, selected_date, start_time=None):
         self._select_day(selected_date)

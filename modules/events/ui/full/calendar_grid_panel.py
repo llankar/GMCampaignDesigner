@@ -19,6 +19,7 @@ class CalendarGridPanel(ctk.CTkFrame):
         on_cell_click=None,
         on_cell_double_click=None,
         on_event_moved=None,
+        on_event_click=None,
     ):
         super().__init__(master)
         self.get_events_for_day = get_events_for_day
@@ -27,6 +28,7 @@ class CalendarGridPanel(ctk.CTkFrame):
         self._on_cell_click = on_cell_click
         self._on_cell_double_click = on_cell_double_click
         self._on_event_moved = on_event_moved
+        self._on_event_click = on_event_click
 
         self.grid_rowconfigure(0, weight=1)
         self.grid_columnconfigure(0, weight=1)
@@ -193,7 +195,7 @@ class CalendarGridPanel(ctk.CTkFrame):
             text_color=event.get("color") or event_type.color,
         )
         label.pack(fill="x", padx=8, pady=6)
-        label.bind("<ButtonPress-1>", lambda _event, current=event: self._start_drag(current))
+        label.bind("<ButtonPress-1>", lambda _event, current=event: self._emit_event_click(current))
 
     def _start_drag(self, event):
         self._dragged_event = event
@@ -233,6 +235,10 @@ class CalendarGridPanel(ctk.CTkFrame):
     def _emit_cell_double_click(self, selected_date, start_time=None):
         if callable(self._on_cell_double_click):
             self._on_cell_double_click(selected_date, start_time)
+
+    def _emit_event_click(self, event):
+        if callable(self._on_event_click):
+            self._on_event_click(event)
 
     @staticmethod
     def _day_color(events):
