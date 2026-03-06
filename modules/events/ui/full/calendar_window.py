@@ -131,6 +131,7 @@ class CalendarWindow(ctk.CTkToplevel):
             on_compact_toggle=self._on_compact_toggle,
             on_quick_edit=self._on_quick_edit,
             on_open_entity=self._on_open_entity,
+            on_event_click=self._on_calendar_event_click,
         )
 
         outer_pane.add(self.navigation_panel, minsize=220, stretch="never")

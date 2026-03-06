@@ -10,11 +10,12 @@ class EventDetailPanel(ctk.CTkFrame):
 
     LINKED_TYPES = ("Places", "NPCs", "Scenarios", "Informations")
 
-    def __init__(self, master, *, on_compact_toggle, on_quick_edit, on_open_entity=None):
+    def __init__(self, master, *, on_compact_toggle, on_quick_edit, on_open_entity=None, on_event_click=None):
         super().__init__(master)
         self._on_compact_toggle = on_compact_toggle
         self._on_quick_edit = on_quick_edit
         self._on_open_entity = on_open_entity
+        self._on_event_click = on_event_click
         self._is_compact = False
         self._events = []
 
@@ -82,7 +83,16 @@ class EventDetailPanel(ctk.CTkFrame):
             event_block = ctk.CTkFrame(self.events_frame)
             event_block.pack(fill="x", pady=(0, 6), padx=2)
             event_type = get_event_type(event.get("type"))
-            ctk.CTkLabel(event_block, text=text, anchor="w", justify="left", text_color=event_type.color).pack(anchor="w", padx=8, pady=(6, 2))
+            title_label = ctk.CTkLabel(
+                event_block,
+                text=text,
+                anchor="w",
+                justify="left",
+                text_color=event_type.color,
+                cursor="hand2",
+            )
+            title_label.pack(anchor="w", padx=8, pady=(6, 2))
+            title_label.bind("<Button-1>", lambda _e, current_event=event: self._emit_event_click(current_event))
 
             links_added = False
             for linked_type in self.LINKED_TYPES:
@@ -111,6 +121,10 @@ class EventDetailPanel(ctk.CTkFrame):
     def _open_link(self, entity_type, entity_name):
         if callable(self._on_open_entity):
             self._on_open_entity(entity_type, entity_name)
+
+    def _emit_event_click(self, event):
+        if callable(self._on_event_click):
+            self._on_event_click(event)
 
     def _toggle_compact(self):
         self.set_compact_mode(bool(self.compact_toggle.get()))
