@@ -3102,12 +3102,18 @@ class MainWindow(ctk.CTk):
         self.refresh_entities()
 
         db_name = os.path.splitext(os.path.basename(normalized_path))[0]
-        self.db_name_label.configure(text=db_name)
+        db_name_label = getattr(self, "db_name_label", None)
+        if db_name_label is not None and db_name_label.winfo_exists():
+            db_name_label.configure(text=db_name)
+
         try:
             full_path = os.path.abspath(normalized_path)
-            if getattr(self, "db_tooltip", None) is None:
-                self.db_tooltip = ToolTip(self.db_name_label, full_path)
-            else:
+            if db_name_label is not None and db_name_label.winfo_exists():
+                if getattr(self, "db_tooltip", None) is None:
+                    self.db_tooltip = ToolTip(db_name_label, full_path)
+                else:
+                    self.db_tooltip.text = full_path
+            elif getattr(self, "db_tooltip", None) is not None:
                 self.db_tooltip.text = full_path
         except Exception:
             self.db_tooltip = None
