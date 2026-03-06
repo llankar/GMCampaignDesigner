@@ -31,6 +31,8 @@ class CalendarWindow(ctk.CTkToplevel):
         initial_date=None,
         initial_view_mode="month",
         on_state_change=None,
+        initial_filters=None,
+        initial_panel_widths=None,
         on_open_entity=None,
         entity_link_service=None,
     ):
@@ -59,9 +61,11 @@ class CalendarWindow(ctk.CTkToplevel):
             "status": "",
             "agenda_window_days": 7,
         }
+        if isinstance(initial_filters, dict):
+            self.panel_filters.update(initial_filters)
         self.is_detail_compact = False
 
-        self._build_ui()
+        self._build_ui(initial_panel_widths=initial_panel_widths)
         self._bind_responsive_events()
 
         self.protocol("WM_DELETE_WINDOW", self._close_window)
@@ -89,11 +93,12 @@ class CalendarWindow(ctk.CTkToplevel):
     def _start_of_week(target_date):
         return target_date - timedelta(days=target_date.weekday())
 
-    def _build_ui(self):
+    def _build_ui(self, initial_panel_widths=None):
         self.grid_rowconfigure(0, weight=1)
         self.grid_columnconfigure(0, weight=1)
 
         outer_pane = tk.PanedWindow(self, orient=tk.HORIZONTAL, sashrelief=tk.RAISED, sashwidth=6, bd=0)
+        self.outer_pane = outer_pane
         outer_pane.grid(row=0, column=0, sticky="nsew", padx=10, pady=10)
 
         self.navigation_panel = NavigationPanel(
@@ -108,6 +113,7 @@ class CalendarWindow(ctk.CTkToplevel):
         )
 
         center_pane = tk.PanedWindow(outer_pane, orient=tk.HORIZONTAL, sashrelief=tk.RAISED, sashwidth=6, bd=0)
+        self.center_pane = center_pane
 
         self.calendar_grid_panel = CalendarGridPanel(
             center_pane,
@@ -130,10 +136,15 @@ class CalendarWindow(ctk.CTkToplevel):
         center_pane.add(self.calendar_grid_panel, minsize=420, stretch="always")
         center_pane.add(self.event_detail_panel, minsize=250, stretch="always")
 
+        self.navigation_panel.set_filters(self.panel_filters)
+        self.after_idle(lambda: self._restore_panel_widths(initial_panel_widths or {}))
+
+
     def _bind_responsive_events(self):
         self.bind("<Configure>", self._on_window_resized)
         self.bind("<KeyPress-n>", self._on_new_event_shortcut)
         self.bind("<KeyPress-N>", self._on_new_event_shortcut)
+        self.bind("<ButtonRelease-1>", self._on_sash_interaction, add="+")
 
     def _on_window_resized(self, event):
         if event.widget is not self:
@@ -146,9 +157,11 @@ class CalendarWindow(ctk.CTkToplevel):
     def _on_filters_changed(self, filters):
         self.panel_filters.update(filters)
         self._render()
+        self._emit_state_change()
 
     def _on_compact_toggle(self, is_compact):
         self.is_detail_compact = bool(is_compact)
+        self._emit_state_change()
 
     def _on_quick_edit(self, event, new_title):
         event["title"] = new_title
@@ -296,6 +309,7 @@ class CalendarWindow(ctk.CTkToplevel):
         )
 
         self.navigation_panel.set_filter_options(types=unique_types, entities=linked_entities, statuses=unique_statuses)
+        self.navigation_panel.set_filters(self.panel_filters)
         self.navigation_panel.set_state(
             active_date=self.active_date,
             anchor_date=self.anchor_date,
@@ -354,8 +368,58 @@ class CalendarWindow(ctk.CTkToplevel):
         return True
 
     def _close_window(self):
+        self._emit_state_change()
         self.withdraw()
+
+    def _on_sash_interaction(self, _event=None):
+        self._emit_state_change()
+
+    def _restore_panel_widths(self, panel_widths):
+        if not isinstance(panel_widths, dict):
+            return
+        try:
+            left = int(panel_widths.get("left_sidebar")) if panel_widths.get("left_sidebar") is not None else None
+        except (TypeError, ValueError):
+            left = None
+        try:
+            center = int(panel_widths.get("center_grid")) if panel_widths.get("center_grid") is not None else None
+        except (TypeError, ValueError):
+            center = None
+
+        if left is not None and left >= 0:
+            try:
+                self.outer_pane.sash_place(0, left, 0)
+            except Exception:
+                pass
+        if center is not None and center >= 0:
+            try:
+                self.center_pane.sash_place(0, center, 0)
+            except Exception:
+                pass
+
+    def _collect_state(self):
+        left_sidebar = None
+        center_grid = None
+        try:
+            left_sidebar = int(self.outer_pane.sash_coord(0)[0])
+        except Exception:
+            pass
+        try:
+            center_grid = int(self.center_pane.sash_coord(0)[0])
+        except Exception:
+            pass
+
+        return {
+            "active_date": self.active_date,
+            "view_mode": self.view_mode,
+            "filters": dict(self.panel_filters),
+            "panel_widths": {
+                "left_sidebar": left_sidebar,
+                "center_grid": center_grid,
+            },
+        }
 
     def _emit_state_change(self):
         if callable(self.on_state_change):
-            self.on_state_change(self.active_date, self.view_mode)
+            state = self._collect_state()
+            self.on_state_change(state)

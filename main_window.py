@@ -68,6 +68,7 @@ from modules.ui.menu_bar import AppMenuBar
 from modules.events.ui.dock import CalendarDock
 from modules.events.ui.full import CalendarWindow
 from modules.events.services.entity_link_service import EntityLinkService
+from modules.events.services.calendar_state_store import CalendarStateStore
 
 from modules.generic.generic_list_view import GenericListView
 from modules.generic.generic_model_wrapper import GenericModelWrapper
@@ -140,7 +141,8 @@ class MainWindow(ctk.CTk):
         self.current_open_view   = None
         self.current_open_entity = None    # ← initialize here to avoid AttributeError
         self._calendar_full_window = None
-        self._calendar_ui_state = {"active_date": date.today(), "view_mode": "month"}
+        self._calendar_state_store = CalendarStateStore()
+        self._calendar_ui_state = CalendarStateStore.to_runtime_state(self._calendar_state_store.load())
         self._calendar_events_cache = None
         initialize_db()
         log_info("Database initialization complete", func_name="main_window.MainWindow.__init__")
@@ -1092,6 +1094,8 @@ class MainWindow(ctk.CTk):
     def open_calendar_view(self, target_date=None, view_mode=None):
         target = target_date or self._calendar_ui_state.get("active_date") or date.today()
         mode = (view_mode or self._calendar_ui_state.get("view_mode") or "month")
+        saved_filters = dict(self._calendar_ui_state.get("filters") or {})
+        saved_panel_widths = dict(self._calendar_ui_state.get("panel_widths") or {})
 
         window = getattr(self, "_calendar_full_window", None)
         if window is None or not window.winfo_exists():
@@ -1104,6 +1108,8 @@ class MainWindow(ctk.CTk):
                 initial_date=target,
                 initial_view_mode=mode,
                 on_state_change=self._on_calendar_full_state_change,
+                initial_filters=saved_filters,
+                initial_panel_widths=saved_panel_widths,
                 on_open_entity=self._open_linked_calendar_entity,
                 entity_link_service=EntityLinkService(self.entity_wrappers),
             )
@@ -1117,11 +1123,36 @@ class MainWindow(ctk.CTk):
         window.focus_date(target, view_mode=mode, auto_select=True)
         window.lift()
         window.focus_force()
-        self._on_calendar_full_state_change(window.active_date, window.view_mode)
+        self._on_calendar_full_state_change(window._collect_state())
         return window
 
-    def _on_calendar_full_state_change(self, active_date, view_mode):
-        self._calendar_ui_state = {"active_date": active_date, "view_mode": view_mode}
+    def _on_calendar_full_state_change(self, state):
+        if not isinstance(state, dict):
+            return
+
+        active_date = state.get("active_date")
+        if not isinstance(active_date, date):
+            active_date = self._calendar_ui_state.get("active_date") or date.today()
+
+        view_mode = str(state.get("view_mode") or "").strip().lower() or "month"
+        filters = state.get("filters") if isinstance(state.get("filters"), dict) else {}
+        panel_widths = state.get("panel_widths") if isinstance(state.get("panel_widths"), dict) else {}
+
+        self._calendar_ui_state = {
+            "active_date": active_date,
+            "view_mode": view_mode,
+            "filters": dict(filters),
+            "panel_widths": dict(panel_widths),
+        }
+
+        self._calendar_state_store.save(
+            {
+                "active_date": active_date,
+                "view_mode": view_mode,
+                "filters": filters,
+                "panel_widths": panel_widths,
+            }
+        )
         self._refresh_calendar_dock(active_date)
 
     def _open_linked_calendar_entity(self, entity_type, entity_name):
