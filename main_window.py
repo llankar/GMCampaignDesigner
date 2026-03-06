@@ -67,8 +67,10 @@ from modules.ui.system_manager_dialog import SystemManagerDialog
 from modules.ui.menu_bar import AppMenuBar
 from modules.events.ui.dock import CalendarDock
 from modules.events.ui.full import CalendarWindow
+from modules.events.models.event_types import get_event_type
 from modules.events.services.entity_link_service import EntityLinkService
 from modules.events.services.calendar_state_store import CalendarStateStore
+from modules.events.ui.shared.color_utils import normalize_hex_color
 
 from modules.generic.generic_list_view import GenericListView
 from modules.generic.generic_model_wrapper import GenericModelWrapper
@@ -1175,8 +1177,10 @@ class MainWindow(ctk.CTk):
         reference_date = selected_date or dock.selected_date or date.today()
         selected_events = self._get_events_for_day(reference_date)
         upcoming_events = self._get_upcoming_events(reference_date)
+        month_events = self._get_month_events(reference_date.year, reference_date.month)
         dock.set_selected_date_events(reference_date, selected_events)
         dock.set_upcoming_events(upcoming_events)
+        dock.set_month_event_map(month_events)
 
     def _invalidate_calendar_events_cache(self):
         self._calendar_events_cache = None
@@ -1199,6 +1203,17 @@ class MainWindow(ctk.CTk):
         ]
         upcoming.sort(key=lambda row: (row["date"], row.get("time") or "", row.get("title") or ""))
         return upcoming[:limit]
+
+    def _get_month_events(self, year, month):
+        month_events = {}
+        for event in self._collect_calendar_events():
+            event_date = event.get("date")
+            if event_date is None or event_date.year != year or event_date.month != month:
+                continue
+            month_events.setdefault(event_date, []).append(event)
+        for entries in month_events.values():
+            entries.sort(key=lambda row: (row.get("time") or "", row.get("title") or ""))
+        return month_events
 
     def _create_calendar_event(self, payload):
         if not isinstance(payload, dict):
@@ -1224,6 +1239,7 @@ class MainWindow(ctk.CTk):
             "StartTime": start_time,
             "EndTime": end_time,
             "Type": (payload.get("type") or "Session").strip(),
+            "Color": normalize_hex_color(payload.get("color"), fallback=get_event_type(payload.get("type")).color),
             "Status": (payload.get("status") or "Planifié").strip(),
             "Places": linked_places,
             "NPCs": linked_npcs,
@@ -1242,6 +1258,7 @@ class MainWindow(ctk.CTk):
             "date": event_date,
             "title": title,
             "time": start_time,
+            "color": normalize_hex_color(payload.get("color"), fallback=get_event_type(payload.get("type")).color),
             "source": slug,
             "Places": linked_places,
             "NPCs": linked_npcs,
@@ -1363,6 +1380,10 @@ class MainWindow(ctk.CTk):
                         "source": slug,
                         "time": self._extract_event_time(item),
                         "type": item.get("Type") or item.get("type") or "",
+                        "color": normalize_hex_color(
+                            item.get("Color") or item.get("color") or item.get("EventColor"),
+                            fallback=get_event_type(item.get("Type") or item.get("type")).color,
+                        ),
                         "status": item.get("Status") or item.get("status") or "",
                         "Places": item.get("Places") or [],
                         "NPCs": item.get("NPCs") or [],

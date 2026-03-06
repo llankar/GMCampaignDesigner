@@ -1,7 +1,9 @@
 from datetime import date, datetime, time, timedelta
+from tkinter import colorchooser
 
 import customtkinter as ctk
 
+from modules.events.ui.shared.color_utils import normalize_hex_color
 from .event_editor_dialog import EventEditorDialog
 
 
@@ -49,12 +51,18 @@ class QuickAddPopover(ctk.CTkToplevel):
         self.type_menu = ctk.CTkOptionMenu(self, values=["Session", "Rencontre", "Quête", "Autre"])
         self.type_menu.grid(row=4, column=1, padx=12, pady=8, sticky="ew")
 
-        ctk.CTkLabel(self, text="Statut").grid(row=5, column=0, padx=12, pady=8, sticky="w")
+        ctk.CTkLabel(self, text="Couleur").grid(row=5, column=0, padx=12, pady=8, sticky="w")
+        self.color_value = "#4F8EF7"
+        self.color_button = ctk.CTkButton(self, text="", command=self._choose_color)
+        self.color_button.grid(row=5, column=1, padx=12, pady=8, sticky="w")
+        self._update_color_button()
+
+        ctk.CTkLabel(self, text="Statut").grid(row=6, column=0, padx=12, pady=8, sticky="w")
         self.status_menu = ctk.CTkOptionMenu(self, values=["Planifié", "Confirmé", "Terminé", "Annulé"])
-        self.status_menu.grid(row=5, column=1, padx=12, pady=8, sticky="ew")
+        self.status_menu.grid(row=6, column=1, padx=12, pady=8, sticky="ew")
 
         buttons = ctk.CTkFrame(self, fg_color="transparent")
-        buttons.grid(row=6, column=0, columnspan=2, padx=12, pady=(16, 12), sticky="e")
+        buttons.grid(row=7, column=0, columnspan=2, padx=12, pady=(16, 12), sticky="e")
         ctk.CTkButton(buttons, text="Plus d'options", fg_color="transparent", command=self._open_more_options).pack(
             side="left", padx=(0, 8)
         )
@@ -95,6 +103,7 @@ class QuickAddPopover(ctk.CTkToplevel):
             "start_time": self.start_entry.get().strip(),
             "end_time": self.end_entry.get().strip(),
             "type": self.type_menu.get().strip(),
+            "color": self.color_value,
             "status": self.status_menu.get().strip(),
         }
 
@@ -112,3 +121,20 @@ class QuickAddPopover(ctk.CTkToplevel):
             self.destroy()
 
         EventEditorDialog(self, initial_values=initial_values, on_save=_save_from_editor)
+
+    def _choose_color(self):
+        current = normalize_hex_color(self.color_value, fallback="#4F8EF7")
+        selection = colorchooser.askcolor(color=current, parent=self)
+        color = None
+        if isinstance(selection, (tuple, list)) and len(selection) > 1:
+            color = selection[1]
+        self.color_value = normalize_hex_color(color, fallback=current)
+        self._update_color_button()
+
+    def _update_color_button(self):
+        self.color_button.configure(
+            text=self.color_value,
+            fg_color=self.color_value,
+            hover_color=self.color_value,
+            text_color="#FFFFFF",
+        )
