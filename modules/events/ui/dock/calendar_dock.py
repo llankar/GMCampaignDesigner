@@ -16,6 +16,8 @@ class CalendarDock(ctk.CTkFrame):
 
         self._day_buttons = []
         self._events_by_date = {}
+        self._selected_event_line_widgets = []
+        self._upcoming_event_line_widgets = []
 
         self._build_ui()
         self._render_month()
@@ -57,16 +59,14 @@ class CalendarDock(ctk.CTkFrame):
         self.selected_title_label = ctk.CTkLabel(events_frame, text="Aujourd'hui", anchor="w", font=ctk.CTkFont(size=13, weight="bold"))
         self.selected_title_label.pack(fill="x", padx=8, pady=(8, 4))
 
-        self.selected_events_box = ctk.CTkTextbox(events_frame, height=90)
+        self.selected_events_box = ctk.CTkScrollableFrame(events_frame, height=100)
         self.selected_events_box.pack(fill="x", padx=8, pady=(0, 8))
-        self.selected_events_box.configure(state="disabled")
 
         upcoming_label = ctk.CTkLabel(events_frame, text="Prochains évènements", anchor="w", font=ctk.CTkFont(size=13, weight="bold"))
         upcoming_label.pack(fill="x", padx=8, pady=(4, 4))
 
-        self.upcoming_events_box = ctk.CTkTextbox(events_frame, height=120)
+        self.upcoming_events_box = ctk.CTkScrollableFrame(events_frame, height=140)
         self.upcoming_events_box.pack(fill="both", expand=True, padx=8, pady=(0, 8))
-        self.upcoming_events_box.configure(state="disabled")
 
     def _render_month(self):
         self.month_label.configure(text=f"{calendar.month_name[self.display_month]} {self.display_year}")
@@ -117,11 +117,23 @@ class CalendarDock(ctk.CTkFrame):
     def set_selected_date_events(self, selected_date, events):
         self.selected_date = selected_date
         self.selected_title_label.configure(text=f"Évènements du {selected_date.strftime('%d/%m/%Y')}")
-        self._set_textbox_lines(self.selected_events_box, self._format_event_lines(events, empty_message="Aucun évènement."))
+        self._populate_event_list(
+            self.selected_events_box,
+            self._selected_event_line_widgets,
+            events,
+            include_date=False,
+            empty_message="Aucun évènement.",
+        )
         self._render_month()
 
     def set_upcoming_events(self, events):
-        self._set_textbox_lines(self.upcoming_events_box, self._format_event_lines(events, include_date=True, empty_message="Aucun évènement à venir."))
+        self._populate_event_list(
+            self.upcoming_events_box,
+            self._upcoming_event_line_widgets,
+            events,
+            include_date=True,
+            empty_message="Aucun évènement à venir.",
+        )
 
     def set_month_event_map(self, events_by_date):
         if isinstance(events_by_date, dict):
@@ -143,27 +155,37 @@ class CalendarDock(ctk.CTkFrame):
         return "à venir"
 
     @classmethod
-    def _format_event_lines(cls, events, include_date=False, empty_message="Aucun évènement"):
+    def _format_event_line(cls, event, include_date=False):
+        title = event.get("title", "Sans titre")
+        badge = cls._event_badge(event)
+        if include_date:
+            event_date = event.get("date")
+            if event_date:
+                return f"• {event_date.strftime('%d/%m')} — {title} [{badge}]"
+        return f"• {title} [{badge}]"
+
+    @classmethod
+    def _populate_event_list(cls, container, cache, events, *, include_date=False, empty_message="Aucun évènement"):
+        for widget in cache:
+            try:
+                widget.destroy()
+            except Exception:
+                pass
+        cache.clear()
+
         if not events:
-            return [empty_message]
+            empty_label = ctk.CTkLabel(container, text=empty_message, anchor="w", justify="left", text_color="gray")
+            empty_label.pack(fill="x", padx=2, pady=2)
+            cache.append(empty_label)
+            return
 
-        lines = []
         for event in events:
-            title = event.get("title", "Sans titre")
-            badge = cls._event_badge(event)
-            if include_date:
-                event_date = event.get("date")
-                if event_date:
-                    lines.append(f"• {event_date.strftime('%d/%m')} — {title} [{badge}]")
-                else:
-                    lines.append(f"• {title} [{badge}]")
-            else:
-                lines.append(f"• {title} [{badge}]")
-        return lines
-
-    @staticmethod
-    def _set_textbox_lines(textbox, lines):
-        textbox.configure(state="normal")
-        textbox.delete("1.0", "end")
-        textbox.insert("1.0", "\n".join(lines))
-        textbox.configure(state="disabled")
+            label = ctk.CTkLabel(
+                container,
+                text=cls._format_event_line(event, include_date=include_date),
+                anchor="w",
+                justify="left",
+                text_color=event.get("color") or ("#1a1a1a", "#f0f0f0"),
+            )
+            label.pack(fill="x", padx=2, pady=2)
+            cache.append(label)
