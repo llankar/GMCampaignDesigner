@@ -88,7 +88,7 @@ class EventDetailPanel(ctk.CTkFrame):
                 text=text,
                 anchor="w",
                 justify="left",
-                text_color=event_type.color,
+                text_color=event.get("color") or event_type.color,
                 cursor="hand2",
             )
             title_label.pack(anchor="w", padx=8, pady=(6, 2))

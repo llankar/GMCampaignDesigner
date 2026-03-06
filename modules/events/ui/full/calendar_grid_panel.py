@@ -144,6 +144,7 @@ class CalendarGridPanel(ctk.CTkFrame):
                 text=f"{key}  —  {title}",
                 anchor="w",
                 fg_color=slot_color,
+                text_color=(event.get("color") if event else None) or ("#1a1a1a", "#f0f0f0"),
                 command=lambda current=active_date, start=key: self._emit_cell_click(current, start),
             )
             button.pack(fill="x", padx=6, pady=2)
