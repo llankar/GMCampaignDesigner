@@ -1,9 +1,11 @@
 from datetime import date
+from tkinter import colorchooser
 
 import customtkinter as ctk
 
 from modules.events.services.entity_link_service import EntityLinkService
 from modules.events.models.event_types import event_type_labels
+from modules.events.ui.shared.color_utils import normalize_hex_color
 from modules.events.ui.shared.multi_link_selector import MultiLinkSelector
 
 
@@ -58,6 +60,12 @@ class EventEditorDialog(ctk.CTkToplevel):
         ctk.CTkLabel(content, text="Type").grid(row=row, column=0, padx=12, pady=8, sticky="w")
         self.type_menu = ctk.CTkOptionMenu(content, values=event_type_labels())
         self.type_menu.grid(row=row, column=1, padx=12, pady=8, sticky="ew")
+
+        row += 1
+        ctk.CTkLabel(content, text="Couleur").grid(row=row, column=0, padx=12, pady=8, sticky="w")
+        self.color_button = ctk.CTkButton(content, text="", width=120, command=self._choose_color)
+        self.color_button.grid(row=row, column=1, padx=12, pady=8, sticky="w")
+        self._selected_color = "#4F8EF7"
 
         row += 1
         ctk.CTkLabel(content, text="Statut").grid(row=row, column=0, padx=12, pady=8, sticky="w")
@@ -116,6 +124,8 @@ class EventEditorDialog(ctk.CTkToplevel):
         self.end_entry.insert(0, self._initial.get("end_time", ""))
         initial_type = self._initial.get("type", "Session") or "Session"
         self.type_menu.set(initial_type)
+        self._selected_color = normalize_hex_color(self._initial.get("color"), fallback="#4F8EF7")
+        self._update_color_button()
         self.status_entry.insert(0, self._initial.get("status", ""))
         self.place_selector.set_values(self._initial.get("Places") or [])
         self.npc_selector.set_values(self._initial.get("NPCs") or [])
@@ -129,6 +139,7 @@ class EventEditorDialog(ctk.CTkToplevel):
             "start_time": self.start_entry.get().strip(),
             "end_time": self.end_entry.get().strip(),
             "type": self.type_menu.get().strip(),
+            "color": self._selected_color,
             "status": self.status_entry.get().strip(),
             "Places": self.place_selector.get_values(),
             "NPCs": self.npc_selector.get_values(),
@@ -138,3 +149,20 @@ class EventEditorDialog(ctk.CTkToplevel):
         if callable(self._on_save):
             self._on_save(payload)
         self.destroy()
+
+    def _choose_color(self):
+        current = normalize_hex_color(self._selected_color, fallback="#4F8EF7")
+        selection = colorchooser.askcolor(color=current, parent=self)
+        color = None
+        if isinstance(selection, (tuple, list)) and len(selection) > 1:
+            color = selection[1]
+        self._selected_color = normalize_hex_color(color, fallback=current)
+        self._update_color_button()
+
+    def _update_color_button(self):
+        self.color_button.configure(
+            text=self._selected_color,
+            fg_color=self._selected_color,
+            hover_color=self._selected_color,
+            text_color="#FFFFFF",
+        )

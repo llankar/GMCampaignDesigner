@@ -16,6 +16,7 @@ class CalendarGridPanel(ctk.CTkFrame):
         get_events_for_day,
         get_events_for_range,
         on_day_selected,
+        on_cell_click=None,
         on_cell_double_click=None,
         on_event_moved=None,
     ):
@@ -23,6 +24,7 @@ class CalendarGridPanel(ctk.CTkFrame):
         self.get_events_for_day = get_events_for_day
         self.get_events_for_range = get_events_for_range
         self._on_day_selected = on_day_selected
+        self._on_cell_click = on_cell_click
         self._on_cell_double_click = on_cell_double_click
         self._on_event_moved = on_event_moved
 
@@ -69,14 +71,15 @@ class CalendarGridPanel(ctk.CTkFrame):
                 is_selected = day_date == active_date
                 day_events = [event for event in self.get_events_for_day(day_date) if filter_predicate(event)]
                 marker = " •" if day_events else ""
+                first_color = self._day_color(day_events)
                 button = ctk.CTkButton(
                     frame,
                     text=f"{day_date.day}{marker}",
                     width=42,
                     height=34,
-                    fg_color=("#2f6cc0", "#2f6cc0") if is_selected else "transparent",
+                    fg_color=("#2f6cc0", "#2f6cc0") if is_selected else first_color,
                     text_color=("#1a1a1a", "#f0f0f0") if is_current_month else ("#999999", "#666666"),
-                    command=lambda current=day_date: self._emit_day_selected(current),
+                    command=lambda current=day_date: self._emit_cell_click(current),
                 )
                 button.grid(row=week_idx + 1, column=day_idx, padx=2, pady=2)
                 button.bind("<Double-Button-1>", lambda _event, current=day_date: self._emit_cell_double_click(current))
@@ -93,12 +96,13 @@ class CalendarGridPanel(ctk.CTkFrame):
             events = [event for event in self.get_events_for_day(day) if filter_predicate(event)]
             marker = " •" if events else ""
             label = f"{day.strftime('%A %d/%m')}{marker}".capitalize()
+            first_color = self._day_color(events)
             button = ctk.CTkButton(
                 frame,
                 text=label,
                 anchor="w",
-                fg_color=("#2f6cc0", "#2f6cc0") if day == active_date else "transparent",
-                command=lambda current=day: self._emit_day_selected(current),
+                fg_color=("#2f6cc0", "#2f6cc0") if day == active_date else first_color,
+                command=lambda current=day: self._emit_cell_click(current),
             )
             button.grid(row=offset, column=0, sticky="ew", padx=6, pady=4)
             button.bind("<Double-Button-1>", lambda _event, current=day: self._emit_cell_double_click(current))
@@ -132,12 +136,13 @@ class CalendarGridPanel(ctk.CTkFrame):
             key = f"{hour:02d}:00"
             event = mapped.get(key)
             title = event.get("title", "Libre") if event else "Libre"
+            slot_color = self._day_color([event] if event else [])
             button = ctk.CTkButton(
                 frame,
                 text=f"{key}  —  {title}",
                 anchor="w",
-                fg_color="transparent",
-                command=lambda current=active_date: self._emit_day_selected(current),
+                fg_color=slot_color,
+                command=lambda current=active_date, start=key: self._emit_cell_click(current, start),
             )
             button.pack(fill="x", padx=6, pady=2)
             button.bind("<Double-Button-1>", lambda _event, current=active_date, start_time=key: self._emit_cell_double_click(current, start_time))
@@ -179,7 +184,14 @@ class CalendarGridPanel(ctk.CTkFrame):
 
         block = ctk.CTkFrame(frame)
         block.pack(fill="x", padx=8, pady=4)
-        label = ctk.CTkLabel(block, text=text, anchor="w", justify="left", cursor="hand2", text_color=event_type.color)
+        label = ctk.CTkLabel(
+            block,
+            text=text,
+            anchor="w",
+            justify="left",
+            cursor="hand2",
+            text_color=event.get("color") or event_type.color,
+        )
         label.pack(fill="x", padx=8, pady=6)
         label.bind("<ButtonPress-1>", lambda _event, current=event: self._start_drag(current))
 
@@ -213,6 +225,18 @@ class CalendarGridPanel(ctk.CTkFrame):
         if callable(self._on_day_selected):
             self._on_day_selected(selected_date)
 
+    def _emit_cell_click(self, selected_date, start_time=None):
+        self._emit_day_selected(selected_date)
+        if callable(self._on_cell_click):
+            self._on_cell_click(selected_date, start_time)
+
     def _emit_cell_double_click(self, selected_date, start_time=None):
         if callable(self._on_cell_double_click):
             self._on_cell_double_click(selected_date, start_time)
+
+    @staticmethod
+    def _day_color(events):
+        if not events:
+            return "transparent"
+        first = events[0] or {}
+        return first.get("color") or "transparent"

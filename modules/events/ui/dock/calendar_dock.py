@@ -15,6 +15,7 @@ class CalendarDock(ctk.CTkFrame):
         self.selected_date = date.today()
 
         self._day_buttons = []
+        self._events_by_date = {}
 
         self._build_ui()
         self._render_month()
@@ -78,11 +79,14 @@ class CalendarDock(ctk.CTkFrame):
                 button = self._day_buttons[week_index][day_index]
                 is_current_month = day_date.month == self.display_month
                 is_selected = day_date == self.selected_date
+                day_events = self._events_by_date.get(day_date, [])
+                marker = "•" if day_events else ""
+                first_color = (day_events[0].get("color") if day_events else None) or "transparent"
                 button.configure(
-                    text=str(day_date.day),
+                    text=f"{day_date.day}{marker}",
                     state="normal",
                     text_color=("#1a1a1a", "#f0f0f0") if is_current_month else ("#999999", "#666666"),
-                    fg_color=("#2f6cc0", "#2f6cc0") if is_selected else "transparent",
+                    fg_color=("#2f6cc0", "#2f6cc0") if is_selected else first_color,
                 )
 
     def _select_from_cell(self, week_index, day_index):
@@ -118,6 +122,13 @@ class CalendarDock(ctk.CTkFrame):
 
     def set_upcoming_events(self, events):
         self._set_textbox_lines(self.upcoming_events_box, self._format_event_lines(events, include_date=True, empty_message="Aucun évènement à venir."))
+
+    def set_month_event_map(self, events_by_date):
+        if isinstance(events_by_date, dict):
+            self._events_by_date = dict(events_by_date)
+        else:
+            self._events_by_date = {}
+        self._render_month()
 
     @staticmethod
     def _event_badge(event):

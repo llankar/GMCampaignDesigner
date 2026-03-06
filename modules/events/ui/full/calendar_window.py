@@ -120,6 +120,7 @@ class CalendarWindow(ctk.CTkToplevel):
             get_events_for_day=self.get_events_for_day,
             get_events_for_range=self.get_events_for_range,
             on_day_selected=self._select_day,
+            on_cell_click=self._on_calendar_cell_click,
             on_cell_double_click=self._on_calendar_cell_double_click,
             on_event_moved=self._on_event_moved,
         )
@@ -199,9 +200,12 @@ class CalendarWindow(ctk.CTkToplevel):
             entity_link_service=self.entity_link_service,
         )
 
-    def _on_calendar_cell_double_click(self, selected_date, start_time=None):
+    def _on_calendar_cell_click(self, selected_date, start_time=None):
         self._select_day(selected_date)
         self._open_quick_add(selected_date, start_time=start_time)
+
+    def _on_calendar_cell_double_click(self, selected_date, start_time=None):
+        self._select_day(selected_date)
 
     def _open_quick_add(self, selected_date, start_time=None):
         QuickAddPopover(
