@@ -106,6 +106,31 @@ class NavigationPanel(ctk.CTkFrame):
         self._agenda_window.pack(fill="x", padx=8, pady=(0, 8))
         self._agenda_window.set("7 jours")
 
+
+    def set_filters(self, filters):
+        if not isinstance(filters, dict):
+            return
+
+        show_source = bool(filters.get("show_source", True))
+        if show_source:
+            self._source_filter.select()
+        else:
+            self._source_filter.deselect()
+
+        self._search_entry.delete(0, "end")
+        self._search_entry.insert(0, str(filters.get("search_text") or "").strip())
+
+        selected_type = str(filters.get("type") or "").strip()
+        selected_entity = str(filters.get("entity") or "").strip()
+        selected_status = str(filters.get("status") or "").strip()
+
+        self._type_menu.set(selected_type if selected_type else "Tous types")
+        self._entity_menu.set(selected_entity if selected_entity else "Toutes entités")
+        self._status_menu.set(selected_status if selected_status else "Tous statuts")
+
+        agenda_days = 30 if int(filters.get("agenda_window_days") or 7) == 30 else 7
+        self._agenda_window.set("30 jours" if agenda_days == 30 else "7 jours")
+
     def set_filter_options(self, *, types, entities, statuses):
         self._type_options = [""] + [item for item in types if item]
         self._entity_options = [""] + [item for item in entities if item]
