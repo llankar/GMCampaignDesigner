@@ -1267,7 +1267,7 @@ class MainWindow(ctk.CTk):
         }
 
 
-    def _update_calendar_event(self, event, target_date, target_time=None):
+    def _update_calendar_event(self, event, target_date, target_time=None, payload=None):
         if not isinstance(event, dict):
             return False
 
@@ -1278,7 +1278,10 @@ class MainWindow(ctk.CTk):
             return False
 
         target = self._parse_event_date(target_date) or date.today()
-        new_time = self._normalize_event_time(target_time, fallback=event.get("time") or "09:00")
+        fallback_time = event.get("time") or "09:00"
+        if isinstance(payload, dict):
+            fallback_time = payload.get("start_time") or fallback_time
+        new_time = self._normalize_event_time(target_time, fallback=fallback_time)
 
         try:
             items = wrapper.load_items()
@@ -1303,6 +1306,21 @@ class MainWindow(ctk.CTk):
 
         matched["Date"] = target.isoformat()
         matched["StartTime"] = new_time
+        if isinstance(payload, dict):
+            updated_title = str(payload.get("title") or title).strip() or title
+            matched["Title"] = updated_title
+            matched["EndTime"] = self._normalize_event_time(payload.get("end_time"), fallback=matched.get("EndTime") or "")
+            matched["Type"] = str(payload.get("type") or matched.get("Type") or "Session").strip()
+            matched["Color"] = normalize_hex_color(
+                payload.get("color"),
+                fallback=get_event_type(payload.get("type") or matched.get("Type")).color,
+            )
+            matched["Status"] = str(payload.get("status") or matched.get("Status") or "").strip()
+            matched["Places"] = payload.get("Places") or []
+            matched["NPCs"] = payload.get("NPCs") or []
+            matched["Scenarios"] = payload.get("Scenarios") or []
+            matched["Informations"] = payload.get("Informations") or []
+            title = updated_title
         if matched.get("Name"):
             matched["Name"] = f"{title} {target.isoformat()} {new_time}".strip()
 

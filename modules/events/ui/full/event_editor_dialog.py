@@ -12,7 +12,7 @@ from modules.events.ui.shared.multi_link_selector import MultiLinkSelector
 class EventEditorDialog(ctk.CTkToplevel):
     """Full editor for calendar events."""
 
-    def __init__(self, master, *, initial_values=None, on_save=None, entity_link_service=None):
+    def __init__(self, master, *, initial_values=None, on_save=None, entity_link_service=None, save_label="Créer"):
         super().__init__(master)
         self.title("Éditeur d'évènement")
         self.geometry("560x700")
@@ -21,6 +21,7 @@ class EventEditorDialog(ctk.CTkToplevel):
         self._on_save = on_save
         self._initial = dict(initial_values or {})
         self._entity_link_service = entity_link_service or EntityLinkService()
+        self._save_label = str(save_label or "Créer")
 
         self._build_ui()
         self._populate_fields()
@@ -109,7 +110,7 @@ class EventEditorDialog(ctk.CTkToplevel):
         buttons.grid(row=1, column=0, padx=12, pady=(8, 12), sticky="ew")
         buttons.grid_columnconfigure(0, weight=1)
         ctk.CTkButton(buttons, text="Annuler", fg_color="transparent", command=self.destroy).pack(side="right", padx=(6, 0))
-        ctk.CTkButton(buttons, text="Créer", command=self._save).pack(side="right")
+        ctk.CTkButton(buttons, text=self._save_label, command=self._save).pack(side="right")
 
     def _populate_fields(self):
         self.title_entry.insert(0, self._initial.get("title", ""))
