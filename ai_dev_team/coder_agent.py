@@ -11,9 +11,11 @@ from pathlib import Path
 
 try:
     from .execution import LAST_RUN_DIRNAME
+    from .implementation import write_architecture_snapshot
     from .planner_agent import PlanStep
 except ImportError:
     from execution import LAST_RUN_DIRNAME
+    from implementation import write_architecture_snapshot
     from planner_agent import PlanStep
 
 
@@ -29,6 +31,12 @@ class CoderAgent:
         lines = ["# Feature Lab Implementation Log", ""]
         for step in plan:
             lines.append(f"- [x] Step {step.id}: {step.description}")
+
+        snapshot_path = write_architecture_snapshot(root)
+        lines.extend(["", f"- Generated architecture snapshot: {snapshot_path.relative_to(root)}"])
         implementation_log.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
-        return [str(implementation_log.relative_to(root))]
+        return [
+            str(snapshot_path.relative_to(root)),
+            str(implementation_log.relative_to(root)),
+        ]

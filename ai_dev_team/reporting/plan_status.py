@@ -2,21 +2,11 @@ from __future__ import annotations
 
 from typing import Any
 
-try:
-    from ..execution import LAST_RUN_DIRNAME
-except ImportError:
-    from execution import LAST_RUN_DIRNAME
-
 _ALLOWED_STATES = {"pending", "in_progress", "completed", "failed"}
 
 
 def _normalize_path_set(paths: list[str] | None) -> set[str]:
     return {p.strip() for p in (paths or []) if isinstance(p, str) and p.strip()}
-
-
-def _is_last_run_artifact(path: str) -> bool:
-    normalized = path.replace("\\", "/")
-    return normalized.startswith(f"ai_dev_team/{LAST_RUN_DIRNAME}/")
 
 
 def _is_implementation_step(description: str) -> bool:
@@ -68,8 +58,6 @@ def annotate_plan_states(
     implementation_ok = True
     if target_files:
         implementation_ok = bool(target_files.intersection(changed))
-        if not implementation_ok and changed and all(_is_last_run_artifact(path) for path in changed):
-            implementation_ok = True
 
     pytest_failed = False
     if "pytest" in command.lower() and return_code is not None:
