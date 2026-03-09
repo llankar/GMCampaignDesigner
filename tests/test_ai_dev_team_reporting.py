@@ -63,3 +63,13 @@ def test_run_feature_lab_uses_normalized_execution_fields(monkeypatch, tmp_path)
     assert "status" not in report
     assert report["execution"]["status"] == "failed"
     assert report["execution"]["changed_files"] == ["x.py"]
+
+
+def test_build_final_report_normalizes_windows_style_changed_file_paths():
+    report = build_final_report(
+        proposal={"title": "x"},
+        review={"approved": True, "score": 95, "reasons": ["good"]},
+        changed_files=["src\\module\\file.py", "tests\\test_file.py"],
+    )
+
+    assert report["execution"]["changed_files"] == ["src/module/file.py", "tests/test_file.py"]
