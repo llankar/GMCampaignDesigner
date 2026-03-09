@@ -6,6 +6,11 @@ import subprocess
 from dataclasses import dataclass
 from pathlib import Path
 
+try:
+    from .execution import DEFAULT_SAFE_TEST_COMMAND
+except ImportError:
+    from execution import DEFAULT_SAFE_TEST_COMMAND
+
 
 @dataclass
 class TestResult:
@@ -18,7 +23,7 @@ class TestResult:
 class TestAgent:
     """Run pytest to ensure feature work does not break the repository."""
 
-    def run(self, workspace: str | Path = ".", command: str = "pytest") -> TestResult:
+    def run(self, workspace: str | Path = ".", command: str = DEFAULT_SAFE_TEST_COMMAND) -> TestResult:
         proc = subprocess.run(
             command,
             cwd=Path(workspace),

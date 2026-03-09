@@ -10,8 +10,10 @@ from __future__ import annotations
 from pathlib import Path
 
 try:
+    from .execution import LAST_RUN_DIRNAME
     from .planner_agent import PlanStep
 except ImportError:
+    from execution import LAST_RUN_DIRNAME
     from planner_agent import PlanStep
 
 
@@ -20,7 +22,7 @@ class CoderAgent:
 
     def implement(self, plan: list[PlanStep], workspace: str | Path = ".") -> list[str]:
         root = Path(workspace).resolve()
-        out_dir = root / "ai_dev_team" / "last_run"
+        out_dir = root / "ai_dev_team" / LAST_RUN_DIRNAME
         out_dir.mkdir(parents=True, exist_ok=True)
 
         implementation_log = out_dir / "implementation.md"
