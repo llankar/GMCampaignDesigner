@@ -38,3 +38,18 @@ def analyze_repository(root: str | Path = ".") -> RepoSummary:
     docs_files = sorted({*repo.glob("README*"), *repo.glob("docs/**/*.md"), *repo.glob("docs/**/*.html")})
     docs_files = [p for p in docs_files if p.is_file()]
     return RepoSummary(repo, python_files, test_files, ui_files, docs_files)
+
+
+def architecture_summary_text(root: str | Path = ".") -> str:
+    summary = analyze_repository(root)
+    modules = ", ".join(summary.top_modules()) if summary.python_files else "none"
+    return "\n".join(
+        [
+            f"Repository: {summary.root}",
+            f"Python files: {len(summary.python_files)}",
+            f"Test files: {len(summary.test_files)}",
+            f"UI files: {len(summary.ui_files)}",
+            f"Docs files: {len(summary.docs_files)}",
+            f"Top modules: {modules}",
+        ]
+    )
