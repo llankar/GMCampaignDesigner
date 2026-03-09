@@ -13,10 +13,25 @@ class _DummyWidget:
     def grid(self, *args, **kwargs):
         return None
 
+    def grid_remove(self):
+        return None
+
     def grid_columnconfigure(self, *args, **kwargs):
         return None
 
     def destroy(self):
+        return None
+
+    def set(self, value):
+        self._value = value
+
+    def get(self):
+        return getattr(self, "_value", "")
+
+    def cget(self, _key):
+        return []
+
+    def configure(self, **kwargs):
         return None
 
     def winfo_children(self):
@@ -26,13 +41,24 @@ class _DummyWidget:
 sys.modules.setdefault(
     "customtkinter",
     types.SimpleNamespace(
+        CTk=_DummyWidget,
         CTkFrame=_DummyWidget,
         CTkLabel=_DummyWidget,
         CTkComboBox=_DummyWidget,
         CTkEntry=_DummyWidget,
+        CTkTextbox=_DummyWidget,
         CTkCheckBox=_DummyWidget,
         CTkButton=_DummyWidget,
         CTkScrollableFrame=_DummyWidget,
+        CTkToplevel=_DummyWidget,
+        CTkImage=_DummyWidget,
+        CTkFont=_DummyWidget,
+        set_appearance_mode=lambda *args, **kwargs: None,
+        set_default_color_theme=lambda *args, **kwargs: None,
+        StringVar=tk.StringVar,
+        BooleanVar=tk.BooleanVar,
+        IntVar=tk.IntVar,
+        DoubleVar=tk.DoubleVar,
     ),
 )
 

@@ -14,7 +14,10 @@ from modules.ui.webview.pywebview_client import PyWebviewClient
 log_module_import(__name__)
 
 
-class ImageBrowserDialog(ctk.CTkToplevel):
+_CTK_TOPLEVEL_BASE = getattr(ctk, "CTkToplevel", tk.Toplevel)
+
+
+class ImageBrowserDialog(_CTK_TOPLEVEL_BASE):
     """Display an optional dialog that launches a webview for free image search."""
 
     _PROVIDER_URLS: dict[str, str] = {

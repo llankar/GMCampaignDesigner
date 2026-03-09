@@ -17,6 +17,8 @@ from modules.generic.generic_model_wrapper import GenericModelWrapper
 from modules.generic.generic_list_selection_view import GenericListSelectionView
 from modules.helpers.template_loader import load_template
 import tkinter as tk
+
+_CTK_TOPLEVEL_BASE = getattr(ctk, "CTkToplevel", tk.Toplevel)
 import random
 from modules.helpers.text_helpers import format_longtext
 from modules.helpers.text_helpers import ai_text_to_rtf_json
@@ -120,7 +122,7 @@ class ReadOnlyLongTextPreview(ctk.CTkFrame):
         return str(value or "")
 
     def _open_full_transcript(self):
-        top = ctk.CTkToplevel(self)
+        top = _CTK_TOPLEVEL_BASE(self)
         top.title(f"{self.field_label} – Full Transcript")
         top.geometry("900x600")
         position_window_at_top(top)
@@ -136,7 +138,7 @@ class ReadOnlyLongTextPreview(ctk.CTkFrame):
         return self._raw_value
 
 @log_methods
-class CustomDropdown(ctk.CTkToplevel):
+class CustomDropdown(_CTK_TOPLEVEL_BASE):
     def __init__(self, master, options, command, width=None, max_height=300, **kwargs):
         """
         master      – parent widget (usually the root or your main window)
@@ -307,7 +309,7 @@ Args:
     creation_mode (bool, optional): Whether the window is in item creation mode. Defaults to False.
 """
 @log_methods
-class GenericEditorWindow(ctk.CTkToplevel):
+class GenericEditorWindow(_CTK_TOPLEVEL_BASE):
     def __init__(self, master, item, template, model_wrapper, creation_mode=False):
         super().__init__(master)
         self.item = item
@@ -653,7 +655,7 @@ class GenericEditorWindow(ctk.CTkToplevel):
 
         def open_entity_picker(state, label):
             wrapper, template = _get_wrapper(label)
-            dialog = ctk.CTkToplevel(self)
+            dialog = _CTK_TOPLEVEL_BASE(self)
             dialog.title(f"Select {label[:-1] if label.endswith('s') else label}")
             dialog.geometry("1200x700")
             dialog.transient(self)
@@ -1881,7 +1883,7 @@ class GenericEditorWindow(ctk.CTkToplevel):
             return
 
         # Pop-up to select model
-        top = ctk.CTkToplevel(self)
+        top = _CTK_TOPLEVEL_BASE(self)
         top.title("Select AI Model")
         top.geometry("400x200")
         top.transient(self)
@@ -2004,7 +2006,7 @@ class GenericEditorWindow(ctk.CTkToplevel):
         if not pil_images:
             return None
 
-        top = ctk.CTkToplevel(self)
+        top = _CTK_TOPLEVEL_BASE(self)
         top.title("Choose a Portrait")
         top.transient(self)
         top.grab_set()

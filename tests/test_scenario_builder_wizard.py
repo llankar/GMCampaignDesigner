@@ -95,12 +95,27 @@ sys.modules.setdefault(
 
 _fake_resampling = SimpleNamespace(LANCZOS="LANCZOS")
 class _StubImage(SimpleNamespace):
-    def __init__(self, size=(0, 0)):
+    def __init__(self, size=(0, 0), mode="RGB"):
         super().__init__()
         self._size = size
+        self.mode = mode
 
     def filter(self, *_args, **_kwargs):
         return self
+
+    def save(self, *_args, **_kwargs):
+        return None
+
+    def copy(self):
+        return _StubImage(size=self._size, mode=self.mode)
+
+    def convert(self, mode):
+        self.mode = mode
+        return self
+
+    @property
+    def size(self):
+        return self._size
 
     def width(self):  # pragma: no cover - defensive
         return self._size[0]
@@ -131,15 +146,20 @@ _fake_image_module = SimpleNamespace(
     Resampling=_fake_resampling,
     LANCZOS="LANCZOS",
     new=_new_image,
+    open=lambda *args, **kwargs: _StubImage(size=(10, 20)),
 )
 _fake_imagetk_module = SimpleNamespace(PhotoImage=_StubWidget)
 _fake_image_draw = _StubImageDraw()
 _fake_image_filter = _StubImageFilter()
+_fake_image_ops = SimpleNamespace(exif_transpose=lambda image: image, contain=lambda image, size, resampling=None: image)
+_fake_image_font = SimpleNamespace(FreeTypeFont=object, ImageFont=object, truetype=lambda *a, **k: object(), load_default=lambda: object())
 _fake_pil_module = SimpleNamespace(
     Image=_fake_image_module,
     ImageTk=_fake_imagetk_module,
     ImageDraw=_fake_image_draw,
     ImageFilter=_fake_image_filter,
+    ImageOps=_fake_image_ops,
+    ImageFont=_fake_image_font,
     Resampling=_fake_resampling,
     LANCZOS="LANCZOS",
 )
@@ -148,6 +168,8 @@ sys.modules.setdefault("PIL.Image", _fake_image_module)
 sys.modules.setdefault("PIL.ImageTk", _fake_imagetk_module)
 sys.modules.setdefault("PIL.ImageDraw", _fake_image_draw)
 sys.modules.setdefault("PIL.ImageFilter", _fake_image_filter)
+sys.modules.setdefault("PIL.ImageOps", _fake_image_ops)
+sys.modules.setdefault("PIL.ImageFont", _fake_image_font)
 _fake_image_grab = SimpleNamespace(grab=lambda *args, **kwargs: None)
 sys.modules.setdefault("PIL.ImageGrab", _fake_image_grab)
 setattr(_fake_pil_module, "ImageGrab", _fake_image_grab)
