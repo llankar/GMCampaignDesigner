@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
+from .path_normalization import normalize_report_paths
 from .plan_status import annotate_plan_states
 
 
@@ -24,7 +25,7 @@ def build_final_report(
     - If tests fail, ``execution.status`` is forced to ``failed``.
     """
     normalized_tests = tests or {"ok": False, "command": None, "return_code": None}
-    normalized_changed_files = changed_files or []
+    normalized_changed_files = normalize_report_paths(changed_files)
     proposal_target_files = list(proposal.get("target_files", [])) if isinstance(proposal, dict) else []
     normalized_plan = annotate_plan_states(
         plan=plan,
