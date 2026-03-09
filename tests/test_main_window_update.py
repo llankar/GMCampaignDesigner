@@ -22,10 +22,65 @@ if "winsound" not in sys.modules:
     winsound_stub.SND_PURGE = 0
     _ensure_module("winsound", winsound_stub)
 
+if "cryptography" not in sys.modules:
+    cryptography_stub = types.ModuleType("cryptography")
+    cryptography_fernet_stub = types.ModuleType("cryptography.fernet")
+
+    class _Fernet:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        @staticmethod
+        def generate_key():
+            return b"test-key"
+
+        def encrypt(self, data):
+            return data
+
+        def decrypt(self, data):
+            return data
+
+    cryptography_fernet_stub.Fernet = _Fernet
+    cryptography_fernet_stub.InvalidToken = type("InvalidToken", (Exception,), {})
+    _ensure_module("cryptography", cryptography_stub)
+    _ensure_module("cryptography.fernet", cryptography_fernet_stub)
+
 if "fitz" not in sys.modules:
     fitz_stub = types.ModuleType("fitz")
     fitz_stub.open = lambda *args, **kwargs: None
     _ensure_module("fitz", fitz_stub)
+
+if "docx" not in sys.modules:
+    docx_stub = types.ModuleType("docx")
+    docx_stub.Document = lambda *args, **kwargs: types.SimpleNamespace(
+        add_heading=lambda *a, **k: None,
+        add_paragraph=lambda *a, **k: types.SimpleNamespace(add_run=lambda *aa, **kk: types.SimpleNamespace()),
+        styles={},
+        save=lambda *a, **k: None,
+    )
+    _ensure_module("docx", docx_stub)
+
+if "docx.shared" not in sys.modules:
+    docx_shared_stub = types.ModuleType("docx.shared")
+    docx_shared_stub.Pt = lambda value: value
+    docx_shared_stub.Inches = lambda value: value
+    docx_shared_stub.RGBColor = lambda r, g, b: (r, g, b)
+    _ensure_module("docx.shared", docx_shared_stub)
+
+if "docx.enum.text" not in sys.modules:
+    docx_enum_text_stub = types.ModuleType("docx.enum.text")
+    docx_enum_text_stub.WD_ALIGN_PARAGRAPH = types.SimpleNamespace(LEFT=0, CENTER=1, RIGHT=2, JUSTIFY=3)
+    _ensure_module("docx.enum.text", docx_enum_text_stub)
+
+if "docx.oxml" not in sys.modules:
+    docx_oxml_stub = types.ModuleType("docx.oxml")
+    docx_oxml_stub.OxmlElement = lambda name: types.SimpleNamespace(set=lambda *a, **k: None, append=lambda *a, **k: None)
+    _ensure_module("docx.oxml", docx_oxml_stub)
+
+if "docx.oxml.ns" not in sys.modules:
+    docx_oxml_ns_stub = types.ModuleType("docx.oxml.ns")
+    docx_oxml_ns_stub.qn = lambda value: value
+    _ensure_module("docx.oxml.ns", docx_oxml_ns_stub)
 
 if "pypdf" not in sys.modules:
     pypdf_stub = types.ModuleType("pypdf")
@@ -41,6 +96,33 @@ if "pypdf" not in sys.modules:
     pypdf_stub.PdfReader = _Reader
     pypdf_stub.PdfWriter = _Writer
     _ensure_module("pypdf", pypdf_stub)
+
+
+if "PIL" in sys.modules:
+    pil_mod = sys.modules["PIL"]
+    if not hasattr(pil_mod, "ImageOps"):
+        imageops_stub = types.ModuleType("PIL.ImageOps")
+        imageops_stub.exif_transpose = lambda image: image
+        imageops_stub.contain = lambda image, size, resampling=None: image
+        sys.modules.setdefault("PIL.ImageOps", imageops_stub)
+        setattr(pil_mod, "ImageOps", imageops_stub)
+    image_mod = getattr(pil_mod, "Image", None)
+    if image_mod is not None and not hasattr(image_mod, "Image"):
+        class _ImageType:
+            pass
+        setattr(image_mod, "Image", _ImageType)
+
+
+    if not hasattr(pil_mod, "ImageFont"):
+        imagefont_stub = types.ModuleType("PIL.ImageFont")
+        imagefont_stub.FreeTypeFont = object
+        imagefont_stub.ImageFont = object
+        imagefont_stub.truetype = lambda *args, **kwargs: object()
+        imagefont_stub.load_default = lambda *args, **kwargs: object()
+        sys.modules.setdefault("PIL.ImageFont", imagefont_stub)
+        setattr(pil_mod, "ImageFont", imagefont_stub)
+
+
 
 if "screeninfo" not in sys.modules:
     screeninfo_stub = types.ModuleType("screeninfo")
@@ -69,8 +151,13 @@ if "flask" not in sys.modules:
             pass
 
     flask_stub.Flask = _Flask
+    flask_stub.Response = type("Response", (), {})
+    flask_stub.Blueprint = type("Blueprint", (), {"__init__": lambda self, *a, **k: None, "route": lambda self, *a, **k: (lambda f: f)})
     flask_stub.send_file = lambda *args, **kwargs: b""
-    flask_stub.request = types.SimpleNamespace(args={})
+    flask_stub.send_from_directory = lambda *args, **kwargs: b""
+    flask_stub.jsonify = lambda *args, **kwargs: {}
+    flask_stub.render_template_string = lambda *args, **kwargs: ""
+    flask_stub.request = types.SimpleNamespace(args={}, json={})
     _ensure_module("flask", flask_stub)
 
 if "werkzeug" not in sys.modules:

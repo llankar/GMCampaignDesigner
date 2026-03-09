@@ -1,3 +1,4 @@
+import importlib
 import sys
 import tkinter as tk
 import types
@@ -70,18 +71,34 @@ class _StubComboBox(_StubWidget):
         raise KeyError(key)
 
 
-sys.modules.setdefault(
-    "customtkinter",
-    types.SimpleNamespace(
-        CTkFrame=_StubFrame,
-        CTkLabel=_StubLabel,
-        CTkEntry=_StubEntry,
-        CTkComboBox=_StubComboBox,
-        CTkButton=_StubButton,
-    ),
+sys.modules["customtkinter"] = types.SimpleNamespace(
+    CTk=_StubWidget,
+    CTkFrame=_StubFrame,
+    CTkLabel=_StubLabel,
+    CTkEntry=_StubEntry,
+    CTkTextbox=_StubWidget,
+    CTkComboBox=_StubComboBox,
+    CTkButton=_StubButton,
+    CTkToplevel=_StubWidget,
+    CTkImage=_StubWidget,
+    CTkFont=_StubWidget,
+    CTkCanvas=_StubWidget,
+    CTkSegmentedButton=_StubWidget,
+    CTkSwitch=_StubWidget,
+    CTkCheckBox=_StubWidget,
+    CTkOptionMenu=_StubWidget,
+    CTkProgressBar=_StubWidget,
+    CTkScrollableFrame=_StubWidget,
+    set_appearance_mode=lambda *args, **kwargs: None,
+    set_default_color_theme=lambda *args, **kwargs: None,
+    StringVar=tk.StringVar,
+    BooleanVar=tk.BooleanVar,
+    IntVar=tk.IntVar,
+    DoubleVar=tk.DoubleVar,
 )
 
 import modules.pcs.character_creation.ui.equipment_editor as editor_module
+editor_module = importlib.reload(editor_module)
 
 EquipmentEditor = editor_module.EquipmentEditor
 

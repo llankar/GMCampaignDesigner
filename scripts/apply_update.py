@@ -83,6 +83,10 @@ def _wait_for_pid(pid: int, timeout: int, progress_cb: ProgressCallback | None =
         wait_fraction = min(1.0, (elapsed / timeout) if timeout else 0.0)
         _emit_progress(progress_cb, "Waiting for app to close…", wait_fraction * 0.1)
         time.sleep(0.5)
+
+    if os.name == "nt" and _is_pid_alive(pid):
+        raise SystemExit(1)
+
     raise RuntimeError(f"Process {pid} did not exit within {timeout} seconds.")
 
 

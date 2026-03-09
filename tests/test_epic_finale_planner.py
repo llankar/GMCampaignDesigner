@@ -70,6 +70,9 @@ def _ensure_pil_stub():
         def copy(self):  # pragma: no cover - defensive stub
             return self
 
+        def save(self, *_args, **_kwargs):  # pragma: no cover - defensive stub
+            return None
+
     class _StubImageModule(types.SimpleNamespace):
         def __init__(self):
             super().__init__()

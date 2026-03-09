@@ -27,6 +27,8 @@ from modules.helpers.text_helpers import normalize_rtf_json
 
 log_module_import(__name__)
 
+_CTK_TOPLEVEL_BASE = getattr(ctk, "CTkToplevel", tk.Toplevel)
+
 
 # ---------------------------------------------------------------------------
 # Rich text helpers
@@ -840,7 +842,7 @@ def _collect_book_excerpts(record: Mapping[str, Any], query: str) -> list[tuple[
 # ---------------------------------------------------------------------------
 # Dialog implementation
 # ---------------------------------------------------------------------------
-class ChatbotDialog(ctk.CTkToplevel):
+class ChatbotDialog(_CTK_TOPLEVEL_BASE):
     """Tk dialog that surfaces entity notes with styled text."""
 
     def __init__(

@@ -6,7 +6,28 @@ import tkinter as tk
 from tkinter import filedialog, messagebox, ttk
 
 import customtkinter as ctk
-from PIL import Image, ImageOps, ImageTk
+
+try:
+    from PIL import Image, ImageOps, ImageTk
+except ImportError:  # pragma: no cover - test stubs may not expose full Pillow API
+    from PIL import Image, ImageTk
+
+    class _ImageOpsFallback:
+        @staticmethod
+        def exif_transpose(image):
+            return image
+
+        @staticmethod
+        def contain(image, size, resampling):
+            resize = getattr(image, "resize", None)
+            if callable(resize):
+                try:
+                    return resize(size, resampling)
+                except Exception:
+                    return image
+            return image
+
+    ImageOps = _ImageOpsFallback()
 
 from modules.helpers.config_helper import ConfigHelper
 from modules.helpers.logging_helper import log_exception, log_info, log_module_import

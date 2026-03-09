@@ -3,10 +3,13 @@
 from __future__ import annotations
 
 import tkinter as tk
+
 from tkinter import messagebox
 from typing import Callable
 
 import customtkinter as ctk
+
+_CTK_TOPLEVEL_BASE = getattr(ctk, "CTkToplevel", tk.Toplevel)
 
 from modules.helpers import system_config
 from modules.helpers import theme_manager
@@ -23,7 +26,7 @@ log_module_import(__name__)
 SystemSelectedCallback = Callable[[system_config.SystemConfig], None]
 
 
-class CampaignSystemSelectorDialog(ctk.CTkToplevel):
+class CampaignSystemSelectorDialog(_CTK_TOPLEVEL_BASE):
     """Displays available campaign systems and updates the active selection."""
 
     def __init__(

@@ -19,7 +19,7 @@ class _DummyCTkModule:
 import sys
 
 sys.modules.setdefault("customtkinter", _DummyCTkModule())
-sys.modules.setdefault("pypdf", type("_DummyPdfModule", (), {"PdfReader": object}))
+sys.modules.setdefault("pypdf", type("_DummyPdfModule", (), {"PdfReader": object, "PdfWriter": object}))
 
 from modules.ui import chatbot_dialog
 

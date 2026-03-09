@@ -21,6 +21,15 @@ class _StubWidget:
     def destroy(self):
         return None
 
+    def set(self, value):
+        self._value = value
+
+    def get(self):
+        return getattr(self, "_value", "")
+
+    def cget(self, _key):
+        return []
+
     def configure(self, **kwargs):
         return None
 
@@ -28,11 +37,22 @@ class _StubWidget:
 sys.modules.setdefault(
     "customtkinter",
     types.SimpleNamespace(
+        CTk=_StubWidget,
         CTkFrame=_StubWidget,
         CTkLabel=_StubWidget,
         CTkComboBox=_StubWidget,
         CTkEntry=_StubWidget,
+        CTkTextbox=_StubWidget,
         CTkButton=_StubWidget,
+        CTkToplevel=_StubWidget,
+        CTkImage=_StubWidget,
+        CTkFont=_StubWidget,
+        set_appearance_mode=lambda *args, **kwargs: None,
+        set_default_color_theme=lambda *args, **kwargs: None,
+        StringVar=tk.StringVar,
+        BooleanVar=tk.BooleanVar,
+        IntVar=tk.IntVar,
+        DoubleVar=tk.DoubleVar,
     ),
 )
 
