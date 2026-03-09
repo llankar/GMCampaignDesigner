@@ -32,6 +32,10 @@ from modules.maps.controllers.display_map_controller import DisplayMapController
 from modules.scenarios.scene_flow_viewer import create_scene_flow_frame, scene_flow_content_factory
 from modules.scenarios.plot_twist_scheduler import PlotTwistScheduler
 from modules.scenarios.plot_twist_panel import PlotTwistPanel, roll_plot_twist
+from modules.scenarios.session_notes import (
+    build_scene_snapshot_entry,
+    build_session_debrief_entry,
+)
 from modules.ui.chatbot_dialog import (
     open_chatbot_dialog,
     _DEFAULT_NAME_FIELD_OVERRIDES as CHATBOT_NAME_OVERRIDES,
@@ -508,7 +512,21 @@ class GMScreenView(ctk.CTkFrame):
         start_btn = ctk.CTkButton(self._session_controls, text="Start", width=70, command=self._start_session)
         start_btn.pack(side="left", padx=(0, 4))
         end_btn = ctk.CTkButton(self._session_controls, text="End", width=70, command=self._end_session)
-        end_btn.pack(side="left")
+        end_btn.pack(side="left", padx=(0, 4))
+        capture_btn = ctk.CTkButton(
+            self._session_controls,
+            text="Capture",
+            width=84,
+            command=self._capture_scene_snapshot,
+        )
+        capture_btn.pack(side="left", padx=(0, 4))
+        debrief_btn = ctk.CTkButton(
+            self._session_controls,
+            text="Debrief",
+            width=84,
+            command=self._append_session_debrief,
+        )
+        debrief_btn.pack(side="left")
 
         mid_entry.bind("<FocusOut>", self._persist_session_hours, add="+")
         end_entry.bind("<FocusOut>", self._persist_session_hours, add="+")
@@ -519,6 +537,8 @@ class GMScreenView(ctk.CTkFrame):
         self._session_end_entry = end_entry
         self._session_start_button = start_btn
         self._session_end_button = end_btn
+        self._session_capture_button = capture_btn
+        self._session_debrief_button = debrief_btn
         self._update_session_controls_state()
 
     def _load_session_hours(self):
@@ -580,6 +600,8 @@ class GMScreenView(ctk.CTkFrame):
     def _end_session(self, silent: bool = False):
         if not self._session_active and not self._plot_twist_scheduler.is_active():
             return
+        if not silent:
+            self._append_session_debrief()
         self._plot_twist_scheduler.cancel()
         self._session_active = False
         self._session_start = None
@@ -953,6 +975,66 @@ class GMScreenView(ctk.CTkFrame):
                 self._set_scene_var(key, True)
                 return True
         return False
+
+    def _append_note_entry(self, entry_text):
+        if not entry_text:
+            return
+        text = entry_text.strip()
+        if not text:
+            return
+
+        if self.note_widget:
+            existing = self.note_widget.get("1.0", "end-1c").strip()
+            prefix = "\n\n" if existing else ""
+            self.note_widget.insert("end", f"{prefix}{text}")
+            self.note_widget.see("end")
+            self._update_note_cache()
+            return
+
+        existing = self._note_cache.strip()
+        prefix = "\n\n" if existing else ""
+        self._note_cache = f"{existing}{prefix}{text}".strip()
+        self._persist_scene_state()
+
+    def _capture_scene_snapshot(self):
+        metadata = self._scene_metadata.get(self._active_scene_key) if self._active_scene_key else {}
+        entry = build_scene_snapshot_entry(
+            timestamp=datetime.now(),
+            scene_key=self._active_scene_key,
+            scene_metadata=metadata,
+            active_tab=self.current_tab,
+        )
+        self._append_note_entry(entry)
+
+    def _append_session_debrief(self):
+        labels = {}
+        for key, metadata in self._scene_metadata.items():
+            label = (metadata or {}).get("display_label") or key
+            labels[key] = str(label).strip()
+
+        completed = [
+            labels.get(key, key)
+            for key in self._scene_order
+            if self._scene_completion_state.get(key, False)
+        ]
+        pending = [
+            labels.get(key, key)
+            for key in self._scene_order
+            if not self._scene_completion_state.get(key, False)
+        ]
+        if not completed and not pending and labels:
+            for key, value in labels.items():
+                target = completed if self._scene_completion_state.get(key, False) else pending
+                target.append(value)
+
+        entry = build_session_debrief_entry(
+            scenario_name=self.scenario_name,
+            started_at=self._session_start,
+            ended_at=datetime.now(),
+            completed_scenes=completed,
+            pending_scenes=pending,
+        )
+        self._append_note_entry(entry)
 
     def add_timestamped_note(self):
         if not self.note_widget:
