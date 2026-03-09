@@ -41,15 +41,18 @@ def analyze_repository(root: str | Path = ".") -> RepoSummary:
 
 
 def architecture_summary_text(root: str | Path = ".") -> str:
-    summary = analyze_repository(root)
+    return format_architecture_summary(analyze_repository(root))
+
+
+def format_architecture_summary(summary: RepoSummary) -> str:
+    """Render a plain-text architecture snapshot for CLI output."""
     modules = ", ".join(summary.top_modules()) if summary.python_files else "none"
-    return "\n".join(
-        [
-            f"Repository: {summary.root}",
-            f"Python files: {len(summary.python_files)}",
-            f"Test files: {len(summary.test_files)}",
-            f"UI files: {len(summary.ui_files)}",
-            f"Docs files: {len(summary.docs_files)}",
-            f"Top modules: {modules}",
-        ]
-    )
+    sections = [
+        ("Repository", str(summary.root)),
+        ("Python files", str(len(summary.python_files))),
+        ("Test files", str(len(summary.test_files))),
+        ("UI files", str(len(summary.ui_files))),
+        ("Docs files", str(len(summary.docs_files))),
+        ("Top modules", modules),
+    ]
+    return "\n".join(f"{name}: {value}" for name, value in sections)
