@@ -11,7 +11,7 @@ try:
     from .feature_score import FeatureScorer
     from .planner_agent import PlannerAgent
     from .pr_agent import PRAgent
-    from .repo_analyzer import analyze_repository
+    from .repo_analyzer import analyze_repository, architecture_summary_text
     from .test_agent import TestAgent
 except ImportError:
     from coder_agent import CoderAgent
@@ -20,7 +20,7 @@ except ImportError:
     from feature_score import FeatureScorer
     from planner_agent import PlannerAgent
     from pr_agent import PRAgent
-    from repo_analyzer import analyze_repository
+    from repo_analyzer import analyze_repository, architecture_summary_text
     from test_agent import TestAgent
 
 
@@ -53,9 +53,17 @@ def run_feature_lab(workspace: str | Path = ".", commit: bool = False, push: boo
 def main() -> None:
     p = argparse.ArgumentParser(description="Run autonomous feature lab pipeline.")
     p.add_argument("--workspace", default=".", help="Repository root path")
+    p.add_argument(
+        "--architecture-summary",
+        action="store_true",
+        help="Print a quick repository architecture summary and exit",
+    )
     p.add_argument("--commit", action="store_true", help="Create git branch and commit")
     p.add_argument("--push", action="store_true", help="Push branch to origin (implies --commit)")
     a = p.parse_args()
+    if a.architecture_summary:
+        print(architecture_summary_text(a.workspace))
+        return
     print(json.dumps(run_feature_lab(a.workspace, commit=(a.commit or a.push), push=a.push), indent=2))
 
 
