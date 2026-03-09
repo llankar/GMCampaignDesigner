@@ -37,3 +37,15 @@ def test_feature_lab_cli_architecture_summary_exits_early(monkeypatch, capsys, t
     out = capsys.readouterr().out
     assert "Repository:" in out
     assert "Python files: 1" in out
+
+
+def test_run_architecture_summary_command_delegates_to_repo_analyzer(monkeypatch, tmp_path):
+    expected = "Repository: delegated"
+
+    def _fake_summary(workspace):
+        assert workspace == tmp_path
+        return expected
+
+    monkeypatch.setattr(feature_lab, "architecture_summary_text", _fake_summary)
+
+    assert feature_lab.run_architecture_summary_command(tmp_path) == expected

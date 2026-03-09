@@ -24,6 +24,11 @@ except ImportError:
     from test_agent import TestAgent
 
 
+def run_architecture_summary_command(workspace: str | Path = ".") -> str:
+    """Return architecture summary text for the requested workspace."""
+    return architecture_summary_text(workspace)
+
+
 def run_feature_lab(workspace: str | Path = ".", commit: bool = False, push: bool = False) -> dict:
     root = Path(workspace).resolve()
     summary = analyze_repository(root)
@@ -62,7 +67,7 @@ def main() -> None:
     p.add_argument("--push", action="store_true", help="Push branch to origin (implies --commit)")
     a = p.parse_args()
     if a.architecture_summary:
-        print(architecture_summary_text(a.workspace))
+        print(run_architecture_summary_command(a.workspace))
         return
     print(json.dumps(run_feature_lab(a.workspace, commit=(a.commit or a.push), push=a.push), indent=2))
 
