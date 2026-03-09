@@ -5,30 +5,32 @@ import json
 from pathlib import Path
 
 try:
+    from .cli.architecture_summary import build_architecture_summary
     from .coder_agent import CoderAgent
     from .context_builder import ContextBuilder
     from .feature_agent import FeatureAgent
     from .feature_score import FeatureScorer
     from .planner_agent import PlannerAgent
     from .pr_agent import PRAgent
-    from .repo_analyzer import analyze_repository, architecture_summary_text
+    from .repo_analyzer import analyze_repository
     from .reporting import build_final_report
     from .test_agent import TestAgent
 except ImportError:
+    from cli.architecture_summary import build_architecture_summary
     from coder_agent import CoderAgent
     from context_builder import ContextBuilder
     from feature_agent import FeatureAgent
     from feature_score import FeatureScorer
     from planner_agent import PlannerAgent
     from pr_agent import PRAgent
-    from repo_analyzer import analyze_repository, architecture_summary_text
+    from repo_analyzer import analyze_repository
     from reporting import build_final_report
     from test_agent import TestAgent
 
 
 def run_architecture_summary_command(workspace: str | Path = ".") -> str:
     """Return architecture summary text for the requested workspace."""
-    return architecture_summary_text(workspace)
+    return build_architecture_summary(workspace)
 
 
 def run_feature_lab(workspace: str | Path = ".", commit: bool = False, push: bool = False) -> dict:

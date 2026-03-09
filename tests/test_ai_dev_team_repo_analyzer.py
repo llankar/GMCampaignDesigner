@@ -46,6 +46,6 @@ def test_run_architecture_summary_command_delegates_to_repo_analyzer(monkeypatch
         assert workspace == tmp_path
         return expected
 
-    monkeypatch.setattr(feature_lab, "architecture_summary_text", _fake_summary)
+    monkeypatch.setattr(feature_lab, "build_architecture_summary", _fake_summary)
 
     assert feature_lab.run_architecture_summary_command(tmp_path) == expected
