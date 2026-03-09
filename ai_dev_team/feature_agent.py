@@ -39,6 +39,7 @@ class FeatureAgent:
                 "ai_dev_team/feature_lab.py",
                 "ai_dev_team/repo_analyzer.py",
                 "tests/test_ai_dev_team_repo_analyzer.py",
+                "docs/architecture/ai_dev_team_summary.md",
             ],
             acceptance_criteria=criteria,
         )

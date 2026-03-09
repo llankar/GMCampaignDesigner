@@ -64,7 +64,7 @@ def test_plan_states_pending_when_proposal_not_approved():
     assert {step["state"] for step in report["plan"]} == {"pending"}
 
 
-def test_plan_states_accept_safe_last_run_artifact_as_implementation_output():
+def test_plan_states_fail_when_only_implementation_artifact_is_changed():
     report = build_final_report(
         proposal={"title": "x", "target_files": ["ai_dev_team/feature_lab.py"]},
         review={"approved": True, "score": 90, "reasons": ["ok"]},
@@ -74,5 +74,5 @@ def test_plan_states_accept_safe_last_run_artifact_as_implementation_output():
     )
 
     states = {step["id"]: step["state"] for step in report["plan"]}
-    assert states[2] == "completed"
-    assert states[5] == "completed"
+    assert states[2] == "failed"
+    assert states[5] == "failed"
