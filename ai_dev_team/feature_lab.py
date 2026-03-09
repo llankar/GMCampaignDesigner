@@ -12,6 +12,7 @@ try:
     from .planner_agent import PlannerAgent
     from .pr_agent import PRAgent
     from .repo_analyzer import analyze_repository, architecture_summary_text
+    from .reporting import build_final_report
     from .test_agent import TestAgent
 except ImportError:
     from coder_agent import CoderAgent
@@ -21,6 +22,7 @@ except ImportError:
     from planner_agent import PlannerAgent
     from pr_agent import PRAgent
     from repo_analyzer import analyze_repository, architecture_summary_text
+    from reporting import build_final_report
     from test_agent import TestAgent
 
 
@@ -36,19 +38,21 @@ def run_feature_lab(workspace: str | Path = ".", commit: bool = False, push: boo
     proposal = FeatureAgent().propose(context)
     score = FeatureScorer().evaluate(proposal)
     if not score.approved:
-        return {"status": "rejected", "score": score.score, "reasons": score.reasons}
+        return build_final_report(
+            proposal=proposal.__dict__,
+            review={"approved": score.approved, "score": score.score, "reasons": score.reasons},
+        )
 
     plan = PlannerAgent().plan(proposal)
     changed_files = CoderAgent().implement(plan, root)
     tests = TestAgent().run(root)
-    result: dict = {
-        "status": "completed" if tests.ok else "test_failed",
-        "proposal": proposal.__dict__,
-        "score": {"value": score.score, "reasons": score.reasons},
-        "plan": [step.__dict__ for step in plan],
-        "changed_files": changed_files,
-        "tests": {"ok": tests.ok, "command": tests.command, "return_code": tests.return_code},
-    }
+    result: dict = build_final_report(
+        proposal=proposal.__dict__,
+        review={"approved": score.approved, "score": score.score, "reasons": score.reasons},
+        plan=[step.__dict__ for step in plan],
+        changed_files=changed_files,
+        tests={"ok": tests.ok, "command": tests.command, "return_code": tests.return_code},
+    )
     if commit:
         msg = f"feat: {proposal.title.lower()}"
         result["pr"] = PRAgent().create_branch_and_commit(root, msg, push=push).__dict__
