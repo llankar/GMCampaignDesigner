@@ -184,6 +184,18 @@ class _DummyButton:
             self._state = kwargs["state"]
 
 
+class _RecordingScenarioWrapper:
+    def __init__(self, items=None):
+        self._items = list(items or [])
+        self.saved_items = None
+
+    def load_items(self):
+        return list(self._items)
+
+    def save_items(self, items):
+        self.saved_items = list(items)
+
+
 def test_finish_shows_retry_dialog_on_load_failure(monkeypatch):
     wizard = scenario_builder_wizard.ScenarioBuilderWizard.__new__(
         scenario_builder_wizard.ScenarioBuilderWizard
@@ -242,6 +254,71 @@ def test_finish_shows_retry_dialog_on_load_failure(monkeypatch):
     assert logged_messages == [
         ("Failed to load scenarios for ScenarioBuilderWizard.", "ScenarioBuilderWizard.finish")
     ]
+
+
+def test_entity_linking_step_includes_villains_and_events():
+    expected_fields = {
+        "bases": ("Bases", "Base"),
+        "books": ("Books", "Book"),
+        "creatures": ("Creatures", "Creature"),
+        "events": ("Events", "Event"),
+        "factions": ("Factions", "Faction"),
+        "maps": ("Maps", "Map"),
+        "npcs": ("NPCs", "NPC"),
+        "objects": ("Objects", "Item"),
+        "pcs": ("PCs", "PC"),
+        "places": ("Places", "Place"),
+        "villains": ("Villains", "Villain"),
+    }
+
+    for entity_type, labels in expected_fields.items():
+        assert scenario_builder_wizard.EntityLinkingStep.ENTITY_FIELDS[entity_type] == labels
+
+
+def test_finish_saves_all_selected_entity_links(monkeypatch):
+    wizard = scenario_builder_wizard.ScenarioBuilderWizard.__new__(
+        scenario_builder_wizard.ScenarioBuilderWizard
+    )
+    wizard.current_step_index = 0
+    wizard.steps = [("Review", _DummyStep())]
+    wizard.wizard_state = {
+        "Title": "Linked Scenario",
+        "Summary": "Summary",
+        "Secrets": "Secret",
+        "Scenes": [{"Title": "Intro"}],
+        "Bases": [],
+        "Places": ["Harbor"],
+        "Maps": ["Harbor Map"],
+        "NPCs": ["Morgan"],
+        "PCs": ["Avery"],
+        "Creatures": [],
+        "Factions": [],
+        "Villains": ["The Broker", "The Broker"],
+        "Events": ["Festival Night", "Festival Night"],
+        "Objects": [],
+        "Books": ["Chronicle", "Chronicle"],
+        "ScenarioCharacterGraph": {},
+        "ScenarioCharacterGraphSync": False,
+    }
+    wizard.on_saved = None
+    wizard.destroy = lambda: None
+    wizard.back_btn = _DummyButton()
+    wizard.next_btn = _DummyButton()
+    wizard.finish_btn = _DummyButton()
+    wizard.cancel_btn = _DummyButton()
+    wizard.scenario_wrapper = _RecordingScenarioWrapper()
+
+    monkeypatch.setattr(scenario_builder_wizard.messagebox, "showwarning", lambda *args, **kwargs: None)
+    monkeypatch.setattr(scenario_builder_wizard.messagebox, "showinfo", lambda *args, **kwargs: None)
+    monkeypatch.setattr(scenario_builder_wizard.messagebox, "askyesno", lambda *args, **kwargs: True)
+    monkeypatch.setattr(scenario_builder_wizard.messagebox, "askretrycancel", lambda *args, **kwargs: True)
+
+    wizard.finish()
+
+    assert wizard.scenario_wrapper.saved_items is not None
+    assert wizard.scenario_wrapper.saved_items[0]["Villains"] == ["The Broker"]
+    assert wizard.scenario_wrapper.saved_items[0]["Events"] == ["Festival Night"]
+    assert wizard.scenario_wrapper.saved_items[0]["Books"] == ["Chronicle"]
 
 
 def _build_scenes_step():

@@ -36,6 +36,104 @@ except AttributeError:  # pragma: no cover - Pillow < 9.1
 log_module_import(__name__)
 
 
+SCENARIO_ENTITY_SINGULAR_LABELS = {
+    "Bases": "Base",
+    "Books": "Book",
+    "Creatures": "Creature",
+    "Events": "Event",
+    "Factions": "Faction",
+    "Maps": "Map",
+    "NPCs": "NPC",
+    "Objects": "Item",
+    "PCs": "PC",
+    "Places": "Place",
+    "Villains": "Villain",
+}
+
+LEGACY_SCENARIO_ENTITY_FIELD_NAMES = {
+    "npcs": "NPCs",
+    "pcs": "PCs",
+    "villains": "Villains",
+    "creatures": "Creatures",
+    "bases": "Bases",
+    "places": "Places",
+    "maps": "Maps",
+    "events": "Events",
+    "factions": "Factions",
+    "objects": "Objects",
+    "books": "Books",
+}
+
+SCENARIO_ENTITY_TYPE_ORDER = (
+    "npcs",
+    "pcs",
+    "villains",
+    "creatures",
+    "bases",
+    "places",
+    "maps",
+    "events",
+    "factions",
+    "objects",
+    "books",
+)
+
+
+def _derive_scenario_entity_singular_label(field_name):
+    override = SCENARIO_ENTITY_SINGULAR_LABELS.get(field_name)
+    if override:
+        return override
+    if field_name.endswith("ies") and len(field_name) > 3:
+        return field_name[:-3] + "y"
+    if field_name.endswith("s") and len(field_name) > 1:
+        return field_name[:-1]
+    return field_name
+
+
+def _build_scenario_entity_fields():
+    field_names = {}
+    try:
+        template = load_template("scenarios")
+    except Exception:
+        template = {}
+
+    for field in template.get("fields") or []:
+        if not isinstance(field, dict):
+            continue
+        field_name = str(field.get("name") or "").strip()
+        field_type = str(field.get("type") or "").strip().lower()
+        linked_type = str(field.get("linked_type") or "").strip()
+        if not field_name or field_name == "Scenes" or field_type != "list" or not linked_type:
+            continue
+        field_names[linked_type.lower()] = field_name
+
+    for entity_type, field_name in LEGACY_SCENARIO_ENTITY_FIELD_NAMES.items():
+        field_names.setdefault(entity_type, field_name)
+
+    ordered = {}
+    for entity_type in SCENARIO_ENTITY_TYPE_ORDER:
+        field_name = field_names.pop(entity_type, None)
+        if not field_name:
+            continue
+        ordered[entity_type] = (
+            field_name,
+            _derive_scenario_entity_singular_label(field_name),
+        )
+
+    for entity_type, field_name in field_names.items():
+        ordered[entity_type] = (
+            field_name,
+            _derive_scenario_entity_singular_label(field_name),
+        )
+    return ordered
+
+
+SCENARIO_ENTITY_FIELDS = _build_scenario_entity_fields()
+SCENARIO_ENTITY_FIELD_NAMES = tuple(
+    field_name for field_name, _ in SCENARIO_ENTITY_FIELDS.values()
+)
+
+
 class WizardStep(ctk.CTkFrame):
     """Base class for wizard steps with state synchronization hooks."""
 
@@ -459,7 +557,7 @@ class ScenesPlanningStep(WizardStep):
         else:
             self._state_ref["_SceneLayout"] = []
 
-        for field in ("NPCs", "PCs", "Creatures", "Bases", "Places", "Maps", "Factions", "Objects"):
+        for field in SCENARIO_ENTITY_FIELD_NAMES:
             values = scenario.get(field) or []
             if isinstance(values, str):
                 values = self._split_to_list(values)
@@ -1388,17 +1486,12 @@ class EntityLinkingStep(WizardStep):
     CARD_SELECTED_BORDER = "#60a5fa"
     CARD_TEXT_COLOR = ("#e2e8f0", "#e2e8f0")
     CARD_SUBTEXT_COLOR = ("#94a3b8", "#94a3b8")
-    ENTITY_FIELDS = {
-        "npcs": ("NPCs", "NPC"),
-        "places": ("Places", "Place"),
-        "factions": ("Factions", "Faction"),
-        "creatures": ("Creatures", "Creature"),
-        "objects": ("Objects", "Item"),
-        "maps": ("Maps", "Map"),
-    }
+    ENTITY_FIELDS = SCENARIO_ENTITY_FIELDS
 
     def __init__(self, master, wrappers):
         super().__init__(master)
+        self.grid_rowconfigure(0, weight=1)
+        self.grid_columnconfigure(0, weight=1)
         self.wrappers = wrappers
         self.selected = {field: [] for field, _ in self.ENTITY_FIELDS.values()}
         self.card_containers = {}
@@ -1429,23 +1522,22 @@ class EntityLinkingStep(WizardStep):
                 self._entity_icons[entity_type] = None
             self._media_fields[entity_type] = self._detect_media_field(entity_type)
 
-        container = ctk.CTkFrame(self)
-        container.pack(fill="both", expand=True, padx=10, pady=10)
+        container = ctk.CTkScrollableFrame(self, fg_color="transparent")
+        container.grid(row=0, column=0, sticky="nsew", padx=10, pady=10)
         container.grid_columnconfigure((0, 1), weight=1, uniform="entities")
 
         for idx, (entity_type, (field, label)) in enumerate(self.ENTITY_FIELDS.items()):
             frame = ctk.CTkFrame(container)
             row, col = divmod(idx, 2)
             frame.grid(row=row, column=col, sticky="nsew", padx=8, pady=8)
-            frame.grid_rowconfigure(1, weight=1)
             frame.grid_columnconfigure(0, weight=1)
 
             ctk.CTkLabel(frame, text=f"Linked {label}s", anchor="w", font=ctk.CTkFont(size=14, weight="bold")).grid(
                 row=0, column=0, sticky="w", padx=6, pady=(6, 4)
             )
 
-            cards = ctk.CTkScrollableFrame(frame, fg_color="transparent")
-            cards.grid(row=1, column=0, sticky="nsew", padx=6, pady=(0, 6))
+            cards = ctk.CTkFrame(frame, fg_color="transparent")
+            cards.grid(row=1, column=0, sticky="ew", padx=6, pady=(0, 6))
             cards.grid_columnconfigure(0, weight=1)
             self.card_containers[field] = cards
             self.card_widgets[field] = {}
@@ -1663,7 +1755,10 @@ class EntityLinkingStep(WizardStep):
         return card
 
     def open_selector(self, entity_type, field):  # pragma: no cover - UI interaction
-        wrapper = self.wrappers[entity_type]
+        wrapper = self.wrappers.get(entity_type)
+        if not wrapper:
+            messagebox.showerror("Unavailable", f"No data source is available for {field}.")
+            return
         template = load_template(entity_type)
         top = ctk.CTkToplevel(self)
         top.title(f"Select {field}")
@@ -2064,18 +2159,10 @@ class ReviewStep(WizardStep):
 
         scene_count = len(scenes)
         entity_counts = []
-        for field, label in (
-            ("NPCs", "NPCs"),
-            ("Creatures", "Creatures"),
-            ("Bases", "Bases"),
-            ("Places", "Places"),
-            ("Maps", "Maps"),
-            ("Factions", "Factions"),
-            ("Objects", "Objects"),
-        ):
+        for field in SCENARIO_ENTITY_FIELD_NAMES:
             entries = state.get(field) or []
             if entries:
-                entity_counts.append(f"{len(entries)} {label}")
+                entity_counts.append(f"{len(entries)} {field}")
         stats_text = " • ".join(entity_counts)
         stats_prefix = f"{scene_count} scene{'s' if scene_count != 1 else ''}"
         self.stats_label.configure(
@@ -2106,7 +2193,7 @@ class ReviewStep(WizardStep):
         else:
             summary_lines.append("  (No scenes planned.)")
 
-        for field in ("NPCs", "Creatures", "Bases", "Places", "Maps", "Factions", "Objects"):
+        for field in SCENARIO_ENTITY_FIELD_NAMES:
             entries = state.get(field) or []
             summary_lines.append("")
             summary_lines.append(f"{field}:")
@@ -2141,27 +2228,28 @@ class ScenarioBuilderWizard(ctk.CTkToplevel):
             "Secrets": "",
             "Secret": "",
             "Scenes": [],
-            "NPCs": [],
-            "PCs": [],
-            "Creatures": [],
-            "Bases": [],
-            "Places": [],
-            "Maps": [],
-            "Factions": [],
-            "Objects": [],
             "ScenarioCharacterGraph": {"nodes": [], "links": []},
             "ScenarioCharacterGraphSync": False,
         }
+        for field in SCENARIO_ENTITY_FIELD_NAMES:
+            self.wizard_state[field] = []
 
         self.scenario_wrapper = GenericModelWrapper("scenarios")
-        self.npc_wrapper = GenericModelWrapper("npcs")
-        self.pc_wrapper = GenericModelWrapper("pcs")
-        self.creature_wrapper = GenericModelWrapper("creatures")
-        self.base_wrapper = GenericModelWrapper("bases")
-        self.place_wrapper = GenericModelWrapper("places")
-        self.map_wrapper = GenericModelWrapper("maps")
-        self.faction_wrapper = GenericModelWrapper("factions")
-        self.object_wrapper = GenericModelWrapper("objects")
+        self.entity_wrappers = {
+            entity_type: GenericModelWrapper(entity_type)
+            for entity_type in SCENARIO_ENTITY_FIELDS
+        }
+        self.npc_wrapper = self.entity_wrappers["npcs"]
+        self.pc_wrapper = self.entity_wrappers["pcs"]
+        self.villain_wrapper = self.entity_wrappers["villains"]
+        self.creature_wrapper = self.entity_wrappers["creatures"]
+        self.base_wrapper = self.entity_wrappers["bases"]
+        self.place_wrapper = self.entity_wrappers["places"]
+        self.map_wrapper = self.entity_wrappers["maps"]
+        self.event_wrapper = self.entity_wrappers["events"]
+        self.faction_wrapper = self.entity_wrappers["factions"]
+        self.object_wrapper = self.entity_wrappers["objects"]
+        self.book_wrapper = self.entity_wrappers["books"]
 
         self._build_layout()
         self._create_steps()
@@ -2267,15 +2355,7 @@ class ScenarioBuilderWizard(ctk.CTkToplevel):
         self.cancel_btn.grid(row=0, column=3, padx=10, pady=10, sticky="ew")
 
     def _create_steps(self):  # pragma: no cover - UI layout
-        entity_wrappers = {
-            "npcs": self.npc_wrapper,
-            "bases": self.base_wrapper,
-            "places": self.place_wrapper,
-            "factions": self.faction_wrapper,
-            "creatures": self.creature_wrapper,
-            "objects": self.object_wrapper,
-            "maps": self.map_wrapper,
-        }
+        entity_wrappers = dict(self.entity_wrappers)
 
         planning_step = ScenesPlanningStep(
             self.step_container,
@@ -2464,16 +2544,10 @@ class ScenarioBuilderWizard(ctk.CTkToplevel):
             "Secrets": secrets,
             "Secret": secrets,
             "Scenes": scenes,
-            "Bases": list(dict.fromkeys(self.wizard_state.get("Bases", []))),
-            "Places": list(dict.fromkeys(self.wizard_state.get("Places", []))),
-            "NPCs": list(dict.fromkeys(self.wizard_state.get("NPCs", []))),
-            "PCs": list(dict.fromkeys(self.wizard_state.get("PCs", []))),
-            "Creatures": list(dict.fromkeys(self.wizard_state.get("Creatures", []))),
-            "Maps": list(dict.fromkeys(self.wizard_state.get("Maps", []))),
-            "Factions": list(dict.fromkeys(self.wizard_state.get("Factions", []))),
-            "Objects": list(dict.fromkeys(self.wizard_state.get("Objects", []))),
             "ScenarioCharacterGraph": self.wizard_state.get("ScenarioCharacterGraph", {}),
         }
+        for field in SCENARIO_ENTITY_FIELD_NAMES:
+            payload[field] = list(dict.fromkeys(self.wizard_state.get(field, [])))
         sync_graph = bool(self.wizard_state.get("ScenarioCharacterGraphSync"))
 
         buttons = {
