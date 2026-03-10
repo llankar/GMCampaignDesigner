@@ -3047,6 +3047,7 @@ class MainWindow(ctk.CTk):
                     "npcs",
                     "scenarios",
                     "factions",
+                    "bases",
                     "places",
                     "objects",
                     "creatures",

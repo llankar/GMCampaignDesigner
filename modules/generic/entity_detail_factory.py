@@ -47,6 +47,7 @@ TOOLTIP_FIELDS = {
     "Creatures": ("Type", "Stats", "Powers", "Weakness", "Background"),
     "PCs": ("Role", "Traits", "Secret", "Background"),
     "Places": ("Description", "Secrets"),
+    "Bases": ("Location", "Upgrades", "Threats", "DowntimeHooks"),
     "Objects": ("Description", "Powers"),
     "Factions": ("Description", "Secrets"),
     "Books": ("Subject", "Game", "Tags", "Notes"),
@@ -94,6 +95,7 @@ def _attach_portrait_tooltip(widget, entity_type, data):
 wrappers = {
     "Scenarios": GenericModelWrapper("scenarios"),
     "Places": GenericModelWrapper("places"),
+    "Bases": GenericModelWrapper("bases"),
     "NPCs": GenericModelWrapper("npcs"),
     "Factions": GenericModelWrapper("factions"),
     "Objects": GenericModelWrapper("objects"),
@@ -1287,7 +1289,7 @@ def create_scenario_detail_frame(entity_type, scenario_item, master, open_entity
         justify="left"
     ).pack(fill="x", pady=(0, 15))
 
-    if entity_type in {"Scenarios", "Places", "NPCs", "Informations"}:
+    if entity_type in {"Scenarios", "Places", "Bases", "NPCs", "Informations"}:
         related_events_panel = RelatedEventsPanel(
             _get_section_frame("Notes"),
             entity_type=entity_type,
@@ -1507,7 +1509,7 @@ def create_entity_detail_frame(entity_type, entity, master, open_entity_callback
             if linked_type:
                 insert_links(content_frame, field_name, entity.get(field_name) or [], linked_type, open_entity_callback)
 
-    if entity_type in {"Scenarios", "Places", "NPCs", "Informations"}:
+    if entity_type in {"Scenarios", "Places", "Bases", "NPCs", "Informations"}:
         related_events_panel = RelatedEventsPanel(
             content_frame,
             entity_type=entity_type,

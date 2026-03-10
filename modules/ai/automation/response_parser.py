@@ -79,9 +79,11 @@ def parse_story_arc_json(payload: str) -> Dict[str, Any]:
         "Synopsis",
         "Goal",
         "KeyNPCs",
+        "KeyBases",
         "KeyLocations",
         "KeyItems",
         "Hooks",
+        "DowntimeHooks",
         "Outcome",
         "LeadsTo",
     }
@@ -99,9 +101,11 @@ def parse_story_arc_json(payload: str) -> Dict[str, Any]:
                 "Synopsis": str(entry.get("Synopsis", "")).strip(),
                 "Goal": str(entry.get("Goal", "")).strip(),
                 "KeyNPCs": _normalize_string_list(entry.get("KeyNPCs")),
+                "KeyBases": _normalize_string_list(entry.get("KeyBases")),
                 "KeyLocations": _normalize_string_list(entry.get("KeyLocations")),
                 "KeyItems": _normalize_string_list(entry.get("KeyItems")),
                 "Hooks": _normalize_string_list(entry.get("Hooks")),
+                "DowntimeHooks": _normalize_string_list(entry.get("DowntimeHooks")),
                 "Outcome": str(entry.get("Outcome", "")).strip(),
                 "LeadsTo": str(entry.get("LeadsTo", "")).strip(),
             }
