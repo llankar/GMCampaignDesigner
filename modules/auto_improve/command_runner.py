@@ -19,7 +19,7 @@ class CommandRunner:
 
         try:
             prompt_file_value = self._quote_value(str(prompt_path))
-            prompt_value = self._quote_value(prompt)
+            prompt_value = self._quote_prompt_value(prompt)
 
             command = (
                 command_template.replace("{prompt_file}", prompt_file_value).replace("{prompt}", prompt_value)
@@ -62,6 +62,11 @@ class CommandRunner:
             return subprocess.list2cmdline([value])
         return shlex.quote(value)
 
+    @classmethod
+    def _quote_prompt_value(cls, prompt: str) -> str:
+        flattened = " ".join(prompt.splitlines()).strip()
+        return cls._quote_value(flattened)
+
     @staticmethod
     def _build_prompt_fallback_template(command_template: str) -> str:
         fallback = command_template.replace("--input-file {prompt_file}", "{prompt}")
@@ -72,6 +77,8 @@ class CommandRunner:
 
     @staticmethod
     def _debug_agent_call(command: str, prompt: str, is_fallback: bool = False) -> None:
+        if not _is_debug_enabled():
+            return
         attempt = "fallback" if is_fallback else "primary"
         print(
             "[AUTO_IMPROVE_DEBUG] "
@@ -82,6 +89,8 @@ class CommandRunner:
 
     @staticmethod
     def _debug_agent_result(command: str, return_code: int, output: str) -> None:
+        if not _is_debug_enabled():
+            return
         rendered_output = output.strip() or "<no output>"
         print(
             "[AUTO_IMPROVE_DEBUG] "
@@ -106,3 +115,8 @@ class CommandRunner:
                 f"Validation command failed with code {result.returncode}.\nCommand: {command}\n{output.strip()}"
             )
         return output.strip() or "Validation completed without console output."
+
+
+def _is_debug_enabled() -> bool:
+    value = os.getenv("AUTO_IMPROVE_DEBUG", "").strip().lower()
+    return value in {"1", "true", "yes", "on"}
