@@ -102,6 +102,7 @@ class GMScreenView(ctk.CTkFrame):
         self.wrappers = {
             "Scenarios": GenericModelWrapper("scenarios"),
             "Places": GenericModelWrapper("places"),
+            "Bases": GenericModelWrapper("bases"),
             "NPCs": GenericModelWrapper("npcs"),
             "PCs": GenericModelWrapper("pcs"),
             "Factions": GenericModelWrapper("factions"),
@@ -122,6 +123,7 @@ class GMScreenView(ctk.CTkFrame):
         self.templates = {
             "Scenarios": load_entity_template("scenarios"),
             "Places": load_entity_template("places"),
+            "Bases": load_entity_template("bases"),
             "NPCs": load_entity_template("npcs"),
             "PCs": load_entity_template("pcs"),
             "Factions": load_entity_template("factions"),
@@ -194,6 +196,7 @@ class GMScreenView(ctk.CTkFrame):
             "Random Tables",
             "Plot Twists",
             "Factions",
+            "Bases",
             "Places",
             "NPCs",
             "PCs",
@@ -2224,7 +2227,7 @@ class GMScreenView(ctk.CTkFrame):
         log_info("Adding random entity to GM screen", func_name="GMScreenView._add_random_entity")
         """Pick a random NPC, Creature, Object, Information or Clue and open it.
         """
-        types = ["NPCs", "Creatures", "Objects", "Informations", "Clues", "Puzzles"]
+        types = ["NPCs", "Creatures", "Bases", "Objects", "Informations", "Clues", "Puzzles"]
         random.shuffle(types)
 
         for etype in types:

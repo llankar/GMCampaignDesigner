@@ -200,6 +200,7 @@ def _apply_line_prefix(value: RichTextValue, first_prefix: str, later_prefix: st
 _DEFAULT_WRAPPER_FACTORIES: Sequence[tuple[str, str]] = (
     ("Scenarios", "scenarios"),
     ("Places", "places"),
+    ("Bases", "bases"),
     ("NPCs", "npcs"),
     ("PCs", "pcs"),
     ("Factions", "factions"),
@@ -395,6 +396,12 @@ _DEFAULT_SECTION_FIELDS: Mapping[str, Sequence[tuple[str, tuple[str, ...]]]] = {
         ("Secrets", ("Goals", "Agenda", "Secret", "Secrets", "PlotHooks")),
         ("Connections", ("Allies", "Enemies", "Contacts", "Rivals")),
     ),
+    "Bases": (
+        ("Overview", tuple(dict.fromkeys((*_NOTE_FIELD_CANDIDATES, "Location")))),
+        ("Role", ("Type", "Location", "Region", "Scale")),
+        ("Operations", ("Upgrades", "Staff", "Stores", "Threats", "Defenses", "DowntimeHooks")),
+        ("Connections", ("Maps", "NPCs", "Factions", "Places", "Scenarios")),
+    ),
     "Places": (
         ("Overview", tuple(dict.fromkeys((*_NOTE_FIELD_CANDIDATES, "History", "Atmosphere")))),
         (
@@ -429,7 +436,7 @@ _DEFAULT_SECTION_FIELDS: Mapping[str, Sequence[tuple[str, tuple[str, ...]]]] = {
         ),
         (
             "Connections",
-            ("Scenes", "Places", "NPCs", "Creatures", "Objects", "Factions", "Clues"),
+            ("Scenes", "Bases", "Places", "NPCs", "Creatures", "Objects", "Factions", "Clues"),
         ),
     ),
 }

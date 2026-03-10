@@ -88,9 +88,11 @@ def build_story_arc_prompt(scenario_count: int, user_prompt: str) -> str:
                 "Synopsis": "",
                 "Goal": "",
                 "KeyNPCs": [],
+                "KeyBases": [],
                 "KeyLocations": [],
                 "KeyItems": [],
                 "Hooks": [],
+                "DowntimeHooks": [],
                 "Outcome": "",
                 "LeadsTo": "",
             }
@@ -106,9 +108,9 @@ def build_story_arc_prompt(scenario_count: int, user_prompt: str) -> str:
         "- Output must be a single JSON object.\n"
         "- Include keys: ArcTitle, Premise, Tone, ScenarioCount, Scenarios.\n"
         "- ScenarioCount must match the number of Scenarios items.\n"
-        "- Each scenario must include Title, Synopsis, Goal, KeyNPCs, KeyLocations, "
-        "KeyItems, Hooks, Outcome, LeadsTo.\n"
-        "- Use lists for KeyNPCs, KeyLocations, KeyItems, Hooks (even if empty).\n"
+        "- Each scenario must include Title, Synopsis, Goal, KeyNPCs, KeyBases, KeyLocations, "
+        "KeyItems, Hooks, DowntimeHooks, Outcome, LeadsTo.\n"
+        "- Use lists for KeyNPCs, KeyBases, KeyLocations, KeyItems, Hooks, DowntimeHooks (even if empty).\n"
         "- Use plain strings for other fields.\n"
         "- Do not wrap the JSON in markdown fences.\n\n"
         f"Example shape (not actual content):\n{schema_json}\n\n"

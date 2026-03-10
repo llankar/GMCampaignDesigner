@@ -542,6 +542,7 @@ class GenericEditorWindow(ctk.CTkToplevel):
         entity_type_map = {
             "NPCs": "npcs",
             "Creatures": "creatures",
+            "Bases": "bases",
             "Places": "places",
             "Maps": "maps",
         }

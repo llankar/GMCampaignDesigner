@@ -63,6 +63,7 @@ _TOKEN_COLORS = {
     "NPC": "#FFB347",
     "PC": "#6ECFF6",
     "Creature": "#FF6F91",
+    "Base": "#C9A66B",
     "Place": "#B5E48C",
     "Map": "#F9C74F",
 }
@@ -114,6 +115,7 @@ class WorldMapPanel(ctk.CTkFrame):
         self.npc_wrapper = GenericModelWrapper("npcs")
         self.pc_wrapper = GenericModelWrapper("pcs")
         self.creature_wrapper = GenericModelWrapper("creatures")
+        self.base_wrapper = GenericModelWrapper("bases")
         self.place_wrapper = GenericModelWrapper("places")
 
         self.maps_wrapper_data = {item.get("Name", ""): item for item in self.maps_wrapper.load_items() if item.get("Name")}
@@ -750,6 +752,7 @@ class WorldMapPanel(ctk.CTkFrame):
             "NPC": "NPCs",
             "PC": "PCs",
             "Creature": "Creatures",
+            "Base": "Bases",
             "Place": "Places",
         }
         target_type = type_map.get(entity_type)
@@ -779,6 +782,7 @@ class WorldMapPanel(ctk.CTkFrame):
             "NPC": self.npc_wrapper,
             "PC": self.pc_wrapper,
             "Creature": self.creature_wrapper,
+            "Base": self.base_wrapper,
             "Place": self.place_wrapper,
             "Map": self.maps_wrapper,
         }
@@ -786,6 +790,7 @@ class WorldMapPanel(ctk.CTkFrame):
             "NPC": load_template("npcs"),
             "PC": load_template("pcs"),
             "Creature": load_template("creatures"),
+            "Base": load_template("bases"),
             "Place": load_template("places"),
             "Map": load_template("maps"),
         }
@@ -1532,7 +1537,7 @@ class WorldMapPanel(ctk.CTkFrame):
             self.tab_selector.set("Summary")
         self._select_inspector_tab("Summary")
         self._render_summary_message(
-            "Use the controls above to place NPCs, PCs, creatures, places, and nested maps. "
+            "Use the controls above to place NPCs, PCs, creatures, bases, places, and nested maps. "
             "Double-click a map token to dive deeper, and drag entities to reposition them."
         )
         self._notes_textbox = None
@@ -2028,7 +2033,7 @@ class WorldMapPanel(ctk.CTkFrame):
         if not token or token.get("type") == "map":
             self._render_tab_message(
                 "Notes",
-                "Notes are available for NPCs, PCs, creatures, and places.",
+                "Notes are available for NPCs, PCs, creatures, bases, and places.",
             )
             return
 
@@ -2295,6 +2300,7 @@ class WorldMapPanel(ctk.CTkFrame):
             "NPC": "npcs",
             "PC": "pcs",
             "CREATURE": "creatures",
+            "BASE": "bases",
             "PLACE": "places",
             "MAP": "maps",
         }
@@ -2325,6 +2331,7 @@ class WorldMapPanel(ctk.CTkFrame):
             "NPC": ("Profile", ["Role", "Traits", "Motivation", "Secret"]),
             "PC": ("Adventurer Details", ["Role", "Traits", "Background", "Secret"]),
             "Creature": ("Creature Traits", ["Type", "Powers", "Stats", "Weakness"]),
+            "Base": ("Base Operations", ["Location", "Upgrades", "Staff", "Stores", "Threats", "Defenses", "DowntimeHooks"]),
             "Place": ("Location Facts", ["Description", "NPCs", "Secrets", "PlayerDisplay"]),
         }
 
@@ -2438,6 +2445,7 @@ class WorldMapPanel(ctk.CTkFrame):
             "NPC": self.npc_wrapper,
             "PC": self.pc_wrapper,
             "Creature": self.creature_wrapper,
+            "Base": self.base_wrapper,
             "Place": self.place_wrapper,
             "Map": self.maps_wrapper,
         }

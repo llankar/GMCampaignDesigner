@@ -48,6 +48,7 @@ class AuthoringWizardView(ctk.CTkFrame):
         self.npcs = GenericModelWrapper("npcs")
         self.scenarios = GenericModelWrapper("scenarios")
         self.places = GenericModelWrapper("places")
+        self.bases = GenericModelWrapper("bases")
         self.factions = GenericModelWrapper("factions")
         self.infos = GenericModelWrapper("informations")
         self.ai = LocalAIClient()
@@ -201,6 +202,7 @@ class AuthoringWizardView(ctk.CTkFrame):
 
         npc_items = self.npcs.load_items()
         place_items = self.places.load_items()
+        base_items = self.bases.load_items()
         faction_items = self.factions.load_items()
         info_items = self.infos.load_items()
 
@@ -217,6 +219,7 @@ class AuthoringWizardView(ctk.CTkFrame):
             npc_lines.append(f"- {name}: {role} | Factions: {', '.join(facs or [])}")
 
         place_lines = [f"- {it.get('Name','?')}: {self._short(it.get('Description',''))}" for it in place_items[:15]]
+        base_lines = [f"- {it.get('Name','?')}: {self._short(it.get('Location',''))} | Hooks: {self._short(it.get('DowntimeHooks',''))}" for it in base_items[:12]]
         fac_lines = [f"- {it.get('Name','?')}" for it in faction_items[:20]]
         info_lines = [f"- {self._short(it.get('Information',''))}" for it in info_items[:20]]
 
@@ -224,6 +227,7 @@ class AuthoringWizardView(ctk.CTkFrame):
             "Lore Summary:",
             "NPCs:\n" + "\n".join(npc_lines),
             "Places:\n" + "\n".join(place_lines),
+            "Bases:\n" + "\n".join(base_lines),
             "Factions:\n" + "\n".join(fac_lines),
             "Facts:\n" + "\n".join(info_lines),
         ]
@@ -319,6 +323,7 @@ class AuthoringWizardView(ctk.CTkFrame):
                 scenes.append(self._as_text(sc))
         parts.append(self._format_list("Scenes", scenes))
         parts.append(self._format_list("NPCs", data.get("NPCs") or []))
+        parts.append(self._format_list("Bases", data.get("Bases") or []))
         parts.append(self._format_list("Places", data.get("Places") or []))
         parts.append(self._format_list("Factions", data.get("Factions") or []))
         return "\n".join(p for p in parts if p).strip() + "\n"
@@ -450,6 +455,7 @@ class AuthoringWizardView(ctk.CTkFrame):
             "Secrets": "",
             "Scenes": [],
             "NPCs": [],
+            "Bases": [],
             "Places": [],
             "Factions": [],
         }
@@ -458,7 +464,7 @@ class AuthoringWizardView(ctk.CTkFrame):
             f"Theme: {theme}. Antagonist: {antagonist or 'Unknown'}.\n"
             f"Return JSON with keys: {list(schema.keys())}.\n"
             f"- Summary: 2-4 paragraphs.\n- Secrets: GM-only twists.\n- Scenes: up to 5 short beats.\n"
-            f"- NPCs: up to 4 names only.\n- Places: up to 4 names only.\n- Factions: names only."
+            f"- NPCs: up to 4 names only.\n- Bases: up to 3 names only.\n- Places: up to 4 names only.\n- Factions: names only."
         )
         data = self._chat_json(self._with_lore(prompt))
         if not data:
@@ -466,6 +472,8 @@ class AuthoringWizardView(ctk.CTkFrame):
         # Enforce caps on generated lists
         if isinstance(data.get("NPCs"), list):
             data["NPCs"] = data["NPCs"][:4]
+        if isinstance(data.get("Bases"), list):
+            data["Bases"] = data["Bases"][:3]
         if isinstance(data.get("Places"), list):
             data["Places"] = data["Places"][:4]
         if isinstance(data.get("Scenes"), list):
@@ -491,6 +499,10 @@ class AuthoringWizardView(ctk.CTkFrame):
         for p in data.get("Places", []) or []:
             if p and p not in known_places:
                 issues.append(f"Unknown place: {p}")
+        known_bases = {it.get("Name") for it in self.bases.load_items()}
+        for b in data.get("Bases", []) or []:
+            if b and b not in known_bases:
+                issues.append(f"Unknown base: {b}")
         known_factions = {it.get("Name") for it in self.factions.load_items()}
         for f in data.get("Factions", []) or []:
             if f and f not in known_factions:
@@ -513,6 +525,8 @@ class AuthoringWizardView(ctk.CTkFrame):
         # Enforce caps again on save
         if isinstance(data.get("NPCs"), list):
             data["NPCs"] = data["NPCs"][:4]
+        if isinstance(data.get("Bases"), list):
+            data["Bases"] = data["Bases"][:3]
         if isinstance(data.get("Places"), list):
             data["Places"] = data["Places"][:4]
         if isinstance(data.get("Scenes"), list):
@@ -522,6 +536,7 @@ class AuthoringWizardView(ctk.CTkFrame):
             "Title": self._as_text(data.get("Title", "Untitled")),
             "Summary": {"text": self._as_text(data.get("Summary", "")), "formatting": {"bold":[],"italic":[],"underline":[],"left":[],"center":[],"right":[]}},
             "Secrets": {"text": self._as_text(data.get("Secrets", "")), "formatting": {"bold":[],"italic":[],"underline":[],"left":[],"center":[],"right":[]}},
+            "Bases": data.get("Bases", []),
             "Places": data.get("Places", []),
             "NPCs": data.get("NPCs", []),
             "Factions": data.get("Factions", []),

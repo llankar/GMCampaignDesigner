@@ -93,6 +93,7 @@ class ScenesPlanningStep(WizardStep):
     ENTITY_FIELDS = {
         "NPCs": ("npcs", "Key NPCs", "NPC"),
         "Creatures": ("creatures", "Creatures / Foes", "Creature"),
+        "Bases": ("bases", "Bases / Domains", "Base"),
         "Places": ("places", "Locations / Places", "Place"),
         "Maps": ("maps", "Maps & Handouts", "Map"),
     }
@@ -119,6 +120,7 @@ class ScenesPlanningStep(WizardStep):
         "_SceneLayout",
         "NPCs",
         "Creatures",
+        "Bases",
         "Places",
         "Maps",
         "Factions",
@@ -143,6 +145,7 @@ class ScenesPlanningStep(WizardStep):
         "Type",
         "NPCs",
         "Creatures",
+        "Bases",
         "Places",
         "Maps",
         "NextScenes",
@@ -446,7 +449,7 @@ class ScenesPlanningStep(WizardStep):
         else:
             self._state_ref["_SceneLayout"] = []
 
-        for field in ("NPCs", "PCs", "Creatures", "Places", "Maps", "Factions", "Objects"):
+        for field in ("NPCs", "PCs", "Creatures", "Bases", "Places", "Maps", "Factions", "Objects"):
             values = scenario.get(field) or []
             if isinstance(values, str):
                 values = self._split_to_list(values)
@@ -1025,6 +1028,7 @@ class ScenesPlanningStep(WizardStep):
                 "Text": scene.get("Summary", ""),
                 "NPCs": list(scene.get("NPCs", [])),
                 "Creatures": list(scene.get("Creatures", [])),
+                "Bases": list(scene.get("Bases", [])),
                 "Places": list(scene.get("Places", [])),
                 "Maps": list(scene.get("Maps", [])),
             }
@@ -1048,7 +1052,7 @@ class ScenesPlanningStep(WizardStep):
         state["Scenes"] = payload
         state["_SceneLayout"] = layout
 
-        for field in ("NPCs", "Creatures", "Places", "Maps"):
+        for field in ("NPCs", "Creatures", "Bases", "Places", "Maps"):
             merged = self._dedupe(self._split_to_list(state.get(field, [])))
             for scene in self.scenes:
                 merged.extend(scene.get(field, []))
@@ -1200,6 +1204,7 @@ class ScenesPlanningStep(WizardStep):
             "SceneType": entry.get("SceneType") or entry.get("Type") or "",
             "NPCs": self._split_to_list(entry.get("NPCs")),
             "Creatures": self._split_to_list(entry.get("Creatures")),
+            "Bases": self._split_to_list(entry.get("Bases")),
             "Places": self._split_to_list(entry.get("Places")),
             "Maps": self._split_to_list(entry.get("Maps")),
             "NextScenes": [link["target"] for link in deduped],
@@ -2052,6 +2057,7 @@ class ReviewStep(WizardStep):
         for field, label in (
             ("NPCs", "NPCs"),
             ("Creatures", "Creatures"),
+            ("Bases", "Bases"),
             ("Places", "Places"),
             ("Maps", "Maps"),
             ("Factions", "Factions"),
@@ -2090,7 +2096,7 @@ class ReviewStep(WizardStep):
         else:
             summary_lines.append("  (No scenes planned.)")
 
-        for field in ("NPCs", "Creatures", "Places", "Maps", "Factions", "Objects"):
+        for field in ("NPCs", "Creatures", "Bases", "Places", "Maps", "Factions", "Objects"):
             entries = state.get(field) or []
             summary_lines.append("")
             summary_lines.append(f"{field}:")
@@ -2128,6 +2134,7 @@ class ScenarioBuilderWizard(ctk.CTkToplevel):
             "NPCs": [],
             "PCs": [],
             "Creatures": [],
+            "Bases": [],
             "Places": [],
             "Maps": [],
             "Factions": [],
@@ -2140,6 +2147,7 @@ class ScenarioBuilderWizard(ctk.CTkToplevel):
         self.npc_wrapper = GenericModelWrapper("npcs")
         self.pc_wrapper = GenericModelWrapper("pcs")
         self.creature_wrapper = GenericModelWrapper("creatures")
+        self.base_wrapper = GenericModelWrapper("bases")
         self.place_wrapper = GenericModelWrapper("places")
         self.map_wrapper = GenericModelWrapper("maps")
         self.faction_wrapper = GenericModelWrapper("factions")
@@ -2251,6 +2259,7 @@ class ScenarioBuilderWizard(ctk.CTkToplevel):
     def _create_steps(self):  # pragma: no cover - UI layout
         entity_wrappers = {
             "npcs": self.npc_wrapper,
+            "bases": self.base_wrapper,
             "places": self.place_wrapper,
             "factions": self.faction_wrapper,
             "creatures": self.creature_wrapper,
@@ -2263,7 +2272,7 @@ class ScenarioBuilderWizard(ctk.CTkToplevel):
             {
                 key: wrapper
                 for key, wrapper in entity_wrappers.items()
-                if key in ("npcs", "creatures", "places", "maps")
+                if key in ("npcs", "creatures", "bases", "places", "maps")
             },
             scenario_wrapper=self.scenario_wrapper,
             finale_planner_callback=self._launch_epic_finale_planner,
@@ -2445,6 +2454,7 @@ class ScenarioBuilderWizard(ctk.CTkToplevel):
             "Secrets": secrets,
             "Secret": secrets,
             "Scenes": scenes,
+            "Bases": list(dict.fromkeys(self.wizard_state.get("Bases", []))),
             "Places": list(dict.fromkeys(self.wizard_state.get("Places", []))),
             "NPCs": list(dict.fromkeys(self.wizard_state.get("NPCs", []))),
             "PCs": list(dict.fromkeys(self.wizard_state.get("PCs", []))),

@@ -178,6 +178,7 @@ def build_world_map_toolbar(panel) -> None:
         text="Add Creature",
         command=lambda: panel._open_picker("Creature"),
     )
+    panel.add_base_button = ctk.CTkButton(entity_section, text="Add Base", command=lambda: panel._open_picker("Base"))
     panel.add_place_button = ctk.CTkButton(entity_section, text="Add Place", command=lambda: panel._open_picker("Place"))
     panel.add_map_button = ctk.CTkButton(entity_section, text="Add Map", command=lambda: panel._open_picker("Map"))
 
@@ -185,6 +186,7 @@ def build_world_map_toolbar(panel) -> None:
         panel.add_npc_button,
         panel.add_pc_button,
         panel.add_creature_button,
+        panel.add_base_button,
         panel.add_place_button,
         panel.add_map_button,
     ):

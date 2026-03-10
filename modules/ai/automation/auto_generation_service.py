@@ -106,7 +106,28 @@ class AutoGenerationService:
         key_field = "Title" if entity_slug in {"scenarios", "books"} else "Name"
         title = item.get(key_field, "")
         summary = item.get("Summary", "") or item.get("Description", "")
-        return f"Parent {entity_slug}: {title}\nSummary: {summary}".strip()
+        context_lines = [f"Parent {entity_slug}: {title}"]
+        if summary:
+            context_lines.append(f"Summary: {summary}")
+
+        template = load_template(entity_slug)
+        for field in template.get("fields", []):
+            name = field.get("name")
+            field_type = field.get("type")
+            if not name or name in {key_field, "Summary", "Description"}:
+                continue
+            value = item.get(name)
+            if not value:
+                continue
+            if field_type in {"list", "list_longtext"} and isinstance(value, list):
+                joined = ", ".join(str(entry).strip() for entry in value if str(entry).strip())
+                if joined:
+                    context_lines.append(f"{name}: {joined}")
+                continue
+            text = str(value).strip()
+            if text:
+                context_lines.append(f"{name}: {text}")
+        return "\n".join(context_lines).strip()
 
     def _slugify(self, label: str) -> str:
         return label.strip().lower().replace(" ", "_")

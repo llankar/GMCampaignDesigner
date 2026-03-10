@@ -565,10 +565,11 @@ class SceneCanvas(ctk.CTkFrame):
     ICON_LABELS = {
         "NPCs": "N",
         "Creatures": "C",
+        "Bases": "B",
         "Places": "P",
         "Maps": "M",
     }
-    ENTITY_DISPLAY_ORDER = ("NPCs", "Creatures", "Places", "Maps")
+    ENTITY_DISPLAY_ORDER = ("NPCs", "Creatures", "Bases", "Places", "Maps")
 
     def __init__(
         self,
