@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from json import JSONDecodeError
 
 from modules.auto_improve.command_runner import CommandRunner
 from modules.auto_improve.models import ImprovementProposal
@@ -65,17 +66,66 @@ class IdeaGenerationService:
     @staticmethod
     def _extract_json(raw_output: str):
         text = raw_output.strip()
-        if text.startswith("```"):
-            lines = text.splitlines()
-            if lines and lines[0].startswith("```"):
-                lines = lines[1:]
-            if lines and lines[-1].startswith("```"):
-                lines = lines[:-1]
-            text = "\n".join(lines).strip()
+        if not text:
+            raise ValueError("Idea generator output is empty.")
 
-        start = text.find("[")
-        end = text.rfind("]")
-        if start == -1 or end == -1 or end < start:
-            raise ValueError("No JSON array found in idea generator output.")
+        candidates = [text]
+        candidates.extend(IdeaGenerationService._extract_fenced_blocks(text))
 
-        return json.loads(text[start : end + 1])
+        for candidate in candidates:
+            payload = IdeaGenerationService._decode_first_json_array(candidate)
+            if payload is not None:
+                return payload
+
+        raise ValueError("No valid JSON array found in idea generator output.")
+
+    @staticmethod
+    def _extract_fenced_blocks(text: str) -> list[str]:
+        blocks: list[str] = []
+        current: list[str] | None = None
+
+        for line in text.splitlines():
+            if line.strip().startswith("```"):
+                if current is None:
+                    current = []
+                else:
+                    block = "\n".join(current).strip()
+                    if block:
+                        blocks.append(block)
+                    current = None
+                continue
+            if current is not None:
+                current.append(line)
+
+        if current:
+            block = "\n".join(current).strip()
+            if block:
+                blocks.append(block)
+
+        return blocks
+
+    @staticmethod
+    def _decode_first_json_array(text: str):
+        stripped = text.strip()
+        if not stripped:
+            return None
+
+        try:
+            payload = json.loads(stripped)
+            if isinstance(payload, list):
+                return payload
+        except JSONDecodeError:
+            pass
+
+        decoder = json.JSONDecoder()
+        for index, char in enumerate(stripped):
+            if char != "[":
+                continue
+            try:
+                payload, _ = decoder.raw_decode(stripped[index:])
+            except JSONDecodeError:
+                continue
+            if isinstance(payload, list):
+                return payload
+
+        return None
