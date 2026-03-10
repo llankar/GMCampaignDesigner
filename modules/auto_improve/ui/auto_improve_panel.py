@@ -25,7 +25,7 @@ class AutoImprovePanel(ctk.CTkToplevel):
 
         self.header = ctk.CTkLabel(
             self,
-            text="Lancez des améliorations produit imaginées automatiquement par Codex CLI",
+            text="Run automatically generated product improvements with Codex CLI",
             font=("Helvetica", 16, "bold"),
         )
         self.header.grid(row=0, column=0, padx=16, pady=(16, 8), sticky="w")
@@ -43,13 +43,13 @@ class AutoImprovePanel(ctk.CTkToplevel):
         controls = ctk.CTkFrame(body, fg_color="transparent")
         controls.grid(row=2, column=0, padx=10, pady=(0, 8), sticky="ew")
 
-        self.refresh_button = ctk.CTkButton(controls, text="Rafraîchir idées", command=self.load_proposals)
+        self.refresh_button = ctk.CTkButton(controls, text="Refresh ideas", command=self.load_proposals)
         self.refresh_button.pack(side="left", padx=(0, 8))
 
-        self.run_button = ctk.CTkButton(controls, text="Exécuter la proposition", command=self.run_selected)
+        self.run_button = ctk.CTkButton(controls, text="Run proposal", command=self.run_selected)
         self.run_button.pack(side="left")
 
-        self.summary_label = ctk.CTkLabel(body, text="Sélectionnez une proposition pour voir les détails.", justify="left")
+        self.summary_label = ctk.CTkLabel(body, text="Select a proposal to view details.", justify="left")
         self.summary_label.grid(row=0, column=0, padx=10, pady=(10, 0), sticky="w")
 
         self.output = ctk.CTkTextbox(body, wrap="word")
@@ -58,7 +58,15 @@ class AutoImprovePanel(ctk.CTkToplevel):
         self.load_proposals()
 
     def load_proposals(self):
-        self.proposals = self.orchestrator.list_proposals(limit=5)
+        try:
+            self.proposals = self.orchestrator.list_proposals(limit=5)
+        except Exception as exc:
+            self.proposals = []
+            self.listbox.delete(0, tk.END)
+            self.summary_label.configure(text="Unable to generate ideas right now.")
+            messagebox.showerror("Auto-improvement", f"Failed to generate ideas:\\n{exc}")
+            return
+
         self.listbox.delete(0, tk.END)
         for proposal in self.proposals:
             self.listbox.insert(tk.END, proposal.title)
@@ -83,12 +91,12 @@ class AutoImprovePanel(ctk.CTkToplevel):
     def run_selected(self):
         index = self._selected_index()
         if index is None:
-            messagebox.showinfo("Auto-improvement", "Choisissez d'abord une proposition.")
+            messagebox.showinfo("Auto-improvement", "Please choose a proposal first.")
             return
 
         proposal = self.proposals[index]
         self.output.delete("1.0", tk.END)
-        self.output.insert(tk.END, f"Exécution: {proposal.title}\n")
+        self.output.insert(tk.END, f"Running: {proposal.title}\n")
         self.run_button.configure(state="disabled")
 
         def worker():
@@ -100,10 +108,10 @@ class AutoImprovePanel(ctk.CTkToplevel):
     def _render_report(self, report):
         self.run_button.configure(state="normal")
         self.output.delete("1.0", tk.END)
-        self.output.insert(tk.END, f"Proposition: {report.proposal.title}\n")
-        self.output.insert(tk.END, f"Succès: {'oui' if report.success else 'non'}\n")
-        self.output.insert(tk.END, f"Démarré: {report.started_at.isoformat()}\n")
+        self.output.insert(tk.END, f"Proposal: {report.proposal.title}\n")
+        self.output.insert(tk.END, f"Success: {'yes' if report.success else 'no'}\n")
+        self.output.insert(tk.END, f"Started: {report.started_at.isoformat()}\n")
         if report.completed_at:
-            self.output.insert(tk.END, f"Terminé: {report.completed_at.isoformat()}\n\n")
+            self.output.insert(tk.END, f"Completed: {report.completed_at.isoformat()}\n\n")
         for step in report.steps:
             self.output.insert(tk.END, f"- {step}\n")

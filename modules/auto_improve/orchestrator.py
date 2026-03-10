@@ -5,7 +5,7 @@ from pathlib import Path
 
 from modules.auto_improve.command_runner import CommandExecutionError, CommandRunner
 from modules.auto_improve.git_manager import GitManager
-from modules.auto_improve.idea_catalog import get_proposals
+from modules.auto_improve.idea_catalog import configure_catalog, get_proposals
 from modules.auto_improve.models import ExecutionReport, ImprovementProposal
 from modules.auto_improve.settings import AutoImproveSettings
 
@@ -16,6 +16,7 @@ class AutoImproveOrchestrator:
         self.settings = AutoImproveSettings.load()
         self.runner = CommandRunner()
         self.git = GitManager(self.workdir)
+        configure_catalog(runner=self.runner, command_template=self.settings.agent_command, workdir=self.workdir)
 
     def list_proposals(self, limit: int = 5) -> list[ImprovementProposal]:
         return get_proposals(limit)

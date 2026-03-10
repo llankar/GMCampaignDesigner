@@ -1,3 +1,4 @@
+from modules.auto_improve.models import ImprovementProposal
 from modules.auto_improve.orchestrator import AutoImproveOrchestrator
 from modules.auto_improve.settings import AutoImproveSettings
 
@@ -12,7 +13,13 @@ def test_dry_run_execution(monkeypatch, tmp_path):
         classmethod(lambda cls: AutoImproveSettings(dry_run=True)),
     )
     orchestrator = AutoImproveOrchestrator(workdir=tmp_path)
-    proposal = orchestrator.list_proposals(limit=1)[0]
+    proposal = ImprovementProposal(
+        slug="test-proposal",
+        title="Test Proposal",
+        summary="Summary",
+        scope="Scope",
+        prompt="Prompt",
+    )
 
     report = orchestrator.execute(proposal)
 
