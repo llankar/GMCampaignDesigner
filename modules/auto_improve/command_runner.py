@@ -3,6 +3,7 @@ from __future__ import annotations
 import shlex
 import subprocess
 import tempfile
+import os
 from pathlib import Path
 
 
@@ -17,16 +18,17 @@ class CommandRunner:
             prompt_path = Path(handle.name)
 
         try:
-            prompt_file_value = shlex.quote(str(prompt_path))
-            prompt_value = shlex.quote(prompt)
+            prompt_file_value = self._quote_value(str(prompt_path))
+            prompt_value = self._quote_value(prompt)
 
             command = (
                 command_template.replace("{prompt_file}", prompt_file_value).replace("{prompt}", prompt_value)
             )
             result = self._run_shell(command=command, workdir=workdir)
 
-            if result.returncode != 0 and "unexpected argument '--input-file' found" in (result.stderr or ""):
-                fallback_command = command_template.replace("--input-file {prompt_file}", "{prompt}")
+            stderr = result.stderr or ""
+            if result.returncode != 0 and "unexpected argument" in stderr and "--input-file" in command_template:
+                fallback_command = self._build_prompt_fallback_template(command_template)
                 fallback_command = fallback_command.replace("{prompt_file}", prompt_file_value).replace("{prompt}", prompt_value)
                 result = self._run_shell(command=fallback_command, workdir=workdir)
                 command = fallback_command
@@ -50,6 +52,20 @@ class CommandRunner:
             text=True,
             check=False,
         )
+
+    @staticmethod
+    def _quote_value(value: str) -> str:
+        if os.name == "nt":
+            return subprocess.list2cmdline([value])
+        return shlex.quote(value)
+
+    @staticmethod
+    def _build_prompt_fallback_template(command_template: str) -> str:
+        fallback = command_template.replace("--input-file {prompt_file}", "{prompt}")
+        fallback = fallback.replace("--input-file={prompt_file}", "{prompt}")
+        if fallback == command_template:
+            fallback = fallback.replace("{prompt_file}", "{prompt}")
+        return fallback
 
     def run_validation(self, command: str, workdir: Path) -> str:
         result = subprocess.run(
