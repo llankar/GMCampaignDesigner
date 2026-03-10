@@ -12,7 +12,7 @@ def build_idea_prompt(limit: int, excluded_slugs: set[str]) -> str:
         "- Ideas must be RPG/GM oriented (story prep, campaign play, NPCs, encounters, factions, clues, etc.).\n"
         "- Favor system-level capabilities that connect multiple modules/entities.\n"
         "- Avoid overly narrow ideas (example to avoid: improving only encounter rhythm tuning).\n"
-        "- Prefer broad features like villain lifecycle management, home-base management, or enemy ecosystem tools.\n"
+        "- Prefer broad features like villain management, home-base management, or faction global plans.\n"
         "- Do NOT propose coding/tooling/devops/refactor features.\n"
         "- Do NOT repeat excluded slugs: "
         f"{excluded}.\n"
