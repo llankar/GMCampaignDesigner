@@ -94,7 +94,6 @@ From **Data & System**, open **Auto-improvement (Codex CLI)** to let the applica
 - Configure behavior in `config/config.ini` using section `[AutoImprove]`:
   - `agent_command`: command used to run Codex CLI (supports `{prompt_file}` placeholder)
   - `validation_command`: command executed after generation (tests/checks)
-  - `branch_prefix`: prefix for generated Git branches
   - `dry_run`: `true/false`
   - `auto_commit`: `true/false`
 

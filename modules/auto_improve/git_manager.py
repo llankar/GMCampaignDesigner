@@ -21,8 +21,6 @@ class GitManager:
             raise RuntimeError(f"git {' '.join(args)} failed: {err}")
         return (result.stdout or "").strip()
 
-    def create_branch(self, branch_name: str) -> None:
-        self._run(["checkout", "-b", branch_name])
 
     def commit_all(self, message: str) -> None:
         self._run(["add", "-A"])
