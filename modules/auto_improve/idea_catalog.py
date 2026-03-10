@@ -14,7 +14,7 @@ def configure_catalog(runner: CommandRunner, command_template: str, workdir: Pat
     _SERVICE = IdeaGenerationService(runner=runner, command_template=command_template, workdir=workdir)
 
 
-def get_proposals(limit: int = 5) -> list[ImprovementProposal]:
+def get_proposals(limit: int = 10) -> list[ImprovementProposal]:
     if _SERVICE is None:
         raise RuntimeError("Auto-improve idea catalog is not configured.")
     return _SERVICE.generate(limit)

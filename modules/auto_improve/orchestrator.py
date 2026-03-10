@@ -18,7 +18,7 @@ class AutoImproveOrchestrator:
         self.git = GitManager(self.workdir)
         configure_catalog(runner=self.runner, command_template=self.settings.agent_command, workdir=self.workdir)
 
-    def list_proposals(self, limit: int = 5) -> list[ImprovementProposal]:
+    def list_proposals(self, limit: int = 10) -> list[ImprovementProposal]:
         return get_proposals(limit)
 
     def execute(self, proposal: ImprovementProposal) -> ExecutionReport:

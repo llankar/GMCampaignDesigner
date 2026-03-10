@@ -59,7 +59,7 @@ class AutoImprovePanel(ctk.CTkToplevel):
 
     def load_proposals(self):
         try:
-            self.proposals = self.orchestrator.list_proposals(limit=5)
+            self.proposals = self.orchestrator.list_proposals(limit=10)
         except Exception as exc:
             self.proposals = []
             self.listbox.delete(0, tk.END)

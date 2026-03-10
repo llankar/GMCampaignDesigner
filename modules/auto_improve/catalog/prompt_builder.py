@@ -6,9 +6,13 @@ def build_idea_prompt(limit: int, excluded_slugs: set[str]) -> str:
     return (
         "You are reviewing the current GMCampaignDesigner repository.\n"
         "Propose NEW product features for tabletop RPG Game Masters only.\n"
+        "Prioritize BROAD, cross-cutting features over narrow or single-screen tweaks.\n"
         "Hard constraints:\n"
         "- Output must be strictly in English.\n"
         "- Ideas must be RPG/GM oriented (story prep, campaign play, NPCs, encounters, factions, clues, etc.).\n"
+        "- Favor system-level capabilities that connect multiple modules/entities.\n"
+        "- Avoid overly narrow ideas (example to avoid: improving only encounter rhythm tuning).\n"
+        "- Prefer broad features like villain lifecycle management, home-base management, or enemy ecosystem tools.\n"
         "- Do NOT propose coding/tooling/devops/refactor features.\n"
         "- Do NOT repeat excluded slugs: "
         f"{excluded}.\n"
