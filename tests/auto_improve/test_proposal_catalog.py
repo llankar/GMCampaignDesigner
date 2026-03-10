@@ -45,3 +45,20 @@ def test_generation_service_avoids_immediate_repeat_via_prompt_exclusions(tmp_pa
 
     assert first[0].slug != second[0].slug
     assert "Do NOT repeat excluded slugs: faction-pressure-tracker." in runner.prompts[1]
+
+
+def test_generation_service_parses_json_when_logs_include_brackets(tmp_path):
+    runner = SequenceRunner(
+        [
+            "[INFO] auto improve launch\n"
+            '[{"slug":"encounter-clock","title":"Encounter Clock","summary":"Add tension clocks.",' \
+            '"scope":"encounter pacing","prompt":"Implement an encounter tension clock for sessions."}]\n'
+            "completed"
+        ]
+    )
+    service = IdeaGenerationService(runner=runner, command_template="codex exec --input-file {prompt_file}", workdir=tmp_path)
+
+    proposals = service.generate(limit=1)
+
+    assert len(proposals) == 1
+    assert proposals[0].slug == "encounter-clock"
