@@ -22,6 +22,7 @@ from modules.helpers.text_helpers import format_longtext
 from modules.helpers.text_helpers import ai_text_to_rtf_json
 from modules.helpers.dice_markup import parse_inline_actions
 from modules.ai.local_ai_client import LocalAIClient
+from modules.events.ui.shared.schedule_widgets import EventDatePickerField, EventTimePickerField
 import json
 import ast
 from io import BytesIO
@@ -268,6 +269,9 @@ def load_factions_list():
 def load_npcs_list():
     return load_entities_list("npcs")
 @log_function
+def load_villains_list():
+    return load_entities_list("villains")
+@log_function
 def load_pcs_list():
     return load_entities_list("pcs")
 @log_function
@@ -421,7 +425,7 @@ class GenericEditorWindow(ctk.CTkToplevel):
             self.create_dynamic_longtext_list(field)
         elif field_type == "longtext":
             self.create_longtext_field(field)
-        elif field_name in ["NPCs", "Places", "Factions", "Objects", "Creatures", "PCs"] or \
+        elif field_name in ["NPCs", "Places", "Factions", "Objects", "Creatures", "PCs", "Villains", "Events"] or \
              (field_type == "list" and field.get("linked_type")):
             self.create_dynamic_combobox_list(field)
         elif field_type == "boolean":
@@ -515,14 +519,25 @@ class GenericEditorWindow(ctk.CTkToplevel):
                 command=lambda fn=field["name"]: self.ai_draft_field(fn)
             ).pack(side="left", padx=5, pady=5)
 
-        # Add AI draft for NPC/Creature Description
+        entity_slug = getattr(self.model_wrapper, "entity_type", "") if self.model_wrapper else ""
+
+        # Add AI draft for NPC/Creature/Villain Description
         if (
             field["name"] == "Description"
-            and self.model_wrapper
-            and getattr(self.model_wrapper, "entity_type", "") in ("npcs", "creatures")
+            and entity_slug in ("npcs", "creatures", "villains")
         ):
             ctk.CTkButton(
                 btn_row, text="AI Draft Description",
+                command=lambda fn=field["name"]: self.ai_draft_field(fn)
+            ).pack(side="left", padx=5, pady=5)
+        if field["name"] == "Scheme" and entity_slug == "villains":
+            ctk.CTkButton(
+                btn_row, text="AI Draft Scheme",
+                command=lambda fn=field["name"]: self.ai_draft_field(fn)
+            ).pack(side="left", padx=5, pady=5)
+        if field["name"] == "LieutenantNetwork" and entity_slug == "villains":
+            ctk.CTkButton(
+                btn_row, text="AI Draft Network",
                 command=lambda fn=field["name"]: self.ai_draft_field(fn)
             ).pack(side="left", padx=5, pady=5)
 
@@ -541,6 +556,7 @@ class GenericEditorWindow(ctk.CTkToplevel):
         editors = []
         entity_type_map = {
             "NPCs": "npcs",
+            "Villains": "villains",
             "Creatures": "creatures",
             "Bases": "bases",
             "Places": "places",
@@ -1291,6 +1307,9 @@ class GenericEditorWindow(ctk.CTkToplevel):
         elif linked == "NPCs" or fname == "NPCs":
             options_list = load_npcs_list()
             label_text = f"Add {linked or 'NPC'}"
+        elif linked == "Villains" or fname == "Villains":
+            options_list = load_villains_list()
+            label_text = f"Add {linked or 'Villain'}"
         elif linked == "Places" or fname == "Places":
             options_list = load_places_list()
             label_text = f"Add {linked or 'Place'}"
@@ -1306,6 +1325,9 @@ class GenericEditorWindow(ctk.CTkToplevel):
         elif linked == "Books" or fname == "Books":
             options_list = load_books_list()
             label_text = f"Add {linked or 'Book'}"
+        elif linked == "Events" or fname == "Events":
+            options_list = load_entities_list("events")
+            label_text = f"Add {linked or 'Event'}"
         else:
             options_list = []
             label_text = f"Add {fname}"
@@ -1383,8 +1405,22 @@ class GenericEditorWindow(ctk.CTkToplevel):
 
 
     def create_text_entry(self, field):
-        entry = ctk.CTkEntry(self.scroll_frame)
         value = self.item.get(field["name"], "")
+        field_name = str(field.get("name", ""))
+
+        if getattr(self.model_wrapper, "entity_type", "") == "events":
+            if field_name == "Date":
+                widget = EventDatePickerField(self.scroll_frame, initial_value=value)
+                widget.pack(fill="x", pady=5)
+                self.field_widgets[field["name"]] = widget
+                return
+            if field_name in {"StartTime", "EndTime"}:
+                widget = EventTimePickerField(self.scroll_frame, initial_value=value)
+                widget.pack(fill="x", pady=5)
+                self.field_widgets[field["name"]] = widget
+                return
+
+        entry = ctk.CTkEntry(self.scroll_frame)
         if value:
             entry.insert(0, self.item.get(field["name"], ""))
         entry.pack(fill="x", pady=5)
@@ -2375,7 +2411,7 @@ class GenericEditorWindow(ctk.CTkToplevel):
             context_name = self.item.get("Name") or self.item.get("Title") or self.model_wrapper.entity_type
             # Build a lightweight context from common fields if present
             hints = []
-            for key in ("NPCs", "Places", "Creatures", "Factions", "Genre", "Tags", "Objectives"):
+            for key in ("NPCs", "Villains", "Places", "Creatures", "Factions", "Objects", "Genre", "Tags", "Objectives"):
                 val = self.item.get(key)
                 if val:
                     hints.append(f"{key}: {val}")

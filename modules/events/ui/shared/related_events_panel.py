@@ -33,8 +33,13 @@ class RelatedEventsPanel(ctk.CTkFrame):
         field_map = {
             "Places": "Places",
             "NPCs": "NPCs",
+            "Villains": "Villains",
             "Scenarios": "Scenarios",
             "Informations": "Informations",
+            "Factions": "Factions",
+            "Bases": "Bases",
+            "Maps": "Maps",
+            "Clues": "Clues",
         }
         linked_field = field_map.get(entity_type)
         if not linked_field:

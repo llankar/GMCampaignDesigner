@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import json
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Dict, Optional
 
@@ -74,6 +74,6 @@ class PDFHashTracker:
         hashes = cls._load_history()
         hashes[pdf_hash] = {
             "path": str(source_path),
-            "timestamp": datetime.utcnow().isoformat() + "Z",
+            "timestamp": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
         }
         cls._save_history(hashes)

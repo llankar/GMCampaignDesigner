@@ -658,6 +658,7 @@ class PortraitImporter:
         entity_configs = [
             ("npcs", "Name"),
             ("pcs", "Name"),
+            ("villains", "Name"),
             ("creatures", "Name"),
             ("places", "Name"),
             ("objects", "Name"),
@@ -667,6 +668,7 @@ class PortraitImporter:
         display_names = {
             "npcs": "NPCs",
             "pcs": "PCs",
+            "villains": "Villains",
             "creatures": "Creatures",
             "places": "Places",
             "objects": "Objects",

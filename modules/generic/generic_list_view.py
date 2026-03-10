@@ -47,6 +47,7 @@ theme_manager.apply_theme(theme_manager.get_theme())
 
 SCENARIO_LINK_FIELDS = {
     "npcs": "NPCs",
+    "villains": "Villains",
     "creatures": "Creatures",
     "factions": "Factions",
     "places": "Places",
@@ -57,6 +58,7 @@ GM_SCREEN_ENTITY_TYPES = {
     "scenarios": "Scenarios",
     "pcs": "PCs",
     "npcs": "NPCs",
+    "villains": "Villains",
     "creatures": "Creatures",
     "factions": "Factions",
     "bases": "Bases",
@@ -72,6 +74,7 @@ ENTITY_DISPLAY_LABELS = {
     "scenarios": "Scenarios",
     "pcs": "PCs",
     "npcs": "NPCs",
+    "villains": "Villains",
     "creatures": "Creatures",
     "factions": "Factions",
     "bases": "Bases",
@@ -1531,6 +1534,7 @@ class GenericListView(ctk.CTkFrame):
             except Exception as exc:
                 messagebox.showerror("Save Error", f"Failed to save changes: {exc}")
                 return
+            self._notify_calendar_event_change(editor.item)
             self.refresh_list()
 
     def _edit_selected_item(self):
@@ -1944,7 +1948,10 @@ class GenericListView(ctk.CTkFrame):
                     lookup_seen.add(normalized)
                     lookup_values.append(cleaned)
 
-                collected.append({"display": display_name, "lookups": lookup_values})
+                if isinstance(entry, dict):
+                    collected.append({"display": display_name, "lookups": lookup_values})
+                else:
+                    collected.append(display_name)
                 seen.add(display_key)
 
             if not was_existing and len(collected) == initial_len:
@@ -3097,8 +3104,23 @@ class GenericListView(ctk.CTkFrame):
         if self.open_editor(new, True):
             self.items.append(new)
             self.model_wrapper.save_items(self.items)
+            self._notify_calendar_event_change(new)
             self._save_list_order()
             self.filter_items(self.search_var.get())
+
+    def _notify_calendar_event_change(self, item=None):
+        if getattr(self.model_wrapper, "entity_type", "") != "events":
+            return
+
+        top = self.winfo_toplevel()
+        callback = getattr(top, "notify_calendar_events_changed", None)
+        if not callable(callback):
+            return
+
+        target_date = None
+        if isinstance(item, dict):
+            target_date = item.get("Date") or item.get("date")
+        callback(target_date)
 
     def open_editor(self, item, creation_mode=False):
         log_info(f"Opening editor for {self.model_wrapper.entity_type} (creation={creation_mode})", func_name="GenericListView.open_editor")

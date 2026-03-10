@@ -22,6 +22,7 @@ _BUILTIN_ENTITY_METADATA = {
     "scenarios": {"label": "Scenarios", "icon": "assets/scenario_icon.png"},
     "pcs": {"label": "PCs", "icon": "assets/pc_icon.png"},
     "npcs": {"label": "NPCs", "icon": "assets/npc_icon.png"},
+    "villains": {"label": "Villains", "icon": "assets/npc_graph_icon.png"},
     "creatures": {"label": "Creatures", "icon": "assets/creature_icon.png"},
     "factions": {"label": "Factions", "icon": "assets/faction_icon.png"},
     "bases": {"label": "Bases", "icon": "assets/places_icon.png"},
@@ -54,7 +55,21 @@ def _template_path(entity_name: str) -> str:
 
 @log_function
 def _load_base_template(entity_name: str) -> dict:
-    """Load the current template JSON (campaign-local if present)."""
+    """Load the current template JSON (campaign-local if present).
+
+    Built-in templates are synchronized on read so runtime schema changes in the
+    repo are reflected even if an older campaign-local copy already exists.
+    """
+    default_path = _default_template_path(entity_name)
+    campaign_path = _campaign_template_path(entity_name)
+    if os.path.exists(default_path) and os.path.exists(campaign_path):
+        try:
+            sync_campaign_template(entity_name)
+        except Exception as exc:
+            log_warning(
+                f"Unable to sync template for '{entity_name}' before load: {exc}",
+                func_name="modules.helpers.template_loader._load_base_template",
+            )
     with open(_template_path(entity_name), "r", encoding="utf-8") as f:
         return json.load(f)
 

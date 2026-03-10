@@ -333,7 +333,15 @@ class ScenesPlanningStep(WizardStep):
             messagebox.showerror("Unavailable", "No scenario library is available to load from.")
             return
 
-        scenario_name = self._choose_existing_scenario()
+        scenario_choice = self._choose_existing_scenario()
+        if not scenario_choice:
+            return
+
+        if isinstance(scenario_choice, dict):
+            self.load_from_payload(copy.deepcopy(scenario_choice))
+            return
+
+        scenario_name = str(scenario_choice).strip()
         if not scenario_name:
             return
 
@@ -347,10 +355,11 @@ class ScenesPlanningStep(WizardStep):
             messagebox.showerror("Load Error", "Unable to load scenarios from the database.")
             return
 
+        normalized_choice = scenario_name.casefold()
         match = None
         for entry in scenarios or []:
-            title = entry.get("Title") or entry.get("Name")
-            if title == scenario_name:
+            title = str(entry.get("Title") or entry.get("Name") or "").strip()
+            if title and title.casefold() == normalized_choice:
                 match = entry
                 break
 
@@ -375,15 +384,16 @@ class ScenesPlanningStep(WizardStep):
         dialog.title("Select Scenario")
         dialog.geometry("1100x720")
         dialog.minsize(1100, 720)
-        result = {"name": None}
+        result = {"name": None, "payload": None}
 
         view = GenericListSelectionView(
             dialog,
             "scenarios",
             self.scenario_wrapper,
             template,
-            on_select_callback=lambda _et, name, win=dialog: (
+            on_select_callback=lambda _et, name, item=None, win=dialog: (
                 result.__setitem__("name", name),
+                result.__setitem__("payload", copy.deepcopy(item) if isinstance(item, dict) else None),
                 win.destroy(),
             ),
         )
@@ -391,7 +401,7 @@ class ScenesPlanningStep(WizardStep):
         dialog.transient(self.winfo_toplevel())
         dialog.grab_set()
         self.wait_window(dialog)
-        return result["name"]
+        return result["payload"] if result["payload"] is not None else result["name"]
 
     def load_from_payload(self, scenario):  # pragma: no cover - UI synchronization
         if not isinstance(scenario, dict):

@@ -3,6 +3,7 @@
       {"name": "Name", "type": "text"},
       {"name": "Description", "type": "longtext"},
       {"name": "NPCs", "type": "list", "linked_type": "NPCs"},
+      {"name": "Villains", "type": "list", "linked_type": "Villains"},
       {"name": "PlayerDisplay", "type": "boolean"},
       {"name": "Secrets", "type": "longtext"},
       {"name": "Notes", "type": "longtext"},

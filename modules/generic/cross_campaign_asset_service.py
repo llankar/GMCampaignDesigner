@@ -10,7 +10,7 @@ import sqlite3
 import tempfile
 import zipfile
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Dict, Iterable, List, Optional, Tuple
 
@@ -527,7 +527,7 @@ def export_bundle(
     temp_root = Path(data_dir)
     manifest: dict = {
         "version": BUNDLE_VERSION,
-        "created_at": datetime.utcnow().isoformat() + "Z",
+        "created_at": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
         "source_campaign": {
             "name": source_campaign.name,
             "path": str(source_campaign.root),

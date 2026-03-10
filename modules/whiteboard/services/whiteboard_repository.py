@@ -1,6 +1,6 @@
 import json
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import List, Optional, Tuple
 
 from db.db import get_connection
@@ -13,7 +13,7 @@ _TIMESTAMP_FMT = "%Y-%m-%dT%H:%M:%S.%fZ"
 
 
 def _now_iso() -> str:
-    return datetime.utcnow().strftime(_TIMESTAMP_FMT)
+    return datetime.now(timezone.utc).strftime(_TIMESTAMP_FMT)
 
 
 @dataclass

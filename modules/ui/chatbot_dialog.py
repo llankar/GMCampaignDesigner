@@ -202,12 +202,13 @@ _DEFAULT_WRAPPER_FACTORIES: Sequence[tuple[str, str]] = (
     ("Places", "places"),
     ("Bases", "bases"),
     ("NPCs", "npcs"),
+    ("Villains", "villains"),
     ("PCs", "pcs"),
     ("Factions", "factions"),
     ("Creatures", "creatures"),
     ("Clues", "clues"),
     ("Informations", "informations"),
-    ("Objects", "Objects"),
+    ("Objects", "objects"),
     ("Books", "books"),
 )
 
@@ -373,6 +374,13 @@ _DEFAULT_SECTION_FIELDS: Mapping[str, Sequence[tuple[str, tuple[str, ...]]]] = {
             ),
         ),
         ("Connections", ("Allies", "Contacts", "Enemies", "Friends", "Factions")),
+    ),
+    "Villains": (
+        ("Overview", tuple(dict.fromkeys((*_NOTE_FIELD_CANDIDATES, "Synopsis", "Scheme")))),
+        ("Role", ("Title", "Archetype", "ThreatLevel")),
+        ("Traits", ("Description", "CurrentObjective", "LieutenantNetwork")),
+        ("Secrets", ("Scheme", "Secrets", "Agenda", "Goals")),
+        ("Connections", ("Lieutenants", "NPCs", "Creatures", "Factions", "Places", "Scenarios", "Objects", "Clues")),
     ),
     "Creatures": (
         ("Overview", tuple(dict.fromkeys((*_NOTE_FIELD_CANDIDATES, "Ecology")))),

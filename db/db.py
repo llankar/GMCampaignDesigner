@@ -20,6 +20,7 @@ log_module_import(__name__)
 _SQLITE_TYPE = {
     "text":     "TEXT",
     "longtext": "TEXT",
+    "list_longtext": "TEXT",
     "boolean":  "BOOLEAN",
     "list":     "TEXT",  # we’ll store lists as JSON strings
     "file":     "TEXT",

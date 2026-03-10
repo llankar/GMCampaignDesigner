@@ -3,6 +3,7 @@
     {"name": "Name", "type": "text"},
     {"name": "Type", "type": "text"},
     {"name": "Description", "type": "longtext"},
+    {"name": "Villains", "type": "list", "linked_type": "Villains"},
     {"name": "PlayerDisplay", "type": "boolean"},
     {"name": "Portrait", "type": "text"},
     {"name": "Attachment", "type": "file"}

@@ -6,7 +6,7 @@ import json
 import os
 import re
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Callable, Dict, List, Optional
 from urllib.parse import quote
@@ -228,7 +228,7 @@ class GithubGalleryClient:
         session = self._create_session(auth=True)
         metadata = self._metadata_from_manifest(manifest, title, description)
         tag_slug = _slugify(title or archive_path.stem)
-        tag_name = f"bundle-{tag_slug}-{datetime.utcnow().strftime('%Y%m%d-%H%M%S')}"
+        tag_name = f"bundle-{tag_slug}-{datetime.now(timezone.utc).strftime('%Y%m%d-%H%M%S')}"
         payload = {
             "tag_name": tag_name,
             "name": title,

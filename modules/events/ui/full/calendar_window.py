@@ -28,6 +28,7 @@ class CalendarWindow(ctk.CTkToplevel):
         get_events_for_range,
         on_create_event=None,
         on_update_event=None,
+        on_open_timeline_simulator=None,
         initial_date=None,
         initial_view_mode="month",
         on_state_change=None,
@@ -45,6 +46,7 @@ class CalendarWindow(ctk.CTkToplevel):
         self.get_events_for_range = get_events_for_range
         self.on_create_event = on_create_event
         self.on_update_event = on_update_event
+        self.on_open_timeline_simulator = on_open_timeline_simulator
         self.on_state_change = on_state_change
         self.on_open_entity = on_open_entity
 
@@ -104,6 +106,7 @@ class CalendarWindow(ctk.CTkToplevel):
         self.navigation_panel = NavigationPanel(
             outer_pane,
             on_new_event=self._open_full_editor,
+            on_open_timeline_simulator=self._open_timeline_simulator,
             on_previous=self._go_previous,
             on_next=self._go_next,
             on_today=self._jump_today,
@@ -189,6 +192,10 @@ class CalendarWindow(ctk.CTkToplevel):
         if callable(self.on_open_entity):
             self.on_open_entity(entity_type, entity_name)
 
+    def _open_timeline_simulator(self):
+        if callable(self.on_open_timeline_simulator):
+            self.on_open_timeline_simulator(parent=self, target_date=self.active_date)
+
     def _on_new_event_shortcut(self, _event=None):
         self._open_full_editor()
 
@@ -218,7 +225,14 @@ class CalendarWindow(ctk.CTkToplevel):
             "status": event.get("status") or "",
             "Places": event.get("Places") or [],
             "NPCs": event.get("NPCs") or [],
+            "Villains": event.get("Villains") or [],
             "Scenarios": event.get("Scenarios") or [],
+            "Creatures": event.get("Creatures") or [],
+            "Objects": event.get("Objects") or [],
+            "Factions": event.get("Factions") or [],
+            "Bases": event.get("Bases") or [],
+            "Maps": event.get("Maps") or [],
+            "Clues": event.get("Clues") or [],
             "Informations": event.get("Informations") or [],
         }
 
@@ -352,7 +366,7 @@ class CalendarWindow(ctk.CTkToplevel):
             {
                 linked
                 for event in filtered_events
-                for key in ("Places", "NPCs", "Scenarios", "Informations")
+                for key in ("Places", "NPCs", "Villains", "Creatures", "Objects", "Factions", "Bases", "Maps", "Clues", "Scenarios", "Informations")
                 for linked in (event.get(key) or [])
                 if linked
             }
@@ -399,7 +413,7 @@ class CalendarWindow(ctk.CTkToplevel):
 
         linked = [
             str(name).strip().lower()
-            for key in ("Places", "NPCs", "Scenarios", "Informations")
+            for key in ("Places", "NPCs", "Villains", "Creatures", "Objects", "Factions", "Bases", "Maps", "Clues", "Scenarios", "Informations")
             for name in (event.get(key) or [])
         ]
         if entity_filter and entity_filter not in linked:

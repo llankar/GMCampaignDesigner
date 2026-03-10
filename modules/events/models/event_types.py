@@ -11,6 +11,7 @@ class EventType:
 EVENT_TYPES = {
     "session": EventType("session", "Session", "#4F8EF7"),
     "intrigue": EventType("intrigue", "Intrigue", "#C96CFF"),
+    "villain": EventType("villain", "Villain", "#A63DE0"),
     "pnj": EventType("pnj", "PNJ", "#FF9F43"),
     "lore": EventType("lore", "Lore", "#5AC8A8"),
 }

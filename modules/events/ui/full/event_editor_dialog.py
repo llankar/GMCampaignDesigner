@@ -7,6 +7,7 @@ from modules.events.services.entity_link_service import EntityLinkService
 from modules.events.models.event_types import event_type_labels
 from modules.events.ui.shared.color_utils import normalize_hex_color
 from modules.events.ui.shared.multi_link_selector import MultiLinkSelector
+from modules.events.ui.shared.schedule_widgets import EventDatePickerField, EventTimePickerField
 
 
 class EventEditorDialog(ctk.CTkToplevel):
@@ -44,17 +45,35 @@ class EventEditorDialog(ctk.CTkToplevel):
 
         row += 1
         ctk.CTkLabel(content, text="Date").grid(row=row, column=0, padx=12, pady=8, sticky="w")
-        self.date_entry = ctk.CTkEntry(content, placeholder_text="YYYY-MM-DD")
+        self.date_entry = EventDatePickerField(
+            content,
+            picker_button_text="Calendrier",
+            today_button_text="Aujourd'hui",
+            clear_button_text="Effacer",
+            empty_hint_text="Aucune date selectionnee",
+        )
         self.date_entry.grid(row=row, column=1, padx=12, pady=8, sticky="ew")
 
         row += 1
         ctk.CTkLabel(content, text="Heure début").grid(row=row, column=0, padx=12, pady=8, sticky="w")
-        self.start_entry = ctk.CTkEntry(content, placeholder_text="HH:MM")
+        self.start_entry = EventTimePickerField(
+            content,
+            picker_button_text="Choisir",
+            now_button_text="Maint.",
+            clear_button_text="Effacer",
+            empty_hint_text="Aucune heure selectionnee",
+        )
         self.start_entry.grid(row=row, column=1, padx=12, pady=8, sticky="ew")
 
         row += 1
         ctk.CTkLabel(content, text="Heure fin").grid(row=row, column=0, padx=12, pady=8, sticky="w")
-        self.end_entry = ctk.CTkEntry(content, placeholder_text="HH:MM")
+        self.end_entry = EventTimePickerField(
+            content,
+            picker_button_text="Choisir",
+            now_button_text="Maint.",
+            clear_button_text="Effacer",
+            empty_hint_text="Aucune heure selectionnee",
+        )
         self.end_entry.grid(row=row, column=1, padx=12, pady=8, sticky="ew")
 
         row += 1
@@ -90,12 +109,68 @@ class EventEditorDialog(ctk.CTkToplevel):
         self.npc_selector.grid(row=row, column=0, columnspan=2, padx=12, pady=4, sticky="ew")
 
         row += 1
+        self.villain_selector = MultiLinkSelector(
+            content,
+            label="Villains",
+            load_options=lambda query: self._entity_link_service.search_entities("Villains", query),
+        )
+        self.villain_selector.grid(row=row, column=0, columnspan=2, padx=12, pady=4, sticky="ew")
+
+        row += 1
         self.scenario_selector = MultiLinkSelector(
             content,
             label="Scenarios",
             load_options=lambda query: self._entity_link_service.search_entities("Scenarios", query),
         )
         self.scenario_selector.grid(row=row, column=0, columnspan=2, padx=12, pady=4, sticky="ew")
+
+        row += 1
+        self.creature_selector = MultiLinkSelector(
+            content,
+            label="Creatures",
+            load_options=lambda query: self._entity_link_service.search_entities("Creatures", query),
+        )
+        self.creature_selector.grid(row=row, column=0, columnspan=2, padx=12, pady=4, sticky="ew")
+
+        row += 1
+        self.object_selector = MultiLinkSelector(
+            content,
+            label="Objects",
+            load_options=lambda query: self._entity_link_service.search_entities("Objects", query),
+        )
+        self.object_selector.grid(row=row, column=0, columnspan=2, padx=12, pady=4, sticky="ew")
+
+        row += 1
+        self.faction_selector = MultiLinkSelector(
+            content,
+            label="Factions",
+            load_options=lambda query: self._entity_link_service.search_entities("Factions", query),
+        )
+        self.faction_selector.grid(row=row, column=0, columnspan=2, padx=12, pady=4, sticky="ew")
+
+        row += 1
+        self.base_selector = MultiLinkSelector(
+            content,
+            label="Bases",
+            load_options=lambda query: self._entity_link_service.search_entities("Bases", query),
+        )
+        self.base_selector.grid(row=row, column=0, columnspan=2, padx=12, pady=4, sticky="ew")
+
+        row += 1
+        self.map_selector = MultiLinkSelector(
+            content,
+            label="Maps",
+            load_options=lambda query: self._entity_link_service.search_entities("Maps", query),
+        )
+        self.map_selector.grid(row=row, column=0, columnspan=2, padx=12, pady=4, sticky="ew")
+
+        row += 1
+        self.clue_selector = MultiLinkSelector(
+            content,
+            label="Clues",
+            load_options=lambda query: self._entity_link_service.search_entities("Clues", query),
+        )
+        self.clue_selector.grid(row=row, column=0, columnspan=2, padx=12, pady=4, sticky="ew")
 
         row += 1
         self.information_selector = MultiLinkSelector(
@@ -116,13 +191,10 @@ class EventEditorDialog(ctk.CTkToplevel):
         self.title_entry.insert(0, self._initial.get("title", ""))
 
         current_date = self._initial.get("date") or date.today()
-        if isinstance(current_date, date):
-            self.date_entry.insert(0, current_date.isoformat())
-        elif current_date:
-            self.date_entry.insert(0, str(current_date))
+        self.date_entry.set(current_date)
 
-        self.start_entry.insert(0, self._initial.get("start_time", ""))
-        self.end_entry.insert(0, self._initial.get("end_time", ""))
+        self.start_entry.set(self._initial.get("start_time", ""))
+        self.end_entry.set(self._initial.get("end_time", ""))
         initial_type = self._initial.get("type", "Session") or "Session"
         self.type_menu.set(initial_type)
         self._selected_color = normalize_hex_color(self._initial.get("color"), fallback="#4F8EF7")
@@ -130,7 +202,14 @@ class EventEditorDialog(ctk.CTkToplevel):
         self.status_entry.insert(0, self._initial.get("status", ""))
         self.place_selector.set_values(self._initial.get("Places") or [])
         self.npc_selector.set_values(self._initial.get("NPCs") or [])
+        self.villain_selector.set_values(self._initial.get("Villains") or [])
         self.scenario_selector.set_values(self._initial.get("Scenarios") or [])
+        self.creature_selector.set_values(self._initial.get("Creatures") or [])
+        self.object_selector.set_values(self._initial.get("Objects") or [])
+        self.faction_selector.set_values(self._initial.get("Factions") or [])
+        self.base_selector.set_values(self._initial.get("Bases") or [])
+        self.map_selector.set_values(self._initial.get("Maps") or [])
+        self.clue_selector.set_values(self._initial.get("Clues") or [])
         self.information_selector.set_values(self._initial.get("Informations") or [])
 
     def _save(self):
@@ -144,7 +223,14 @@ class EventEditorDialog(ctk.CTkToplevel):
             "status": self.status_entry.get().strip(),
             "Places": self.place_selector.get_values(),
             "NPCs": self.npc_selector.get_values(),
+            "Villains": self.villain_selector.get_values(),
             "Scenarios": self.scenario_selector.get_values(),
+            "Creatures": self.creature_selector.get_values(),
+            "Objects": self.object_selector.get_values(),
+            "Factions": self.faction_selector.get_values(),
+            "Bases": self.base_selector.get_values(),
+            "Maps": self.map_selector.get_values(),
+            "Clues": self.clue_selector.get_values(),
             "Informations": self.information_selector.get_values(),
         }
         if callable(self._on_save):

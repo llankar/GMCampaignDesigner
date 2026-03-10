@@ -191,9 +191,8 @@ class GenericListSelectionView(ctk.CTkFrame):
         if not item_id:
             return
         selected_item = self.item_by_id.get(item_id)
-        if selected_item and self.on_select_callback:
-            entity_name = selected_item.get("Name", selected_item.get("Title", "Unnamed"))
-            self.on_select_callback(self.entity_type, entity_name)
+        if selected_item:
+            self._emit_selection(selected_item)
 
     def open_selected(self):
         selection_ids = list(self.tree.selection())
@@ -230,8 +229,22 @@ class GenericListSelectionView(ctk.CTkFrame):
             messagebox.showwarning("No Selection", f"No {self.entity_type} available to select.")
 
     def select_entity(self, item):
-        self.on_select_callback(self.entity_type, item.get("Name", item.get("Title", "Unnamed")))
-        self.destroy()
+        self._emit_selection(item)
+        # Selection views are commonly hosted inside a transient dialog that is
+        # waiting on the toplevel, not the embedded frame. Closing only the
+        # frame makes the UI appear unresponsive because the caller keeps
+        # waiting for the dialog to close.
+        target = self.master if isinstance(self.master, tk.Toplevel) else self
+        target.destroy()
+
+    def _emit_selection(self, item):
+        if not self.on_select_callback:
+            return
+        entity_name = item.get("Name", item.get("Title", "Unnamed"))
+        try:
+            self.on_select_callback(self.entity_type, entity_name, item)
+        except TypeError:
+            self.on_select_callback(self.entity_type, entity_name)
 
     def _clean_value(self, val):
         if val is None:

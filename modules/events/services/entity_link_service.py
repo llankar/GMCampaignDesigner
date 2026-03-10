@@ -4,7 +4,19 @@ from modules.generic.generic_model_wrapper import GenericModelWrapper
 class EntityLinkService:
     """Load/search linkable entities for calendar events."""
 
-    SUPPORTED_TYPES = ("Places", "NPCs", "Scenarios", "Informations")
+    SUPPORTED_TYPES = (
+        "Places",
+        "NPCs",
+        "Villains",
+        "Scenarios",
+        "Informations",
+        "Creatures",
+        "Objects",
+        "Factions",
+        "Bases",
+        "Maps",
+        "Clues",
+    )
 
     def __init__(self, wrappers=None):
         self._wrappers = wrappers if isinstance(wrappers, dict) else {}
@@ -58,8 +70,15 @@ class EntityLinkService:
         mapping = {
             "Places": "places",
             "NPCs": "npcs",
+            "Villains": "villains",
             "Scenarios": "scenarios",
             "Informations": "informations",
+            "Creatures": "creatures",
+            "Objects": "objects",
+            "Factions": "factions",
+            "Bases": "bases",
+            "Maps": "maps",
+            "Clues": "clues",
         }
         return mapping.get(entity_type)
 

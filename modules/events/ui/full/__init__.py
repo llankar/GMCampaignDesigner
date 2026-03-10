@@ -1,5 +1,6 @@
 from .calendar_window import CalendarWindow
 from .event_editor_dialog import EventEditorDialog
 from .quick_add_popover import QuickAddPopover
+from .timeline_simulator_dialog import TimelineSimulatorDialog
 
-__all__ = ["CalendarWindow", "QuickAddPopover", "EventEditorDialog"]
+__all__ = ["CalendarWindow", "QuickAddPopover", "EventEditorDialog", "TimelineSimulatorDialog"]

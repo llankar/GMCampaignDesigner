@@ -24,6 +24,63 @@ ALLOWED_FIELDS = {
 GENERIC_ALLOWED_FIELDS = ("damage", "pierce_armor", "armor", "special_effect", "skill_bonus")
 
 
+class _FallbackWidget:
+    def __init__(self, master=None, *args, **kwargs):
+        self.master = master
+        self._grid_visible = True
+        self._grid_kwargs = {}
+
+    def grid(self, *args, **kwargs):
+        self._grid_visible = True
+        self._grid_kwargs = dict(kwargs)
+        return None
+
+    def grid_remove(self):
+        self._grid_visible = False
+        return None
+
+    def grid_configure(self, *args, **kwargs):
+        self._grid_kwargs.update(kwargs)
+        return None
+
+    def grid_columnconfigure(self, *args, **kwargs):
+        return None
+
+    def destroy(self):
+        return None
+
+
+class _FallbackComboBox(_FallbackWidget):
+    def __init__(self, master=None, *args, values=None, command=None, **kwargs):
+        super().__init__(master, *args, **kwargs)
+        self._values = list(values or [])
+        self._value = ""
+        self._command = command
+
+    def set(self, value):
+        self._value = value
+
+    def get(self):
+        return self._value
+
+    def configure(self, **kwargs):
+        if "values" in kwargs:
+            self._values = list(kwargs["values"])
+        if "command" in kwargs:
+            self._command = kwargs["command"]
+
+    def cget(self, key):
+        if key == "values":
+            return self._values
+        raise KeyError(key)
+
+
+class _FallbackButton(_FallbackWidget):
+    def __init__(self, master=None, *args, command=None, **kwargs):
+        super().__init__(master, *args, **kwargs)
+        self.command = command
+
+
 class EquipmentEditor:
     def __init__(self, parent, on_change, max_level_provider, grid_row: int = 11):
         self._on_change = on_change
@@ -31,19 +88,20 @@ class EquipmentEditor:
         self._columns: dict[str, dict] = {}
         self._active_object_keys: list[str] = [OBJECT_ORDER[0]]
         self._next_object_number = len(OBJECT_ORDER) + 1
+        self._headless = not hasattr(parent, "tk")
 
-        self.frame = ctk.CTkFrame(parent)
+        self.frame = self._make_frame(parent)
         self.frame.grid(row=grid_row, column=0, columnspan=2, sticky="ew", padx=6, pady=(4, 4))
         self.frame.grid_columnconfigure((0, 1, 2), weight=1)
 
-        controls = ctk.CTkFrame(self.frame)
+        controls = self._make_frame(self.frame)
         controls.grid(row=0, column=0, columnspan=3, sticky="ew", padx=4, pady=(4, 0))
         controls.grid_columnconfigure(0, weight=1)
 
-        ctk.CTkLabel(controls, text="Gestion des objets", font=("Arial", 12, "bold")).grid(
+        self._make_label(controls, text="Gestion des objets", font=("Arial", 12, "bold")).grid(
             row=0, column=0, sticky="w", padx=6, pady=4
         )
-        ctk.CTkButton(controls, text="+ Ajouter un objet", width=140, command=self.add_object_slot).grid(
+        self._make_button(controls, text="+ Ajouter un objet", width=140, command=self.add_object_slot).grid(
             row=0, column=1, sticky="e", padx=6, pady=4
         )
 
@@ -54,15 +112,15 @@ class EquipmentEditor:
         self._render_object_grid()
 
     def _build_column(self, object_key: str) -> dict:
-        box = ctk.CTkFrame(self.frame)
+        box = self._make_frame(self.frame)
         box.grid(row=1, column=0, sticky="nsew", padx=4, pady=4)
         box.grid_columnconfigure(0, weight=1)
 
-        header = ctk.CTkFrame(box)
+        header = self._make_frame(box)
         header.grid(row=0, column=0, sticky="ew", padx=6, pady=(4, 2))
         header.grid_columnconfigure(0, weight=1)
-        ctk.CTkLabel(header, text=OBJECT_TITLES[object_key], font=("Arial", 12, "bold")).grid(row=0, column=0, sticky="w")
-        ctk.CTkButton(
+        self._make_label(header, text=OBJECT_TITLES[object_key], font=("Arial", 12, "bold")).grid(row=0, column=0, sticky="w")
+        self._make_button(
             header,
             text="Retirer",
             width=90,
@@ -70,14 +128,14 @@ class EquipmentEditor:
         ).grid(row=0, column=1, sticky="e")
 
         name_var = tk.StringVar(value="")
-        ctk.CTkLabel(box, text="Nom").grid(row=1, column=0, sticky="w", padx=6)
-        ctk.CTkEntry(box, textvariable=name_var).grid(row=2, column=0, sticky="ew", padx=6, pady=(0, 4))
+        self._make_label(box, text="Nom").grid(row=1, column=0, sticky="w", padx=6)
+        self._make_entry(box, textvariable=name_var).grid(row=2, column=0, sticky="ew", padx=6, pady=(0, 4))
 
-        rows_frame = ctk.CTkFrame(box)
+        rows_frame = self._make_frame(box)
         rows_frame.grid(row=3, column=0, sticky="ew", padx=6, pady=(2, 4))
         rows_frame.grid_columnconfigure(0, weight=1)
 
-        ctk.CTkButton(
+        self._make_button(
             box,
             text="+ Ajouter un effet",
             width=130,
@@ -85,7 +143,7 @@ class EquipmentEditor:
         ).grid(row=4, column=0, sticky="w", padx=6, pady=(2, 6))
 
         summary_var = tk.StringVar(value="Résumé : aucun effet")
-        ctk.CTkLabel(box, textvariable=summary_var, justify="left", wraplength=280).grid(row=5, column=0, sticky="w", padx=6, pady=(0, 6))
+        self._make_label(box, textvariable=summary_var, justify="left", wraplength=280).grid(row=5, column=0, sticky="w", padx=6, pady=(0, 6))
 
         name_var.trace_add("write", self._on_internal_change)
         return {
@@ -137,7 +195,7 @@ class EquipmentEditor:
     def add_effect_row(self, object_key: str) -> None:
         column = self._columns[object_key]
         row_index = len(column["rows"])
-        row_box = ctk.CTkFrame(column["rows_frame"])
+        row_box = self._make_frame(column["rows_frame"])
         row_box.grid(row=row_index, column=0, sticky="ew", pady=3)
         row_box.grid_columnconfigure(0, weight=1)
 
@@ -145,7 +203,7 @@ class EquipmentEditor:
         effect_var = tk.StringVar(value=field_choices[0])
         level_var = tk.StringVar(value="0")
 
-        effect_combo = ctk.CTkComboBox(
+        effect_combo = self._make_combobox(
             row_box,
             values=[FIELD_LABELS[field] for field in field_choices],
             state="readonly",
@@ -154,13 +212,13 @@ class EquipmentEditor:
         effect_combo.set(FIELD_LABELS[field_choices[0]])
         effect_combo.grid(row=0, column=0, sticky="ew", padx=4, pady=(4, 2))
 
-        ctk.CTkLabel(row_box, text="Niveau").grid(row=1, column=0, sticky="w", padx=4)
-        level_combo = ctk.CTkComboBox(row_box, values=self._level_values_for(effect_var.get()), state="readonly")
+        self._make_label(row_box, text="Niveau").grid(row=1, column=0, sticky="w", padx=4)
+        level_combo = self._make_combobox(row_box, values=self._level_values_for(effect_var.get()), state="readonly")
         level_combo.set("0")
         level_combo.configure(command=lambda value, var=level_var: var.set(value))
         level_combo.grid(row=2, column=0, sticky="ew", padx=4, pady=(0, 4))
 
-        ctk.CTkButton(
+        self._make_button(
             row_box,
             text="Retirer cet effet",
             width=120,
@@ -180,6 +238,31 @@ class EquipmentEditor:
             }
         )
         self._on_internal_change()
+
+    def _make_frame(self, master):
+        if self._headless:
+            return _FallbackWidget(master)
+        return ctk.CTkFrame(master)
+
+    def _make_label(self, master, **kwargs):
+        if self._headless:
+            return _FallbackWidget(master, **kwargs)
+        return ctk.CTkLabel(master, **kwargs)
+
+    def _make_entry(self, master, **kwargs):
+        if self._headless:
+            return _FallbackWidget(master, **kwargs)
+        return ctk.CTkEntry(master, **kwargs)
+
+    def _make_button(self, master, **kwargs):
+        if self._headless:
+            return _FallbackButton(master, **kwargs)
+        return ctk.CTkButton(master, **kwargs)
+
+    def _make_combobox(self, master, **kwargs):
+        if self._headless:
+            return _FallbackComboBox(master, **kwargs)
+        return ctk.CTkComboBox(master, **kwargs)
 
     def remove_effect_row(self, object_key: str, row_frame) -> None:
         column = self._columns[object_key]

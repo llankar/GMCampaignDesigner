@@ -44,6 +44,7 @@ _open_entity_windows = {}
 
 TOOLTIP_FIELDS = {
     "NPCs": ("Role", "Secret", "Traits", "Motivation"),
+    "Villains": ("Archetype", "ThreatLevel", "Scheme", "CurrentObjective"),
     "Creatures": ("Type", "Stats", "Powers", "Weakness", "Background"),
     "PCs": ("Role", "Traits", "Secret", "Background"),
     "Places": ("Description", "Secrets"),
@@ -97,6 +98,7 @@ wrappers = {
     "Places": GenericModelWrapper("places"),
     "Bases": GenericModelWrapper("bases"),
     "NPCs": GenericModelWrapper("npcs"),
+    "Villains": GenericModelWrapper("villains"),
     "Factions": GenericModelWrapper("factions"),
     "Objects": GenericModelWrapper("objects"),
     "Creatures": GenericModelWrapper("creatures"),
@@ -734,11 +736,13 @@ def insert_list_longtext(
             scene_dict["Title"] = title_clean
 
         npc_names = _coerce_names(scene_dict.get("NPCs"))
+        villain_names = _coerce_names(scene_dict.get("Villains"))
         creature_names = _coerce_names(scene_dict.get("Creatures"))
         place_names = _coerce_names(scene_dict.get("Places"))
         map_names = _coerce_names(scene_dict.get("Maps"))
         if entity_collector is not None:
             entity_collector.setdefault("NPCs", set()).update(npc_names)
+            entity_collector.setdefault("Villains", set()).update(villain_names)
             entity_collector.setdefault("Creatures", set()).update(creature_names)
             entity_collector.setdefault("Places", set()).update(place_names)
             entity_collector.setdefault("Maps", set()).update(map_names)
@@ -752,6 +756,7 @@ def insert_list_longtext(
             body,
             body_text=body_text,
             npc_names=npc_names,
+            villain_names=villain_names,
             creature_names=creature_names,
             place_names=place_names,
             map_names=map_names,
@@ -938,7 +943,7 @@ def create_scenario_detail_frame(entity_type, scenario_item, master, open_entity
     sections = {}
     pinned_sections = set()
     active_section = None
-    section_order = ["Summary", "Scenes", "NPCs", "Creatures", "Places", "Secrets", "Notes"]
+    section_order = ["Summary", "Scenes", "NPCs", "Villains", "Creatures", "Places", "Secrets", "Notes"]
     section_names = []
     def rebuild_frame(updated_item):
         # 1) Destroy the old frame
@@ -1046,7 +1051,7 @@ def create_scenario_detail_frame(entity_type, scenario_item, master, open_entity
 
     # ——— BODY — prepare fields in the custom order ———
     tpl = load_template(entity_type.lower())
-    scene_entity_tracker = {"NPCs": set(), "Creatures": set(), "Places": set(), "Maps": set()}
+    scene_entity_tracker = {"NPCs": set(), "Villains": set(), "Creatures": set(), "Places": set(), "Maps": set()}
     # remove header fields
     body_fields = [
         f for f in tpl["fields"]
@@ -1057,10 +1062,11 @@ def create_scenario_detail_frame(entity_type, scenario_item, master, open_entity
     # group them
     scenes_fields = [f for f in body_fields if f["name"] == "Scenes"]
     npc_fields   = [f for f in body_fields if f.get("linked_type") == "NPCs"]
+    villain_fields = [f for f in body_fields if f.get("linked_type") == "Villains"]
     creature_fields = [f for f in body_fields if f.get("linked_type") == "Creatures"]
     place_fields = [f for f in body_fields if f.get("linked_type") == "Places"]
-    other_fields = [f for f in body_fields if f not in scenes_fields +  npc_fields + place_fields + creature_fields]
-    ordered_fields = scenes_fields + npc_fields + creature_fields + place_fields + other_fields
+    other_fields = [f for f in body_fields if f not in scenes_fields + npc_fields + villain_fields + place_fields + creature_fields]
+    ordered_fields = scenes_fields + npc_fields + villain_fields + creature_fields + place_fields + other_fields
 
     if gm_view_instance and hasattr(gm_view_instance, "reset_scene_widgets"):
         gm_view_instance.reset_scene_widgets()
@@ -1069,6 +1075,7 @@ def create_scenario_detail_frame(entity_type, scenario_item, master, open_entity
         "Summary": "Summary",
         "Scenes": "Scenes",
         "NPCs": "NPCs",
+        "Villains": "Villains",
         "Creatures": "Creatures",
         "Places": "Places",
         "Secrets": "Secrets",
@@ -1257,6 +1264,8 @@ def create_scenario_detail_frame(entity_type, scenario_item, master, open_entity
             items  = value if isinstance(value, list) else []
             if linked == "NPCs":
                 insert_npc_table(section_frame, "NPCs", items, open_entity_callback)
+            elif linked == "Villains":
+                insert_links(section_frame, "Villains", items, linked, open_entity_callback)
             elif linked == "Creatures":
                 filtered_creatures = [
                     creature for creature in items
@@ -1289,7 +1298,7 @@ def create_scenario_detail_frame(entity_type, scenario_item, master, open_entity
         justify="left"
     ).pack(fill="x", pady=(0, 15))
 
-    if entity_type in {"Scenarios", "Places", "Bases", "NPCs", "Informations"}:
+    if entity_type in {"Scenarios", "Places", "Bases", "NPCs", "Villains", "Informations"}:
         related_events_panel = RelatedEventsPanel(
             _get_section_frame("Notes"),
             entity_type=entity_type,
@@ -1470,7 +1479,7 @@ def create_entity_detail_frame(entity_type, entity, master, open_entity_callback
 
     # If the entity has a valid Portrait, load and show it for portrait-capable types.
     portrait_path = primary_portrait(entity.get("Portrait"))
-    if (entity_type in {"NPCs", "PCs", "Creatures", "Factions"}):
+    if (entity_type in {"NPCs", "PCs", "Villains", "Creatures", "Factions"}):
         resolved_portrait = resolve_portrait_path(portrait_path, ConfigHelper.get_campaign_dir())
         if resolved_portrait and os.path.exists(resolved_portrait):
             try:
@@ -1498,7 +1507,7 @@ def create_entity_detail_frame(entity_type, entity, master, open_entity_callback
         field_name = field["name"]
         field_type = field["type"]
         # Skip the Portrait field if already handled.
-        if (entity_type in {"NPCs", "PCs", "Creatures", "Factions"}) and field_name == "Portrait":
+        if (entity_type in {"NPCs", "PCs", "Villains", "Creatures", "Factions"}) and field_name == "Portrait":
             continue
         if field_type == "longtext":
             insert_longtext(content_frame, field_name, entity.get(field_name, ""))
@@ -1509,7 +1518,7 @@ def create_entity_detail_frame(entity_type, entity, master, open_entity_callback
             if linked_type:
                 insert_links(content_frame, field_name, entity.get(field_name) or [], linked_type, open_entity_callback)
 
-    if entity_type in {"Scenarios", "Places", "Bases", "NPCs", "Informations"}:
+    if entity_type in {"Scenarios", "Places", "Bases", "NPCs", "Villains", "Informations"}:
         related_events_panel = RelatedEventsPanel(
             content_frame,
             entity_type=entity_type,

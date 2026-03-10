@@ -1,0 +1,28 @@
+{
+  "fields": [
+    {"name": "Name", "type": "text"},
+    {"name": "Title", "type": "text"},
+    {"name": "Archetype", "type": "text"},
+    {"name": "ThreatLevel", "type": "text"},
+    {"name": "Description", "type": "longtext"},
+    {"name": "Scheme", "type": "longtext"},
+    {"name": "CurrentObjective", "type": "longtext"},
+    {"name": "LieutenantNetwork", "type": "longtext"},
+    {"name": "Secrets", "type": "longtext"},
+    {"name": "Notes", "type": "longtext"},
+    {"name": "Portrait", "type": "text"},
+    {"name": "Audio", "type": "audio"},
+    {"name": "EscalationLevel", "type": "int"},
+    {"name": "EscalationCadenceDays", "type": "int"},
+    {"name": "LastEscalationDate", "type": "text"},
+    {"name": "NextEscalationDate", "type": "text"},
+    {"name": "SchemeHistory", "type": "list"},
+    {"name": "Factions", "type": "list", "linked_type": "Factions"},
+    {"name": "Clues", "type": "list", "linked_type": "Clues"},
+    {"name": "Objects", "type": "list", "linked_type": "Objects"},
+    {"name": "Events", "type": "list", "linked_type": "Events"},
+    {"name": "Lieutenants", "type": "list", "linked_type": "NPCs"},
+    {"name": "CreatureAgents", "type": "list", "linked_type": "Creatures"},
+    {"name": "Links", "type": "links"}
+  ]
+}

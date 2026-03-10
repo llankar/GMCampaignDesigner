@@ -8,7 +8,7 @@ import json
 import os
 import sys
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 
 import webview
@@ -263,7 +263,7 @@ class BrowserShellApi:
         payload = {
             "selection": selection_text,
             "url": current_url,
-            "received_at": datetime.utcnow().isoformat(timespec="seconds"),
+            "received_at": datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z"),
         }
         try:
             Path(self.selection_output).write_text(

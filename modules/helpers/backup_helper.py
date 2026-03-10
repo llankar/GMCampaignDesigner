@@ -159,7 +159,7 @@ def create_backup_archive(
     manifest = {
         "format_version": BACKUP_FORMAT_VERSION,
         "app_version": _read_app_version(),
-        "created_at": _dt.datetime.utcnow().isoformat() + "Z",
+        "created_at": _dt.datetime.now(_dt.timezone.utc).isoformat().replace("+00:00", "Z"),
         "campaign_directory": str(campaign_dir),
         "campaign_name": campaign_dir.name,
         "database_path": str(db_path),

@@ -30,8 +30,8 @@ def _create_description_block(parent, body_text):
     return description_block, description_label
 
 
-def _create_entities_block(parent, npc_names, creature_names, place_names, open_entity_callback=None):
-    has_entities = bool(npc_names or creature_names or place_names)
+def _create_entities_block(parent, npc_names, villain_names, creature_names, place_names, open_entity_callback=None):
+    has_entities = bool(npc_names or villain_names or creature_names or place_names)
     if not has_entities:
         return None
 
@@ -39,7 +39,7 @@ def _create_entities_block(parent, npc_names, creature_names, place_names, open_
     entities_block.pack(fill="x", padx=4, pady=(0, 0))
     _create_section_title(entities_block, "Entities")
 
-    for label_text, names in (("NPCs", npc_names), ("Creatures", creature_names), ("Places", place_names)):
+    for label_text, names in (("NPCs", npc_names), ("Villains", villain_names), ("Creatures", creature_names), ("Places", place_names)):
         if not names:
             continue
         row = ctk.CTkFrame(entities_block, fg_color="transparent")
@@ -170,6 +170,7 @@ def build_scene_body_sections(
     parent,
     body_text,
     npc_names,
+    villain_names,
     creature_names,
     place_names,
     map_names,
@@ -177,7 +178,7 @@ def build_scene_body_sections(
     open_entity_callback=None,
     gm_view_ref=None,
 ):
-    has_entities = bool(npc_names or creature_names or place_names)
+    has_entities = bool(npc_names or villain_names or creature_names or place_names)
     has_maps = bool(map_names)
     has_links = bool(links)
 
@@ -188,6 +189,7 @@ def build_scene_body_sections(
     entities_block = _create_entities_block(
         parent,
         npc_names,
+        villain_names,
         creature_names,
         place_names,
         open_entity_callback=open_entity_callback,

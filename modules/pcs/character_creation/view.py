@@ -228,6 +228,25 @@ class CharacterCreationView(ctk.CTkFrame):
 
         self._advancement_choices_cache = existing_choices[:advancement_count]
 
+        # Headless tests may provide a lightweight placeholder instead of a real
+        # Tk container. Preserve the data model without requiring widget creation.
+        if not hasattr(self.advancement_frame, "tk"):
+            for idx in range(advancement_count):
+                existing_choice = self._advancement_choices_cache[idx] if idx < len(self._advancement_choices_cache) else {}
+                initial_type = (existing_choice.get("type") or "").strip() or ADVANCEMENT_OPTIONS[0][0]
+                option_var = tk.StringVar(value=initial_type)
+                details_var = tk.StringVar(value=(existing_choice.get("details") or "").strip())
+                self.advancement_rows.append(
+                    {
+                        "type_var": option_var,
+                        "details_var": details_var,
+                        "combo": None,
+                        "label_map": {value: label for value, label in ADVANCEMENT_OPTIONS},
+                        "label_var": None,
+                    }
+                )
+            return
+
         ctk.CTkLabel(
             self.advancement_frame,
             text="Advancement choices",

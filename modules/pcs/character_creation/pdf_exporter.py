@@ -8,8 +8,11 @@ import fitz  # PyMuPDF
 
 
 def _write(page: fitz.Page, x: float, y: float, text: str, size: float = 10, bold: bool = False) -> None:
-    font = "helv" if not bold else "helv-bold"
-    page.insert_text((x, y), text, fontsize=size, fontname=font)
+    font = "helv-bold" if bold else "helv"
+    try:
+        page.insert_text((x, y), text, fontsize=size, fontname=font)
+    except Exception:
+        page.insert_text((x, y), text, fontsize=size, fontname="helv")
 
 
 def export_character_pdf(character: dict, rules_result, output_path: str) -> str:
@@ -24,7 +27,6 @@ def export_character_pdf(character: dict, rules_result, output_path: str) -> str
         raise RuntimeError("Impossible d'initialiser le document PDF via PyMuPDF.")
 
     page1 = doc.new_page(width=595, height=842)
-    page2 = doc.new_page(width=595, height=842)
 
     _write(page1, 40, 40, "Savage Fate - Character Creation", 16, bold=True)
     _write(page1, 40, 70, f"Nom: {character.get('name', '')}", 12)
@@ -45,6 +47,7 @@ def export_character_pdf(character: dict, rules_result, output_path: str) -> str
         if y > 800:
             break
 
+    page2 = doc.new_page(width=595, height=842)
     _write(page2, 40, 40, "Prouesses", 13, bold=True)
     y = 65
     for idx, feat in enumerate(character.get("feats") or [], start=1):

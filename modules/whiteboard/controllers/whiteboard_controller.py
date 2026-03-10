@@ -5,7 +5,7 @@ import socket
 import threading
 import tkinter as tk
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 from tkinter import colorchooser, filedialog
 from typing import Any, Callable, Dict, Iterable, List, Optional, Tuple, cast
 
@@ -638,7 +638,7 @@ class WhiteboardController:
         if not state:
             log_warning("Snapshot missing", func_name="WhiteboardController._restore_snapshot")
             return
-        self._apply_loaded_state(state, datetime.utcnow().isoformat())
+        self._apply_loaded_state(state, datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"))
         if dialog is not None:
             try:
                 dialog.destroy()

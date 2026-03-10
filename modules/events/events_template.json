@@ -12,12 +12,15 @@
     {"name": "Resolution", "type": "longtext"},
     {"name": "Places", "type": "list", "linked_type": "Places"},
     {"name": "NPCs", "type": "list", "linked_type": "NPCs"},
+    {"name": "Villains", "type": "list", "linked_type": "Villains"},
+    {"name": "Creatures", "type": "list", "linked_type": "Creatures"},
     {"name": "Scenarios", "type": "list", "linked_type": "Scenarios"},
     {"name": "Informations", "type": "list", "linked_type": "Informations"},
     {"name": "Factions", "type": "list", "linked_type": "Factions"},
     {"name": "Bases", "type": "list", "linked_type": "Bases"},
     {"name": "Maps", "type": "list", "linked_type": "Maps"},
     {"name": "Clues", "type": "list", "linked_type": "Clues"},
+    {"name": "Objects", "type": "list", "linked_type": "Objects"},
     {"name": "Notes", "type": "longtext"}
   ]
 }

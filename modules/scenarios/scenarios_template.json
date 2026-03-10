@@ -7,6 +7,7 @@
       {"name": "Bases", "type": "list", "linked_type": "Bases"},
       {"name": "Places", "type": "list", "linked_type": "Places"},
       {"name": "NPCs", "type": "list", "linked_type": "NPCs"},
+      {"name": "Villains", "type": "list", "linked_type": "Villains"},
       {"name": "Creatures", "type": "list", "linked_type": "Creatures"},
       {"name": "Factions", "type": "list", "linked_type": "Factions"},
       {"name": "Objects", "type": "list", "linked_type": "Objects"},

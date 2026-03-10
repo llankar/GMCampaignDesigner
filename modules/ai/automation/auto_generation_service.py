@@ -1,4 +1,5 @@
 import json
+import json
 from typing import Any, Dict, List
 
 from modules.ai.automation.entity_generator import EntityAutoGenerator
@@ -119,7 +120,7 @@ class AutoGenerationService:
             value = item.get(name)
             if not value:
                 continue
-            if field_type in {"list", "list_longtext"} and isinstance(value, list):
+            if isinstance(value, list):
                 joined = ", ".join(str(entry).strip() for entry in value if str(entry).strip())
                 if joined:
                     context_lines.append(f"{name}: {joined}")

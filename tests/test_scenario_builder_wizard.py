@@ -270,3 +270,25 @@ def test_normalise_scene_collects_nested_text_fragments():
     scene = step._normalise_scene(entry, 1)
 
     assert scene["Summary"] == "First part.\n\nSecond part.\n\nThird part."
+
+
+def test_load_existing_scenario_uses_selected_payload_directly():
+    step = _build_scenes_step()
+    loaded = []
+    step.scenario_wrapper = object()
+    step._choose_existing_scenario = lambda: {
+        "Title": "Loaded Scenario",
+        "Scenes": [{"Title": "Intro", "Summary": "Opening scene"}],
+        "NPCs": ["Morgan"],
+    }
+    step.load_from_payload = lambda scenario: loaded.append(scenario)
+
+    step._load_existing_scenario()
+
+    assert loaded == [
+        {
+            "Title": "Loaded Scenario",
+            "Scenes": [{"Title": "Intro", "Summary": "Opening scene"}],
+            "NPCs": ["Morgan"],
+        }
+    ]

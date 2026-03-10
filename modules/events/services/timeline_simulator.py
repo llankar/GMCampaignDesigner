@@ -47,6 +47,7 @@ class CampaignTimelineSimulator:
     ENTITY_TYPES = (
         "events",
         "factions",
+        "villains",
         "npcs",
         "bases",
         "places",
@@ -62,6 +63,10 @@ class CampaignTimelineSimulator:
     def advance_days(self, days: int) -> TimelineSimulationResult:
         current = self._get_current_date()
         return self.advance_to(current + timedelta(days=max(0, int(days))))
+
+    @classmethod
+    def current_campaign_date(cls) -> date:
+        return cls._get_current_date()
 
     def advance_to(self, target_date: date | str) -> TimelineSimulationResult:
         end_date = _coerce_date(target_date)
@@ -187,6 +192,43 @@ class CampaignTimelineSimulator:
             )
             self._apply_change_feedback(change, state, indexes)
             counts["escalated_factions"] += 1
+
+        for villain in state["villains"]:
+            if _coerce_date(villain.get("NextEscalationDate")) != current_day:
+                continue
+            name = _text(villain.get("Name") or "Villain")
+            agenda = _text(
+                villain.get("CurrentObjective")
+                or villain.get("Scheme")
+                or villain.get("Description")
+                or "Advance a villainous scheme"
+            )
+            level = _int_value(villain.get("EscalationLevel")) + 1
+            villain["EscalationLevel"] = level
+            villain["LastEscalationDate"] = current_day.isoformat()
+            cadence = max(1, _int_value(villain.get("EscalationCadenceDays"), default=7))
+            villain["NextEscalationDate"] = (current_day + timedelta(days=cadence)).isoformat()
+            villain["SchemeHistory"] = _append_history(
+                villain.get("SchemeHistory"),
+                {"date": current_day.isoformat(), "level": level, "summary": agenda},
+            )
+            related_npcs = [name] + _coerce_list(villain.get("Lieutenants")) + _coerce_list(villain.get("NPCs"))
+            change = self._record_change(
+                changes,
+                current_day,
+                category="villain",
+                entity_type="villains",
+                entity_name=name,
+                summary=f"{name} advances a villain plan to level {level}: {agenda}.",
+                scenario_names=_coerce_list(villain.get("Scenarios")),
+                place_names=_coerce_list(villain.get("Places")),
+                npc_names=related_npcs,
+                map_names=_coerce_list(villain.get("Maps")),
+                clue_names=_coerce_list(villain.get("Clues")),
+            )
+            self._apply_change_feedback(change, state, indexes)
+            self._upsert_villain_escalation_event(state, villain, current_day, agenda, level)
+            counts["escalated_villains"] += 1
 
         for npc in state["npcs"]:
             if not _is_truthy(npc.get("IsVillain")):
@@ -447,6 +489,45 @@ class CampaignTimelineSimulator:
             wrapper = GenericModelWrapper(slug)
             self._wrappers[slug] = wrapper
         return wrapper
+
+    def _upsert_villain_escalation_event(
+        self,
+        state: dict[str, list[dict]],
+        villain: dict[str, Any],
+        current_day: date,
+        agenda: str,
+        level: int,
+    ) -> None:
+        events = state.setdefault("events", [])
+        villain_name = _text(villain.get("Name") or "Villain")
+        event_name = f"{villain_name} escalation {current_day.isoformat()}"
+        payload = {
+            "Name": event_name,
+            "Title": f"{villain_name} escalation",
+            "Date": current_day.isoformat(),
+            "Type": "villain",
+            "Color": "#A63DE0",
+            "Status": "Escalated",
+            "AutoResolve": False,
+            "Resolution": "",
+            "Places": _coerce_list(villain.get("Places")),
+            "NPCs": _coerce_list(villain.get("Lieutenants")) + _coerce_list(villain.get("NPCs")),
+            "Villains": [villain_name],
+            "Creatures": _coerce_list(villain.get("Creatures")) + _coerce_list(villain.get("CreatureAgents")),
+            "Scenarios": _coerce_list(villain.get("Scenarios")),
+            "Informations": [],
+            "Factions": _coerce_list(villain.get("Factions")),
+            "Bases": [],
+            "Maps": _coerce_list(villain.get("Maps")),
+            "Clues": _coerce_list(villain.get("Clues")),
+            "Objects": _coerce_list(villain.get("Objects")),
+            "Notes": f"Escalation level {level}: {agenda}",
+        }
+        for index, event in enumerate(events):
+            if _normalize_key(event.get("Name")) == _normalize_key(event_name):
+                events[index] = payload
+                return
+        events.append(payload)
 
     @staticmethod
     def _get_current_date() -> date:

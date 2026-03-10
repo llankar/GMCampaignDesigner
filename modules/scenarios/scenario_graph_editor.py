@@ -228,26 +228,33 @@ class ScenarioGraphEditor(ctk.CTkFrame):
                 npc_wrapper: GenericModelWrapper,
                 creature_wrapper: GenericModelWrapper,
                 place_wrapper: GenericModelWrapper,
+                faction_wrapper: Optional[GenericModelWrapper] = None,
+                villain_wrapper: Optional[GenericModelWrapper] = None,
                 *args, **kwargs):
         super().__init__(master, *args, **kwargs)
         self.scenario_wrapper = scenario_wrapper
         self.npc_wrapper = npc_wrapper
         self.creature_wrapper = creature_wrapper
         self.place_wrapper = place_wrapper
+        self.faction_wrapper = faction_wrapper or GenericModelWrapper("factions")
+        self.villain_wrapper = villain_wrapper or GenericModelWrapper("villains")
         self.node_holder_images = {}    # ← keep PhotoImage refs here
         self.node_bboxes = {}
         self.node_images = {}  # Prevent garbage collection of PhotoImage objects
         self.overlay_images={}
-        # Preload NPC, Creature and Place data for quick lookup.
+        # Preload linked entity data for quick lookup.
         self.npcs = {npc["Name"]: npc for npc in self.npc_wrapper.load_items()}
+        self.villains = {villain["Name"]: villain for villain in self.villain_wrapper.load_items()}
         self.creatures = {creature["Name"]: creature for creature in self.creature_wrapper.load_items()}
         self.places = {pl["Name"]: pl for pl in self.place_wrapper.load_items()}
+        self.factions = {faction["Name"]: faction for faction in self.faction_wrapper.load_items()}
 
         self.scenario = None
         self.canvas_scale = 1.0
         self.zoom_factor = 1.1
         self.type_icon_paths = {
             "npc": "assets/npc_icon.png",
+            "villain": "assets/npc_graph_icon.png",
             "place": "assets/places_icon.png",
             "scenario": "assets/gm_screen_icon.png",
             "creature": "assets/creature_icon.png",
@@ -659,6 +666,9 @@ class ScenarioGraphEditor(ctk.CTkFrame):
             "character": "npc",
             "ally": "npc",
             "npcs": "npc",
+            "villains": "villain",
+            "antagonist": "villain",
+            "boss": "villain",
             "monster": "creature",
             "enemy": "creature",
             "foe": "creature",
@@ -682,6 +692,12 @@ class ScenarioGraphEditor(ctk.CTkFrame):
             template_key = "npcs"
             display_type = "NPCs"
             record = self._lookup_entity_by_name("npc", name)
+        elif base_type == "villain":
+            collection = getattr(self, "villains", {})
+            wrapper = getattr(self, "villain_wrapper", None)
+            template_key = "villains"
+            display_type = "Villains"
+            record = self._lookup_from_collection(collection, name)
         elif base_type == "creature":
             collection = getattr(self, "creatures", {})
             wrapper = getattr(self, "creature_wrapper", None)
@@ -1419,6 +1435,41 @@ class ScenarioGraphEditor(ctk.CTkFrame):
                     "from": scenario_tag,
                     "to": npc_tag,
                     "text": ""
+                })
+
+        # Villain nodes
+        villains_list = scenario.get("Villains") or []
+        villains_count = len(villains_list)
+        if villains_count > 0:
+            arc_start_villains = -40
+            arc_end_villains = 30
+            offset_villains = 430
+
+            for i, villain_name in enumerate(villains_list):
+                if villain_name not in self.villains:
+                    continue
+                angle_deg = (arc_start_villains if villains_count == 1
+                            else arc_start_villains + i * (arc_end_villains - arc_start_villains) / (villains_count - 1))
+                angle_rad = math.radians(angle_deg)
+                x = center_x + offset_villains * math.cos(angle_rad)
+                y = center_y + offset_villains * math.sin(angle_rad)
+                villain_data = self.villains[villain_name]
+                scheme = clean_longtext(villain_data.get("Scheme", ""), max_length=5000)
+                villain_data["Scheme"] = scheme
+                villain_tag = self._build_tag("villain", villain_name)
+                self.graph["nodes"].append({
+                    "type": "villain",
+                    "name": villain_name,
+                    "x": x,
+                    "y": y,
+                    "color": "midnightblue",
+                    "data": villain_data
+                })
+                self.node_positions[villain_tag] = (x, y)
+                self.graph["links"].append({
+                    "from": scenario_tag,
+                    "to": villain_tag,
+                    "text": "villain"
                 })
 
         # Place nodes
@@ -3679,6 +3730,11 @@ class ScenarioGraphEditor(ctk.CTkFrame):
             entity_name = node_tag.replace("faction_", "").replace("_", " ")
             entity = self.factions.get(entity_name)
             wrapper=self.faction_wrapper
+        elif node_tag.startswith("villain_"):
+            entity_type = "Villains"
+            entity_name = node_tag.replace("villain_", "").replace("_", " ")
+            entity = self.villains.get(entity_name)
+            wrapper = self.villain_wrapper
         else:
             return
 
@@ -3701,6 +3757,7 @@ class ScenarioGraphEditor(ctk.CTkFrame):
             return
         node_tag = next((t for t in tags if t.startswith("scenario_")
                         or t.startswith("npc_")
+                        or t.startswith("villain_")
                         or t.startswith("creature_")
                         or t.startswith("place_")
                         or t.startswith("faction_")), None)

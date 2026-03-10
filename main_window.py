@@ -67,7 +67,9 @@ from modules.ui.system_manager_dialog import SystemManagerDialog
 from modules.ui.menu_bar import AppMenuBar
 from modules.events.ui.dock import CalendarDock
 from modules.events.ui.full import CalendarWindow
+from modules.events.ui.full.timeline_simulator_dialog import TimelineSimulatorDialog
 from modules.events.models.event_types import get_event_type
+from modules.events.services.timeline_simulator import CampaignTimelineSimulator
 from modules.events.services.entity_link_service import EntityLinkService
 from modules.events.services.calendar_state_store import CalendarStateStore
 from modules.events.ui.shared.color_utils import normalize_hex_color
@@ -152,17 +154,10 @@ class MainWindow(ctk.CTk):
         position_window_at_top(self)
         self.set_window_icon()
         self.create_layout()
-        self.show_sidebar = False
-        self.sidebar_default_width = 220
-        self._sidebar_collapsed = False
-        self._sidebar_animating = False
-        self._sidebar_animation_job = None
-        self._sidebar_pack_kwargs = None
         self.entity_definitions = load_entity_definitions()
         self.create_menu_bar()
         self.entity_wrappers = {}
         self.load_icons()
-        self.create_sidebar()
         self.create_content_area()
         self.create_exit_button()
         self.load_model_config()
@@ -315,6 +310,7 @@ class MainWindow(ctk.CTk):
             "asset_library": "icons/save.png",
             "gm_screen": "gm_screen_icon.png",
             "character_graph": "npc_graph_icon.png",
+            "villain_graph": "npc_graph_icon.png",
             "faction_graph": "faction_graph_icon.png",
             "scenario_graph": "scenario_graph_icon.png",
             "scenario_builder": "scenario_graph_icon.png",
@@ -721,16 +717,6 @@ class MainWindow(ctk.CTk):
                 self.menu_bar.refresh_theme()
         except Exception:
             pass
-        try:
-            # Recreate sidebar so header bands and borders update
-            self.create_sidebar(force=True)
-        except Exception:
-            # Fallback: at least rebuild the sections area
-            try:
-                self.create_accordion_sidebar()
-            except Exception:
-                pass
-
         # Re-open floating bars/windows to pick up the new palette immediately
         try:
             if reopen_audio_bar:
@@ -896,6 +882,7 @@ class MainWindow(ctk.CTk):
 
         relations = [
             ("character_graph", "Open Character Graph Editor", self.open_character_graph_editor),
+            ("villain_graph", "Open Villain Graph Editor", self.open_villain_graph_editor),
             ("faction_graph", "Open Factions Graph Editor", self.open_faction_graph_editor),
             ("scenario_graph", "Open Scenario Graph Editor", self.open_scenario_graph_editor),
             ("create_random_table", "Create Random Table", self.open_random_table_editor),
@@ -905,6 +892,7 @@ class MainWindow(ctk.CTk):
         utilities = [
             ("generate_scenario", "Generate Scenario", self.open_scenario_generator),
             ("scenario_builder", "Scenario Builder Wizard", self.open_scenario_builder),
+            ("timeline_simulator", "Advance Timeline", self.open_timeline_simulator_dialog),
             ("import_scenario", "Import Scenario", self.open_scenario_importer),
             ("import_creatures_pdf", "Import NPCs/Creatures from PDF", self.open_creature_importer),
             ("import_objects_pdf", "Import Equipment from PDF", self.open_object_importer),
@@ -1124,6 +1112,7 @@ class MainWindow(ctk.CTk):
                 get_events_for_range=self._get_events_for_range,
                 on_create_event=self._create_calendar_event,
                 on_update_event=self._update_calendar_event,
+                on_open_timeline_simulator=self.open_timeline_simulator_dialog,
                 initial_date=target,
                 initial_view_mode=mode,
                 on_state_change=self._on_calendar_full_state_change,
@@ -1202,6 +1191,55 @@ class MainWindow(ctk.CTk):
     def _invalidate_calendar_events_cache(self):
         self._calendar_events_cache = None
 
+    def notify_calendar_events_changed(self, target_date=None):
+        parsed_target = self._parse_event_date(target_date)
+        self._invalidate_calendar_events_cache()
+        self._refresh_calendar_dock(parsed_target)
+
+        window = getattr(self, "_calendar_full_window", None)
+        if window is None or not window.winfo_exists():
+            return
+
+        try:
+            window._render()
+        except Exception:
+            return
+
+    def open_timeline_simulator_dialog(self, parent=None, target_date=None):
+        dialog_parent = parent or self
+        current_date = CampaignTimelineSimulator.current_campaign_date()
+        initial_target = self._parse_event_date(target_date) or current_date
+        TimelineSimulatorDialog(
+            dialog_parent,
+            current_date=current_date,
+            initial_target_date=initial_target,
+            on_run=self._run_timeline_simulation,
+        )
+
+    def _run_timeline_simulation(self, *, target_date):
+        with self._busy_operation("Advancing campaign timeline..."):
+            simulator = CampaignTimelineSimulator(wrappers=self.entity_wrappers)
+            result = simulator.advance_to(target_date)
+
+        self.notify_calendar_events_changed(result.end_date)
+        self._refresh_open_entity_views()
+        return result
+
+    def _refresh_open_entity_views(self):
+        container = getattr(self, "current_open_view", None)
+        if container is None:
+            return
+        try:
+            widgets = list(container.winfo_children())
+        except Exception:
+            return
+        for child in widgets:
+            if hasattr(child, "reload_from_db"):
+                try:
+                    child.reload_from_db()
+                except Exception:
+                    continue
+
     def _get_events_for_day(self, target_date):
         return [event for event in self._collect_calendar_events() if event.get("date") == target_date]
 
@@ -1247,6 +1285,13 @@ class MainWindow(ctk.CTk):
         slug, wrapper = self._resolve_calendar_event_wrapper()
         linked_places = payload.get("Places") or []
         linked_npcs = payload.get("NPCs") or []
+        linked_villains = payload.get("Villains") or []
+        linked_creatures = payload.get("Creatures") or []
+        linked_objects = payload.get("Objects") or []
+        linked_factions = payload.get("Factions") or []
+        linked_bases = payload.get("Bases") or []
+        linked_maps = payload.get("Maps") or []
+        linked_clues = payload.get("Clues") or []
         linked_scenarios = payload.get("Scenarios") or []
         linked_informations = payload.get("Informations") or []
 
@@ -1260,6 +1305,13 @@ class MainWindow(ctk.CTk):
             "Status": (payload.get("status") or "Planifié").strip(),
             "Places": linked_places,
             "NPCs": linked_npcs,
+            "Villains": linked_villains,
+            "Creatures": linked_creatures,
+            "Objects": linked_objects,
+            "Factions": linked_factions,
+            "Bases": linked_bases,
+            "Maps": linked_maps,
+            "Clues": linked_clues,
             "Scenarios": linked_scenarios,
             "Informations": linked_informations,
             "Name": f"{title} {event_date.isoformat()} {start_time}".strip(),
@@ -1279,6 +1331,13 @@ class MainWindow(ctk.CTk):
             "source": slug,
             "Places": linked_places,
             "NPCs": linked_npcs,
+            "Villains": linked_villains,
+            "Creatures": linked_creatures,
+            "Objects": linked_objects,
+            "Factions": linked_factions,
+            "Bases": linked_bases,
+            "Maps": linked_maps,
+            "Clues": linked_clues,
             "Scenarios": linked_scenarios,
             "Informations": linked_informations,
         }
@@ -1335,6 +1394,13 @@ class MainWindow(ctk.CTk):
             matched["Status"] = str(payload.get("status") or matched.get("Status") or "").strip()
             matched["Places"] = payload.get("Places") or []
             matched["NPCs"] = payload.get("NPCs") or []
+            matched["Villains"] = payload.get("Villains") or []
+            matched["Creatures"] = payload.get("Creatures") or []
+            matched["Objects"] = payload.get("Objects") or []
+            matched["Factions"] = payload.get("Factions") or []
+            matched["Bases"] = payload.get("Bases") or []
+            matched["Maps"] = payload.get("Maps") or []
+            matched["Clues"] = payload.get("Clues") or []
             matched["Scenarios"] = payload.get("Scenarios") or []
             matched["Informations"] = payload.get("Informations") or []
             title = updated_title
@@ -1422,6 +1488,13 @@ class MainWindow(ctk.CTk):
                         "status": item.get("Status") or item.get("status") or "",
                         "Places": item.get("Places") or [],
                         "NPCs": item.get("NPCs") or [],
+                        "Villains": item.get("Villains") or [],
+                        "Creatures": item.get("Creatures") or [],
+                        "Objects": item.get("Objects") or [],
+                        "Factions": item.get("Factions") or [],
+                        "Bases": item.get("Bases") or [],
+                        "Maps": item.get("Maps") or [],
+                        "Clues": item.get("Clues") or [],
                         "Scenarios": item.get("Scenarios") or [],
                         "Informations": item.get("Informations") or [],
                     }
@@ -1657,6 +1730,18 @@ class MainWindow(ctk.CTk):
                     self.npc_wrapper,
                     self.pc_wrapper,
                     self.faction_wrapper,
+                )
+            elif self._graph_type == 'villain':
+                editor = CharacterGraphEditor(
+                    new_container,
+                    self.npc_wrapper,
+                    self.pc_wrapper,
+                    self.faction_wrapper,
+                    villain_wrapper=GenericModelWrapper("villains"),
+                    allowed_entity_types=("villain", "npc", "pc"),
+                    graph_path=os.path.join(ConfigHelper.get_campaign_dir(), "graphs", "villain_graph.json"),
+                    background_style="scene_flow",
+                    node_style="modern",
                 )
             elif self._graph_type == 'faction':
                 editor = FactionGraphEditor(new_container, self.faction_wrapper)
@@ -2104,7 +2189,6 @@ class MainWindow(ctk.CTk):
         self.entity_definitions = load_entity_definitions()
         self.load_icons()
         self.init_wrappers()
-        self.create_sidebar()
         if getattr(self, "menu_bar", None) is not None:
             self.menu_bar.rebuild()
 
@@ -2465,6 +2549,35 @@ class MainWindow(ctk.CTk):
         editor.pack(fill="both", expand=True)
 
         # keep both container and editor so we can snapshot/restore
+        container.graph_editor = editor
+        self.current_open_view = container
+        self.current_open_entity = None
+
+    def open_villain_graph_editor(self):
+        self._graph_type = 'villain'
+        self.current_gm_view = None
+        self.clear_current_content()
+        self.banner_toggle_btn.configure(state="normal")
+        parent = self.get_content_container()
+
+        container = ctk.CTkFrame(parent)
+        container.grid(row=0, column=0, sticky="nsew")
+        parent.grid_rowconfigure(0, weight=1)
+        parent.grid_columnconfigure(0, weight=1)
+
+        editor = CharacterGraphEditor(
+            container,
+            self.npc_wrapper,
+            self.pc_wrapper,
+            self.faction_wrapper,
+            villain_wrapper=GenericModelWrapper("villains"),
+            allowed_entity_types=("villain", "npc", "pc"),
+            graph_path=os.path.join(ConfigHelper.get_campaign_dir(), "graphs", "villain_graph.json"),
+            background_style="scene_flow",
+            node_style="modern",
+        )
+        editor.pack(fill="both", expand=True)
+
         container.graph_editor = editor
         self.current_open_view = container
         self.current_open_entity = None
@@ -3454,6 +3567,7 @@ class MainWindow(ctk.CTk):
         creature_items = {creature["Name"]: creature for creature in self.creature_wrapper.load_items()}
         place_items = {place["Name"]: place for place in self.place_wrapper.load_items()}
         npc_items = {npc["Name"]: npc for npc in self.npc_wrapper.load_items()}
+        villain_items = {villain["Name"]: villain for villain in GenericModelWrapper("villains").load_items()}
 
         file_path = filedialog.asksaveasfilename(
             defaultextension=".docx",
@@ -3534,6 +3648,26 @@ class MainWindow(ctk.CTk):
                     self.apply_formatting(run, description.get("formatting", {}))
                 else:
                     p.add_run(str(description))
+
+            # Villains Section
+            villains = scenario.get("Villains", []) or []
+            if villains:
+                doc.add_heading("Villains", level=3)
+                for villain_name in villains:
+                    villain = villain_items.get(villain_name, {
+                        "Name": villain_name,
+                        "Title": "",
+                        "Archetype": "Unknown",
+                        "Scheme": {"text": "Unknown scheme", "formatting": {}},
+                    })
+                    headline = villain.get("Title") or villain.get("Archetype") or "Villain"
+                    p = doc.add_paragraph(f"- {villain['Name']} ({headline}): ")
+                    scheme = villain.get("Scheme") or villain.get("Description") or ""
+                    if isinstance(scheme, dict):
+                        run = p.add_run(scheme.get("text", ""))
+                        self.apply_formatting(run, scheme.get("formatting", {}))
+                    else:
+                        p.add_run(str(scheme))
 
             # Creatures Section
             doc.add_heading("Creatures", level=3)
@@ -3702,14 +3836,6 @@ class MainWindow(ctk.CTk):
         except Exception as exc:
             log_warning(
                 f"Failed to invalidate analyzer cache: {exc}",
-                func_name="MainWindow._on_system_changed",
-            )
-
-        try:
-            self.update_sidebar_metadata()
-        except Exception as exc:
-            log_warning(
-                f"Failed to update sidebar metadata: {exc}",
                 func_name="MainWindow._on_system_changed",
             )
 

@@ -3,6 +3,7 @@
       {"name": "Name", "type": "text"},
       {"name": "Description", "type": "longtext"},
       {"name": "Secrets", "type": "longtext"},
+      {"name": "Villains", "type": "list", "linked_type": "Villains"},
       {"name": "Portrait", "type": "text"}
   ]
 }

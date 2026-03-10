@@ -4,6 +4,7 @@ import os
 import customtkinter as ctk
 from PIL import Image, ImageTk
 from tkinter import filedialog, messagebox, ttk, Menu
+from typing import Optional
 
 from modules.audio.entity_audio import (
     get_entity_audio_value,
@@ -19,6 +20,7 @@ from modules.helpers.portrait_helper import primary_portrait, resolve_portrait_p
 from modules.helpers.template_loader import load_template
 from modules.npcs import npc_opener
 from modules.pcs import pc_opener
+from modules.villains import villain_opener
 from modules.scenarios.scene_flow_rendering import (
     SCENE_FLOW_BG,
     apply_scene_flow_canvas_styling,
@@ -65,6 +67,7 @@ class CharacterGraphEditor(ctk.CTkFrame):
         npc_wrapper: GenericModelWrapper,
         pc_wrapper: GenericModelWrapper,
         faction_wrapper: GenericModelWrapper,
+        villain_wrapper: Optional[GenericModelWrapper] = None,
         allowed_entity_types=None,
         graph_path=None,
         background_style="corkboard",
@@ -78,13 +81,15 @@ class CharacterGraphEditor(ctk.CTkFrame):
         self.npc_wrapper = npc_wrapper
         self.pc_wrapper = pc_wrapper
         self.faction_wrapper = faction_wrapper
+        self.villain_wrapper = villain_wrapper or GenericModelWrapper("villains")
         self.allowed_entity_types = set(allowed_entity_types or ("npc", "pc"))
         self.entity_wrappers = {
             "npc": self.npc_wrapper,
             "pc": self.pc_wrapper,
+            "villain": self.villain_wrapper,
         }
-        self.entity_records = {"npc": {}, "pc": {}}
-        self.entity_records_normalized = {"npc": {}, "pc": {}}
+        self.entity_records = {"npc": {}, "pc": {}, "villain": {}}
+        self.entity_records_normalized = {"npc": {}, "pc": {}, "villain": {}}
         for etype in self.allowed_entity_types:
             if etype in self.entity_records:
                 self._refresh_entity_records(etype)
@@ -574,6 +579,8 @@ class CharacterGraphEditor(ctk.CTkFrame):
     def _get_entity_opener(self, entity_type):
         if entity_type == "pc":
             return pc_opener.open_pc_editor_window
+        if entity_type == "villain":
+            return villain_opener.open_villain_editor_window
         return npc_opener.open_npc_editor_window
 
     def _on_zoom(self, event):
@@ -1039,8 +1046,12 @@ class CharacterGraphEditor(ctk.CTkFrame):
                 dialog.destroy()
             self.canvas.bind("<Button-1>", self.place_pending_entity)
 
-        template_key = "npcs" if entity_type == "npc" else "pcs"
-        display_name = "NPCs" if entity_type == "npc" else "PCs"
+        template_map = {
+            "npc": ("npcs", "NPCs"),
+            "pc": ("pcs", "PCs"),
+            "villain": ("villains", "Villains"),
+        }
+        template_key, display_name = template_map.get(entity_type, ("npcs", "NPCs"))
         template = load_template(template_key)
         dialog = ctk.CTkToplevel(self)
         dialog.title(f"Select {entity_type.upper()}")

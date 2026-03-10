@@ -8,7 +8,7 @@ from modules.events.models.event_types import get_event_type
 class EventDetailPanel(ctk.CTkFrame):
     """Selected-day details with compact mode and quick edit callback."""
 
-    LINKED_TYPES = ("Places", "NPCs", "Scenarios", "Informations")
+    LINKED_TYPES = ("Places", "NPCs", "Villains", "Creatures", "Objects", "Factions", "Bases", "Maps", "Clues", "Scenarios", "Informations")
 
     def __init__(self, master, *, on_compact_toggle, on_quick_edit, on_open_entity=None, on_event_click=None):
         super().__init__(master)

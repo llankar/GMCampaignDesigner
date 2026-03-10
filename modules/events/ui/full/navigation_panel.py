@@ -20,6 +20,7 @@ class NavigationPanel(ctk.CTkFrame):
         master,
         *,
         on_new_event,
+        on_open_timeline_simulator,
         on_previous,
         on_next,
         on_today,
@@ -29,6 +30,7 @@ class NavigationPanel(ctk.CTkFrame):
     ):
         super().__init__(master)
         self._on_new_event = on_new_event
+        self._on_open_timeline_simulator = on_open_timeline_simulator
         self._on_previous = on_previous
         self._on_next = on_next
         self._on_today = on_today
@@ -45,27 +47,36 @@ class NavigationPanel(ctk.CTkFrame):
         self._status_options = [""]
 
         self.grid_columnconfigure(0, weight=1)
-        self.grid_rowconfigure(5, weight=1)
+        self.grid_rowconfigure(6, weight=1)
 
         self._build_controls()
 
     def _build_controls(self):
-        ctk.CTkButton(self, text="Nouvel évènement", command=self._on_new_event).grid(row=0, column=0, sticky="ew", padx=10, pady=(10, 6))
+        ctk.CTkButton(self, text="Nouvel evenement", command=self._on_new_event).grid(
+            row=0, column=0, sticky="ew", padx=10, pady=(10, 6)
+        )
+        ctk.CTkButton(self, text="Advance Timeline", command=self._open_timeline_simulator).grid(
+            row=1, column=0, sticky="ew", padx=10, pady=(0, 6)
+        )
 
         nav = ctk.CTkFrame(self, fg_color="transparent")
-        nav.grid(row=1, column=0, sticky="ew", padx=10, pady=(6, 8))
-        ctk.CTkButton(nav, text="◀", width=34, command=self._on_previous).pack(side="left", padx=(0, 6))
+        nav.grid(row=2, column=0, sticky="ew", padx=10, pady=(6, 8))
+        ctk.CTkButton(nav, text="<", width=34, command=self._on_previous).pack(side="left", padx=(0, 6))
         ctk.CTkButton(nav, text="Aujourd'hui", width=90, command=self._on_today).pack(side="left", padx=(0, 6))
-        ctk.CTkButton(nav, text="▶", width=34, command=self._on_next).pack(side="left")
+        ctk.CTkButton(nav, text=">", width=34, command=self._on_next).pack(side="left")
 
         self.period_label = ctk.CTkLabel(self, text="", font=ctk.CTkFont(size=14, weight="bold"), anchor="w")
-        self.period_label.grid(row=2, column=0, sticky="ew", padx=10)
+        self.period_label.grid(row=3, column=0, sticky="ew", padx=10)
 
-        self.view_mode_switch = ctk.CTkSegmentedButton(self, values=list(self.VIEW_LABELS.values()), command=self._handle_view_change)
-        self.view_mode_switch.grid(row=3, column=0, sticky="ew", padx=10, pady=(8, 10))
+        self.view_mode_switch = ctk.CTkSegmentedButton(
+            self,
+            values=list(self.VIEW_LABELS.values()),
+            command=self._handle_view_change,
+        )
+        self.view_mode_switch.grid(row=4, column=0, sticky="ew", padx=10, pady=(8, 10))
 
         cal_frame = ctk.CTkFrame(self)
-        cal_frame.grid(row=4, column=0, sticky="ew", padx=10, pady=(0, 8))
+        cal_frame.grid(row=5, column=0, sticky="ew", padx=10, pady=(0, 8))
         for idx, label in enumerate(("L", "M", "M", "J", "V", "S", "D")):
             ctk.CTkLabel(cal_frame, text=label).grid(row=0, column=idx, padx=2, pady=(4, 2), sticky="ew")
 
@@ -73,20 +84,27 @@ class NavigationPanel(ctk.CTkFrame):
         for week_idx in range(6):
             row = []
             for day_idx in range(7):
-                btn = ctk.CTkButton(cal_frame, text="", width=28, height=26, fg_color="transparent", command=lambda w=week_idx, d=day_idx: self._select_cell(w, d))
+                btn = ctk.CTkButton(
+                    cal_frame,
+                    text="",
+                    width=28,
+                    height=26,
+                    fg_color="transparent",
+                    command=lambda w=week_idx, d=day_idx: self._select_cell(w, d),
+                )
                 btn.grid(row=week_idx + 1, column=day_idx, padx=2, pady=2)
                 row.append(btn)
             self._month_cells.append(row)
 
         filters = ctk.CTkFrame(self)
-        filters.grid(row=5, column=0, sticky="new", padx=10, pady=(0, 10))
+        filters.grid(row=6, column=0, sticky="new", padx=10, pady=(0, 10))
         ctk.CTkLabel(filters, text="Filtres", anchor="w").pack(fill="x", padx=8, pady=(8, 4))
 
         self._source_filter = ctk.CTkCheckBox(filters, text="Afficher la source", command=self._emit_filter_change)
         self._source_filter.select()
         self._source_filter.pack(anchor="w", padx=8, pady=(0, 6))
 
-        self._search_entry = ctk.CTkEntry(filters, placeholder_text="Recherche instantanée")
+        self._search_entry = ctk.CTkEntry(filters, placeholder_text="Recherche instantanee")
         self._search_entry.pack(fill="x", padx=8, pady=(0, 6))
         self._search_entry.bind("<KeyRelease>", lambda _e: self._emit_filter_change())
 
@@ -94,9 +112,9 @@ class NavigationPanel(ctk.CTkFrame):
         self._type_menu.pack(fill="x", padx=8, pady=(0, 6))
         self._type_menu.set("Tous types")
 
-        self._entity_menu = ctk.CTkOptionMenu(filters, values=["Toutes entités"], command=lambda _v: self._emit_filter_change())
+        self._entity_menu = ctk.CTkOptionMenu(filters, values=["Toutes entites"], command=lambda _v: self._emit_filter_change())
         self._entity_menu.pack(fill="x", padx=8, pady=(0, 6))
-        self._entity_menu.set("Toutes entités")
+        self._entity_menu.set("Toutes entites")
 
         self._status_menu = ctk.CTkOptionMenu(filters, values=["Tous statuts"], command=lambda _v: self._emit_filter_change())
         self._status_menu.pack(fill="x", padx=8, pady=(0, 6))
@@ -105,7 +123,6 @@ class NavigationPanel(ctk.CTkFrame):
         self._agenda_window = ctk.CTkSegmentedButton(filters, values=["7 jours", "30 jours"], command=lambda _v: self._emit_filter_change())
         self._agenda_window.pack(fill="x", padx=8, pady=(0, 8))
         self._agenda_window.set("7 jours")
-
 
     def set_filters(self, filters):
         if not isinstance(filters, dict):
@@ -125,7 +142,7 @@ class NavigationPanel(ctk.CTkFrame):
         selected_status = str(filters.get("status") or "").strip()
 
         self._type_menu.set(selected_type if selected_type else "Tous types")
-        self._entity_menu.set(selected_entity if selected_entity else "Toutes entités")
+        self._entity_menu.set(selected_entity if selected_entity else "Toutes entites")
         self._status_menu.set(selected_status if selected_status else "Tous statuts")
 
         agenda_days = 30 if int(filters.get("agenda_window_days") or 7) == 30 else 7
@@ -137,7 +154,7 @@ class NavigationPanel(ctk.CTkFrame):
         self._status_options = [""] + [item for item in statuses if item]
 
         self._type_menu.configure(values=["Tous types"] + self._type_options[1:])
-        self._entity_menu.configure(values=["Toutes entités"] + self._entity_options[1:])
+        self._entity_menu.configure(values=["Toutes entites"] + self._entity_options[1:])
         self._status_menu.configure(values=["Tous statuts"] + self._status_options[1:])
 
     def set_state(self, *, active_date, anchor_date, view_mode):
@@ -175,6 +192,10 @@ class NavigationPanel(ctk.CTkFrame):
         if callable(self._on_view_change):
             self._on_view_change(selected_mode)
 
+    def _open_timeline_simulator(self):
+        if callable(self._on_open_timeline_simulator):
+            self._on_open_timeline_simulator()
+
     def _select_cell(self, week_index, day_index):
         if week_index >= len(self._month_matrix):
             return
@@ -194,7 +215,7 @@ class NavigationPanel(ctk.CTkFrame):
                 "show_source": bool(self._source_filter.get()),
                 "search_text": self._search_entry.get().strip(),
                 "type": "" if selected_type == "Tous types" else selected_type,
-                "entity": "" if selected_entity == "Toutes entités" else selected_entity,
+                "entity": "" if selected_entity == "Toutes entites" else selected_entity,
                 "status": "" if selected_status == "Tous statuts" else selected_status,
                 "agenda_window_days": 30 if self._agenda_window.get() == "30 jours" else 7,
             }

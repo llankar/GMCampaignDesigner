@@ -148,6 +148,7 @@ class AppMenuBar:
         campaign_menu.add_command(label="World Map\t F5", command=self.app.open_world_map)
         campaign_menu.add_separator()
         campaign_menu.add_command(label="Character Graph", command=self.app.open_character_graph_editor)
+        campaign_menu.add_command(label="Villain Graph", command=self.app.open_villain_graph_editor)
         campaign_menu.add_command(label="Faction Graph", command=self.app.open_faction_graph_editor)
         campaign_menu.add_command(label="Scenario Graph", command=self.app.open_scenario_graph_editor)
         campaign_menu.add_command(label="Scene Flow Viewer", command=self.app.open_scene_flow_viewer)
