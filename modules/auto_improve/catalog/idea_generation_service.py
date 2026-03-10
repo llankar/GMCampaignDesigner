@@ -17,7 +17,7 @@ class IdeaGenerationService:
         self._workdir = workdir
         self._last_slugs: set[str] = set()
 
-    def generate(self, limit: int = 5) -> list[ImprovementProposal]:
+    def generate(self, limit: int = 10) -> list[ImprovementProposal]:
         normalized_limit = max(1, limit)
         prompt = build_idea_prompt(normalized_limit, self._last_slugs)
         raw_output = self._runner.run_agent(
