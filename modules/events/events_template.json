@@ -1,0 +1,23 @@
+{
+  "fields": [
+    {"name": "Name", "type": "text"},
+    {"name": "Title", "type": "text"},
+    {"name": "Date", "type": "text"},
+    {"name": "StartTime", "type": "text"},
+    {"name": "EndTime", "type": "text"},
+    {"name": "Type", "type": "text"},
+    {"name": "Color", "type": "text"},
+    {"name": "Status", "type": "text"},
+    {"name": "AutoResolve", "type": "boolean"},
+    {"name": "Resolution", "type": "longtext"},
+    {"name": "Places", "type": "list", "linked_type": "Places"},
+    {"name": "NPCs", "type": "list", "linked_type": "NPCs"},
+    {"name": "Scenarios", "type": "list", "linked_type": "Scenarios"},
+    {"name": "Informations", "type": "list", "linked_type": "Informations"},
+    {"name": "Factions", "type": "list", "linked_type": "Factions"},
+    {"name": "Bases", "type": "list", "linked_type": "Bases"},
+    {"name": "Maps", "type": "list", "linked_type": "Maps"},
+    {"name": "Clues", "type": "list", "linked_type": "Clues"},
+    {"name": "Notes", "type": "longtext"}
+  ]
+}
