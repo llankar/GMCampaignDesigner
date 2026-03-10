@@ -32,12 +32,7 @@ class AutoImproveOrchestrator:
             report.completed_at = datetime.now(timezone.utc)
             return report
 
-        branch_name = f"{self.settings.branch_prefix}/{proposal.slug}-{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S')}"
-
         try:
-            self.git.create_branch(branch_name)
-            report.add_step(f"Created branch: {branch_name}")
-
             agent_output = self.runner.run_agent(
                 command_template=self.settings.agent_command,
                 prompt=proposal.prompt,
