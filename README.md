@@ -88,6 +88,16 @@ The export functionality lets you select one or more scenarios and generate a DO
 Cross-campaign Asset Library:
 Use the **Cross-campaign Asset Library** button (Data & System section) to browse neighboring campaign databases, review their NPCs, objects, and maps, and export selected records—including portraits, map images, fog masks, and token assets—into a portable bundle. The same window can import bundles into the active campaign, reconcile duplicates, and copy all referenced media into the correct folders automatically.
 
+Auto-improvement (Codex CLI):
+From **Data & System**, open **Auto-improvement (Codex CLI)** to let the application propose and execute product-level improvements automatically. The workflow is user-triggered and can run in dry-run mode first.
+
+- Configure behavior in `config/config.ini` using section `[AutoImprove]`:
+  - `agent_command`: command used to run Codex CLI (supports `{prompt_file}` placeholder)
+  - `validation_command`: command executed after generation (tests/checks)
+  - `branch_prefix`: prefix for generated Git branches
+  - `dry_run`: `true/false`
+  - `auto_commit`: `true/false`
+
 Contributing
 Contributions to GMCampaignDesigner2 are welcome! To contribute:
 

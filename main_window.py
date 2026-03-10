@@ -105,6 +105,7 @@ from modules.maps.controllers.display_map_controller import DisplayMapController
 from modules.maps.world_map_view import WorldMapWindow
 from modules.generic.custom_fields_editor import CustomFieldsEditor
 from modules.generic.new_entity_type_dialog import NewEntityTypeDialog
+from modules.auto_improve.ui.auto_improve_panel import AutoImprovePanel
 
 
 from modules.dice.dice_roller_window import DiceRollerWindow
@@ -335,6 +336,7 @@ class MainWindow(ctk.CTk):
             "scene_flow_viewer": "scenes_flow_icon.png",
             "create_random_table"   : "random_table_icon.png",
             "system_manager": "database_icon.png",
+            "auto_improve": "ai_settings_icon.png",
         }
 
         # Entity-specific icons come from metadata; keep base ones separate.
@@ -406,6 +408,20 @@ class MainWindow(ctk.CTk):
                 func_name="main_window.MainWindow.open_new_entity_type_dialog",
             )
             messagebox.showerror("Error", f"Failed to open New Entity Type dialog:\n{exc}")
+
+    def open_auto_improve_panel(self):
+        try:
+            log_info("Opening Auto-improvement panel", func_name="main_window.MainWindow.open_auto_improve_panel")
+            panel = AutoImprovePanel(self)
+            panel.transient(self)
+            panel.lift()
+            panel.focus_force()
+        except Exception as exc:
+            log_exception(
+                f"Failed to open Auto-improvement panel: {exc}",
+                func_name="main_window.MainWindow.open_auto_improve_panel",
+            )
+            messagebox.showerror("Error", f"Failed to open Auto-improvement panel:\n{exc}")
 
     def load_icon(self, file_name, size=(60, 60)):
         if not file_name:
@@ -864,6 +880,7 @@ class MainWindow(ctk.CTk):
             ("swarm_path", "Set SwarmUI Path", self.select_swarmui_path),
             ("customize_fields", "Customize Fields", self.open_custom_fields_editor),
             ("new_entity_type", "New Entity Type", self.open_new_entity_type_dialog),
+            ("auto_improve", "Auto-improvement (Codex CLI)", self.open_auto_improve_panel),
             ("system_manager", "Manage Campaign Systems", self.open_system_manager_dialog),
             ("db_export", "Create Campaign Backup", self.prompt_campaign_backup),
             ("db_import", "Restore Campaign Backup", self.prompt_campaign_restore),
