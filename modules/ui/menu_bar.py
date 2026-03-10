@@ -128,6 +128,7 @@ class AppMenuBar:
         file_menu.add_command(label="Manage Systems", command=self.app.open_system_manager_dialog)
         file_menu.add_command(label="Cross-campaign Asset Library", command=self.app.open_cross_campaign_asset_library)
         file_menu.add_separator()
+        file_menu.add_command(label="Auto Improve App", command=self.app.open_auto_improve_panel)
         file_menu.add_command(label="Quit\t F12", command=self.app.destroy)
 
         self._add_menu_button("File", file_menu)
