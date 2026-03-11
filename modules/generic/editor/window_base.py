@@ -88,8 +88,9 @@ class GenericEditorWindowBase(ctk.CTkToplevel):
         min_width = min(1000, int(screen_w * 0.92))
         min_height = min(900, int(screen_h * 0.88))
         req_width = max(min_width, min(req_width, int(screen_w * 0.94)))
-        # Use full screen height as the default editor height.
-        req_height = screen_h
+        # Force the generic editor to open at 1080px tall (capped by screen size
+        # on smaller displays) so the window consistently fills a 1080p screen.
+        req_height = min(1080, screen_h)
         self.geometry(f"{req_width}x{req_height}")
         self.minsize(min_width, min_height)
 
