@@ -1,9 +1,10 @@
 from modules.generic.editor.window_context import *
+from modules.generic.editor.styles import EDITOR_PALETTE, primary_button_style
 
 
 class GenericEditorWindowPortraitAndImageWorkflows:
     def create_portrait_field(self, field):
-        frame = ctk.CTkFrame(self._field_parent())
+        frame = ctk.CTkFrame(self._field_parent(), fg_color="transparent")
         frame.pack(fill="x", pady=5)
 
         campaign_dir = Path(ConfigHelper.get_campaign_dir())
@@ -16,35 +17,36 @@ class GenericEditorWindowPortraitAndImageWorkflows:
         self.portrait_paths = normalized_paths
         self.portrait_path = primary_portrait(self.portrait_paths)
 
-        image_frame = ctk.CTkFrame(frame)
+        image_frame = ctk.CTkFrame(frame, fg_color=EDITOR_PALETTE["surface_soft"], corner_radius=10)
         image_frame.pack(fill="x", pady=5)
 
-        self.portrait_label = ctk.CTkLabel(image_frame, text="[No Portrait]")
+        self.portrait_label = ctk.CTkLabel(image_frame, text="[No Portrait]", text_color=EDITOR_PALETTE["muted_text"])
         self.portrait_label.pack(pady=5)
 
-        list_frame = ctk.CTkFrame(frame)
+        list_frame = ctk.CTkFrame(frame, fg_color=EDITOR_PALETTE["surface_soft"], corner_radius=10)
         list_frame.pack(fill="x", pady=(0, 5))
 
-        ctk.CTkLabel(list_frame, text="Portraits").pack(anchor="w", padx=5, pady=(5, 0))
+        ctk.CTkLabel(list_frame, text="Portraits", text_color=EDITOR_PALETTE["muted_text"]).pack(anchor="w", padx=8, pady=(8, 0))
         self.portrait_listbox = tk.Listbox(list_frame, height=4, exportselection=False)
         self.portrait_listbox.pack(fill="x", padx=5, pady=5)
         self._refresh_portrait_listbox(select_primary=True)
         self.portrait_listbox.bind("<<ListboxSelect>>", self._on_portrait_select)
 
-        button_frame = ctk.CTkFrame(frame)
+        button_frame = ctk.CTkFrame(frame, fg_color="transparent")
         button_frame.pack(pady=5)
 
-        ctk.CTkButton(button_frame, text="Add Portrait(s)", command=self.select_portrait).pack(side="left", padx=5)
-        ctk.CTkButton(button_frame, text="Search Images", command=self.open_portrait_image_browser).pack(side="left", padx=5)
-        ctk.CTkButton(button_frame, text="Paste Portrait", command=self.paste_portrait_from_clipboard).pack(side="left", padx=5)
-        ctk.CTkButton(button_frame, text="Create Portrait with description", command=self.create_portrait_with_swarmui).pack(side="left", padx=5)
-        ctk.CTkButton(button_frame, text="Set Primary", command=self.set_primary_portrait).pack(side="left", padx=5)
-        ctk.CTkButton(button_frame, text="Remove Selected", command=self.remove_selected_portrait).pack(side="left", padx=5)
+        ctk.CTkButton(button_frame, text="Add Portrait(s)", **primary_button_style(), command=self.select_portrait).pack(side="left", padx=5)
+        ctk.CTkButton(button_frame, text="Search Images", **primary_button_style(), command=self.open_portrait_image_browser).pack(side="left", padx=5)
+        ctk.CTkButton(button_frame, text="Paste Portrait", **primary_button_style(), command=self.paste_portrait_from_clipboard).pack(side="left", padx=5)
+        ctk.CTkButton(button_frame, text="Create Portrait with description", **primary_button_style(), command=self.create_portrait_with_swarmui).pack(side="left", padx=5)
+        ctk.CTkButton(button_frame, text="Set Primary", **primary_button_style(), command=self.set_primary_portrait).pack(side="left", padx=5)
+        ctk.CTkButton(button_frame, text="Remove Selected", **primary_button_style(), command=self.remove_selected_portrait).pack(side="left", padx=5)
 
         helper_label = ctk.CTkLabel(
             frame,
             text="Copiez l’image puis utilisez ‘Paste Portrait’.",
             font=ctk.CTkFont(size=12, slant="italic"),
+            text_color=EDITOR_PALETTE["muted_text"],
             anchor="w",
         )
         helper_label.pack(fill="x", padx=5, pady=(0, 5))
@@ -150,7 +152,7 @@ class GenericEditorWindowPortraitAndImageWorkflows:
             candidate = Path(raw_image_path)
             abs_path = candidate if candidate.is_absolute() else campaign_dir / candidate
 
-        image_frame = ctk.CTkFrame(frame)
+        image_frame = ctk.CTkFrame(frame, fg_color=EDITOR_PALETTE["surface_soft"], corner_radius=10)
         image_frame.pack(fill="x", pady=5)
 
         if abs_path and abs_path.exists():
@@ -169,11 +171,11 @@ class GenericEditorWindowPortraitAndImageWorkflows:
 
         self.image_label.pack(pady=5)
 
-        button_frame = ctk.CTkFrame(frame)
+        button_frame = ctk.CTkFrame(frame, fg_color="transparent")
         button_frame.pack(pady=5)
 
-        ctk.CTkButton(button_frame, text="Select Image", command=self.select_image).pack(side="left", padx=5)
-        ctk.CTkButton(button_frame, text="Paste Image", command=self.paste_image_from_clipboard).pack(side="left", padx=5)
+        ctk.CTkButton(button_frame, text="Select Image", command=self.select_image, **primary_button_style()).pack(side="left", padx=5)
+        ctk.CTkButton(button_frame, text="Paste Image", command=self.paste_image_from_clipboard, **primary_button_style()).pack(side="left", padx=5)
         self.field_widgets[field["name"]] = self.image_path
     def paste_image_from_clipboard(self):
         """Paste image from clipboard and set as entity image (map image).

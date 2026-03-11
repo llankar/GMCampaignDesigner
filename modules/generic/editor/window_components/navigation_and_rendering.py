@@ -1,4 +1,5 @@
 from modules.generic.editor.window_context import *
+from modules.generic.editor.styles import EDITOR_PALETTE, primary_button_style, section_style
 
 
 class GenericEditorWindowNavigationAndRendering:
@@ -11,7 +12,7 @@ class GenericEditorWindowNavigationAndRendering:
         if getattr(self, "toolbar", None):
             self.toolbar.set_dirty(True)
     def _register_field_section(self, field_name: str):
-        section = ctk.CTkFrame(self.scroll_frame)
+        section = ctk.CTkFrame(self.scroll_frame, **section_style())
         section.pack(fill="x", pady=2)
         self._field_sections[field_name] = section
         self._field_section_order.append(field_name)
@@ -63,7 +64,12 @@ class GenericEditorWindowNavigationAndRendering:
         field_container = self._register_field_section(field_name)
         self._active_field_parent = field_container
 
-        ctk.CTkLabel(field_container, text=field_name).pack(pady=(5, 0), anchor="w")
+        ctk.CTkLabel(
+            field_container,
+            text=field_name,
+            text_color=EDITOR_PALETTE["text"],
+            font=ctk.CTkFont(size=14, weight="bold"),
+        ).pack(pady=(8, 2), padx=10, anchor="w")
 
         if field_name == "Portrait":
             self.create_portrait_field(field)
@@ -95,7 +101,9 @@ class GenericEditorWindowNavigationAndRendering:
         line_limit = 100 if max_lines is None else max_lines
         editor = RichTextEditor(parent, max_lines=line_limit)
         editor.text_widget.configure(
-            bg="#2B2B2B", fg="white", insertbackground="white"
+            bg=EDITOR_PALETTE["surface_soft"],
+            fg=EDITOR_PALETTE["text"],
+            insertbackground=EDITOR_PALETTE["text"],
         )
         # Load data (dict or raw string)
 
@@ -146,27 +154,31 @@ class GenericEditorWindowNavigationAndRendering:
         self.field_widgets[field["name"]] = editor
 
         # Place action buttons for this field on one row
-        btn_row = ctk.CTkFrame(self._field_parent())
+        btn_row = ctk.CTkFrame(self._field_parent(), fg_color="transparent")
         btn_row.pack(fill="x", pady=5)
 
         # extra buttons for Summary/Secrets…
         if field["name"] == "Summary":
             ctk.CTkButton(
                 btn_row, text="Random Summary",
-                command=self.generate_scenario_description
+                command=self.generate_scenario_description,
+                **primary_button_style(),
             ).pack(side="left", padx=5, pady=5)
             ctk.CTkButton(
                 btn_row, text="AI Draft Summary",
-                command=lambda fn=field["name"]: self.ai_draft_field(fn)
+                command=lambda fn=field["name"]: self.ai_draft_field(fn),
+                **primary_button_style(),
             ).pack(side="left", padx=5, pady=5)
         if field["name"] == "Secrets":
             ctk.CTkButton(
                 btn_row, text="Generate Secret",
-                command=self.generate_secret_text
+                command=self.generate_secret_text,
+                **primary_button_style(),
             ).pack(side="left", padx=5, pady=5)
             ctk.CTkButton(
                 btn_row, text="AI Draft Secret",
-                command=lambda fn=field["name"]: self.ai_draft_field(fn)
+                command=lambda fn=field["name"]: self.ai_draft_field(fn),
+                **primary_button_style(),
             ).pack(side="left", padx=5, pady=5)
 
         entity_slug = getattr(self.model_wrapper, "entity_type", "") if self.model_wrapper else ""
@@ -178,23 +190,27 @@ class GenericEditorWindowNavigationAndRendering:
         ):
             ctk.CTkButton(
                 btn_row, text="AI Draft Description",
-                command=lambda fn=field["name"]: self.ai_draft_field(fn)
+                command=lambda fn=field["name"]: self.ai_draft_field(fn),
+                **primary_button_style(),
             ).pack(side="left", padx=5, pady=5)
         if field["name"] == "Scheme" and entity_slug == "villains":
             ctk.CTkButton(
                 btn_row, text="AI Draft Scheme",
-                command=lambda fn=field["name"]: self.ai_draft_field(fn)
+                command=lambda fn=field["name"]: self.ai_draft_field(fn),
+                **primary_button_style(),
             ).pack(side="left", padx=5, pady=5)
         if field["name"] == "LieutenantNetwork" and entity_slug == "villains":
             ctk.CTkButton(
                 btn_row, text="AI Draft Network",
-                command=lambda fn=field["name"]: self.ai_draft_field(fn)
+                command=lambda fn=field["name"]: self.ai_draft_field(fn),
+                **primary_button_style(),
             ).pack(side="left", padx=5, pady=5)
 
         # Generic AI improvement button for any long text field
         ctk.CTkButton(
             btn_row, text=f"AI Improve {field['name']}",
-            command=lambda fn=field["name"]: self.ai_improve_field(fn)
+            command=lambda fn=field["name"]: self.ai_improve_field(fn),
+            **primary_button_style(),
         ).pack(side="left", padx=5, pady=5)
 
         markup_supported_fields = {"Traits", "Stats"}
