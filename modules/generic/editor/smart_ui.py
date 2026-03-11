@@ -2,6 +2,12 @@ from __future__ import annotations
 
 import customtkinter as ctk
 
+from modules.generic.editor.styles import (
+    EDITOR_PALETTE,
+    primary_button_style,
+    toolbar_entry_style,
+)
+
 
 DEFAULT_FIELD_PRIORITY = ("Name", "Portrait", "Image", "Audio")
 
@@ -31,14 +37,25 @@ class SmartEditorToolbar(ctk.CTkFrame):
     """Top toolbar with quick-jump, filtering and dirty-state feedback."""
 
     def __init__(self, master, *, on_filter_change, on_jump_to_field):
-        super().__init__(master)
+        super().__init__(
+            master,
+            fg_color=EDITOR_PALETTE["surface_alt"],
+            border_width=1,
+            border_color=EDITOR_PALETTE["border"],
+            corner_radius=12,
+        )
         self._on_filter_change = on_filter_change
         self._on_jump_to_field = on_jump_to_field
         self._field_names: list[str] = []
 
         self.grid_columnconfigure(1, weight=1)
 
-        ctk.CTkLabel(self, text="Find field").grid(row=0, column=0, padx=(8, 6), pady=8)
+        ctk.CTkLabel(
+            self,
+            text="Find field",
+            text_color=EDITOR_PALETTE["muted_text"],
+            font=ctk.CTkFont(size=13, weight="bold"),
+        ).grid(row=0, column=0, padx=(14, 8), pady=10)
 
         self.search_var = ctk.StringVar()
         self.search_var.trace_add("write", self._handle_search)
@@ -46,17 +63,33 @@ class SmartEditorToolbar(ctk.CTkFrame):
             self,
             textvariable=self.search_var,
             placeholder_text="Type to filter fields…",
+            **toolbar_entry_style(),
         )
-        self.search_entry.grid(row=0, column=1, sticky="ew", pady=8)
+        self.search_entry.grid(row=0, column=1, sticky="ew", pady=10)
 
-        self.jump_menu = ctk.CTkOptionMenu(self, values=["Jump to…"], command=self._handle_jump)
-        self.jump_menu.grid(row=0, column=2, padx=8, pady=8)
+        self.jump_menu = ctk.CTkOptionMenu(
+            self,
+            values=["Jump to…"],
+            command=self._handle_jump,
+            **primary_button_style(),
+        )
+        self.jump_menu.grid(row=0, column=2, padx=10, pady=10)
 
-        self.info_label = ctk.CTkLabel(self, text="0/0 fields")
-        self.info_label.grid(row=0, column=3, padx=(0, 8), pady=8)
+        self.info_label = ctk.CTkLabel(
+            self,
+            text="0/0 fields",
+            text_color=EDITOR_PALETTE["muted_text"],
+            font=ctk.CTkFont(size=12, weight="bold"),
+        )
+        self.info_label.grid(row=0, column=3, padx=(0, 10), pady=10)
 
-        self.dirty_label = ctk.CTkLabel(self, text="Saved", text_color="#8ddf8d")
-        self.dirty_label.grid(row=0, column=4, padx=(0, 8), pady=8)
+        self.dirty_label = ctk.CTkLabel(
+            self,
+            text="Saved",
+            text_color=EDITOR_PALETTE["success"],
+            font=ctk.CTkFont(size=12, weight="bold"),
+        )
+        self.dirty_label.grid(row=0, column=4, padx=(0, 14), pady=10)
 
     def set_fields(self, field_names: list[str]):
         self._field_names = field_names
@@ -70,9 +103,9 @@ class SmartEditorToolbar(ctk.CTkFrame):
 
     def set_dirty(self, dirty: bool):
         if dirty:
-            self.dirty_label.configure(text="Unsaved changes", text_color="#f2bd4a")
+            self.dirty_label.configure(text="Unsaved changes", text_color=EDITOR_PALETTE["warning"])
         else:
-            self.dirty_label.configure(text="Saved", text_color="#8ddf8d")
+            self.dirty_label.configure(text="Saved", text_color=EDITOR_PALETTE["success"])
 
     def _handle_search(self, *_):
         self._on_filter_change(self.search_var.get())

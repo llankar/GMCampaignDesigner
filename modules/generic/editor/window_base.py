@@ -1,4 +1,5 @@
 from modules.generic.editor.window_context import *
+from modules.generic.editor.styles import EDITOR_PALETTE
 
 
 @log_methods
@@ -36,7 +37,9 @@ class GenericEditorWindowBase(ctk.CTkToplevel):
         item_type = self.model_wrapper.entity_type.capitalize()[:-1]  # "npcs" → "Npc"
         self.title(f"Create {item_type}" if creation_mode else f"Edit {item_type}")
 
-        self.main_frame = ctk.CTkFrame(self)
+        self.configure(fg_color=EDITOR_PALETTE["surface"])
+
+        self.main_frame = ctk.CTkFrame(self, fg_color=EDITOR_PALETTE["surface"])
         self.main_frame.pack(fill="both", expand=True)
 
         self.toolbar = SmartEditorToolbar(
@@ -46,7 +49,12 @@ class GenericEditorWindowBase(ctk.CTkToplevel):
         )
         self.toolbar.pack(fill="x", padx=5, pady=(5, 0))
 
-        self.scroll_frame = ctk.CTkScrollableFrame(self.main_frame)
+        self.scroll_frame = ctk.CTkScrollableFrame(
+            self.main_frame,
+            fg_color=EDITOR_PALETTE["surface"],
+            scrollbar_button_color=EDITOR_PALETTE["surface_soft"],
+            scrollbar_button_hover_color=EDITOR_PALETTE["accent"],
+        )
         self.scroll_frame.pack(fill="both", expand=True, padx=5, pady=5)
 
         fields = prioritize_fields(self.template["fields"])

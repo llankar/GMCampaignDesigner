@@ -1,23 +1,30 @@
 from modules.generic.editor.window_context import *
+from modules.generic.editor.styles import EDITOR_PALETTE, primary_button_style
 
 
 class GenericEditorWindowFormActionsAndPersistence:
     def create_action_bar(self):
-        action_bar = ctk.CTkFrame(self.main_frame)
+        action_bar = ctk.CTkFrame(
+            self.main_frame,
+            fg_color=EDITOR_PALETTE["surface_alt"],
+            border_width=1,
+            border_color=EDITOR_PALETTE["border"],
+            corner_radius=12,
+        )
         action_bar.pack(fill="x", pady=5)
 
-        ctk.CTkButton(action_bar, text="Cancel", command=self.destroy).pack(side="right", padx=5)
-        ctk.CTkButton(action_bar, text="Save", command=self.save).pack(side="right", padx=5)
+        ctk.CTkButton(action_bar, text="Cancel", command=self.destroy, **primary_button_style()).pack(side="right", padx=8, pady=8)
+        ctk.CTkButton(action_bar, text="Save", command=self.save, **primary_button_style()).pack(side="right", padx=8, pady=8)
         if self.model_wrapper.entity_type== 'scenarios':
-            ctk.CTkButton(action_bar, text='Generate Scenario', command=self.generate_scenario).pack(side='left', padx=5)
-            ctk.CTkButton(action_bar, text='AI Generate Scenario', command=self.ai_generate_full_scenario).pack(side='left', padx=5)
+            ctk.CTkButton(action_bar, text='Generate Scenario', command=self.generate_scenario, **primary_button_style()).pack(side='left', padx=8, pady=8)
+            ctk.CTkButton(action_bar, text='AI Generate Scenario', command=self.ai_generate_full_scenario, **primary_button_style()).pack(side='left', padx=8, pady=8)
 
         if self.model_wrapper.entity_type== 'npcs':
-            ctk.CTkButton(action_bar, text='Generate NPC', command=self.generate_npc).pack(side='left', padx=5)
-            ctk.CTkButton(action_bar, text='AI Generate NPC', command=self.ai_generate_full_npc).pack(side='left', padx=5)
+            ctk.CTkButton(action_bar, text='Generate NPC', command=self.generate_npc, **primary_button_style()).pack(side='left', padx=8, pady=8)
+            ctk.CTkButton(action_bar, text='AI Generate NPC', command=self.ai_generate_full_npc, **primary_button_style()).pack(side='left', padx=8, pady=8)
 
         if self.model_wrapper.entity_type== 'creatures':
-            ctk.CTkButton(action_bar, text='AI Generate Creature', command=self.ai_generate_full_creature).pack(side='left', padx=5)
+            ctk.CTkButton(action_bar, text='AI Generate Creature', command=self.ai_generate_full_creature, **primary_button_style()).pack(side='left', padx=8, pady=8)
     def _serialize_scene_states(self, states):
         serialized = []
         for state in states:

@@ -1,9 +1,10 @@
 from modules.generic.editor.window_context import *
+from modules.generic.editor.styles import EDITOR_PALETTE, primary_button_style, toolbar_entry_style
 
 
 class GenericEditorWindowListAndBasicFields:
     def create_audio_field(self, field):
-        frame = ctk.CTkFrame(self._field_parent())
+        frame = ctk.CTkFrame(self._field_parent(), fg_color="transparent")
         frame.pack(fill="x", pady=5)
 
         raw_value = self.item.get(field["name"], "") or ""
@@ -14,10 +15,11 @@ class GenericEditorWindowListAndBasicFields:
             frame,
             text=self._format_audio_label(audio_var.get()),
             anchor="w",
+            text_color=EDITOR_PALETTE["muted_text"],
         )
         display_label.pack(fill="x", padx=5, pady=(5, 0))
 
-        button_row = ctk.CTkFrame(frame)
+        button_row = ctk.CTkFrame(frame, fg_color="transparent")
         button_row.pack(fill="x", pady=(5, 0))
 
         def update_value(new_value: str) -> None:
@@ -59,14 +61,14 @@ class GenericEditorWindowListAndBasicFields:
         def on_stop() -> None:
             stop_entity_audio()
 
-        ctk.CTkButton(button_row, text="Select Audio", command=on_select).pack(side="left", padx=5)
-        ctk.CTkButton(button_row, text="Clear", command=on_clear).pack(side="left", padx=5)
-        ctk.CTkButton(button_row, text="Play", command=on_play).pack(side="left", padx=5)
-        ctk.CTkButton(button_row, text="Stop", command=on_stop).pack(side="left", padx=5)
+        ctk.CTkButton(button_row, text="Select Audio", **primary_button_style(), command=on_select).pack(side="left", padx=5)
+        ctk.CTkButton(button_row, text="Clear", **primary_button_style(), command=on_clear).pack(side="left", padx=5)
+        ctk.CTkButton(button_row, text="Play", **primary_button_style(), command=on_play).pack(side="left", padx=5)
+        ctk.CTkButton(button_row, text="Stop", **primary_button_style(), command=on_stop).pack(side="left", padx=5)
 
         self.field_widgets[field["name"]] = audio_var
     def create_file_field(self, field):
-        frame = ctk.CTkFrame(self._field_parent())
+        frame = ctk.CTkFrame(self._field_parent(), fg_color="transparent")
         frame.pack(fill="x", pady=5)
 
         field_name = field.get("name")
@@ -84,13 +86,14 @@ class GenericEditorWindowListAndBasicFields:
         else:
             label_text = "[No Attachment]"
 
-        label_widget = ctk.CTkLabel(frame, text=label_text)
+        label_widget = ctk.CTkLabel(frame, text=label_text, text_color=EDITOR_PALETTE["muted_text"])
         label_widget.pack(side="left", padx=5)
 
         ctk.CTkButton(
             frame,
             text="Browse Attachment",
-            command=lambda: self.select_attachment(field_name, label_widget, storage_subdir)
+            command=lambda: self.select_attachment(field_name, label_widget, storage_subdir),
+            **primary_button_style(),
         ).pack(side="left", padx=5)
 
         self._file_field_info[field_name] = {
@@ -145,12 +148,12 @@ class GenericEditorWindowListAndBasicFields:
         # Create a StringVar with the initial value.
         var = ctk.StringVar(value=initial_value)
         # Create the OptionMenu (dropdown) using customtkinter.
-        option_menu = ctk.CTkOptionMenu(self._field_parent(), variable=var, values=options)
+        option_menu = ctk.CTkOptionMenu(self._field_parent(), variable=var, values=options, **primary_button_style())
         option_menu.pack(fill="x", pady=5)
         # Save the widget and its StringVar for later retrieval.
         self.field_widgets[field["name"]] = (option_menu, var)
     def create_dynamic_combobox_list(self, field):
-        container = ctk.CTkFrame(self._field_parent())
+        container = ctk.CTkFrame(self._field_parent(), fg_color="transparent")
         container.pack(fill="x", pady=5)
 
         combobox_list = []
@@ -221,12 +224,12 @@ class GenericEditorWindowListAndBasicFields:
             dropdown.entry.focus_set()
 
         def add_combobox(initial_value=None):
-            row = ctk.CTkFrame(container)
+            row = ctk.CTkFrame(container, fg_color="transparent")
             row.pack(fill="x", pady=2)
 
             var = ctk.StringVar()
             state = "normal" if not options_list else "readonly"
-            entry = ctk.CTkEntry(row, textvariable=var, state=state)
+            entry = ctk.CTkEntry(row, textvariable=var, state=state, **toolbar_entry_style())
             entry.pack(side="left", expand=True, fill="x")
 
             if options_list:
@@ -238,10 +241,10 @@ class GenericEditorWindowListAndBasicFields:
                 var.set(options_list[0])
 
             if options_list:
-                btn = ctk.CTkButton(row, text="▼", width=30, command=lambda: open_dropdown(entry, var))
+                btn = ctk.CTkButton(row, text="▼", width=30, command=lambda: open_dropdown(entry, var), **primary_button_style())
                 btn.pack(side="left", padx=5)
 
-            remove_btn = ctk.CTkButton(row, text="-", width=30, command=lambda: remove_this(row, entry))
+            remove_btn = ctk.CTkButton(row, text="−", width=30, command=lambda: remove_this(row, entry), **primary_button_style())
             remove_btn.pack(side="left", padx=5)
 
             combobox_list.append(entry)
@@ -250,7 +253,7 @@ class GenericEditorWindowListAndBasicFields:
         for value in initial_values:
             add_combobox(value)
 
-        add_button = ctk.CTkButton(container, text=label_text, command=add_combobox)
+        add_button = ctk.CTkButton(container, text=label_text, command=add_combobox, **primary_button_style())
         add_button.pack(anchor="w", pady=2)
 
         # Save widgets clearly
@@ -274,7 +277,7 @@ class GenericEditorWindowListAndBasicFields:
                 self.field_widgets[field["name"]] = widget
                 return
 
-        entry = ctk.CTkEntry(self._field_parent())
+        entry = ctk.CTkEntry(self._field_parent(), **toolbar_entry_style())
         if value:
             entry.insert(0, self.item.get(field["name"], ""))
         entry.pack(fill="x", pady=5)
