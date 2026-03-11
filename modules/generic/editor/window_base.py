@@ -82,13 +82,14 @@ class GenericEditorWindowBase(ctk.CTkToplevel):
         self.update_idletasks()
         req_width = self.winfo_reqwidth()
         req_height = self.winfo_reqheight()
-        # Responsive size on smaller screens while preserving comfortable defaults.
+        # Responsive width on smaller screens while preserving comfortable defaults.
         screen_w = max(self.winfo_screenwidth(), 1200)
-        screen_h = max(self.winfo_screenheight(), 900)
+        screen_h = self.winfo_screenheight()
         min_width = min(1000, int(screen_w * 0.92))
         min_height = min(900, int(screen_h * 0.88))
         req_width = max(min_width, min(req_width, int(screen_w * 0.94)))
-        req_height = max(min_height, min(req_height, int(screen_h * 0.92)))
+        # Use full screen height as the default editor height.
+        req_height = screen_h
         self.geometry(f"{req_width}x{req_height}")
         self.minsize(min_width, min_height)
 
