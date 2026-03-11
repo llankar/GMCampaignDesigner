@@ -27,6 +27,7 @@ class GenericEditorWindowBase(ctk.CTkToplevel):
         self._file_field_info = {}
         self._field_sections = {}
         self._field_section_order = []
+        self._hidden_field_sections = set()
         self._dirty = False
         
         self.transient(master)
@@ -56,6 +57,8 @@ class GenericEditorWindowBase(ctk.CTkToplevel):
             scrollbar_button_hover_color=EDITOR_PALETTE["accent"],
         )
         self.scroll_frame.pack(fill="both", expand=True, padx=5, pady=5)
+        self.scroll_frame.grid_columnconfigure(0, weight=1, uniform="editor_fields")
+        self.scroll_frame.grid_columnconfigure(1, weight=1, uniform="editor_fields")
 
         fields = prioritize_fields(self.template["fields"])
         for field in fields:
