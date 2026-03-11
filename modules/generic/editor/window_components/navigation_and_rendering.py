@@ -23,7 +23,10 @@ class GenericEditorWindowNavigationAndRendering:
         if field_name in media_fields:
             return 1
 
-        position = len(self._field_section_order) - 1
+        try:
+            position = self._field_section_order.index(field_name)
+        except ValueError:
+            position = len(self._field_section_order) - 1
         return 0 if position % 2 == 0 else 1
 
     def _layout_visible_sections(self):
