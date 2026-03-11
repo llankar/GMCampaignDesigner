@@ -13,25 +13,41 @@ class GenericEditorWindowNavigationAndRendering:
             self.toolbar.set_dirty(True)
     def _register_field_section(self, field_name: str):
         section = ctk.CTkFrame(self.scroll_frame, **section_style())
-        section.pack(fill="x", pady=2)
         self._field_sections[field_name] = section
         self._field_section_order.append(field_name)
+        self._layout_visible_sections()
         return section
+    def _layout_visible_sections(self):
+        visible_fields = [
+            name for name in self._field_section_order
+            if name not in getattr(self, "_hidden_field_sections", set())
+        ]
+        for position, field_name in enumerate(visible_fields):
+            section = self._field_sections.get(field_name)
+            if section is None:
+                continue
+            row = position // 2
+            col = position % 2
+            section.grid(row=row, column=col, sticky="nsew", padx=4, pady=3)
+
+        for field_name in getattr(self, "_hidden_field_sections", set()):
+            section = self._field_sections.get(field_name)
+            if section is not None:
+                section.grid_forget()
     def _filter_visible_fields(self, query: str):
         query = (query or "").strip().lower()
         total = len(self._field_section_order)
         visible = 0
+        self._hidden_field_sections = set()
+
         for field_name in self._field_section_order:
-            section = self._field_sections.get(field_name)
-            if section is None:
-                continue
             should_show = (not query) or (query in field_name.lower())
             if should_show:
-                if not section.winfo_manager():
-                    section.pack(fill="x", pady=2)
                 visible += 1
-            elif section.winfo_manager():
-                section.pack_forget()
+            else:
+                self._hidden_field_sections.add(field_name)
+
+        self._layout_visible_sections()
         self.toolbar.update_visible_count(visible, total)
     def _jump_to_field(self, field_name: str):
         section = self._field_sections.get(field_name)
