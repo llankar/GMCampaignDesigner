@@ -17,23 +17,41 @@ class GenericEditorWindowNavigationAndRendering:
         self._field_section_order.append(field_name)
         self._layout_visible_sections()
         return section
+
+    def _target_column_for_field(self, field_name: str) -> int:
+        media_fields = {"Portrait", "Image"}
+        if field_name in media_fields:
+            return 1
+
+        position = len(self._field_section_order) - 1
+        return 0 if position % 2 == 0 else 1
+
     def _layout_visible_sections(self):
         visible_fields = [
             name for name in self._field_section_order
             if name not in getattr(self, "_hidden_field_sections", set())
         ]
-        for position, field_name in enumerate(visible_fields):
+
+        left_column = getattr(self, "_left_column", None)
+        right_column = getattr(self, "_right_column", None)
+
+        if left_column is None or right_column is None:
+            return
+
+        for field_name in self._field_section_order:
             section = self._field_sections.get(field_name)
             if section is None:
                 continue
-            row = position // 2
-            col = position % 2
-            section.grid(row=row, column=col, sticky="nsew", padx=4, pady=3)
+            section.pack_forget()
+            section.grid_forget()
 
-        for field_name in getattr(self, "_hidden_field_sections", set()):
+        for field_name in visible_fields:
             section = self._field_sections.get(field_name)
-            if section is not None:
-                section.grid_forget()
+            if section is None:
+                continue
+            column_index = self._target_column_for_field(field_name)
+            target_column = right_column if column_index == 1 else left_column
+            section.pack(in_=target_column, fill="x", padx=4, pady=3)
     def _filter_visible_fields(self, query: str):
         query = (query or "").strip().lower()
         total = len(self._field_section_order)
