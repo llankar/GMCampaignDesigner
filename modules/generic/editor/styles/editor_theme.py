@@ -36,6 +36,16 @@ def primary_button_style() -> dict:
     }
 
 
+def option_menu_style() -> dict:
+    return {
+        "fg_color": EDITOR_PALETTE["accent"],
+        "button_color": EDITOR_PALETTE["accent"],
+        "button_hover_color": EDITOR_PALETTE["accent_hover"],
+        "text_color": "#FFFFFF",
+        "corner_radius": 10,
+    }
+
+
 def section_style() -> dict:
     return {
         "fg_color": EDITOR_PALETTE["surface_alt"],

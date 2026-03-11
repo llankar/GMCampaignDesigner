@@ -4,6 +4,7 @@ import customtkinter as ctk
 
 from modules.generic.editor.styles import (
     EDITOR_PALETTE,
+    option_menu_style,
     primary_button_style,
     toolbar_entry_style,
 )
@@ -71,7 +72,7 @@ class SmartEditorToolbar(ctk.CTkFrame):
             self,
             values=["Jump to…"],
             command=self._handle_jump,
-            **primary_button_style(),
+            **option_menu_style(),
         )
         self.jump_menu.grid(row=0, column=2, padx=10, pady=10)
 

@@ -1,5 +1,5 @@
 from modules.generic.editor.window_context import *
-from modules.generic.editor.styles import EDITOR_PALETTE, primary_button_style, toolbar_entry_style
+from modules.generic.editor.styles import EDITOR_PALETTE, option_menu_style, primary_button_style, toolbar_entry_style
 
 
 class GenericEditorWindowListAndBasicFields:
@@ -148,7 +148,7 @@ class GenericEditorWindowListAndBasicFields:
         # Create a StringVar with the initial value.
         var = ctk.StringVar(value=initial_value)
         # Create the OptionMenu (dropdown) using customtkinter.
-        option_menu = ctk.CTkOptionMenu(self._field_parent(), variable=var, values=options, **primary_button_style())
+        option_menu = ctk.CTkOptionMenu(self._field_parent(), variable=var, values=options, **option_menu_style())
         option_menu.pack(fill="x", pady=5)
         # Save the widget and its StringVar for later retrieval.
         self.field_widgets[field["name"]] = (option_menu, var)
