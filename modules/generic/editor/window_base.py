@@ -36,7 +36,11 @@ class GenericEditorWindowBase(ctk.CTkToplevel):
         self.focus_force()
         self.bind("<Escape>", lambda e: self.destroy())
         item_type = self.model_wrapper.entity_type.capitalize()[:-1]  # "npcs" → "Npc"
-        self.title(f"Create {item_type}" if creation_mode else f"Edit {item_type}")
+        self.title(
+            f"Create {item_type}"
+            if creation_mode
+            else self._build_edit_title(item_type)
+        )
 
         self.configure(fg_color=EDITOR_PALETTE["surface"])
 
@@ -59,6 +63,11 @@ class GenericEditorWindowBase(ctk.CTkToplevel):
         self.scroll_frame.pack(fill="both", expand=True, padx=5, pady=5)
         self.scroll_frame.grid_columnconfigure(0, weight=1, uniform="editor_fields")
         self.scroll_frame.grid_columnconfigure(1, weight=1, uniform="editor_fields")
+
+        self._left_column = ctk.CTkFrame(self.scroll_frame, fg_color="transparent")
+        self._right_column = ctk.CTkFrame(self.scroll_frame, fg_color="transparent")
+        self._left_column.grid(row=0, column=0, sticky="new")
+        self._right_column.grid(row=0, column=1, sticky="new")
 
         fields = prioritize_fields(self.template["fields"])
         for field in fields:
@@ -89,3 +98,15 @@ class GenericEditorWindowBase(ctk.CTkToplevel):
         self.bind("<KeyRelease>", self._mark_dirty, add="+")
         # Lazy AI client init
         self._ai_client = None
+
+    def _build_edit_title(self, item_type: str) -> str:
+        """Display the entity name in the title bar to save vertical UI space."""
+        if not isinstance(self.item, dict):
+            return f"Edit {item_type}"
+
+        candidate_keys = ("Name", "Title", "Label")
+        for key in candidate_keys:
+            value = str(self.item.get(key, "")).strip()
+            if value:
+                return f"Edit {value}"
+        return f"Edit {item_type}"
