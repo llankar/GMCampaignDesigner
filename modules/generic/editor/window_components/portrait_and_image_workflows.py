@@ -1,5 +1,5 @@
 from modules.generic.editor.window_context import *
-from modules.generic.editor.styles import EDITOR_PALETTE, primary_button_style
+from modules.generic.editor.styles import EDITOR_PALETTE, primary_button_style, tk_listbox_theme
 
 
 class GenericEditorWindowPortraitAndImageWorkflows:
@@ -27,7 +27,7 @@ class GenericEditorWindowPortraitAndImageWorkflows:
         list_frame.pack(fill="x", pady=(0, 5))
 
         ctk.CTkLabel(list_frame, text="Portraits", text_color=EDITOR_PALETTE["muted_text"]).pack(anchor="w", padx=8, pady=(8, 0))
-        self.portrait_listbox = tk.Listbox(list_frame, height=4, exportselection=False)
+        self.portrait_listbox = tk.Listbox(list_frame, height=4, exportselection=False, **tk_listbox_theme())
         self.portrait_listbox.pack(fill="x", padx=5, pady=5)
         self._refresh_portrait_listbox(select_primary=True)
         self.portrait_listbox.bind("<<ListboxSelect>>", self._on_portrait_select)

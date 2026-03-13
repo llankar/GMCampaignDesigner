@@ -44,6 +44,7 @@ from modules.helpers.logging_helper import (
 from modules.ui.image_browser_dialog import ImageBrowserDialog
 from modules.ui.webview.pywebview_client import PyWebviewClient
 from modules.generic.editor import SmartEditorToolbar, prioritize_fields
+from modules.generic.editor.styles import tk_listbox_theme
 
 log_module_import(__name__)
 
@@ -166,7 +167,7 @@ class CustomDropdown(ctk.CTkToplevel):
         # ─── Listbox + Scrollbar ─────────────────────────────────────────────
         container = tk.Frame(self)
         container.pack(fill="both", expand=True, padx=5, pady=5)
-        self.listbox = tk.Listbox(container, exportselection=False)
+        self.listbox = tk.Listbox(container, exportselection=False, **tk_listbox_theme())
         self.scroll  = tk.Scrollbar(container, command=self.listbox.yview)
         self.listbox.config(yscrollcommand=self.scroll.set)
 

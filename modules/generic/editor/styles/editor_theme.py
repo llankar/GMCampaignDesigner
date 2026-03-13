@@ -53,3 +53,19 @@ def section_style() -> dict:
         "border_color": EDITOR_PALETTE["border"],
         "corner_radius": 12,
     }
+
+
+def tk_listbox_theme() -> dict:
+    """Return a Tk Listbox palette that matches the editor's dark theme."""
+
+    return {
+        "bg": EDITOR_PALETTE["surface_soft"],
+        "fg": EDITOR_PALETTE["text"],
+        "selectbackground": EDITOR_PALETTE["accent"],
+        "selectforeground": "#FFFFFF",
+        "highlightbackground": EDITOR_PALETTE["border"],
+        "highlightcolor": EDITOR_PALETTE["border"],
+        "highlightthickness": 1,
+        "relief": "flat",
+        "bd": 0,
+    }
