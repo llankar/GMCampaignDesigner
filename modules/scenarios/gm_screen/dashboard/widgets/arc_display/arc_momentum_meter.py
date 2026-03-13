@@ -46,7 +46,6 @@ class ArcMomentumMeter(ctk.CTkFrame):
             style="arc",
             outline=DASHBOARD_THEME.accent_soft,
             width=thickness,
-            capstyle=tk.ROUND,
         )
         self.canvas.create_text(
             canvas_size / 2,
