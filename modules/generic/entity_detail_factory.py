@@ -1036,13 +1036,14 @@ def create_scenario_detail_frame(entity_type, scenario_item, master, open_entity
     ttk.Separator(summary_section, orient="horizontal").pack(fill="x", pady=1)
     CTkLabel(summary_section, text="Summary", font=("Arial", 18, "bold"))\
         .pack(anchor="w", pady=(0, 6))
-    CTkLabel(
+    summary_text_label = CTkLabel(
         summary_section,
         text=format_multiline_text(scenario_item.get("Summary", "")),
         font=("Arial", 16),
-        wraplength=1620,
+        wraplength=400,
         justify="left"
-    ).pack(fill="x", pady=(0, 15))
+    )
+    summary_text_label.pack(fill="x", padx=10, pady=(0, 15), anchor="w")
 
     # ——— BODY — prepare fields in the custom order ———
     tpl = load_template(entity_type.lower())
@@ -1285,13 +1286,25 @@ def create_scenario_detail_frame(entity_type, scenario_item, master, open_entity
     ttk.Separator(secrets_section, orient="horizontal").pack(fill="x", pady=1)
     CTkLabel(secrets_section, text="Secrets", font=("Arial", 18, "bold"))\
         .pack(anchor="w", pady=(0, 5))
-    CTkLabel(
+    secrets_text_label = CTkLabel(
         secrets_section,
         text=format_multiline_text(scenario_item.get("Secrets", "")),
         font=("Arial", 16),
-        wraplength=1620,
+        wraplength=400,
         justify="left"
-    ).pack(fill="x", pady=(0, 15))
+    )
+    secrets_text_label.pack(fill="x", padx=10, pady=(0, 15), anchor="w")
+
+    def _update_text_wraplength(_event=None):
+        try:
+            available_width = max(260, scrollable_frame.winfo_width() - 80)
+            summary_text_label.configure(wraplength=available_width)
+            secrets_text_label.configure(wraplength=available_width)
+        except Exception:
+            pass
+
+    scrollable_frame.bind("<Configure>", _update_text_wraplength, add="+")
+    scrollable_frame.after(50, _update_text_wraplength)
 
     if entity_type in {"Scenarios", "Places", "Bases", "NPCs", "Villains", "Informations"}:
         related_events_panel = RelatedEventsPanel(
