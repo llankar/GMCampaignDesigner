@@ -12,7 +12,7 @@ _CAMPAIGN_LABEL_KEY = "Name"
 def load_campaign_entities(wrappers: dict[str, Any]) -> list[dict[str, Any]]:
     """Return campaign entities only (never every entity type)."""
 
-    wrapper = (wrappers or {}).get("Campaigns")
+    wrapper = _resolve_campaign_wrapper(wrappers or {})
     if wrapper is None:
         return []
 
@@ -34,6 +34,24 @@ def load_campaign_entities(wrappers: dict[str, Any]) -> list[dict[str, Any]]:
         seen_names.add(key)
         catalog.append({"entity_type": "Campaigns", "name": name, "item": item})
     return catalog
+
+
+def _resolve_campaign_wrapper(wrappers: dict[str, Any]) -> Any | None:
+    """Find campaign wrapper regardless of key casing/pluralization."""
+
+    if not wrappers:
+        return None
+
+    direct = wrappers.get("Campaigns")
+    if direct is not None:
+        return direct
+
+    for key, wrapper in wrappers.items():
+        normalized = coerce_text(key).strip().lower()
+        if normalized in {"campaign", "campaigns"}:
+            return wrapper
+
+    return None
 
 
 def build_campaign_option_index(campaigns: list[dict[str, Any]]) -> tuple[list[str], dict[str, dict[str, Any]]]:
