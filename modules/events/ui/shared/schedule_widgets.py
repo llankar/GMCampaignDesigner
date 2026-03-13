@@ -219,30 +219,58 @@ class EventDatePickerField(ctk.CTkFrame):
         today_button_text="Today",
         clear_button_text="Clear",
         empty_hint_text="No date selected",
+        entry_style=None,
+        button_style=None,
+        clear_button_style=None,
+        hint_text_color="#A8A8A8",
     ):
         super().__init__(master, fg_color="transparent")
         self._empty_hint_text = empty_hint_text
         self._value_var = tk.StringVar()
 
+        entry_style = entry_style or {}
+        button_style = button_style or {}
+        clear_button_style = clear_button_style or {}
+
         self.grid_columnconfigure(0, weight=1)
 
-        self.entry = ctk.CTkEntry(self, textvariable=self._value_var, placeholder_text="YYYY-MM-DD")
+        self.entry = ctk.CTkEntry(
+            self,
+            textvariable=self._value_var,
+            placeholder_text="YYYY-MM-DD",
+            **entry_style,
+        )
         self.entry.grid(row=0, column=0, padx=(0, 8), pady=0, sticky="ew")
         self.entry.bind("<FocusOut>", self._on_focus_out)
 
         controls = ctk.CTkFrame(self, fg_color="transparent")
         controls.grid(row=0, column=1, sticky="e")
-        ctk.CTkButton(controls, text=picker_button_text, width=88, command=self._open_calendar).pack(side="left")
-        ctk.CTkButton(controls, text=today_button_text, width=72, command=self._set_today).pack(side="left", padx=6)
+        self.picker_button = ctk.CTkButton(
+            controls,
+            text=picker_button_text,
+            width=88,
+            command=self._open_calendar,
+            **button_style,
+        )
+        self.picker_button.pack(side="left")
+        self.today_button = ctk.CTkButton(
+            controls,
+            text=today_button_text,
+            width=72,
+            command=self._set_today,
+            **button_style,
+        )
+        self.today_button.pack(side="left", padx=6)
         ctk.CTkButton(
             controls,
             text=clear_button_text,
             width=72,
             fg_color="transparent",
             command=self.clear,
+            **clear_button_style,
         ).pack(side="left")
 
-        self.hint_label = ctk.CTkLabel(self, text="", anchor="w", text_color="#A8A8A8")
+        self.hint_label = ctk.CTkLabel(self, text="", anchor="w", text_color=hint_text_color)
         self.hint_label.grid(row=1, column=0, columnspan=2, pady=(6, 0), sticky="w")
 
         self.set(initial_value)
