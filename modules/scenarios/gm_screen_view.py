@@ -44,6 +44,7 @@ from modules.objects.loot_generator_panel import LootGeneratorPanel
 from modules.scenarios.random_tables_panel import RandomTablesPanel
 from modules.whiteboard.controllers.whiteboard_controller import WhiteboardController
 from modules.puzzles.puzzle_display_window import create_puzzle_display_frame
+from modules.scenarios.gm_screen import CampaignOverviewPanel
 
 log_module_import(__name__)
 
@@ -190,6 +191,7 @@ class GMScreenView(ctk.CTkFrame):
         self.add_button.pack(side="left", padx=2, pady=5)
 
         self._add_menu_options = [
+            "Campaign Dashboard",
             "World Map",
             "Map Tool",
             "Scene Flow",
@@ -1339,6 +1341,8 @@ class GMScreenView(ctk.CTkFrame):
                     meta.pop("state", None)
             elif meta.get("kind") == "whiteboard":
                 meta.pop("controller", None)
+            elif meta.get("kind") == "campaign_dashboard":
+                meta.pop("cache", None)
             layout_tabs.append(meta)
         return {
             "scenario": self.scenario_name,
@@ -1542,6 +1546,8 @@ class GMScreenView(ctk.CTkFrame):
         elif kind == "world_map":
             name = tab_def.get("map_name")
             self.open_world_map_tab(map_name=name, title=title or (f"World Map: {name}" if name else "World Map"))
+        elif kind == "campaign_dashboard":
+            self.open_campaign_dashboard_tab(title=title or "Campaign Dashboard")
         elif kind == "map_tool":
             name = tab_def.get("map_name")
             self.open_map_tool_tab(map_name=name, title=title or (f"Map Tool: {name}" if name else "Map Tool"))
@@ -2354,6 +2360,9 @@ class GMScreenView(ctk.CTkFrame):
         elif entity_type == "World Map":
             self.open_world_map_tab()
             return
+        elif entity_type == "Campaign Dashboard":
+            self.open_campaign_dashboard_tab()
+            return
         elif entity_type == "Map Tool":
             self.open_map_tool_tab()
             return
@@ -2478,6 +2487,39 @@ class GMScreenView(ctk.CTkFrame):
                 "entity_type": entity_type,
                 "entity_name": name,
             },
+        )
+
+    def open_campaign_dashboard_tab(self, title="Campaign Dashboard"):
+        existing_tab = next(
+            (
+                tab_name
+                for tab_name, tab in self.tabs.items()
+                if (tab.get("meta") or {}).get("kind") == "campaign_dashboard"
+            ),
+            None,
+        )
+        if existing_tab:
+            self.show_tab(existing_tab)
+            return
+
+        frame = CampaignOverviewPanel(
+            self.content_area,
+            scenario_item=self.scenario,
+            wrappers=self.wrappers,
+            open_entity_callback=self.open_entity_tab,
+            map_count=len(self._map_records),
+        )
+        self.add_tab(
+            title,
+            frame,
+            content_factory=lambda master: CampaignOverviewPanel(
+                master,
+                scenario_item=self.scenario,
+                wrappers=self.wrappers,
+                open_entity_callback=self.open_entity_tab,
+                map_count=len(self._map_records),
+            ),
+            layout_meta={"kind": "campaign_dashboard"},
         )
 
     def _focus_existing_tab(self, tab_name):
