@@ -138,6 +138,13 @@ class CampaignDashboardPanel(ctk.CTkFrame):
             variable=self.campaign_picker_var,
             values=values,
             command=self._on_campaign_selected,
+            fg_color=DASHBOARD_THEME.input_bg,
+            button_color=DASHBOARD_THEME.input_button,
+            button_hover_color=DASHBOARD_THEME.input_hover,
+            text_color=DASHBOARD_THEME.text_primary,
+            dropdown_fg_color=DASHBOARD_THEME.card_bg,
+            dropdown_hover_color=DASHBOARD_THEME.button_hover,
+            dropdown_text_color=DASHBOARD_THEME.text_primary,
         )
         self.campaign_selector.grid(row=1, column=0, sticky="ew", padx=6, pady=(4, 10))
 
@@ -145,7 +152,7 @@ class CampaignDashboardPanel(ctk.CTkFrame):
             selector_wrap,
             text="Open campaign tab",
             fg_color=DASHBOARD_THEME.accent,
-            hover_color="#6d28d9",
+            hover_color=DASHBOARD_THEME.accent_hover,
             command=self._open_selected_campaign,
         ).grid(row=1, column=1, sticky="ew", padx=6, pady=(4, 10))
 
@@ -169,7 +176,7 @@ class CampaignDashboardPanel(ctk.CTkFrame):
         )
         self.entity_meta_label.grid(row=1, column=0, sticky="ew", padx=16, pady=(0, 8))
 
-        self.details_scroll = ctk.CTkScrollableFrame(parent, fg_color="#141d2f")
+        self.details_scroll = ctk.CTkScrollableFrame(parent, fg_color=DASHBOARD_THEME.panel_bg)
         self.details_scroll.grid(row=2, column=0, sticky="nsew", padx=10, pady=(0, 10))
         self.details_scroll.grid_columnconfigure(0, weight=1)
 
@@ -182,7 +189,7 @@ class CampaignDashboardPanel(ctk.CTkFrame):
             ctk.CTkLabel(
                 self.details_scroll,
                 text="No campaign selected.",
-                text_color="gray70",
+                text_color=DASHBOARD_THEME.text_secondary,
                 anchor="w",
             ).grid(row=0, column=0, sticky="ew", padx=8, pady=8)
             self.entity_meta_label.configure(text="")
@@ -197,7 +204,7 @@ class CampaignDashboardPanel(ctk.CTkFrame):
             ctk.CTkLabel(
                 self.details_scroll,
                 text="No displayable fields found for this campaign.",
-                text_color="gray70",
+                text_color=DASHBOARD_THEME.text_secondary,
                 anchor="w",
             ).grid(row=0, column=0, sticky="ew", padx=8, pady=8)
             return
@@ -233,12 +240,18 @@ class CampaignDashboardPanel(ctk.CTkFrame):
                             values_wrap,
                             text=f"Open {value}",
                             anchor="w",
-                            fg_color="#25314a",
-                            hover_color="#334567",
+                            fg_color=DASHBOARD_THEME.button_fg,
+                            hover_color=DASHBOARD_THEME.button_hover,
+                            text_color=DASHBOARD_THEME.text_primary,
                             command=lambda et=linked_type, n=value: self.open_entity_callback(et, n),
                         ).grid(row=idx, column=0, sticky="ew", pady=2)
                     else:
-                        ctk.CTkLabel(values_wrap, text=f"• {value}", anchor="w").grid(
+                        ctk.CTkLabel(
+                            values_wrap,
+                            text=f"• {value}",
+                            anchor="w",
+                            text_color=DASHBOARD_THEME.text_secondary,
+                        ).grid(
                             row=idx,
                             column=0,
                             sticky="ew",
@@ -283,7 +296,15 @@ class CampaignDashboardPanel(ctk.CTkFrame):
             return
 
         textbox_height = self._compute_textbox_height(value)
-        body = ctk.CTkTextbox(parent, height=textbox_height, wrap="word")
+        body = ctk.CTkTextbox(
+            parent,
+            height=textbox_height,
+            wrap="word",
+            fg_color=DASHBOARD_THEME.panel_bg,
+            border_width=1,
+            border_color=DASHBOARD_THEME.card_border,
+            text_color=DASHBOARD_THEME.text_secondary,
+        )
         body.grid(row=1, column=0, sticky="ew", padx=10, pady=(0, 8))
         body.insert("1.0", value)
         body.configure(state="disabled")

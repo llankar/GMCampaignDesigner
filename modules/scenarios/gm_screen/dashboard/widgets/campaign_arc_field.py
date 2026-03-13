@@ -33,7 +33,7 @@ class CampaignArcField(ctk.CTkFrame):
 
         arcs = coerce_arc_list(raw_value)
         if not arcs:
-            ctk.CTkLabel(self, text="No arcs configured.", text_color="gray70", anchor="w").grid(
+            ctk.CTkLabel(self, text="No arcs configured.", text_color=DASHBOARD_THEME.text_secondary, anchor="w").grid(
                 row=0,
                 column=0,
                 sticky="ew",
@@ -132,8 +132,9 @@ class CampaignArcField(ctk.CTkFrame):
                 scenario_wrap,
                 text=f"↗ Open {scenario_name}",
                 anchor="w",
-                fg_color="#25314a",
-                hover_color="#334567",
+                fg_color=DASHBOARD_THEME.button_fg,
+                hover_color=DASHBOARD_THEME.button_hover,
+                text_color=DASHBOARD_THEME.text_primary,
                 command=lambda n=scenario_name: self._open_scenario_callback(n),
             ).grid(row=idx // 2, column=idx % 2, sticky="ew", padx=3, pady=3)
 
