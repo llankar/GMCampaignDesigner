@@ -255,8 +255,20 @@ def load_entities_list(entity_type):
     try:
         wrapper = GenericModelWrapper(entity_type)
         entities = wrapper.load_items() # Assumes get_all() returns a list of dictionaries.
-        # Each record is expected to have a "Name" key:
-        return [entity.get("Name", "Unnamed") for entity in entities]
+
+        key_field = "Title" if str(entity_type).lower() in {"scenarios", "books"} else "Name"
+        options = []
+        for entity in entities:
+            value = entity.get(key_field)
+            if value is None and key_field != "Name":
+                value = entity.get("Name")
+            if value is None and key_field != "Title":
+                value = entity.get("Title")
+            label = str(value).strip() if value is not None else ""
+            if label:
+                options.append(label)
+
+        return options
     except Exception as e:
         # Log error if needed:
         print(f"Error loading {entity_type}: {e}")
