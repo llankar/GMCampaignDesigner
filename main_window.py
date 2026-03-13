@@ -202,6 +202,7 @@ class MainWindow(ctk.CTk):
         root.bind_all("<F6>", lambda _event: self.change_database_storage())
         root.bind_all("<F7>", lambda _event: self.open_sound_manager())
         root.bind_all("<F8>", lambda _event: self.open_dice_roller())
+        root.bind_all("<F9>", lambda _event: self.open_campaign_builder())
         root.bind_all("<F12>", lambda _event: self.destroy())
 
     def open_ai_settings(self):

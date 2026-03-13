@@ -10,7 +10,7 @@
     {"name": "EndDate", "type": "text"},
     {"name": "MainObjective", "type": "longtext"},
     {"name": "Stakes", "type": "longtext"},
-    {"name": "Themes", "type": "list_longtext"},
+    {"name": "Themes", "type": "longtext"},
     {"name": "Arcs", "type": "longtext"},
     {"name": "LinkedScenarios", "type": "list", "linked_type": "Scenarios"},
     {"name": "Notes", "type": "longtext"}

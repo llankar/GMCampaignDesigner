@@ -159,6 +159,7 @@ class AppMenuBar:
         tools_menu = self._new_submenu()
         tools_menu.add_command(label="Generate Scenario", command=self.app.open_scenario_generator)
         tools_menu.add_command(label="Scenario Builder\t F4", command=self.app.open_scenario_builder)
+        tools_menu.add_command(label="Campaign Builder\t F9", command=self.app.open_campaign_builder)
         tools_menu.add_command(label="Import Scenario", command=self.app.open_scenario_importer)
         tools_menu.add_command(label="Import Creatures (PDF)", command=self.app.open_creature_importer)
         tools_menu.add_command(label="Import Objects (PDF)", command=self.app.open_object_importer)
