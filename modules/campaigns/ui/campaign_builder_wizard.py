@@ -83,6 +83,9 @@ class CampaignBuilderWizard(ctk.CTkToplevel):
         frame = ctk.CTkFrame(parent, **section_style())
         frame.pack_propagate(False)
 
+        scrollable = ctk.CTkScrollableFrame(frame, fg_color="transparent")
+        scrollable.pack(fill="both", expand=True, padx=4, pady=4)
+
         self.form_vars = {
             "name": ctk.StringVar(),
             "genre": ctk.StringVar(),
@@ -91,13 +94,13 @@ class CampaignBuilderWizard(ctk.CTkToplevel):
         }
 
         ctk.CTkLabel(
-            frame,
+            scrollable,
             text="Campaign Foundation",
             font=("Arial", 16, "bold"),
             text_color=EDITOR_PALETTE["text"],
         ).pack(anchor="w", padx=12, pady=(12, 8))
 
-        form_body = ctk.CTkFrame(frame, fg_color="transparent")
+        form_body = ctk.CTkFrame(scrollable, fg_color="transparent")
         form_body.pack(fill="both", expand=True, padx=12, pady=(0, 8))
 
         row1 = ctk.CTkFrame(form_body, fg_color="transparent")
