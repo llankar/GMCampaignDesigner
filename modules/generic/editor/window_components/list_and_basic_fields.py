@@ -233,6 +233,15 @@ class GenericEditorWindowListAndBasicFields:
     def create_text_entry(self, field):
         value = self.item.get(field["name"], "")
         field_name = str(field.get("name", ""))
+        field_type = str(field.get("type", "")).strip().lower()
+
+        is_date_field = field_type == "date" or field_name.lower().endswith("date")
+
+        if is_date_field:
+            widget = EventDatePickerField(self._field_parent(), initial_value=value)
+            widget.pack(fill="x", pady=5)
+            self.field_widgets[field["name"]] = widget
+            return
 
         if getattr(self.model_wrapper, "entity_type", "") == "events":
             if field_name == "Date":
