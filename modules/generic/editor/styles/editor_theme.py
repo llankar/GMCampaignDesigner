@@ -2,18 +2,31 @@ from __future__ import annotations
 
 """Visual theme helpers for the generic editor UI."""
 
-EDITOR_PALETTE = {
-    "surface": "#171A22",
-    "surface_alt": "#1F2430",
-    "surface_soft": "#252C3A",
-    "border": "#313A4E",
-    "text": "#EAF1FF",
-    "muted_text": "#A9B5D1",
-    "accent": "#4A8DFF",
-    "accent_hover": "#6BA0FF",
-    "success": "#4ADE80",
-    "warning": "#F7C65D",
-}
+from modules.helpers.theme_manager import get_theme, get_tokens
+
+
+def _build_editor_palette() -> dict:
+    """Build the generic editor palette from the currently selected UI theme."""
+
+    tokens = get_tokens(get_theme())
+    accent = tokens.get("button_fg", "#4A8DFF")
+    accent_hover = tokens.get("button_hover", "#6BA0FF")
+    border = tokens.get("button_border", accent_hover)
+
+    return {
+        "surface": "#171A22",
+        "surface_alt": "#1F2430",
+        "surface_soft": "#252C3A",
+        "border": border,
+        "text": "#EAF1FF",
+        "muted_text": "#A9B5D1",
+        "accent": accent,
+        "accent_hover": accent_hover,
+        "success": "#4ADE80",
+        "warning": "#F7C65D",
+    }
+
+EDITOR_PALETTE = _build_editor_palette()
 
 
 def toolbar_entry_style() -> dict:
