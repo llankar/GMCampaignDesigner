@@ -108,6 +108,7 @@ from modules.maps.world_map_view import WorldMapWindow
 from modules.generic.custom_fields_editor import CustomFieldsEditor
 from modules.generic.new_entity_type_dialog import NewEntityTypeDialog
 from modules.auto_improve.ui.auto_improve_panel import AutoImprovePanel
+from modules.campaigns.ui.campaign_builder_wizard import CampaignBuilderWizard
 
 
 from modules.dice.dice_roller_window import DiceRollerWindow
@@ -314,6 +315,7 @@ class MainWindow(ctk.CTk):
             "faction_graph": "faction_graph_icon.png",
             "scenario_graph": "scenario_graph_icon.png",
             "scenario_builder": "scenario_graph_icon.png",
+            "campaign_builder": "scenario_graph_icon.png",
             "world_map": "maps_icon.png",
             "generate_portraits": "generate_icon.png",
             "associate_portraits": "associate_icon.png",
@@ -892,6 +894,7 @@ class MainWindow(ctk.CTk):
         utilities = [
             ("generate_scenario", "Generate Scenario", self.open_scenario_generator),
             ("scenario_builder", "Scenario Builder Wizard", self.open_scenario_builder),
+            ("campaign_builder", "Campaign Builder Wizard", self.open_campaign_builder),
             ("timeline_simulator", "Advance Timeline", self.open_timeline_simulator_dialog),
             ("import_scenario", "Import Scenario", self.open_scenario_importer),
             ("import_creatures_pdf", "Import NPCs/Creatures from PDF", self.open_creature_importer),
@@ -3086,6 +3089,28 @@ class MainWindow(ctk.CTk):
                 func_name="main_window.MainWindow.open_scenario_builder",
             )
             messagebox.showerror("Error", f"Failed to open Scenario Builder:\n{exc}")
+
+    def open_campaign_builder(self):
+        try:
+            campaign_wrapper = self.entity_wrappers.get("campaigns") or GenericModelWrapper("campaigns")
+            self.entity_wrappers.setdefault("campaigns", campaign_wrapper)
+
+            scenario_wrapper = self.entity_wrappers.get("scenarios") or GenericModelWrapper("scenarios")
+            self.entity_wrappers.setdefault("scenarios", scenario_wrapper)
+
+            wizard = CampaignBuilderWizard(
+                self,
+                campaign_wrapper=campaign_wrapper,
+                scenario_wrapper=scenario_wrapper,
+            )
+            wizard.grab_set()
+            wizard.focus_force()
+        except Exception as exc:
+            log_exception(
+                f"Failed to open Campaign Builder Wizard: {exc}",
+                func_name="main_window.MainWindow.open_campaign_builder",
+            )
+            messagebox.showerror("Error", f"Failed to open Campaign Builder:\n{exc}")
 
     def open_character_creation(self):
         self.clear_current_content()
