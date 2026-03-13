@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import math
 import customtkinter as ctk
 import tkinter as tk
 from typing import Callable
@@ -14,6 +15,12 @@ from .campaign_dashboard_data import (
 
 class CampaignDashboardPanel(ctk.CTkFrame):
     """GM dashboard focused on campaign entities only."""
+
+    _COMPACT_VALUE_MAX_LENGTH = 80
+    _TEXTBOX_MIN_HEIGHT = 36
+    _TEXTBOX_MAX_HEIGHT = 120
+    _TEXTBOX_LINE_HEIGHT = 18
+    _TEXTBOX_WIDTH_CHARS = 72
 
     def __init__(
         self,
@@ -182,11 +189,34 @@ class CampaignDashboardPanel(ctk.CTkFrame):
                 )
                 arc_field.grid(row=1, column=0, sticky="ew", padx=10, pady=(0, 8))
             else:
-                body = ctk.CTkTextbox(block, height=90, wrap="word")
-                body.grid(row=1, column=0, sticky="ew", padx=10, pady=(0, 8))
-                body.insert("1.0", field.get("value") or "")
-                body.configure(state="disabled")
+                self._render_read_only_field(block, field.get("value"))
             row += 1
+
+    def _render_read_only_field(self, parent: ctk.CTkFrame, raw_value: str | None) -> None:
+        value = raw_value or ""
+        if self._should_use_compact_render(value):
+            ctk.CTkLabel(
+                parent,
+                text=value,
+                anchor="w",
+                justify="left",
+                text_color="gray90",
+            ).grid(row=1, column=0, sticky="ew", padx=10, pady=(0, 8))
+            return
+
+        textbox_height = self._compute_textbox_height(value)
+        body = ctk.CTkTextbox(parent, height=textbox_height, wrap="word")
+        body.grid(row=1, column=0, sticky="ew", padx=10, pady=(0, 8))
+        body.insert("1.0", value)
+        body.configure(state="disabled")
+
+    def _should_use_compact_render(self, value: str) -> bool:
+        return "\n" not in value and len(value) <= self._COMPACT_VALUE_MAX_LENGTH
+
+    def _compute_textbox_height(self, value: str) -> int:
+        line_count = max(value.count("\n") + 1, math.ceil(len(value) / self._TEXTBOX_WIDTH_CHARS))
+        content_height = line_count * self._TEXTBOX_LINE_HEIGHT
+        return max(self._TEXTBOX_MIN_HEIGHT, min(self._TEXTBOX_MAX_HEIGHT, content_height))
 
     def _open_selected_campaign(self) -> None:
         selected = self.campaign_picker_var.get()
