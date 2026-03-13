@@ -5,13 +5,16 @@ import tkinter as tk
 from typing import Callable
 
 from modules.helpers.text_helpers import coerce_text
-from .dashboard_presenter import build_entity_picker_data, build_search_index, group_results, scenario_label
-
-_ENTITY_ORDER = ["NPCs", "Places", "Clues", "Factions", "Villains", "Creatures", "Objects", "Informations", "Books", "PCs"]
+from .campaign_entity_browser import (
+    build_campaign_entity_catalog,
+    build_option_index,
+    extract_display_fields,
+    scenario_label,
+)
 
 
 class CampaignOverviewPanel(ctk.CTkFrame):
-    """Campaign-centric dashboard with quick access for GMs."""
+    """Campaign-centric dashboard focused on currently linked scenario entities."""
 
     def __init__(
         self,
@@ -29,11 +32,11 @@ class CampaignOverviewPanel(ctk.CTkFrame):
         self.open_entity_callback = open_entity_callback
         self.map_count = int(map_count or 0)
 
-        self._search_items, self._entity_counts = build_search_index(self.wrappers)
-        self._picker_data = build_entity_picker_data(self._search_items)
+        self._entity_catalog = build_campaign_entity_catalog(self.wrappers)
+        self._entity_options, self._option_to_entity = build_option_index(self._entity_catalog)
 
-        self.grid_columnconfigure(0, weight=2)
-        self.grid_columnconfigure(1, weight=3)
+        self.grid_columnconfigure(0, weight=3)
+        self.grid_columnconfigure(1, weight=2)
         self.grid_rowconfigure(0, weight=1)
 
         left = ctk.CTkFrame(self, corner_radius=14)
@@ -44,11 +47,14 @@ class CampaignOverviewPanel(ctk.CTkFrame):
 
         self._build_left_column(left)
         self._build_right_column(right)
-        self._refresh_search_results()
+
+        if self._entity_options:
+            self.entity_picker_var.set(self._entity_options[0])
+            self._on_entity_selected(self._entity_options[0])
 
     def _build_left_column(self, parent: ctk.CTkFrame) -> None:
         parent.grid_columnconfigure(0, weight=1)
-        parent.grid_rowconfigure(4, weight=1)
+        parent.grid_rowconfigure(5, weight=1)
 
         ctk.CTkLabel(
             parent,
@@ -72,24 +78,16 @@ class CampaignOverviewPanel(ctk.CTkFrame):
         summary_box.insert("1.0", summary)
         summary_box.configure(state="disabled")
 
-        cards = ctk.CTkFrame(parent, fg_color="transparent")
-        cards.grid(row=3, column=0, sticky="ew", padx=12, pady=(12, 8))
-        cards.grid_columnconfigure((0, 1), weight=1)
-
-        for idx, (label, count) in enumerate(self._collect_counts()):
-            card = ctk.CTkFrame(cards, corner_radius=12)
-            card.grid(row=idx // 2, column=idx % 2, sticky="ew", padx=5, pady=5)
-            ctk.CTkLabel(card, text=str(count), font=ctk.CTkFont(size=20, weight="bold")).pack(pady=(10, 0))
-            ctk.CTkLabel(card, text=label, text_color="gray70").pack(pady=(0, 10))
+        self._build_entity_picker(parent)
 
         linked_frame = ctk.CTkFrame(parent)
-        linked_frame.grid(row=4, column=0, sticky="nsew", padx=12, pady=(4, 12))
+        linked_frame.grid(row=5, column=0, sticky="nsew", padx=12, pady=(4, 12))
         linked_frame.grid_columnconfigure(0, weight=1)
         linked_frame.grid_rowconfigure(1, weight=1)
 
         ctk.CTkLabel(
             linked_frame,
-            text="🔗 Scenario quick links",
+            text="🔗 Current campaign quick links",
             font=ctk.CTkFont(size=15, weight="bold"),
             anchor="w",
         ).grid(row=0, column=0, sticky="ew", padx=10, pady=(10, 6))
@@ -99,111 +97,158 @@ class CampaignOverviewPanel(ctk.CTkFrame):
         quick_links.grid_columnconfigure(0, weight=1)
         self._populate_linked_entities(quick_links)
 
-    def _build_right_column(self, parent: ctk.CTkFrame) -> None:
-        parent.grid_columnconfigure(0, weight=1)
-        parent.grid_rowconfigure(3, weight=1)
+    def _build_entity_picker(self, parent: ctk.CTkFrame) -> None:
+        selector_wrap = ctk.CTkFrame(parent)
+        selector_wrap.grid(row=3, column=0, sticky="ew", padx=12, pady=(12, 8))
+        selector_wrap.grid_columnconfigure((0, 1), weight=1)
 
         ctk.CTkLabel(
-            parent,
-            text="⚡ Campaign Intel Finder",
-            font=ctk.CTkFont(size=20, weight="bold"),
-            anchor="w",
-        ).grid(row=0, column=0, sticky="ew", padx=16, pady=(14, 4))
-
-        selector_wrap = ctk.CTkFrame(parent)
-        selector_wrap.grid(row=1, column=0, sticky="ew", padx=10, pady=(0, 8))
-        selector_wrap.grid_columnconfigure((0, 1, 2), weight=1)
-
-        self.entity_type_var = tk.StringVar(value="All entities")
-        available_types = ["All entities"] + [et for et in _ENTITY_ORDER if et in self._picker_data]
-        self.entity_type_selector = ctk.CTkOptionMenu(
             selector_wrap,
-            variable=self.entity_type_var,
-            values=available_types,
-            command=self._on_entity_type_change,
-        )
-        self.entity_type_selector.grid(row=0, column=0, sticky="ew", padx=4, pady=4)
+            text="Current campaign entity",
+            font=ctk.CTkFont(size=14, weight="bold"),
+            anchor="w",
+        ).grid(row=0, column=0, columnspan=2, sticky="ew", padx=6, pady=(8, 2))
 
-        self.entity_var = tk.StringVar(value="Select entity")
+        values = self._entity_options or ["No linked entities"]
+        self.entity_picker_var = tk.StringVar(value=values[0])
         self.entity_selector = ctk.CTkOptionMenu(
             selector_wrap,
-            variable=self.entity_var,
-            values=["Select entity"],
-            command=lambda _value: None,
+            variable=self.entity_picker_var,
+            values=values,
+            command=self._on_entity_selected,
         )
-        self.entity_selector.grid(row=0, column=1, sticky="ew", padx=4, pady=4)
+        self.entity_selector.grid(row=1, column=0, sticky="ew", padx=4, pady=(4, 8))
 
         ctk.CTkButton(
             selector_wrap,
-            text="Open",
+            text="Open in tab",
             command=self._open_selected_entity,
-        ).grid(row=0, column=2, sticky="ew", padx=4, pady=4)
+        ).grid(row=1, column=1, sticky="ew", padx=4, pady=(4, 8))
 
-        self.search_var = tk.StringVar(value="")
-        search_entry = ctk.CTkEntry(
-            parent,
-            textvariable=self.search_var,
-            placeholder_text="Search inside selected campaign entities...",
-        )
-        search_entry.grid(row=2, column=0, sticky="ew", padx=16, pady=(0, 10))
-        search_entry.bind("<KeyRelease>", lambda _e: self._refresh_search_results())
+        cards = ctk.CTkFrame(parent, fg_color="transparent")
+        cards.grid(row=4, column=0, sticky="ew", padx=12, pady=(0, 8))
+        cards.grid_columnconfigure((0, 1), weight=1)
 
-        self.result_frame = ctk.CTkScrollableFrame(parent)
-        self.result_frame.grid(row=3, column=0, sticky="nsew", padx=10, pady=(0, 10))
-        self.result_frame.grid_columnconfigure(0, weight=1)
+        for idx, (label, count) in enumerate(self._collect_counts()):
+            card = ctk.CTkFrame(cards, corner_radius=12)
+            card.grid(row=idx // 2, column=idx % 2, sticky="ew", padx=5, pady=5)
+            ctk.CTkLabel(card, text=str(count), font=ctk.CTkFont(size=20, weight="bold")).pack(pady=(10, 0))
+            ctk.CTkLabel(card, text=label, text_color="gray70").pack(pady=(0, 10))
+
+    def _build_right_column(self, parent: ctk.CTkFrame) -> None:
+        parent.grid_columnconfigure(0, weight=1)
+        parent.grid_rowconfigure(2, weight=1)
 
         ctk.CTkLabel(
             parent,
-            text="Use type + entity selectors to jump instantly, or search to scan the campaign.",
-            text_color="gray70",
+            text="📖 Current Campaign Entity Details",
+            font=ctk.CTkFont(size=20, weight="bold"),
             anchor="w",
-        ).grid(row=4, column=0, sticky="ew", padx=16, pady=(0, 12))
+        ).grid(row=0, column=0, sticky="ew", padx=16, pady=(14, 6))
 
-        self._on_entity_type_change(self.entity_type_var.get())
+        self.entity_meta_label = ctk.CTkLabel(parent, text="", anchor="w", text_color="gray80")
+        self.entity_meta_label.grid(row=1, column=0, sticky="ew", padx=16, pady=(0, 8))
 
-    def _on_entity_type_change(self, selected_type: str) -> None:
-        if selected_type == "All entities":
-            combined = []
-            for et in _ENTITY_ORDER:
-                combined.extend(self._picker_data.get(et, []))
-            values = sorted(set(combined), key=str.lower)
-        else:
-            values = self._picker_data.get(selected_type, [])
+        self.details_scroll = ctk.CTkScrollableFrame(parent)
+        self.details_scroll.grid(row=2, column=0, sticky="nsew", padx=10, pady=(0, 10))
+        self.details_scroll.grid_columnconfigure(0, weight=1)
 
-        if not values:
-            values = ["No entities"]
-        self.entity_selector.configure(values=values)
-        self.entity_var.set(values[0])
-        self._refresh_search_results()
+    def _on_entity_selected(self, selected_option: str) -> None:
+        entry = self._option_to_entity.get(selected_option)
+        for child in self.details_scroll.winfo_children():
+            child.destroy()
+
+        if not entry:
+            ctk.CTkLabel(
+                self.details_scroll,
+                text="No linked entities in this scenario yet.",
+                text_color="gray70",
+                anchor="w",
+            ).grid(row=0, column=0, sticky="ew", padx=8, pady=8)
+            self.entity_meta_label.configure(text="")
+            return
+
+        entity_type = entry["entity_type"]
+        name = entry["name"]
+        item = entry.get("item")
+        fields = extract_display_fields(entity_type, item)
+
+        self.entity_meta_label.configure(text=f"{entity_type} • {name}")
+
+        if not fields:
+            ctk.CTkLabel(
+                self.details_scroll,
+                text="No displayable fields found for this entity.",
+                text_color="gray70",
+                anchor="w",
+            ).grid(row=0, column=0, sticky="ew", padx=8, pady=8)
+            return
+
+        row = 0
+        for field in fields:
+            block = ctk.CTkFrame(self.details_scroll, corner_radius=10)
+            block.grid(row=row, column=0, sticky="ew", padx=6, pady=5)
+            block.grid_columnconfigure(0, weight=1)
+
+            ctk.CTkLabel(
+                block,
+                text=field["name"],
+                font=ctk.CTkFont(size=13, weight="bold"),
+                anchor="w",
+                text_color="gray85",
+            ).grid(row=0, column=0, sticky="ew", padx=10, pady=(8, 2))
+
+            if field["type"] == "list":
+                values_wrap = ctk.CTkFrame(block, fg_color="transparent")
+                values_wrap.grid(row=1, column=0, sticky="ew", padx=8, pady=(0, 8))
+                values_wrap.grid_columnconfigure(0, weight=1)
+                linked_type = field.get("linked_type")
+                for idx, value in enumerate(field.get("values", [])):
+                    if linked_type:
+                        ctk.CTkButton(
+                            values_wrap,
+                            text=f"Open {value}",
+                            anchor="w",
+                            command=lambda et=linked_type, n=value: self.open_entity_callback(et, n),
+                        ).grid(row=idx, column=0, sticky="ew", pady=2)
+                    else:
+                        ctk.CTkLabel(values_wrap, text=f"• {value}", anchor="w").grid(
+                            row=idx,
+                            column=0,
+                            sticky="ew",
+                            pady=1,
+                        )
+            else:
+                body = ctk.CTkTextbox(block, height=90, wrap="word")
+                body.grid(row=1, column=0, sticky="ew", padx=10, pady=(0, 8))
+                body.insert("1.0", field.get("value") or "")
+                body.configure(state="disabled")
+            row += 1
 
     def _open_selected_entity(self) -> None:
-        entity_name = (self.entity_var.get() or "").strip()
-        entity_type = self.entity_type_var.get()
-        if not entity_name or entity_name == "No entities":
+        selected = self.entity_picker_var.get()
+        entry = self._option_to_entity.get(selected)
+        if not entry:
             return
-
-        if entity_type != "All entities":
-            self.open_entity_callback(entity_type, entity_name)
-            return
-
-        for item in self._search_items:
-            if item["label"] == entity_name:
-                self.open_entity_callback(item["entity_type"], entity_name)
-                return
+        self.open_entity_callback(entry["entity_type"], entry["name"])
 
     def _collect_counts(self):
+        linked_total = sum(len(self.scenario_item.get(entity_type) or []) for entity_type in self._linked_types())
         cards = [
             ("Scenes", len(self.scenario_item.get("Scenes") or [])),
             ("Linked NPCs", len(self.scenario_item.get("NPCs") or [])),
             ("Linked Places", len(self.scenario_item.get("Places") or [])),
             ("Maps", self.map_count),
-            ("Campaign Entities", sum(self._entity_counts.values())),
-            ("Entity Types", len([k for k in self._entity_counts if self._entity_counts.get(k, 0) > 0])),
+            ("Campaign Links", linked_total),
+            ("Linked Types", len([t for t in self._linked_types() if self.scenario_item.get(t)])),
         ]
         return cards
 
+    def _linked_types(self) -> list[str]:
+        return ["NPCs", "Places", "Clues", "Factions", "Objects", "Creatures", "Villains", "PCs", "Informations", "Books"]
+
     def _populate_linked_entities(self, parent: ctk.CTkScrollableFrame) -> None:
-        preferred_order = ["NPCs", "Places", "Clues", "Factions", "Objects", "Creatures", "Villains", "PCs"]
+        preferred_order = self._linked_types()
         row = 0
         has_any = False
         for entity_type in preferred_order:
@@ -218,7 +263,7 @@ class CampaignOverviewPanel(ctk.CTkFrame):
                 pady=(6, 2),
             )
             row += 1
-            for name in names[:8]:
+            for name in names[:12]:
                 ctk.CTkButton(
                     parent,
                     text=f"Open {name}",
@@ -235,48 +280,3 @@ class CampaignOverviewPanel(ctk.CTkFrame):
                 justify="left",
                 wraplength=320,
             ).grid(row=0, column=0, sticky="ew", padx=4, pady=10)
-
-    def _refresh_search_results(self):
-        for child in self.result_frame.winfo_children():
-            child.destroy()
-
-        selected_type = self.entity_type_var.get()
-        term = (self.search_var.get() or "").strip().lower()
-
-        results = self._search_items
-        if selected_type != "All entities":
-            results = [item for item in results if item["entity_type"] == selected_type]
-        if term:
-            results = [item for item in results if term in item["searchable"]]
-
-        if not results:
-            ctk.CTkLabel(self.result_frame, text="No results.", text_color="gray70").grid(
-                row=0,
-                column=0,
-                sticky="w",
-                padx=8,
-                pady=8,
-            )
-            return
-
-        grouped = group_results(results[:180])
-        row = 0
-        for entity_type in _ENTITY_ORDER:
-            items = grouped.get(entity_type)
-            if not items:
-                continue
-            ctk.CTkLabel(
-                self.result_frame,
-                text=f"{entity_type} ({len(items)})",
-                anchor="w",
-                font=ctk.CTkFont(size=14, weight="bold"),
-            ).grid(row=row, column=0, sticky="ew", padx=8, pady=(8, 2))
-            row += 1
-            for item in items[:20]:
-                ctk.CTkButton(
-                    self.result_frame,
-                    text=item["label"],
-                    anchor="w",
-                    command=lambda et=item["entity_type"], name=item["label"]: self.open_entity_callback(et, name),
-                ).grid(row=row, column=0, sticky="ew", padx=6, pady=2)
-                row += 1
