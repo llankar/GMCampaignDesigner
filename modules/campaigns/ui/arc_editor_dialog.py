@@ -3,6 +3,8 @@ from __future__ import annotations
 import customtkinter as ctk
 from tkinter import messagebox
 
+from modules.campaigns.ui.widgets import ScenarioMultiSelector
+
 
 class ArcEditorDialog(ctk.CTkToplevel):
     """Modal dialog used by campaign wizard to create/update one campaign arc."""
@@ -37,14 +39,17 @@ class ArcEditorDialog(ctk.CTkToplevel):
         ctk.CTkLabel(container, text="Status").pack(anchor="w")
         ctk.CTkOptionMenu(container, variable=self.status_var, values=["Planned", "Running", "Done", "Paused"]).pack(fill="x", pady=(0, 8))
 
-        ctk.CTkLabel(container, text="Scenario Titles (comma separated)").pack(anchor="w")
-        self.scenario_box = ctk.CTkTextbox(container, height=80)
-        self.scenario_box.pack(fill="x")
+        self.scenario_selector = ScenarioMultiSelector(
+            container,
+            scenarios,
+            label="Linked Scenarios",
+        )
+        self.scenario_selector.pack(fill="x")
 
         initial_scenarios = initial.get("scenarios") or []
         if not initial_scenarios and scenarios:
             initial_scenarios = scenarios[:2]
-        self.scenario_box.insert("1.0", ", ".join(initial_scenarios))
+        self.scenario_selector.set_values(initial_scenarios)
 
         if scenarios:
             ctk.CTkLabel(
@@ -69,8 +74,7 @@ class ArcEditorDialog(ctk.CTkToplevel):
             messagebox.showwarning("Missing Name", "Arc name is required.", parent=self)
             return
 
-        raw_scenarios = self.scenario_box.get("1.0", "end").strip()
-        scenarios = [part.strip() for part in raw_scenarios.split(",") if part.strip()]
+        scenarios = self.scenario_selector.get_values()
 
         self.result = {
             "name": name,
