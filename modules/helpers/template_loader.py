@@ -532,6 +532,19 @@ def list_known_entities() -> list:
 
 
 @log_function
+def list_known_entity_labels() -> list:
+    """Return display labels for every discovered entity template."""
+
+    definitions = load_entity_definitions()
+    labels = []
+    for slug in sorted(definitions.keys()):
+        label = str(definitions.get(slug, {}).get("label") or "").strip()
+        if label:
+            labels.append(label)
+    return labels
+
+
+@log_function
 def build_entity_wrappers() -> dict:
     """Return ``slug -> GenericModelWrapper`` for all known entities."""
 

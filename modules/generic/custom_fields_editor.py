@@ -1,7 +1,12 @@
 import customtkinter as ctk
 import tkinter as tk
 from tkinter import messagebox
-from modules.helpers.template_loader import _load_base_template, save_custom_fields, list_known_entities
+from modules.helpers.template_loader import (
+    _load_base_template,
+    save_custom_fields,
+    list_known_entities,
+    list_known_entity_labels,
+)
 from modules.helpers.logging_helper import (
     log_function,
     log_info,
@@ -83,9 +88,9 @@ class CustomFieldsEditor(ctk.CTkToplevel):
         self.type_menu.grid(row=1, column=1, padx=4, pady=4, sticky="ew")
         ctk.CTkLabel(form, text="Linked Type (for list)").grid(row=2, column=0, padx=4, pady=4, sticky="w")
         self.linked_var = tk.StringVar(value="")
-        # known linked types match display names used elsewhere
-        self.known_linked = ["NPCs", "PCs", "Villains", "Creatures", "Factions", "Objects", "Places", "Scenarios", "Clues", "Informations", "Puzzles", "Maps", "Books", "Events"]
-        self.linked_menu = ctk.CTkOptionMenu(form, values=[""] + self.known_linked, variable=self.linked_var)
+        # linked types are discovered dynamically from all known entity templates
+        self.known_linked = [""] + list_known_entity_labels()
+        self.linked_menu = ctk.CTkOptionMenu(form, values=self.known_linked, variable=self.linked_var)
         self.linked_menu.grid(row=2, column=1, padx=4, pady=4, sticky="ew")
 
         btns = ctk.CTkFrame(right)
@@ -125,10 +130,29 @@ class CustomFieldsEditor(ctk.CTkToplevel):
         # Load custom fields for this entity
         customs = list((base.get("custom_fields") or []))
         self._custom_current = customs
+        self._refresh_linked_options()
         self._refresh_custom_list()
         self.name_var.set("")
         self.type_var.set(FIELD_TYPES[0])
         self.linked_var.set("")
+
+
+    def _refresh_linked_options(self):
+        dynamic_labels = list_known_entity_labels()
+        values = [""] + dynamic_labels
+        existing_linked = {
+            str(f.get("linked_type", "")).strip()
+            for f in self._custom_current
+            if str(f.get("linked_type", "")).strip()
+        }
+        for linked in sorted(existing_linked):
+            if linked not in values:
+                values.append(linked)
+        self.known_linked = values
+        try:
+            self.linked_menu.configure(values=self.known_linked)
+        except Exception:
+            pass
 
     def _refresh_custom_list(self):
         self.custom_list.delete(0, tk.END)
@@ -173,6 +197,7 @@ class CustomFieldsEditor(ctk.CTkToplevel):
         if not replaced:
             self._custom_current.append(item)
         self._custom_buffer[entity] = list(self._custom_current)
+        self._refresh_linked_options()
         self._refresh_custom_list()
         self.name_var.set("")
         self.type_var.set(FIELD_TYPES[0])
@@ -187,6 +212,7 @@ class CustomFieldsEditor(ctk.CTkToplevel):
         try:
             self._custom_current.pop(idx)
             self._custom_buffer[self.entity_var.get()] = list(self._custom_current)
+            self._refresh_linked_options()
             self._refresh_custom_list()
         except IndexError:
             pass
