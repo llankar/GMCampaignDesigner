@@ -4,6 +4,8 @@ import customtkinter as ctk
 import tkinter as tk
 from typing import Callable
 
+from modules.helpers.text_helpers import coerce_text
+
 
 _DEFAULT_ENTITY_LABELS = {
     "Scenarios": "Title",
@@ -49,8 +51,10 @@ class CampaignOverviewPanel(ctk.CTkFrame):
     def _build_left_column(self, parent: ctk.CTkFrame) -> None:
         parent.grid_columnconfigure(0, weight=1)
 
-        title = self.scenario_item.get("Title") or self.scenario_item.get("Name") or "Scenario"
-        summary = (self.scenario_item.get("Summary") or "No summary for this scenario yet.").strip()
+        title = coerce_text(self.scenario_item.get("Title") or self.scenario_item.get("Name") or "Scenario")
+        summary = coerce_text(self.scenario_item.get("Summary")).strip()
+        if not summary:
+            summary = "No summary for this scenario yet."
 
         ctk.CTkLabel(
             parent,
@@ -201,7 +205,7 @@ class CampaignOverviewPanel(ctk.CTkFrame):
                 continue
             label_key = _DEFAULT_ENTITY_LABELS.get(entity_type, "Name")
             for item in items:
-                label = (item.get(label_key) or "").strip()
+                label = coerce_text(item.get(label_key)).strip()
                 if not label:
                     continue
                 searchable = f"{label} {entity_type}".lower()
