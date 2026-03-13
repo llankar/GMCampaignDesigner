@@ -1,5 +1,6 @@
 from modules.generic.editor.window_context import *
 from modules.generic.editor.styles import EDITOR_PALETTE, option_menu_style, primary_button_style, toolbar_entry_style
+from modules.generic.editor.window_components.dynamic_linked_entities import resolve_linked_entity_source
 
 
 class GenericEditorWindowListAndBasicFields:
@@ -158,39 +159,7 @@ class GenericEditorWindowListAndBasicFields:
 
         combobox_list = []
         combobox_vars = []
-        # Prefer explicit linked_type when provided (for custom fields)
-        linked = (field.get("linked_type") or "").strip()
-        fname = field.get("name")
-        if linked == "PCs" or fname == "PCs":
-            options_list = load_pcs_list()
-            label_text = f"Add {linked or 'PC'}"
-        elif linked == "NPCs" or fname == "NPCs":
-            options_list = load_npcs_list()
-            label_text = f"Add {linked or 'NPC'}"
-        elif linked == "Villains" or fname == "Villains":
-            options_list = load_villains_list()
-            label_text = f"Add {linked or 'Villain'}"
-        elif linked == "Places" or fname == "Places":
-            options_list = load_places_list()
-            label_text = f"Add {linked or 'Place'}"
-        elif linked == "Factions" or fname == "Factions":
-            options_list = load_factions_list()
-            label_text = f"Add {linked or 'Faction'}"
-        elif linked == "Objects" or fname == "Objects":
-            options_list = load_objects_list()
-            label_text = f"Add {linked or 'Object'}"
-        elif linked == "Creatures" or fname == "Creatures":
-            options_list = load_creatures_list()
-            label_text = f"Add {linked or 'Creature'}"
-        elif linked == "Books" or fname == "Books":
-            options_list = load_books_list()
-            label_text = f"Add {linked or 'Book'}"
-        elif linked == "Events" or fname == "Events":
-            options_list = load_entities_list("events")
-            label_text = f"Add {linked or 'Event'}"
-        else:
-            options_list = []
-            label_text = f"Add {fname}"
+        options_list, label_text = resolve_linked_entity_source(field)
 
         initial_values = self.item.get(field["name"]) or []
         if isinstance(initial_values, str):
