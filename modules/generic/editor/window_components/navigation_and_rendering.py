@@ -1,5 +1,6 @@
 from modules.generic.editor.window_context import *
 from modules.generic.editor.styles import EDITOR_PALETTE, primary_button_style, section_style
+from modules.campaigns.ui.arcs_read_only_preview import ReadOnlyArcsPreview
 
 
 class GenericEditorWindowNavigationAndRendering:
@@ -184,6 +185,12 @@ class GenericEditorWindowNavigationAndRendering:
                 field.get("label") or field["name"],
                 raw,
             )
+            preview.pack(fill="x", pady=5)
+            self.field_widgets[field["name"]] = preview
+            return
+
+        if field["name"] == "Arcs":
+            preview = ReadOnlyArcsPreview(self._field_parent(), raw)
             preview.pack(fill="x", pady=5)
             self.field_widgets[field["name"]] = preview
             return
