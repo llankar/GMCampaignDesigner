@@ -38,6 +38,7 @@ from modules.helpers.logging_helper import (
     log_warning,
 )
 from modules.objects.object_constants import OBJECT_CATEGORY_ALLOWED
+from modules.generic.entities.linking import entity_label_map, resolve_entity_slug
 
 log_module_import(__name__)
 
@@ -86,6 +87,15 @@ ENTITY_DISPLAY_LABELS = {
     "maps": "Maps",
     "books": "Books",
 }
+
+
+def _dynamic_entity_labels() -> dict:
+    labels = dict(ENTITY_DISPLAY_LABELS)
+    try:
+        labels.update(entity_label_map())
+    except Exception:
+        pass
+    return labels
 
 AI_CATEGORIZE_BATCH_SIZE = 20
 PORTRAIT_MENU_THUMB_SIZE = (48, 48)
@@ -1818,7 +1828,8 @@ class GenericListView(ctk.CTkFrame):
         if not isinstance(fields, list):
             return result
 
-        label_to_slug = {label: slug for slug, label in ENTITY_DISPLAY_LABELS.items()}
+        entity_labels = _dynamic_entity_labels()
+        label_to_slug = {label: slug for slug, label in entity_labels.items()}
         normalized_labels = {label.lower(): slug for label, slug in label_to_slug.items()}
 
         for field in fields:
@@ -1840,12 +1851,12 @@ class GenericListView(ctk.CTkFrame):
             slug = None
             if linked_label:
                 candidate = linked_label.lower()
-                if candidate in ENTITY_DISPLAY_LABELS:
+                if candidate in entity_labels:
                     slug = candidate
                 else:
                     slug = label_to_slug.get(linked_label) or normalized_labels.get(candidate)
                     if not slug:
-                        slug = candidate
+                        slug = resolve_entity_slug(candidate) or candidate
             elif field_label:
                 slug = label_to_slug.get(field_label) or normalized_labels.get(field_label.lower())
                 if not slug and field_label:
@@ -1962,10 +1973,11 @@ class GenericListView(ctk.CTkFrame):
     def _display_label_for_slug(self, slug):
         if not slug:
             return ""
-        if slug in ENTITY_DISPLAY_LABELS:
-            return ENTITY_DISPLAY_LABELS[slug]
+        entity_labels = _dynamic_entity_labels()
+        if slug in entity_labels:
+            return entity_labels[slug]
         slug_lower = str(slug).lower()
-        for key, label in ENTITY_DISPLAY_LABELS.items():
+        for key, label in entity_labels.items():
             if key.lower() == slug_lower or label.lower() == slug_lower:
                 return label
         return str(slug).replace("_", " ").title()
@@ -4278,7 +4290,8 @@ class GenericListView(ctk.CTkFrame):
             self.bulk_action_button.configure(state=tk.DISABLED)
 
     def _get_display_label(self):
-        return ENTITY_DISPLAY_LABELS.get(
+        entity_labels = _dynamic_entity_labels()
+        return entity_labels.get(
             self.model_wrapper.entity_type,
             self.model_wrapper.entity_type.replace("_", " ").title(),
         )

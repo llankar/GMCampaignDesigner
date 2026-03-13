@@ -1,19 +1,7 @@
 from __future__ import annotations
 
 from modules.generic.editor.window_context import load_entities_list
-
-
-ENTITY_CONFIG_BY_PLURAL = {
-    "PCs": {"entity_type": "pcs", "singular": "PC"},
-    "NPCs": {"entity_type": "npcs", "singular": "NPC"},
-    "Villains": {"entity_type": "villains", "singular": "Villain"},
-    "Places": {"entity_type": "places", "singular": "Place"},
-    "Factions": {"entity_type": "factions", "singular": "Faction"},
-    "Objects": {"entity_type": "objects", "singular": "Object"},
-    "Creatures": {"entity_type": "creatures", "singular": "Creature"},
-    "Books": {"entity_type": "books", "singular": "Book"},
-    "Events": {"entity_type": "events", "singular": "Event"},
-}
+from modules.generic.entities.linking import resolve_entity_label, resolve_entity_slug
 
 
 def resolve_linked_entity_source(field: dict) -> tuple[list[str], str]:
@@ -26,11 +14,10 @@ def resolve_linked_entity_source(field: dict) -> tuple[list[str], str]:
     fname = (field.get("name") or "").strip()
     key = linked or fname
 
-    config = ENTITY_CONFIG_BY_PLURAL.get(key)
-    if not config:
-        return [], f"Add {fname}"
+    slug = resolve_entity_slug(key)
+    if not slug:
+        return [], f"Add {fname or linked}"
 
-    options = load_entities_list(config["entity_type"])
-    label = f"Add {linked or config['singular']}"
+    options = load_entities_list(slug)
+    label = f"Add {resolve_entity_label(slug)}"
     return options, label
-

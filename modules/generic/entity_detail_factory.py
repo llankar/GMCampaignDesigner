@@ -35,6 +35,7 @@ from modules.scenarios.scene_flow_viewer import create_scene_flow_frame
 from modules.scenarios.widgets.scene_body_sections import build_scene_body_sections
 from modules.ui.vertical_section_tabs import VerticalSectionTabs
 from modules.events.ui.shared.related_events_panel import RelatedEventsPanel
+from modules.generic.entities.linking import resolve_entity_label, resolve_entity_slug
 
 log_module_import(__name__)
 
@@ -93,28 +94,21 @@ def _attach_portrait_tooltip(widget, entity_type, data):
     if tooltip_text:
         widget.tooltip = ToolTip(widget, tooltip_text)
 
-wrappers = {
-    "Scenarios": GenericModelWrapper("scenarios"),
-    "Places": GenericModelWrapper("places"),
-    "Bases": GenericModelWrapper("bases"),
-    "NPCs": GenericModelWrapper("npcs"),
-    "Villains": GenericModelWrapper("villains"),
-    "Factions": GenericModelWrapper("factions"),
-    "Objects": GenericModelWrapper("objects"),
-    "Creatures": GenericModelWrapper("creatures"),
-    "PCs": GenericModelWrapper("pcs"),
-    "Clues": GenericModelWrapper("clues"),
-    "Informations": GenericModelWrapper("informations"),
-    "Puzzles": GenericModelWrapper("puzzles"),
-    "Books": GenericModelWrapper("books"),
-}
+def _wrapper_for(entity_type: str):
+    slug = resolve_entity_slug(entity_type)
+    if not slug:
+        return None
+    try:
+        return GenericModelWrapper(slug)
+    except Exception:
+        return None
 
 @log_function
 def _open_book_link(parent, book_title: str) -> None:
     title = str(book_title or "").strip()
     if not title:
         return
-    wrapper = wrappers.get("Books")
+    wrapper = _wrapper_for("Books")
     if wrapper is None:
         messagebox.showerror("Books", "Book library is not available.")
         return
@@ -251,20 +245,21 @@ def open_entity_tab(entity_type, name, master):
             _open_entity_windows.pop(window_key, None)
 
     # 2) Load the data item
-    wrapper = wrappers.get(entity_type)
+    wrapper = _wrapper_for(entity_type)
     if not wrapper:
         messagebox.showerror("Error", f"Unknown type '{entity_type}'")
         return
 
-    key_field = "Title" if entity_type in {"Scenarios", "Books"} else "Name"
+    resolved_label = resolve_entity_label(entity_type)
+    key_field = "Title" if resolve_entity_slug(entity_type) in {"scenarios", "books"} else "Name"
     item = wrapper.load_item_by_key(name, key_field=key_field)
     if not item:
-        messagebox.showerror("Error", f"{entity_type[:-1]} '{name}' not found.")
+        messagebox.showerror("Error", f"{resolved_label} '{name}' not found.")
         return
 
     # 3) Create a new Toplevel window
     new_window = ctk.CTkToplevel()
-    new_window.title(f"{entity_type[:-1]}: {name}")
+    new_window.title(f"{resolved_label}: {name}")
     new_window.geometry("1000x600")
     new_window.minsize(1000, 600)
     new_window.configure(padx=10, pady=10)
