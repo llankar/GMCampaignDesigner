@@ -101,6 +101,7 @@ class GMScreenView(ctk.CTkFrame):
                                     size=(20, 20))
 
         self.wrappers = {
+            "Campaigns": GenericModelWrapper("campaigns"),
             "Scenarios": GenericModelWrapper("scenarios"),
             "Places": GenericModelWrapper("places"),
             "Bases": GenericModelWrapper("bases"),
@@ -123,6 +124,7 @@ class GMScreenView(ctk.CTkFrame):
         self._map_thumbnail_size = DEFAULT_MAP_THUMBNAIL_SIZE
 
         self.templates = {
+            "Campaigns": load_entity_template("campaigns"),
             "Scenarios": load_entity_template("scenarios"),
             "Places": load_entity_template("places"),
             "Bases": load_entity_template("bases"),
