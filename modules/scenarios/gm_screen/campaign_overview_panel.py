@@ -74,7 +74,7 @@ class CampaignOverviewPanel(ctk.CTkFrame):
         ).grid(row=1, column=0, sticky="ew", padx=16, pady=(0, 8))
 
         summary_box = ctk.CTkTextbox(parent, height=120, wrap="word")
-        summary_box.grid(row=2, column=0, sticky="ew", padx=16)
+        summary_box.grid(row=2, column=0, sticky="ew", padx=8)
         summary_box.insert("1.0", summary)
         summary_box.configure(state="disabled")
 
