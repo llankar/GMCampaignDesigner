@@ -19,6 +19,7 @@ _CUSTOM_ENTITY_MANIFEST = "custom_entities.json"
 
 _BUILTIN_ENTITY_METADATA = {
     "events": {"label": "Events", "icon": "assets/scenario_icon.png"},
+    "campaigns": {"label": "Campaigns", "icon": "assets/scenario_graph_icon.png"},
     "scenarios": {"label": "Scenarios", "icon": "assets/scenario_icon.png"},
     "pcs": {"label": "PCs", "icon": "assets/pc_icon.png"},
     "npcs": {"label": "NPCs", "icon": "assets/npc_icon.png"},

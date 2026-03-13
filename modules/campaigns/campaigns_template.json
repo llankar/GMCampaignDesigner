@@ -1,0 +1,18 @@
+{
+  "fields": [
+    {"name": "Name", "type": "text"},
+    {"name": "Logline", "type": "longtext"},
+    {"name": "Genre", "type": "text"},
+    {"name": "Tone", "type": "text"},
+    {"name": "Setting", "type": "longtext"},
+    {"name": "Status", "type": "text"},
+    {"name": "StartDate", "type": "text"},
+    {"name": "EndDate", "type": "text"},
+    {"name": "MainObjective", "type": "longtext"},
+    {"name": "Stakes", "type": "longtext"},
+    {"name": "Themes", "type": "list_longtext"},
+    {"name": "Arcs", "type": "longtext"},
+    {"name": "LinkedScenarios", "type": "list", "linked_type": "Scenarios"},
+    {"name": "Notes", "type": "longtext"}
+  ]
+}
