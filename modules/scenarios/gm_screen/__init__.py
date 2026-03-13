@@ -1,3 +1,3 @@
-from .campaign_overview_panel import CampaignOverviewPanel
+from .dashboard import CampaignDashboardPanel
 
-__all__ = ["CampaignOverviewPanel"]
+__all__ = ["CampaignDashboardPanel"]

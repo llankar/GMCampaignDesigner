@@ -44,7 +44,7 @@ from modules.objects.loot_generator_panel import LootGeneratorPanel
 from modules.scenarios.random_tables_panel import RandomTablesPanel
 from modules.whiteboard.controllers.whiteboard_controller import WhiteboardController
 from modules.puzzles.puzzle_display_window import create_puzzle_display_frame
-from modules.scenarios.gm_screen import CampaignOverviewPanel
+from modules.scenarios.gm_screen import CampaignDashboardPanel
 
 log_module_import(__name__)
 
@@ -2502,22 +2502,18 @@ class GMScreenView(ctk.CTkFrame):
             self.show_tab(existing_tab)
             return
 
-        frame = CampaignOverviewPanel(
+        frame = CampaignDashboardPanel(
             self.content_area,
-            scenario_item=self.scenario,
             wrappers=self.wrappers,
             open_entity_callback=self.open_entity_tab,
-            map_count=len(self._map_records),
         )
         self.add_tab(
             title,
             frame,
-            content_factory=lambda master: CampaignOverviewPanel(
+            content_factory=lambda master: CampaignDashboardPanel(
                 master,
-                scenario_item=self.scenario,
                 wrappers=self.wrappers,
                 open_entity_callback=self.open_entity_tab,
-                map_count=len(self._map_records),
             ),
             layout_meta={"kind": "campaign_dashboard"},
         )
