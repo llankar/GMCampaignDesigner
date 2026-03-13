@@ -72,8 +72,26 @@ class ReadOnlyArcsPreview(ctk.CTkFrame):
 
     @staticmethod
     def _coerce_to_arc_list(raw_value: Any) -> list[dict[str, Any]]:
+        def _from_dict(payload: dict[str, Any]) -> list[dict[str, Any]]:
+            arcs_value = payload.get("arcs")
+            if isinstance(arcs_value, list):
+                return [arc for arc in arcs_value if isinstance(arc, dict)]
+
+            text_value = payload.get("text")
+            if text_value is not None:
+                return ReadOnlyArcsPreview._coerce_to_arc_list(text_value)
+
+            arc_keys = {"name", "summary", "objective", "status", "scenarios"}
+            if any(key in payload for key in arc_keys):
+                return [payload]
+
+            return []
+
         if isinstance(raw_value, list):
             return [arc for arc in raw_value if isinstance(arc, dict)]
+
+        if isinstance(raw_value, dict):
+            return _from_dict(raw_value)
 
         if isinstance(raw_value, str):
             parsed: Any = None
@@ -86,5 +104,7 @@ class ReadOnlyArcsPreview(ctk.CTkFrame):
                     parsed = None
             if isinstance(parsed, list):
                 return [arc for arc in parsed if isinstance(arc, dict)]
+            if isinstance(parsed, dict):
+                return _from_dict(parsed)
 
         return []
