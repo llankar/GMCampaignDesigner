@@ -111,7 +111,7 @@ def export_session_brief(
     output_format: str,
     output_path: str,
 ) -> str:
-    """Export a session brief to markdown or lightweight PDF.
+    """Export a session brief to markdown, DOCX, or lightweight PDF.
 
     Returns the exported file path.
     """
@@ -132,9 +132,8 @@ def export_session_brief(
         target_path.write_text(payload, encoding="utf-8")
         return str(target_path)
 
-    if export_format == "pdf":
+    if export_format in {"docx", "pdf"}:
         docx_path = target_path.with_suffix(".docx")
-        pdf_path = target_path.with_suffix(".pdf")
         try:
             document = _build_docx_document(
                 campaign_name=campaign_name,
@@ -161,6 +160,11 @@ def export_session_brief(
                 encoding="utf-8",
             )
             return str(markdown_fallback_path)
+
+        if export_format == "docx":
+            return str(docx_path)
+
+        pdf_path = target_path.with_suffix(".pdf")
         if _convert_docx_to_pdf(str(docx_path), str(pdf_path)):
             try:
                 docx_path.unlink(missing_ok=True)
