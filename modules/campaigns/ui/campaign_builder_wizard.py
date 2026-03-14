@@ -28,7 +28,7 @@ class CampaignBuilderWizard(ctk.CTkToplevel):
     def __init__(self, master, campaign_wrapper, scenario_wrapper):
         super().__init__(master)
         self.title("Campaign Builder Wizard")
-        self.geometry("980x760")
+        self.geometry("980x1040")
         self.configure(fg_color=EDITOR_PALETTE["surface"])
 
         self.campaign_wrapper = campaign_wrapper
@@ -323,8 +323,8 @@ class CampaignBuilderWizard(ctk.CTkToplevel):
         result = {"payload": None}
         dialog = ctk.CTkToplevel(self)
         dialog.title("Select Campaign")
-        dialog.geometry("1100x720")
-        dialog.minsize(1100, 720)
+        dialog.geometry("1100x1040")
+        dialog.minsize(1100, 1040)
 
         view = GenericListSelectionView(
             dialog,
