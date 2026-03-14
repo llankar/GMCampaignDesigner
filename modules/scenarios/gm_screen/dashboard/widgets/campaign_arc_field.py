@@ -6,6 +6,7 @@ from typing import Any, Callable
 
 import customtkinter as ctk
 
+from modules.campaigns.shared.arc_status import canonicalize_arc_status
 from modules.scenarios.gm_screen.dashboard.styles.dashboard_theme import DASHBOARD_THEME
 from modules.scenarios.gm_screen.dashboard.widgets.arc_display import ArcMomentumMeter
 
@@ -14,10 +15,10 @@ class CampaignArcField(ctk.CTkFrame):
     """Stylized read-only campaign arc renderer with momentum visuals."""
 
     _STATUS_COLOR = {
-        "completed": DASHBOARD_THEME.arc_complete,
-        "in progress": DASHBOARD_THEME.arc_active,
-        "active": DASHBOARD_THEME.arc_active,
-        "planned": DASHBOARD_THEME.arc_planned,
+        "Planned": DASHBOARD_THEME.arc_planned,
+        "In Progress": DASHBOARD_THEME.arc_active,
+        "Paused": DASHBOARD_THEME.accent_soft,
+        "Completed": DASHBOARD_THEME.arc_complete,
     }
 
     def __init__(
@@ -47,8 +48,8 @@ class CampaignArcField(ctk.CTkFrame):
 
     def _render_arc_card(self, arc: dict[str, Any], row: int) -> None:
         arc_name = str(arc.get("name") or f"Arc {row + 1}").strip() or f"Arc {row + 1}"
-        status_text = str(arc.get("status") or "Planned").strip() or "Planned"
-        status_color = self._STATUS_COLOR.get(status_text.lower(), DASHBOARD_THEME.accent_soft)
+        status_text = canonicalize_arc_status(arc.get("status"))
+        status_color = self._STATUS_COLOR.get(status_text, DASHBOARD_THEME.accent_soft)
 
         scenarios = [str(name).strip() for name in arc.get("scenarios") or [] if str(name).strip()]
         total_steps = max(len(scenarios), 1)
@@ -142,20 +143,26 @@ class CampaignArcField(ctk.CTkFrame):
         scenario_wrap.grid_columnconfigure(1, weight=1)
 
     def _estimate_completion(self, status_text: str, scenarios: list[str]) -> int:
-        status = status_text.lower()
+        status = canonicalize_arc_status(status_text)
         total = max(len(scenarios), 1)
-        if status == "completed":
+        if status == "Completed":
             return total
-        if status in {"in progress", "active"}:
+        if status == "In Progress":
             return max(1, total // 2)
         return 0
+
+
+def _normalize_arc_status(arc: dict[str, Any]) -> dict[str, Any]:
+    normalized = dict(arc)
+    normalized["status"] = canonicalize_arc_status(normalized.get("status"))
+    return normalized
 
 
 def coerce_arc_list(raw_value: Any) -> list[dict[str, Any]]:
     def _from_dict(payload: dict[str, Any]) -> list[dict[str, Any]]:
         arcs_value = payload.get("arcs")
         if isinstance(arcs_value, list):
-            return [arc for arc in arcs_value if isinstance(arc, dict)]
+            return [_normalize_arc_status(arc) for arc in arcs_value if isinstance(arc, dict)]
 
         text_value = payload.get("text")
         if text_value is not None:
@@ -163,12 +170,12 @@ def coerce_arc_list(raw_value: Any) -> list[dict[str, Any]]:
 
         arc_keys = {"name", "summary", "objective", "status", "scenarios"}
         if any(key in payload for key in arc_keys):
-            return [payload]
+            return [_normalize_arc_status(payload)]
 
         return []
 
     if isinstance(raw_value, list):
-        return [arc for arc in raw_value if isinstance(arc, dict)]
+        return [_normalize_arc_status(arc) for arc in raw_value if isinstance(arc, dict)]
 
     if isinstance(raw_value, dict):
         return _from_dict(raw_value)
@@ -184,7 +191,7 @@ def coerce_arc_list(raw_value: Any) -> list[dict[str, Any]]:
                 parsed = None
 
         if isinstance(parsed, list):
-            return [arc for arc in parsed if isinstance(arc, dict)]
+            return [_normalize_arc_status(arc) for arc in parsed if isinstance(arc, dict)]
         if isinstance(parsed, dict):
             return _from_dict(parsed)
 

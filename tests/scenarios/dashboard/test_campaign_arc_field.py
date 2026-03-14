@@ -29,8 +29,8 @@ def test_coerce_arc_list_from_dict_with_arcs_key():
     arcs = coerce_arc_list(raw)
 
     assert arcs == [
-        {"name": "Arc Alpha", "status": "Running"},
-        {"name": "Arc Beta"},
+        {"name": "Arc Alpha", "status": "In Progress"},
+        {"name": "Arc Beta", "status": "Planned"},
     ]
 
 
@@ -39,4 +39,10 @@ def test_coerce_arc_list_from_text_payload():
 
     arcs = coerce_arc_list(raw)
 
-    assert arcs == [{"name": "Text Arc", "objective": "Find clue"}]
+    assert arcs == [{"name": "Text Arc", "objective": "Find clue", "status": "Planned"}]
+
+
+def test_coerce_arc_list_single_arc_dict_normalizes_status():
+    arcs = coerce_arc_list({"name": "Arc Solo", "status": "done"})
+
+    assert arcs == [{"name": "Arc Solo", "status": "Completed"}]

@@ -3,6 +3,7 @@ from __future__ import annotations
 import customtkinter as ctk
 from tkinter import messagebox
 
+from modules.campaigns.shared.arc_status import CANONICAL_ARC_STATUSES, canonicalize_arc_status
 from modules.campaigns.ui.widgets import ScenarioMultiSelector
 
 
@@ -18,7 +19,7 @@ class ArcEditorDialog(ctk.CTkToplevel):
         initial = initial_data or {}
 
         self.name_var = ctk.StringVar(value=initial.get("name", ""))
-        self.status_var = ctk.StringVar(value=initial.get("status", "Planned"))
+        self.status_var = ctk.StringVar(value=canonicalize_arc_status(initial.get("status")))
 
         container = ctk.CTkFrame(self)
         container.pack(fill="both", expand=True, padx=12, pady=12)
@@ -37,7 +38,7 @@ class ArcEditorDialog(ctk.CTkToplevel):
         self.objective_box.insert("1.0", initial.get("objective", ""))
 
         ctk.CTkLabel(container, text="Status").pack(anchor="w")
-        ctk.CTkOptionMenu(container, variable=self.status_var, values=["Planned", "Running", "Done", "Paused"]).pack(fill="x", pady=(0, 8))
+        ctk.CTkOptionMenu(container, variable=self.status_var, values=list(CANONICAL_ARC_STATUSES)).pack(fill="x", pady=(0, 8))
 
         self.scenario_selector = ScenarioMultiSelector(
             container,
@@ -80,7 +81,7 @@ class ArcEditorDialog(ctk.CTkToplevel):
             "name": name,
             "summary": self.summary_box.get("1.0", "end").strip(),
             "objective": self.objective_box.get("1.0", "end").strip(),
-            "status": self.status_var.get().strip() or "Planned",
+            "status": canonicalize_arc_status(self.status_var.get()),
             "scenarios": scenarios,
         }
         self.destroy()

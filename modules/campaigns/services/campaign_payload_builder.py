@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from modules.campaigns.models.campaign_blueprint import CampaignArc, CampaignBlueprint
+from modules.campaigns.shared.arc_status import canonicalize_arc_status
 
 
 REQUIRED_FIELD = "name"
@@ -26,7 +27,7 @@ def build_campaign_payload(form_data: dict, arcs_data: list[dict]) -> dict:
                 name=arc_name,
                 summary=(raw_arc.get("summary") or "").strip(),
                 objective=(raw_arc.get("objective") or "").strip(),
-                status=(raw_arc.get("status") or "Planned").strip() or "Planned",
+                status=canonicalize_arc_status(raw_arc.get("status")),
                 scenarios=[s.strip() for s in raw_scenarios if str(s).strip()],
             )
         )
