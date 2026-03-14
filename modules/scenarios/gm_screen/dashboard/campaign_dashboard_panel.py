@@ -5,13 +5,15 @@ import customtkinter as ctk
 import tkinter as tk
 from typing import Callable
 
-from .widgets.campaign_arc_field import CampaignArcField, coerce_arc_list
+from modules.campaigns.shared.arc_parser import coerce_arc_list
+from .widgets.campaign_arc_field import CampaignArcField
 from .campaign_dashboard_data import (
     build_campaign_option_index,
     extract_campaign_fields,
     load_campaign_entities,
 )
 from .search.campaign_field_search import build_field_search_index, find_match_ranges, normalize_query
+from .session_prep.session_prep_summary import build_session_prep_summary
 from .styles.dashboard_theme import DASHBOARD_THEME
 
 
@@ -126,6 +128,7 @@ class CampaignDashboardPanel(ctk.CTkFrame):
         )
         selector_wrap.grid(row=0, column=1, rowspan=3, sticky="nsew", padx=12, pady=10)
         selector_wrap.grid_columnconfigure((0, 1), weight=1)
+        selector_wrap.grid_columnconfigure(2, weight=0)
 
         ctk.CTkLabel(
             selector_wrap,
@@ -159,6 +162,19 @@ class CampaignDashboardPanel(ctk.CTkFrame):
             hover_color=DASHBOARD_THEME.accent_hover,
             command=self._open_selected_campaign,
         ).grid(row=1, column=1, sticky="ew", padx=6, pady=(4, 10))
+
+        self.session_prep_var = tk.BooleanVar(value=False)
+        self.session_prep_toggle = ctk.CTkSwitch(
+            selector_wrap,
+            text="Session Prep",
+            variable=self.session_prep_var,
+            command=self._on_session_prep_toggled,
+            text_color=DASHBOARD_THEME.text_primary,
+            progress_color=DASHBOARD_THEME.accent,
+            button_color=DASHBOARD_THEME.input_button,
+            button_hover_color=DASHBOARD_THEME.input_hover,
+        )
+        self.session_prep_toggle.grid(row=1, column=2, sticky="e", padx=(4, 10), pady=(4, 10))
 
     def _build_details_content(self, parent: ctk.CTkFrame) -> None:
         parent.grid_columnconfigure(0, weight=1)
@@ -230,6 +246,9 @@ class CampaignDashboardPanel(ctk.CTkFrame):
     def _on_search_changed(self) -> None:
         self._render_filtered_fields()
 
+    def _on_session_prep_toggled(self) -> None:
+        self._render_filtered_fields()
+
     def _render_empty_state(self, message: str) -> None:
         ctk.CTkLabel(
             self.details_scroll,
@@ -250,6 +269,10 @@ class CampaignDashboardPanel(ctk.CTkFrame):
         visible_fields = [
             indexed["field"] for indexed in self._indexed_fields if not query or query in indexed["searchable_text"]
         ]
+
+        if self.session_prep_var.get():
+            self._render_session_prep_view(visible_fields, query)
+            return
 
         if not visible_fields:
             self._render_empty_state("No field matches your search.")
@@ -314,6 +337,58 @@ class CampaignDashboardPanel(ctk.CTkFrame):
                 self._render_read_only_field(block, field.get("value"), query)
             row += 1
 
+    def _render_session_prep_view(self, visible_fields: list[dict], query: str) -> None:
+        summary = build_session_prep_summary(visible_fields)
+
+        prep_sections = [
+            ("Objectifs actifs", summary.active_objectives),
+            ("Arcs in-progress", summary.in_progress_arcs),
+            ("Rappels PNJ/Lieux critiques", summary.critical_reminders),
+        ]
+
+        row = 0
+        for title, lines in prep_sections:
+            if query and not lines:
+                continue
+
+            block = ctk.CTkFrame(
+                self.details_scroll,
+                corner_radius=12,
+                fg_color=DASHBOARD_THEME.card_bg,
+                border_width=1,
+                border_color=DASHBOARD_THEME.card_border,
+            )
+            block.grid(row=row, column=0, sticky="ew", padx=6, pady=5)
+            block.grid_columnconfigure(0, weight=1)
+
+            ctk.CTkLabel(
+                block,
+                text=title,
+                font=ctk.CTkFont(size=13, weight="bold"),
+                anchor="w",
+                text_color=DASHBOARD_THEME.text_primary,
+            ).grid(row=0, column=0, sticky="ew", padx=10, pady=(8, 2))
+
+            if not lines:
+                ctk.CTkLabel(
+                    block,
+                    text="Aucune donnée prioritaire trouvée.",
+                    anchor="w",
+                    text_color=DASHBOARD_THEME.text_secondary,
+                ).grid(row=1, column=0, sticky="ew", padx=10, pady=(0, 8))
+                row += 1
+                continue
+
+            for idx, line in enumerate(lines, start=1):
+                line_wrap = ctk.CTkFrame(block, fg_color="transparent")
+                line_wrap.grid(row=idx, column=0, sticky="ew", padx=10, pady=(0, 6))
+                self._render_highlighted_line(line_wrap, f"• {line}", query)
+
+            row += 1
+
+        if row == 0:
+            self._render_empty_state("No field matches your search.")
+
     def _update_summary_cards(self, fields: list[dict]) -> None:
         arcs_count = 0
         scenario_count = 0
@@ -353,11 +428,13 @@ class CampaignDashboardPanel(ctk.CTkFrame):
     def _render_compact_with_highlight(self, parent: ctk.CTkFrame, value: str, query: str) -> None:
         content_wrap = ctk.CTkFrame(parent, fg_color="transparent")
         content_wrap.grid(row=1, column=0, sticky="ew", padx=10, pady=(0, 8))
+        self._render_highlighted_line(content_wrap, value, query)
 
+    def _render_highlighted_line(self, parent: ctk.CTkFrame, value: str, query: str) -> None:
         ranges = find_match_ranges(value, query)
         if not ranges:
             ctk.CTkLabel(
-                content_wrap,
+                parent,
                 text=value,
                 anchor="w",
                 justify="left",
@@ -369,7 +446,7 @@ class CampaignDashboardPanel(ctk.CTkFrame):
         for start, end in ranges:
             if start > cursor:
                 ctk.CTkLabel(
-                    content_wrap,
+                    parent,
                     text=value[cursor:start],
                     anchor="w",
                     justify="left",
@@ -377,7 +454,7 @@ class CampaignDashboardPanel(ctk.CTkFrame):
                 ).pack(side="left")
 
             ctk.CTkLabel(
-                content_wrap,
+                parent,
                 text=value[start:end],
                 anchor="w",
                 justify="left",
@@ -389,7 +466,7 @@ class CampaignDashboardPanel(ctk.CTkFrame):
 
         if cursor < len(value):
             ctk.CTkLabel(
-                content_wrap,
+                parent,
                 text=value[cursor:],
                 anchor="w",
                 justify="left",
