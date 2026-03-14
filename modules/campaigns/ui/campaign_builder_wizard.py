@@ -4,9 +4,14 @@ import json
 import customtkinter as ctk
 from tkinter import messagebox
 
-from modules.campaigns.services.campaign_payload_builder import build_campaign_payload
+from modules.campaigns.services import (
+    build_campaign_payload,
+    build_form_state_from_campaign,
+    list_campaign_names,
+)
 from modules.campaigns.ui.arc_editor_dialog import ArcEditorDialog
 from modules.campaigns.ui.widgets import CampaignDateField
+from modules.helpers.selection_dialog import SelectionDialog
 from modules.generic.editor.styles import (
     EDITOR_PALETTE,
     option_menu_style,
@@ -29,6 +34,7 @@ class CampaignBuilderWizard(ctk.CTkToplevel):
         self.scenario_titles = self._load_scenario_titles(scenario_wrapper)
 
         self.arcs: list[dict] = []
+        self.original_campaign_name: str | None = None
         self.current_step = 0
         self.steps: list[ctk.CTkFrame] = []
 
@@ -54,6 +60,15 @@ class CampaignBuilderWizard(ctk.CTkToplevel):
             text="Create the foundation, arcs, and summary in the same visual style as the entity editor.",
             text_color=EDITOR_PALETTE["muted_text"],
         ).pack(anchor="w", pady=(0, 10))
+
+        load_row = ctk.CTkFrame(root, fg_color="transparent")
+        load_row.pack(fill="x", pady=(0, 8))
+        ctk.CTkButton(
+            load_row,
+            text="Load Existing Campaign",
+            command=self._load_existing_campaign,
+            **primary_button_style(),
+        ).pack(side="left")
 
         self.content = ctk.CTkFrame(root, fg_color="transparent")
         self.content.pack(fill="both", expand=True)
@@ -269,13 +284,75 @@ class CampaignBuilderWizard(ctk.CTkToplevel):
                 },
                 arcs_data=self.arcs,
             )
-            self.campaign_wrapper.save_item(payload, key_field="Name")
+            self.campaign_wrapper.save_item(
+                payload,
+                key_field="Name",
+                original_key_value=self.original_campaign_name,
+            )
         except Exception as exc:
             messagebox.showerror("Save failed", f"Unable to save campaign: {exc}", parent=self)
             return
 
         messagebox.showinfo("Campaign saved", f"Campaign '{payload['Name']}' has been saved.", parent=self)
         self.destroy()
+
+
+    def _load_existing_campaign(self):
+        try:
+            campaigns = self.campaign_wrapper.load_items()
+        except Exception as exc:
+            messagebox.showerror("Campaigns", f"Unable to load campaigns: {exc}", parent=self)
+            return
+
+        campaign_names = list_campaign_names(campaigns)
+        if not campaign_names:
+            messagebox.showinfo("Campaigns", "No saved campaigns found.", parent=self)
+            return
+
+        dialog = SelectionDialog(
+            self,
+            title="Load Existing Campaign",
+            label="Choose a campaign to edit:",
+            options=campaign_names,
+        )
+        self.wait_window(dialog)
+        selected_name = (dialog.result or "").strip()
+        if not selected_name:
+            return
+
+        campaign_data = self.campaign_wrapper.load_item_by_key(selected_name, key_field="Name")
+        if not campaign_data:
+            messagebox.showwarning("Campaigns", f"Campaign '{selected_name}' was not found.", parent=self)
+            return
+
+        self._apply_campaign_to_form(campaign_data)
+        self.original_campaign_name = str(campaign_data.get("Name") or "").strip() or None
+        self._refresh_arcs_preview()
+        self._refresh_review()
+        self._show_step(0)
+
+    def _apply_campaign_to_form(self, campaign_data: dict):
+        form_data, text_areas, arcs = build_form_state_from_campaign(campaign_data)
+
+        for key in ("name", "genre", "tone", "status"):
+            self.form_vars[key].set(form_data.get(key, ""))
+
+        self.start_date_field.set(form_data.get("start_date", ""))
+        self.end_date_field.set(form_data.get("end_date", ""))
+
+        self._set_textbox_value(self.logline_box, text_areas.get("logline", ""))
+        self._set_textbox_value(self.setting_box, text_areas.get("setting", ""))
+        self._set_textbox_value(self.objective_box, text_areas.get("main_objective", ""))
+        self._set_textbox_value(self.stakes_box, text_areas.get("stakes", ""))
+        self._set_textbox_value(self.themes_box, text_areas.get("themes", ""))
+        self._set_textbox_value(self.notes_box, text_areas.get("notes", ""))
+
+        self.arcs = arcs
+
+    @staticmethod
+    def _set_textbox_value(textbox: ctk.CTkTextbox, value: str):
+        textbox.delete("1.0", "end")
+        textbox.insert("1.0", value or "")
 
     @staticmethod
     def _load_scenario_titles(scenario_wrapper) -> list[str]:
