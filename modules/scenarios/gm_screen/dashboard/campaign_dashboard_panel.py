@@ -476,17 +476,16 @@ class CampaignDashboardPanel(ctk.CTkFrame):
         default_name = campaign_name.strip().replace("/", "_")
         output_path = filedialog.asksaveasfilename(
             title="Export session brief",
-            defaultextension=".md",
-            initialfile=f"{default_name}_session_brief.md",
+            defaultextension=".docx",
+            initialfile=f"{default_name}_session_brief.docx",
             filetypes=[
-                ("Markdown", "*.md"),
-                ("PDF", "*.pdf"),
+                ("Word Document", "*.docx"),
             ],
         )
         if not output_path:
             return
 
-        output_format = "pdf" if output_path.lower().endswith(".pdf") else "markdown"
+        output_format = "docx"
         payload = build_session_brief_payload(
             fields=self._selected_campaign_fields,
             campaign_item=self._selected_campaign_entry.get("item"),
