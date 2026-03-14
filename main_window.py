@@ -2446,11 +2446,14 @@ class MainWindow(ctk.CTk):
         layout_menu = ctk.CTkOptionMenu(layout_bar, variable=selected_layout_var, values=layout_options)
         layout_menu.pack(side="left", pady=5)
 
+        def _resolve_scenario_title(scenario):
+            return str((scenario or {}).get("Title") or (scenario or {}).get("Name") or "").strip()
+
         # 5) Callback to open a selected scenario in detail
         def on_scenario_select(entity_type, entity_name):
             selected = next(
                 (s for s in scenarios
-                if s.get("Name", s.get("Title", "")) == entity_name),
+                if _resolve_scenario_title(s) == entity_name),
                 None
             )
             if not selected:
