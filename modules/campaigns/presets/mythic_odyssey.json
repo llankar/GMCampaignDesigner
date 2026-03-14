@@ -1,0 +1,40 @@
+{
+  "id": "mythic_odyssey",
+  "name": "Mythic Odyssey",
+  "description": "Preset Mythic Odyssey with default tone, themes, and 3-arc structure.",
+  "form": {
+    "genre": "Mythic Fantasy",
+    "tone": "Epic, poetic, tragic",
+    "status": "Planned"
+  },
+  "text_areas": {
+    "logline": "Heroes sail beyond known lands to avert a divine feud.",
+    "setting": "Sacred seas, oracle islands, and titan-haunted straits.",
+    "main_objective": "Recover sacred oaths and reconcile rival pantheons.",
+    "stakes": "Divine conflict spills into mortal lands with catastrophic storms.",
+    "themes": "Fate\nHonor\nMortality"
+  },
+  "arcs": [
+    {
+      "name": "Arc I — Inciting Pressure",
+      "summary": "Initial crisis forces action.",
+      "objective": "Establish allies and identify first leverage point.",
+      "status": "Planned",
+      "scenarios": []
+    },
+    {
+      "name": "Arc II — Escalation",
+      "summary": "Opposition adapts and raises the cost.",
+      "objective": "Disrupt enemy momentum and protect key assets.",
+      "status": "Planned",
+      "scenarios": []
+    },
+    {
+      "name": "Arc III — Final Turning Point",
+      "summary": "The central conflict reaches decisive climax.",
+      "objective": "Resolve the core threat and define long-term consequences.",
+      "status": "Planned",
+      "scenarios": []
+    }
+  ]
+}

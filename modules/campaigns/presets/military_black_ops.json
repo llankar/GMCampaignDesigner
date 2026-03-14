@@ -1,0 +1,40 @@
+{
+  "id": "military_black_ops",
+  "name": "Military Black Ops",
+  "description": "Preset Military Black Ops with default tone, themes, and 3-arc structure.",
+  "form": {
+    "genre": "Modern Military",
+    "tone": "Tactical, urgent, covert",
+    "status": "Planned"
+  },
+  "text_areas": {
+    "logline": "A deniable team must prevent a cascading geopolitical crisis.",
+    "setting": "Disputed borders, clandestine labs, and proxy war zones.",
+    "main_objective": "Intercept weaponized intel before hostile deployment.",
+    "stakes": "Escalation triggers multi-state conflict and civilian disasters.",
+    "themes": "Duty\nSecrecy\nCost"
+  },
+  "arcs": [
+    {
+      "name": "Arc I — Inciting Pressure",
+      "summary": "Initial crisis forces action.",
+      "objective": "Establish allies and identify first leverage point.",
+      "status": "Planned",
+      "scenarios": []
+    },
+    {
+      "name": "Arc II — Escalation",
+      "summary": "Opposition adapts and raises the cost.",
+      "objective": "Disrupt enemy momentum and protect key assets.",
+      "status": "Planned",
+      "scenarios": []
+    },
+    {
+      "name": "Arc III — Final Turning Point",
+      "summary": "The central conflict reaches decisive climax.",
+      "objective": "Resolve the core threat and define long-term consequences.",
+      "status": "Planned",
+      "scenarios": []
+    }
+  ]
+}

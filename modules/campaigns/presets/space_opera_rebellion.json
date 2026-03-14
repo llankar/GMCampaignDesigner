@@ -1,0 +1,40 @@
+{
+  "id": "space_opera_rebellion",
+  "name": "Space Opera Rebellion",
+  "description": "Preset Space Opera Rebellion with default tone, themes, and 3-arc structure.",
+  "form": {
+    "genre": "Sci‑Fi / Space Opera",
+    "tone": "Cinematic, adventurous, defiant",
+    "status": "Planned"
+  },
+  "text_areas": {
+    "logline": "A small crew ignites rebellion against a galactic regime.",
+    "setting": "Core worlds, fringe colonies, and contested hyperspace routes.",
+    "main_objective": "Disrupt regime infrastructure and rally neutral systems.",
+    "stakes": "Failure cements authoritarian control for generations.",
+    "themes": "Freedom\nHope\nResistance"
+  },
+  "arcs": [
+    {
+      "name": "Arc I — Inciting Pressure",
+      "summary": "Initial crisis forces action.",
+      "objective": "Establish allies and identify first leverage point.",
+      "status": "Planned",
+      "scenarios": []
+    },
+    {
+      "name": "Arc II — Escalation",
+      "summary": "Opposition adapts and raises the cost.",
+      "objective": "Disrupt enemy momentum and protect key assets.",
+      "status": "Planned",
+      "scenarios": []
+    },
+    {
+      "name": "Arc III — Final Turning Point",
+      "summary": "The central conflict reaches decisive climax.",
+      "objective": "Resolve the core threat and define long-term consequences.",
+      "status": "Planned",
+      "scenarios": []
+    }
+  ]
+}

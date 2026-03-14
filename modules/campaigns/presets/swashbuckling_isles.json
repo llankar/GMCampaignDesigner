@@ -1,0 +1,40 @@
+{
+  "id": "swashbuckling_isles",
+  "name": "Swashbuckling Isles",
+  "description": "Preset Swashbuckling Isles with default tone, themes, and 3-arc structure.",
+  "form": {
+    "genre": "Adventure / Pirate",
+    "tone": "Bold, playful, high-energy",
+    "status": "Planned"
+  },
+  "text_areas": {
+    "logline": "Rival captains race to claim a map to a legendary vault.",
+    "setting": "Storm-torn archipelagos, free ports, and imperial patrol routes.",
+    "main_objective": "Gather map fragments before the imperial armada does.",
+    "stakes": "Empire secures absolute naval dominance and crushes free ports.",
+    "themes": "Liberty\nAmbition\nLegacy"
+  },
+  "arcs": [
+    {
+      "name": "Arc I — Inciting Pressure",
+      "summary": "Initial crisis forces action.",
+      "objective": "Establish allies and identify first leverage point.",
+      "status": "Planned",
+      "scenarios": []
+    },
+    {
+      "name": "Arc II — Escalation",
+      "summary": "Opposition adapts and raises the cost.",
+      "objective": "Disrupt enemy momentum and protect key assets.",
+      "status": "Planned",
+      "scenarios": []
+    },
+    {
+      "name": "Arc III — Final Turning Point",
+      "summary": "The central conflict reaches decisive climax.",
+      "objective": "Resolve the core threat and define long-term consequences.",
+      "status": "Planned",
+      "scenarios": []
+    }
+  ]
+}

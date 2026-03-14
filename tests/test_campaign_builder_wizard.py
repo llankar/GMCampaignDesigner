@@ -71,3 +71,76 @@ def test_load_existing_campaign_ignores_empty_selection():
     )
 
     wizard._load_existing_campaign()
+
+
+class _FakeTextBox:
+    def __init__(self, value=""):
+        self.value = value
+
+    def get(self, *_args, **_kwargs):
+        return self.value
+
+    def delete(self, *_args, **_kwargs):
+        self.value = ""
+
+    def insert(self, *_args):
+        self.value = _args[-1]
+
+
+class _FakeDateField:
+    def __init__(self, value=""):
+        self.value = value
+
+    def get(self):
+        return self.value
+
+    def set(self, value):
+        self.value = value
+
+
+class _FakeVar:
+    def __init__(self, value=""):
+        self.value = value
+
+    def get(self):
+        return self.value
+
+    def set(self, value):
+        self.value = value
+
+
+def test_apply_preset_preserves_touched_fields_and_arcs():
+    wizard = campaign_builder_wizard.CampaignBuilderWizard.__new__(
+        campaign_builder_wizard.CampaignBuilderWizard
+    )
+    wizard.form_vars = {
+        "name": _FakeVar("Existing Name"),
+        "genre": _FakeVar(""),
+        "tone": _FakeVar("Custom Tone"),
+        "status": _FakeVar("Planned"),
+    }
+    wizard.start_date_field = _FakeDateField("")
+    wizard.end_date_field = _FakeDateField("")
+    wizard.logline_box = _FakeTextBox("Manual logline")
+    wizard.setting_box = _FakeTextBox("")
+    wizard.objective_box = _FakeTextBox("")
+    wizard.stakes_box = _FakeTextBox("")
+    wizard.themes_box = _FakeTextBox("")
+    wizard.notes_box = _FakeTextBox("")
+    wizard.arcs = [{"name": "Existing Arc"}]
+
+    preset = {
+        "form": {"genre": "Fantasy", "tone": "Preset Tone", "start_date": "2026-01-01"},
+        "text_areas": {"logline": "Preset logline", "themes": "Duty\nLegacy"},
+        "arcs": [{"name": "Preset Arc"}],
+    }
+
+    touched_fields, touched_arcs = wizard._detect_manual_modifications()
+    wizard._apply_preset(preset, touched_fields=touched_fields, preserve_arcs=touched_arcs)
+
+    assert wizard.form_vars["genre"].get() == "Fantasy"
+    assert wizard.form_vars["tone"].get() == "Custom Tone"
+    assert wizard.logline_box.get("1.0", "end") == "Manual logline"
+    assert wizard.themes_box.get("1.0", "end") == "Duty\nLegacy"
+    assert wizard.start_date_field.get() == "2026-01-01"
+    assert wizard.arcs == [{"name": "Existing Arc"}]

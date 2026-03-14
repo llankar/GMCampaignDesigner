@@ -1,0 +1,40 @@
+{
+  "id": "political_intrigue_court",
+  "name": "Political Intrigue Court",
+  "description": "Preset Political Intrigue Court with default tone, themes, and 3-arc structure.",
+  "form": {
+    "genre": "Political Fantasy",
+    "tone": "Elegant, tense, manipulative",
+    "status": "Planned"
+  },
+  "text_areas": {
+    "logline": "Courtly alliances hide a succession crisis ready to explode.",
+    "setting": "A royal capital where favors are currency and secrets are weapons.",
+    "main_objective": "Secure legitimacy and neutralize destabilizing factions.",
+    "stakes": "Civil war fractures the realm and invites foreign invasion.",
+    "themes": "Power\nLoyalty\nTruth"
+  },
+  "arcs": [
+    {
+      "name": "Arc I — Inciting Pressure",
+      "summary": "Initial crisis forces action.",
+      "objective": "Establish allies and identify first leverage point.",
+      "status": "Planned",
+      "scenarios": []
+    },
+    {
+      "name": "Arc II — Escalation",
+      "summary": "Opposition adapts and raises the cost.",
+      "objective": "Disrupt enemy momentum and protect key assets.",
+      "status": "Planned",
+      "scenarios": []
+    },
+    {
+      "name": "Arc III — Final Turning Point",
+      "summary": "The central conflict reaches decisive climax.",
+      "objective": "Resolve the core threat and define long-term consequences.",
+      "status": "Planned",
+      "scenarios": []
+    }
+  ]
+}

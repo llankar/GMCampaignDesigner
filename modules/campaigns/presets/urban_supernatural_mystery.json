@@ -1,0 +1,40 @@
+{
+  "id": "urban_supernatural_mystery",
+  "name": "Urban Supernatural Mystery",
+  "description": "Preset Urban Supernatural Mystery with default tone, themes, and 3-arc structure.",
+  "form": {
+    "genre": "Urban Fantasy",
+    "tone": "Moody, mysterious, escalating",
+    "status": "Planned"
+  },
+  "text_areas": {
+    "logline": "Mundane crimes conceal breaches between worlds.",
+    "setting": "A modern city layered atop forgotten magical fault lines.",
+    "main_objective": "Close growing rifts while exposing the occult broker network.",
+    "stakes": "Rifts widen into citywide reality distortions.",
+    "themes": "Secrecy\nBalance\nConsequences"
+  },
+  "arcs": [
+    {
+      "name": "Arc I — Inciting Pressure",
+      "summary": "Initial crisis forces action.",
+      "objective": "Establish allies and identify first leverage point.",
+      "status": "Planned",
+      "scenarios": []
+    },
+    {
+      "name": "Arc II — Escalation",
+      "summary": "Opposition adapts and raises the cost.",
+      "objective": "Disrupt enemy momentum and protect key assets.",
+      "status": "Planned",
+      "scenarios": []
+    },
+    {
+      "name": "Arc III — Final Turning Point",
+      "summary": "The central conflict reaches decisive climax.",
+      "objective": "Resolve the core threat and define long-term consequences.",
+      "status": "Planned",
+      "scenarios": []
+    }
+  ]
+}

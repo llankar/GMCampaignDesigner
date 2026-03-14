@@ -7,6 +7,7 @@ from tkinter import messagebox
 from modules.campaigns.services import (
     build_campaign_payload,
     build_form_state_from_campaign,
+    list_campaign_presets,
 )
 from modules.campaigns.ui.arc_editor_dialog import ArcEditorDialog
 from modules.campaigns.ui.widgets import CampaignDateField
@@ -33,6 +34,9 @@ class CampaignBuilderWizard(ctk.CTkToplevel):
 
         self.campaign_wrapper = campaign_wrapper
         self.scenario_titles = self._load_scenario_titles(scenario_wrapper)
+        self.available_presets = list_campaign_presets()
+        self.preset_by_id = {preset["id"]: preset for preset in self.available_presets}
+        self.selected_preset_id: str | None = None
 
         self.arcs: list[dict] = []
         self.current_arc_index: int | None = None
@@ -117,6 +121,32 @@ class CampaignBuilderWizard(ctk.CTkToplevel):
             text_color=EDITOR_PALETTE["text"],
         ).pack(anchor="w", padx=12, pady=(12, 8))
 
+        preset_row = ctk.CTkFrame(scrollable, fg_color="transparent")
+        preset_row.pack(fill="x", padx=12, pady=(0, 8))
+        ctk.CTkLabel(preset_row, text="Preset", text_color=EDITOR_PALETTE["text"]).pack(anchor="w")
+
+        preset_labels = self._preset_option_labels()
+        default_preset_label = preset_labels[0] if preset_labels else "No preset available"
+        self.preset_var = ctk.StringVar(value=default_preset_label)
+        self.preset_menu = ctk.CTkOptionMenu(
+            preset_row,
+            variable=self.preset_var,
+            values=preset_labels or ["No preset available"],
+            command=self._on_preset_selected,
+            **option_menu_style(),
+        )
+        self.preset_menu.pack(fill="x", pady=(4, 0))
+
+        self.preset_description_label = ctk.CTkLabel(
+            preset_row,
+            text="",
+            text_color=EDITOR_PALETTE["muted_text"],
+            justify="left",
+            wraplength=820,
+        )
+        self.preset_description_label.pack(anchor="w", pady=(4, 0))
+        self._refresh_preset_description()
+
         form_body = ctk.CTkFrame(scrollable, fg_color="transparent")
         form_body.pack(fill="both", expand=True, padx=12, pady=(0, 8))
 
@@ -157,6 +187,124 @@ class CampaignBuilderWizard(ctk.CTkToplevel):
         self.notes_box = self._labeled_box(form_body, "Notes", 90)
 
         return frame
+
+    def _preset_option_labels(self) -> list[str]:
+        labels = ["No preset"]
+        labels.extend(f"{preset['name']} ({preset['id']})" for preset in self.available_presets)
+        return labels
+
+    def _preset_option_to_id(self, option_label: str) -> str | None:
+        if not option_label or option_label == "No preset":
+            return None
+        if option_label.endswith(")") and "(" in option_label:
+            return option_label.rsplit("(", 1)[1].rstrip(")").strip() or None
+        return None
+
+    def _refresh_preset_description(self):
+        if not hasattr(self, "preset_description_label"):
+            return
+        preset = self.preset_by_id.get(self.selected_preset_id) if self.selected_preset_id else None
+        if not preset:
+            self.preset_description_label.configure(text="Choose a preset to pre-fill tone, themes, and default arc structure.")
+            return
+        description = preset.get("description") or "No description."
+        self.preset_description_label.configure(text=f"Preset: {description}")
+
+    def _on_preset_selected(self, value: str):
+        preset_id = self._preset_option_to_id(value)
+        if preset_id == self.selected_preset_id:
+            return
+
+        if not preset_id:
+            self.selected_preset_id = None
+            self._refresh_preset_description()
+            return
+
+        preset = self.preset_by_id.get(preset_id)
+        if not preset:
+            return
+
+        touched_fields, touched_arcs = self._detect_manual_modifications()
+        if touched_fields or touched_arcs:
+            proceed = messagebox.askyesno(
+                "Apply preset",
+                "Some fields/arcs were already modified. Apply the preset without overwriting modified values?",
+                parent=self,
+            )
+            if not proceed:
+                self._restore_selected_preset_label()
+                return
+
+        self._apply_preset(preset, touched_fields=touched_fields, preserve_arcs=touched_arcs)
+        self.selected_preset_id = preset_id
+        self._refresh_preset_description()
+
+    def _restore_selected_preset_label(self):
+        if not hasattr(self, "preset_var"):
+            return
+        if not self.selected_preset_id:
+            self.preset_var.set("No preset")
+            return
+        preset = self.preset_by_id.get(self.selected_preset_id)
+        self.preset_var.set(f"{preset['name']} ({preset['id']})" if preset else "No preset")
+
+    def _detect_manual_modifications(self) -> tuple[set[str], bool]:
+        touched_fields: set[str] = set()
+
+        for key in ("name", "genre", "tone", "status"):
+            if self.form_vars[key].get().strip():
+                touched_fields.add(key)
+
+        if self.start_date_field.get().strip():
+            touched_fields.add("start_date")
+        if self.end_date_field.get().strip():
+            touched_fields.add("end_date")
+
+        textboxes = {
+            "logline": self.logline_box,
+            "setting": self.setting_box,
+            "main_objective": self.objective_box,
+            "stakes": self.stakes_box,
+            "themes": self.themes_box,
+            "notes": self.notes_box,
+        }
+        for key, widget in textboxes.items():
+            if widget.get("1.0", "end").strip():
+                touched_fields.add(key)
+
+        return touched_fields, bool(self.arcs)
+
+    def _apply_preset(self, preset: dict, touched_fields: set[str], preserve_arcs: bool):
+        for key, value in (preset.get("form") or {}).items():
+            if key in touched_fields:
+                continue
+            if key in self.form_vars:
+                self.form_vars[key].set(value)
+
+        if "start_date" in (preset.get("form") or {}) and "start_date" not in touched_fields:
+            self.start_date_field.set((preset.get("form") or {}).get("start_date", ""))
+        if "end_date" in (preset.get("form") or {}) and "end_date" not in touched_fields:
+            self.end_date_field.set((preset.get("form") or {}).get("end_date", ""))
+
+        text_widgets = {
+            "logline": self.logline_box,
+            "setting": self.setting_box,
+            "main_objective": self.objective_box,
+            "stakes": self.stakes_box,
+            "themes": self.themes_box,
+            "notes": self.notes_box,
+        }
+        for key, value in (preset.get("text_areas") or {}).items():
+            if key in touched_fields:
+                continue
+            widget = text_widgets.get(key)
+            if widget is not None:
+                self._set_textbox_value(widget, value)
+
+        if not preserve_arcs:
+            self.arcs = [dict(arc) for arc in (preset.get("arcs") or [])]
+            self.current_arc_index = 0 if self.arcs else None
+            self._refresh_arcs_preview()
 
     def _build_arcs_step(self, parent):
         frame = ctk.CTkFrame(parent, **section_style())
@@ -443,6 +591,9 @@ class CampaignBuilderWizard(ctk.CTkToplevel):
 
         self.arcs = arcs
         self.current_arc_index = 0 if self.arcs else None
+        self.selected_preset_id = None
+        self._restore_selected_preset_label()
+        self._refresh_preset_description()
 
     @staticmethod
     def _set_textbox_value(textbox: ctk.CTkTextbox, value: str):
