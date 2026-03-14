@@ -157,3 +157,19 @@ def test_extract_arc_index_from_preview_line_ignores_non_header_lines():
         "   Objective: Recover the relic"
     )
     assert index is None
+
+
+def test_find_arc_index_for_line_uses_whole_arc_block_ranges():
+    wizard = campaign_builder_wizard.CampaignBuilderWizard.__new__(
+        campaign_builder_wizard.CampaignBuilderWizard
+    )
+    wizard._arc_line_ranges = [
+        (1, 3, 0),
+        (5, 7, 1),
+    ]
+
+    assert wizard._find_arc_index_for_line(1) == 0
+    assert wizard._find_arc_index_for_line(3) == 0
+    assert wizard._find_arc_index_for_line(5) == 1
+    assert wizard._find_arc_index_for_line(7) == 1
+    assert wizard._find_arc_index_for_line(4) is None

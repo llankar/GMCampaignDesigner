@@ -41,6 +41,7 @@ class CampaignBuilderWizard(ctk.CTkToplevel):
 
         self.arcs: list[dict] = []
         self.current_arc_index: int | None = None
+        self._arc_line_ranges: list[tuple[int, int, int]] = []
         self.original_campaign_name: str | None = None
         self.current_step = 0
         self.steps: list[ctk.CTkFrame] = []
@@ -450,11 +451,10 @@ class CampaignBuilderWizard(ctk.CTkToplevel):
             return "break"
 
         self.arcs_list.configure(state="normal")
-        line_index = self.arcs_list.index(f"@{event.x},{event.y}").split(".")[0]
-        line_text = self.arcs_list.get(f"{line_index}.0", f"{line_index}.end")
+        line_index = int(self.arcs_list.index(f"@{event.x},{event.y}").split(".")[0])
         self.arcs_list.configure(state="disabled")
 
-        selected_index = self._extract_arc_index_from_preview_line(line_text)
+        selected_index = self._find_arc_index_for_line(line_index)
         if selected_index is None:
             return "break"
 
@@ -472,14 +472,38 @@ class CampaignBuilderWizard(ctk.CTkToplevel):
 
         self.arcs_list.configure(state="normal")
         self.arcs_list.delete("1.0", "end")
+        self.arcs_list.tag_delete("arc_selected")
+        self._arc_line_ranges = []
+
+        try:
+            self.arcs_list.tag_config(
+                "arc_selected",
+                background=EDITOR_PALETTE["accent"],
+                foreground="#FFFFFF",
+            )
+        except Exception:
+            # Some Tk themes can reject tag-level color overrides.
+            pass
+
         if not self.arcs:
             self.arcs_list.insert("end", "No arc yet. Add one to structure your campaign progression.")
         for idx, arc in enumerate(self.arcs, start=1):
-            selected_marker = " <- selected" if self.current_arc_index == idx - 1 else ""
-            self.arcs_list.insert("end", f"Order {idx}: {arc.get('name')} [{arc.get('status', 'Planned')}]" + selected_marker + "\n")
+            block_start_line = int(float(self.arcs_list.index("end-1c")))
+            self.arcs_list.insert("end", f"Order {idx}: {arc.get('name')} [{arc.get('status', 'Planned')}]\n")
             self.arcs_list.insert("end", f"   Objective: {arc.get('objective', '')}\n")
             self.arcs_list.insert("end", f"   Scenarios: {', '.join(arc.get('scenarios') or [])}\n\n")
+            block_end_line = max(block_start_line, int(float(self.arcs_list.index("end-1c"))) - 1)
+            self._arc_line_ranges.append((block_start_line, block_end_line, idx - 1))
+
+            if self.current_arc_index == idx - 1:
+                self.arcs_list.tag_add("arc_selected", f"{block_start_line}.0", f"{block_end_line}.end")
         self.arcs_list.configure(state="disabled")
+
+    def _find_arc_index_for_line(self, line_index: int) -> int | None:
+        for start_line, end_line, arc_index in self._arc_line_ranges:
+            if start_line <= line_index <= end_line:
+                return arc_index
+        return None
 
     def _refresh_review(self):
         summary = {
