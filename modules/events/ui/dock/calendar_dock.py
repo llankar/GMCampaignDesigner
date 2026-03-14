@@ -1,9 +1,8 @@
 import calendar
-from datetime import date
-
 import customtkinter as ctk
 
 from modules.events.services.campaign_date_service import CampaignDateService
+from modules.events.ui.dock.date_agenda_dialog import DateAgendaDialog
 
 
 class CalendarDock(ctk.CTkFrame):
@@ -39,7 +38,7 @@ class CalendarDock(ctk.CTkFrame):
         bar.pack(fill="x", padx=8, pady=(0, 2))
         self.campaign_today_label = ctk.CTkLabel(bar, text="", anchor="w")
         self.campaign_today_label.pack(side="left", fill="x", expand=True)
-        ctk.CTkButton(bar, text="Définir jour", width=100, command=self._set_campaign_today_from_selection).pack(side="right")
+        ctk.CTkButton(bar, text="Définir jour", width=100, command=self._open_campaign_today_dialog).pack(side="right")
 
         calendar_frame = ctk.CTkFrame(self)
         calendar_frame.pack(fill="x", padx=8, pady=4)
@@ -166,8 +165,13 @@ class CalendarDock(ctk.CTkFrame):
             return "aujourd'hui"
         return "à venir"
 
-    def _set_campaign_today_from_selection(self):
-        campaign_today = CampaignDateService.set_today(self.selected_date)
+    def _open_campaign_today_dialog(self):
+        DateAgendaDialog(self, initial_date=self.selected_date, on_apply=self._on_campaign_today_applied)
+
+    def _on_campaign_today_applied(self, campaign_today):
+        self.selected_date = campaign_today
+        self.display_year = campaign_today.year
+        self.display_month = campaign_today.month
         if callable(self.on_set_campaign_today):
             self.on_set_campaign_today(campaign_today)
         self._render_month()
