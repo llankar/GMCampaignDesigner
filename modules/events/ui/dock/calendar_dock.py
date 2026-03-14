@@ -39,7 +39,7 @@ class CalendarDock(ctk.CTkFrame):
         self.campaign_today_label = ctk.CTkLabel(bar, text="", anchor="w")
         self.campaign_today_label.pack(side="left", fill="x", expand=True)
         self.campaign_today_label.bind("<Button-1>", self._open_campaign_today_dialog)
-        ctk.CTkButton(bar, text="Définir jour", width=100, command=self._open_campaign_today_dialog).pack(side="right")
+        ctk.CTkButton(bar, text="Current Day", width=100, command=self._open_campaign_today_dialog).pack(side="right")
 
         calendar_frame = ctk.CTkFrame(self)
         calendar_frame.pack(fill="x", padx=8, pady=4)
@@ -80,7 +80,7 @@ class CalendarDock(ctk.CTkFrame):
 
     def _render_month(self):
         campaign_today = CampaignDateService.get_today()
-        self.campaign_today_label.configure(text=f"Jour campagne : {campaign_today.strftime('%d/%m/%Y')}")
+        self.campaign_today_label.configure(text=f"Cmpaign Day: {campaign_today.strftime('%m/%d/%Y')}")
         self.month_label.configure(text=f"{calendar.month_name[self.display_month]} {self.display_year}")
 
         month_matrix = calendar.Calendar(firstweekday=0).monthdatescalendar(self.display_year, self.display_month)
