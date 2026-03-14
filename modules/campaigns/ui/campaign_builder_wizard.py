@@ -7,11 +7,12 @@ from tkinter import messagebox
 from modules.campaigns.services import (
     build_campaign_payload,
     build_form_state_from_campaign,
-    list_campaign_names,
 )
 from modules.campaigns.ui.arc_editor_dialog import ArcEditorDialog
 from modules.campaigns.ui.widgets import CampaignDateField
-from modules.helpers.selection_dialog import SelectionDialog
+from modules.generic.generic_list_selection_view import GenericListSelectionView
+from modules.helpers.logging_helper import log_exception
+from modules.helpers.template_loader import load_template
 from modules.generic.editor.styles import (
     EDITOR_PALETTE,
     option_menu_style,
@@ -298,38 +299,48 @@ class CampaignBuilderWizard(ctk.CTkToplevel):
 
 
     def _load_existing_campaign(self):
-        try:
-            campaigns = self.campaign_wrapper.load_items()
-        except Exception as exc:
-            messagebox.showerror("Campaigns", f"Unable to load campaigns: {exc}", parent=self)
+        campaign_payload = self._choose_existing_campaign()
+        if not campaign_payload:
             return
 
-        campaign_names = list_campaign_names(campaigns)
-        if not campaign_names:
-            messagebox.showinfo("Campaigns", "No saved campaigns found.", parent=self)
-            return
-
-        dialog = SelectionDialog(
-            self,
-            title="Load Existing Campaign",
-            label="Choose a campaign to edit:",
-            options=campaign_names,
-        )
-        self.wait_window(dialog)
-        selected_name = (dialog.result or "").strip()
-        if not selected_name:
-            return
-
-        campaign_data = self.campaign_wrapper.load_item_by_key(selected_name, key_field="Name")
-        if not campaign_data:
-            messagebox.showwarning("Campaigns", f"Campaign '{selected_name}' was not found.", parent=self)
-            return
-
-        self._apply_campaign_to_form(campaign_data)
-        self.original_campaign_name = str(campaign_data.get("Name") or "").strip() or None
+        self._apply_campaign_to_form(campaign_payload)
+        self.original_campaign_name = str(campaign_payload.get("Name") or "").strip() or None
         self._refresh_arcs_preview()
         self._refresh_review()
         self._show_step(0)
+
+    def _choose_existing_campaign(self):
+        try:
+            template = load_template("campaigns")
+        except Exception as exc:
+            log_exception(
+                f"Failed to load campaign template: {exc}",
+                func_name="CampaignBuilderWizard._choose_existing_campaign",
+            )
+            messagebox.showerror("Template Error", "Unable to load the campaign list.", parent=self)
+            return None
+
+        result = {"payload": None}
+        dialog = ctk.CTkToplevel(self)
+        dialog.title("Select Campaign")
+        dialog.geometry("1100x720")
+        dialog.minsize(1100, 720)
+
+        view = GenericListSelectionView(
+            dialog,
+            "campaigns",
+            self.campaign_wrapper,
+            template,
+            on_select_callback=lambda _et, _name, item=None, win=dialog: (
+                result.__setitem__("payload", dict(item) if isinstance(item, dict) else None),
+                win.destroy(),
+            ),
+        )
+        view.pack(fill="both", expand=True)
+        dialog.transient(self)
+        dialog.grab_set()
+        self.wait_window(dialog)
+        return result["payload"]
 
     def _apply_campaign_to_form(self, campaign_data: dict):
         form_data, text_areas, arcs = build_form_state_from_campaign(campaign_data)
