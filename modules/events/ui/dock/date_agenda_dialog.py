@@ -8,7 +8,7 @@ from modules.events.services.campaign_date_service import CampaignDateService
 from modules.events.services.date_validation import max_days_for_month, validate_date_parts, validate_iso_text
 
 
-class DateAgendaDialog(ctk.CTkToplevel):
+class CampaignDateAgendaDialog(ctk.CTkToplevel):
     def __init__(self, master, *, initial_date: date | None = None, on_apply=None):
         super().__init__(master)
         self.title("Définir le jour de campagne")
@@ -16,7 +16,7 @@ class DateAgendaDialog(ctk.CTkToplevel):
         self.resizable(False, False)
 
         self._on_apply = on_apply
-        self._selected_date = initial_date or CampaignDateService.get_today()
+        self._selected_date = CampaignDateService.get_today()
 
         self._build_ui()
         self._set_controls_from_date(self._selected_date)
@@ -143,3 +143,7 @@ class DateAgendaDialog(ctk.CTkToplevel):
         if callable(self._on_apply):
             self._on_apply(campaign_today)
         self.destroy()
+
+
+# Backward-compatible alias
+DateAgendaDialog = CampaignDateAgendaDialog
