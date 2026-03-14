@@ -1,6 +1,11 @@
 from modules.generic.editor.window_context import *
 from modules.generic.editor.styles import EDITOR_PALETTE, option_menu_style, primary_button_style, toolbar_entry_style
 from modules.generic.editor.window_components.dynamic_linked_entities import resolve_linked_entity_source
+from modules.generic.editor.shared.campaign_status_field import (
+    campaign_status_choices,
+    canonical_campaign_status,
+    is_campaign_status_field,
+)
 
 
 class GenericEditorWindowListAndBasicFields:
@@ -234,6 +239,20 @@ class GenericEditorWindowListAndBasicFields:
         value = self.item.get(field["name"], "")
         field_name = str(field.get("name", ""))
         field_type = str(field.get("type", "")).strip().lower()
+        entity_type = str(getattr(self.model_wrapper, "entity_type", "") or "")
+
+        if is_campaign_status_field(entity_type=entity_type, field_name=field_name):
+            canonical_status = canonical_campaign_status(value)
+            status_var = ctk.StringVar(value=canonical_status)
+            option_menu = ctk.CTkOptionMenu(
+                self._field_parent(),
+                variable=status_var,
+                values=campaign_status_choices(),
+                **option_menu_style(),
+            )
+            option_menu.pack(fill="x", pady=5)
+            self.field_widgets[field["name"]] = option_menu
+            return
 
         is_date_field = field_type == "date" or field_name.lower().endswith("date")
 
