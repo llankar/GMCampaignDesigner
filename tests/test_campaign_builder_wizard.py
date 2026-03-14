@@ -144,3 +144,16 @@ def test_apply_preset_preserves_touched_fields_and_arcs():
     assert wizard.themes_box.get("1.0", "end") == "Duty\nLegacy"
     assert wizard.start_date_field.get() == "2026-01-01"
     assert wizard.arcs == [{"name": "Existing Arc"}]
+
+def test_extract_arc_index_from_preview_line_parses_order_header():
+    index = campaign_builder_wizard.CampaignBuilderWizard._extract_arc_index_from_preview_line(
+        "Order 3: Midnight Rising [Planned]"
+    )
+    assert index == 2
+
+
+def test_extract_arc_index_from_preview_line_ignores_non_header_lines():
+    index = campaign_builder_wizard.CampaignBuilderWizard._extract_arc_index_from_preview_line(
+        "   Objective: Recover the relic"
+    )
+    assert index is None
