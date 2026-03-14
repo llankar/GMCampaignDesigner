@@ -1,0 +1,40 @@
+{
+  "id": "noir_investigation",
+  "name": "Noir Investigation",
+  "description": "Gritty mystery campaign where each clue reveals a deeper conspiracy.",
+  "form": {
+    "genre": "Noir / Mystery",
+    "tone": "Dark, cynical, tense",
+    "status": "Planned"
+  },
+  "text_areas": {
+    "logline": "A routine case spirals into a city-wide conspiracy.",
+    "setting": "Rain-soaked streets ruled by corrupt institutions and hidden patrons.",
+    "main_objective": "Unmask the conspiracy before it silences every witness.",
+    "stakes": "Truth dies, and the city’s future is bought by blood.",
+    "themes": "Corruption\nTruth\nMoral compromise"
+  },
+  "arcs": [
+    {
+      "name": "Arc I — The Wrong Corpse",
+      "summary": "The first victim is connected to multiple power brokers.",
+      "objective": "Find the missing ledger and survive retaliation.",
+      "status": "Planned",
+      "scenarios": []
+    },
+    {
+      "name": "Arc II — Smoke and Mirrors",
+      "summary": "False leads and betrayals fracture trusted alliances.",
+      "objective": "Separate fabricated evidence from real leverage.",
+      "status": "Planned",
+      "scenarios": []
+    },
+    {
+      "name": "Arc III — City of Ash",
+      "summary": "The mastermind forces a final public reckoning.",
+      "objective": "Expose the network and choose what justice means.",
+      "status": "Planned",
+      "scenarios": []
+    }
+  ]
+}

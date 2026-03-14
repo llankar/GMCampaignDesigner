@@ -1,0 +1,40 @@
+{
+  "id": "cyberpunk_heist_web",
+  "name": "Cyberpunk Heist Web",
+  "description": "Preset Cyberpunk Heist Web with default tone, themes, and 3-arc structure.",
+  "form": {
+    "genre": "Cyberpunk",
+    "tone": "Neon, paranoid, high-pressure",
+    "status": "Planned"
+  },
+  "text_areas": {
+    "logline": "One impossible theft exposes a web of corporate blackmail.",
+    "setting": "Megacity sectors ruled by syndicates and omnipresent surveillance.",
+    "main_objective": "Steal key data while navigating shifting betrayals.",
+    "stakes": "Captured data triggers lethal cleanup and social collapse.",
+    "themes": "Greed\nIdentity\nControl"
+  },
+  "arcs": [
+    {
+      "name": "Arc I — Inciting Pressure",
+      "summary": "Initial crisis forces action.",
+      "objective": "Establish allies and identify first leverage point.",
+      "status": "Planned",
+      "scenarios": []
+    },
+    {
+      "name": "Arc II — Escalation",
+      "summary": "Opposition adapts and raises the cost.",
+      "objective": "Disrupt enemy momentum and protect key assets.",
+      "status": "Planned",
+      "scenarios": []
+    },
+    {
+      "name": "Arc III — Final Turning Point",
+      "summary": "The central conflict reaches decisive climax.",
+      "objective": "Resolve the core threat and define long-term consequences.",
+      "status": "Planned",
+      "scenarios": []
+    }
+  ]
+}

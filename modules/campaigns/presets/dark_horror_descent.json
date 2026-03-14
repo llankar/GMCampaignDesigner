@@ -1,0 +1,40 @@
+{
+  "id": "dark_horror_descent",
+  "name": "Dark Horror Descent",
+  "description": "Preset Dark Horror Descent with default tone, themes, and 3-arc structure.",
+  "form": {
+    "genre": "Horror",
+    "tone": "Oppressive, terrifying, hopeless",
+    "status": "Planned"
+  },
+  "text_areas": {
+    "logline": "A creeping horror devours reason and safety.",
+    "setting": "An isolated region haunted by forgotten rites and hungry entities.",
+    "main_objective": "Survive escalating supernatural threats and uncover the origin point.",
+    "stakes": "If the source remains active, entire communities vanish without trace.",
+    "themes": "Fear\nIsolation\nCorruption"
+  },
+  "arcs": [
+    {
+      "name": "Arc I — Inciting Pressure",
+      "summary": "Initial crisis forces action.",
+      "objective": "Establish allies and identify first leverage point.",
+      "status": "Planned",
+      "scenarios": []
+    },
+    {
+      "name": "Arc II — Escalation",
+      "summary": "Opposition adapts and raises the cost.",
+      "objective": "Disrupt enemy momentum and protect key assets.",
+      "status": "Planned",
+      "scenarios": []
+    },
+    {
+      "name": "Arc III — Final Turning Point",
+      "summary": "The central conflict reaches decisive climax.",
+      "objective": "Resolve the core threat and define long-term consequences.",
+      "status": "Planned",
+      "scenarios": []
+    }
+  ]
+}

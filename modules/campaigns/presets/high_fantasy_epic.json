@@ -1,0 +1,40 @@
+{
+  "id": "high_fantasy_epic",
+  "name": "High Fantasy Epic",
+  "description": "Classic heroic fantasy with ancient prophecies, kingdoms in peril, and escalating revelations.",
+  "form": {
+    "genre": "Fantasy",
+    "tone": "Heroic, mythic, hopeful",
+    "status": "Planned"
+  },
+  "text_areas": {
+    "logline": "A band of unlikely heroes rises as an ancient darkness awakens.",
+    "setting": "A fractured realm of rival houses, elder ruins, and fading magic.",
+    "main_objective": "Unite key factions before the final ritual is completed.",
+    "stakes": "If they fail, the realm is consumed by eternal night.",
+    "themes": "Duty\nSacrifice\nLegacy"
+  },
+  "arcs": [
+    {
+      "name": "Arc I — Gathering Embers",
+      "summary": "The party uncovers signs of a buried prophecy.",
+      "objective": "Secure the first relic and identify allies.",
+      "status": "Planned",
+      "scenarios": []
+    },
+    {
+      "name": "Arc II — Kingdoms at the Brink",
+      "summary": "Political tensions explode into open conflict.",
+      "objective": "Broker alliances and expose the traitor network.",
+      "status": "Planned",
+      "scenarios": []
+    },
+    {
+      "name": "Arc III — The Last Seal",
+      "summary": "The enemy launches the final phase of its plan.",
+      "objective": "Reach the ritual site and decide the world’s future.",
+      "status": "Planned",
+      "scenarios": []
+    }
+  ]
+}
