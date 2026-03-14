@@ -9,6 +9,7 @@ from .navigation_panel import NavigationPanel
 from .event_editor_dialog import EventEditorDialog
 from .quick_add_popover import QuickAddPopover
 from modules.events.services.entity_link_service import EntityLinkService
+from modules.events.services.campaign_date_service import CampaignDateService
 
 
 class CalendarWindow(ctk.CTkToplevel):
@@ -328,7 +329,7 @@ class CalendarWindow(ctk.CTkToplevel):
         self._emit_state_change()
 
     def _jump_today(self):
-        self.focus_date(date.today(), view_mode=self.view_mode, auto_select=True)
+        self.focus_date(CampaignDateService.get_today(), view_mode=self.view_mode, auto_select=True)
 
     def set_view_mode(self, view_mode):
         normalized = self._normalize_view_mode(view_mode)
@@ -341,7 +342,7 @@ class CalendarWindow(ctk.CTkToplevel):
 
     def focus_date(self, target_date, view_mode=None, auto_select=True):
         if target_date is None:
-            target_date = date.today()
+            target_date = CampaignDateService.get_today()
         if view_mode is not None:
             self.view_mode = self._normalize_view_mode(view_mode)
 

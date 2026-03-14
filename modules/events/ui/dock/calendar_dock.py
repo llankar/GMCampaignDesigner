@@ -3,16 +3,20 @@ from datetime import date
 
 import customtkinter as ctk
 
+from modules.events.services.campaign_date_service import CampaignDateService
+
 
 class CalendarDock(ctk.CTkFrame):
-    def __init__(self, master, on_date_selected=None):
+    def __init__(self, master, on_date_selected=None, on_set_campaign_today=None):
         super().__init__(master, width=320, corner_radius=8)
         self.grid_propagate(False)
         self.on_date_selected = on_date_selected
+        self.on_set_campaign_today = on_set_campaign_today
 
-        self.display_year = date.today().year
-        self.display_month = date.today().month
-        self.selected_date = date.today()
+        campaign_today = CampaignDateService.get_today()
+        self.display_year = campaign_today.year
+        self.display_month = campaign_today.month
+        self.selected_date = campaign_today
 
         self._day_buttons = []
         self._events_by_date = {}
@@ -30,6 +34,12 @@ class CalendarDock(ctk.CTkFrame):
         self.month_label = ctk.CTkLabel(header, text="", font=ctk.CTkFont(size=14, weight="bold"))
         self.month_label.pack(side="left", expand=True)
         ctk.CTkButton(header, text="▶", width=28, command=self._next_month).pack(side="right")
+
+        bar = ctk.CTkFrame(self, fg_color="transparent")
+        bar.pack(fill="x", padx=8, pady=(0, 2))
+        self.campaign_today_label = ctk.CTkLabel(bar, text="", anchor="w")
+        self.campaign_today_label.pack(side="left", fill="x", expand=True)
+        ctk.CTkButton(bar, text="Définir jour", width=100, command=self._set_campaign_today_from_selection).pack(side="right")
 
         calendar_frame = ctk.CTkFrame(self)
         calendar_frame.pack(fill="x", padx=8, pady=4)
@@ -69,6 +79,8 @@ class CalendarDock(ctk.CTkFrame):
         self.upcoming_events_box.pack(fill="both", expand=True, padx=8, pady=(0, 8))
 
     def _render_month(self):
+        campaign_today = CampaignDateService.get_today()
+        self.campaign_today_label.configure(text=f"Jour campagne : {campaign_today.strftime('%d/%m/%Y')}")
         self.month_label.configure(text=f"{calendar.month_name[self.display_month]} {self.display_year}")
 
         month_matrix = calendar.Calendar(firstweekday=0).monthdatescalendar(self.display_year, self.display_month)
@@ -147,12 +159,18 @@ class CalendarDock(ctk.CTkFrame):
         event_date = event.get("date")
         if event_date is None:
             return "à venir"
-        today = date.today()
+        today = CampaignDateService.get_today()
         if event_date < today:
             return "en retard"
         if event_date == today:
             return "aujourd'hui"
         return "à venir"
+
+    def _set_campaign_today_from_selection(self):
+        campaign_today = CampaignDateService.set_today(self.selected_date)
+        if callable(self.on_set_campaign_today):
+            self.on_set_campaign_today(campaign_today)
+        self._render_month()
 
     @classmethod
     def _format_event_line(cls, event, include_date=False):

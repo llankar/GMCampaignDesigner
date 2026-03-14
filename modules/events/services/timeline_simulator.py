@@ -5,7 +5,8 @@ from dataclasses import asdict, dataclass
 from datetime import date, datetime, timedelta
 from typing import Any
 
-from db.db import get_campaign_setting, set_campaign_setting
+from db.db import set_campaign_setting
+from modules.events.services.campaign_date_service import CampaignDateService
 from modules.generic.generic_model_wrapper import GenericModelWrapper
 
 
@@ -531,12 +532,11 @@ class CampaignTimelineSimulator:
 
     @staticmethod
     def _get_current_date() -> date:
-        stored = get_campaign_setting("timeline_current_date")
-        return _coerce_date(stored) or date.today()
+        return CampaignDateService.get_today()
 
     @staticmethod
     def _set_current_date(value: date) -> None:
-        set_campaign_setting("timeline_current_date", value.isoformat())
+        CampaignDateService.set_today(value)
 
 
 def _coerce_date(value: Any) -> date | None:

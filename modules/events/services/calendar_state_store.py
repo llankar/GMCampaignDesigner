@@ -5,6 +5,7 @@ from datetime import date
 from pathlib import Path
 
 from modules.helpers.config_helper import ConfigHelper
+from modules.events.services.campaign_date_service import CampaignDateService
 
 
 class CalendarStateStore:
@@ -93,7 +94,7 @@ class CalendarStateStore:
         state = cls()._sanitize_state(stored_state or {})
         runtime = {
             "view_mode": state["view_mode"],
-            "active_date": cls._parse_date(state.get("active_date")) or date.today(),
+            "active_date": cls._parse_date(state.get("active_date")) or CampaignDateService.get_today(),
             "filters": dict(state["filters"]),
             "panel_widths": dict(state["panel_widths"]),
         }

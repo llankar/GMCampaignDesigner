@@ -1073,7 +1073,11 @@ class MainWindow(ctk.CTk):
         self.content_frame.grid_columnconfigure(0, weight=1)
         self.content_frame.grid_columnconfigure(1, weight=0)
 
-        self.calendar_dock = CalendarDock(self.content_frame, on_date_selected=self._on_calendar_date_selected)
+        self.calendar_dock = CalendarDock(
+            self.content_frame,
+            on_date_selected=self._on_calendar_date_selected,
+            on_set_campaign_today=self._on_calendar_campaign_today_changed,
+        )
         self.calendar_dock.grid(row=0, column=1, rowspan=2, sticky="nse", padx=(0, 8), pady=(8, 8))
         self._calendar_dock_visible = True
 
@@ -1098,12 +1102,24 @@ class MainWindow(ctk.CTk):
         self.calendar_dock_toggle_btn.configure(text="Calendrier ◀")
         self._refresh_calendar_dock(self.calendar_dock.selected_date)
 
+
+    def _on_calendar_campaign_today_changed(self, campaign_today):
+        self._calendar_ui_state["active_date"] = campaign_today
+        self._refresh_calendar_dock(campaign_today)
+
+        window = getattr(self, "_calendar_full_window", None)
+        if window is not None and window.winfo_exists():
+            try:
+                window.focus_date(campaign_today, view_mode=window.view_mode, auto_select=True)
+            except Exception:
+                pass
+
     def _on_calendar_date_selected(self, selected_date):
         self._refresh_calendar_dock(selected_date)
         self.open_calendar_view(target_date=selected_date, view_mode=self._calendar_ui_state.get("view_mode", "month"))
 
     def open_calendar_view(self, target_date=None, view_mode=None):
-        target = target_date or self._calendar_ui_state.get("active_date") or date.today()
+        target = target_date or self._calendar_ui_state.get("active_date") or CampaignTimelineSimulator.current_campaign_date()
         mode = (view_mode or self._calendar_ui_state.get("view_mode") or "month")
         saved_filters = dict(self._calendar_ui_state.get("filters") or {})
         saved_panel_widths = dict(self._calendar_ui_state.get("panel_widths") or {})
@@ -1144,7 +1160,7 @@ class MainWindow(ctk.CTk):
 
         active_date = state.get("active_date")
         if not isinstance(active_date, date):
-            active_date = self._calendar_ui_state.get("active_date") or date.today()
+            active_date = self._calendar_ui_state.get("active_date") or CampaignTimelineSimulator.current_campaign_date()
 
         view_mode = str(state.get("view_mode") or "").strip().lower() or "month"
         filters = state.get("filters") if isinstance(state.get("filters"), dict) else {}
@@ -1184,7 +1200,7 @@ class MainWindow(ctk.CTk):
         if dock is None:
             return
 
-        reference_date = selected_date or dock.selected_date or date.today()
+        reference_date = selected_date or dock.selected_date or CampaignTimelineSimulator.current_campaign_date()
         selected_events = self._get_events_for_day(reference_date)
         upcoming_events = self._get_upcoming_events(reference_date)
         month_events = self._get_month_events(reference_date.year, reference_date.month)
