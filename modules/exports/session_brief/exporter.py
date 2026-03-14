@@ -22,7 +22,8 @@ def _build_markdown(
     campaign_name: str,
     summary: str,
     active_arcs: list[str],
-    linked_scenarios: list[str],
+    arc_details: list[str],
+    dashboard_fields: list[str],
     gm_priority_notes: list[str],
 ) -> str:
     lines: list[str] = [
@@ -39,11 +40,17 @@ def _build_markdown(
     else:
         lines.append("- Aucun arc actif.")
 
-    lines.extend(["", "## Scénarios liés"])
-    if linked_scenarios:
-        lines.extend([f"- {scenario}" for scenario in linked_scenarios])
+    lines.extend(["", "## Détails des arcs"])
+    if arc_details:
+        lines.extend([f"- {arc}" for arc in arc_details])
     else:
-        lines.append("- Aucun scénario lié.")
+        lines.append("- Aucun détail d'arc.")
+
+    lines.extend(["", "## Champs dashboard"])
+    if dashboard_fields:
+        lines.extend([f"- {field}" for field in dashboard_fields])
+    else:
+        lines.append("- Aucun champ dashboard.")
 
     lines.extend(["", "## Notes MJ prioritaires"])
     if gm_priority_notes:
@@ -77,7 +84,8 @@ def _build_docx_document(
     campaign_name: str,
     summary: str,
     active_arcs: list[str],
-    linked_scenarios: list[str],
+    arc_details: list[str],
+    dashboard_fields: list[str],
     gm_priority_notes: list[str],
 ):
     from docx import Document
@@ -95,7 +103,8 @@ def _build_docx_document(
 
     add_section("Résumé", paragraph_text=summary.strip() or "Aucun résumé disponible.")
     add_section("Arcs actifs", values=active_arcs or ["Aucun arc actif."])
-    add_section("Scénarios liés", values=linked_scenarios or ["Aucun scénario lié."])
+    add_section("Détails des arcs", values=arc_details or ["Aucun détail d'arc."])
+    add_section("Champs dashboard", values=dashboard_fields or ["Aucun champ dashboard."])
     add_section("Notes MJ prioritaires", values=gm_priority_notes or ["Aucune note prioritaire."])
 
     return document
@@ -106,7 +115,8 @@ def export_session_brief(
     campaign_name: str,
     summary: str,
     active_arcs: list[str],
-    linked_scenarios: list[str],
+    arc_details: list[str],
+    dashboard_fields: list[str],
     gm_priority_notes: list[str],
     output_format: str,
     output_path: str,
@@ -126,7 +136,8 @@ def export_session_brief(
             campaign_name=campaign_name,
             summary=summary,
             active_arcs=active_arcs,
-            linked_scenarios=linked_scenarios,
+            arc_details=arc_details,
+            dashboard_fields=dashboard_fields,
             gm_priority_notes=gm_priority_notes,
         )
         target_path.write_text(payload, encoding="utf-8")
@@ -139,7 +150,8 @@ def export_session_brief(
                 campaign_name=campaign_name,
                 summary=summary,
                 active_arcs=active_arcs,
-                linked_scenarios=linked_scenarios,
+                arc_details=arc_details,
+                dashboard_fields=dashboard_fields,
                 gm_priority_notes=gm_priority_notes,
             )
             document.save(str(docx_path))
@@ -154,7 +166,8 @@ def export_session_brief(
                     campaign_name=campaign_name,
                     summary=summary,
                     active_arcs=active_arcs,
-                    linked_scenarios=linked_scenarios,
+                    arc_details=arc_details,
+                    dashboard_fields=dashboard_fields,
                     gm_priority_notes=gm_priority_notes,
                 ),
                 encoding="utf-8",
