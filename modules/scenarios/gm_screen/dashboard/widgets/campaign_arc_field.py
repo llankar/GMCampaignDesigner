@@ -1,12 +1,11 @@
 from __future__ import annotations
 
-import ast
-import json
 from typing import Any, Callable
 
 import customtkinter as ctk
 
 from modules.campaigns.shared.arc_status import canonicalize_arc_status
+from modules.campaigns.shared.arc_parser import coerce_arc_list
 from modules.scenarios.gm_screen.dashboard.styles.dashboard_theme import DASHBOARD_THEME
 from modules.scenarios.gm_screen.dashboard.widgets.arc_display import ArcMomentumMeter
 
@@ -152,47 +151,3 @@ class CampaignArcField(ctk.CTkFrame):
         return 0
 
 
-def _normalize_arc_status(arc: dict[str, Any]) -> dict[str, Any]:
-    normalized = dict(arc)
-    normalized["status"] = canonicalize_arc_status(normalized.get("status"))
-    return normalized
-
-
-def coerce_arc_list(raw_value: Any) -> list[dict[str, Any]]:
-    def _from_dict(payload: dict[str, Any]) -> list[dict[str, Any]]:
-        arcs_value = payload.get("arcs")
-        if isinstance(arcs_value, list):
-            return [_normalize_arc_status(arc) for arc in arcs_value if isinstance(arc, dict)]
-
-        text_value = payload.get("text")
-        if text_value is not None:
-            return coerce_arc_list(text_value)
-
-        arc_keys = {"name", "summary", "objective", "status", "scenarios"}
-        if any(key in payload for key in arc_keys):
-            return [_normalize_arc_status(payload)]
-
-        return []
-
-    if isinstance(raw_value, list):
-        return [_normalize_arc_status(arc) for arc in raw_value if isinstance(arc, dict)]
-
-    if isinstance(raw_value, dict):
-        return _from_dict(raw_value)
-
-    if isinstance(raw_value, str):
-        parsed: Any = None
-        try:
-            parsed = json.loads(raw_value)
-        except Exception:
-            try:
-                parsed = ast.literal_eval(raw_value)
-            except Exception:
-                parsed = None
-
-        if isinstance(parsed, list):
-            return [_normalize_arc_status(arc) for arc in parsed if isinstance(arc, dict)]
-        if isinstance(parsed, dict):
-            return _from_dict(parsed)
-
-    return []
