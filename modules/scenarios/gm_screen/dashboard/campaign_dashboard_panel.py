@@ -11,6 +11,7 @@ from .campaign_dashboard_data import (
     extract_campaign_fields,
     load_campaign_entities,
 )
+from .search.campaign_field_search import build_field_search_index, find_match_ranges, normalize_query
 from .styles.dashboard_theme import DASHBOARD_THEME
 
 
@@ -22,6 +23,8 @@ class CampaignDashboardPanel(ctk.CTkFrame):
     _TEXTBOX_MAX_HEIGHT = 120
     _TEXTBOX_LINE_HEIGHT = 18
     _TEXTBOX_WIDTH_CHARS = 72
+    _HIGHLIGHT_BG_COLOR = "#61482A"
+    _HIGHLIGHT_TEXT_COLOR = "#FFE2AD"
 
     def __init__(
         self,
@@ -37,6 +40,7 @@ class CampaignDashboardPanel(ctk.CTkFrame):
 
         self._campaign_catalog = load_campaign_entities(self.wrappers)
         self._campaign_options, self._option_to_campaign = build_campaign_option_index(self._campaign_catalog)
+        self._indexed_fields: list[dict] = []
 
         self.grid_columnconfigure(0, weight=1)
         self.grid_rowconfigure(1, weight=1)
@@ -176,8 +180,32 @@ class CampaignDashboardPanel(ctk.CTkFrame):
         )
         self.entity_meta_label.grid(row=1, column=0, sticky="ew", padx=16, pady=(0, 8))
 
+        self.search_var = tk.StringVar(value="")
+        self.search_var.trace_add("write", lambda *_: self._on_search_changed())
+
+        search_wrap = ctk.CTkFrame(parent, fg_color="transparent")
+        search_wrap.grid(row=2, column=0, sticky="ew", padx=16, pady=(0, 8))
+        search_wrap.grid_columnconfigure(1, weight=1)
+
+        ctk.CTkLabel(
+            search_wrap,
+            text="Search fields",
+            anchor="w",
+            text_color=DASHBOARD_THEME.text_secondary,
+        ).grid(row=0, column=0, sticky="w", padx=(0, 8))
+
+        self.search_entry = ctk.CTkEntry(
+            search_wrap,
+            textvariable=self.search_var,
+            placeholder_text="Filter by field name or value...",
+            fg_color=DASHBOARD_THEME.input_bg,
+            border_color=DASHBOARD_THEME.card_border,
+            text_color=DASHBOARD_THEME.text_primary,
+        )
+        self.search_entry.grid(row=0, column=1, sticky="ew")
+
         self.details_scroll = ctk.CTkScrollableFrame(parent, fg_color=DASHBOARD_THEME.panel_bg)
-        self.details_scroll.grid(row=2, column=0, sticky="nsew", padx=10, pady=(0, 10))
+        self.details_scroll.grid(row=3, column=0, sticky="nsew", padx=10, pady=(0, 10))
         self.details_scroll.grid_columnconfigure(0, weight=1)
 
     def _on_campaign_selected(self, selected_option: str) -> None:
@@ -186,12 +214,8 @@ class CampaignDashboardPanel(ctk.CTkFrame):
             child.destroy()
 
         if not entry:
-            ctk.CTkLabel(
-                self.details_scroll,
-                text="No campaign selected.",
-                text_color=DASHBOARD_THEME.text_secondary,
-                anchor="w",
-            ).grid(row=0, column=0, sticky="ew", padx=8, pady=8)
+            self._indexed_fields = []
+            self._render_empty_state("No campaign selected.")
             self.entity_meta_label.configure(text="")
             return
 
@@ -199,18 +223,39 @@ class CampaignDashboardPanel(ctk.CTkFrame):
         fields = extract_campaign_fields(entry.get("item"))
         self.entity_meta_label.configure(text=f"Campaigns • {campaign_name}")
         self._update_summary_cards(fields)
+        self._indexed_fields = build_field_search_index(fields)
+        self._render_filtered_fields()
 
-        if not fields:
-            ctk.CTkLabel(
-                self.details_scroll,
-                text="No displayable fields found for this campaign.",
-                text_color=DASHBOARD_THEME.text_secondary,
-                anchor="w",
-            ).grid(row=0, column=0, sticky="ew", padx=8, pady=8)
+    def _on_search_changed(self) -> None:
+        self._render_filtered_fields()
+
+    def _render_empty_state(self, message: str) -> None:
+        ctk.CTkLabel(
+            self.details_scroll,
+            text=message,
+            text_color=DASHBOARD_THEME.text_secondary,
+            anchor="w",
+        ).grid(row=0, column=0, sticky="ew", padx=8, pady=8)
+
+    def _render_filtered_fields(self) -> None:
+        for child in self.details_scroll.winfo_children():
+            child.destroy()
+
+        if not self._indexed_fields:
+            self._render_empty_state("No displayable fields found for this campaign.")
+            return
+
+        query = normalize_query(self.search_var.get())
+        visible_fields = [
+            indexed["field"] for indexed in self._indexed_fields if not query or query in indexed["searchable_text"]
+        ]
+
+        if not visible_fields:
+            self._render_empty_state("No field matches your search.")
             return
 
         row = 0
-        for field in fields:
+        for field in visible_fields:
             block = ctk.CTkFrame(
                 self.details_scroll,
                 corner_radius=12,
@@ -265,7 +310,7 @@ class CampaignDashboardPanel(ctk.CTkFrame):
                 )
                 arc_field.grid(row=1, column=0, sticky="ew", padx=10, pady=(0, 8))
             else:
-                self._render_read_only_field(block, field.get("value"))
+                self._render_read_only_field(block, field.get("value"), query)
             row += 1
 
     def _update_summary_cards(self, fields: list[dict]) -> None:
@@ -283,16 +328,10 @@ class CampaignDashboardPanel(ctk.CTkFrame):
         self.summary_arcs.configure(text=str(arcs_count))
         self.summary_scenarios.configure(text=str(scenario_count))
 
-    def _render_read_only_field(self, parent: ctk.CTkFrame, raw_value: str | None) -> None:
+    def _render_read_only_field(self, parent: ctk.CTkFrame, raw_value: str | None, query: str) -> None:
         value = raw_value or ""
         if self._should_use_compact_render(value):
-            ctk.CTkLabel(
-                parent,
-                text=value,
-                anchor="w",
-                justify="left",
-                text_color=DASHBOARD_THEME.text_secondary,
-            ).grid(row=1, column=0, sticky="ew", padx=10, pady=(0, 8))
+            self._render_compact_with_highlight(parent, value, query)
             return
 
         textbox_height = self._compute_textbox_height(value)
@@ -307,7 +346,63 @@ class CampaignDashboardPanel(ctk.CTkFrame):
         )
         body.grid(row=1, column=0, sticky="ew", padx=10, pady=(0, 8))
         body.insert("1.0", value)
+        self._highlight_textbox_matches(body, value, query)
         body.configure(state="disabled")
+
+    def _render_compact_with_highlight(self, parent: ctk.CTkFrame, value: str, query: str) -> None:
+        content_wrap = ctk.CTkFrame(parent, fg_color="transparent")
+        content_wrap.grid(row=1, column=0, sticky="ew", padx=10, pady=(0, 8))
+
+        ranges = find_match_ranges(value, query)
+        if not ranges:
+            ctk.CTkLabel(
+                content_wrap,
+                text=value,
+                anchor="w",
+                justify="left",
+                text_color=DASHBOARD_THEME.text_secondary,
+            ).pack(side="left", fill="x", expand=True)
+            return
+
+        cursor = 0
+        for start, end in ranges:
+            if start > cursor:
+                ctk.CTkLabel(
+                    content_wrap,
+                    text=value[cursor:start],
+                    anchor="w",
+                    justify="left",
+                    text_color=DASHBOARD_THEME.text_secondary,
+                ).pack(side="left")
+
+            ctk.CTkLabel(
+                content_wrap,
+                text=value[start:end],
+                anchor="w",
+                justify="left",
+                text_color=self._HIGHLIGHT_TEXT_COLOR,
+                fg_color=self._HIGHLIGHT_BG_COLOR,
+                corner_radius=4,
+            ).pack(side="left", padx=1)
+            cursor = end
+
+        if cursor < len(value):
+            ctk.CTkLabel(
+                content_wrap,
+                text=value[cursor:],
+                anchor="w",
+                justify="left",
+                text_color=DASHBOARD_THEME.text_secondary,
+            ).pack(side="left")
+
+    def _highlight_textbox_matches(self, textbox: ctk.CTkTextbox, value: str, query: str) -> None:
+        ranges = find_match_ranges(value, query)
+        if not ranges:
+            return
+
+        textbox.tag_config("search_match", background=self._HIGHLIGHT_BG_COLOR, foreground=self._HIGHLIGHT_TEXT_COLOR)
+        for start, end in ranges:
+            textbox.tag_add("search_match", f"1.0+{start}c", f"1.0+{end}c")
 
     def _should_use_compact_render(self, value: str) -> bool:
         return "\n" not in value and len(value) <= self._COMPACT_VALUE_MAX_LENGTH
