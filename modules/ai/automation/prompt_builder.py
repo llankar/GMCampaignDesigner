@@ -1,6 +1,10 @@
 import json
 from typing import List, Dict
 
+from modules.campaigns.services.tone_contract import (
+    format_tone_contract_guidance,
+    load_campaign_tone_contract,
+)
 from modules.helpers.template_loader import load_template
 from modules.helpers.logging_helper import log_module_import
 
@@ -18,7 +22,14 @@ def _format_fields(fields: List[Dict[str, str]]) -> str:
     return "\n".join(lines)
 
 
-def build_entity_prompt(entity_slug: str, count: int, user_prompt: str) -> str:
+def _build_tone_contract_section(*, db_path: str | None = None) -> str:
+    contract = load_campaign_tone_contract(db_path=db_path)
+    if not contract:
+        return ""
+    return f"\n{format_tone_contract_guidance(contract)}\n"
+
+
+def build_entity_prompt(entity_slug: str, count: int, user_prompt: str, *, db_path: str | None = None) -> str:
     template = load_template(entity_slug)
     fields = template.get("fields", [])
     field_list = _format_fields(fields)
@@ -28,11 +39,14 @@ def build_entity_prompt(entity_slug: str, count: int, user_prompt: str) -> str:
     }
     schema_json = json.dumps(schema_hint, indent=2, ensure_ascii=False)
 
+    tone_contract = _build_tone_contract_section(db_path=db_path)
+
     return (
         "You are generating RPG campaign content. "
         "Return ONLY valid JSON.\n"
         f"Entity type: {entity_slug}\n"
         f"Number of items: {count}\n\n"
+        f"{tone_contract}"
         "Use the following fields exactly as keys (keep casing):\n"
         f"{field_list}\n\n"
         "Rules:\n"
@@ -51,17 +65,22 @@ def build_linked_entities_prompt(
     names: List[str],
     user_prompt: str,
     parent_context: str,
+    *,
+    db_path: str | None = None,
 ) -> str:
     template = load_template(entity_slug)
     fields = template.get("fields", [])
     field_list = _format_fields(fields)
     name_list = ", ".join(names)
 
+    tone_contract = _build_tone_contract_section(db_path=db_path)
+
     return (
         "You are generating linked RPG campaign entities. "
         "Return ONLY valid JSON.\n"
         f"Entity type: {entity_slug}\n"
         f"Required names: {name_list}\n\n"
+        f"{tone_contract}"
         "Use the following fields exactly as keys (keep casing):\n"
         f"{field_list}\n\n"
         "Rules:\n"
@@ -76,7 +95,7 @@ def build_linked_entities_prompt(
     )
 
 
-def build_story_arc_prompt(scenario_count: int, user_prompt: str) -> str:
+def build_story_arc_prompt(scenario_count: int, user_prompt: str, *, db_path: str | None = None) -> str:
     schema_hint = {
         "ArcTitle": "",
         "Premise": "",
@@ -100,10 +119,13 @@ def build_story_arc_prompt(scenario_count: int, user_prompt: str) -> str:
     }
     schema_json = json.dumps(schema_hint, indent=2, ensure_ascii=False)
 
+    tone_contract = _build_tone_contract_section(db_path=db_path)
+
     return (
         "You are generating a narrative story arc for an RPG campaign. "
         "Return ONLY valid JSON.\n"
         f"Scenario count: {scenario_count}\n\n"
+        f"{tone_contract}"
         "Rules:\n"
         "- Output must be a single JSON object.\n"
         "- Include keys: ArcTitle, Premise, Tone, ScenarioCount, Scenarios.\n"
