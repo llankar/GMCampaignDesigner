@@ -117,17 +117,16 @@ class GenericModelWrapper:
         try:
             existing_columns = self._ensure_schema(cursor, items)
 
-            # Determine the unique field to use
-            if items:
+            # Determine the unique field to use based on entity semantics first.
+            unique_field = self._infer_key_field()
+            if items and unique_field not in items[0]:
                 sample_item = items[0]
                 if "Name" in sample_item:
                     unique_field = "Name"
                 elif "Title" in sample_item:
                     unique_field = "Title"
-                else:
+                elif sample_item:
                     unique_field = list(sample_item.keys())[0]
-            else:
-                unique_field = "Name"  # Default value when the list is empty
 
             # Insert or update (INSERT OR REPLACE)
             for item in items:
