@@ -162,7 +162,7 @@ class CampaignDashboardPanel(ctk.CTkFrame):
 
     def _build_details_content(self, parent: ctk.CTkFrame) -> None:
         parent.grid_columnconfigure(0, weight=1)
-        parent.grid_rowconfigure(2, weight=1)
+        parent.grid_rowconfigure(3, weight=1)
 
         ctk.CTkLabel(
             parent,
@@ -185,7 +185,7 @@ class CampaignDashboardPanel(ctk.CTkFrame):
 
         search_wrap = ctk.CTkFrame(parent, fg_color="transparent")
         search_wrap.grid(row=2, column=0, sticky="ew", padx=16, pady=(0, 8))
-        search_wrap.grid_columnconfigure(1, weight=1)
+        search_wrap.grid_columnconfigure(2, weight=1)
 
         ctk.CTkLabel(
             search_wrap,
@@ -198,11 +198,12 @@ class CampaignDashboardPanel(ctk.CTkFrame):
             search_wrap,
             textvariable=self.search_var,
             placeholder_text="Filter by field name or value...",
+            width=360,
             fg_color=DASHBOARD_THEME.input_bg,
             border_color=DASHBOARD_THEME.card_border,
             text_color=DASHBOARD_THEME.text_primary,
         )
-        self.search_entry.grid(row=0, column=1, sticky="ew")
+        self.search_entry.grid(row=0, column=1, sticky="w")
 
         self.details_scroll = ctk.CTkScrollableFrame(parent, fg_color=DASHBOARD_THEME.panel_bg)
         self.details_scroll.grid(row=3, column=0, sticky="nsew", padx=10, pady=(0, 10))
