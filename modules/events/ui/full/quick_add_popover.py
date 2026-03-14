@@ -31,34 +31,34 @@ class QuickAddPopover(ctk.CTkToplevel):
     def _build_ui(self):
         self.grid_columnconfigure(1, weight=1)
 
-        ctk.CTkLabel(self, text="Titre").grid(row=0, column=0, padx=12, pady=(16, 8), sticky="w")
-        self.title_entry = ctk.CTkEntry(self, placeholder_text="Nouvel évènement")
+        ctk.CTkLabel(self, text="Title").grid(row=0, column=0, padx=12, pady=(16, 8), sticky="w")
+        self.title_entry = ctk.CTkEntry(self, placeholder_text="New event")
         self.title_entry.grid(row=0, column=1, padx=12, pady=(16, 8), sticky="ew")
 
         ctk.CTkLabel(self, text="Date").grid(row=1, column=0, padx=12, pady=8, sticky="w")
         self.date_entry = ctk.CTkEntry(self, placeholder_text="YYYY-MM-DD")
         self.date_entry.grid(row=1, column=1, padx=12, pady=8, sticky="ew")
 
-        ctk.CTkLabel(self, text="Heure début").grid(row=2, column=0, padx=12, pady=8, sticky="w")
+        ctk.CTkLabel(self, text="Start time").grid(row=2, column=0, padx=12, pady=8, sticky="w")
         self.start_entry = ctk.CTkEntry(self, placeholder_text="HH:MM")
         self.start_entry.grid(row=2, column=1, padx=12, pady=8, sticky="ew")
 
-        ctk.CTkLabel(self, text="Heure fin").grid(row=3, column=0, padx=12, pady=8, sticky="w")
+        ctk.CTkLabel(self, text="End time").grid(row=3, column=0, padx=12, pady=8, sticky="w")
         self.end_entry = ctk.CTkEntry(self, placeholder_text="HH:MM")
         self.end_entry.grid(row=3, column=1, padx=12, pady=8, sticky="ew")
 
         ctk.CTkLabel(self, text="Type").grid(row=4, column=0, padx=12, pady=8, sticky="w")
-        self.type_menu = ctk.CTkOptionMenu(self, values=["Session", "Rencontre", "Quête", "Autre"])
+        self.type_menu = ctk.CTkOptionMenu(self, values=["Session", "Encounter", "Quest", "Other"])
         self.type_menu.grid(row=4, column=1, padx=12, pady=8, sticky="ew")
 
-        ctk.CTkLabel(self, text="Couleur").grid(row=5, column=0, padx=12, pady=8, sticky="w")
+        ctk.CTkLabel(self, text="Color").grid(row=5, column=0, padx=12, pady=8, sticky="w")
         self.color_value = "#4F8EF7"
         self.color_button = ctk.CTkButton(self, text="", command=self._choose_color)
         self.color_button.grid(row=5, column=1, padx=12, pady=8, sticky="w")
         self._update_color_button()
 
-        ctk.CTkLabel(self, text="Statut").grid(row=6, column=0, padx=12, pady=8, sticky="w")
-        self.status_menu = ctk.CTkOptionMenu(self, values=["Planifié", "Confirmé", "Terminé", "Annulé"])
+        ctk.CTkLabel(self, text="Status").grid(row=6, column=0, padx=12, pady=8, sticky="w")
+        self.status_menu = ctk.CTkOptionMenu(self, values=["Planned", "Confirmed", "Completed", "Canceled"])
         self.status_menu.grid(row=6, column=1, padx=12, pady=8, sticky="ew")
 
         buttons = ctk.CTkFrame(self, fg_color="transparent")
@@ -66,7 +66,7 @@ class QuickAddPopover(ctk.CTkToplevel):
         ctk.CTkButton(buttons, text="Plus d'options", fg_color="transparent", command=self._open_more_options).pack(
             side="left", padx=(0, 8)
         )
-        ctk.CTkButton(buttons, text="Créer", command=self._emit_create).pack(side="right")
+        ctk.CTkButton(buttons, text="Create", command=self._emit_create).pack(side="right")
 
     @staticmethod
     def _normalize_time(value):
@@ -86,7 +86,7 @@ class QuickAddPopover(ctk.CTkToplevel):
         self.start_entry.insert(0, self._initial_start_time)
         self.end_entry.insert(0, self._suggest_end_time(self._initial_start_time))
         self.type_menu.set("Session")
-        self.status_menu.set("Planifié")
+        self.status_menu.set("Planned")
 
     @staticmethod
     def _suggest_end_time(start_text):

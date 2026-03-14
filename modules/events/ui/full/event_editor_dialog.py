@@ -13,16 +13,16 @@ from modules.events.ui.shared.schedule_widgets import EventDatePickerField, Even
 class EventEditorDialog(ctk.CTkToplevel):
     """Full editor for calendar events."""
 
-    def __init__(self, master, *, initial_values=None, on_save=None, entity_link_service=None, save_label="Créer"):
+    def __init__(self, master, *, initial_values=None, on_save=None, entity_link_service=None, save_label="Create"):
         super().__init__(master)
-        self.title("Éditeur d'évènement")
+        self.title("Event editor")
         self.geometry("560x700")
         self.resizable(True, True)
 
         self._on_save = on_save
         self._initial = dict(initial_values or {})
         self._entity_link_service = entity_link_service or EntityLinkService()
-        self._save_label = str(save_label or "Créer")
+        self._save_label = str(save_label or "Create")
 
         self._build_ui()
         self._populate_fields()
@@ -39,40 +39,40 @@ class EventEditorDialog(ctk.CTkToplevel):
         content.grid_columnconfigure(1, weight=1)
 
         row = 0
-        ctk.CTkLabel(content, text="Titre").grid(row=row, column=0, padx=12, pady=(16, 8), sticky="w")
-        self.title_entry = ctk.CTkEntry(content, placeholder_text="Titre de l'évènement")
+        ctk.CTkLabel(content, text="Title").grid(row=row, column=0, padx=12, pady=(16, 8), sticky="w")
+        self.title_entry = ctk.CTkEntry(content, placeholder_text="Event title")
         self.title_entry.grid(row=row, column=1, padx=12, pady=(16, 8), sticky="ew")
 
         row += 1
         ctk.CTkLabel(content, text="Date").grid(row=row, column=0, padx=12, pady=8, sticky="w")
         self.date_entry = EventDatePickerField(
             content,
-            picker_button_text="Calendrier",
-            today_button_text="Aujourd'hui",
-            clear_button_text="Effacer",
-            empty_hint_text="Aucune date selectionnee",
+            picker_button_text="Calendar",
+            today_button_text="Today",
+            clear_button_text="Clear",
+            empty_hint_text="No date selected",
         )
         self.date_entry.grid(row=row, column=1, padx=12, pady=8, sticky="ew")
 
         row += 1
-        ctk.CTkLabel(content, text="Heure début").grid(row=row, column=0, padx=12, pady=8, sticky="w")
+        ctk.CTkLabel(content, text="Start time").grid(row=row, column=0, padx=12, pady=8, sticky="w")
         self.start_entry = EventTimePickerField(
             content,
-            picker_button_text="Choisir",
-            now_button_text="Maint.",
-            clear_button_text="Effacer",
-            empty_hint_text="Aucune heure selectionnee",
+            picker_button_text="Pick",
+            now_button_text="Now",
+            clear_button_text="Clear",
+            empty_hint_text="No time selected",
         )
         self.start_entry.grid(row=row, column=1, padx=12, pady=8, sticky="ew")
 
         row += 1
-        ctk.CTkLabel(content, text="Heure fin").grid(row=row, column=0, padx=12, pady=8, sticky="w")
+        ctk.CTkLabel(content, text="End time").grid(row=row, column=0, padx=12, pady=8, sticky="w")
         self.end_entry = EventTimePickerField(
             content,
-            picker_button_text="Choisir",
-            now_button_text="Maint.",
-            clear_button_text="Effacer",
-            empty_hint_text="Aucune heure selectionnee",
+            picker_button_text="Pick",
+            now_button_text="Now",
+            clear_button_text="Clear",
+            empty_hint_text="No time selected",
         )
         self.end_entry.grid(row=row, column=1, padx=12, pady=8, sticky="ew")
 
@@ -82,14 +82,14 @@ class EventEditorDialog(ctk.CTkToplevel):
         self.type_menu.grid(row=row, column=1, padx=12, pady=8, sticky="ew")
 
         row += 1
-        ctk.CTkLabel(content, text="Couleur").grid(row=row, column=0, padx=12, pady=8, sticky="w")
+        ctk.CTkLabel(content, text="Color").grid(row=row, column=0, padx=12, pady=8, sticky="w")
         self.color_button = ctk.CTkButton(content, text="", width=120, command=self._choose_color)
         self.color_button.grid(row=row, column=1, padx=12, pady=8, sticky="w")
         self._selected_color = "#4F8EF7"
 
         row += 1
-        ctk.CTkLabel(content, text="Statut").grid(row=row, column=0, padx=12, pady=8, sticky="w")
-        self.status_entry = ctk.CTkEntry(content, placeholder_text="Planifié / Confirmé / Terminé...")
+        ctk.CTkLabel(content, text="Status").grid(row=row, column=0, padx=12, pady=8, sticky="w")
+        self.status_entry = ctk.CTkEntry(content, placeholder_text="Planned / Confirmed / Completed...")
         self.status_entry.grid(row=row, column=1, padx=12, pady=8, sticky="ew")
 
         row += 1
@@ -184,7 +184,7 @@ class EventEditorDialog(ctk.CTkToplevel):
         buttons = ctk.CTkFrame(self, fg_color="transparent")
         buttons.grid(row=1, column=0, padx=12, pady=(8, 12), sticky="ew")
         buttons.grid_columnconfigure(0, weight=1)
-        ctk.CTkButton(buttons, text="Annuler", fg_color="transparent", command=self.destroy).pack(side="right", padx=(6, 0))
+        ctk.CTkButton(buttons, text="Cancel", fg_color="transparent", command=self.destroy).pack(side="right", padx=(6, 0))
         ctk.CTkButton(buttons, text=self._save_label, command=self._save).pack(side="right")
 
     def _populate_fields(self):
