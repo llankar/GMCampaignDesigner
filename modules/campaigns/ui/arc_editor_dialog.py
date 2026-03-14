@@ -13,8 +13,9 @@ class ArcEditorDialog(ctk.CTkToplevel):
     def __init__(self, master, scenarios: list[str], initial_data: dict | None = None):
         super().__init__(master)
         self.title("Campaign Arc")
-        self.geometry("700x560")
+        self.geometry("700x1040")
         self.result = None
+        self.minsize(700, 1040)
 
         initial = initial_data or {}
 

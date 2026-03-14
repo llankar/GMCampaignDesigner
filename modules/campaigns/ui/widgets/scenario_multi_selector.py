@@ -42,6 +42,8 @@ class ScenarioMultiSelector(ctk.CTkFrame):
         self._refresh_list(query=self.search_var.get().strip())
 
     def _capture_current_selection(self):
+        visible_set = set(self._visible_scenarios)
+        self._selected_scenarios.difference_update(visible_set)
         for index in self.listbox.curselection():
             if 0 <= index < len(self._visible_scenarios):
                 self._selected_scenarios.add(self._visible_scenarios[index])
