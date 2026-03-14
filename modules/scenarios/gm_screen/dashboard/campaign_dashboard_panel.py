@@ -61,8 +61,7 @@ class CampaignDashboardPanel(ctk.CTkFrame):
             self._on_campaign_selected(self._campaign_options[0])
 
     def _build_header(self, parent: ctk.CTkFrame) -> None:
-        parent.grid_columnconfigure(0, weight=2)
-        parent.grid_columnconfigure(1, weight=3)
+        parent.grid_columnconfigure(0, weight=1)
 
         self._build_campaign_picker(parent)
 
@@ -103,7 +102,7 @@ class CampaignDashboardPanel(ctk.CTkFrame):
             border_color=DASHBOARD_THEME.card_border,
             corner_radius=12,
         )
-        selector_wrap.grid(row=0, column=1, rowspan=3, sticky="nswe", padx=12, pady=10)
+        selector_wrap.grid(row=0, column=0, rowspan=3, sticky="nswe", padx=12, pady=10)
         selector_wrap.grid_columnconfigure((0, 1), weight=1)
         selector_wrap.grid_columnconfigure(2, weight=0)
 
