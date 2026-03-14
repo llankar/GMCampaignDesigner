@@ -212,7 +212,7 @@ class GenericListSelectionView(ctk.CTkFrame):
                 self.on_multi_select_callback(self.entity_type, selected_items)
             elif self.on_select_callback:
                 for item in selected_items:
-                    entity_name = item.get("Name", item.get("Title", "Unnamed"))
+                    entity_name = self._resolve_entity_name(item)
                     self.on_select_callback(self.entity_type, entity_name)
             return
 
@@ -240,11 +240,17 @@ class GenericListSelectionView(ctk.CTkFrame):
     def _emit_selection(self, item):
         if not self.on_select_callback:
             return
-        entity_name = item.get("Name", item.get("Title", "Unnamed"))
+        entity_name = self._resolve_entity_name(item)
         try:
             self.on_select_callback(self.entity_type, entity_name, item)
         except TypeError:
             self.on_select_callback(self.entity_type, entity_name)
+
+    def _resolve_entity_name(self, item):
+        is_scenario = str(self.entity_type or "").strip().lower() == "scenarios"
+        primary_key, fallback_key = ("Title", "Name") if is_scenario else ("Name", "Title")
+        entity_name = str(item.get(primary_key) or item.get(fallback_key) or "").strip()
+        return entity_name or "Unnamed"
 
     def _clean_value(self, val):
         if val is None:
