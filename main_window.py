@@ -1105,14 +1105,9 @@ class MainWindow(ctk.CTk):
 
     def _on_calendar_campaign_today_changed(self, campaign_today):
         self._calendar_ui_state["active_date"] = campaign_today
+        self._calendar_ui_state["view_mode"] = "agenda"
         self._refresh_calendar_dock(campaign_today)
-
-        window = getattr(self, "_calendar_full_window", None)
-        if window is not None and window.winfo_exists():
-            try:
-                window.focus_date(campaign_today, view_mode=window.view_mode, auto_select=True)
-            except Exception:
-                pass
+        self.open_calendar_view(target_date=campaign_today, view_mode="agenda")
 
     def _on_calendar_date_selected(self, selected_date):
         self._refresh_calendar_dock(selected_date)
