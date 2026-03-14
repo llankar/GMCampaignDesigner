@@ -22,7 +22,7 @@ class EntityAutoGenerator:
         self._ai = LocalAIClient()
 
     def generate(self, entity_slug: str, count: int, user_prompt: str) -> List[Dict[str, Any]]:
-        prompt = build_entity_prompt(entity_slug, count, user_prompt)
+        prompt = build_entity_prompt(entity_slug, count, user_prompt, db_path=self._db_path)
         response = self._ai.chat(
             [
                 {"role": "system", "content": "You are a helpful RPG content generator."},
@@ -42,7 +42,13 @@ class EntityAutoGenerator:
     ) -> List[Dict[str, Any]]:
         if not names:
             return []
-        prompt = build_linked_entities_prompt(entity_slug, names, user_prompt, parent_context)
+        prompt = build_linked_entities_prompt(
+            entity_slug,
+            names,
+            user_prompt,
+            parent_context,
+            db_path=self._db_path,
+        )
         response = self._ai.chat(
             [
                 {"role": "system", "content": "You are a helpful RPG content generator."},
@@ -64,7 +70,7 @@ class EntityAutoGenerator:
         )
 
     def generate_story_arc(self, scenario_count: int, user_prompt: str) -> Dict[str, Any]:
-        prompt = build_story_arc_prompt(scenario_count, user_prompt)
+        prompt = build_story_arc_prompt(scenario_count, user_prompt, db_path=self._db_path)
         response = self._ai.chat(
             [
                 {"role": "system", "content": "You are a helpful RPG content generator."},

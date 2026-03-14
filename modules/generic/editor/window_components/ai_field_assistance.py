@@ -1,7 +1,14 @@
 from modules.generic.editor.window_context import *
+from modules.campaigns.services.tone_contract import format_tone_contract_guidance, load_campaign_tone_contract
 
 
 class GenericEditorWindowAIFieldAssistance:
+    def _tone_contract_guidance(self):
+        contract = load_campaign_tone_contract()
+        if not contract:
+            return ""
+        return format_tone_contract_guidance(contract)
+
     def _field_text(self, field_name):
         widget = self.field_widgets.get(field_name)
         if hasattr(widget, "text_widget"):
@@ -54,6 +61,9 @@ class GenericEditorWindowAIFieldAssistance:
             except Exception:
                 user = default_user.format(**fmt_values)
             system = system_tpl
+            tone_contract = self._tone_contract_guidance()
+            if tone_contract:
+                system = f"{system}\n\n{tone_contract}"
             content = self._get_ai().chat([
                 {"role": "system", "content": system},
                 {"role": "user", "content": user},
@@ -102,6 +112,9 @@ class GenericEditorWindowAIFieldAssistance:
             except Exception:
                 user = default_user.format(**fmt_values)
             system = system_tpl
+            tone_contract = self._tone_contract_guidance()
+            if tone_contract:
+                system = f"{system}\n\n{tone_contract}"
             content = self._get_ai().chat([
                 {"role": "system", "content": system},
                 {"role": "user", "content": user},
