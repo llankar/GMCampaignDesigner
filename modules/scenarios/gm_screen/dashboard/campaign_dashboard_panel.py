@@ -3,6 +3,7 @@ from __future__ import annotations
 import math
 import customtkinter as ctk
 import tkinter as tk
+from tkinter import filedialog, messagebox
 from typing import Callable
 
 from modules.campaigns.shared.arc_parser import coerce_arc_list
@@ -13,6 +14,8 @@ from .campaign_dashboard_data import (
     load_campaign_entities,
 )
 from .search.campaign_field_search import build_field_search_index, find_match_ranges, normalize_query
+from modules.exports.session_brief import export_session_brief
+from .session_prep import build_session_brief_payload
 from .session_prep.session_prep_summary import build_session_prep_summary
 from .styles.dashboard_theme import DASHBOARD_THEME
 
@@ -43,6 +46,8 @@ class CampaignDashboardPanel(ctk.CTkFrame):
         self._campaign_catalog = load_campaign_entities(self.wrappers)
         self._campaign_options, self._option_to_campaign = build_campaign_option_index(self._campaign_catalog)
         self._indexed_fields: list[dict] = []
+        self._selected_campaign_entry: dict | None = None
+        self._selected_campaign_fields: list[dict] = []
 
         self.grid_columnconfigure(0, weight=1)
         self.grid_rowconfigure(1, weight=1)
@@ -152,6 +157,14 @@ class CampaignDashboardPanel(ctk.CTkFrame):
         )
         self.session_prep_toggle.grid(row=1, column=2, sticky="nsew", padx=(4, 10), pady=(4, 10))
 
+        ctk.CTkButton(
+            selector_wrap,
+            text="Export session brief",
+            fg_color=DASHBOARD_THEME.accent,
+            hover_color=DASHBOARD_THEME.accent_hover,
+            command=self._export_session_brief,
+        ).grid(row=2, column=0, columnspan=3, sticky="ew", padx=6, pady=(0, 10))
+
     def _build_details_content(self, parent: ctk.CTkFrame) -> None:
         parent.grid_columnconfigure(0, weight=1)
         parent.grid_rowconfigure(3, weight=1)
@@ -207,6 +220,8 @@ class CampaignDashboardPanel(ctk.CTkFrame):
             child.destroy()
 
         if not entry:
+            self._selected_campaign_entry = None
+            self._selected_campaign_fields = []
             self._indexed_fields = []
             self._render_empty_state("No campaign selected.")
             self.entity_meta_label.configure(text="")
@@ -214,6 +229,8 @@ class CampaignDashboardPanel(ctk.CTkFrame):
 
         campaign_name = entry["name"]
         fields = extract_campaign_fields(entry.get("item"))
+        self._selected_campaign_entry = entry
+        self._selected_campaign_fields = fields
         self.entity_meta_label.configure(text=f"Campaigns • {campaign_name}")
         self._indexed_fields = build_field_search_index(fields)
         self._render_filtered_fields()
@@ -449,6 +466,42 @@ class CampaignDashboardPanel(ctk.CTkFrame):
         line_count = max(value.count("\n") + 1, math.ceil(len(value) / self._TEXTBOX_WIDTH_CHARS))
         content_height = line_count * self._TEXTBOX_LINE_HEIGHT
         return max(self._TEXTBOX_MIN_HEIGHT, min(self._TEXTBOX_MAX_HEIGHT, content_height))
+
+    def _export_session_brief(self) -> None:
+        if not self._selected_campaign_entry:
+            messagebox.showwarning("Session brief", "Select a campaign first.")
+            return
+
+        campaign_name = self._selected_campaign_entry.get("name") or "Campaign"
+        default_name = campaign_name.strip().replace("/", "_")
+        output_path = filedialog.asksaveasfilename(
+            title="Export session brief",
+            defaultextension=".md",
+            initialfile=f"{default_name}_session_brief.md",
+            filetypes=[
+                ("Markdown", "*.md"),
+                ("PDF", "*.pdf"),
+            ],
+        )
+        if not output_path:
+            return
+
+        output_format = "pdf" if output_path.lower().endswith(".pdf") else "markdown"
+        payload = build_session_brief_payload(
+            fields=self._selected_campaign_fields,
+            campaign_item=self._selected_campaign_entry.get("item"),
+        )
+
+        exported = export_session_brief(
+            campaign_name=campaign_name,
+            summary=payload.summary,
+            active_arcs=payload.active_arcs,
+            linked_scenarios=payload.linked_scenarios,
+            gm_priority_notes=payload.gm_priority_notes,
+            output_format=output_format,
+            output_path=output_path,
+        )
+        messagebox.showinfo("Session brief", f"Session brief exported to:\n{exported}")
 
     def _open_selected_campaign(self) -> None:
         selected = self.campaign_picker_var.get()
