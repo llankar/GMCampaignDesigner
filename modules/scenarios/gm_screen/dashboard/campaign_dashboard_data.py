@@ -77,6 +77,9 @@ def extract_campaign_fields(campaign_item: dict[str, Any] | None) -> list[dict[s
         if not field_name:
             continue
 
+        if field_name == "LinkedScenarios":
+            continue
+
         value = campaign_item.get(field_name)
         if _is_empty(value):
             continue
@@ -99,7 +102,7 @@ def extract_campaign_fields(campaign_item: dict[str, Any] | None) -> list[dict[s
             {
                 "name": field_name,
                 "type": field_type,
-                "value": coerce_text(value).strip(),
+                "value": value if field_name == "Arcs" else coerce_text(value).strip(),
             }
         )
 
