@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import re
 import customtkinter as ctk
 from tkinter import messagebox
 
@@ -312,19 +313,11 @@ class CampaignBuilderWizard(ctk.CTkToplevel):
 
         self.arcs_list = ctk.CTkTextbox(frame, height=420, fg_color=EDITOR_PALETTE["surface_soft"], border_width=1, border_color=EDITOR_PALETTE["border"])
         self.arcs_list.pack(fill="both", expand=True, padx=12)
-        self.arcs_list.configure(state="disabled")
+        self.arcs_list.bind("<Button-1>", self._on_arcs_preview_click)
+        self.arcs_list.configure(state="disabled", cursor="hand2")
 
         buttons = ctk.CTkFrame(frame, fg_color="transparent")
         buttons.pack(fill="x", pady=(8, 12), padx=12)
-        self.arc_selection_var = ctk.StringVar(value="No arc selected")
-        self.arc_selection_menu = ctk.CTkOptionMenu(
-            buttons,
-            variable=self.arc_selection_var,
-            values=["No arc selected"],
-            command=self._on_arc_selection_change,
-            **option_menu_style(),
-        )
-        self.arc_selection_menu.pack(side="left", padx=4)
         ctk.CTkButton(buttons, text="Add Arc", command=self._add_arc, **primary_button_style()).pack(side="left", padx=4)
         ctk.CTkButton(buttons, text="Edit Arc", command=self._edit_selected_arc, **primary_button_style()).pack(side="left", padx=4)
         ctk.CTkButton(buttons, text="Move Up", command=self._move_arc_up, **primary_button_style()).pack(side="left", padx=4)
@@ -442,33 +435,41 @@ class CampaignBuilderWizard(ctk.CTkToplevel):
             self.current_arc_index = len(self.arcs) - 1
         return self.current_arc_index
 
-    def _on_arc_selection_change(self, value: str):
-        if not value.startswith("#"):
-            self.current_arc_index = None
-            return
+    @staticmethod
+    def _extract_arc_index_from_preview_line(line_text: str) -> int | None:
+        match = re.match(r"\s*Order\s+(\d+):", line_text or "")
+        if not match:
+            return None
         try:
-            index_str = value.split(" ", 1)[0].lstrip("#")
-            self.current_arc_index = int(index_str) - 1
-        except (TypeError, ValueError):
-            self.current_arc_index = None
+            return max(0, int(match.group(1)) - 1)
+        except ValueError:
+            return None
 
-    def _refresh_arc_selection(self):
+    def _on_arcs_preview_click(self, event):
         if not self.arcs:
-            self.arc_selection_menu.configure(values=["No arc selected"])
-            self.arc_selection_var.set("No arc selected")
-            self.current_arc_index = None
-            return
+            return "break"
 
-        options = [f"#{idx}. {arc.get('name') or 'Untitled Arc'}" for idx, arc in enumerate(self.arcs, start=1)]
-        self.arc_selection_menu.configure(values=options)
+        self.arcs_list.configure(state="normal")
+        line_index = self.arcs_list.index(f"@{event.x},{event.y}").split(".")[0]
+        line_text = self.arcs_list.get(f"{line_index}.0", f"{line_index}.end")
+        self.arcs_list.configure(state="disabled")
 
-        if self.current_arc_index is None:
-            self.current_arc_index = 0
-        self.current_arc_index = max(0, min(self.current_arc_index, len(self.arcs) - 1))
-        self.arc_selection_var.set(options[self.current_arc_index])
+        selected_index = self._extract_arc_index_from_preview_line(line_text)
+        if selected_index is None:
+            return "break"
+
+        self.current_arc_index = min(selected_index, len(self.arcs) - 1)
+        self._refresh_arcs_preview()
+        return "break"
 
     def _refresh_arcs_preview(self):
-        self._refresh_arc_selection()
+        if not self.arcs:
+            self.current_arc_index = None
+        elif self.current_arc_index is None:
+            self.current_arc_index = 0
+        else:
+            self.current_arc_index = max(0, min(self.current_arc_index, len(self.arcs) - 1))
+
         self.arcs_list.configure(state="normal")
         self.arcs_list.delete("1.0", "end")
         if not self.arcs:
