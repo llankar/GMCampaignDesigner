@@ -46,11 +46,11 @@ def _build_markdown(
     else:
         lines.append("- Aucun détail d'arc.")
 
-    lines.extend(["", "## Champs dashboard"])
+    lines.extend(["", "## Campagne"])
     if dashboard_fields:
         lines.extend([f"- {field}" for field in dashboard_fields])
     else:
-        lines.append("- Aucun champ dashboard.")
+        lines.append("- Aucun champ de campagne")
 
     lines.extend(["", "## Notes MJ prioritaires"])
     if gm_priority_notes:
