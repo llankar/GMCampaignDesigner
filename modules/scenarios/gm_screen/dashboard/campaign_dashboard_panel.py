@@ -64,29 +64,6 @@ class CampaignDashboardPanel(ctk.CTkFrame):
         parent.grid_columnconfigure(0, weight=2)
         parent.grid_columnconfigure(1, weight=3)
 
-        ctk.CTkLabel(
-            parent,
-            text="🎬 Campaign Command Center",
-            font=ctk.CTkFont(size=26, weight="bold"),
-            anchor="w",
-            text_color=DASHBOARD_THEME.text_primary,
-        ).grid(row=0, column=0, sticky="ew", padx=16, pady=(12, 4))
-
-        ctk.CTkLabel(
-            parent,
-            text="Monitor key arc momentum and instantly jump into linked scenarios.",
-            text_color=DASHBOARD_THEME.text_secondary,
-            anchor="w",
-        ).grid(row=1, column=0, sticky="ew", padx=16, pady=(0, 8))
-
-        self.summary_row = ctk.CTkFrame(parent, fg_color="transparent")
-        self.summary_row.grid(row=2, column=0, sticky="ew", padx=12, pady=(0, 12))
-        self.summary_row.grid_columnconfigure((0, 1, 2), weight=1)
-
-        self.summary_campaigns = self._make_summary_card(self.summary_row, "Campaigns", "0")
-        self.summary_arcs = self._make_summary_card(self.summary_row, "Arcs", "0")
-        self.summary_scenarios = self._make_summary_card(self.summary_row, "Linked scenarios", "0")
-
         self._build_campaign_picker(parent)
 
     def _make_summary_card(self, parent: ctk.CTkFrame, label: str, value: str) -> ctk.CTkLabel:
@@ -126,17 +103,17 @@ class CampaignDashboardPanel(ctk.CTkFrame):
             border_color=DASHBOARD_THEME.card_border,
             corner_radius=12,
         )
-        selector_wrap.grid(row=0, column=1, rowspan=3, sticky="nsew", padx=12, pady=10)
+        selector_wrap.grid(row=0, column=1, rowspan=3, sticky="nswe", padx=12, pady=10)
         selector_wrap.grid_columnconfigure((0, 1), weight=1)
         selector_wrap.grid_columnconfigure(2, weight=0)
 
         ctk.CTkLabel(
             selector_wrap,
-            text="Campaign selector",
+            text="Select a Campaign",
             font=ctk.CTkFont(size=14, weight="bold"),
-            anchor="w",
+            anchor="nw",
             text_color=DASHBOARD_THEME.text_primary,
-        ).grid(row=0, column=0, columnspan=2, sticky="ew", padx=10, pady=(10, 2))
+        ).grid(row=0, column=0, columnspan=2, sticky="nsew", padx=10, pady=(10, 2))
 
         values = self._campaign_options or ["No campaigns"]
         self.campaign_picker_var = tk.StringVar(value=values[0])
@@ -153,7 +130,7 @@ class CampaignDashboardPanel(ctk.CTkFrame):
             dropdown_hover_color=DASHBOARD_THEME.button_hover,
             dropdown_text_color=DASHBOARD_THEME.text_primary,
         )
-        self.campaign_selector.grid(row=1, column=0, sticky="ew", padx=6, pady=(4, 10))
+        self.campaign_selector.grid(row=1, column=0, sticky="nsew", padx=6, pady=(4, 10))
 
         ctk.CTkButton(
             selector_wrap,
@@ -161,7 +138,7 @@ class CampaignDashboardPanel(ctk.CTkFrame):
             fg_color=DASHBOARD_THEME.accent,
             hover_color=DASHBOARD_THEME.accent_hover,
             command=self._open_selected_campaign,
-        ).grid(row=1, column=1, sticky="ew", padx=6, pady=(4, 10))
+        ).grid(row=1, column=1, sticky="nsew", padx=6, pady=(4, 10))
 
         self.session_prep_var = tk.BooleanVar(value=False)
         self.session_prep_toggle = ctk.CTkSwitch(
@@ -174,7 +151,7 @@ class CampaignDashboardPanel(ctk.CTkFrame):
             button_color=DASHBOARD_THEME.input_button,
             button_hover_color=DASHBOARD_THEME.input_hover,
         )
-        self.session_prep_toggle.grid(row=1, column=2, sticky="e", padx=(4, 10), pady=(4, 10))
+        self.session_prep_toggle.grid(row=1, column=2, sticky="nsew", padx=(4, 10), pady=(4, 10))
 
     def _build_details_content(self, parent: ctk.CTkFrame) -> None:
         parent.grid_columnconfigure(0, weight=1)
@@ -182,7 +159,7 @@ class CampaignDashboardPanel(ctk.CTkFrame):
 
         ctk.CTkLabel(
             parent,
-            text="📖 Campaign Entity Details",
+            text="📖 Campaign Details",
             font=ctk.CTkFont(size=20, weight="bold"),
             anchor="w",
             text_color=DASHBOARD_THEME.text_primary,
@@ -239,7 +216,6 @@ class CampaignDashboardPanel(ctk.CTkFrame):
         campaign_name = entry["name"]
         fields = extract_campaign_fields(entry.get("item"))
         self.entity_meta_label.configure(text=f"Campaigns • {campaign_name}")
-        self._update_summary_cards(fields)
         self._indexed_fields = build_field_search_index(fields)
         self._render_filtered_fields()
 
@@ -388,21 +364,6 @@ class CampaignDashboardPanel(ctk.CTkFrame):
 
         if row == 0:
             self._render_empty_state("No field matches your search.")
-
-    def _update_summary_cards(self, fields: list[dict]) -> None:
-        arcs_count = 0
-        scenario_count = 0
-        for field in fields:
-            if field.get("name") != "Arcs":
-                continue
-            arcs = coerce_arc_list(field.get("value"))
-            arcs_count = len(arcs)
-            scenario_count = sum(len([s for s in arc.get("scenarios") or [] if str(s).strip()]) for arc in arcs)
-            break
-
-        self.summary_campaigns.configure(text=str(len(self._campaign_options or [])))
-        self.summary_arcs.configure(text=str(arcs_count))
-        self.summary_scenarios.configure(text=str(scenario_count))
 
     def _render_read_only_field(self, parent: ctk.CTkFrame, raw_value: str | None, query: str) -> None:
         value = raw_value or ""

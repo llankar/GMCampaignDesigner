@@ -148,7 +148,7 @@ class CampaignOverviewPanel(ctk.CTkFrame):
 
         ctk.CTkLabel(
             parent,
-            text="📖 Current Campaign Entity Details",
+            text="📖 Current Campaign Details",
             font=ctk.CTkFont(size=20, weight="bold"),
             anchor="w",
         ).grid(row=0, column=0, sticky="ew", padx=16, pady=(14, 6))
