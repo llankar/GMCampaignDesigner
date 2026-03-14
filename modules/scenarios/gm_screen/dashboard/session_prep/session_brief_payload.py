@@ -64,7 +64,7 @@ def _extract_active_arcs(fields: list[dict[str, Any]]) -> list[str]:
             status = str(arc.get("status") or "").strip().lower()
             if status not in {"in progress", "active", "ongoing"}:
                 continue
-            arc_name = str(arc.get("name") or "").strip() or "Arc sans nom"
+            arc_name = str(arc.get("name") or "").strip() or "Unnamed arc"
             objective = str(arc.get("objective") or "").strip()
             lines.append(f"{arc_name} — {objective}" if objective else arc_name)
         return lines

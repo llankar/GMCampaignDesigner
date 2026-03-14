@@ -29,34 +29,34 @@ def _build_markdown(
     lines: list[str] = [
         f"# Session brief — {campaign_name}",
         "",
-        "## Résumé",
-        summary.strip() or "Aucun résumé disponible.",
+        "## Summary",
+        summary.strip() or "No summary available.",
         "",
-        "## Arcs actifs",
+        "## Active arcs",
     ]
 
     if active_arcs:
         lines.extend([f"- {arc}" for arc in active_arcs])
     else:
-        lines.append("- Aucun arc actif.")
+        lines.append("- No active arc.")
 
-    lines.extend(["", "## Détails des arcs"])
+    lines.extend(["", "## Arc details"])
     if arc_details:
         lines.extend([f"- {arc}" for arc in arc_details])
     else:
-        lines.append("- Aucun détail d'arc.")
+        lines.append("- No arc details.")
 
-    lines.extend(["", "## Campagne"])
+    lines.extend(["", "## Campaign"])
     if dashboard_fields:
         lines.extend([f"- {field}" for field in dashboard_fields])
     else:
-        lines.append("- Aucun champ de campagne")
+        lines.append("- No campaign field")
 
-    lines.extend(["", "## Notes MJ prioritaires"])
+    lines.extend(["", "## Priority GM notes"])
     if gm_priority_notes:
         lines.extend([f"- {note}" for note in gm_priority_notes])
     else:
-        lines.append("- Aucune note prioritaire.")
+        lines.append("- No priority note.")
 
     lines.append("")
     return "\n".join(lines)
@@ -101,11 +101,11 @@ def _build_docx_document(
         for value in values or []:
             document.add_paragraph(value, style="List Bullet")
 
-    add_section("Résumé", paragraph_text=summary.strip() or "Aucun résumé disponible.")
-    add_section("Arcs actifs", values=active_arcs or ["Aucun arc actif."])
-    add_section("Détails des arcs", values=arc_details or ["Aucun détail d'arc."])
-    add_section("Champs dashboard", values=dashboard_fields or ["Aucun champ dashboard."])
-    add_section("Notes MJ prioritaires", values=gm_priority_notes or ["Aucune note prioritaire."])
+    add_section("Summary", paragraph_text=summary.strip() or "No summary available.")
+    add_section("Active arcs", values=active_arcs or ["No active arc."])
+    add_section("Arc details", values=arc_details or ["No arc details."])
+    add_section("Dashboard fields", values=dashboard_fields or ["No dashboard field."])
+    add_section("Priority GM notes", values=gm_priority_notes or ["No priority note."])
 
     return document
 
