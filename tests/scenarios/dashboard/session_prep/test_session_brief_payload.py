@@ -20,5 +20,13 @@ def test_build_session_brief_payload_collects_expected_sections():
 
     assert payload.summary == "The city is on edge."
     assert payload.active_arcs == ["Arc Alpha — Find the traitor"]
-    assert payload.linked_scenarios == ["Opening Gambit", "Siege at Dawn"]
+    assert payload.arc_details == [
+        "Arc 1: Arc Alpha | status: In Progress | objective: Find the traitor",
+        "Arc 2: Arc Beta | status: Planned | objective: Prepare defenses",
+    ]
+    assert payload.dashboard_fields == [
+        "Summary: The city is on edge.",
+        "Arcs: {'name': 'Arc Alpha', 'status': 'In Progress', 'objective': 'Find the traitor'} | {'name': 'Arc Beta', 'status': 'Planned', 'objective': 'Prepare defenses'}",
+        "CriticalNPCs: Marshal Kora",
+    ]
     assert payload.gm_priority_notes == ["Marshal Kora"]

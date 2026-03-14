@@ -10,7 +10,8 @@ def test_export_session_brief_markdown(tmp_path: Path):
         campaign_name="Dragonfall",
         summary="Résumé rapide",
         active_arcs=["Arc One — Recover relic"],
-        linked_scenarios=["Scene 1"],
+        arc_details=["Arc 1: Arc One | objective: Recover relic | status: In Progress"],
+        dashboard_fields=["Summary: Résumé rapide", "CriticalNPCs: Witness X"],
         gm_priority_notes=["Protect the witness"],
         output_format="markdown",
         output_path=str(output),
@@ -22,6 +23,10 @@ def test_export_session_brief_markdown(tmp_path: Path):
     assert "# Session brief — Dragonfall" in text
     assert "## Arcs actifs" in text
     assert "- Arc One — Recover relic" in text
+    assert "## Détails des arcs" in text
+    assert "Arc 1: Arc One | objective: Recover relic | status: In Progress" in text
+    assert "## Champs dashboard" in text
+    assert "Summary: Résumé rapide" in text
 
 
 
@@ -37,7 +42,8 @@ def test_export_session_brief_docx(tmp_path: Path, monkeypatch):
         campaign_name="Dragonfall",
         summary="Résumé rapide",
         active_arcs=["Arc One — Recover relic"],
-        linked_scenarios=["Scene 1"],
+        arc_details=["Arc 1: Arc One | objective: Recover relic | status: In Progress"],
+        dashboard_fields=["Summary: Résumé rapide", "CriticalNPCs: Witness X"],
         gm_priority_notes=["Protect the witness"],
         output_format="docx",
         output_path=str(output),
@@ -55,7 +61,8 @@ def test_export_session_brief_pdf_fallback_returns_non_pdf_file_when_unavailable
         campaign_name="Dragonfall",
         summary="Résumé rapide",
         active_arcs=[],
-        linked_scenarios=[],
+        arc_details=[],
+        dashboard_fields=[],
         gm_priority_notes=[],
         output_format="pdf",
         output_path=str(output),

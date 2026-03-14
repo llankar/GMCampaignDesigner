@@ -16,7 +16,8 @@ _SUMMARY_KEYS = ("summary", "résumé", "resume", "synopsis", "pitch", "overview
 class SessionBriefPayload:
     summary: str
     active_arcs: list[str]
-    linked_scenarios: list[str]
+    arc_details: list[str]
+    dashboard_fields: list[str]
     gm_priority_notes: list[str]
 
 
@@ -25,12 +26,14 @@ def build_session_brief_payload(
 ) -> SessionBriefPayload:
     summary = _extract_summary(fields)
     active_arcs = _extract_active_arcs(fields)
-    linked_scenarios = _extract_linked_scenarios(campaign_item)
+    arc_details = _extract_arc_details(fields)
+    dashboard_fields = _extract_dashboard_fields(fields)
     gm_priority_notes = build_session_prep_summary(fields).critical_reminders
     return SessionBriefPayload(
         summary=summary,
         active_arcs=active_arcs,
-        linked_scenarios=linked_scenarios,
+        arc_details=arc_details,
+        dashboard_fields=dashboard_fields,
         gm_priority_notes=gm_priority_notes,
     )
 
@@ -68,19 +71,62 @@ def _extract_active_arcs(fields: list[dict[str, Any]]) -> list[str]:
     return []
 
 
-def _extract_linked_scenarios(campaign_item: dict[str, Any] | None) -> list[str]:
-    if not campaign_item:
-        return []
-    scenarios = campaign_item.get("LinkedScenarios") or []
-    if not isinstance(scenarios, list):
-        return []
-    seen: set[str] = set()
-    ordered: list[str] = []
-    for scenario in scenarios:
-        label = str(scenario).strip()
-        key = label.lower()
-        if not label or key in seen:
+def _extract_arc_details(fields: list[dict[str, Any]]) -> list[str]:
+    for field in fields:
+        if str(field.get("name") or "").strip().lower() != "arcs":
             continue
-        seen.add(key)
-        ordered.append(label)
-    return ordered
+
+        details: list[str] = []
+        for index, arc in enumerate(coerce_arc_list(field.get("value")), start=1):
+            name = str(arc.get("name") or "").strip() or f"Arc #{index}"
+            segments = [f"Arc {index}: {name}"]
+            for key, raw_value in arc.items():
+                if str(key).strip().lower() == "name":
+                    continue
+                rendered = _render_arc_value(raw_value)
+                if not rendered:
+                    continue
+                segments.append(f"{key}: {rendered}")
+
+            details.append(" | ".join(segments))
+        return details
+    return []
+
+
+def _extract_dashboard_fields(fields: list[dict[str, Any]]) -> list[str]:
+    lines: list[str] = []
+    for field in fields:
+        name = str(field.get("name") or "").strip()
+        if not name:
+            continue
+
+        values = _extract_text_values(field)
+        if not values:
+            continue
+
+        lines.append(f"{name}: {' | '.join(values)}")
+    return lines
+
+
+def _extract_text_values(field: dict[str, Any]) -> list[str]:
+    if field.get("type") == "list":
+        return [str(value).strip() for value in (field.get("values") or []) if str(value).strip()]
+
+    value = field.get("value")
+    if isinstance(value, list):
+        rendered_items: list[str] = []
+        for item in value:
+            rendered = _render_arc_value(item)
+            if rendered:
+                rendered_items.append(rendered)
+        return rendered_items
+
+    text = str(value or "").strip()
+    return [text] if text else []
+
+
+def _render_arc_value(raw_value: Any) -> str:
+    if isinstance(raw_value, list):
+        rendered = [str(item).strip() for item in raw_value if str(item).strip()]
+        return ", ".join(rendered)
+    return str(raw_value or "").strip()
