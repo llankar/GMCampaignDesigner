@@ -117,12 +117,12 @@ class CalendarGridPanel(ctk.CTkFrame):
         events = [event for event in self.get_events_for_day(active_date) if filter_predicate(event)]
         ctk.CTkLabel(
             frame,
-            text=f"{len(events)} évènement(s) pour {active_date.strftime('%d/%m/%Y')}",
+            text=f"{len(events)} event(s) for {active_date.strftime('%d/%m/%Y')}",
             font=ctk.CTkFont(size=16, weight="bold"),
         ).pack(anchor="w", padx=12, pady=12)
 
         if not events:
-            ctk.CTkLabel(frame, text="Aucun évènement pour cette journée.").pack(anchor="w", padx=12, pady=(0, 12))
+            ctk.CTkLabel(frame, text="No events for this day.").pack(anchor="w", padx=12, pady=(0, 12))
             return
 
         for event in events:
@@ -137,7 +137,7 @@ class CalendarGridPanel(ctk.CTkFrame):
         for hour in range(0, 24):
             key = f"{hour:02d}:00"
             event = mapped.get(key)
-            title = event.get("title", "Libre") if event else "Libre"
+            title = event.get("title", "Free") if event else "Free"
             slot_color = self._day_color([event] if event else [])
             button = ctk.CTkButton(
                 frame,
@@ -162,13 +162,13 @@ class CalendarGridPanel(ctk.CTkFrame):
 
         ctk.CTkLabel(
             frame,
-            text=f"Agenda: {start.strftime('%d/%m')} → {end.strftime('%d/%m')} ({len(events)} évènement(s))",
+            text=f"Agenda: {start.strftime('%d/%m')} → {end.strftime('%d/%m')} ({len(events)} event(s))",
             font=ctk.CTkFont(size=15, weight="bold"),
             anchor="w",
         ).pack(fill="x", padx=8, pady=(6, 8))
 
         if not events:
-            ctk.CTkLabel(frame, text="Aucun évènement sur la période.", anchor="w").pack(fill="x", padx=8, pady=6)
+            ctk.CTkLabel(frame, text="No events in this range.", anchor="w").pack(fill="x", padx=8, pady=6)
             return
 
         for event in sorted(events, key=lambda row: (row.get("date"), row.get("time") or "", row.get("title") or "")):
@@ -180,7 +180,7 @@ class CalendarGridPanel(ctk.CTkFrame):
         date_prefix = f"[{event_date.strftime('%d/%m')}] " if include_date and event_date else ""
         badge = self._timeline_badge(event)
         details = " / ".join(part for part in [event.get("time") or "", event.get("status") or ""] if part)
-        text = f"{date_prefix}{event.get('title', 'Sans titre')}"
+        text = f"{date_prefix}{event.get('title', 'Untitled')}"
         if details:
             text = f"{text} — {details}"
         text = f"{text} [{badge}]"
@@ -213,16 +213,16 @@ class CalendarGridPanel(ctk.CTkFrame):
     def _timeline_badge(event):
         event_date = event.get("date")
         if event_date is None:
-            return "à venir"
+            return "upcoming"
 
         from datetime import date as _date
 
         today = _date.today()
         if event_date < today:
-            return "en retard"
+            return "overdue"
         if event_date == today:
-            return "aujourd'hui"
-        return "à venir"
+            return "today"
+        return "upcoming"
 
     def _emit_day_selected(self, selected_date):
         if callable(self._on_day_selected):

@@ -29,15 +29,15 @@ def validate_date_parts(year: int, month: int, day: int) -> DateAgendaValidation
     day_value = int(day)
 
     if not 1 <= year_value <= 9999:
-        return DateAgendaValidationResult(None, "Année invalide (1-9999).", 31)
+        return DateAgendaValidationResult(None, "Invalid year (1-9999).", 31)
     if not 1 <= month_value <= 12:
-        return DateAgendaValidationResult(None, "Mois invalide (1-12).", 31)
+        return DateAgendaValidationResult(None, "Invalid month (1-12).", 31)
 
     max_day = max_days_for_month(year_value, month_value)
     if not 1 <= day_value <= max_day:
         return DateAgendaValidationResult(
             None,
-            f"Jour invalide pour {year_value:04d}-{month_value:02d} (1-{max_day}).",
+            f"Invalid day for {year_value:04d}-{month_value:02d} (1-{max_day}).",
             max_day,
         )
 
@@ -47,15 +47,15 @@ def validate_date_parts(year: int, month: int, day: int) -> DateAgendaValidation
 def validate_iso_text(raw_text: str) -> DateAgendaValidationResult:
     text = str(raw_text or "").strip()
     if not text:
-        return DateAgendaValidationResult(None, "Saisissez une date au format YYYY-MM-DD.", 31)
+        return DateAgendaValidationResult(None, "Enter a date in YYYY-MM-DD format.", 31)
 
     parts = text.split("-")
     if len(parts) != 3:
-        return DateAgendaValidationResult(None, "Format invalide. Utilisez YYYY-MM-DD.", 31)
+        return DateAgendaValidationResult(None, "Invalid format. Use YYYY-MM-DD.", 31)
 
     try:
         year_value, month_value, day_value = (int(value) for value in parts)
     except ValueError:
-        return DateAgendaValidationResult(None, "Format invalide. Utilisez YYYY-MM-DD.", 31)
+        return DateAgendaValidationResult(None, "Invalid format. Use YYYY-MM-DD.", 31)
 
     return validate_date_parts(year_value, month_value, day_value)

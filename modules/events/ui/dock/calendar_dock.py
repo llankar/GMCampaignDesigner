@@ -44,7 +44,7 @@ class CalendarDock(ctk.CTkFrame):
         calendar_frame = ctk.CTkFrame(self)
         calendar_frame.pack(fill="x", padx=8, pady=4)
 
-        for column, label in enumerate(("L", "M", "M", "J", "V", "S", "D")):
+        for column, label in enumerate(("M", "T", "W", "T", "F", "S", "S")):
             ctk.CTkLabel(calendar_frame, text=label, width=34).grid(row=0, column=column, padx=1, pady=(4, 2))
 
         for week in range(6):
@@ -66,13 +66,13 @@ class CalendarDock(ctk.CTkFrame):
         events_frame = ctk.CTkFrame(self)
         events_frame.pack(fill="both", expand=True, padx=8, pady=(4, 8))
 
-        self.selected_title_label = ctk.CTkLabel(events_frame, text="Aujourd'hui", anchor="w", font=ctk.CTkFont(size=13, weight="bold"))
+        self.selected_title_label = ctk.CTkLabel(events_frame, text="Today", anchor="w", font=ctk.CTkFont(size=13, weight="bold"))
         self.selected_title_label.pack(fill="x", padx=8, pady=(8, 4))
 
         self.selected_events_box = ctk.CTkScrollableFrame(events_frame, height=100)
         self.selected_events_box.pack(fill="x", padx=8, pady=(0, 8))
 
-        upcoming_label = ctk.CTkLabel(events_frame, text="Prochains évènements", anchor="w", font=ctk.CTkFont(size=13, weight="bold"))
+        upcoming_label = ctk.CTkLabel(events_frame, text="Upcoming events", anchor="w", font=ctk.CTkFont(size=13, weight="bold"))
         upcoming_label.pack(fill="x", padx=8, pady=(4, 4))
 
         self.upcoming_events_box = ctk.CTkScrollableFrame(events_frame, height=140)
@@ -80,7 +80,7 @@ class CalendarDock(ctk.CTkFrame):
 
     def _render_month(self):
         campaign_today = CampaignDateService.get_today()
-        self.campaign_today_label.configure(text=f"Cmpaign Day: {campaign_today.strftime('%m/%d/%Y')}")
+        self.campaign_today_label.configure(text=f"Campaign Day: {campaign_today.strftime('%m/%d/%Y')}")
         self.month_label.configure(text=f"{calendar.month_name[self.display_month]} {self.display_year}")
 
         month_matrix = calendar.Calendar(firstweekday=0).monthdatescalendar(self.display_year, self.display_month)
@@ -128,13 +128,13 @@ class CalendarDock(ctk.CTkFrame):
 
     def set_selected_date_events(self, selected_date, events):
         self.selected_date = selected_date
-        self.selected_title_label.configure(text=f"Évènements du {selected_date.strftime('%d/%m/%Y')}")
+        self.selected_title_label.configure(text=f"Events for {selected_date.strftime('%d/%m/%Y')}")
         self._populate_event_list(
             self.selected_events_box,
             self._selected_event_line_widgets,
             events,
             include_date=False,
-            empty_message="Aucun évènement.",
+            empty_message="No events.",
         )
         self._render_month()
 
@@ -144,7 +144,7 @@ class CalendarDock(ctk.CTkFrame):
             self._upcoming_event_line_widgets,
             events,
             include_date=True,
-            empty_message="Aucun évènement à venir.",
+            empty_message="No upcoming events.",
         )
 
     def set_month_event_map(self, events_by_date):
@@ -158,13 +158,13 @@ class CalendarDock(ctk.CTkFrame):
     def _event_badge(event):
         event_date = event.get("date")
         if event_date is None:
-            return "à venir"
+            return "upcoming"
         today = CampaignDateService.get_today()
         if event_date < today:
-            return "en retard"
+            return "overdue"
         if event_date == today:
-            return "aujourd'hui"
-        return "à venir"
+            return "today"
+        return "upcoming"
 
     def _open_campaign_today_dialog(self, _event=None):
         CampaignDateAgendaDialog(self, on_apply=self._on_campaign_today_applied)
@@ -183,7 +183,7 @@ class CalendarDock(ctk.CTkFrame):
 
     @classmethod
     def _format_event_line(cls, event, include_date=False):
-        title = event.get("title", "Sans titre")
+        title = event.get("title", "Untitled")
         badge = cls._event_badge(event)
         if include_date:
             event_date = event.get("date")
@@ -192,7 +192,7 @@ class CalendarDock(ctk.CTkFrame):
         return f"• {title} [{badge}]"
 
     @classmethod
-    def _populate_event_list(cls, container, cache, events, *, include_date=False, empty_message="Aucun évènement"):
+    def _populate_event_list(cls, container, cache, events, *, include_date=False, empty_message="No events"):
         for widget in cache:
             try:
                 widget.destroy()

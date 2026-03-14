@@ -35,7 +35,7 @@ class EventDetailPanel(ctk.CTkFrame):
         self.editor_frame.grid(row=3, column=0, sticky="ew", padx=10, pady=(0, 10))
         self.editor_frame.grid_columnconfigure(0, weight=1)
 
-        self.quick_title_entry = ctk.CTkEntry(self.editor_frame, placeholder_text="Titre (édition rapide)")
+        self.quick_title_entry = ctk.CTkEntry(self.editor_frame, placeholder_text="Title (quick edit)")
         self.quick_title_entry.grid(row=0, column=0, sticky="ew", padx=(0, 6))
         ctk.CTkButton(self.editor_frame, text="Enregistrer", width=110, command=self._emit_quick_edit).grid(row=0, column=1, sticky="e")
 
@@ -52,7 +52,7 @@ class EventDetailPanel(ctk.CTkFrame):
 
     def render(self, *, active_date, events, show_source=True):
         self._events = list(events)
-        self.selection_label.configure(text=f"Jour sélectionné : {active_date.strftime('%A %d/%m/%Y').capitalize()}")
+        self.selection_label.configure(text=f"Selected day: {active_date.strftime('%A %d/%m/%Y').capitalize()}")
         self._render_events(show_source=show_source)
 
     def _render_events(self, *, show_source):
@@ -60,11 +60,11 @@ class EventDetailPanel(ctk.CTkFrame):
             child.destroy()
 
         if not self._events:
-            ctk.CTkLabel(self.events_frame, text="Aucun évènement.").pack(anchor="w", padx=4, pady=4)
+            ctk.CTkLabel(self.events_frame, text="No events.").pack(anchor="w", padx=4, pady=4)
             return
 
         for event in self._events:
-            title = event.get("title", "Sans titre")
+            title = event.get("title", "Untitled")
             source = event.get("source")
             details = []
             if event.get("time"):
@@ -104,19 +104,19 @@ class EventDetailPanel(ctk.CTkFrame):
                     label.bind("<Button-1>", lambda _e, t=linked_type, n=linked_name: self._open_link(t, n))
 
             if not links_added:
-                ctk.CTkLabel(event_block, text="↳ Aucun lien", anchor="w", text_color="gray").pack(anchor="w", padx=18, pady=(0, 4))
+                ctk.CTkLabel(event_block, text="↳ No links", anchor="w", text_color="gray").pack(anchor="w", padx=18, pady=(0, 4))
 
     @staticmethod
     def _badge_text(event):
         event_date = event.get("date")
         if event_date is None:
-            return "à venir"
+            return "upcoming"
         today = date.today()
         if event_date < today:
-            return "en retard"
+            return "overdue"
         if event_date == today:
-            return "aujourd'hui"
-        return "à venir"
+            return "today"
+        return "upcoming"
 
     def _open_link(self, entity_type, entity_name):
         if callable(self._on_open_entity):

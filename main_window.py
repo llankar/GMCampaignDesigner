@@ -1094,12 +1094,12 @@ class MainWindow(ctk.CTk):
         if self._calendar_dock_visible:
             self.calendar_dock.grid_remove()
             self._calendar_dock_visible = False
-            self.calendar_dock_toggle_btn.configure(text="Calendrier ▶")
+            self.calendar_dock_toggle_btn.configure(text="Calendar ▶")
             return
 
         self.calendar_dock.grid()
         self._calendar_dock_visible = True
-        self.calendar_dock_toggle_btn.configure(text="Calendrier ◀")
+        self.calendar_dock_toggle_btn.configure(text="Calendar ◀")
         self._refresh_calendar_dock(self.calendar_dock.selected_date)
 
 
@@ -1295,7 +1295,7 @@ class MainWindow(ctk.CTk):
 
         start_time = self._normalize_event_time(payload.get("start_time"))
         end_time = self._normalize_event_time(payload.get("end_time"))
-        title = (payload.get("title") or "Nouvel évènement").strip()
+        title = (payload.get("title") or "New event").strip()
 
         slug, wrapper = self._resolve_calendar_event_wrapper()
         linked_places = payload.get("Places") or []
@@ -1317,7 +1317,7 @@ class MainWindow(ctk.CTk):
             "EndTime": end_time,
             "Type": (payload.get("type") or "Session").strip(),
             "Color": normalize_hex_color(payload.get("color"), fallback=get_event_type(payload.get("type")).color),
-            "Status": (payload.get("status") or "Planifié").strip(),
+            "Status": (payload.get("status") or "Planned").strip(),
             "Places": linked_places,
             "NPCs": linked_npcs,
             "Villains": linked_villains,
@@ -1908,7 +1908,7 @@ class MainWindow(ctk.CTk):
             width=90,
         )
         self.calendar_dock_toggle_btn = self.menu_bar.create_action_button(
-            text="Calendrier ◀",
+            text="Calendar ◀",
             command=self._toggle_calendar_dock,
             width=130,
         )
