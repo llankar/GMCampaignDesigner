@@ -35,6 +35,7 @@ class CampaignBuilderWizard(ctk.CTkToplevel):
         self.scenario_titles = self._load_scenario_titles(scenario_wrapper)
 
         self.arcs: list[dict] = []
+        self.current_arc_index: int | None = None
         self.original_campaign_name: str | None = None
         self.current_step = 0
         self.steps: list[ctk.CTkFrame] = []
@@ -167,9 +168,21 @@ class CampaignBuilderWizard(ctk.CTkToplevel):
 
         buttons = ctk.CTkFrame(frame, fg_color="transparent")
         buttons.pack(fill="x", pady=(8, 12), padx=12)
+        self.arc_selection_var = ctk.StringVar(value="No arc selected")
+        self.arc_selection_menu = ctk.CTkOptionMenu(
+            buttons,
+            variable=self.arc_selection_var,
+            values=["No arc selected"],
+            command=self._on_arc_selection_change,
+            **option_menu_style(),
+        )
+        self.arc_selection_menu.pack(side="left", padx=4)
         ctk.CTkButton(buttons, text="Add Arc", command=self._add_arc, **primary_button_style()).pack(side="left", padx=4)
-        ctk.CTkButton(buttons, text="Edit Last Arc", command=self._edit_last_arc, **primary_button_style()).pack(side="left", padx=4)
-        ctk.CTkButton(buttons, text="Remove Last Arc", command=self._remove_last_arc, **primary_button_style()).pack(side="left", padx=4)
+        ctk.CTkButton(buttons, text="Edit Arc", command=self._edit_selected_arc, **primary_button_style()).pack(side="left", padx=4)
+        ctk.CTkButton(buttons, text="Move Up", command=self._move_arc_up, **primary_button_style()).pack(side="left", padx=4)
+        ctk.CTkButton(buttons, text="Move Down", command=self._move_arc_down, **primary_button_style()).pack(side="left", padx=4)
+        ctk.CTkButton(buttons, text="Duplicate", command=self._duplicate_selected_arc, **primary_button_style()).pack(side="left", padx=4)
+        ctk.CTkButton(buttons, text="Delete", command=self._delete_selected_arc, **primary_button_style()).pack(side="left", padx=4)
 
         return frame
 
@@ -221,30 +234,100 @@ class CampaignBuilderWizard(ctk.CTkToplevel):
         self.wait_window(dlg)
         if dlg.result:
             self.arcs.append(dlg.result)
+            self.current_arc_index = len(self.arcs) - 1
             self._refresh_arcs_preview()
 
-    def _edit_last_arc(self):
-        if not self.arcs:
+    def _edit_selected_arc(self):
+        selected_index = self._get_selected_arc_index()
+        if selected_index is None:
             messagebox.showinfo("No arc", "Add at least one arc first.", parent=self)
             return
-        dlg = ArcEditorDialog(self, self.scenario_titles, initial_data=self.arcs[-1])
+        dlg = ArcEditorDialog(self, self.scenario_titles, initial_data=self.arcs[selected_index])
         self.wait_window(dlg)
         if dlg.result:
-            self.arcs[-1] = dlg.result
+            self.arcs[selected_index] = dlg.result
+            self.current_arc_index = selected_index
             self._refresh_arcs_preview()
 
-    def _remove_last_arc(self):
-        if self.arcs:
-            self.arcs.pop()
-            self._refresh_arcs_preview()
+    def _move_arc_up(self):
+        selected_index = self._get_selected_arc_index()
+        if selected_index is None or selected_index == 0:
+            return
+        self.arcs[selected_index - 1], self.arcs[selected_index] = self.arcs[selected_index], self.arcs[selected_index - 1]
+        self.current_arc_index = selected_index - 1
+        self._refresh_arcs_preview()
+
+    def _move_arc_down(self):
+        selected_index = self._get_selected_arc_index()
+        if selected_index is None or selected_index >= len(self.arcs) - 1:
+            return
+        self.arcs[selected_index + 1], self.arcs[selected_index] = self.arcs[selected_index], self.arcs[selected_index + 1]
+        self.current_arc_index = selected_index + 1
+        self._refresh_arcs_preview()
+
+    def _duplicate_selected_arc(self):
+        selected_index = self._get_selected_arc_index()
+        if selected_index is None:
+            return
+        duplicated_arc = dict(self.arcs[selected_index])
+        self.arcs.insert(selected_index + 1, duplicated_arc)
+        self.current_arc_index = selected_index + 1
+        self._refresh_arcs_preview()
+
+    def _delete_selected_arc(self):
+        selected_index = self._get_selected_arc_index()
+        if selected_index is None:
+            return
+        self.arcs.pop(selected_index)
+        if not self.arcs:
+            self.current_arc_index = None
+        else:
+            self.current_arc_index = min(selected_index, len(self.arcs) - 1)
+        self._refresh_arcs_preview()
+
+    def _get_selected_arc_index(self) -> int | None:
+        if not self.arcs:
+            return None
+        if self.current_arc_index is None:
+            self.current_arc_index = 0
+        if self.current_arc_index < 0 or self.current_arc_index >= len(self.arcs):
+            self.current_arc_index = len(self.arcs) - 1
+        return self.current_arc_index
+
+    def _on_arc_selection_change(self, value: str):
+        if not value.startswith("#"):
+            self.current_arc_index = None
+            return
+        try:
+            index_str = value.split(" ", 1)[0].lstrip("#")
+            self.current_arc_index = int(index_str) - 1
+        except (TypeError, ValueError):
+            self.current_arc_index = None
+
+    def _refresh_arc_selection(self):
+        if not self.arcs:
+            self.arc_selection_menu.configure(values=["No arc selected"])
+            self.arc_selection_var.set("No arc selected")
+            self.current_arc_index = None
+            return
+
+        options = [f"#{idx}. {arc.get('name') or 'Untitled Arc'}" for idx, arc in enumerate(self.arcs, start=1)]
+        self.arc_selection_menu.configure(values=options)
+
+        if self.current_arc_index is None:
+            self.current_arc_index = 0
+        self.current_arc_index = max(0, min(self.current_arc_index, len(self.arcs) - 1))
+        self.arc_selection_var.set(options[self.current_arc_index])
 
     def _refresh_arcs_preview(self):
+        self._refresh_arc_selection()
         self.arcs_list.configure(state="normal")
         self.arcs_list.delete("1.0", "end")
         if not self.arcs:
             self.arcs_list.insert("end", "No arc yet. Add one to structure your campaign progression.")
         for idx, arc in enumerate(self.arcs, start=1):
-            self.arcs_list.insert("end", f"{idx}. {arc.get('name')} [{arc.get('status', 'Planned')}]\n")
+            selected_marker = " <- selected" if self.current_arc_index == idx - 1 else ""
+            self.arcs_list.insert("end", f"Order {idx}: {arc.get('name')} [{arc.get('status', 'Planned')}]" + selected_marker + "\n")
             self.arcs_list.insert("end", f"   Objective: {arc.get('objective', '')}\n")
             self.arcs_list.insert("end", f"   Scenarios: {', '.join(arc.get('scenarios') or [])}\n\n")
         self.arcs_list.configure(state="disabled")
@@ -359,6 +442,7 @@ class CampaignBuilderWizard(ctk.CTkToplevel):
         self._set_textbox_value(self.notes_box, text_areas.get("notes", ""))
 
         self.arcs = arcs
+        self.current_arc_index = 0 if self.arcs else None
 
     @staticmethod
     def _set_textbox_value(textbox: ctk.CTkTextbox, value: str):
