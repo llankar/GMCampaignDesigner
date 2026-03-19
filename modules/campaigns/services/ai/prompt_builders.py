@@ -4,6 +4,7 @@ import json
 from typing import Any
 
 from modules.helpers.text_helpers import coerce_text
+from .constraints import minimum_scenarios_per_arc
 
 
 ARC_GENERATION_SCHEMA = {
@@ -27,7 +28,7 @@ ARC_GENERATION_SCHEMA = {
             "objective": "string",
             "status": "Planned|In Progress|Completed|Paused",
             "thread": "string",
-            "scenarios": ["Existing Scenario Title, max 3 items"],
+            "scenarios": ["Existing Scenario Title 1", "Existing Scenario Title 2", "Existing Scenario Title 3+"],
         }
     ],
 }
@@ -59,11 +60,15 @@ def build_arc_generation_prompt(foundation: dict[str, Any], scenarios: list[dict
         "notes": _clean(foundation.get("notes")),
     }
 
+    min_scenarios = minimum_scenarios_per_arc(len(scenario_catalog))
+
     return (
         "You are an expert tabletop RPG campaign architect.\n"
         "Return STRICT JSON only. No markdown, no explanations, no code fences.\n"
         "Design a globally coherent campaign progression using ONLY the existing scenarios provided.\n"
-        "You may leave an arc with fewer than 3 scenarios, but never include more than 3 scenarios in one arc.\n"
+        f"Each arc must contain at least {min_scenarios} connected scenarios when enough scenarios exist in the catalog.\n"
+        "Within each arc, order scenarios so they form a clear cause-and-effect chain: setup, escalation, then payoff or fallout.\n"
+        "If an arc would otherwise be too short, merge it into a neighboring arc instead of creating an isolated one-scenario beat.\n"
         "Every scenario reference must match an existing scenario title exactly.\n"
         "Create one or more campaign threads that span multiple arcs when appropriate.\n"
         "Order arcs for progression from early to late campaign.\n\n"
@@ -78,6 +83,7 @@ def build_arc_generation_prompt(foundation: dict[str, Any], scenarios: list[dict
         "- Keep status realistic for a planning workflow; default to Planned unless campaign state strongly implies otherwise.\n"
         "- The thread field on each arc must match one of the generated thread names.\n"
         "- Prefer broad campaign continuity over isolated arc ideas.\n"
+        f"- Do not create arcs with fewer than {min_scenarios} scenarios unless the full scenario catalog itself contains fewer than that many scenarios.\n"
         "- Do not invent new scenario titles.\n"
     )
 

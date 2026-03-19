@@ -4,8 +4,7 @@ import json
 import re
 from typing import Any
 
-
-MAX_SCENARIOS_PER_ARC = 3
+from .constraints import minimum_scenarios_per_arc
 
 
 class ArcGenerationValidationError(RuntimeError):
@@ -102,6 +101,8 @@ def _normalize_arcs(raw_arcs: Any, available_scenarios: set[str] | None = None) 
         raise ArcGenerationValidationError("The 'arcs' field must be a JSON array")
 
     normalized: list[dict[str, Any]] = []
+    total_available = len(available_scenarios) if available_scenarios is not None else None
+    min_required = minimum_scenarios_per_arc(total_available)
     for index, raw_arc in enumerate(raw_arcs, start=1):
         if not isinstance(raw_arc, dict):
             continue
@@ -109,7 +110,7 @@ def _normalize_arcs(raw_arcs: Any, available_scenarios: set[str] | None = None) 
         if not name:
             raise ArcGenerationValidationError(f"Arc #{index} is missing a name")
 
-        scenarios = _normalize_scenarios(raw_arc.get("scenarios") or [], index=index)
+        scenarios = _normalize_scenarios(raw_arc.get("scenarios") or [], index=index, min_required=min_required)
         if available_scenarios is not None:
             unknown = [title for title in scenarios if title not in available_scenarios]
             if unknown:
@@ -130,7 +131,7 @@ def _normalize_arcs(raw_arcs: Any, available_scenarios: set[str] | None = None) 
     return normalized
 
 
-def _normalize_scenarios(raw_scenarios: Any, index: int) -> list[str]:
+def _normalize_scenarios(raw_scenarios: Any, index: int, *, min_required: int) -> list[str]:
     if isinstance(raw_scenarios, str):
         scenarios = [part.strip() for part in raw_scenarios.split(",") if part.strip()]
     elif isinstance(raw_scenarios, list):
@@ -138,15 +139,16 @@ def _normalize_scenarios(raw_scenarios: Any, index: int) -> list[str]:
     else:
         raise ArcGenerationValidationError(f"Arc #{index} has an invalid 'scenarios' field")
 
-    if len(scenarios) > MAX_SCENARIOS_PER_ARC:
-        raise ArcGenerationValidationError(
-            f"Arc #{index} exceeds the {MAX_SCENARIOS_PER_ARC}-scenario limit"
-        )
-
     deduped: list[str] = []
     for scenario in scenarios:
         if scenario not in deduped:
             deduped.append(scenario)
+
+    if len(deduped) < min_required:
+        raise ArcGenerationValidationError(
+            f"Arc #{index} must contain at least {min_required} connected scenarios"
+        )
+
     return deduped
 
 
