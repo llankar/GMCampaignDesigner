@@ -22,6 +22,7 @@ from modules.generic.generic_model_wrapper import GenericModelWrapper
 from modules.generic.generic_list_selection_view import GenericListSelectionView
 from modules.helpers.logging_helper import log_exception
 from modules.helpers.template_loader import load_template
+from modules.helpers.window_helper import position_window_at_top
 from modules.generic.editor.styles import (
     EDITOR_PALETTE,
     option_menu_style,
@@ -61,6 +62,7 @@ class CampaignBuilderWizard(ctk.CTkToplevel):
         self.transient(master)
         self.grab_set()
         self.focus_force()
+        position_window_at_top(self)
 
     def _build_layout(self):
         root = ctk.CTkFrame(self, fg_color=EDITOR_PALETTE["surface"])
@@ -324,6 +326,7 @@ class CampaignBuilderWizard(ctk.CTkToplevel):
         self.arcs_list = ctk.CTkTextbox(frame, height=420, fg_color=EDITOR_PALETTE["surface_soft"], border_width=1, border_color=EDITOR_PALETTE["border"])
         self.arcs_list.pack(fill="both", expand=True, padx=12)
         self.arcs_list.bind("<Button-1>", self._on_arcs_preview_click)
+        self.arcs_list.bind("<Double-Button-1>", self._on_arcs_preview_double_click)
         self.arcs_list.configure(state="disabled", cursor="hand2")
 
         buttons = ctk.CTkFrame(frame, fg_color="transparent")
@@ -614,20 +617,35 @@ class CampaignBuilderWizard(ctk.CTkToplevel):
             return None
 
     def _on_arcs_preview_click(self, event):
-        if not self.arcs:
+        selected_index = self._select_arc_from_preview_event(event)
+        if selected_index is None:
             return "break"
+        return "break"
+
+    def _on_arcs_preview_double_click(self, event):
+        selected_index = self._select_arc_from_preview_event(event)
+        if selected_index is None:
+            return "break"
+        self._edit_selected_arc()
+        return "break"
+
+    def _select_arc_from_preview_event(self, event) -> int | None:
+        if not self.arcs:
+            return None
 
         self.arcs_list.configure(state="normal")
-        line_index = int(self.arcs_list.index(f"@{event.x},{event.y}").split(".")[0])
-        self.arcs_list.configure(state="disabled")
+        try:
+            line_index = int(self.arcs_list.index(f"@{event.x},{event.y}").split(".")[0])
+        finally:
+            self.arcs_list.configure(state="disabled")
 
         selected_index = self._find_arc_index_for_line(line_index)
         if selected_index is None:
-            return "break"
+            return None
 
         self.current_arc_index = min(selected_index, len(self.arcs) - 1)
         self._refresh_arcs_preview()
-        return "break"
+        return self.current_arc_index
 
     def _refresh_arcs_preview(self):
         if not self.arcs:
@@ -766,6 +784,7 @@ class CampaignBuilderWizard(ctk.CTkToplevel):
         view.pack(fill="both", expand=True)
         dialog.transient(self)
         dialog.grab_set()
+        position_window_at_top(dialog)
         self.wait_window(dialog)
         return result["payload"]
 

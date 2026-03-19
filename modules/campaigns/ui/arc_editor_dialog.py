@@ -5,6 +5,7 @@ from tkinter import messagebox
 
 from modules.campaigns.shared.arc_status import CANONICAL_ARC_STATUSES, canonicalize_arc_status
 from modules.campaigns.ui.widgets import ScenarioMultiSelector
+from modules.helpers.window_helper import position_window_at_top
 
 
 class ArcEditorDialog(ctk.CTkToplevel):
@@ -73,6 +74,7 @@ class ArcEditorDialog(ctk.CTkToplevel):
         self.transient(master)
         self.grab_set()
         self.focus_force()
+        position_window_at_top(self)
 
     def _save(self):
         name = self.name_var.get().strip()
