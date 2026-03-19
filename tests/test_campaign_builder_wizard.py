@@ -274,6 +274,13 @@ def test_generate_arcs_from_scenarios_applies_service_result_after_confirmation(
         "stakes": "The district burns.",
         "themes": ["Trust", "Betrayal"],
         "notes": "Use existing cases.",
+        "existing_entities": {
+            "villains": [],
+            "factions": [],
+            "places": [],
+            "npcs": [],
+            "creatures": [],
+        },
     }
     assert applied["merge"] is False
     assert applied["arcs"][0]["thread"] == "Guild War"
@@ -346,8 +353,30 @@ def test_generate_scenarios_per_arc_links_saved_titles_back_to_parent_arc(monkey
                     {
                         "arc_name": "Guild War",
                         "scenarios": [
-                            {"Title": "Rainmarket Ultimatum", "Summary": "", "Secrets": "", "Places": [], "NPCs": [], "Objects": []},
-                            {"Title": "Ash Dock Reckoning", "Summary": "", "Secrets": "", "Places": [], "NPCs": [], "Objects": []},
+                            {
+                                "Title": "Rainmarket Ultimatum",
+                                "Summary": "",
+                                "Secrets": "",
+                                "Scenes": ["Scene 1", "Scene 2", "Scene 3"],
+                                "Places": ["Rainmarket"],
+                                "NPCs": [],
+                                "Villains": ["Marshal Vey"],
+                                "Creatures": [],
+                                "Factions": ["Rainmarket Compact"],
+                                "Objects": [],
+                            },
+                            {
+                                "Title": "Ash Dock Reckoning",
+                                "Summary": "",
+                                "Secrets": "",
+                                "Scenes": ["Scene 4", "Scene 5", "Scene 6"],
+                                "Places": ["Ash Dock"],
+                                "NPCs": [],
+                                "Villains": ["Marshal Vey"],
+                                "Creatures": [],
+                                "Factions": ["Rainmarket Compact"],
+                                "Objects": [],
+                            },
                         ],
                     }
                 ]

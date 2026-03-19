@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from typing import Any
 
+from modules.campaigns.services.ai.arc_scenario_entities import build_existing_entity_lookup
 from modules.campaigns.services.ai.json_parsing import parse_json_relaxed
 from modules.campaigns.services.ai.prompt_builders import build_arc_scenario_expansion_prompt
 
@@ -18,6 +19,7 @@ class ArcScenarioExpansionService:
 
     def generate_scenarios(self, foundation: dict[str, Any], arcs: list[dict[str, Any]]) -> dict[str, Any]:
         normalized_arcs = self._normalize_input_arcs(arcs)
+        existing_entities = build_existing_entity_lookup(foundation)
         prompt = build_arc_scenario_expansion_prompt(foundation=foundation, arcs=normalized_arcs)
         messages = [
             {
@@ -32,7 +34,11 @@ class ArcScenarioExpansionService:
             raw_response = self.ai_client.chat(messages)
             try:
                 parsed = parse_json_relaxed(raw_response)
-                return self._normalize_generated_payload(parsed, normalized_arcs)
+                return self._normalize_generated_payload(
+                    parsed,
+                    normalized_arcs,
+                    existing_entities=existing_entities,
+                )
             except Exception as exc:
                 last_error = exc
                 if attempt == 1:
@@ -82,7 +88,13 @@ class ArcScenarioExpansionService:
             raise ArcScenarioExpansionValidationError("At least one arc is required for scenario generation")
         return normalized
 
-    def _normalize_generated_payload(self, payload: Any, arcs: list[dict[str, Any]]) -> dict[str, Any]:
+    def _normalize_generated_payload(
+        self,
+        payload: Any,
+        arcs: list[dict[str, Any]],
+        *,
+        existing_entities: dict[str, set[str]] | None = None,
+    ) -> dict[str, Any]:
         if not isinstance(payload, dict):
             raise ArcScenarioExpansionValidationError("AI scenario generation must return a JSON object")
 
@@ -127,6 +139,7 @@ class ArcScenarioExpansionService:
                     scenario_payload,
                     parent_arc=arc_context_lookup[arc_key],
                     used_titles=used_titles,
+                    existing_entities=existing_entities,
                 )
                 for scenario_payload in raw_scenarios
             ]
@@ -151,6 +164,7 @@ class ArcScenarioExpansionService:
         *,
         parent_arc: dict[str, Any],
         used_titles: set[str],
+        existing_entities: dict[str, set[str]] | None,
     ) -> dict[str, Any]:
         parent_arc_name = parent_arc["name"]
         if not isinstance(payload, dict):
@@ -172,6 +186,80 @@ class ArcScenarioExpansionService:
         summary = str(payload.get("Summary") or "").strip()
         secrets = str(payload.get("Secrets") or "").strip()
         traceability_block = ArcScenarioExpansionService._build_traceability_block(parent_arc)
+        entity_creations = ArcScenarioExpansionService._normalize_entity_creations(payload.get("EntityCreations"))
+
+        scenes = ArcScenarioExpansionService._normalize_string_list(payload.get("Scenes"))
+        if len(scenes) < 3:
+            raise ArcScenarioExpansionValidationError(
+                f"Generated scenario '{title}' for arc '{parent_arc_name}' must include at least 3 scenes"
+            )
+
+        places = ArcScenarioExpansionService._normalize_string_list(payload.get("Places"))
+        npcs = ArcScenarioExpansionService._normalize_string_list(payload.get("NPCs"))
+        villains = ArcScenarioExpansionService._normalize_string_list(payload.get("Villains"))
+        creatures = ArcScenarioExpansionService._normalize_string_list(payload.get("Creatures"))
+        factions = ArcScenarioExpansionService._normalize_string_list(payload.get("Factions"))
+        objects = ArcScenarioExpansionService._normalize_string_list(payload.get("Objects"))
+
+        places = ArcScenarioExpansionService._ensure_created_links_present(places, entity_creations["places"])
+        villains = ArcScenarioExpansionService._ensure_created_links_present(villains, entity_creations["villains"])
+        factions = ArcScenarioExpansionService._ensure_created_links_present(factions, entity_creations["factions"])
+        npcs = ArcScenarioExpansionService._ensure_created_links_present(npcs, entity_creations["npcs"])
+        creatures = ArcScenarioExpansionService._ensure_created_links_present(creatures, entity_creations["creatures"])
+
+        if not places:
+            raise ArcScenarioExpansionValidationError(
+                f"Generated scenario '{title}' for arc '{parent_arc_name}' must include at least 1 place"
+            )
+        if not villains:
+            raise ArcScenarioExpansionValidationError(
+                f"Generated scenario '{title}' for arc '{parent_arc_name}' must include at least 1 villain"
+            )
+        if not factions:
+            raise ArcScenarioExpansionValidationError(
+                f"Generated scenario '{title}' for arc '{parent_arc_name}' must include at least 1 faction"
+            )
+
+        ArcScenarioExpansionService._validate_new_links_are_defined(
+            title=title,
+            field_name="Places",
+            entity_type="places",
+            values=places,
+            entity_creations=entity_creations,
+            existing_entities=existing_entities,
+        )
+        ArcScenarioExpansionService._validate_new_links_are_defined(
+            title=title,
+            field_name="Villains",
+            entity_type="villains",
+            values=villains,
+            entity_creations=entity_creations,
+            existing_entities=existing_entities,
+        )
+        ArcScenarioExpansionService._validate_new_links_are_defined(
+            title=title,
+            field_name="Factions",
+            entity_type="factions",
+            values=factions,
+            entity_creations=entity_creations,
+            existing_entities=existing_entities,
+        )
+        ArcScenarioExpansionService._validate_new_links_are_defined(
+            title=title,
+            field_name="NPCs",
+            entity_type="npcs",
+            values=npcs,
+            entity_creations=entity_creations,
+            existing_entities=existing_entities,
+        )
+        ArcScenarioExpansionService._validate_new_links_are_defined(
+            title=title,
+            field_name="Creatures",
+            entity_type="creatures",
+            values=creatures,
+            entity_creations=entity_creations,
+            existing_entities=existing_entities,
+        )
 
         if parent_arc_name and parent_arc_name not in summary:
             summary = f"{summary}\n\nContinues arc: {parent_arc_name}." if summary else f"Continues arc: {parent_arc_name}."
@@ -182,9 +270,14 @@ class ArcScenarioExpansionService:
             "Title": title,
             "Summary": summary,
             "Secrets": secrets,
-            "Places": ArcScenarioExpansionService._normalize_string_list(payload.get("Places")),
-            "NPCs": ArcScenarioExpansionService._normalize_string_list(payload.get("NPCs")),
-            "Objects": ArcScenarioExpansionService._normalize_string_list(payload.get("Objects")),
+            "Scenes": scenes,
+            "Places": places,
+            "NPCs": npcs,
+            "Villains": villains,
+            "Creatures": creatures,
+            "Factions": factions,
+            "Objects": objects,
+            "EntityCreations": entity_creations,
         }
 
     @staticmethod
@@ -194,6 +287,164 @@ class ArcScenarioExpansionService:
         if not isinstance(value, list):
             raise ArcScenarioExpansionValidationError("Scenario link fields must be JSON arrays")
         return [str(item).strip() for item in value if str(item).strip()]
+
+    @staticmethod
+    def _normalize_entity_creations(value: Any) -> dict[str, list[dict[str, Any]]]:
+        raw = value if isinstance(value, dict) else {}
+        return {
+            "villains": ArcScenarioExpansionService._normalize_created_villains(raw.get("villains")),
+            "factions": ArcScenarioExpansionService._normalize_created_factions(raw.get("factions")),
+            "places": ArcScenarioExpansionService._normalize_created_places(raw.get("places")),
+            "npcs": ArcScenarioExpansionService._normalize_created_npcs(raw.get("npcs")),
+            "creatures": ArcScenarioExpansionService._normalize_created_creatures(raw.get("creatures")),
+        }
+
+    @staticmethod
+    def _ensure_created_links_present(values: list[str], created_records: list[dict[str, Any]]) -> list[str]:
+        normalized = list(values)
+        seen = {value.casefold() for value in normalized}
+        for record in created_records:
+            name = str(record.get("Name") or "").strip()
+            if not name or name.casefold() in seen:
+                continue
+            normalized.append(name)
+            seen.add(name.casefold())
+        return normalized
+
+    @staticmethod
+    def _validate_new_links_are_defined(
+        *,
+        title: str,
+        field_name: str,
+        entity_type: str,
+        values: list[str],
+        entity_creations: dict[str, list[dict[str, Any]]],
+        existing_entities: dict[str, set[str]] | None,
+    ) -> None:
+        if existing_entities is None:
+            return
+
+        known_existing = existing_entities.get(entity_type, set())
+        known_created = {
+            str(item.get("Name") or "").strip().casefold()
+            for item in entity_creations.get(entity_type) or []
+            if str(item.get("Name") or "").strip()
+        }
+        missing = [
+            value for value in values
+            if value.casefold() not in known_existing and value.casefold() not in known_created
+        ]
+        if missing:
+            raise ArcScenarioExpansionValidationError(
+                f"Scenario '{title}' links unknown {field_name}: {', '.join(missing)}. "
+                "Add them to EntityCreations or reuse existing catalog entities."
+            )
+
+    @staticmethod
+    def _normalize_created_villains(value: Any) -> list[dict[str, Any]]:
+        records = ArcScenarioExpansionService._normalize_created_records(value, "villains")
+        return [
+            {
+                "Name": record["Name"],
+                "Title": str(record.get("Title") or "").strip(),
+                "Archetype": str(record.get("Archetype") or "").strip(),
+                "ThreatLevel": str(record.get("ThreatLevel") or "").strip(),
+                "Description": str(record.get("Description") or "").strip(),
+                "Scheme": str(record.get("Scheme") or "").strip(),
+                "CurrentObjective": str(record.get("CurrentObjective") or "").strip(),
+                "Secrets": str(record.get("Secrets") or "").strip(),
+                "Factions": ArcScenarioExpansionService._normalize_string_list(record.get("Factions")),
+                "Lieutenants": ArcScenarioExpansionService._normalize_string_list(record.get("Lieutenants")),
+                "CreatureAgents": ArcScenarioExpansionService._normalize_string_list(record.get("CreatureAgents")),
+            }
+            for record in records
+        ]
+
+    @staticmethod
+    def _normalize_created_factions(value: Any) -> list[dict[str, Any]]:
+        records = ArcScenarioExpansionService._normalize_created_records(value, "factions")
+        return [
+            {
+                "Name": record["Name"],
+                "Description": str(record.get("Description") or "").strip(),
+                "Secrets": str(record.get("Secrets") or "").strip(),
+                "Villains": ArcScenarioExpansionService._normalize_string_list(record.get("Villains")),
+            }
+            for record in records
+        ]
+
+    @staticmethod
+    def _normalize_created_places(value: Any) -> list[dict[str, Any]]:
+        records = ArcScenarioExpansionService._normalize_created_records(value, "places")
+        return [
+            {
+                "Name": record["Name"],
+                "Description": str(record.get("Description") or "").strip(),
+                "Secrets": str(record.get("Secrets") or "").strip(),
+                "NPCs": ArcScenarioExpansionService._normalize_string_list(record.get("NPCs")),
+                "Villains": ArcScenarioExpansionService._normalize_string_list(record.get("Villains")),
+            }
+            for record in records
+        ]
+
+    @staticmethod
+    def _normalize_created_npcs(value: Any) -> list[dict[str, Any]]:
+        records = ArcScenarioExpansionService._normalize_created_records(value, "npcs")
+        return [
+            {
+                "Name": record["Name"],
+                "Role": str(record.get("Role") or "").strip(),
+                "Description": str(record.get("Description") or "").strip(),
+                "Secret": str(record.get("Secret") or "").strip(),
+                "Motivation": str(record.get("Motivation") or "").strip(),
+                "Background": str(record.get("Background") or "").strip(),
+                "Personality": str(record.get("Personality") or "").strip(),
+                "Factions": ArcScenarioExpansionService._normalize_string_list(record.get("Factions")),
+            }
+            for record in records
+        ]
+
+    @staticmethod
+    def _normalize_created_creatures(value: Any) -> list[dict[str, Any]]:
+        records = ArcScenarioExpansionService._normalize_created_records(value, "creatures")
+        return [
+            {
+                "Name": record["Name"],
+                "Type": str(record.get("Type") or "").strip(),
+                "Description": str(record.get("Description") or "").strip(),
+                "Weakness": str(record.get("Weakness") or "").strip(),
+                "Powers": str(record.get("Powers") or "").strip(),
+            }
+            for record in records
+        ]
+
+    @staticmethod
+    def _normalize_created_records(value: Any, entity_type: str) -> list[dict[str, Any]]:
+        if value in (None, ""):
+            return []
+        if not isinstance(value, list):
+            raise ArcScenarioExpansionValidationError(
+                f"EntityCreations.{entity_type} must be a JSON array"
+            )
+
+        normalized: list[dict[str, Any]] = []
+        seen: set[str] = set()
+        for record in value:
+            if not isinstance(record, dict):
+                raise ArcScenarioExpansionValidationError(
+                    f"EntityCreations.{entity_type} entries must be JSON objects"
+                )
+            name = str(record.get("Name") or "").strip()
+            if not name:
+                raise ArcScenarioExpansionValidationError(
+                    f"EntityCreations.{entity_type} entries must include a Name"
+                )
+            key = name.casefold()
+            if key in seen:
+                continue
+            seen.add(key)
+            normalized.append({"Name": name, **record})
+        return normalized
 
     @staticmethod
     def _build_traceability_block(parent_arc: dict[str, Any]) -> str:

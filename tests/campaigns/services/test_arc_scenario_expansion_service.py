@@ -34,6 +34,9 @@ class _FakeScenarioWrapper:
             }
         )
 
+    def save_items(self, items, *, replace=True):
+        self.saved_items = [dict(item) for item in items]
+
 
 def test_arc_scenario_expansion_requires_linked_scenarios():
     service = ArcScenarioExpansionService(_FakeAIClient('{"arcs": []}'))
@@ -67,16 +70,24 @@ def test_arc_scenario_expansion_generates_exactly_two_scenarios_per_arc():
                   "Title": "Rainmarket Ultimatum",
                   "Summary": "The crew traces the conspiracy into Rainmarket.",
                   "Secrets": "A broker carries the ledger fragment.",
+                  "Scenes": ["Stake out the market", "Interrogate the broker", "Escape the crackdown"],
                   "Places": ["Rainmarket"],
                   "NPCs": ["Rika Vale"],
+                  "Villains": ["Marshal Vey"],
+                  "Creatures": [],
+                  "Factions": ["Rainmarket Compact"],
                   "Objects": ["Ledger Fragment"]
                 },
                 {
                   "Title": "Ash Dock Reckoning",
                   "Summary": "A trap at Ash Dock forces the crew to expose the mole.",
                   "Secrets": "The dockmaster answers to the same patron.",
+                  "Scenes": ["Follow the dock rumor", "Survive the ambush", "Corner the mole"],
                   "Places": ["Ash Dock"],
                   "NPCs": ["Dockmaster Neral"],
+                  "Villains": ["Marshal Vey"],
+                  "Creatures": [],
+                  "Factions": ["Rainmarket Compact"],
                   "Objects": []
                 }
               ]
@@ -105,12 +116,27 @@ def test_arc_scenario_expansion_generates_exactly_two_scenarios_per_arc():
     assert len(result["arcs"][0]["scenarios"]) == 2
     assert result["arcs"][0]["scenarios"][0]["Title"] == "Rainmarket Ultimatum"
     assert "Parent arc: Guild War" in result["arcs"][0]["scenarios"][0]["Secrets"]
+    assert result["arcs"][0]["scenarios"][0]["Scenes"] == [
+        "Stake out the market",
+        "Interrogate the broker",
+        "Escape the crackdown",
+    ]
+    assert result["arcs"][0]["scenarios"][0]["Villains"] == ["Marshal Vey"]
     assert "Hidden conspiracy" in ai_client.messages[1]["content"]
 
 
 def test_generated_scenario_persistence_handles_duplicate_titles_before_save():
     wrapper = _FakeScenarioWrapper(items=[{"Title": "Rainmarket Ultimatum"}])
-    persistence = GeneratedScenarioPersistence(wrapper)
+    persistence = GeneratedScenarioPersistence(
+        wrapper,
+        entity_wrappers={
+            "villains": _FakeScenarioWrapper(),
+            "factions": _FakeScenarioWrapper(),
+            "places": _FakeScenarioWrapper(),
+            "npcs": _FakeScenarioWrapper(),
+            "creatures": _FakeScenarioWrapper(),
+        },
+    )
     arcs = [{"name": "Guild War", "scenarios": ["Cold Open"]}]
 
     saved_groups = persistence.save_generated_arc_scenarios(
@@ -119,8 +145,37 @@ def test_generated_scenario_persistence_handles_duplicate_titles_before_save():
                 {
                     "arc_name": "Guild War",
                     "scenarios": [
-                        {"Title": "Rainmarket Ultimatum", "Summary": "", "Secrets": "", "Places": [], "NPCs": [], "Objects": []},
-                        {"Title": "Rainmarket Ultimatum", "Summary": "", "Secrets": "", "Places": [], "NPCs": [], "Objects": []},
+                        {
+                            "Title": "Rainmarket Ultimatum",
+                            "Summary": "",
+                            "Secrets": "",
+                            "Scenes": ["A", "B", "C"],
+                            "Places": ["Rainmarket"],
+                            "NPCs": [],
+                            "Villains": ["Marshal Vey"],
+                            "Creatures": [],
+                            "Factions": ["Rainmarket Compact"],
+                            "Objects": [],
+                            "EntityCreations": {
+                                "villains": [{"Name": "Marshal Vey", "Description": "A relentless enforcer."}],
+                                "factions": [{"Name": "Rainmarket Compact", "Description": "Market fixers."}],
+                                "places": [{"Name": "Rainmarket", "Description": "A covered bazaar."}],
+                                "npcs": [],
+                                "creatures": [],
+                            },
+                        },
+                        {
+                            "Title": "Rainmarket Ultimatum",
+                            "Summary": "",
+                            "Secrets": "",
+                            "Scenes": ["D", "E", "F"],
+                            "Places": ["Rainmarket"],
+                            "NPCs": [],
+                            "Villains": ["Marshal Vey"],
+                            "Creatures": [],
+                            "Factions": ["Rainmarket Compact"],
+                            "Objects": [],
+                        },
                     ],
                 }
             ]
@@ -136,3 +191,63 @@ def test_generated_scenario_persistence_handles_duplicate_titles_before_save():
         "Rainmarket Ultimatum (2)",
         "Rainmarket Ultimatum (3)",
     ]
+    assert persistence.entity_wrappers["villains"].saved_items[0]["Name"] == "Marshal Vey"
+    assert persistence.entity_wrappers["factions"].saved_items[0]["Name"] == "Rainmarket Compact"
+    assert persistence.entity_wrappers["places"].saved_items[0]["Name"] == "Rainmarket"
+
+
+def test_arc_scenario_expansion_rejects_missing_required_links():
+    ai_client = _FakeAIClient(
+        """
+        {
+          "arcs": [
+            {
+              "arc_name": "Guild War",
+              "scenarios": [
+                {
+                  "Title": "Rainmarket Ultimatum",
+                  "Summary": "The crew traces the conspiracy into Rainmarket.",
+                  "Secrets": "A broker carries the ledger fragment.",
+                  "Scenes": ["Stake out the market", "Pressure the broker", "Evade the crackdown"],
+                  "Places": ["Rainmarket"],
+                  "NPCs": [],
+                  "Villains": [],
+                  "Creatures": [],
+                  "Factions": [],
+                  "Objects": []
+                },
+                {
+                  "Title": "Ash Dock Reckoning",
+                  "Summary": "A trap at Ash Dock forces the crew to expose the mole.",
+                  "Secrets": "The dockmaster answers to the same patron.",
+                  "Scenes": ["Follow the dock rumor", "Survive the ambush", "Corner the mole"],
+                  "Places": ["Ash Dock"],
+                  "NPCs": [],
+                  "Villains": ["Marshal Vey"],
+                  "Creatures": [],
+                  "Factions": ["Rainmarket Compact"],
+                  "Objects": []
+                }
+              ]
+            }
+          ]
+        }
+        """
+    )
+    service = ArcScenarioExpansionService(ai_client)
+
+    with pytest.raises(ArcScenarioExpansionValidationError) as exc:
+        service.generate_scenarios(
+            {"name": "Stormfront", "tone": "Noir"},
+            [
+                {
+                    "name": "Guild War",
+                    "summary": "Street-level pressure escalates.",
+                    "objective": "Identify the patron behind the gang war.",
+                    "thread": "Hidden conspiracy",
+                    "scenarios": ["Cold Open"],
+                }
+            ],
+        )
+
+    assert "at least 1 villain" in str(exc.value)

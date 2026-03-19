@@ -42,17 +42,91 @@ ARC_SCENARIO_EXPANSION_SCHEMA = {
                     "Title": "string",
                     "Summary": "string",
                     "Secrets": "string",
+                    "Scenes": [
+                        "Detailed scene 1",
+                        "Detailed scene 2",
+                        "Detailed scene 3+",
+                    ],
                     "Places": ["Existing or new place names if needed"],
                     "NPCs": ["Existing or new NPC names if needed"],
+                    "Villains": ["At least 1 villain name"],
+                    "Creatures": ["Existing or new creature names if needed"],
+                    "Factions": ["At least 1 faction name"],
                     "Objects": ["Existing or new object names if needed"],
+                    "EntityCreations": {
+                        "villains": [
+                            {
+                                "Name": "string",
+                                "Title": "string",
+                                "Archetype": "string",
+                                "ThreatLevel": "string",
+                                "Description": "string",
+                                "Scheme": "string",
+                                "CurrentObjective": "string",
+                                "Secrets": "string",
+                                "Factions": ["Faction names"],
+                                "Lieutenants": ["NPC names"],
+                                "CreatureAgents": ["Creature names"],
+                            }
+                        ],
+                        "factions": [
+                            {
+                                "Name": "string",
+                                "Description": "string",
+                                "Secrets": "string",
+                                "Villains": ["Villain names"],
+                            }
+                        ],
+                        "places": [
+                            {
+                                "Name": "string",
+                                "Description": "string",
+                                "Secrets": "string",
+                                "NPCs": ["NPC names"],
+                                "Villains": ["Villain names"],
+                            }
+                        ],
+                        "npcs": [
+                            {
+                                "Name": "string",
+                                "Role": "string",
+                                "Description": "string",
+                                "Secret": "string",
+                                "Motivation": "string",
+                                "Background": "string",
+                                "Personality": "string",
+                                "Factions": ["Faction names"],
+                            }
+                        ],
+                        "creatures": [
+                            {
+                                "Name": "string",
+                                "Type": "string",
+                                "Description": "string",
+                                "Weakness": "string",
+                                "Powers": "string",
+                            }
+                        ],
+                    },
                 },
                 {
                     "Title": "string",
                     "Summary": "string",
                     "Secrets": "string",
+                    "Scenes": ["Detailed scene list"],
                     "Places": ["Existing or new place names if needed"],
                     "NPCs": ["Existing or new NPC names if needed"],
+                    "Villains": ["At least 1 villain name"],
+                    "Creatures": ["Existing or new creature names if needed"],
+                    "Factions": ["At least 1 faction name"],
                     "Objects": ["Existing or new object names if needed"],
+                    "EntityCreations": {
+                        "villains": [],
+                        "factions": [],
+                        "places": [],
+                        "npcs": [],
+                        "creatures": [],
+                    },
                 },
             ],
         }
@@ -84,6 +158,10 @@ def build_arc_generation_prompt(foundation: dict[str, Any], scenarios: list[dict
         "stakes": _clean(foundation.get("stakes")),
         "themes": [_clean(theme) for theme in (foundation.get("themes") or []) if _clean(theme)],
         "notes": _clean(foundation.get("notes")),
+        "existing_entities": {
+            entity_type: [_clean(name) for name in (foundation.get("existing_entities", {}).get(entity_type) or []) if _clean(name)]
+            for entity_type in ("villains", "factions", "places", "npcs", "creatures")
+        },
     }
 
     min_scenarios = minimum_scenarios_per_arc(len(scenario_catalog))
@@ -145,9 +223,11 @@ def build_arc_scenario_expansion_prompt(foundation: dict[str, Any], arcs: list[d
         "You are an expert tabletop RPG scenario writer.\n"
         "Return STRICT JSON only. No markdown, no explanations, no code fences.\n"
         "For EACH input arc, generate EXACTLY 2 brand-new scenarios that continue the parent arc's narrative thread.\n"
-        "Each scenario payload must remain directly compatible with the existing scenario entity schema: Title, Summary, Secrets, Places, NPCs, Objects.\n"
+        "Each scenario payload must remain directly compatible with the existing scenario entity schema and be ready to save immediately.\n"
         "Use the parent arc's name, summary, objective, thread, and linked scenario titles as the narrative seed.\n"
         "Preserve traceability inside the scenario text itself by explicitly mentioning the parent arc name, inherited thread, and the already-linked source scenario titles.\n"
+        "Prefer reusing existing entities from the campaign catalog in about 90% of links. Only invent a new villain, faction, place, NPC, or creature when the arc genuinely needs one.\n"
+        "If you invent a new linked entity, add its full record under EntityCreations in the same scenario payload.\n"
         "Do not omit any arc. Do not generate more than 2 scenarios for any arc. Do not generate fewer than 2 scenarios for any arc.\n\n"
         "Campaign foundation:\n"
         f"{json.dumps(foundation_payload, ensure_ascii=False, indent=2)}\n\n"
@@ -159,7 +239,11 @@ def build_arc_scenario_expansion_prompt(foundation: dict[str, Any], arcs: list[d
         "- Make every generated Title unique within the full response.\n"
         "- Summary should read like a ready-to-run scenario hook and clearly continue the arc thread.\n"
         "- Secrets should include a short traceability block referencing the parent arc and source scenarios.\n"
-        "- Places, NPCs, and Objects must always be JSON arrays, even when empty.\n"
+        "- Scenes must always be a JSON array with at least 3 playable scenes.\n"
+        "- Each scenario must include at least 1 villain, at least 1 faction, and at least 1 place.\n"
+        "- NPCs and Creatures are optional, but include them whenever the premise naturally needs them.\n"
+        "- Places, NPCs, Villains, Creatures, Factions, and Objects must always be JSON arrays, even when empty.\n"
+        "- Reuse existing entities whenever they fit; create new entities only for genuine gaps in the current catalog.\n"
         "- Keep each scenario self-contained enough to save directly as a scenario record.\n"
     )
 

@@ -14,6 +14,7 @@ from modules.campaigns.services import (
     build_form_state_from_campaign,
     list_campaign_presets,
 )
+from modules.campaigns.services.ai.arc_scenario_entities import load_existing_entity_catalog
 from modules.campaigns.shared.arc_status import canonicalize_arc_status
 from modules.campaigns.ui.arc_editor_dialog import ArcEditorDialog
 from modules.campaigns.ui.widgets import CampaignDateField
@@ -473,6 +474,9 @@ class CampaignBuilderWizard(ctk.CTkToplevel):
             "stakes": self.stakes_box.get("1.0", "end").strip(),
             "themes": [line.strip() for line in self.themes_box.get("1.0", "end").splitlines() if line.strip()],
             "notes": self.notes_box.get("1.0", "end").strip(),
+            "existing_entities": load_existing_entity_catalog(
+                ("villains", "factions", "places", "npcs", "creatures")
+            ),
         }
 
     def _generate_scenarios_per_arc(self):
