@@ -45,6 +45,16 @@ def test_parse_json_relaxed_accepts_code_fenced_payload():
     assert payload["campaign"]["name"] == "Stormfront"
 
 
+def test_parse_json_relaxed_extracts_json_with_trailing_commentary():
+    payload = parse_json_relaxed(
+        """{"arcs": [{"arc_name": "Guild War", "scenarios": []}]}
+
+I hope this helps."""
+    )
+
+    assert payload == {"arcs": [{"arc_name": "Guild War", "scenarios": []}]}
+
+
 def test_minimum_scenarios_per_arc_scales_for_small_catalogs():
     assert minimum_scenarios_per_arc(None) == 3
     assert minimum_scenarios_per_arc(1) == 1

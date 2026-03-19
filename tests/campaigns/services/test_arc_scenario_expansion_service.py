@@ -17,6 +17,16 @@ class _FakeAIClient:
         return self.response
 
 
+class _RetryingFakeAIClient:
+    def __init__(self, responses):
+        self.responses = list(responses)
+        self.calls: list[list[dict[str, str]]] = []
+
+    def chat(self, messages):
+        self.calls.append(list(messages))
+        return self.responses.pop(0)
+
+
 class _FakeScenarioWrapper:
     def __init__(self, items=None):
         self.items = list(items or [])
@@ -123,6 +133,67 @@ def test_arc_scenario_expansion_generates_exactly_two_scenarios_per_arc():
     ]
     assert result["arcs"][0]["scenarios"][0]["Villains"] == ["Marshal Vey"]
     assert "Hidden conspiracy" in ai_client.messages[1]["content"]
+
+
+def test_arc_scenario_expansion_retries_when_first_response_has_trailing_commentary():
+    ai_client = _RetryingFakeAIClient(
+        [
+            """
+            {
+              "arcs": [
+                {
+                  "arc_name": "Guild War",
+                  "scenarios": [
+                    {
+                      "Title": "Rainmarket Ultimatum",
+                      "Summary": "The crew traces the conspiracy into Rainmarket.",
+                      "Secrets": "A broker carries the ledger fragment.",
+                      "Scenes": ["Stake out the market", "Interrogate the broker", "Escape the crackdown"],
+                      "Places": ["Rainmarket"],
+                      "NPCs": ["Rika Vale"],
+                      "Villains": ["Marshal Vey"],
+                      "Creatures": [],
+                      "Factions": ["Rainmarket Compact"],
+                      "Objects": ["Ledger Fragment"]
+                    },
+                    {
+                      "Title": "Ash Dock Reckoning",
+                      "Summary": "A trap at Ash Dock forces the crew to expose the mole.",
+                      "Secrets": "The dockmaster answers to the same patron.",
+                      "Scenes": ["Follow the dock rumor", "Survive the ambush", "Corner the mole"],
+                      "Places": ["Ash Dock"],
+                      "NPCs": ["Dockmaster Neral"],
+                      "Villains": ["Marshal Vey"],
+                      "Creatures": [],
+                      "Factions": ["Rainmarket Compact"],
+                      "Objects": []
+                    }
+                  ]
+                }
+              ]
+            }
+
+            This extra commentary should be ignored.
+            """
+        ]
+    )
+    service = ArcScenarioExpansionService(ai_client)
+
+    result = service.generate_scenarios(
+        {"name": "Stormfront", "tone": "Noir"},
+        [
+            {
+                "name": "Guild War",
+                "summary": "Street-level pressure escalates.",
+                "objective": "Identify the patron behind the gang war.",
+                "thread": "Hidden conspiracy",
+                "scenarios": ["Cold Open"],
+            }
+        ],
+    )
+
+    assert result["arcs"][0]["scenarios"][0]["Title"] == "Rainmarket Ultimatum"
+    assert len(ai_client.calls) == 1
 
 
 def test_arc_scenario_expansion_prompt_includes_existing_entity_catalog():
