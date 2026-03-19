@@ -1,6 +1,7 @@
 from modules.campaigns.services.ai import (
     ArcGenerationService,
     ArcGenerationValidationError,
+    minimum_scenarios_per_arc,
     normalize_arc_generation_payload,
     parse_json_relaxed,
 )
@@ -14,6 +15,16 @@ class _FakeAIClient:
     def chat(self, messages):
         self.messages = messages
         return self.response
+
+
+class _RetryingFakeAIClient:
+    def __init__(self, responses):
+        self.responses = list(responses)
+        self.calls: list[list[dict[str, str]]] = []
+
+    def chat(self, messages):
+        self.calls.append(list(messages))
+        return self.responses.pop(0)
 
 
 class _FakeScenarioWrapper:
@@ -34,7 +45,39 @@ def test_parse_json_relaxed_accepts_code_fenced_payload():
     assert payload["campaign"]["name"] == "Stormfront"
 
 
-def test_normalize_arc_generation_payload_rejects_more_than_three_scenarios():
+def test_minimum_scenarios_per_arc_scales_for_small_catalogs():
+    assert minimum_scenarios_per_arc(None) == 3
+    assert minimum_scenarios_per_arc(1) == 1
+    assert minimum_scenarios_per_arc(2) == 2
+    assert minimum_scenarios_per_arc(3) == 3
+    assert minimum_scenarios_per_arc(8) == 3
+
+
+def test_normalize_arc_generation_payload_rejects_arc_with_too_few_scenarios():
+    payload = {
+        "campaign": {"name": "Stormfront"},
+        "threads": [{"name": "Main Thread", "summary": "", "arcs": ["Arc One"]}],
+        "arcs": [
+            {
+                "name": "Arc One",
+                "summary": "",
+                "objective": "",
+                "status": "Planned",
+                "thread": "Main Thread",
+                "scenarios": ["A", "B"],
+            }
+        ],
+    }
+
+    try:
+        normalize_arc_generation_payload(payload, available_scenarios={"A", "B", "C", "D"})
+    except ArcGenerationValidationError as exc:
+        assert "at least 3 connected scenarios" in str(exc)
+    else:
+        raise AssertionError("Expected ArcGenerationValidationError")
+
+
+def test_normalize_arc_generation_payload_allows_longer_arcs_when_connected():
     payload = {
         "campaign": {"name": "Stormfront"},
         "threads": [{"name": "Main Thread", "summary": "", "arcs": ["Arc One"]}],
@@ -50,12 +93,9 @@ def test_normalize_arc_generation_payload_rejects_more_than_three_scenarios():
         ],
     }
 
-    try:
-        normalize_arc_generation_payload(payload, available_scenarios={"A", "B", "C", "D"})
-    except ArcGenerationValidationError as exc:
-        assert "3-scenario limit" in str(exc)
-    else:
-        raise AssertionError("Expected ArcGenerationValidationError")
+    normalized = normalize_arc_generation_payload(payload, available_scenarios={"A", "B", "C", "D"})
+
+    assert normalized["arcs"][0]["scenarios"] == ["A", "B", "C", "D"]
 
 
 def test_arc_generation_service_uses_full_scenario_catalog_and_normalizes_arcs():
@@ -63,7 +103,7 @@ def test_arc_generation_service_uses_full_scenario_catalog_and_normalizes_arcs()
         '{"campaign": {"name": "Stormfront", "summary": "", "objective": ""}, '
         '"threads": [{"name": "Conspiracy", "summary": "Escalation", "arcs": ["Arc One"]}], '
         '"arcs": [{"name": "Arc One", "summary": "Setup", "objective": "Investigate", '
-        '"status": "running", "thread": "Conspiracy", "scenarios": ["Cold Open", "Hidden Ledger"]}]}'
+        '"status": "running", "thread": "Conspiracy", "scenarios": ["Cold Open", "Hidden Ledger", "Broken Oath"]}]}'
     )
     scenario_wrapper = _FakeScenarioWrapper(
         [
@@ -79,6 +119,11 @@ def test_arc_generation_service_uses_full_scenario_catalog_and_normalizes_arcs()
                 "NPCs": ["Rika Vale"],
                 "Places": ["The Iron Chapel"],
             },
+            {
+                "Title": "Broken Oath",
+                "Summary": {"text": "An ally defects to save their family."},
+                "Places": ["Old Signal Tower"],
+            },
         ]
     )
 
@@ -92,10 +137,38 @@ def test_arc_generation_service_uses_full_scenario_catalog_and_normalizes_arcs()
             "objective": "Investigate",
             "status": "In Progress",
             "thread": "Conspiracy",
-            "scenarios": ["Cold Open", "Hidden Ledger"],
+            "scenarios": ["Cold Open", "Hidden Ledger", "Broken Oath"],
         }
     ]
     user_prompt = ai_client.messages[1]["content"]
     assert "The crew survives the ambush." in user_prompt
     assert "A mole is inside the guild." in user_prompt
     assert "Rika Vale" in user_prompt
+    assert "connected scenarios" in user_prompt
+
+
+def test_arc_generation_service_retries_when_first_payload_has_single_scenario_arc():
+    ai_client = _RetryingFakeAIClient(
+        [
+            '{"campaign": {"name": "Stormfront"}, "threads": [{"name": "Conspiracy", "summary": "", "arcs": ["Arc One"]}], '
+            '"arcs": [{"name": "Arc One", "summary": "Setup", "objective": "Investigate", "status": "Planned", '
+            '"thread": "Conspiracy", "scenarios": ["Cold Open"]}]}',
+            '{"campaign": {"name": "Stormfront"}, "threads": [{"name": "Conspiracy", "summary": "", "arcs": ["Arc One"]}], '
+            '"arcs": [{"name": "Arc One", "summary": "Setup", "objective": "Investigate", "status": "Planned", '
+            '"thread": "Conspiracy", "scenarios": ["Cold Open", "Hidden Ledger", "Broken Oath"]}]}'
+        ]
+    )
+    scenario_wrapper = _FakeScenarioWrapper(
+        [
+            {"Title": "Cold Open", "Summary": "The crew survives the ambush."},
+            {"Title": "Hidden Ledger", "Summary": "A blackmail ledger surfaces."},
+            {"Title": "Broken Oath", "Summary": "An ally defects to save their family."},
+        ]
+    )
+
+    service = ArcGenerationService(ai_client=ai_client, scenario_wrapper=scenario_wrapper)
+    result = service.generate_arcs({"name": "Stormfront"})
+
+    assert result["arcs"][0]["scenarios"] == ["Cold Open", "Hidden Ledger", "Broken Oath"]
+    assert len(ai_client.calls) == 2
+    assert "did not satisfy the campaign-arc constraints" in ai_client.calls[1][-1]["content"]
