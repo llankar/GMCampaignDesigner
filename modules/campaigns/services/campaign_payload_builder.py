@@ -28,6 +28,7 @@ def build_campaign_payload(form_data: dict, arcs_data: list[dict]) -> dict:
                 summary=(raw_arc.get("summary") or "").strip(),
                 objective=(raw_arc.get("objective") or "").strip(),
                 status=canonicalize_arc_status(raw_arc.get("status")),
+                thread=(raw_arc.get("thread") or "").strip(),
                 scenarios=[s.strip() for s in raw_scenarios if str(s).strip()],
             )
         )

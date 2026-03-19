@@ -173,3 +173,107 @@ def test_find_arc_index_for_line_uses_whole_arc_block_ranges():
     assert wizard._find_arc_index_for_line(5) == 1
     assert wizard._find_arc_index_for_line(7) == 1
     assert wizard._find_arc_index_for_line(4) is None
+
+
+def test_apply_generated_arcs_replaces_existing_arcs_after_ai_success():
+    wizard = campaign_builder_wizard.CampaignBuilderWizard.__new__(
+        campaign_builder_wizard.CampaignBuilderWizard
+    )
+    wizard.arcs = [{"name": "Existing Arc", "summary": "", "objective": "", "status": "Planned", "thread": "Old", "scenarios": ["Old Scenario"]}]
+    wizard.current_arc_index = 0
+    refresh_calls = {"preview": 0, "review": 0}
+    wizard._refresh_arcs_preview = lambda: refresh_calls.__setitem__("preview", refresh_calls["preview"] + 1)
+    wizard._refresh_review = lambda: refresh_calls.__setitem__("review", refresh_calls["review"] + 1)
+
+    wizard._apply_generated_arcs(
+        [
+            {
+                "name": "Arc One",
+                "summary": "Setup",
+                "objective": "Investigate the guild",
+                "status": "In Progress",
+                "thread": "Guild War",
+                "scenarios": ["Cold Open", "Hidden Ledger"],
+            }
+        ],
+        merge=False,
+    )
+
+    assert wizard.arcs == [
+        {
+            "name": "Arc One",
+            "summary": "Setup",
+            "objective": "Investigate the guild",
+            "status": "In Progress",
+            "thread": "Guild War",
+            "scenarios": ["Cold Open", "Hidden Ledger"],
+        }
+    ]
+    assert wizard.current_arc_index == 0
+    assert refresh_calls == {"preview": 1, "review": 1}
+
+
+def test_generate_arcs_from_scenarios_applies_service_result_after_confirmation(monkeypatch):
+    wizard = campaign_builder_wizard.CampaignBuilderWizard.__new__(
+        campaign_builder_wizard.CampaignBuilderWizard
+    )
+    wizard.scenario_titles = ["Cold Open"]
+    wizard.scenario_wrapper = object()
+    wizard.arcs = []
+    wizard.form_vars = {
+        "name": _FakeVar("Stormfront"),
+        "genre": _FakeVar("Noir"),
+        "tone": _FakeVar("Tense"),
+        "status": _FakeVar("Planned"),
+    }
+    wizard.logline_box = _FakeTextBox("A city on the edge.")
+    wizard.setting_box = _FakeTextBox("Rain-soaked towers.")
+    wizard.objective_box = _FakeTextBox("Stop the syndicate war.")
+    wizard.stakes_box = _FakeTextBox("The district burns.")
+    wizard.themes_box = _FakeTextBox("Trust\nBetrayal")
+    wizard.notes_box = _FakeTextBox("Use existing cases.")
+    wizard._get_ai = lambda: object()
+
+    applied = {}
+    wizard._apply_generated_arcs = lambda arcs, merge=False: applied.update({"arcs": arcs, "merge": merge})
+
+    class _FakeArcGenerationService:
+        def __init__(self, ai_client, scenario_wrapper):
+            applied["ai_client"] = ai_client
+            applied["scenario_wrapper"] = scenario_wrapper
+
+        def generate_arcs(self, foundation):
+            applied["foundation"] = foundation
+            return {
+                "arcs": [
+                    {
+                        "name": "Arc One",
+                        "summary": "Setup",
+                        "objective": "Investigate",
+                        "status": "Planned",
+                        "thread": "Guild War",
+                        "scenarios": ["Cold Open"],
+                    }
+                ]
+            }
+
+    monkeypatch.setattr(campaign_builder_wizard, "ArcGenerationService", _FakeArcGenerationService)
+    monkeypatch.setattr(campaign_builder_wizard.messagebox, "showinfo", lambda *args, **kwargs: None)
+
+    wizard._generate_arcs_from_scenarios()
+
+    assert applied["scenario_wrapper"] is wizard.scenario_wrapper
+    assert applied["foundation"] == {
+        "name": "Stormfront",
+        "genre": "Noir",
+        "tone": "Tense",
+        "status": "Planned",
+        "logline": "A city on the edge.",
+        "setting": "Rain-soaked towers.",
+        "main_objective": "Stop the syndicate war.",
+        "stakes": "The district burns.",
+        "themes": ["Trust", "Betrayal"],
+        "notes": "Use existing cases.",
+    }
+    assert applied["merge"] is False
+    assert applied["arcs"][0]["thread"] == "Guild War"

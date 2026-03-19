@@ -21,6 +21,7 @@ class ArcEditorDialog(ctk.CTkToplevel):
 
         self.name_var = ctk.StringVar(value=initial.get("name", ""))
         self.status_var = ctk.StringVar(value=canonicalize_arc_status(initial.get("status")))
+        self.thread_var = ctk.StringVar(value=initial.get("thread", ""))
 
         container = ctk.CTkFrame(self)
         container.pack(fill="both", expand=True, padx=12, pady=12)
@@ -40,6 +41,9 @@ class ArcEditorDialog(ctk.CTkToplevel):
 
         ctk.CTkLabel(container, text="Status").pack(anchor="w")
         ctk.CTkOptionMenu(container, variable=self.status_var, values=list(CANONICAL_ARC_STATUSES)).pack(fill="x", pady=(0, 8))
+
+        ctk.CTkLabel(container, text="Thread").pack(anchor="w")
+        ctk.CTkEntry(container, textvariable=self.thread_var).pack(fill="x", pady=(0, 8))
 
         self.scenario_selector = ScenarioMultiSelector(
             container,
@@ -83,6 +87,7 @@ class ArcEditorDialog(ctk.CTkToplevel):
             "summary": self.summary_box.get("1.0", "end").strip(),
             "objective": self.objective_box.get("1.0", "end").strip(),
             "status": canonicalize_arc_status(self.status_var.get()),
+            "thread": self.thread_var.get().strip(),
             "scenarios": scenarios,
         }
         self.destroy()
