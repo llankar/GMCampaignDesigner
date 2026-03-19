@@ -266,6 +266,79 @@ def test_arc_scenario_expansion_prompt_includes_existing_entity_catalog():
     assert "Rainmarket Compact" in prompt
 
 
+def test_arc_scenario_expansion_backfills_missing_entity_creation_records():
+    ai_client = _FakeAIClient(
+        """
+        {
+          "arcs": [
+            {
+              "arc_name": "Ghost Runners",
+              "scenarios": [
+                {
+                  "Title": "Rescue Mission in the Mutant-Rioted Zone",
+                  "Summary": "The crew pushes into a shattered district to extract a trapped asset.",
+                  "Secrets": "The rescue route is being manipulated by a hostile cell.",
+                  "Scenes": ["Enter the riot line", "Secure the asset", "Escape through the tunnels"],
+                  "Places": ["Mutant-Rioted Zone"],
+                  "NPCs": [],
+                  "Villains": ["Commandant Hex"],
+                  "Creatures": [],
+                  "Factions": ["Nazis"],
+                  "Objects": []
+                },
+                {
+                  "Title": "Ghostline Exfiltration",
+                  "Summary": "The survivors race a blockade before the trap closes for good.",
+                  "Secrets": "A second team intends to erase all witnesses.",
+                  "Scenes": ["Stage the convoy", "Break the blockade", "Choose who gets out"],
+                  "Places": ["Transit Bunker"],
+                  "NPCs": [],
+                  "Villains": ["Commandant Hex"],
+                  "Creatures": [],
+                  "Factions": ["Nazis"],
+                  "Objects": []
+                }
+              ]
+            }
+          ]
+        }
+        """
+    )
+    service = ArcScenarioExpansionService(ai_client)
+
+    result = service.generate_scenarios(
+        {
+            "name": "Stormfront",
+            "tone": "Grim",
+            "existing_entities": {
+                "villains": [],
+                "factions": [],
+                "places": [],
+                "npcs": [],
+                "creatures": [],
+            },
+        },
+        [
+            {
+                "name": "Ghost Runners",
+                "summary": "A desperate chain of extractions across occupied territory.",
+                "objective": "Keep the resistance network alive.",
+                "thread": "Occupied escape routes",
+                "scenarios": ["Signal in the Static"],
+            }
+        ],
+    )
+
+    first_scenario = result["arcs"][0]["scenarios"][0]
+    created_factions = first_scenario["EntityCreations"]["factions"]
+    created_villains = first_scenario["EntityCreations"]["villains"]
+    created_places = first_scenario["EntityCreations"]["places"]
+
+    assert any(item["Name"] == "Nazis" for item in created_factions)
+    assert any(item["Name"] == "Commandant Hex" for item in created_villains)
+    assert any(item["Name"] == "Mutant-Rioted Zone" for item in created_places)
+
+
 def test_generated_scenario_persistence_handles_duplicate_titles_before_save():
     wrapper = _FakeScenarioWrapper(items=[{"Title": "Rainmarket Ultimatum"}])
     persistence = GeneratedScenarioPersistence(
