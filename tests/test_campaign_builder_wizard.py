@@ -277,3 +277,114 @@ def test_generate_arcs_from_scenarios_applies_service_result_after_confirmation(
     }
     assert applied["merge"] is False
     assert applied["arcs"][0]["thread"] == "Guild War"
+
+
+def test_validate_arcs_for_scenario_generation_rejects_arcs_without_linked_scenarios():
+    wizard = campaign_builder_wizard.CampaignBuilderWizard.__new__(
+        campaign_builder_wizard.CampaignBuilderWizard
+    )
+    wizard.arcs = [
+        {
+            "name": "Guild War",
+            "summary": "Escalation",
+            "objective": "Break the syndicate",
+            "status": "Planned",
+            "thread": "Hidden conspiracy",
+            "scenarios": [],
+        }
+    ]
+
+    try:
+        wizard._validate_arcs_for_scenario_generation()
+    except campaign_builder_wizard.ArcScenarioExpansionValidationError as exc:
+        assert "at least one linked scenario" in str(exc)
+    else:
+        raise AssertionError("Expected ArcScenarioExpansionValidationError")
+
+
+def test_generate_scenarios_per_arc_links_saved_titles_back_to_parent_arc(monkeypatch):
+    wizard = campaign_builder_wizard.CampaignBuilderWizard.__new__(
+        campaign_builder_wizard.CampaignBuilderWizard
+    )
+    wizard.arcs = [
+        {
+            "name": "Guild War",
+            "summary": "Escalation",
+            "objective": "Break the syndicate",
+            "status": "Planned",
+            "thread": "Hidden conspiracy",
+            "scenarios": ["Cold Open"],
+        }
+    ]
+    wizard.scenario_titles = ["Cold Open"]
+    wizard.form_vars = {
+        "name": _FakeVar("Stormfront"),
+        "genre": _FakeVar("Noir"),
+        "tone": _FakeVar("Tense"),
+        "status": _FakeVar("Planned"),
+    }
+    wizard.logline_box = _FakeTextBox("A city on the edge.")
+    wizard.setting_box = _FakeTextBox("Rain-soaked towers.")
+    wizard.objective_box = _FakeTextBox("Stop the syndicate war.")
+    wizard.stakes_box = _FakeTextBox("The district burns.")
+    wizard.themes_box = _FakeTextBox("Trust\nBetrayal")
+    wizard.notes_box = _FakeTextBox("Use existing cases.")
+    wizard._get_ai = lambda: object()
+    refresh_calls = {"preview": 0, "review": 0}
+    wizard._refresh_arcs_preview = lambda: refresh_calls.__setitem__("preview", refresh_calls["preview"] + 1)
+    wizard._refresh_review = lambda: refresh_calls.__setitem__("review", refresh_calls["review"] + 1)
+
+    class _FakeExpansionService:
+        def __init__(self, ai_client):
+            assert ai_client is not None
+
+        def generate_scenarios(self, foundation, arcs):
+            assert foundation["name"] == "Stormfront"
+            assert arcs[0]["name"] == "Guild War"
+            return {
+                "arcs": [
+                    {
+                        "arc_name": "Guild War",
+                        "scenarios": [
+                            {"Title": "Rainmarket Ultimatum", "Summary": "", "Secrets": "", "Places": [], "NPCs": [], "Objects": []},
+                            {"Title": "Ash Dock Reckoning", "Summary": "", "Secrets": "", "Places": [], "NPCs": [], "Objects": []},
+                        ],
+                    }
+                ]
+            }
+
+    class _FakeWrapper:
+        def __init__(self, entity_type):
+            assert entity_type == "scenarios"
+
+    class _FakePersistence:
+        def __init__(self, scenario_wrapper):
+            assert scenario_wrapper is not None
+
+        def save_generated_arc_scenarios(self, generated_payload, arcs):
+            arcs[0]["scenarios"].extend(
+                [scenario["Title"] for scenario in generated_payload["arcs"][0]["scenarios"]]
+            )
+            return generated_payload["arcs"]
+
+    monkeypatch.setattr(campaign_builder_wizard, "ArcScenarioExpansionService", _FakeExpansionService)
+    monkeypatch.setattr(campaign_builder_wizard, "GenericModelWrapper", _FakeWrapper)
+    monkeypatch.setattr(campaign_builder_wizard, "GeneratedScenarioPersistence", _FakePersistence)
+    monkeypatch.setattr(campaign_builder_wizard.messagebox, "askyesno", lambda *args, **kwargs: True)
+    monkeypatch.setattr(campaign_builder_wizard.messagebox, "showinfo", lambda *args, **kwargs: None)
+    monkeypatch.setattr(campaign_builder_wizard.messagebox, "showerror", lambda *args, **kwargs: None)
+    monkeypatch.setattr(campaign_builder_wizard.messagebox, "showwarning", lambda *args, **kwargs: None)
+
+    wizard._generate_scenarios_per_arc()
+
+    assert wizard.arcs[0]["scenarios"] == [
+        "Cold Open",
+        "Rainmarket Ultimatum",
+        "Ash Dock Reckoning",
+    ]
+    assert wizard.scenario_titles == [
+        "Cold Open",
+        "Rainmarket Ultimatum",
+        "Ash Dock Reckoning",
+    ]
+    assert refresh_calls == {"preview": 1, "review": 1}

@@ -42,7 +42,7 @@ class ArcEditorDialog(ctk.CTkToplevel):
         ctk.CTkLabel(container, text="Status").pack(anchor="w")
         ctk.CTkOptionMenu(container, variable=self.status_var, values=list(CANONICAL_ARC_STATUSES)).pack(fill="x", pady=(0, 8))
 
-        ctk.CTkLabel(container, text="Thread").pack(anchor="w")
+        ctk.CTkLabel(container, text="Narrative Thread").pack(anchor="w")
         ctk.CTkEntry(container, textvariable=self.thread_var).pack(fill="x", pady=(0, 8))
 
         self.scenario_selector = ScenarioMultiSelector(
@@ -91,3 +91,11 @@ class ArcEditorDialog(ctk.CTkToplevel):
             "scenarios": scenarios,
         }
         self.destroy()
+
+    @staticmethod
+    def validate_generation_requirements(arc: dict) -> str | None:
+        name = str((arc or {}).get("name") or "").strip() or "Unnamed arc"
+        linked_scenarios = [str(title).strip() for title in ((arc or {}).get("scenarios") or []) if str(title).strip()]
+        if not linked_scenarios:
+            return f"Arc '{name}' must include at least one linked scenario before generating new scenarios."
+        return None

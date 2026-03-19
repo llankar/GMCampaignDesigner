@@ -33,6 +33,32 @@ ARC_GENERATION_SCHEMA = {
     ],
 }
 
+ARC_SCENARIO_EXPANSION_SCHEMA = {
+    "arcs": [
+        {
+            "arc_name": "string",
+            "scenarios": [
+                {
+                    "Title": "string",
+                    "Summary": "string",
+                    "Secrets": "string",
+                    "Places": ["Existing or new place names if needed"],
+                    "NPCs": ["Existing or new NPC names if needed"],
+                    "Objects": ["Existing or new object names if needed"],
+                },
+                {
+                    "Title": "string",
+                    "Summary": "string",
+                    "Secrets": "string",
+                    "Places": ["Existing or new place names if needed"],
+                    "NPCs": ["Existing or new NPC names if needed"],
+                    "Objects": ["Existing or new object names if needed"],
+                },
+            ],
+        }
+    ],
+}
+
 
 def build_arc_generation_prompt(foundation: dict[str, Any], scenarios: list[dict[str, Any]]) -> str:
     """Build the strict JSON prompt used to generate campaign arcs from scenarios."""
@@ -85,6 +111,56 @@ def build_arc_generation_prompt(foundation: dict[str, Any], scenarios: list[dict
         "- Prefer broad campaign continuity over isolated arc ideas.\n"
         f"- Do not create arcs with fewer than {min_scenarios} scenarios unless the full scenario catalog itself contains fewer than that many scenarios.\n"
         "- Do not invent new scenario titles.\n"
+    )
+
+
+def build_arc_scenario_expansion_prompt(foundation: dict[str, Any], arcs: list[dict[str, Any]]) -> str:
+    """Build the strict JSON prompt used to generate two new scenarios per arc."""
+
+    foundation_payload = {
+        "name": _clean(foundation.get("name")),
+        "genre": _clean(foundation.get("genre")),
+        "tone": _clean(foundation.get("tone")),
+        "status": _clean(foundation.get("status")),
+        "logline": _clean(foundation.get("logline")),
+        "setting": _clean(foundation.get("setting")),
+        "main_objective": _clean(foundation.get("main_objective")),
+        "stakes": _clean(foundation.get("stakes")),
+        "themes": [_clean(theme) for theme in (foundation.get("themes") or []) if _clean(theme)],
+        "notes": _clean(foundation.get("notes")),
+    }
+    arc_payload = [
+        {
+            "name": _clean(arc.get("name")),
+            "summary": _clean(arc.get("summary") or arc.get("description")),
+            "objective": _clean(arc.get("objective")),
+            "thread": _clean(arc.get("thread")),
+            "linked_scenarios": [_clean(title) for title in (arc.get("scenarios") or []) if _clean(title)],
+        }
+        for arc in arcs
+        if _clean(arc.get("name"))
+    ]
+
+    return (
+        "You are an expert tabletop RPG scenario writer.\n"
+        "Return STRICT JSON only. No markdown, no explanations, no code fences.\n"
+        "For EACH input arc, generate EXACTLY 2 brand-new scenarios that continue the parent arc's narrative thread.\n"
+        "Each scenario payload must remain directly compatible with the existing scenario entity schema: Title, Summary, Secrets, Places, NPCs, Objects.\n"
+        "Use the parent arc's name, summary, objective, thread, and linked scenario titles as the narrative seed.\n"
+        "Preserve traceability inside the scenario text itself by explicitly mentioning the parent arc name, inherited thread, and the already-linked source scenario titles.\n"
+        "Do not omit any arc. Do not generate more than 2 scenarios for any arc. Do not generate fewer than 2 scenarios for any arc.\n\n"
+        "Campaign foundation:\n"
+        f"{json.dumps(foundation_payload, ensure_ascii=False, indent=2)}\n\n"
+        "Arc seeds:\n"
+        f"{json.dumps(arc_payload, ensure_ascii=False, indent=2)}\n\n"
+        "Required JSON schema:\n"
+        f"{json.dumps(ARC_SCENARIO_EXPANSION_SCHEMA, ensure_ascii=False, indent=2)}\n\n"
+        "Rules:\n"
+        "- Make every generated Title unique within the full response.\n"
+        "- Summary should read like a ready-to-run scenario hook and clearly continue the arc thread.\n"
+        "- Secrets should include a short traceability block referencing the parent arc and source scenarios.\n"
+        "- Places, NPCs, and Objects must always be JSON arrays, even when empty.\n"
+        "- Keep each scenario self-contained enough to save directly as a scenario record.\n"
     )
 
 

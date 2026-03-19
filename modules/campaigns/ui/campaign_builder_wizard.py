@@ -7,6 +7,9 @@ from tkinter import messagebox
 
 from modules.campaigns.services import (
     ArcGenerationService,
+    ArcScenarioExpansionService,
+    ArcScenarioExpansionValidationError,
+    GeneratedScenarioPersistence,
     build_campaign_payload,
     build_form_state_from_campaign,
     list_campaign_presets,
@@ -14,6 +17,7 @@ from modules.campaigns.services import (
 from modules.campaigns.shared.arc_status import canonicalize_arc_status
 from modules.campaigns.ui.arc_editor_dialog import ArcEditorDialog
 from modules.campaigns.ui.widgets import CampaignDateField
+from modules.generic.generic_model_wrapper import GenericModelWrapper
 from modules.generic.generic_list_selection_view import GenericListSelectionView
 from modules.helpers.logging_helper import log_exception
 from modules.helpers.template_loader import load_template
@@ -325,6 +329,7 @@ class CampaignBuilderWizard(ctk.CTkToplevel):
         buttons.pack(fill="x", pady=(8, 12), padx=12)
         ctk.CTkButton(buttons, text="Add Arc", command=self._add_arc, **primary_button_style()).pack(side="left", padx=4)
         ctk.CTkButton(buttons, text="Generate Arcs from Scenarios", command=self._generate_arcs_from_scenarios, **primary_button_style()).pack(side="left", padx=4)
+        ctk.CTkButton(buttons, text="Generate 2 Scenarios per Arc", command=self._generate_scenarios_per_arc, **primary_button_style()).pack(side="left", padx=4)
         ctk.CTkButton(buttons, text="Edit Arc", command=self._edit_selected_arc, **primary_button_style()).pack(side="left", padx=4)
         ctk.CTkButton(buttons, text="Move Up", command=self._move_arc_up, **primary_button_style()).pack(side="left", padx=4)
         ctk.CTkButton(buttons, text="Move Down", command=self._move_arc_down, **primary_button_style()).pack(side="left", padx=4)
@@ -469,6 +474,69 @@ class CampaignBuilderWizard(ctk.CTkToplevel):
             "themes": [line.strip() for line in self.themes_box.get("1.0", "end").splitlines() if line.strip()],
             "notes": self.notes_box.get("1.0", "end").strip(),
         }
+
+    def _generate_scenarios_per_arc(self):
+        try:
+            self._validate_arcs_for_scenario_generation()
+        except ArcScenarioExpansionValidationError as exc:
+            messagebox.showwarning("Arc validation failed", str(exc), parent=self)
+            return
+
+        try:
+            service = ArcScenarioExpansionService(self._get_ai())
+            generated_payload = service.generate_scenarios(self._build_arc_generation_foundation(), self.arcs)
+        except Exception as exc:
+            messagebox.showerror("Scenario generation failed", f"Unable to generate scenarios: {exc}", parent=self)
+            return
+
+        accepted_payload = self._preview_generated_arc_scenarios(generated_payload)
+        if not accepted_payload:
+            return
+
+        persistence = GeneratedScenarioPersistence(GenericModelWrapper("scenarios"))
+        try:
+            saved_groups = persistence.save_generated_arc_scenarios(accepted_payload, self.arcs)
+        except Exception as exc:
+            messagebox.showerror("Scenario save failed", f"Unable to save generated scenarios: {exc}", parent=self)
+            return
+
+        self._refresh_scenario_titles_from_saved_groups(saved_groups)
+        self._refresh_arcs_preview()
+        self._refresh_review()
+        saved_count = sum(len(group.get("scenarios") or []) for group in saved_groups)
+        messagebox.showinfo(
+            "Scenarios generated",
+            f"Saved {saved_count} generated scenario(s) across {len(saved_groups)} arc(s).",
+            parent=self,
+        )
+
+    def _validate_arcs_for_scenario_generation(self):
+        if not self.arcs:
+            raise ArcScenarioExpansionValidationError("Add at least one arc before generating scenarios.")
+
+        for arc in self.arcs:
+            error_message = ArcEditorDialog.validate_generation_requirements(arc)
+            if error_message:
+                raise ArcScenarioExpansionValidationError(error_message)
+
+    def _preview_generated_arc_scenarios(self, generated_payload: dict) -> dict | None:
+        preview_lines: list[str] = []
+        for group in generated_payload.get("arcs") or []:
+            preview_lines.append(f"Arc: {group.get('arc_name', '')}")
+            for scenario in group.get("scenarios") or []:
+                preview_lines.append(f" - {scenario.get('Title', '')}")
+                summary = str(scenario.get("Summary") or "").strip()
+                if summary:
+                    preview_lines.append(f"   {summary}")
+            preview_lines.append("")
+
+        preview_text = "\n".join(preview_lines).strip() or "No generated scenarios."
+        accepted = messagebox.askyesno(
+            "Preview generated scenarios",
+            f"{preview_text}\n\nSave these generated scenarios?",
+            parent=self,
+        )
+        return generated_payload if accepted else None
 
     def _confirm_generated_arc_action(self, generated_count: int) -> str:
         if not self.arcs:
@@ -736,3 +804,10 @@ class CampaignBuilderWizard(ctk.CTkToplevel):
             if title and title not in titles:
                 titles.append(title)
         return titles
+
+    def _refresh_scenario_titles_from_saved_groups(self, saved_groups: list[dict]) -> None:
+        for group in saved_groups:
+            for scenario in group.get("scenarios") or []:
+                title = str(scenario.get("Title") or "").strip()
+                if title and title not in self.scenario_titles:
+                    self.scenario_titles.append(title)
