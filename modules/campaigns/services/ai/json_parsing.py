@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import json
 import re
+import unicodedata
+from collections.abc import Mapping
 from typing import Any
 
 from .constraints import minimum_scenarios_per_arc
@@ -96,12 +98,13 @@ def _normalize_threads(raw_threads: Any) -> list[dict[str, Any]]:
     return normalized
 
 
-def _normalize_arcs(raw_arcs: Any, available_scenarios: set[str] | None = None) -> list[dict[str, Any]]:
+def _normalize_arcs(raw_arcs: Any, available_scenarios: set[str] | Mapping[str, str] | None = None) -> list[dict[str, Any]]:
     if not isinstance(raw_arcs, list):
         raise ArcGenerationValidationError("The 'arcs' field must be a JSON array")
 
     normalized: list[dict[str, Any]] = []
-    total_available = len(available_scenarios) if available_scenarios is not None else None
+    canonical_titles, scenario_lookup = _build_scenario_lookup(available_scenarios)
+    total_available = len(canonical_titles) if canonical_titles is not None else None
     min_required = minimum_scenarios_per_arc(total_available)
     for index, raw_arc in enumerate(raw_arcs, start=1):
         if not isinstance(raw_arc, dict):
@@ -111,12 +114,21 @@ def _normalize_arcs(raw_arcs: Any, available_scenarios: set[str] | None = None) 
             raise ArcGenerationValidationError(f"Arc #{index} is missing a name")
 
         scenarios = _normalize_scenarios(raw_arc.get("scenarios") or [], index=index, min_required=min_required)
-        if available_scenarios is not None:
-            unknown = [title for title in scenarios if title not in available_scenarios]
+        if scenario_lookup is not None:
+            resolved_scenarios: list[str] = []
+            unknown: list[str] = []
+            for title in scenarios:
+                canonical_title = _resolve_scenario_title(title, scenario_lookup)
+                if canonical_title is None:
+                    unknown.append(title)
+                    continue
+                if canonical_title not in resolved_scenarios:
+                    resolved_scenarios.append(canonical_title)
             if unknown:
                 raise ArcGenerationValidationError(
                     f"Arc '{name}' references unknown scenarios: {', '.join(unknown)}"
                 )
+            scenarios = resolved_scenarios
 
         normalized.append(
             {
@@ -154,3 +166,63 @@ def _normalize_scenarios(raw_scenarios: Any, index: int, *, min_required: int) -
 
 def _clean_text(value: Any) -> str:
     return str(value or "").strip()
+
+
+def _build_scenario_lookup(available_scenarios: set[str] | Mapping[str, str] | None) -> tuple[set[str] | None, dict[str, str] | None]:
+    if available_scenarios is None:
+        return None, None
+
+    canonical_titles: set[str] = set()
+    lookup: dict[str, str] = {}
+    if isinstance(available_scenarios, Mapping):
+        items = available_scenarios.items()
+    else:
+        items = ((title, title) for title in available_scenarios)
+
+    for alias, canonical in items:
+        canonical_title = _clean_text(canonical)
+        alias_title = _clean_text(alias) or canonical_title
+        if not canonical_title:
+            continue
+        canonical_titles.add(canonical_title)
+        for candidate in {canonical_title, alias_title}:
+            normalized_candidate = _normalize_title_token(candidate)
+            if normalized_candidate:
+                lookup[normalized_candidate] = canonical_title
+
+    return canonical_titles, lookup
+
+
+def _resolve_scenario_title(title: str, scenario_lookup: dict[str, str]) -> str | None:
+    normalized_title = _normalize_title_token(title)
+    if not normalized_title:
+        return None
+    direct_match = scenario_lookup.get(normalized_title)
+    if direct_match:
+        return direct_match
+
+    for delimiter in (":", " - ", " – ", " — ", " —", " –", "-"):
+        if delimiter not in title:
+            continue
+        prefix = _clean_text(title.split(delimiter, 1)[0])
+        prefix_match = scenario_lookup.get(_normalize_title_token(prefix))
+        if prefix_match:
+            return prefix_match
+
+    for normalized_candidate, canonical_title in scenario_lookup.items():
+        if len(normalized_candidate) < 8:
+            continue
+        if normalized_title.startswith(normalized_candidate):
+            return canonical_title
+
+    return None
+
+
+def _normalize_title_token(value: Any) -> str:
+    cleaned = unicodedata.normalize("NFKD", _clean_text(value))
+    cleaned = "".join(ch for ch in cleaned if not unicodedata.combining(ch))
+    cleaned = cleaned.casefold()
+    cleaned = cleaned.replace("’", "'").replace("`", "'")
+    cleaned = re.sub(r"[^\w\s']+", " ", cleaned)
+    cleaned = re.sub(r"\s+", " ", cleaned).strip()
+    return cleaned

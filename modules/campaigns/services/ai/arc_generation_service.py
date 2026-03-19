@@ -24,11 +24,7 @@ class ArcGenerationService:
     def generate_arcs(self, foundation: dict[str, Any]) -> dict[str, Any]:
         scenarios = self.load_scenario_catalog()
         prompt = build_arc_generation_prompt(foundation=foundation, scenarios=scenarios)
-        available_titles = {
-            str(item.get("Title") or item.get("Name") or "").strip()
-            for item in scenarios
-            if str(item.get("Title") or item.get("Name") or "").strip()
-        }
+        available_titles = self._build_available_scenario_aliases(scenarios)
 
         messages = [
             {
@@ -74,3 +70,19 @@ class ArcGenerationService:
             "thread": (arc.get("thread") or "").strip(),
             "scenarios": [str(title).strip() for title in (arc.get("scenarios") or []) if str(title).strip()],
         }
+
+    @staticmethod
+    def _build_available_scenario_aliases(scenarios: list[dict[str, Any]]) -> dict[str, str]:
+        aliases: dict[str, str] = {}
+        for item in scenarios:
+            title = str(item.get("Title") or item.get("Name") or "").strip()
+            if not title:
+                continue
+
+            aliases[title] = title
+
+            summary = str(item.get("Summary") or item.get("Description") or item.get("Logline") or "").strip()
+            if summary:
+                aliases[f"{title}: {summary}"] = title
+
+        return aliases
