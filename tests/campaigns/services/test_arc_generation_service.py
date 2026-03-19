@@ -98,6 +98,44 @@ def test_normalize_arc_generation_payload_allows_longer_arcs_when_connected():
     assert normalized["arcs"][0]["scenarios"] == ["A", "B", "C", "D"]
 
 
+def test_normalize_arc_generation_payload_resolves_title_plus_summary_aliases():
+    payload = {
+        "campaign": {"name": "Stormfront"},
+        "threads": [{"name": "Main Thread", "summary": "", "arcs": ["Arc One"]}],
+        "arcs": [
+            {
+                "name": "Arc One",
+                "summary": "",
+                "objective": "",
+                "status": "Planned",
+                "thread": "Main Thread",
+                "scenarios": [
+                    "Cyber-attaque à Moscou : détourner un mecha de Cyberdyn",
+                    "Tournée de l'Éclipse : sabotage d'un concert de rock à New York",
+                    "Broken Oath",
+                ],
+            }
+        ],
+    }
+
+    normalized = normalize_arc_generation_payload(
+        payload,
+        available_scenarios={
+            "Cyber-attaque à Moscou": "Cyber-attaque à Moscou",
+            "Cyber-attaque à Moscou: détourner un mecha de Cyberdyn": "Cyber-attaque à Moscou",
+            "Tournée de l’Éclipse": "Tournée de l’Éclipse",
+            "Tournée de l’Éclipse: sabotage d’un concert de rock à New York": "Tournée de l’Éclipse",
+            "Broken Oath": "Broken Oath",
+        },
+    )
+
+    assert normalized["arcs"][0]["scenarios"] == [
+        "Cyber-attaque à Moscou",
+        "Tournée de l’Éclipse",
+        "Broken Oath",
+    ]
+
+
 def test_arc_generation_service_uses_full_scenario_catalog_and_normalizes_arcs():
     ai_client = _FakeAIClient(
         '{"campaign": {"name": "Stormfront", "summary": "", "objective": ""}, '
@@ -145,6 +183,31 @@ def test_arc_generation_service_uses_full_scenario_catalog_and_normalizes_arcs()
     assert "A mole is inside the guild." in user_prompt
     assert "Rika Vale" in user_prompt
     assert "connected scenarios" in user_prompt
+
+
+def test_arc_generation_service_accepts_title_plus_summary_scenario_references():
+    ai_client = _FakeAIClient(
+        '{"campaign": {"name": "Neon Eclipse"}, "threads": [{"name": "Main Thread", "summary": "", "arcs": ["Arc One"]}], '
+        '"arcs": [{"name": "Arc One", "summary": "Escalation", "objective": "Stop the conspiracy", "status": "planned", '
+        '"thread": "Main Thread", "scenarios": ["Cyber-attaque à Moscou : détourner un mecha de Cyberdyn", '
+        '"Tournée de l\\u2019\\u00c9clipse : sabotage d\\u2019un concert de rock à New York", "Broken Oath"]}]}'
+    )
+    scenario_wrapper = _FakeScenarioWrapper(
+        [
+            {"Title": "Cyber-attaque à Moscou", "Summary": "détourner un mecha de Cyberdyn"},
+            {"Title": "Tournée de l’Éclipse", "Summary": "sabotage d’un concert de rock à New York"},
+            {"Title": "Broken Oath", "Summary": "An ally defects to save their family."},
+        ]
+    )
+
+    service = ArcGenerationService(ai_client=ai_client, scenario_wrapper=scenario_wrapper)
+    result = service.generate_arcs({"name": "Neon Eclipse"})
+
+    assert result["arcs"][0]["scenarios"] == [
+        "Cyber-attaque à Moscou",
+        "Tournée de l’Éclipse",
+        "Broken Oath",
+    ]
 
 
 def test_arc_generation_service_retries_when_first_payload_has_single_scenario_arc():
