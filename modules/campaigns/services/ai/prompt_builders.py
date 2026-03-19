@@ -206,6 +206,14 @@ def build_arc_scenario_expansion_prompt(foundation: dict[str, Any], arcs: list[d
         "stakes": _clean(foundation.get("stakes")),
         "themes": [_clean(theme) for theme in (foundation.get("themes") or []) if _clean(theme)],
         "notes": _clean(foundation.get("notes")),
+        "existing_entities": {
+            entity_type: [
+                _clean(name)
+                for name in (foundation.get("existing_entities", {}).get(entity_type) or [])
+                if _clean(name)
+            ]
+            for entity_type in ("villains", "factions", "places", "npcs", "creatures")
+        },
     }
     arc_payload = [
         {
@@ -227,7 +235,7 @@ def build_arc_scenario_expansion_prompt(foundation: dict[str, Any], arcs: list[d
         "Use the parent arc's name, summary, objective, thread, and linked scenario titles as the narrative seed.\n"
         "Preserve traceability inside the scenario text itself by explicitly mentioning the parent arc name, inherited thread, and the already-linked source scenario titles.\n"
         "Prefer reusing existing entities from the campaign catalog in about 90% of links. Only invent a new villain, faction, place, NPC, or creature when the arc genuinely needs one.\n"
-        "If you invent a new linked entity, add its full record under EntityCreations in the same scenario payload.\n"
+        "If you invent a new linked entity that is not listed in campaign foundation.existing_entities, add its full record under EntityCreations in the same scenario payload.\n"
         "Do not omit any arc. Do not generate more than 2 scenarios for any arc. Do not generate fewer than 2 scenarios for any arc.\n\n"
         "Campaign foundation:\n"
         f"{json.dumps(foundation_payload, ensure_ascii=False, indent=2)}\n\n"
@@ -243,7 +251,8 @@ def build_arc_scenario_expansion_prompt(foundation: dict[str, Any], arcs: list[d
         "- Each scenario must include at least 1 villain, at least 1 faction, and at least 1 place.\n"
         "- NPCs and Creatures are optional, but include them whenever the premise naturally needs them.\n"
         "- Places, NPCs, Villains, Creatures, Factions, and Objects must always be JSON arrays, even when empty.\n"
-        "- Reuse existing entities whenever they fit; create new entities only for genuine gaps in the current catalog.\n"
+        "- Reuse names from campaign foundation.existing_entities whenever they fit.\n"
+        "- If you use any villain, faction, place, NPC, or creature name that is not in campaign foundation.existing_entities, include it in EntityCreations with a matching Name.\n"
         "- Keep each scenario self-contained enough to save directly as a scenario record.\n"
     )
 
