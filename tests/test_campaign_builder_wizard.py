@@ -175,6 +175,52 @@ def test_find_arc_index_for_line_uses_whole_arc_block_ranges():
     assert wizard._find_arc_index_for_line(4) is None
 
 
+def test_select_arc_from_preview_event_updates_current_arc_and_refreshes():
+    wizard = campaign_builder_wizard.CampaignBuilderWizard.__new__(
+        campaign_builder_wizard.CampaignBuilderWizard
+    )
+    wizard.arcs = [{"name": "Arc One"}, {"name": "Arc Two"}]
+    wizard.current_arc_index = 0
+    refresh_calls = {"count": 0}
+
+    class _FakeArcsList:
+        def __init__(self):
+            self.states = []
+
+        def configure(self, **kwargs):
+            self.states.append(kwargs.get("state"))
+
+        def index(self, _index):
+            return "5.0"
+
+    wizard.arcs_list = _FakeArcsList()
+    wizard._find_arc_index_for_line = lambda line_index: 1 if line_index == 5 else None
+    wizard._refresh_arcs_preview = lambda: refresh_calls.__setitem__("count", refresh_calls["count"] + 1)
+
+    selected_index = wizard._select_arc_from_preview_event(SimpleNamespace(x=12, y=34))
+
+    assert selected_index == 1
+    assert wizard.current_arc_index == 1
+    assert refresh_calls["count"] == 1
+    assert wizard.arcs_list.states == ["normal", "disabled"]
+
+
+def test_double_click_on_arc_preview_opens_selected_arc_editor():
+    wizard = campaign_builder_wizard.CampaignBuilderWizard.__new__(
+        campaign_builder_wizard.CampaignBuilderWizard
+    )
+    selected_indices = []
+    wizard._select_arc_from_preview_event = lambda event: selected_indices.append((event.x, event.y)) or 0
+    edit_calls = {"count": 0}
+    wizard._edit_selected_arc = lambda: edit_calls.__setitem__("count", edit_calls["count"] + 1)
+
+    result = wizard._on_arcs_preview_double_click(SimpleNamespace(x=40, y=80))
+
+    assert result == "break"
+    assert selected_indices == [(40, 80)]
+    assert edit_calls["count"] == 1
+
+
 def test_apply_generated_arcs_replaces_existing_arcs_after_ai_success():
     wizard = campaign_builder_wizard.CampaignBuilderWizard.__new__(
         campaign_builder_wizard.CampaignBuilderWizard
