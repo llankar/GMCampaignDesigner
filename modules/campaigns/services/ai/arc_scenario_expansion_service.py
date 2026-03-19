@@ -201,6 +201,19 @@ class ArcScenarioExpansionService:
         factions = ArcScenarioExpansionService._normalize_string_list(payload.get("Factions"))
         objects = ArcScenarioExpansionService._normalize_string_list(payload.get("Objects"))
 
+        ArcScenarioExpansionService._backfill_missing_entity_creations(
+            title=title,
+            summary=summary,
+            parent_arc_name=parent_arc_name,
+            places=places,
+            npcs=npcs,
+            villains=villains,
+            creatures=creatures,
+            factions=factions,
+            entity_creations=entity_creations,
+            existing_entities=existing_entities,
+        )
+
         places = ArcScenarioExpansionService._ensure_created_links_present(places, entity_creations["places"])
         villains = ArcScenarioExpansionService._ensure_created_links_present(villains, entity_creations["villains"])
         factions = ArcScenarioExpansionService._ensure_created_links_present(factions, entity_creations["factions"])
@@ -339,6 +352,136 @@ class ArcScenarioExpansionService:
                 f"Scenario '{title}' links unknown {field_name}: {', '.join(missing)}. "
                 "Add them to EntityCreations or reuse existing catalog entities."
             )
+
+    @staticmethod
+    def _backfill_missing_entity_creations(
+        *,
+        title: str,
+        summary: str,
+        parent_arc_name: str,
+        places: list[str],
+        npcs: list[str],
+        villains: list[str],
+        creatures: list[str],
+        factions: list[str],
+        entity_creations: dict[str, list[dict[str, Any]]],
+        existing_entities: dict[str, set[str]] | None,
+    ) -> None:
+        if existing_entities is None:
+            return
+
+        scenario_context = {
+            "title": title,
+            "summary": summary,
+            "parent_arc_name": parent_arc_name,
+        }
+        for entity_type, values in (
+            ("places", places),
+            ("npcs", npcs),
+            ("villains", villains),
+            ("creatures", creatures),
+            ("factions", factions),
+        ):
+            ArcScenarioExpansionService._append_missing_entity_creations(
+                entity_type=entity_type,
+                values=values,
+                entity_creations=entity_creations,
+                existing_entities=existing_entities,
+                scenario_context=scenario_context,
+            )
+
+    @staticmethod
+    def _append_missing_entity_creations(
+        *,
+        entity_type: str,
+        values: list[str],
+        entity_creations: dict[str, list[dict[str, Any]]],
+        existing_entities: dict[str, set[str]],
+        scenario_context: dict[str, str],
+    ) -> None:
+        known_existing = existing_entities.get(entity_type, set())
+        created_records = entity_creations.setdefault(entity_type, [])
+        known_created = {
+            str(item.get("Name") or "").strip().casefold()
+            for item in created_records
+            if str(item.get("Name") or "").strip()
+        }
+        for value in values:
+            key = value.casefold()
+            if key in known_existing or key in known_created:
+                continue
+            created_records.append(
+                ArcScenarioExpansionService._build_placeholder_entity_record(
+                    entity_type=entity_type,
+                    name=value,
+                    title=scenario_context["title"],
+                    summary=scenario_context["summary"],
+                    parent_arc_name=scenario_context["parent_arc_name"],
+                )
+            )
+            known_created.add(key)
+
+    @staticmethod
+    def _build_placeholder_entity_record(
+        *,
+        entity_type: str,
+        name: str,
+        title: str,
+        summary: str,
+        parent_arc_name: str,
+    ) -> dict[str, Any]:
+        summary_text = summary.strip() or f"Auto-created from generated scenario '{title}'."
+        arc_suffix = f" for arc '{parent_arc_name}'" if parent_arc_name else ""
+
+        if entity_type == "villains":
+            return {
+                "Name": name,
+                "Title": "",
+                "Archetype": "",
+                "ThreatLevel": "",
+                "Description": summary_text,
+                "Scheme": f"Auto-created from generated scenario '{title}'{arc_suffix}.",
+                "CurrentObjective": "",
+                "Secrets": "",
+                "Factions": [],
+                "Lieutenants": [],
+                "CreatureAgents": [],
+            }
+        if entity_type == "factions":
+            return {
+                "Name": name,
+                "Description": summary_text,
+                "Secrets": f"Auto-created from generated scenario '{title}'{arc_suffix}.",
+                "Villains": [],
+            }
+        if entity_type == "places":
+            return {
+                "Name": name,
+                "Description": summary_text,
+                "Secrets": f"Auto-created from generated scenario '{title}'{arc_suffix}.",
+                "NPCs": [],
+                "Villains": [],
+            }
+        if entity_type == "npcs":
+            return {
+                "Name": name,
+                "Role": "",
+                "Description": summary_text,
+                "Secret": "",
+                "Motivation": "",
+                "Background": f"Auto-created from generated scenario '{title}'{arc_suffix}.",
+                "Personality": "",
+                "Factions": [],
+            }
+        if entity_type == "creatures":
+            return {
+                "Name": name,
+                "Type": "",
+                "Description": summary_text,
+                "Weakness": "",
+                "Powers": "",
+            }
+        return {"Name": name}
 
     @staticmethod
     def _normalize_created_villains(value: Any) -> list[dict[str, Any]]:
