@@ -37,7 +37,7 @@ class CampaignBuilderWizard(ctk.CTkToplevel):
     def __init__(self, master, campaign_wrapper, scenario_wrapper):
         super().__init__(master)
         self.title("Campaign Builder Wizard")
-        self.geometry("980x1040")
+        self.geometry("1480x1040")
         self.configure(fg_color=EDITOR_PALETTE["surface"])
 
         self.campaign_wrapper = campaign_wrapper
