@@ -15,7 +15,9 @@ def test_build_form_state_from_campaign_reads_rich_text_and_arcs_payloads():
         "Stakes": {"text": "Entire Ten-Towns survival."},
         "Themes": ["Hope", {"text": "Sacrifice"}],
         "Notes": {"text": "Focus on faction politics."},
-        "Arcs": {"text": '[{"name": "Auril", "status": "running", "scenarios": ["Cold Open"]}]'},
+        "Arcs": {
+            "text": '[{"name": "Auril", "status": "running", "thread": "Frostmaiden", "scenarios": ["Cold Open"]}]'
+        },
     }
 
     form_vars, text_areas, arcs = build_form_state_from_campaign(payload)
@@ -36,6 +38,7 @@ def test_build_form_state_from_campaign_reads_rich_text_and_arcs_payloads():
             "summary": "",
             "objective": "",
             "status": "running",
+            "thread": "Frostmaiden",
             "scenarios": ["Cold Open"],
         }
     ]

@@ -12,6 +12,7 @@ class CampaignArc:
     summary: str = ""
     objective: str = ""
     status: str = "Planned"
+    thread: str = ""
     scenarios: list[str] = field(default_factory=list)
 
     def as_dict(self) -> dict[str, Any]:
@@ -20,6 +21,7 @@ class CampaignArc:
             "summary": self.summary,
             "objective": self.objective,
             "status": self.status,
+            "thread": self.thread,
             "scenarios": [s for s in self.scenarios if s],
         }
 

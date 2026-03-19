@@ -6,10 +6,12 @@ import customtkinter as ctk
 from tkinter import messagebox
 
 from modules.campaigns.services import (
+    ArcGenerationService,
     build_campaign_payload,
     build_form_state_from_campaign,
     list_campaign_presets,
 )
+from modules.campaigns.shared.arc_status import canonicalize_arc_status
 from modules.campaigns.ui.arc_editor_dialog import ArcEditorDialog
 from modules.campaigns.ui.widgets import CampaignDateField
 from modules.generic.generic_list_selection_view import GenericListSelectionView
@@ -34,6 +36,7 @@ class CampaignBuilderWizard(ctk.CTkToplevel):
         self.configure(fg_color=EDITOR_PALETTE["surface"])
 
         self.campaign_wrapper = campaign_wrapper
+        self.scenario_wrapper = scenario_wrapper
         self.scenario_titles = self._load_scenario_titles(scenario_wrapper)
         self.available_presets = list_campaign_presets()
         self.preset_by_id = {preset["id"]: preset for preset in self.available_presets}
@@ -43,6 +46,7 @@ class CampaignBuilderWizard(ctk.CTkToplevel):
         self.current_arc_index: int | None = None
         self._arc_line_ranges: list[tuple[int, int, int]] = []
         self.original_campaign_name: str | None = None
+        self._ai_client = None
         self.current_step = 0
         self.steps: list[ctk.CTkFrame] = []
 
@@ -320,6 +324,7 @@ class CampaignBuilderWizard(ctk.CTkToplevel):
         buttons = ctk.CTkFrame(frame, fg_color="transparent")
         buttons.pack(fill="x", pady=(8, 12), padx=12)
         ctk.CTkButton(buttons, text="Add Arc", command=self._add_arc, **primary_button_style()).pack(side="left", padx=4)
+        ctk.CTkButton(buttons, text="Generate Arcs from Scenarios", command=self._generate_arcs_from_scenarios, **primary_button_style()).pack(side="left", padx=4)
         ctk.CTkButton(buttons, text="Edit Arc", command=self._edit_selected_arc, **primary_button_style()).pack(side="left", padx=4)
         ctk.CTkButton(buttons, text="Move Up", command=self._move_arc_up, **primary_button_style()).pack(side="left", padx=4)
         ctk.CTkButton(buttons, text="Move Down", command=self._move_arc_down, **primary_button_style()).pack(side="left", padx=4)
@@ -427,6 +432,96 @@ class CampaignBuilderWizard(ctk.CTkToplevel):
             self.current_arc_index = min(selected_index, len(self.arcs) - 1)
         self._refresh_arcs_preview()
 
+    def _generate_arcs_from_scenarios(self):
+        if not self.scenario_titles:
+            messagebox.showwarning("No scenarios", "Load or create scenarios before generating arcs.", parent=self)
+            return
+
+        try:
+            service = ArcGenerationService(self._get_ai(), self.scenario_wrapper)
+            result = service.generate_arcs(self._build_arc_generation_foundation())
+        except Exception as exc:
+            messagebox.showerror("Arc generation failed", f"Unable to generate arcs: {exc}", parent=self)
+            return
+
+        generated_arcs = [dict(arc) for arc in (result.get("arcs") or []) if isinstance(arc, dict)]
+        if not generated_arcs:
+            messagebox.showwarning("No arcs", "The AI did not return any usable arcs.", parent=self)
+            return
+
+        action = self._confirm_generated_arc_action(len(generated_arcs))
+        if action == "cancel":
+            return
+
+        self._apply_generated_arcs(generated_arcs, merge=(action == "merge"))
+        messagebox.showinfo("Arcs generated", f"Applied {len(generated_arcs)} AI-generated arc(s).", parent=self)
+
+    def _build_arc_generation_foundation(self) -> dict:
+        return {
+            "name": self.form_vars["name"].get().strip(),
+            "genre": self.form_vars["genre"].get().strip(),
+            "tone": self.form_vars["tone"].get().strip(),
+            "status": self.form_vars["status"].get().strip(),
+            "logline": self.logline_box.get("1.0", "end").strip(),
+            "setting": self.setting_box.get("1.0", "end").strip(),
+            "main_objective": self.objective_box.get("1.0", "end").strip(),
+            "stakes": self.stakes_box.get("1.0", "end").strip(),
+            "themes": [line.strip() for line in self.themes_box.get("1.0", "end").splitlines() if line.strip()],
+            "notes": self.notes_box.get("1.0", "end").strip(),
+        }
+
+    def _confirm_generated_arc_action(self, generated_count: int) -> str:
+        if not self.arcs:
+            return "replace"
+
+        replace_existing = messagebox.askyesnocancel(
+            "Apply generated arcs",
+            f"The AI generated {generated_count} arc(s).\n\nYes = replace current arcs\nNo = merge with current arcs\nCancel = keep current arcs",
+            parent=self,
+        )
+        if replace_existing is None:
+            return "cancel"
+        return "replace" if replace_existing else "merge"
+
+    def _apply_generated_arcs(self, generated_arcs: list[dict], merge: bool = False):
+        normalized_generated = [self._normalize_arc_dict(arc) for arc in generated_arcs if arc.get("name")]
+        if merge:
+            self.arcs = self._merge_arcs(self.arcs, normalized_generated)
+        else:
+            self.arcs = normalized_generated
+        self.current_arc_index = 0 if self.arcs else None
+        self._refresh_arcs_preview()
+        self._refresh_review()
+
+    def _merge_arcs(self, existing_arcs: list[dict], generated_arcs: list[dict]) -> list[dict]:
+        merged = [self._normalize_arc_dict(arc) for arc in existing_arcs if arc.get("name")]
+        existing_names = {arc["name"].casefold() for arc in merged}
+        for arc in generated_arcs:
+            normalized = self._normalize_arc_dict(arc)
+            if normalized["name"].casefold() in existing_names:
+                continue
+            merged.append(normalized)
+            existing_names.add(normalized["name"].casefold())
+        return merged
+
+    @staticmethod
+    def _normalize_arc_dict(arc: dict) -> dict:
+        return {
+            "name": (arc.get("name") or "").strip(),
+            "summary": (arc.get("summary") or "").strip(),
+            "objective": (arc.get("objective") or "").strip(),
+            "status": canonicalize_arc_status(arc.get("status")),
+            "thread": (arc.get("thread") or "").strip(),
+            "scenarios": [str(title).strip() for title in (arc.get("scenarios") or []) if str(title).strip()],
+        }
+
+    def _get_ai(self):
+        if self._ai_client is None:
+            from modules.ai.local_ai_client import LocalAIClient
+
+            self._ai_client = LocalAIClient()
+        return self._ai_client
+
     def _get_selected_arc_index(self) -> int | None:
         if not self.arcs:
             return None
@@ -491,6 +586,7 @@ class CampaignBuilderWizard(ctk.CTkToplevel):
             block_start_line = int(float(self.arcs_list.index("end-1c")))
             self.arcs_list.insert("end", f"Order {idx}: {arc.get('name')} [{arc.get('status', 'Planned')}]\n")
             self.arcs_list.insert("end", f"   Objective: {arc.get('objective', '')}\n")
+            self.arcs_list.insert("end", f"   Thread: {arc.get('thread', '') or '—'}\n")
             self.arcs_list.insert("end", f"   Scenarios: {', '.join(arc.get('scenarios') or [])}\n\n")
             block_end_line = max(block_start_line, int(float(self.arcs_list.index("end-1c"))) - 1)
             self._arc_line_ranges.append((block_start_line, block_end_line, idx - 1))
@@ -506,6 +602,9 @@ class CampaignBuilderWizard(ctk.CTkToplevel):
         return None
 
     def _refresh_review(self):
+        if not hasattr(self, "review_box"):
+            return
+
         summary = {
             "campaign": {
                 **{k: var.get().strip() for k, var in self.form_vars.items()},

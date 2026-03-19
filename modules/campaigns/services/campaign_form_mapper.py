@@ -54,6 +54,7 @@ def build_form_state_from_campaign(campaign_data: dict) -> tuple[dict, dict, lis
                 "summary": coerce_text(arc.get("summary")).strip(),
                 "objective": coerce_text(arc.get("objective")).strip(),
                 "status": coerce_text(arc.get("status") or "Planned").strip() or "Planned",
+                "thread": coerce_text(arc.get("thread")).strip(),
                 "scenarios": [coerce_text(v).strip() for v in (arc.get("scenarios") or []) if coerce_text(v).strip()],
             }
         )
@@ -74,7 +75,7 @@ def _coerce_arcs_payload(raw_arcs: Any) -> list[dict]:
         if isinstance(nested_arcs, list):
             return [arc for arc in nested_arcs if isinstance(arc, dict)]
 
-        arc_keys = {"name", "summary", "objective", "status", "scenarios"}
+        arc_keys = {"name", "summary", "objective", "status", "thread", "scenarios"}
         if any(key in parsed for key in arc_keys):
             return [parsed]
         return []

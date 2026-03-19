@@ -17,6 +17,7 @@ def test_build_campaign_payload_embeds_arcs_and_linked_scenarios():
                 "summary": "Setup",
                 "objective": "Gather allies",
                 "status": "Running",
+                "thread": "Relic War",
                 "scenarios": ["The Fallen Keep", "Court of Ash"],
             },
             {
@@ -32,6 +33,7 @@ def test_build_campaign_payload_embeds_arcs_and_linked_scenarios():
     assert len(payload["Arcs"]) == 2
     assert payload["Arcs"][0]["name"] == "Arc One"
     assert payload["Arcs"][0]["status"] == "In Progress"
+    assert payload["Arcs"][0]["thread"] == "Relic War"
     assert payload["Arcs"][1]["status"] == "Planned"
     assert payload["Arcs"][1]["scenarios"] == ["Court of Ash", "Throne of Glass"]
     assert payload["LinkedScenarios"] == ["The Fallen Keep", "Court of Ash", "Throne of Glass"]
