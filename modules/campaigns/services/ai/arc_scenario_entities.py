@@ -55,16 +55,12 @@ def build_existing_entity_lookup(foundation: dict[str, Any]) -> dict[str, set[st
         return None
 
     lookup: dict[str, set[str]] = {}
-    has_values = False
     for entity_type in ENTITY_WRAPPER_SPECS:
         raw_values = raw_catalog.get(entity_type)
         if not isinstance(raw_values, list):
             lookup[entity_type] = set()
             continue
 
-        values = {str(value).strip().casefold() for value in raw_values if str(value).strip()}
-        if values:
-            has_values = True
-        lookup[entity_type] = values
+        lookup[entity_type] = {str(value).strip().casefold() for value in raw_values if str(value).strip()}
 
-    return lookup if has_values else None
+    return lookup
