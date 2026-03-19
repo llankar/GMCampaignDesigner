@@ -19,7 +19,7 @@ def parse_json_relaxed(text: str) -> Any:
     if not text:
         raise ArcGenerationValidationError("Empty AI response")
 
-    candidate = str(text).strip()
+    candidate = str(text).strip().lstrip("﻿")
     if candidate.startswith("```"):
         candidate = re.sub(r"^```(?:json)?", "", candidate, flags=re.IGNORECASE).strip()
         candidate = candidate.rstrip("`").strip()
@@ -29,24 +29,27 @@ def parse_json_relaxed(text: str) -> Any:
     except Exception:
         pass
 
-    start = None
+    extracted = _extract_embedded_json(candidate)
+    if extracted is not None:
+        return extracted
+
+    raise ArcGenerationValidationError("Failed to parse JSON from AI response")
+
+
+def _extract_embedded_json(candidate: str) -> Any | None:
+    decoder = json.JSONDecoder()
+
     for idx, char in enumerate(candidate):
-        if char in "[{":
-            start = idx
-            break
+        if char not in "[{":
+            continue
 
-    if start is None:
-        raise ArcGenerationValidationError("Failed to locate JSON payload in AI response")
-
-    tail = candidate[start:]
-    for end in range(len(tail), max(len(tail) - 4000, 0), -1):
-        chunk = tail[:end]
         try:
-            return json.loads(chunk)
+            payload, _ = decoder.raw_decode(candidate[idx:])
+            return payload
         except Exception:
             continue
 
-    raise ArcGenerationValidationError("Failed to parse JSON from AI response")
+    return None
 
 
 def normalize_arc_generation_payload(payload: Any, available_scenarios: set[str] | None = None) -> dict[str, Any]:
