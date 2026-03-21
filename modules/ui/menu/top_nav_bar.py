@@ -5,6 +5,7 @@ import tkinter as tk
 import customtkinter as ctk
 
 from modules.helpers import theme_manager
+from modules.ui.menu.menu_image_adapter import prepare_menu_image
 from modules.ui.menu.menu_sections import build_menu_specs, format_menu_label
 from modules.ui.menu.quick_actions import build_primary_quick_actions, build_system_quick_actions
 
@@ -19,6 +20,7 @@ class AppMenuBar:
         self._menu_buttons: list[ctk.CTkButton] = []
         self._button_menus: list[tuple[ctk.CTkButton, tk.Menu]] = []
         self._open_menu: tk.Menu | None = None
+        self._menu_images: list[tk.PhotoImage] = []
         self._action_buttons: list[ctk.CTkButton] = []
         self._primary_quick_buttons: list[ctk.CTkButton] = []
         self._system_quick_buttons: list[ctk.CTkButton] = []
@@ -80,6 +82,7 @@ class AppMenuBar:
         self._submenus.clear()
         self._menu_buttons.clear()
         self._button_menus.clear()
+        self._menu_images.clear()
         self._action_buttons.clear()
         self._primary_quick_buttons.clear()
         self._system_quick_buttons.clear()
@@ -111,8 +114,9 @@ class AppMenuBar:
                     "label": format_menu_label(item),
                     "command": item.command,
                 }
-                icon = self._get_icon(item.icon_key)
+                icon = prepare_menu_image(self._get_icon(item.icon_key))
                 if icon is not None:
+                    self._menu_images.append(icon)
                     kwargs["image"] = icon
                     kwargs["compound"] = "left"
                 submenu.add_command(**kwargs)
