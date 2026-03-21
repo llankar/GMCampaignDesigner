@@ -156,9 +156,9 @@ class MainWindow(ctk.CTk):
         self.set_window_icon()
         self.create_layout()
         self.entity_definitions = load_entity_definitions()
+        self.load_icons()
         self.create_menu_bar()
         self.entity_wrappers = {}
-        self.load_icons()
         self.create_content_area()
         self.create_exit_button()
         self.load_model_config()
