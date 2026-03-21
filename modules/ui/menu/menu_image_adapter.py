@@ -25,6 +25,28 @@ def prepare_menu_image(icon: Any) -> tk.PhotoImage | None:
     return ImageTk.PhotoImage(pil_image)
 
 
+def resize_ctk_icon(icon: Any, size: tuple[int, int]):
+    """Create a resized CTkImage-like icon for compact button layouts."""
+    if icon is None:
+        return None
+
+    if getattr(icon, "_size", None) == size:
+        return icon
+
+    pil_image = _extract_pil_image(icon)
+    if pil_image is None:
+        return icon
+
+    contained = ImageOps.contain(pil_image.copy(), size)
+
+    try:
+        import customtkinter as ctk
+
+        return ctk.CTkImage(light_image=contained, dark_image=contained, size=size)
+    except Exception:
+        return icon
+
+
 def _extract_pil_image(icon: Any):
     for attr_name in ("_light_image", "_dark_image", "light_image", "dark_image", "_image"):
         image = getattr(icon, attr_name, None)

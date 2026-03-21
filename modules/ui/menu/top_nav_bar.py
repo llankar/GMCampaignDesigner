@@ -5,13 +5,23 @@ import tkinter as tk
 import customtkinter as ctk
 
 from modules.helpers import theme_manager
-from modules.ui.menu.menu_image_adapter import prepare_menu_image
+from modules.ui.menu.menu_image_adapter import prepare_menu_image, resize_ctk_icon
 from modules.ui.menu.menu_sections import build_menu_specs, format_menu_label
 from modules.ui.menu.quick_actions import build_primary_quick_actions, build_system_quick_actions
 
 
 class AppMenuBar:
     """Custom in-window navigation bar with grouped menus and quick actions."""
+
+    FRAME_HEIGHT = 34
+    MENU_BUTTON_HEIGHT = 26
+    MENU_BUTTON_WIDTH = 84
+    MENU_FONT = ("Segoe UI", 12, "bold")
+    QUICK_ICON_SIZE = (32, 32)
+    QUICK_BUTTON_HEIGHT = 24
+    QUICK_BUTTON_RADIUS = 12
+    QUICK_BUTTON_MIN_WIDTH = 74
+    QUICK_BUTTON_WIDTH_SCALE = 8
 
     def __init__(self, app):
         self.app = app
@@ -25,7 +35,7 @@ class AppMenuBar:
         self._primary_quick_buttons: list[ctk.CTkButton] = []
         self._system_quick_buttons: list[ctk.CTkButton] = []
 
-        self.frame = ctk.CTkFrame(app, corner_radius=0, height=42)
+        self.frame = ctk.CTkFrame(app, corner_radius=0, height=self.FRAME_HEIGHT)
         self.frame.grid_columnconfigure(0, weight=0)
         self.frame.grid_columnconfigure(1, weight=1)
         self.frame.grid_columnconfigure(2, weight=0)
@@ -39,10 +49,10 @@ class AppMenuBar:
 
         self.menu_frame.grid(row=0, column=0, sticky="w", padx=(0, 4))
         self.quick_actions_frame.grid(row=0, column=1, sticky="ew")
-        self.quick_actions_inner.pack(anchor="center", pady=4)
+        self.quick_actions_inner.pack(anchor="center", pady=2)
         self.actions_frame.grid(row=0, column=2, sticky="e", padx=(4, 8))
-        self.system_quick_frame.pack(side="left", padx=(0, 10), pady=4)
-        self.utility_actions_frame.pack(side="right", pady=4)
+        self.system_quick_frame.pack(side="left", padx=(0, 8), pady=2)
+        self.utility_actions_frame.pack(side="right", pady=2)
 
         self._build()
         self.refresh_theme()
@@ -154,14 +164,14 @@ class AppMenuBar:
         button = ctk.CTkButton(
             self.menu_frame,
             text=label,
-            width=96,
-            height=32,
-            corner_radius=10,
+            width=self.MENU_BUTTON_WIDTH,
+            height=self.MENU_BUTTON_HEIGHT,
+            corner_radius=9,
             border_width=0,
             command=None,
         )
         button.configure(command=lambda m=menu, b=button: self._popup_menu(m, b))
-        button.pack(side="left", padx=(0, 6), pady=4)
+        button.pack(side="left", padx=(0, 4), pady=2)
         self._menu_buttons.append(button)
         self._button_menus.append((button, menu))
 
@@ -176,17 +186,19 @@ class AppMenuBar:
             self._system_quick_buttons.append(button)
 
     def _create_quick_action_button(self, parent, action_spec):
-        icon = self._get_icon(action_spec.icon_key)
+        icon = resize_ctk_icon(self._get_icon(action_spec.icon_key), self.QUICK_ICON_SIZE)
         button = ctk.CTkButton(
             parent,
             text=action_spec.text,
             image=icon,
             compound="left",
-            height=28,
-            width=max(88, len(action_spec.text) * 10 + 24),
-            corner_radius=14,
+            anchor="w",
+            height=self.QUICK_BUTTON_HEIGHT,
+            width=max(self.QUICK_BUTTON_MIN_WIDTH, len(action_spec.text) * self.QUICK_BUTTON_WIDTH_SCALE + 18),
+            corner_radius=self.QUICK_BUTTON_RADIUS,
             command=action_spec.command,
-            font=("Segoe UI", 12, "bold"),
+            font=("Segoe UI", 11, "bold"),
+            border_spacing=6,
         )
         button._menu_style = action_spec.style
         return button
@@ -226,8 +238,8 @@ class AppMenuBar:
                     fg_color=menu_bg,
                     hover_color=button_fg,
                     text_color="#E8EEF6",
-                    font=("Segoe UI", 13, "bold"),
-                    width=max(72, len(button.cget("text")) * 11),
+                    font=self.MENU_FONT,
+                    width=max(64, len(button.cget("text")) * 9),
                 )
             except Exception:
                 pass
@@ -268,6 +280,8 @@ class AppMenuBar:
                 text_color=colors["text_color"],
                 border_width=1,
                 border_color=colors["border_color"],
+                height=self.QUICK_BUTTON_HEIGHT,
+                corner_radius=self.QUICK_BUTTON_RADIUS,
             )
         except Exception:
             button.configure(
