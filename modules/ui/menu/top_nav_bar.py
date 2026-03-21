@@ -21,6 +21,7 @@ class AppMenuBar:
     """Custom in-window navigation bar with grouped menus and quick actions."""
 
     FRAME_HEIGHT = 18
+    LAYOUT_WIDTH_DELTA_THRESHOLD = 32
     MENU_BUTTON_HEIGHT = 14
     MENU_BUTTON_WIDTH = 70
     MENU_FONT = ("Segoe UI", 10, "bold")
@@ -398,6 +399,24 @@ class AppMenuBar:
             return None
         return parsed_width
 
+    def _has_meaningful_layout_change(self, width: int, metrics=None) -> bool:
+        metrics = metrics or MenuLayoutController.resolve(width)
+        last_mode = self._last_layout_metrics.mode if self._last_layout_metrics is not None else self._layout_mode
+        if metrics.mode != last_mode:
+            return True
+
+        comparison_widths = (
+            self._pending_layout_width,
+            self._last_layout_width,
+            self._last_configure_width,
+        )
+        for previous_width in comparison_widths:
+            if previous_width is None:
+                continue
+            if abs(width - previous_width) >= self.LAYOUT_WIDTH_DELTA_THRESHOLD:
+                return True
+        return all(previous_width is None for previous_width in comparison_widths)
+
     def _queue_layout(self, width: int, *, force: bool = False):
         parsed_width = self._parse_layout_width(width)
         if parsed_width is None:
@@ -411,7 +430,7 @@ class AppMenuBar:
                 or parsed_width == self._pending_layout_width
             ):
                 return
-            if metrics == self._last_layout_metrics:
+            if not self._has_meaningful_layout_change(parsed_width, metrics):
                 self._last_configure_width = parsed_width
                 return
 
@@ -434,6 +453,6 @@ class AppMenuBar:
 
     def _on_app_configure(self, event):
         width = self._parse_layout_width(getattr(event, "width", None))
-        if width is None or width == self._last_layout_width:
+        if width is None:
             return
         self._queue_layout(width)

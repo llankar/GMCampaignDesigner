@@ -29,7 +29,6 @@ from PIL import Image
 from docx import Document
 
 # Modular helper imports
-from modules.helpers.window_helper import position_window_at_top
 from modules.helpers import theme_manager
 from modules.helpers.template_loader import (
     load_template,
@@ -141,8 +140,6 @@ class MainWindow(ctk.CTk):
         log_info("Initializing MainWindow", func_name="main_window.MainWindow.__init__")
 
         self.title("GMCampaignDesigner")
-        self.geometry("1920x980")
-        self.minsize(1920, 980)
         self.attributes("-fullscreen", True)
         self.current_open_view   = None
         self.current_open_entity = None    # ← initialize here to avoid AttributeError
@@ -152,7 +149,6 @@ class MainWindow(ctk.CTk):
         self._calendar_events_cache = None
         initialize_db()
         log_info("Database initialization complete", func_name="main_window.MainWindow.__init__")
-        position_window_at_top(self)
         self.set_window_icon()
         self.create_layout()
         self.entity_definitions = load_entity_definitions()
