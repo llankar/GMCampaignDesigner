@@ -13,15 +13,16 @@ from modules.ui.menu.quick_actions import build_primary_quick_actions, build_sys
 class AppMenuBar:
     """Custom in-window navigation bar with grouped menus and quick actions."""
 
-    FRAME_HEIGHT = 34
-    MENU_BUTTON_HEIGHT = 26
-    MENU_BUTTON_WIDTH = 84
-    MENU_FONT = ("Segoe UI", 12, "bold")
-    QUICK_ICON_SIZE = (32, 32)
-    QUICK_BUTTON_HEIGHT = 24
-    QUICK_BUTTON_RADIUS = 12
-    QUICK_BUTTON_MIN_WIDTH = 74
-    QUICK_BUTTON_WIDTH_SCALE = 8
+    FRAME_HEIGHT = 18
+    MENU_BUTTON_HEIGHT = 14
+    MENU_BUTTON_WIDTH = 70
+    MENU_FONT = ("Segoe UI", 10, "bold")
+    MENU_ICON_SIZE = (30, 30)
+    QUICK_ICON_SIZE = (16, 16)
+    QUICK_BUTTON_HEIGHT = 16
+    QUICK_BUTTON_RADIUS = 8
+    QUICK_BUTTON_MIN_WIDTH = 64
+    QUICK_BUTTON_WIDTH_SCALE = 7
 
     def __init__(self, app):
         self.app = app
@@ -49,10 +50,10 @@ class AppMenuBar:
 
         self.menu_frame.grid(row=0, column=0, sticky="w", padx=(0, 4))
         self.quick_actions_frame.grid(row=0, column=1, sticky="ew")
-        self.quick_actions_inner.pack(anchor="center", pady=2)
+        self.quick_actions_inner.pack(anchor="center", pady=1)
         self.actions_frame.grid(row=0, column=2, sticky="e", padx=(4, 8))
-        self.system_quick_frame.pack(side="left", padx=(0, 8), pady=2)
-        self.utility_actions_frame.pack(side="right", pady=2)
+        self.system_quick_frame.pack(side="left", padx=(0, 8), pady=1)
+        self.utility_actions_frame.pack(side="right", pady=1)
 
         self._build()
         self.refresh_theme()
@@ -124,7 +125,8 @@ class AppMenuBar:
                     "label": format_menu_label(item),
                     "command": item.command,
                 }
-                icon = prepare_menu_image(self._get_icon(item.icon_key))
+                compact_icon = resize_ctk_icon(self._get_icon(item.icon_key), self.MENU_ICON_SIZE)
+                icon = prepare_menu_image(compact_icon)
                 if icon is not None:
                     self._menu_images.append(icon)
                     kwargs["image"] = icon
@@ -171,7 +173,7 @@ class AppMenuBar:
             command=None,
         )
         button.configure(command=lambda m=menu, b=button: self._popup_menu(m, b))
-        button.pack(side="left", padx=(0, 4), pady=2)
+        button.pack(side="left", padx=(0, 4), pady=1)
         self._menu_buttons.append(button)
         self._button_menus.append((button, menu))
 
@@ -197,8 +199,8 @@ class AppMenuBar:
             width=max(self.QUICK_BUTTON_MIN_WIDTH, len(action_spec.text) * self.QUICK_BUTTON_WIDTH_SCALE + 18),
             corner_radius=self.QUICK_BUTTON_RADIUS,
             command=action_spec.command,
-            font=("Segoe UI", 11, "bold"),
-            border_spacing=6,
+            font=("Segoe UI", 10, "bold"),
+            border_spacing=4,
         )
         button._menu_style = action_spec.style
         return button
@@ -212,7 +214,7 @@ class AppMenuBar:
         self.app.bind_all("<Button-1>", self._on_root_click, add="+")
 
     def create_action_button(self, **kwargs) -> ctk.CTkButton:
-        button = ctk.CTkButton(self.utility_actions_frame, height=24, corner_radius=12, **kwargs)
+        button = ctk.CTkButton(self.utility_actions_frame, height=16, corner_radius=8, **kwargs)
         button.pack(side="right", padx=(6, 0))
         self._action_buttons.append(button)
         return button

@@ -141,3 +141,41 @@ def test_populate_submenu_uses_tk_compatible_images(monkeypatch):
     assert submenu.commands[2]["image"] is sentinel_image
     assert submenu.commands[2]["compound"] == "left"
     assert bar._menu_images == [sentinel_image]
+
+
+def test_populate_submenu_resizes_icons_for_compact_top_bar(monkeypatch):
+    resize_calls = []
+    sentinel_image = object()
+
+    def _fake_resize(icon, size):
+        resize_calls.append((icon, size))
+        return icon
+
+    monkeypatch.setattr("modules.ui.menu.top_nav_bar.resize_ctk_icon", _fake_resize)
+    monkeypatch.setattr("modules.ui.menu.top_nav_bar.prepare_menu_image", lambda icon: sentinel_image)
+
+    bar = AppMenuBar.__new__(AppMenuBar)
+    bar.app = SimpleNamespace(icons={"gm_screen": _FakeIcon(size=(60, 60))})
+    bar._menu_images = []
+
+    submenu = _FakeMenu()
+    menu_spec = SimpleNamespace(
+        groups=[
+            SimpleNamespace(
+                title="Workspace",
+                helper="test helper",
+                items=[
+                    SimpleNamespace(
+                        label="Open GM Screen",
+                        shortcut="F1",
+                        command=lambda: None,
+                        icon_key="gm_screen",
+                    )
+                ],
+            )
+        ]
+    )
+
+    bar._populate_submenu(submenu, menu_spec)
+
+    assert resize_calls == [(bar.app.icons["gm_screen"], AppMenuBar.MENU_ICON_SIZE)]
