@@ -59,9 +59,14 @@ if "customtkinter" not in sys.modules:
 
     ctk_stub.CTkButton = _Widget
     ctk_stub.CTkFrame = _Widget
+    ctk_stub.CTkImage = lambda light_image=None, dark_image=None, size=None: SimpleNamespace(
+        _light_image=light_image,
+        _dark_image=dark_image,
+        _size=size,
+    )
     sys.modules["customtkinter"] = ctk_stub
 
-from modules.ui.menu.menu_image_adapter import prepare_menu_image
+from modules.ui.menu.menu_image_adapter import prepare_menu_image, resize_ctk_icon
 from modules.ui.menu.top_nav_bar import AppMenuBar
 
 
@@ -96,6 +101,13 @@ def test_prepare_menu_image_converts_ctk_style_image(monkeypatch):
 
     assert result == "tk-photo"
     assert captured["image"].size == (12, 12)
+
+
+def test_resize_ctk_icon_returns_compact_clone():
+    resized = resize_ctk_icon(_FakeIcon(size=(60, 60)), (32, 20))
+
+    assert resized._size == (32, 20)
+    assert resized._light_image.size == (20, 20)
 
 
 def test_populate_submenu_uses_tk_compatible_images(monkeypatch):
