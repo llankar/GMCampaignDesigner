@@ -49,6 +49,11 @@ class AppMenuBar:
         self._system_quick_controllers: list[QuickActionButton] = []
         self._layout_mode = "expanded"
         self._last_palette = MenuVisualPalette.from_theme()
+        self._last_layout_width: int | None = None
+        self._last_layout_metrics = None
+        self._last_configure_width: int | None = None
+        self._pending_layout_width: int | None = None
+        self._layout_after_id: str | None = None
 
         self.frame = ctk.CTkFrame(app, corner_radius=0, height=self.FRAME_HEIGHT)
         self.frame.grid_columnconfigure(0, weight=0)
@@ -290,6 +295,7 @@ class AppMenuBar:
             self.app.bind("<Configure>", self._on_app_configure, add="+")
         except Exception:
             pass
+        self._queue_layout(self._current_width(), force=True)
 
     def create_action_button(self, **kwargs) -> ctk.CTkButton:
         button = ctk.CTkButton(self.utility_actions_frame, height=16, corner_radius=8, **kwargs)
@@ -351,20 +357,28 @@ class AppMenuBar:
 
     def _apply_layout(self, width: int):
         metrics = MenuLayoutController.resolve(width)
+        metrics_changed = metrics != self._last_layout_metrics
+        width_changed = width != self._last_layout_width
         self._layout_mode = metrics.mode
-        MenuBarLayoutApplier.apply(
-            self._menu_controllers,
-            self._primary_quick_controllers,
-            self._system_quick_controllers,
-            menu_frame=self.menu_frame,
-            quick_actions_inner=self.quick_actions_inner,
-            actions_frame=self.actions_frame,
-            system_quick_frame=self.system_quick_frame,
-            utility_actions_frame=self.utility_actions_frame,
-            metrics=metrics,
-        )
-        for controller in self._menu_controllers:
-            controller.apply_theme(self._last_palette, width=self._menu_button_width(controller.button))
+        self._last_layout_width = width
+
+        if metrics_changed:
+            MenuBarLayoutApplier.apply(
+                self._menu_controllers,
+                self._primary_quick_controllers,
+                self._system_quick_controllers,
+                menu_frame=self.menu_frame,
+                quick_actions_inner=self.quick_actions_inner,
+                actions_frame=self.actions_frame,
+                system_quick_frame=self.system_quick_frame,
+                utility_actions_frame=self.utility_actions_frame,
+                metrics=metrics,
+            )
+            self._last_layout_metrics = metrics
+
+        if metrics_changed or width_changed:
+            for controller in self._menu_controllers:
+                controller.apply_theme(self._last_palette, width=self._menu_button_width(controller.button))
 
     def _current_width(self) -> int:
         try:
@@ -375,8 +389,51 @@ class AppMenuBar:
             pass
         return 1600
 
-    def _on_app_configure(self, event):
-        width = getattr(event, "width", None)
+    def _parse_layout_width(self, width) -> int | None:
+        try:
+            parsed_width = int(width)
+        except (TypeError, ValueError):
+            return None
+        if parsed_width <= 1:
+            return None
+        return parsed_width
+
+    def _queue_layout(self, width: int, *, force: bool = False):
+        parsed_width = self._parse_layout_width(width)
+        if parsed_width is None:
+            return
+
+        metrics = MenuLayoutController.resolve(parsed_width)
+        if not force:
+            if (
+                parsed_width == self._last_layout_width
+                or parsed_width == self._last_configure_width
+                or parsed_width == self._pending_layout_width
+            ):
+                return
+            if metrics == self._last_layout_metrics:
+                self._last_configure_width = parsed_width
+                return
+
+        self._pending_layout_width = parsed_width
+        if self._layout_after_id is not None:
+            try:
+                self.app.after_cancel(self._layout_after_id)
+            except Exception:
+                pass
+        self._layout_after_id = self.app.after_idle(self._flush_layout)
+
+    def _flush_layout(self):
+        self._layout_after_id = None
+        width = self._pending_layout_width
+        self._pending_layout_width = None
         if width is None:
-            width = self._current_width()
-        self._apply_layout(int(width))
+            return
+        self._last_configure_width = width
+        self._apply_layout(width)
+
+    def _on_app_configure(self, event):
+        width = self._parse_layout_width(getattr(event, "width", None))
+        if width is None or width == self._last_layout_width:
+            return
+        self._queue_layout(width)
