@@ -16,7 +16,9 @@ class QuickActionSpec:
 PRIMARY_ACTIONS = (
     QuickActionSpec("GM Screen", lambda app: app.open_gm_screen(), "gm_screen", "Open the GM reference screen"),
     QuickActionSpec("Scenario", lambda app: app.open_scenario_builder(), "scenario_builder", "Launch the scenario builder"),
+    QuickActionSpec("Campaign", lambda app: app.open_campaign_builder(), "campaign_builder", "Launch the campaign builder"),
     QuickActionSpec("World Map", lambda app: app.open_world_map(), "world_map", "Jump to the world map"),
+    QuickActionSpec("MapTool", lambda app: app.map_tool(), "map_tool", "Jump to the map tool"),
     QuickActionSpec("Dice", lambda app: app.open_dice_roller(), "dice_roller", "Open the dice roller"),
     QuickActionSpec("Audio", lambda app: app.open_sound_manager(), "audio_controls", "Control sound and music"),
 )
