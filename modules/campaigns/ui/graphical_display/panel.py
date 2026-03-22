@@ -11,7 +11,7 @@ from modules.scenarios.gm_screen.dashboard.widgets.arc_display.arc_momentum_mete
 
 from .components import ArcSelectorStrip, ScenarioSelectorStrip
 from .data import CampaignGraphArc, CampaignGraphPayload, CampaignGraphScenario, build_campaign_graph_payload, build_campaign_option_index
-from .visuals import CapsuleWrap, EntityConstellation
+from .visuals import EntityConstellation
 
 
 class CampaignGraphPanel(ctk.CTkFrame):
@@ -200,7 +200,7 @@ class CampaignGraphPanel(ctk.CTkFrame):
         ).pack(padx=12, pady=(12, 8))
         ctk.CTkLabel(
             metrics,
-            text=f"{payload.linked_scenario_count} linked scenes",
+            text=f"{payload.linked_scenario_count} linked scenarios",
             wraplength=120,
             justify="center",
             text_color=DASHBOARD_THEME.text_secondary,
@@ -239,8 +239,9 @@ class CampaignGraphPanel(ctk.CTkFrame):
     def _render_arc_focus(self, payload: CampaignGraphPayload, selected_index: int) -> None:
         selected_arc = payload.arcs[selected_index]
         card = ctk.CTkFrame(self.scroll, fg_color=DASHBOARD_THEME.card_bg, corner_radius=22, border_width=1, border_color="#2b4161")
-        card.grid(row=1, column=0, sticky="ew", padx=8, pady=(0, 12))
+        card.grid(row=1, column=0, sticky="nsew", padx=8, pady=(0, 12))
         card.grid_columnconfigure(0, weight=1)
+        card.grid_rowconfigure(3, weight=1)
 
         header = ctk.CTkFrame(card, fg_color="transparent")
         header.grid(row=0, column=0, sticky="ew", padx=14, pady=(14, 8))
@@ -384,8 +385,9 @@ class CampaignGraphPanel(ctk.CTkFrame):
 
     def _render_scenario_focus(self, parent, arc: CampaignGraphArc) -> None:
         section = ctk.CTkFrame(parent, fg_color="#111a2c", corner_radius=20)
-        section.grid(row=3, column=0, sticky="ew", padx=14, pady=(0, 14))
+        section.grid(row=3, column=0, sticky="nsew", padx=14, pady=(0, 14))
         section.grid_columnconfigure(0, weight=1)
+        section.grid_rowconfigure(2, weight=1)
 
         if not arc.scenarios:
             ctk.CTkLabel(
@@ -405,7 +407,7 @@ class CampaignGraphPanel(ctk.CTkFrame):
             header,
             row=0,
             title="Current scenario",
-            subtitle=f"Scene {self._selected_scenario_index + 1} of {len(arc.scenarios)}",
+            subtitle=f"Scenario {self._selected_scenario_index + 1} of {len(arc.scenarios)}",
             current_label=selected_scenario.title,
             status_label=f"{len(selected_scenario.entity_links)} links",
             prev_command=lambda: self._shift_scenario(-1),
@@ -419,15 +421,15 @@ class CampaignGraphPanel(ctk.CTkFrame):
             scenarios=arc.scenarios,
             selected_index=self._selected_scenario_index,
             on_select=self._select_scenario,
-            on_open_scenario=self._open_scenario,
         ).grid(row=1, column=0, sticky="ew", padx=14, pady=(0, 12))
 
         self._render_selected_scenario_card(section, selected_scenario)
 
     def _render_selected_scenario_card(self, parent, scenario: CampaignGraphScenario) -> None:
         card = ctk.CTkFrame(parent, fg_color="#0d1728", corner_radius=18, border_width=1, border_color="#22395d")
-        card.grid(row=2, column=0, sticky="ew", padx=14, pady=(0, 14))
+        card.grid(row=2, column=0, sticky="nsew", padx=14, pady=(0, 14))
         card.grid_columnconfigure(0, weight=1)
+        card.grid_rowconfigure(2, weight=1)
 
         header = ctk.CTkFrame(card, fg_color="transparent")
         header.grid(row=0, column=0, sticky="ew", padx=12, pady=(12, 6))
@@ -448,19 +450,19 @@ class CampaignGraphPanel(ctk.CTkFrame):
             command=lambda n=scenario.title: self._open_scenario(n),
         ).grid(row=0, column=1, sticky="e")
 
-        ctk.CTkLabel(
+        summary_label = ctk.CTkLabel(
             card,
             text=scenario.summary or "No synopsis written yet for this scenario.",
             wraplength=980,
             justify="left",
             text_color=DASHBOARD_THEME.text_secondary,
             anchor="w",
-        ).grid(row=1, column=0, sticky="ew", padx=12, pady=(0, 10))
+        )
+        summary_label.grid(row=1, column=0, sticky="ew", padx=12, pady=(0, 10))
+        self._bind_wraplength(card, summary_label, horizontal_padding=32, minimum=320)
 
         constellation = EntityConstellation(card, links=scenario.entity_links, on_open_entity=self._open_entity)
-        constellation.grid(row=2, column=0, sticky="ew", padx=12, pady=(0, 10))
-
-        CapsuleWrap(card, items=scenario.entity_links, on_open_entity=self._open_entity).grid(row=3, column=0, sticky="ew", padx=8, pady=(0, 12))
+        constellation.grid(row=2, column=0, sticky="nsew", padx=12, pady=(0, 12))
 
     def _get_selected_arc(self, payload: CampaignGraphPayload) -> CampaignGraphArc | None:
         if not payload.arcs:
@@ -511,6 +513,16 @@ class CampaignGraphPanel(ctk.CTkFrame):
         if length <= 0:
             return 0
         return max(0, min(index, length - 1))
+
+    def _bind_wraplength(self, parent, label, *, horizontal_padding: int = 40, minimum: int = 240) -> None:
+        def _update(_event=None):
+            try:
+                label.configure(wraplength=max(minimum, parent.winfo_width() - horizontal_padding))
+            except Exception:
+                pass
+
+        parent.bind("<Configure>", _update, add="+")
+        parent.after(50, _update)
 
     def _open_scenario(self, scenario_name: str) -> None:
         self._open_entity("Scenarios", scenario_name)

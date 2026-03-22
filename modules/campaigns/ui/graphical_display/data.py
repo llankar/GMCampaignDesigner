@@ -91,7 +91,7 @@ def build_campaign_graph_payload(campaign_item: dict[str, Any] | None, scenario_
                 name="Loose Threads",
                 status="In Progress" if rendered_arcs else "Planned",
                 summary="Linked scenarios that are not yet anchored to a named campaign arc.",
-                objective="Assign these scenes to a narrative arc when the story sharpens.",
+                objective="Assign these scenarios to a narrative arc when the story sharpens.",
                 scenarios=[_build_scenario_payload(name, scenario_index) for name in loose_threads],
             )
         )

@@ -96,7 +96,7 @@ class ArcSelectorStrip(_CanvasSelector):
             canvas.create_text(
                 x1 + 14,
                 y2 - 18,
-                text=f"{arc.status} • {len(arc.scenarios)} scenes",
+                text=f"{arc.status} • {len(arc.scenarios)} scenarios",
                 fill=meta_color,
                 anchor="sw",
                 font=("Segoe UI", 9, "bold"),
@@ -116,13 +116,11 @@ class ScenarioSelectorStrip(_CanvasSelector):
         *,
         scenarios: Sequence[CampaignGraphScenario],
         selected_index: int,
-        on_select: Callable[[int], None],
-        on_open_scenario: Callable[[str], None],
+        on_select: Callable[[int], None]
     ):
         self._scenarios = list(scenarios)
         self._selected_index = selected_index
         self._on_select = on_select
-        self._on_open_scenario = on_open_scenario
         super().__init__(parent, height=122, bg_color="#0d1728")
 
     def _render(self, *_args, **_kwargs) -> None:
@@ -147,7 +145,6 @@ class ScenarioSelectorStrip(_CanvasSelector):
             text_color = "#f8fbff" if selected else DASHBOARD_THEME.text_secondary
             dot_tag = f"scenario-dot:{index}"
             label_tag = f"scenario-label:{index}"
-            open_tag = f"scenario-open:{index}"
 
             canvas.create_oval(x - 24, y - 24, x + 24, y + 24, outline=ring, width=3, tags=(dot_tag,))
             canvas.create_oval(x - 18, y - 18, x + 18, y + 18, fill=fill, outline="#66c0ff", width=2, tags=(dot_tag,))
@@ -162,18 +159,9 @@ class ScenarioSelectorStrip(_CanvasSelector):
                 justify="center",
                 tags=(label_tag,),
             )
-            canvas.create_text(
-                x,
-                y - 34,
-                text="Open",
-                fill="#66c0ff" if selected else "#89a8cf",
-                font=("Segoe UI", 9, "underline"),
-                tags=(open_tag,),
-            )
             canvas.tag_bind(dot_tag, "<Button-1>", lambda _e, idx=index: self._on_select(idx))
             canvas.tag_bind(label_tag, "<Button-1>", lambda _e, idx=index: self._on_select(idx))
-            canvas.tag_bind(open_tag, "<Button-1>", lambda _e, n=scenario.title: self._on_open_scenario(n))
-            for tag in (dot_tag, label_tag, open_tag):
+            for tag in (dot_tag, label_tag):
                 canvas.tag_bind(tag, "<Enter>", lambda _e: canvas.configure(cursor="hand2"))
                 canvas.tag_bind(tag, "<Leave>", lambda _e: canvas.configure(cursor=""))
 
