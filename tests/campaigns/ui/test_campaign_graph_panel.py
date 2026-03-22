@@ -85,7 +85,7 @@ sys.modules.setdefault(
     "modules.campaigns.ui.graphical_display.components",
     types.SimpleNamespace(
         ArcSelectorStrip=_DummyWidget,
-        EntityConstellation=_DummyWidget,
+        ScenarioEntityBrowser=_DummyWidget,
         ScenarioBriefingPanel=_DummyWidget,
         ScenarioHeroStrip=_DummyWidget,
         ScenarioIdentityPanel=_DummyWidget,

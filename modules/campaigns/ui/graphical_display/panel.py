@@ -11,8 +11,8 @@ from modules.scenarios.gm_screen.dashboard.widgets.arc_display.arc_momentum_mete
 
 from .components import (
     ArcSelectorStrip,
-    EntityConstellation,
     ScenarioBriefingPanel,
+    ScenarioEntityBrowser,
     ScenarioHeroStrip,
     ScenarioIdentityPanel,
     ScenarioSelectorStrip,
@@ -519,7 +519,7 @@ class CampaignGraphPanel(ctk.CTkFrame):
         content = ctk.CTkFrame(card, fg_color="transparent")
         content.grid(row=1, column=0, sticky="nsew", padx=14, pady=(0, 14))
         content.grid_columnconfigure(0, weight=3)
-        content.grid_columnconfigure(1, weight=2)
+        content.grid_columnconfigure(1, weight=3)
         content.grid_rowconfigure(0, weight=0)
         content.grid_rowconfigure(1, weight=1)
 
@@ -552,7 +552,7 @@ class CampaignGraphPanel(ctk.CTkFrame):
             stakes=scenario.stakes,
         ).grid(row=1, column=0, sticky="nsew")
 
-        EntityConstellation(
+        ScenarioEntityBrowser(
             content,
             scenario_title=scenario.title,
             links=scenario.entity_links,
