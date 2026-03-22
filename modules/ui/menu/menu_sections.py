@@ -108,6 +108,7 @@ def build_menu_specs(app) -> list[TopLevelMenuSpec]:
                     helper="live reference views during play",
                     items=[
                         _command("GM Screen", app.open_gm_screen, shortcut="F1", icon_key="gm_screen"),
+                        _command("Campaign Constellation", app.open_campaign_graph_view, icon_key="campaign_graph"),
                         _command("World Map", app.open_world_map, shortcut="F5", icon_key="world_map"),
                     ],
                 ),
