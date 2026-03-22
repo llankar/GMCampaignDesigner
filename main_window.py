@@ -1092,17 +1092,39 @@ class MainWindow(ctk.CTk):
         self.banner_visible = False
         self.current_open_view = None
 
+    def _get_calendar_dock_if_alive(self):
+        dock = getattr(self, "calendar_dock", None)
+        if dock is None:
+            return None
+
+        try:
+            if not dock.winfo_exists():
+                return None
+        except Exception:
+            return None
+
+        return dock
+
     def _toggle_calendar_dock(self):
+        dock = self._get_calendar_dock_if_alive()
+        if dock is None:
+            self._calendar_dock_visible = False
+            try:
+                self.calendar_dock_toggle_btn.configure(text="Calendar ▶")
+            except Exception:
+                pass
+            return
+
         if self._calendar_dock_visible:
-            self.calendar_dock.grid_remove()
+            dock.grid_remove()
             self._calendar_dock_visible = False
             self.calendar_dock_toggle_btn.configure(text="Calendar ▶")
             return
 
-        self.calendar_dock.grid()
+        dock.grid()
         self._calendar_dock_visible = True
         self.calendar_dock_toggle_btn.configure(text="Calendar ◀")
-        self._refresh_calendar_dock(self.calendar_dock.selected_date)
+        self._refresh_calendar_dock(dock.selected_date)
 
 
     def _on_calendar_campaign_today_changed(self, campaign_today):
@@ -1193,8 +1215,9 @@ class MainWindow(ctk.CTk):
         open_entity_window(entity_type, entity_name)
 
     def _refresh_calendar_dock(self, selected_date=None):
-        dock = getattr(self, "calendar_dock", None)
+        dock = self._get_calendar_dock_if_alive()
         if dock is None:
+            self._calendar_dock_visible = False
             return
 
         reference_date = selected_date or dock.selected_date or CampaignTimelineSimulator.current_campaign_date()
@@ -2263,8 +2286,13 @@ class MainWindow(ctk.CTk):
             except Exception:
                 pass
             # Clear dynamic children of content_frame (exclude the static frames)
+            static_widgets = {self.banner_frame, self.inner_content_frame}
+            calendar_dock = self._get_calendar_dock_if_alive()
+            if calendar_dock is not None:
+                static_widgets.add(calendar_dock)
+
             for widget in self.content_frame.winfo_children():
-                if widget not in (self.banner_frame, self.inner_content_frame):
+                if widget not in static_widgets:
                     try:
                         widget.destroy()
                     except Exception:
