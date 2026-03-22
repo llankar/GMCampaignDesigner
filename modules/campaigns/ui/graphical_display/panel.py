@@ -9,9 +9,8 @@ from modules.generic.generic_model_wrapper import GenericModelWrapper
 from modules.scenarios.gm_screen.dashboard.styles.dashboard_theme import DASHBOARD_THEME
 from modules.scenarios.gm_screen.dashboard.widgets.arc_display.arc_momentum_meter import ArcMomentumMeter
 
-from .components import ArcSelectorStrip, ScenarioSelectorStrip
-from .data import CampaignGraphArc, CampaignGraphPayload, CampaignGraphScenario, build_campaign_graph_payload, build_campaign_option_index
-from .visuals import EntityConstellation
+from .components import ArcSelectorStrip, ScenarioSelectorStrip, ScenarioSpotlight
+from .data import CampaignGraphArc, CampaignGraphPayload, build_campaign_graph_payload, build_campaign_option_index
 
 
 class CampaignGraphPanel(ctk.CTkFrame):
@@ -28,6 +27,11 @@ class CampaignGraphPanel(ctk.CTkFrame):
         self._selected_campaign: CampaignGraphPayload | None = None
         self._selected_arc_index = 0
         self._selected_scenario_index = 0
+
+        self._hero_mount = None
+        self._content_mount = None
+        self._arc_mount = None
+        self._scenario_mount = None
 
         self.grid_rowconfigure(1, weight=1)
         self.grid_columnconfigure(0, weight=1)
@@ -62,7 +66,7 @@ class CampaignGraphPanel(ctk.CTkFrame):
 
         ctk.CTkLabel(
             text_wrap,
-            text="Focus on one arc and one scenario at a time.",
+            text="Focus on one arc and one scenario at a time — without reloading the whole window.",
             font=ctk.CTkFont(size=12),
             text_color=DASHBOARD_THEME.text_secondary,
             anchor="w",
@@ -122,8 +126,7 @@ class CampaignGraphPanel(ctk.CTkFrame):
         self._render_campaign()
 
     def _render_campaign(self) -> None:
-        for child in self.scroll.winfo_children():
-            child.destroy()
+        self._clear_container(self.scroll)
 
         payload = self._selected_campaign
         if payload is None:
@@ -132,21 +135,27 @@ class CampaignGraphPanel(ctk.CTkFrame):
 
         self._selected_arc_index = self._clamp_index(self._selected_arc_index, len(payload.arcs))
         selected_arc = self._get_selected_arc(payload)
-        if selected_arc is not None:
-            self._selected_scenario_index = self._clamp_index(self._selected_scenario_index, len(selected_arc.scenarios))
-        else:
-            self._selected_scenario_index = 0
+        self._selected_scenario_index = self._clamp_index(
+            self._selected_scenario_index,
+            len(selected_arc.scenarios) if selected_arc is not None else 0,
+        )
+
+        self._hero_mount = ctk.CTkFrame(self.scroll, fg_color="transparent")
+        self._hero_mount.grid(row=0, column=0, sticky="ew", padx=8, pady=(0, 12))
+        self._content_mount = ctk.CTkFrame(self.scroll, fg_color="transparent")
+        self._content_mount.grid(row=1, column=0, sticky="nsew", padx=8, pady=(0, 12))
+        self._content_mount.grid_columnconfigure(0, weight=1)
 
         self._render_campaign_hero(payload)
-        if not payload.arcs:
-            self._render_empty_state("This campaign does not contain any arc data yet.")
-            return
-
-        self._render_arc_focus(payload, self._selected_arc_index)
+        self._refresh_arc_zone()
 
     def _render_campaign_hero(self, payload: CampaignGraphPayload) -> None:
-        hero = ctk.CTkFrame(self.scroll, fg_color="#10192b", corner_radius=22, border_width=1, border_color="#223554")
-        hero.grid(row=0, column=0, sticky="ew", padx=8, pady=(0, 12))
+        parent = self._hero_mount
+        if parent is None:
+            return
+
+        hero = ctk.CTkFrame(parent, fg_color="#10192b", corner_radius=22, border_width=1, border_color="#223554")
+        hero.grid(row=0, column=0, sticky="ew")
         for column in range(3):
             hero.grid_columnconfigure(column, weight=1 if column == 0 else 0)
 
@@ -236,12 +245,28 @@ class CampaignGraphPanel(ctk.CTkFrame):
             anchor="w",
         ).grid(row=1, column=0, sticky="ew", padx=12, pady=(0, 8))
 
-    def _render_arc_focus(self, payload: CampaignGraphPayload, selected_index: int) -> None:
-        selected_arc = payload.arcs[selected_index]
-        card = ctk.CTkFrame(self.scroll, fg_color=DASHBOARD_THEME.card_bg, corner_radius=22, border_width=1, border_color="#2b4161")
-        card.grid(row=1, column=0, sticky="nsew", padx=8, pady=(0, 12))
+    def _refresh_arc_zone(self) -> None:
+        parent = self._content_mount
+        if parent is None:
+            return
+        self._clear_container(parent)
+
+        payload = self._selected_campaign
+        if payload is None:
+            self._render_empty_state("Select a campaign to visualize its structure.", parent=parent)
+            return
+        if not payload.arcs:
+            self._render_empty_state("This campaign does not contain any arc data yet.", parent=parent)
+            return
+
+        self._selected_arc_index = self._clamp_index(self._selected_arc_index, len(payload.arcs))
+        selected_arc = payload.arcs[self._selected_arc_index]
+
+        card = ctk.CTkFrame(parent, fg_color=DASHBOARD_THEME.card_bg, corner_radius=22, border_width=1, border_color="#2b4161")
+        card.grid(row=0, column=0, sticky="nsew")
         card.grid_columnconfigure(0, weight=1)
         card.grid_rowconfigure(3, weight=1)
+        self._arc_mount = card
 
         header = ctk.CTkFrame(card, fg_color="transparent")
         header.grid(row=0, column=0, sticky="ew", padx=14, pady=(14, 8))
@@ -251,19 +276,19 @@ class CampaignGraphPanel(ctk.CTkFrame):
             header,
             row=0,
             title="Current arc",
-            subtitle=f"Arc {selected_index + 1} of {len(payload.arcs)}",
+            subtitle=f"Arc {self._selected_arc_index + 1} of {len(payload.arcs)}",
             current_label=selected_arc.name,
             status_label=selected_arc.status,
             prev_command=lambda: self._shift_arc(-1),
             next_command=lambda: self._shift_arc(1),
-            prev_enabled=selected_index > 0,
-            next_enabled=selected_index < len(payload.arcs) - 1,
+            prev_enabled=self._selected_arc_index > 0,
+            next_enabled=self._selected_arc_index < len(payload.arcs) - 1,
         )
 
         ArcSelectorStrip(
             card,
             arcs=payload.arcs,
-            selected_index=selected_index,
+            selected_index=self._selected_arc_index,
             on_select=self._select_arc,
         ).grid(row=1, column=0, sticky="ew", padx=14, pady=(0, 12))
 
@@ -287,7 +312,11 @@ class CampaignGraphPanel(ctk.CTkFrame):
             accent="#c084fc",
         )
 
-        self._render_scenario_focus(card, selected_arc)
+        self._scenario_mount = ctk.CTkFrame(card, fg_color="transparent")
+        self._scenario_mount.grid(row=3, column=0, sticky="nsew", padx=14, pady=(0, 14))
+        self._scenario_mount.grid_columnconfigure(0, weight=1)
+        self._scenario_mount.grid_rowconfigure(0, weight=1)
+        self._refresh_scenario_zone()
 
     def _render_stepper_controls(
         self,
@@ -383,13 +412,24 @@ class CampaignGraphPanel(ctk.CTkFrame):
             anchor="w",
         ).grid(row=1, column=0, sticky="ew", padx=14, pady=(0, 14))
 
-    def _render_scenario_focus(self, parent, arc: CampaignGraphArc) -> None:
+    def _refresh_scenario_zone(self) -> None:
+        parent = self._scenario_mount
+        if parent is None:
+            return
+        self._clear_container(parent)
+
+        payload = self._selected_campaign
+        selected_arc = self._get_selected_arc(payload) if payload is not None else None
+        if selected_arc is None:
+            self._render_empty_state("Select an arc to inspect its scenarios.", parent=parent)
+            return
+
         section = ctk.CTkFrame(parent, fg_color="#111a2c", corner_radius=20)
-        section.grid(row=3, column=0, sticky="nsew", padx=14, pady=(0, 14))
+        section.grid(row=0, column=0, sticky="nsew")
         section.grid_columnconfigure(0, weight=1)
         section.grid_rowconfigure(2, weight=1)
 
-        if not arc.scenarios:
+        if not selected_arc.scenarios:
             ctk.CTkLabel(
                 section,
                 text="No scenarios are currently attached to this arc.",
@@ -398,7 +438,8 @@ class CampaignGraphPanel(ctk.CTkFrame):
             ).grid(row=0, column=0, sticky="ew", padx=14, pady=18)
             return
 
-        selected_scenario = arc.scenarios[self._selected_scenario_index]
+        self._selected_scenario_index = self._clamp_index(self._selected_scenario_index, len(selected_arc.scenarios))
+        selected_scenario = selected_arc.scenarios[self._selected_scenario_index]
 
         header = ctk.CTkFrame(section, fg_color="transparent")
         header.grid(row=0, column=0, sticky="ew", padx=14, pady=(14, 8))
@@ -407,65 +448,31 @@ class CampaignGraphPanel(ctk.CTkFrame):
             header,
             row=0,
             title="Current scenario",
-            subtitle=f"Scenario {self._selected_scenario_index + 1} of {len(arc.scenarios)}",
+            subtitle=f"Scenario {self._selected_scenario_index + 1} of {len(selected_arc.scenarios)}",
             current_label=selected_scenario.title,
             status_label=f"{len(selected_scenario.entity_links)} links",
             prev_command=lambda: self._shift_scenario(-1),
             next_command=lambda: self._shift_scenario(1),
             prev_enabled=self._selected_scenario_index > 0,
-            next_enabled=self._selected_scenario_index < len(arc.scenarios) - 1,
+            next_enabled=self._selected_scenario_index < len(selected_arc.scenarios) - 1,
         )
 
         ScenarioSelectorStrip(
             section,
-            scenarios=arc.scenarios,
+            scenarios=selected_arc.scenarios,
             selected_index=self._selected_scenario_index,
             on_select=self._select_scenario,
         ).grid(row=1, column=0, sticky="ew", padx=14, pady=(0, 12))
 
-        self._render_selected_scenario_card(section, selected_scenario)
+        ScenarioSpotlight(
+            section,
+            scenario=selected_scenario,
+            on_open_scenario=self._open_scenario,
+            on_open_entity=self._open_entity,
+        ).grid(row=2, column=0, sticky="nsew", padx=14, pady=(0, 14))
 
-    def _render_selected_scenario_card(self, parent, scenario: CampaignGraphScenario) -> None:
-        card = ctk.CTkFrame(parent, fg_color="#0d1728", corner_radius=18, border_width=1, border_color="#22395d")
-        card.grid(row=2, column=0, sticky="nsew", padx=14, pady=(0, 14))
-        card.grid_columnconfigure(0, weight=1)
-        card.grid_rowconfigure(2, weight=1)
-
-        header = ctk.CTkFrame(card, fg_color="transparent")
-        header.grid(row=0, column=0, sticky="ew", padx=12, pady=(12, 6))
-        header.grid_columnconfigure(0, weight=1)
-        ctk.CTkLabel(
-            header,
-            text=scenario.title,
-            font=ctk.CTkFont(size=18, weight="bold"),
-            text_color=DASHBOARD_THEME.text_primary,
-            anchor="w",
-        ).grid(row=0, column=0, sticky="w")
-        ctk.CTkButton(
-            header,
-            text="Edit scenario",
-            width=116,
-            fg_color=DASHBOARD_THEME.accent,
-            hover_color=DASHBOARD_THEME.accent_hover,
-            command=lambda n=scenario.title: self._open_scenario(n),
-        ).grid(row=0, column=1, sticky="e")
-
-        summary_label = ctk.CTkLabel(
-            card,
-            text=scenario.summary or "No synopsis written yet for this scenario.",
-            wraplength=980,
-            justify="left",
-            text_color=DASHBOARD_THEME.text_secondary,
-            anchor="w",
-        )
-        summary_label.grid(row=1, column=0, sticky="ew", padx=12, pady=(0, 10))
-        self._bind_wraplength(card, summary_label, horizontal_padding=32, minimum=320)
-
-        constellation = EntityConstellation(card, links=scenario.entity_links, on_open_entity=self._open_entity)
-        constellation.grid(row=2, column=0, sticky="nsew", padx=12, pady=(0, 12))
-
-    def _get_selected_arc(self, payload: CampaignGraphPayload) -> CampaignGraphArc | None:
-        if not payload.arcs:
+    def _get_selected_arc(self, payload: CampaignGraphPayload | None) -> CampaignGraphArc | None:
+        if payload is None or not payload.arcs:
             return None
         return payload.arcs[self._clamp_index(self._selected_arc_index, len(payload.arcs))]
 
@@ -475,15 +482,15 @@ class CampaignGraphPanel(ctk.CTkFrame):
             return
         self._selected_arc_index = self._clamp_index(self._selected_arc_index + step, len(payload.arcs))
         self._selected_scenario_index = 0
-        self._render_campaign()
+        self._refresh_arc_zone()
 
     def _shift_scenario(self, step: int) -> None:
         payload = self._selected_campaign
-        selected_arc = self._get_selected_arc(payload) if payload is not None else None
+        selected_arc = self._get_selected_arc(payload)
         if selected_arc is None or not selected_arc.scenarios:
             return
         self._selected_scenario_index = self._clamp_index(self._selected_scenario_index + step, len(selected_arc.scenarios))
-        self._render_campaign()
+        self._refresh_scenario_zone()
 
     def _select_arc(self, index: int) -> None:
         payload = self._selected_campaign
@@ -491,15 +498,15 @@ class CampaignGraphPanel(ctk.CTkFrame):
             return
         self._selected_arc_index = self._clamp_index(index, len(payload.arcs))
         self._selected_scenario_index = 0
-        self._render_campaign()
+        self._refresh_arc_zone()
 
     def _select_scenario(self, index: int) -> None:
         payload = self._selected_campaign
-        selected_arc = self._get_selected_arc(payload) if payload is not None else None
+        selected_arc = self._get_selected_arc(payload)
         if selected_arc is None or not selected_arc.scenarios:
             return
         self._selected_scenario_index = self._clamp_index(index, len(selected_arc.scenarios))
-        self._render_campaign()
+        self._refresh_scenario_zone()
 
     def _status_color(self, status_label: str) -> str:
         status = status_label.lower()
@@ -514,15 +521,9 @@ class CampaignGraphPanel(ctk.CTkFrame):
             return 0
         return max(0, min(index, length - 1))
 
-    def _bind_wraplength(self, parent, label, *, horizontal_padding: int = 40, minimum: int = 240) -> None:
-        def _update(_event=None):
-            try:
-                label.configure(wraplength=max(minimum, parent.winfo_width() - horizontal_padding))
-            except Exception:
-                pass
-
-        parent.bind("<Configure>", _update, add="+")
-        parent.after(50, _update)
+    def _clear_container(self, parent) -> None:
+        for child in parent.winfo_children():
+            child.destroy()
 
     def _open_scenario(self, scenario_name: str) -> None:
         self._open_entity("Scenarios", scenario_name)
@@ -533,9 +534,10 @@ class CampaignGraphPanel(ctk.CTkFrame):
         except Exception as exc:
             messagebox.showerror("Open entity", f"Unable to open {entity_type} '{entity_name}':\n{exc}", parent=self.winfo_toplevel())
 
-    def _render_empty_state(self, message: str) -> None:
+    def _render_empty_state(self, message: str, *, parent=None) -> None:
+        target = parent or self.scroll
         ctk.CTkLabel(
-            self.scroll,
+            target,
             text=message,
             text_color=DASHBOARD_THEME.text_secondary,
             font=ctk.CTkFont(size=14),
