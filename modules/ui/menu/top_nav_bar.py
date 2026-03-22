@@ -14,9 +14,10 @@ class AppMenuBar:
     """Custom in-window navigation bar with grouped menus and quick actions."""
 
     FRAME_HEIGHT = 18
-    MENU_BUTTON_HEIGHT = 14
+    MENU_BUTTON_HEIGHT = 16
     MENU_BUTTON_WIDTH = 70
-    MENU_FONT = ("Segoe UI", 10, "bold")
+    ACTION_BUTTON_FONT = ("Segoe UI", 13)
+    MENU_FONT = ACTION_BUTTON_FONT
     MENU_ICON_SIZE = (30, 30)
     QUICK_ICON_SIZE = (16, 16)
     QUICK_BUTTON_HEIGHT = 16
@@ -238,6 +239,7 @@ class AppMenuBar:
         self.app.bind_all("<Button-1>", self._on_root_click, add="+")
 
     def create_action_button(self, **kwargs) -> ctk.CTkButton:
+        kwargs.setdefault("font", self.ACTION_BUTTON_FONT)
         button = ctk.CTkButton(self.utility_actions_frame, height=16, corner_radius=8, **kwargs)
         button.pack(side="right", padx=(6, 0))
         self._action_buttons.append(button)
@@ -265,7 +267,7 @@ class AppMenuBar:
                     hover_color=button_fg,
                     text_color="#E8EEF6",
                     font=self.MENU_FONT,
-                    width=max(64, len(button.cget("text")) * 9),
+                    width=max(64, len(button.cget("text")) * 11),
                 )
             except Exception:
                 pass
