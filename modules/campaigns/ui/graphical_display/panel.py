@@ -135,6 +135,7 @@ class CampaignGraphPanel(ctk.CTkFrame):
         self._selected_campaign = build_campaign_graph_payload(campaign, self._scenario_items)
         self._selected_arc_index = 0
         self._selected_scenario_index = 0
+        self._scroll_to_top()
         self._refresh_campaign_content()
 
     def _refresh_campaign_content(self) -> None:
@@ -164,34 +165,40 @@ class CampaignGraphPanel(ctk.CTkFrame):
         self._render_campaign_hero(payload)
 
     def _refresh_arc_focus(self) -> None:
-        payload = self._selected_campaign
-        self._clear_container(self._arc_focus_container)
-        self._scenario_focus_container = None
-        if payload is None or not payload.arcs:
-            return
+        def _refresh() -> None:
+            payload = self._selected_campaign
+            self._clear_container(self._arc_focus_container)
+            self._scenario_focus_container = None
+            if payload is None or not payload.arcs:
+                return
 
-        self._hide_empty_state()
-        self._selected_arc_index = self._clamp_index(self._selected_arc_index, len(payload.arcs))
-        selected_arc = self._get_selected_arc(payload)
-        if selected_arc is None:
-            return
+            self._hide_empty_state()
+            self._selected_arc_index = self._clamp_index(self._selected_arc_index, len(payload.arcs))
+            selected_arc = self._get_selected_arc(payload)
+            if selected_arc is None:
+                return
 
-        self._selected_scenario_index = self._clamp_index(self._selected_scenario_index, len(selected_arc.scenarios))
-        self._render_arc_focus(payload, self._selected_arc_index)
+            self._selected_scenario_index = self._clamp_index(self._selected_scenario_index, len(selected_arc.scenarios))
+            self._render_arc_focus(payload, self._selected_arc_index)
+
+        self._preserve_scroll_position(_refresh)
 
     def _refresh_scenario_focus(self) -> None:
-        payload = self._selected_campaign
-        selected_arc = self._get_selected_arc(payload) if payload is not None else None
-        scenario_container = getattr(self, "_scenario_focus_container", None)
-        if scenario_container is None:
-            return
+        def _refresh() -> None:
+            payload = self._selected_campaign
+            selected_arc = self._get_selected_arc(payload) if payload is not None else None
+            scenario_container = getattr(self, "_scenario_focus_container", None)
+            if scenario_container is None:
+                return
 
-        self._clear_container(scenario_container)
-        if selected_arc is None:
-            return
+            self._clear_container(scenario_container)
+            if selected_arc is None:
+                return
 
-        self._selected_scenario_index = self._clamp_index(self._selected_scenario_index, len(selected_arc.scenarios))
-        self._render_scenario_focus(selected_arc)
+            self._selected_scenario_index = self._clamp_index(self._selected_scenario_index, len(selected_arc.scenarios))
+            self._render_scenario_focus(selected_arc)
+
+        self._preserve_scroll_position(_refresh)
 
     def _render_campaign_hero(self, payload: CampaignGraphPayload) -> None:
         hero = ctk.CTkFrame(self._hero_container, fg_color="#10192b", corner_radius=22, border_width=1, border_color="#223554")
@@ -553,6 +560,63 @@ class CampaignGraphPanel(ctk.CTkFrame):
             return
         self._selected_scenario_index = self._clamp_index(index, len(selected_arc.scenarios))
         self._refresh_scenario_focus()
+
+    def _preserve_scroll_position(self, callback) -> None:
+        scroll_fraction = self._get_scroll_fraction()
+        callback()
+        if scroll_fraction is not None:
+            self.after_idle(lambda value=scroll_fraction: self._restore_scroll_fraction(value))
+
+    def _get_scroll_fraction(self) -> float | None:
+        canvas = self._get_scroll_canvas()
+        if canvas is None or not hasattr(canvas, "yview"):
+            return None
+        try:
+            return float(canvas.yview()[0])
+        except Exception:
+            return None
+
+    def _restore_scroll_fraction(self, value: float) -> None:
+        canvas = self._get_scroll_canvas()
+        if canvas is None or not hasattr(canvas, "yview_moveto"):
+            return
+        try:
+            canvas.update_idletasks()
+            canvas.yview_moveto(value)
+        except Exception:
+            return
+
+    def _scroll_to_top(self) -> None:
+        self._restore_scroll_fraction(0.0)
+
+    def _get_scroll_canvas(self):
+        scroll = getattr(self, "scroll", None)
+        if scroll is None:
+            return None
+
+        direct_canvas = getattr(scroll, "_parent_canvas", None)
+        if direct_canvas is not None:
+            return direct_canvas
+
+        queue = [scroll]
+        visited: set[int] = set()
+        while queue:
+            widget = queue.pop(0)
+            widget_id = id(widget)
+            if widget_id in visited:
+                continue
+            visited.add(widget_id)
+
+            if isinstance(widget, tk.Canvas):
+                return widget
+
+            children_getter = getattr(widget, "winfo_children", None)
+            if callable(children_getter):
+                try:
+                    queue.extend(children_getter())
+                except Exception:
+                    continue
+        return None
 
     def _status_color(self, status_label: str) -> str:
         status = status_label.lower()
