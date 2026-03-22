@@ -83,11 +83,14 @@ sys.modules.setdefault(
 )
 sys.modules.setdefault(
     "modules.campaigns.ui.graphical_display.components",
-    types.SimpleNamespace(ArcSelectorStrip=_DummyWidget, ScenarioSelectorStrip=_DummyWidget),
-)
-sys.modules.setdefault(
-    "modules.campaigns.ui.graphical_display.visuals",
-    types.SimpleNamespace(EntityConstellation=_DummyWidget),
+    types.SimpleNamespace(
+        ArcSelectorStrip=_DummyWidget,
+        EntityConstellation=_DummyWidget,
+        ScenarioBriefingPanel=_DummyWidget,
+        ScenarioHeroStrip=_DummyWidget,
+        ScenarioIdentityPanel=_DummyWidget,
+        ScenarioSelectorStrip=_DummyWidget,
+    ),
 )
 sys.modules.setdefault(
     "modules.campaigns.ui.graphical_display.data",
@@ -98,6 +101,14 @@ sys.modules.setdefault(
         build_campaign_graph_payload=lambda *args, **kwargs: None,
         build_campaign_option_index=lambda *args, **kwargs: ([], {}),
     ),
+)
+sys.modules.setdefault(
+    "modules.scenarios.gm_screen_view",
+    types.SimpleNamespace(GMScreenView=_DummyWidget),
+)
+sys.modules.setdefault(
+    "modules.scenarios.gm_layout_manager",
+    types.SimpleNamespace(GMScreenLayoutManager=_DummyWidget),
 )
 
 MODULE_PATH = Path("modules/campaigns/ui/graphical_display/panel.py")

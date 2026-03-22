@@ -5,6 +5,7 @@ from typing import Callable
 import customtkinter as ctk
 
 from modules.scenarios.gm_screen.dashboard.styles.dashboard_theme import DASHBOARD_THEME
+from .pill import OutlinedPill
 from .scenario_metrics import ScenarioMetricChip, ScenarioTagRow
 
 
@@ -54,17 +55,15 @@ class ScenarioHeroStrip(ctk.CTkFrame):
         chips = ctk.CTkFrame(identity, fg_color="transparent")
         chips.grid(row=3, column=0, sticky="w", pady=(12, 0))
         for index, (label, value) in enumerate(count_chips):
-            ctk.CTkLabel(
+            OutlinedPill(
                 chips,
                 text=f"{value} {label}",
+                text_color="#edf5ff",
                 fg_color="#162742",
-                corner_radius=999,
+                border_color=accent,
                 padx=12,
                 pady=5,
-                text_color="#edf5ff",
                 font=ctk.CTkFont(size=11, weight="bold"),
-                border_width=1,
-                border_color=accent,
             ).grid(row=index // 4, column=index % 4, sticky="w", padx=(0, 8), pady=(0, 8))
 
         actions = ctk.CTkFrame(self, fg_color="#111f35", corner_radius=20)
