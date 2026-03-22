@@ -3,6 +3,7 @@ from __future__ import annotations
 import customtkinter as ctk
 
 from modules.scenarios.gm_screen.dashboard.styles.dashboard_theme import DASHBOARD_THEME
+from .pill import OutlinedPill
 
 
 class ScenarioMetricChip(ctk.CTkFrame):
@@ -29,15 +30,11 @@ class ScenarioTagRow(ctk.CTkFrame):
     def __init__(self, parent, *, tags: list[str], accent: str = "#7dd3fc"):
         super().__init__(parent, fg_color="transparent")
         for index, tag in enumerate(tags):
-            ctk.CTkLabel(
+            OutlinedPill(
                 self,
                 text=tag,
-                fg_color="#10233a",
-                corner_radius=999,
-                padx=10,
-                pady=4,
                 text_color="#e7f1ff",
-                font=ctk.CTkFont(size=11, weight="bold"),
-                border_width=1,
+                fg_color="#10233a",
                 border_color=accent,
+                font=ctk.CTkFont(size=11, weight="bold"),
             ).grid(row=index // 3, column=index % 3, sticky="w", padx=(0, 8), pady=(0, 8))
