@@ -69,3 +69,36 @@ def test_build_campaign_graph_payload_includes_loose_threads(monkeypatch):
     assert payload.arcs[0].scenarios[0].entity_links[0].name == "Lady Vesper"
     assert payload.arcs[1].scenarios[0].title == "Catacomb Chase"
     assert payload.linked_scenario_count == 2
+
+
+def test_build_campaign_graph_payload_reads_link_fields_once(monkeypatch):
+    calls = []
+
+    def fake_iter_fields():
+        calls.append('called')
+        return [("NPCs", "NPCs")]
+
+    monkeypatch.setattr(module, "iter_scenario_link_fields", fake_iter_fields)
+
+    campaign = {
+        "Name": "Starfall",
+        "LinkedScenarios": ["Scene One", "Scene Two", "Scene Three"],
+        "Arcs": [
+            {
+                "name": "Opening",
+                "scenarios": ["Scene One", "Scene Two"],
+            }
+        ],
+    }
+    scenarios = [
+        {"Title": "Scene One", "NPCs": ["Iris"]},
+        {"Title": "Scene Two", "NPCs": ["Morrow"]},
+        {"Title": "Scene Three", "NPCs": ["Vale"]},
+    ]
+
+    payload = build_campaign_graph_payload(campaign, scenarios)
+
+    assert payload is not None
+    assert len(calls) == 1
+    assert payload.arcs[0].scenarios[1].entity_links[0].name == "Morrow"
+    assert payload.arcs[1].scenarios[0].entity_links[0].name == "Vale"
