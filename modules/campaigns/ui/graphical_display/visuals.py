@@ -92,7 +92,7 @@ class EntityConstellation(ctk.CTkFrame):
 
         self.canvas = tk.Canvas(
             self,
-            height=210,
+            height=340,
             bg=DASHBOARD_THEME.panel_bg,
             highlightthickness=0,
             bd=0,
@@ -108,7 +108,7 @@ class EntityConstellation(ctk.CTkFrame):
 
         canvas.delete("all")
         width = max(canvas.winfo_width(), 340)
-        height = max(canvas.winfo_height(), 210)
+        height = max(canvas.winfo_height(), 340)
         cx, cy = width / 2, height / 2
 
         canvas.create_rectangle(0, 0, width, height, fill=DASHBOARD_THEME.panel_bg, outline="")
@@ -116,7 +116,7 @@ class EntityConstellation(ctk.CTkFrame):
             canvas.create_oval(cx - radius, cy - radius, cx + radius, cy + radius, outline="#1b3351", width=1)
 
         canvas.create_oval(cx - 30, cy - 30, cx + 30, cy + 30, fill="#25164b", outline="#8b5cf6", width=2)
-        canvas.create_text(cx, cy - 6, text="Scene", fill="#f8f6ff", font=("Segoe UI", 12, "bold"))
+        canvas.create_text(cx, cy - 6, text="Scenario", fill="#f8f6ff", font=("Segoe UI", 12, "bold"))
         canvas.create_text(cx, cy + 12, text="Links", fill=DASHBOARD_THEME.text_secondary, font=("Segoe UI", 10))
 
         if not self._links:
@@ -137,7 +137,7 @@ class EntityConstellation(ctk.CTkFrame):
         total = max(len(ordered), 1)
         for index, link in enumerate(ordered):
             angle = (math.tau / total) * index - math.pi / 2
-            orbit = 92 if index % 2 == 0 else 68
+            orbit = min(max(76, min(width, height) * 0.32), max(min(width, height) / 2 - 48, 76)) if index % 2 == 0 else min(max(56, min(width, height) * 0.24), max(min(width, height) / 2 - 76, 56))
             x = cx + math.cos(angle) * orbit
             y = cy + math.sin(angle) * orbit
             color = _ENTITY_COLORS.get(link.entity_type, "#67b6ff")
@@ -158,26 +158,6 @@ class EntityConstellation(ctk.CTkFrame):
             canvas.tag_bind(tag, "<Button-1>", lambda _e, t=link.entity_type, n=link.name: self._on_open_entity(t, n))
             canvas.tag_bind(tag, "<Enter>", lambda _e: canvas.configure(cursor="hand2"))
             canvas.tag_bind(tag, "<Leave>", lambda _e: canvas.configure(cursor=""))
-
-
-class CapsuleWrap(ctk.CTkFrame):
-    def __init__(self, parent, *, items: Iterable[ScenarioEntityLink], on_open_entity: Callable[[str, str], None]):
-        super().__init__(parent, fg_color="transparent")
-        for column in range(3):
-            self.grid_columnconfigure(column, weight=1)
-
-        for index, link in enumerate(items):
-            color = _ENTITY_COLORS.get(link.entity_type, DASHBOARD_THEME.accent_soft)
-            ctk.CTkButton(
-                self,
-                text=f"{_entity_glyph(link.entity_type)} {link.name}",
-                fg_color="#17263d",
-                hover_color="#223a5f",
-                border_width=1,
-                border_color=color,
-                text_color="#f2f6ff",
-                command=lambda t=link.entity_type, n=link.name: on_open_entity(t, n),
-            ).grid(row=index // 3, column=index % 3, sticky="ew", padx=4, pady=4)
 
 
 def _truncate(value: str, limit: int) -> str:

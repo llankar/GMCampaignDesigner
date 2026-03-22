@@ -109,7 +109,7 @@ from modules.generic.custom_fields_editor import CustomFieldsEditor
 from modules.generic.new_entity_type_dialog import NewEntityTypeDialog
 from modules.auto_improve.ui.auto_improve_panel import AutoImprovePanel
 from modules.campaigns.ui.campaign_builder_wizard import CampaignBuilderWizard
-from modules.campaigns.ui.graphical_display import CampaignGraphWindow
+from modules.campaigns.ui.graphical_display import CampaignGraphPanel
 
 
 from modules.dice.dice_roller_window import DiceRollerWindow
@@ -3136,24 +3136,21 @@ class MainWindow(ctk.CTk):
             scenario_wrapper = self.entity_wrappers.get("scenarios") or GenericModelWrapper("scenarios")
             self.entity_wrappers.setdefault("scenarios", scenario_wrapper)
 
-            existing = getattr(self, "_campaign_graph_window", None)
-            if existing and existing.winfo_exists():
-                existing.focus_force()
-                existing.lift()
-                existing.attributes("-topmost", True)
-                existing.after_idle(lambda: existing.attributes("-topmost", False))
-                return
+            self.clear_current_content()
+            parent = self.get_content_container()
+            container = ctk.CTkFrame(parent, fg_color="transparent")
+            container.grid(row=0, column=0, sticky="nsew")
+            parent.grid_rowconfigure(0, weight=1)
+            parent.grid_columnconfigure(0, weight=1)
 
-            window = CampaignGraphWindow(
-                self,
+            panel = CampaignGraphPanel(
+                container,
                 campaign_wrapper=campaign_wrapper,
                 scenario_wrapper=scenario_wrapper,
             )
-            window.lift()
-            window.focus_force()
-            window.attributes("-topmost", True)
-            window.after_idle(lambda: window.attributes("-topmost", False))
-            self._campaign_graph_window = window
+            panel.pack(fill="both", expand=True)
+            self.current_open_view = container
+            self.current_open_entity = None
         except Exception as exc:
             log_exception(
                 f"Failed to open Campaign Graph view: {exc}",
