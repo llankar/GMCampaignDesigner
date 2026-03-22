@@ -84,6 +84,7 @@ sys.modules.setdefault(
 sys.modules.setdefault(
     "modules.campaigns.ui.graphical_display.components",
     types.SimpleNamespace(
+        CampaignOverviewHero=_DummyWidget,
         ArcSelectorStrip=_DummyWidget,
         ScenarioEntityBrowser=_DummyWidget,
         ScenarioBriefingPanel=_DummyWidget,
@@ -109,6 +110,12 @@ sys.modules.setdefault(
 sys.modules.setdefault(
     "modules.scenarios.gm_layout_manager",
     types.SimpleNamespace(GMScreenLayoutManager=_DummyWidget),
+)
+sys.modules.setdefault(
+    "modules.campaigns.ui.graphical_display.services",
+    types.SimpleNamespace(
+        open_scenario_in_embedded_gm_screen=lambda widget, scenario_name, fallback: widget.winfo_toplevel().open_gm_screen(show_empty_message=True, scenario_name=scenario_name)
+    ),
 )
 
 MODULE_PATH = Path("modules/campaigns/ui/graphical_display/panel.py")
@@ -176,3 +183,24 @@ def test_get_scroll_fraction_returns_none_without_canvas():
     panel = _make_panel()
 
     assert panel._get_scroll_fraction() is None
+
+
+class _HostApp:
+    def __init__(self):
+        self.calls = []
+
+    def open_gm_screen(self, **kwargs):
+        self.calls.append(kwargs)
+
+
+def test_open_scenario_gm_screen_prefers_embedded_host(monkeypatch):
+    panel = CampaignGraphPanel.__new__(CampaignGraphPanel)
+    panel._scenario_items = [{"Title": "Night Run"}]
+    host = _HostApp()
+    panel.winfo_toplevel = lambda: host
+
+    module.messagebox = types.SimpleNamespace(showerror=lambda *args, **kwargs: (_ for _ in ()).throw(AssertionError("unexpected error")))
+
+    panel._open_scenario_gm_screen("Night Run")
+
+    assert host.calls == [{"show_empty_message": True, "scenario_name": "Night Run"}]

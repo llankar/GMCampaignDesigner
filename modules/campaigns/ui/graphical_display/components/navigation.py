@@ -126,7 +126,7 @@ class ScenarioSelectorStrip(ctk.CTkFrame):
         self.grid_columnconfigure(0, weight=1)
         self.grid_rowconfigure(0, weight=1)
 
-        self.canvas = tk.Canvas(self, height=142, bg="#0d1728", highlightthickness=0, bd=0)
+        self.canvas = tk.Canvas(self, height=156, bg="#0d1728", highlightthickness=0, bd=0)
         self.canvas.grid(row=0, column=0, sticky="ew")
         self.scrollbar = ctk.CTkScrollbar(self, orientation="horizontal", command=self.canvas.xview)
         self.scrollbar.grid(row=1, column=0, sticky="ew", padx=10, pady=(0, 8))
@@ -143,7 +143,7 @@ class ScenarioSelectorStrip(ctk.CTkFrame):
             child.destroy()
 
         many_scenarios = len(self._scenarios) >= 7
-        card_width = 180 if many_scenarios else 220
+        card_width = 200 if many_scenarios else 232
         for index, scenario in enumerate(self._scenarios):
             selected = index == self._selected_index
             card = ctk.CTkFrame(
@@ -153,7 +153,7 @@ class ScenarioSelectorStrip(ctk.CTkFrame):
                 border_width=2 if selected else 1,
                 border_color="#66c0ff" if selected else "#243a5c",
                 width=card_width,
-                height=118,
+                height=132,
             )
             card.grid(row=0, column=index, sticky="nsw", padx=(0, 10), pady=10)
             card.grid_propagate(False)
@@ -166,22 +166,19 @@ class ScenarioSelectorStrip(ctk.CTkFrame):
                 font=ctk.CTkFont(size=10, weight="bold"),
                 anchor="w",
             ).grid(row=0, column=0, sticky="w", padx=14, pady=(12, 4))
-            title_button = ctk.CTkButton(
+            title_label = ctk.CTkLabel(
                 card,
-                text=_truncate(scenario.title, 28),
-                command=lambda idx=index: self._on_select(idx),
-                fg_color="transparent",
-                hover_color="#1f3a5d" if selected else "#182b45",
+                text=_truncate_middle(scenario.title, 52 if not many_scenarios else 42),
                 text_color="#f8fbff" if selected else DASHBOARD_THEME.text_primary,
                 font=ctk.CTkFont(size=14, weight="bold"),
                 anchor="w",
-                border_spacing=0,
-                height=32,
+                justify="left",
+                wraplength=card_width - 28,
             )
-            title_button.grid(row=1, column=0, sticky="ew", padx=10)
+            title_label.grid(row=1, column=0, sticky="ew", padx=14)
 
             meta = ctk.CTkFrame(card, fg_color="transparent")
-            meta.grid(row=2, column=0, sticky="w", padx=14, pady=(8, 6))
+            meta.grid(row=2, column=0, sticky="w", padx=14, pady=(10, 6))
             first_type = scenario.primary_link_type or "No links"
             for meta_index, label in enumerate((f"{scenario.linked_entity_count} links", first_type, f"{scenario.scene_count or 0} scenes")):
                 ctk.CTkLabel(
@@ -205,7 +202,7 @@ class ScenarioSelectorStrip(ctk.CTkFrame):
                 width=92,
             ).grid(row=3, column=0, sticky="w", padx=14, pady=(0, 12))
 
-            for clickable in (card, meta):
+            for clickable in (card, meta, title_label):
                 clickable.bind("<Button-1>", lambda _event, idx=index: self._on_select(idx))
                 clickable.bind("<Enter>", lambda _event, target=card: target.configure(cursor="hand2"))
                 clickable.bind("<Leave>", lambda _event, target=card: target.configure(cursor=""))
@@ -224,3 +221,14 @@ def _truncate(value: str, limit: int) -> str:
     if len(text) <= limit:
         return text
     return text[: max(limit - 1, 0)].rstrip() + "…"
+
+
+def _truncate_middle(value: str, limit: int) -> str:
+    text = str(value or "").strip()
+    if len(text) <= limit:
+        return text
+    if limit <= 1:
+        return "…"
+    head = max((limit - 1) // 2, 1)
+    tail = max(limit - head - 1, 1)
+    return f"{text[:head].rstrip()}…{text[-tail:].lstrip()}"

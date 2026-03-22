@@ -7,9 +7,8 @@ from tkinter import messagebox
 from modules.generic.entity_detail_factory import open_entity_tab
 from modules.generic.generic_model_wrapper import GenericModelWrapper
 from modules.scenarios.gm_screen.dashboard.styles.dashboard_theme import DASHBOARD_THEME
-from modules.scenarios.gm_screen.dashboard.widgets.arc_display.arc_momentum_meter import ArcMomentumMeter
-
 from .components import (
+    CampaignOverviewHero,
     ArcSelectorStrip,
     ScenarioBriefingPanel,
     ScenarioEntityBrowser,
@@ -20,6 +19,7 @@ from .components import (
 from .data import CampaignGraphArc, CampaignGraphPayload, CampaignGraphScenario, build_campaign_graph_payload, build_campaign_option_index
 from modules.scenarios.gm_screen_view import GMScreenView
 from modules.scenarios.gm_layout_manager import GMScreenLayoutManager
+from .services import open_scenario_in_embedded_gm_screen
 
 
 class CampaignGraphPanel(ctk.CTkFrame):
@@ -209,96 +209,13 @@ class CampaignGraphPanel(ctk.CTkFrame):
         self._preserve_scroll_position(_refresh)
 
     def _render_campaign_hero(self, payload: CampaignGraphPayload) -> None:
-        hero = ctk.CTkFrame(self._hero_container, fg_color="#10192b", corner_radius=22, border_width=1, border_color="#223554")
-        hero.grid(row=0, column=0, sticky="ew", padx=8, pady=(0, 12))
-        for column in range(3):
-            hero.grid_columnconfigure(column, weight=1 if column == 0 else 0)
-
-        identity = ctk.CTkFrame(hero, fg_color="transparent")
-        identity.grid(row=0, column=0, sticky="nsew", padx=(16, 10), pady=14)
-        identity.grid_columnconfigure(0, weight=1)
-
-        ctk.CTkLabel(
-            identity,
-            text=payload.name,
-            font=ctk.CTkFont(size=26, weight="bold"),
-            text_color=DASHBOARD_THEME.text_primary,
-            anchor="w",
-        ).grid(row=0, column=0, sticky="ew")
-
-        chips = ctk.CTkFrame(identity, fg_color="transparent")
-        chips.grid(row=1, column=0, sticky="w", pady=(8, 8))
-        chip_column = 0
-        for value in [payload.genre, payload.tone, payload.status]:
-            if not value:
-                continue
-            ctk.CTkLabel(
-                chips,
-                text=value,
-                fg_color="#1b3150",
-                corner_radius=999,
-                padx=10,
-                pady=3,
-                text_color="#d8ebff",
-                font=ctk.CTkFont(size=11, weight="bold"),
-            ).grid(row=0, column=chip_column, padx=(0, 8))
-            chip_column += 1
-
-        summary_text = payload.logline or payload.setting or payload.main_objective or "No campaign overview written yet."
-        ctk.CTkLabel(
-            identity,
-            text=summary_text,
-            wraplength=560,
-            justify="left",
-            text_color=DASHBOARD_THEME.text_secondary,
-            anchor="w",
-        ).grid(row=2, column=0, sticky="ew")
-
-        metrics = ctk.CTkFrame(hero, fg_color="#120f28", corner_radius=18)
-        metrics.grid(row=0, column=1, sticky="ns", padx=10, pady=14)
-        ArcMomentumMeter(
-            metrics,
-            completed_steps=sum(1 for arc in payload.arcs if arc.status.lower() == "completed"),
-            total_steps=max(len(payload.arcs), 1),
-            label="Arc completion",
-        ).pack(padx=12, pady=(12, 8))
-        ctk.CTkLabel(
-            metrics,
-            text=f"{payload.linked_scenario_count} linked scenarios",
-            wraplength=120,
-            justify="center",
-            text_color=DASHBOARD_THEME.text_secondary,
-        ).pack(padx=8, pady=(0, 12))
-
-        facts = ctk.CTkFrame(hero, fg_color="transparent")
-        facts.grid(row=0, column=2, sticky="nsew", padx=(0, 16), pady=14)
-        facts.grid_columnconfigure(0, weight=1)
-        self._render_fact_tile(facts, 0, "Setting", payload.setting)
-        self._render_fact_tile(facts, 1, "Objective", payload.main_objective)
-        self._render_fact_tile(facts, 2, "Stakes", payload.stakes)
-        self._render_fact_tile(facts, 3, "Themes", payload.themes)
-
-    def _render_fact_tile(self, parent, row: int, label: str, value: str) -> None:
-        if not value:
-            return
-        block = ctk.CTkFrame(parent, fg_color="#162239", corner_radius=14)
-        block.grid(row=row, column=0, sticky="ew", pady=4)
-        block.grid_columnconfigure(0, weight=1)
-        ctk.CTkLabel(
-            block,
-            text=label.upper(),
-            text_color="#8fb0dd",
-            font=ctk.CTkFont(size=10, weight="bold"),
-            anchor="w",
-        ).grid(row=0, column=0, sticky="w", padx=12, pady=(7, 1))
-        ctk.CTkLabel(
-            block,
-            text=value,
-            wraplength=300,
-            justify="left",
-            text_color=DASHBOARD_THEME.text_primary,
-            anchor="w",
-        ).grid(row=1, column=0, sticky="ew", padx=12, pady=(0, 8))
+        CampaignOverviewHero(self._hero_container, payload=payload).grid(
+            row=0,
+            column=0,
+            sticky="ew",
+            padx=8,
+            pady=(0, 12),
+        )
 
     def _render_arc_focus(self, payload: CampaignGraphPayload, selected_index: int) -> None:
         selected_arc = payload.arcs[selected_index]
@@ -685,15 +602,18 @@ class CampaignGraphPanel(ctk.CTkFrame):
             messagebox.showerror("GM screen", f"Scenario '{scenario_name}' could not be loaded.", parent=self.winfo_toplevel())
             return
 
-        try:
-            window = ctk.CTkToplevel(self)
-            window.title(f"Scenario: {scenario_name}")
-            window.geometry("1920x1080+0+0")
-            layout_manager = GMScreenLayoutManager()
-            view = GMScreenView(window, scenario_item=scenario_item, initial_layout=None, layout_manager=layout_manager)
-            view.pack(fill="both", expand=True)
-        except Exception as exc:
-            messagebox.showerror("GM screen", f"Unable to open the GM screen for '{scenario_name}':\n{exc}", parent=self.winfo_toplevel())
+        def _fallback() -> None:
+            try:
+                window = ctk.CTkToplevel(self)
+                window.title(f"Scenario: {scenario_name}")
+                window.geometry("1920x1080+0+0")
+                layout_manager = GMScreenLayoutManager()
+                view = GMScreenView(window, scenario_item=scenario_item, initial_layout=None, layout_manager=layout_manager)
+                view.pack(fill="both", expand=True)
+            except Exception as exc:
+                messagebox.showerror("GM screen", f"Unable to open the GM screen for '{scenario_name}':\n{exc}", parent=self.winfo_toplevel())
+
+        open_scenario_in_embedded_gm_screen(self, scenario_name, fallback=_fallback)
 
     def _open_entity(self, entity_type: str, entity_name: str) -> None:
         try:
