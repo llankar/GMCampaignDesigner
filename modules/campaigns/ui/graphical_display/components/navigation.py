@@ -42,7 +42,7 @@ class ArcSelectorStrip(_CanvasSelector):
         self._arcs = list(arcs)
         self._selected_index = selected_index
         self._on_select = on_select
-        super().__init__(parent, height=124, bg_color="#0d1728")
+        super().__init__(parent, height=156, bg_color="#091423")
 
     def _render(self, *_args, **_kwargs) -> None:
         canvas = getattr(self, "canvas", None)
@@ -51,13 +51,13 @@ class ArcSelectorStrip(_CanvasSelector):
 
         canvas.delete("all")
         width = max(canvas.winfo_width(), 420)
-        height = max(canvas.winfo_height(), 124)
+        height = max(canvas.winfo_height(), 156)
         canvas.create_rectangle(0, 0, width, height, fill=self._bg_color, outline="")
 
         count = max(len(self._arcs), 1)
-        margin = 20
+        margin = 18
         gap = 12
-        card_width = max(min((width - (margin * 2) - (gap * (count - 1))) / count, 220), 118)
+        card_width = max(min((width - (margin * 2) - (gap * (count - 1))) / count, 240), 132)
         total_width = card_width * count + gap * max(count - 1, 0)
         start_x = max((width - total_width) / 2, margin)
 
@@ -68,16 +68,20 @@ class ArcSelectorStrip(_CanvasSelector):
             y2 = height - 18
             selected = index == self._selected_index
             tag = f"arc:{index}"
-            fill = "#173454" if selected else "#101f34"
+            fill = "#173454" if selected else "#0f1e32"
             outline = "#66c0ff" if selected else "#22395d"
+            glow = "#264d78" if selected else "#13253d"
             title_color = "#f8fbff" if selected else DASHBOARD_THEME.text_primary
             meta_color = "#d6e9ff" if selected else DASHBOARD_THEME.text_secondary
 
+            canvas.create_rectangle(x1 + 4, y1 + 6, x2 + 4, y2 + 6, fill="#07111d", outline="")
             canvas.create_rectangle(x1, y1, x2, y2, fill=fill, outline=outline, width=2, tags=(tag,))
+            canvas.create_rectangle(x1, y1, x2, y1 + 8, fill=glow, outline="", tags=(tag,))
+
             canvas.create_text(
                 x1 + 14,
-                y1 + 18,
-                text=f"Arc {index + 1}",
+                y1 + 24,
+                text=f"ARC {index + 1}",
                 fill="#8fb0dd",
                 anchor="w",
                 font=("Segoe UI", 10, "bold"),
@@ -85,12 +89,22 @@ class ArcSelectorStrip(_CanvasSelector):
             )
             canvas.create_text(
                 x1 + 14,
-                y1 + 42,
-                text=_truncate(arc.name, 24),
+                y1 + 48,
+                text=_truncate(arc.name, 26),
                 fill=title_color,
                 anchor="w",
                 width=max(card_width - 28, 40),
-                font=("Segoe UI", 12, "bold"),
+                font=("Segoe UI", 13, "bold"),
+                tags=(tag,),
+            )
+            canvas.create_text(
+                x1 + 14,
+                y1 + 82,
+                text=_truncate(arc.summary or arc.objective or "No arc pitch yet.", 54),
+                fill=meta_color,
+                anchor="nw",
+                width=max(card_width - 28, 40),
+                font=("Segoe UI", 9),
                 tags=(tag,),
             )
             canvas.create_text(
@@ -108,7 +122,7 @@ class ArcSelectorStrip(_CanvasSelector):
 
 
 class ScenarioSelectorStrip(_CanvasSelector):
-    """Compact linear selector for the scenarios of the currently focused arc."""
+    """Cinematic rail selector for scenarios of the currently focused arc."""
 
     def __init__(
         self,
@@ -116,12 +130,12 @@ class ScenarioSelectorStrip(_CanvasSelector):
         *,
         scenarios: Sequence[CampaignGraphScenario],
         selected_index: int,
-        on_select: Callable[[int], None]
+        on_select: Callable[[int], None],
     ):
         self._scenarios = list(scenarios)
         self._selected_index = selected_index
         self._on_select = on_select
-        super().__init__(parent, height=122, bg_color="#0d1728")
+        super().__init__(parent, height=148, bg_color="#091423")
 
     def _render(self, *_args, **_kwargs) -> None:
         canvas = getattr(self, "canvas", None)
@@ -130,38 +144,51 @@ class ScenarioSelectorStrip(_CanvasSelector):
 
         canvas.delete("all")
         width = max(canvas.winfo_width(), 360)
-        height = max(canvas.winfo_height(), 122)
+        height = max(canvas.winfo_height(), 148)
         canvas.create_rectangle(0, 0, width, height, fill=self._bg_color, outline="")
-        canvas.create_line(50, height / 2, width - 50, height / 2, fill="#28415f", width=3, smooth=True)
+        rail_y = height / 2 - 10
+        canvas.create_line(54, rail_y, width - 54, rail_y, fill="#223b5c", width=4, smooth=True)
 
         count = max(len(self._scenarios), 1)
-        step = max((width - 100) / count, 58)
+        step = max((width - 108) / count, 64)
         for index, scenario in enumerate(self._scenarios):
-            x = 50 + step * index + step / 2
-            y = height / 2
+            x = 54 + step * index + step / 2
+            y = rail_y
             selected = index == self._selected_index
             ring = "#8b5cf6" if selected else "#1e3a5f"
-            fill = "#1b3150" if selected else "#142740"
+            halo = "#4c1d95" if selected else "#0b1626"
+            fill = "#1b3150" if selected else "#122339"
             text_color = "#f8fbff" if selected else DASHBOARD_THEME.text_secondary
             dot_tag = f"scenario-dot:{index}"
             label_tag = f"scenario-label:{index}"
+            shared_tags = (dot_tag, label_tag)
 
-            canvas.create_oval(x - 24, y - 24, x + 24, y + 24, outline=ring, width=3, tags=(dot_tag,))
-            canvas.create_oval(x - 18, y - 18, x + 18, y + 18, fill=fill, outline="#66c0ff", width=2, tags=(dot_tag,))
-            canvas.create_text(x, y, text=str(index + 1), fill="#e5ecff", font=("Segoe UI", 11, "bold"), tags=(dot_tag,))
+            canvas.create_oval(x - 28, y - 28, x + 28, y + 28, fill=halo, outline="", tags=shared_tags)
+            canvas.create_oval(x - 24, y - 24, x + 24, y + 24, outline=ring, width=3, tags=shared_tags)
+            canvas.create_oval(x - 18, y - 18, x + 18, y + 18, fill=fill, outline="#66c0ff", width=2, tags=shared_tags)
+            canvas.create_text(x, y, text=str(index + 1), fill="#e5ecff", font=("Segoe UI", 11, "bold"), tags=shared_tags)
             canvas.create_text(
                 x,
-                y + 33,
-                text=_truncate(scenario.title, 22),
+                y + 38,
+                text=_truncate(scenario.title, 24),
                 fill=text_color,
                 font=("Segoe UI", 10, "bold"),
-                width=max(step - 8, 50),
+                width=max(step - 12, 56),
                 justify="center",
-                tags=(label_tag,),
+                tags=shared_tags,
             )
-            canvas.tag_bind(dot_tag, "<Button-1>", lambda _e, idx=index: self._on_select(idx))
-            canvas.tag_bind(label_tag, "<Button-1>", lambda _e, idx=index: self._on_select(idx))
-            for tag in (dot_tag, label_tag):
+            canvas.create_text(
+                x,
+                y + 62,
+                text=_truncate(scenario.summary or f"{len(scenario.entity_links)} entity links", 34),
+                fill="#8aa4c7",
+                font=("Segoe UI", 8),
+                width=max(step - 8, 58),
+                justify="center",
+                tags=shared_tags,
+            )
+            for tag in shared_tags:
+                canvas.tag_bind(tag, "<Button-1>", lambda _e, idx=index: self._on_select(idx))
                 canvas.tag_bind(tag, "<Enter>", lambda _e: canvas.configure(cursor="hand2"))
                 canvas.tag_bind(tag, "<Leave>", lambda _e: canvas.configure(cursor=""))
 

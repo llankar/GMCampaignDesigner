@@ -8,7 +8,7 @@ from typing import Callable, Iterable
 import customtkinter as ctk
 
 from modules.scenarios.gm_screen.dashboard.styles.dashboard_theme import DASHBOARD_THEME
-from .data import CampaignGraphScenario, ScenarioEntityLink
+from .data import ScenarioEntityLink
 
 
 _ENTITY_COLORS = {
@@ -24,62 +24,6 @@ _ENTITY_COLORS = {
     "Maps": "#60a5fa",
     "Events": "#f97316",
 }
-
-
-class ArcScenarioStrip(ctk.CTkFrame):
-    """Compact linear graph for scenarios inside an arc."""
-
-    def __init__(self, parent, *, scenarios: list[CampaignGraphScenario], on_open_scenario: Callable[[str], None]):
-        super().__init__(parent, fg_color="transparent")
-        self._scenarios = scenarios
-        self._on_open_scenario = on_open_scenario
-
-        height = 106
-        self.canvas = tk.Canvas(
-            self,
-            height=height,
-            bg=DASHBOARD_THEME.card_bg,
-            highlightthickness=0,
-            bd=0,
-        )
-        self.canvas.pack(fill="x", expand=True)
-        self.canvas.bind("<Configure>", self._render)
-        self.after_idle(self._render)
-
-    def _render(self, *_args, **_kwargs) -> None:
-        canvas = getattr(self, "canvas", None)
-        if canvas is None or not canvas.winfo_exists():
-            return
-
-        canvas.delete("all")
-        width = max(canvas.winfo_width(), 360)
-        height = max(canvas.winfo_height(), 106)
-
-        canvas.create_rectangle(0, 0, width, height, fill=DASHBOARD_THEME.card_bg, outline="")
-        canvas.create_line(48, height / 2, width - 48, height / 2, fill="#28415f", width=3, smooth=True)
-
-        count = max(len(self._scenarios), 1)
-        step = (width - 96) / count
-        for index, scenario in enumerate(self._scenarios):
-            x = 48 + step * index + step / 2
-            y = height / 2
-            r = 18
-            canvas.create_oval(x - r - 6, y - r - 6, x + r + 6, y + r + 6, outline="#1e3a5f", width=2)
-            canvas.create_oval(x - r, y - r, x + r, y + r, fill="#142740", outline="#66c0ff", width=2)
-            canvas.create_text(x, y, text=str(index + 1), fill="#e5ecff", font=("Segoe UI", 11, "bold"))
-            canvas.create_text(
-                x,
-                y + 32,
-                text=_truncate(scenario.title, 18),
-                fill=DASHBOARD_THEME.text_secondary,
-                font=("Segoe UI", 10, "bold"),
-                width=step - 10,
-                justify="center",
-                tags=(f"scenario:{scenario.title}",),
-            )
-            canvas.tag_bind(f"scenario:{scenario.title}", "<Button-1>", lambda _e, n=scenario.title: self._on_open_scenario(n))
-            canvas.tag_bind(f"scenario:{scenario.title}", "<Enter>", lambda _e: canvas.configure(cursor="hand2"))
-            canvas.tag_bind(f"scenario:{scenario.title}", "<Leave>", lambda _e: canvas.configure(cursor=""))
 
 
 class EntityConstellation(ctk.CTkFrame):
@@ -111,14 +55,7 @@ class EntityConstellation(ctk.CTkFrame):
         height = max(canvas.winfo_height(), 340)
         cx, cy = width / 2, height / 2
 
-        canvas.create_rectangle(0, 0, width, height, fill=DASHBOARD_THEME.panel_bg, outline="")
-        for radius in (42, 68, 94):
-            canvas.create_oval(cx - radius, cy - radius, cx + radius, cy + radius, outline="#1b3351", width=1)
-
-        canvas.create_oval(cx - 30, cy - 30, cx + 30, cy + 30, fill="#25164b", outline="#8b5cf6", width=2)
-        canvas.create_text(cx, cy - 6, text="Scenario", fill="#f8f6ff", font=("Segoe UI", 12, "bold"))
-        canvas.create_text(cx, cy + 12, text="Links", fill=DASHBOARD_THEME.text_secondary, font=("Segoe UI", 10))
-
+        self._draw_background(canvas, width, height, cx, cy)
         if not self._links:
             canvas.create_text(
                 cx,
@@ -130,24 +67,28 @@ class EntityConstellation(ctk.CTkFrame):
             return
 
         grouped: dict[str, list[ScenarioEntityLink]] = defaultdict(list)
-        for link in self._links[:12]:
+        for link in self._links[:14]:
             grouped[link.entity_type].append(link)
 
-        ordered = [link for links in grouped.values() for link in links]
-        total = max(len(ordered), 1)
-        for index, link in enumerate(ordered):
+        ordered_groups = sorted(grouped.items(), key=lambda item: (-len(item[1]), item[0]))
+        nodes = [link for _, links in ordered_groups for link in links]
+        total = max(len(nodes), 1)
+
+        for index, link in enumerate(nodes):
             angle = (math.tau / total) * index - math.pi / 2
-            orbit = min(max(76, min(width, height) * 0.32), max(min(width, height) / 2 - 48, 76)) if index % 2 == 0 else min(max(56, min(width, height) * 0.24), max(min(width, height) / 2 - 76, 56))
+            band = 0 if index % 3 == 0 else (1 if index % 3 == 1 else 2)
+            orbit = self._orbit_radius(width, height, band)
             x = cx + math.cos(angle) * orbit
             y = cy + math.sin(angle) * orbit
             color = _ENTITY_COLORS.get(link.entity_type, "#67b6ff")
             tag = f"entity:{index}"
-            canvas.create_line(cx, cy, x, y, fill="#22385a", width=2)
+            canvas.create_line(cx, cy, x, y, fill="#1c3656", width=2)
+            canvas.create_oval(x - 19, y - 19, x + 19, y + 19, fill="#0d1f33", outline="#081321", width=5)
             canvas.create_oval(x - 16, y - 16, x + 16, y + 16, fill="#10233a", outline=color, width=2, tags=(tag,))
             canvas.create_text(x, y, text=_entity_glyph(link.entity_type), fill=color, font=("Segoe UI Emoji", 11, "bold"), tags=(tag,))
             canvas.create_text(
                 x,
-                y + 26,
+                y + 28,
                 text=_truncate(link.name, 16),
                 fill="#dbe7ff",
                 font=("Segoe UI", 9, "bold"),
@@ -158,6 +99,40 @@ class EntityConstellation(ctk.CTkFrame):
             canvas.tag_bind(tag, "<Button-1>", lambda _e, t=link.entity_type, n=link.name: self._on_open_entity(t, n))
             canvas.tag_bind(tag, "<Enter>", lambda _e: canvas.configure(cursor="hand2"))
             canvas.tag_bind(tag, "<Leave>", lambda _e: canvas.configure(cursor=""))
+
+        legend_items = [f"{entity_type} × {len(links)}" for entity_type, links in ordered_groups[:4]]
+        canvas.create_text(
+            cx,
+            height - 20,
+            text="   •   ".join(legend_items),
+            fill="#92a9ca",
+            font=("Segoe UI", 9, "bold"),
+        )
+
+    def _draw_background(self, canvas: tk.Canvas, width: int, height: int, cx: float, cy: float) -> None:
+        canvas.create_rectangle(0, 0, width, height, fill=DASHBOARD_THEME.panel_bg, outline="")
+        for index in range(18):
+            x = ((index * 97) % max(width - 10, 1)) + 6
+            y = ((index * 53) % max(height - 10, 1)) + 6
+            radius = 1 if index % 4 else 2
+            color = "#1d3552" if radius == 1 else "#365b87"
+            canvas.create_oval(x - radius, y - radius, x + radius, y + radius, fill=color, outline="")
+
+        for radius, outline in ((52, "#132540"), (86, "#17324f"), (122, "#1c3d60")):
+            canvas.create_oval(cx - radius, cy - radius, cx + radius, cy + radius, outline=outline, width=1)
+
+        canvas.create_oval(cx - 42, cy - 42, cx + 42, cy + 42, fill="#170f31", outline="#7c3aed", width=2)
+        canvas.create_oval(cx - 26, cy - 26, cx + 26, cy + 26, fill="#261657", outline="#ad7bff", width=2)
+        canvas.create_text(cx, cy - 7, text="Scenario", fill="#f8f6ff", font=("Segoe UI", 13, "bold"))
+        canvas.create_text(cx, cy + 15, text="Signal Core", fill=DASHBOARD_THEME.text_secondary, font=("Segoe UI", 10))
+
+    def _orbit_radius(self, width: int, height: int, band: int) -> float:
+        limit = min(width, height) / 2
+        if band == 0:
+            return min(max(82, limit * 0.38), max(limit - 44, 82))
+        if band == 1:
+            return min(max(102, limit * 0.48), max(limit - 28, 102))
+        return min(max(62, limit * 0.28), max(limit - 64, 62))
 
 
 def _truncate(value: str, limit: int) -> str:
