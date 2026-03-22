@@ -24,6 +24,30 @@ class AppMenuBar:
     QUICK_BUTTON_MIN_WIDTH = 64
     QUICK_BUTTON_WIDTH_SCALE = 7
 
+    @staticmethod
+    def _normalize_hex(color: str | None, fallback: str) -> str:
+        value = (color or "").strip()
+        if value.startswith("#") and len(value) == 7:
+            return value
+        return fallback
+
+    @classmethod
+    def _mix_colors(cls, first: str | None, second: str | None, ratio: float, *, fallback: str) -> str:
+        start = cls._normalize_hex(first, fallback)
+        end = cls._normalize_hex(second, fallback)
+        weight = max(0.0, min(1.0, ratio))
+
+        def _to_rgb(hex_color: str) -> tuple[int, int, int]:
+            return tuple(int(hex_color[index:index + 2], 16) for index in (1, 3, 5))
+
+        rgb_a = _to_rgb(start)
+        rgb_b = _to_rgb(end)
+        blended = tuple(
+            round((1.0 - weight) * component_a + weight * component_b)
+            for component_a, component_b in zip(rgb_a, rgb_b)
+        )
+        return "#{:02x}{:02x}{:02x}".format(*blended)
+
     def __init__(self, app):
         self.app = app
         self._root_menu = tk.Menu(app)
@@ -269,10 +293,34 @@ class AppMenuBar:
                 pass
 
     def _style_quick_button(self, button, *, menu_bg: str, button_fg: str, panel_bg: str, muted_fg: str):
+        accent_fg = theme_manager.get_tokens().get("accent_button_fg", button_fg)
+        accent_hover = theme_manager.get_tokens().get("accent_button_hover", button_fg)
+        subtle_fg = self._mix_colors(menu_bg, panel_bg, 0.25, fallback=menu_bg)
+        subtle_hover = self._mix_colors(menu_bg, button_fg, 0.35, fallback=button_fg)
+        accent_bg = self._mix_colors(menu_bg, accent_fg, 0.45, fallback=accent_fg)
+        accent_hover_bg = self._mix_colors(button_fg, accent_hover, 0.5, fallback=button_fg)
+        system_bg = self._mix_colors(menu_bg, accent_fg, 0.22, fallback=menu_bg)
+        system_hover = self._mix_colors(button_fg, accent_hover, 0.25, fallback=button_fg)
+
         palette = {
-            "primary": {"fg_color": panel_bg, "hover_color": button_fg, "text_color": "#E8EEF6", "border_color": button_fg},
-            "accent": {"fg_color": button_fg, "hover_color": "#2497FF", "text_color": "#FFFFFF", "border_color": button_fg},
-            "system": {"fg_color": "#53361F", "hover_color": "#7A4D28", "text_color": "#FFE7C2", "border_color": "#B77A3A"},
+            "primary": {
+                "fg_color": subtle_fg,
+                "hover_color": subtle_hover,
+                "text_color": "#E8EEF6",
+                "border_color": self._mix_colors(menu_bg, button_fg, 0.55, fallback=button_fg),
+            },
+            "accent": {
+                "fg_color": accent_bg,
+                "hover_color": accent_hover_bg,
+                "text_color": "#FFFFFF",
+                "border_color": self._mix_colors(button_fg, accent_fg, 0.5, fallback=button_fg),
+            },
+            "system": {
+                "fg_color": system_bg,
+                "hover_color": system_hover,
+                "text_color": "#E8EEF6",
+                "border_color": self._mix_colors(menu_bg, button_fg, 0.7, fallback=button_fg),
+            },
         }
         colors = palette.get(getattr(button, "_menu_style", "primary"), palette["primary"])
         try:
