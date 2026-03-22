@@ -166,14 +166,19 @@ class ScenarioSelectorStrip(ctk.CTkFrame):
                 font=ctk.CTkFont(size=10, weight="bold"),
                 anchor="w",
             ).grid(row=0, column=0, sticky="w", padx=14, pady=(12, 4))
-            ctk.CTkLabel(
+            title_button = ctk.CTkButton(
                 card,
                 text=_truncate(scenario.title, 28),
+                command=lambda idx=index: self._on_select(idx),
+                fg_color="transparent",
+                hover_color="#1f3a5d" if selected else "#182b45",
                 text_color="#f8fbff" if selected else DASHBOARD_THEME.text_primary,
                 font=ctk.CTkFont(size=14, weight="bold"),
-                justify="left",
                 anchor="w",
-            ).grid(row=1, column=0, sticky="ew", padx=14)
+                border_spacing=0,
+                height=32,
+            )
+            title_button.grid(row=1, column=0, sticky="ew", padx=10)
 
             meta = ctk.CTkFrame(card, fg_color="transparent")
             meta.grid(row=2, column=0, sticky="w", padx=14, pady=(8, 6))
@@ -199,6 +204,11 @@ class ScenarioSelectorStrip(ctk.CTkFrame):
                 height=28,
                 width=92,
             ).grid(row=3, column=0, sticky="w", padx=14, pady=(0, 12))
+
+            for clickable in (card, meta):
+                clickable.bind("<Button-1>", lambda _event, idx=index: self._on_select(idx))
+                clickable.bind("<Enter>", lambda _event, target=card: target.configure(cursor="hand2"))
+                clickable.bind("<Leave>", lambda _event, target=card: target.configure(cursor=""))
 
         self.after_idle(self._sync_scrollregion)
 
