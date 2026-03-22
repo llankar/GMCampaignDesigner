@@ -1610,6 +1610,20 @@ class MainWindow(ctk.CTk):
         except Exception:
             pass
 
+    def _prepare_campaign_overview_layout(self):
+        """Show the campaign overview inside the centered content pane with the PC banner."""
+        self._prime_content_frames_for_gm_screen()
+
+        try:
+            pcs_items = {pc["Name"]: pc for pc in self.pc_wrapper.load_items()}
+        except Exception:
+            pcs_items = {}
+
+        try:
+            display_pcs_in_banner(self.banner_frame, pcs_items)
+        except Exception:
+            pass
+
     def _toggle_banner(self):
         # GM Screen mode: reposition content and toggle banner without recreating views
         if getattr(self, "_gm_mode", False):
@@ -3134,6 +3148,7 @@ class MainWindow(ctk.CTk):
             self.entity_wrappers.setdefault("scenarios", scenario_wrapper)
 
             self.clear_current_content()
+            self._prepare_campaign_overview_layout()
             parent = self.get_content_container()
             container = ctk.CTkFrame(parent, fg_color="transparent")
             container.grid(row=0, column=0, sticky="nsew")
