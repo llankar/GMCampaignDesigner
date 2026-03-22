@@ -43,15 +43,20 @@ class ArcScenarioStrip(ctk.CTkFrame):
             bd=0,
         )
         self.canvas.pack(fill="x", expand=True)
-        self.canvas.bind("<Configure>", self._draw)
+        self.canvas.bind("<Configure>", self._render)
+        self.after_idle(self._render)
 
-    def _draw(self, *_args, **_kwargs) -> None:
-        self.canvas.delete("all")
-        width = max(self.canvas.winfo_width(), 360)
-        height = max(self.canvas.winfo_height(), 106)
+    def _render(self, *_args, **_kwargs) -> None:
+        canvas = getattr(self, "canvas", None)
+        if canvas is None or not canvas.winfo_exists():
+            return
 
-        self.canvas.create_rectangle(0, 0, width, height, fill=DASHBOARD_THEME.card_bg, outline="")
-        self.canvas.create_line(48, height / 2, width - 48, height / 2, fill="#28415f", width=3, smooth=True)
+        canvas.delete("all")
+        width = max(canvas.winfo_width(), 360)
+        height = max(canvas.winfo_height(), 106)
+
+        canvas.create_rectangle(0, 0, width, height, fill=DASHBOARD_THEME.card_bg, outline="")
+        canvas.create_line(48, height / 2, width - 48, height / 2, fill="#28415f", width=3, smooth=True)
 
         count = max(len(self._scenarios), 1)
         step = (width - 96) / count
@@ -59,10 +64,10 @@ class ArcScenarioStrip(ctk.CTkFrame):
             x = 48 + step * index + step / 2
             y = height / 2
             r = 18
-            self.canvas.create_oval(x - r - 6, y - r - 6, x + r + 6, y + r + 6, outline="#1e3a5f", width=2)
-            self.canvas.create_oval(x - r, y - r, x + r, y + r, fill="#142740", outline="#66c0ff", width=2)
-            self.canvas.create_text(x, y, text=str(index + 1), fill="#e5ecff", font=("Segoe UI", 11, "bold"))
-            self.canvas.create_text(
+            canvas.create_oval(x - r - 6, y - r - 6, x + r + 6, y + r + 6, outline="#1e3a5f", width=2)
+            canvas.create_oval(x - r, y - r, x + r, y + r, fill="#142740", outline="#66c0ff", width=2)
+            canvas.create_text(x, y, text=str(index + 1), fill="#e5ecff", font=("Segoe UI", 11, "bold"))
+            canvas.create_text(
                 x,
                 y + 32,
                 text=_truncate(scenario.title, 18),
@@ -72,9 +77,9 @@ class ArcScenarioStrip(ctk.CTkFrame):
                 justify="center",
                 tags=(f"scenario:{scenario.title}",),
             )
-            self.canvas.tag_bind(f"scenario:{scenario.title}", "<Button-1>", lambda _e, n=scenario.title: self._on_open_scenario(n))
-            self.canvas.tag_bind(f"scenario:{scenario.title}", "<Enter>", lambda _e: self.canvas.configure(cursor="hand2"))
-            self.canvas.tag_bind(f"scenario:{scenario.title}", "<Leave>", lambda _e: self.canvas.configure(cursor=""))
+            canvas.tag_bind(f"scenario:{scenario.title}", "<Button-1>", lambda _e, n=scenario.title: self._on_open_scenario(n))
+            canvas.tag_bind(f"scenario:{scenario.title}", "<Enter>", lambda _e: canvas.configure(cursor="hand2"))
+            canvas.tag_bind(f"scenario:{scenario.title}", "<Leave>", lambda _e: canvas.configure(cursor=""))
 
 
 class EntityConstellation(ctk.CTkFrame):
@@ -93,24 +98,29 @@ class EntityConstellation(ctk.CTkFrame):
             bd=0,
         )
         self.canvas.pack(fill="x", expand=True)
-        self.canvas.bind("<Configure>", self._draw)
+        self.canvas.bind("<Configure>", self._render)
+        self.after_idle(self._render)
 
-    def _draw(self, *_args, **_kwargs) -> None:
-        self.canvas.delete("all")
-        width = max(self.canvas.winfo_width(), 340)
-        height = max(self.canvas.winfo_height(), 210)
+    def _render(self, *_args, **_kwargs) -> None:
+        canvas = getattr(self, "canvas", None)
+        if canvas is None or not canvas.winfo_exists():
+            return
+
+        canvas.delete("all")
+        width = max(canvas.winfo_width(), 340)
+        height = max(canvas.winfo_height(), 210)
         cx, cy = width / 2, height / 2
 
-        self.canvas.create_rectangle(0, 0, width, height, fill=DASHBOARD_THEME.panel_bg, outline="")
+        canvas.create_rectangle(0, 0, width, height, fill=DASHBOARD_THEME.panel_bg, outline="")
         for radius in (42, 68, 94):
-            self.canvas.create_oval(cx - radius, cy - radius, cx + radius, cy + radius, outline="#1b3351", width=1)
+            canvas.create_oval(cx - radius, cy - radius, cx + radius, cy + radius, outline="#1b3351", width=1)
 
-        self.canvas.create_oval(cx - 30, cy - 30, cx + 30, cy + 30, fill="#25164b", outline="#8b5cf6", width=2)
-        self.canvas.create_text(cx, cy - 6, text="Scene", fill="#f8f6ff", font=("Segoe UI", 12, "bold"))
-        self.canvas.create_text(cx, cy + 12, text="Links", fill=DASHBOARD_THEME.text_secondary, font=("Segoe UI", 10))
+        canvas.create_oval(cx - 30, cy - 30, cx + 30, cy + 30, fill="#25164b", outline="#8b5cf6", width=2)
+        canvas.create_text(cx, cy - 6, text="Scene", fill="#f8f6ff", font=("Segoe UI", 12, "bold"))
+        canvas.create_text(cx, cy + 12, text="Links", fill=DASHBOARD_THEME.text_secondary, font=("Segoe UI", 10))
 
         if not self._links:
-            self.canvas.create_text(
+            canvas.create_text(
                 cx,
                 height - 26,
                 text="No linked entities for this scenario yet.",
@@ -132,10 +142,10 @@ class EntityConstellation(ctk.CTkFrame):
             y = cy + math.sin(angle) * orbit
             color = _ENTITY_COLORS.get(link.entity_type, "#67b6ff")
             tag = f"entity:{index}"
-            self.canvas.create_line(cx, cy, x, y, fill="#22385a", width=2)
-            self.canvas.create_oval(x - 16, y - 16, x + 16, y + 16, fill="#10233a", outline=color, width=2, tags=(tag,))
-            self.canvas.create_text(x, y, text=_entity_glyph(link.entity_type), fill=color, font=("Segoe UI Emoji", 11, "bold"), tags=(tag,))
-            self.canvas.create_text(
+            canvas.create_line(cx, cy, x, y, fill="#22385a", width=2)
+            canvas.create_oval(x - 16, y - 16, x + 16, y + 16, fill="#10233a", outline=color, width=2, tags=(tag,))
+            canvas.create_text(x, y, text=_entity_glyph(link.entity_type), fill=color, font=("Segoe UI Emoji", 11, "bold"), tags=(tag,))
+            canvas.create_text(
                 x,
                 y + 26,
                 text=_truncate(link.name, 16),
@@ -145,9 +155,9 @@ class EntityConstellation(ctk.CTkFrame):
                 justify="center",
                 tags=(tag,),
             )
-            self.canvas.tag_bind(tag, "<Button-1>", lambda _e, t=link.entity_type, n=link.name: self._on_open_entity(t, n))
-            self.canvas.tag_bind(tag, "<Enter>", lambda _e: self.canvas.configure(cursor="hand2"))
-            self.canvas.tag_bind(tag, "<Leave>", lambda _e: self.canvas.configure(cursor=""))
+            canvas.tag_bind(tag, "<Button-1>", lambda _e, t=link.entity_type, n=link.name: self._on_open_entity(t, n))
+            canvas.tag_bind(tag, "<Enter>", lambda _e: canvas.configure(cursor="hand2"))
+            canvas.tag_bind(tag, "<Leave>", lambda _e: canvas.configure(cursor=""))
 
 
 class CapsuleWrap(ctk.CTkFrame):
