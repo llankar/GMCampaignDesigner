@@ -1914,9 +1914,8 @@ class MainWindow(ctk.CTk):
         )
         self.banner_toggle_btn = self.menu_bar.create_action_button(
             text="▼",
-            width=40,
+            width=44,
             command=self._toggle_banner,
-            font=("", 16),
         )
 
        

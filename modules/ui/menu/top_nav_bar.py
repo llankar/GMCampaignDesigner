@@ -16,10 +16,7 @@ class AppMenuBar:
     FRAME_HEIGHT = 18
     MENU_BUTTON_HEIGHT = 16
     MENU_BUTTON_WIDTH = 70
-    ACTION_BUTTON_FONT = ("Segoe UI", 13)
-    TOP_NAV_TEXT_SIZE = 14
-    MENU_FONT = ("Segoe UI", TOP_NAV_TEXT_SIZE)
-    QUICK_ACTION_FONT = ("Segoe UI", TOP_NAV_TEXT_SIZE)
+    BUTTON_FONT = ("Segoe UI", 14)
     MENU_ICON_SIZE = (30, 30)
     QUICK_ICON_SIZE = (16, 16)
     QUICK_BUTTON_HEIGHT = 16
@@ -226,7 +223,7 @@ class AppMenuBar:
             width=max(self.QUICK_BUTTON_MIN_WIDTH, len(action_spec.text) * self.QUICK_BUTTON_WIDTH_SCALE + 18),
             corner_radius=self.QUICK_BUTTON_RADIUS,
             command=action_spec.command,
-            font=self.QUICK_ACTION_FONT,
+            font=self.BUTTON_FONT,
             border_spacing=4,
         )
         button._menu_style = action_spec.style
@@ -241,7 +238,7 @@ class AppMenuBar:
         self.app.bind_all("<Button-1>", self._on_root_click, add="+")
 
     def create_action_button(self, **kwargs) -> ctk.CTkButton:
-        kwargs.setdefault("font", self.ACTION_BUTTON_FONT)
+        kwargs.setdefault("font", self.BUTTON_FONT)
         button = ctk.CTkButton(self.utility_actions_frame, height=16, corner_radius=8, **kwargs)
         button.pack(side="right", padx=(6, 0))
         self._action_buttons.append(button)
@@ -268,7 +265,7 @@ class AppMenuBar:
                     fg_color=menu_bg,
                     hover_color=button_fg,
                     text_color="#E8EEF6",
-                    font=self.MENU_FONT,
+                    font=self.BUTTON_FONT,
                     width=max(64, len(button.cget("text")) * 11),
                 )
             except Exception:
@@ -332,7 +329,7 @@ class AppMenuBar:
                 fg_color=colors["fg_color"],
                 hover_color=colors["hover_color"],
                 text_color=colors["text_color"],
-                font=self.QUICK_ACTION_FONT,
+                font=self.BUTTON_FONT,
                 border_width=1,
                 border_color=colors["border_color"],
                 height=self.QUICK_BUTTON_HEIGHT,
