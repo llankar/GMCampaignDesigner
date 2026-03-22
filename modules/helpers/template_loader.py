@@ -18,12 +18,12 @@ _SKELETON_TEMPLATE = os.path.join("modules", "generic", "new_entity_template_ske
 _CUSTOM_ENTITY_MANIFEST = "custom_entities.json"
 
 _BUILTIN_ENTITY_METADATA = {
-    "events": {"label": "Events", "icon": "assets/scenario_icon.png"},
-    "campaigns": {"label": "Campaigns", "icon": "assets/scenario_graph_icon.png"},
+    "events": {"label": "Events", "icon": "assets/event_icon.png"},
+    "campaigns": {"label": "Campaigns", "icon": "assets/campaign_icon.png"},
     "scenarios": {"label": "Scenarios", "icon": "assets/scenario_icon.png"},
     "pcs": {"label": "PCs", "icon": "assets/pc_icon.png"},
     "npcs": {"label": "NPCs", "icon": "assets/npc_icon.png"},
-    "villains": {"label": "Villains", "icon": "assets/npc_graph_icon.png"},
+    "villains": {"label": "Villains", "icon": "assets/villain_icon.png"},
     "creatures": {"label": "Creatures", "icon": "assets/creature_icon.png"},
     "factions": {"label": "Factions", "icon": "assets/faction_icon.png"},
     "bases": {"label": "Bases", "icon": "assets/places_icon.png"},
