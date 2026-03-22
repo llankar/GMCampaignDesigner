@@ -3,6 +3,17 @@ from modules.helpers.logging_helper import log_module_import
 
 log_module_import(__name__)
 
+
+def fit_window_to_screen(width, height, screen_width, screen_height, *, margin=40):
+    """Clamp a target window size so modal dialogs remain fully reachable on screen."""
+    safe_margin = max(0, int(margin))
+    max_width = max(320, screen_width - safe_margin)
+    max_height = max(240, screen_height - safe_margin)
+    fitted_width = min(max(1, int(width or 1)), max_width)
+    fitted_height = min(max(1, int(height or 1)), max_height)
+    return fitted_width, fitted_height
+
+
 @log_function
 def position_window_at_top(window, width=None, height=None):
     """Position a window at the top of the screen, centered horizontally.
@@ -33,6 +44,7 @@ def position_window_at_top(window, width=None, height=None):
         height_candidates = [g_height, window.winfo_height(), window.winfo_reqheight()]
         height = next((h for h in height_candidates if h and h > 1), 1)
 
+    width, height = fit_window_to_screen(width, height, screen_width, screen_height)
     x = (screen_width - width) // 2
     y = 0  # Keep flush to the top of the screen
 

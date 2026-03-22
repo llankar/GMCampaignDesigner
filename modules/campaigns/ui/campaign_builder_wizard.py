@@ -22,7 +22,7 @@ from modules.generic.generic_model_wrapper import GenericModelWrapper
 from modules.generic.generic_list_selection_view import GenericListSelectionView
 from modules.helpers.logging_helper import log_exception
 from modules.helpers.template_loader import load_template
-from modules.helpers.window_helper import position_window_at_top
+from modules.helpers.window_helper import fit_window_to_screen, position_window_at_top
 from modules.generic.editor.styles import (
     EDITOR_PALETTE,
     option_menu_style,
@@ -38,7 +38,11 @@ class CampaignBuilderWizard(ctk.CTkToplevel):
     def __init__(self, master, campaign_wrapper, scenario_wrapper):
         super().__init__(master)
         self.title("Campaign Builder Wizard")
-        self.geometry("1480x1040")
+        screen_width = self.winfo_screenwidth()
+        screen_height = self.winfo_screenheight()
+        window_width, window_height = fit_window_to_screen(1480, 1040, screen_width, screen_height)
+        self.geometry(f"{window_width}x{window_height}")
+        self.minsize(min(window_width, 960), min(window_height, 700))
         self.configure(fg_color=EDITOR_PALETTE["surface"])
 
         self.campaign_wrapper = campaign_wrapper
@@ -768,8 +772,11 @@ class CampaignBuilderWizard(ctk.CTkToplevel):
         result = {"payload": None}
         dialog = ctk.CTkToplevel(self)
         dialog.title("Select Campaign")
-        dialog.geometry("1100x1040")
-        dialog.minsize(1100, 1040)
+        screen_width = dialog.winfo_screenwidth()
+        screen_height = dialog.winfo_screenheight()
+        dialog_width, dialog_height = fit_window_to_screen(1100, 1040, screen_width, screen_height)
+        dialog.geometry(f"{dialog_width}x{dialog_height}")
+        dialog.minsize(min(dialog_width, 900), min(dialog_height, 640))
 
         view = GenericListSelectionView(
             dialog,
