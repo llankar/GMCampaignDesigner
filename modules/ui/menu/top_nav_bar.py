@@ -17,7 +17,9 @@ class AppMenuBar:
     MENU_BUTTON_HEIGHT = 16
     MENU_BUTTON_WIDTH = 70
     ACTION_BUTTON_FONT = ("Segoe UI", 13)
-    MENU_FONT = ACTION_BUTTON_FONT
+    # Top-level menu buttons render slightly smaller at the same point size, so
+    # we nudge them up to visually match the Calendar/Timer utility actions.
+    MENU_FONT = ("Segoe UI", 14)
     MENU_ICON_SIZE = (30, 30)
     QUICK_ICON_SIZE = (16, 16)
     QUICK_BUTTON_HEIGHT = 16
