@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections import Counter
 from dataclasses import dataclass, field
 from typing import Any, Iterable
 
@@ -18,7 +19,20 @@ class ScenarioEntityLink:
 class CampaignGraphScenario:
     title: str
     summary: str
+    objective: str = ""
+    hook: str = ""
+    stakes: str = ""
+    tags: list[str] = field(default_factory=list)
     entity_links: list[ScenarioEntityLink] = field(default_factory=list)
+    entity_type_counts: dict[str, int] = field(default_factory=dict)
+    linked_entity_count: int = 0
+    linked_places_count: int = 0
+    linked_factions_count: int = 0
+    linked_villains_count: int = 0
+    primary_link_type: str = ""
+    scene_count: int = 0
+    has_secrets: bool = False
+    record_exists: bool = False
 
 
 @dataclass(slots=True)
@@ -133,10 +147,56 @@ def _build_scenario_payload(title: str, scenario_index: dict[str, dict[str, Any]
         for name in _coerce_string_list(scenario.get(field_name)):
             entity_links.append(ScenarioEntityLink(entity_type=entity_type, name=name))
 
+    entity_counts = Counter(link.entity_type for link in entity_links)
+    objective = _pick_first_text(
+        scenario,
+        "Objective",
+        "Objectives",
+        "Goal",
+        "Goals",
+        "CurrentObjective",
+        "MainObjective",
+        "DesiredOutcome",
+    )
+    hook = _pick_first_text(
+        scenario,
+        "Hook",
+        "Hooks",
+        "PlotHook",
+        "PlotHooks",
+        "IntroHook",
+        "IncitingIncident",
+        "SceneSummary",
+    ) or _derive_hook(summary, scenario.get("Scenes"))
+    stakes = _pick_first_text(
+        scenario,
+        "Stakes",
+        "Consequences",
+        "Outcome",
+        "FailureState",
+        "Threat",
+        "Threats",
+    ) or _derive_stakes(summary, scenario.get("Secrets"))
+    scene_count = _coerce_scene_count(scenario.get("Scenes"))
+    has_secrets = bool(coerce_text(scenario.get("Secrets")).strip())
+
     return CampaignGraphScenario(
         title=title or "Untitled scenario",
         summary=summary,
+        objective=objective,
+        hook=hook,
+        stakes=stakes,
+        tags=_build_scenario_tags(entity_counts, scene_count, has_secrets),
         entity_links=entity_links,
+        entity_type_counts=dict(entity_counts),
+        linked_entity_count=len(entity_links),
+        linked_places_count=entity_counts.get("Places", 0),
+        linked_factions_count=entity_counts.get("Factions", 0),
+        linked_villains_count=entity_counts.get("Villains", 0),
+        primary_link_type=max(entity_counts, key=entity_counts.get) if entity_counts else "",
+        scene_count=scene_count,
+        has_secrets=has_secrets,
+        record_exists=bool(scenario),
     )
 
 
@@ -161,3 +221,63 @@ def _coerce_string_list(value: Any) -> list[str]:
         if text and text not in result:
             result.append(text)
     return result
+
+
+def _pick_first_text(record: dict[str, Any], *keys: str) -> str:
+    for key in keys:
+        value = record.get(key)
+        if isinstance(value, list):
+            joined = " • ".join(_coerce_string_list(value)).strip()
+            if joined:
+                return joined
+        text = coerce_text(value).strip()
+        if text:
+            return text
+    return ""
+
+
+def _derive_hook(summary: str, scenes: Any) -> str:
+    first_scene = ""
+    if isinstance(scenes, list):
+        for scene in scenes:
+            if isinstance(scene, dict):
+                first_scene = coerce_text(scene.get("Title") or scene.get("Scene") or scene.get("Summary") or scene.get("Text")).strip()
+            else:
+                first_scene = coerce_text(scene).strip()
+            if first_scene:
+                break
+    if first_scene:
+        return first_scene
+    return _first_sentence(summary)
+
+
+def _derive_stakes(summary: str, secrets: Any) -> str:
+    secret_text = coerce_text(secrets).strip()
+    if secret_text:
+        return _first_sentence(secret_text)
+    sentences = [segment.strip() for segment in str(summary or "").replace("\n", " ").split(".") if segment.strip()]
+    if len(sentences) >= 2:
+        return sentences[1]
+    return ""
+
+
+def _first_sentence(text: str) -> str:
+    for separator in (". ", "\n", "! ", "? "):
+        if separator in text:
+            return text.split(separator, 1)[0].strip().rstrip(".!?")
+    return text.strip()
+
+
+def _coerce_scene_count(value: Any) -> int:
+    return len(value) if isinstance(value, list) else 0
+
+
+def _build_scenario_tags(entity_counts: Counter[str], scene_count: int, has_secrets: bool) -> list[str]:
+    tags: list[str] = []
+    if scene_count:
+        tags.append(f"{scene_count} scene{'s' if scene_count != 1 else ''}")
+    if has_secrets:
+        tags.append("GM secrets")
+    for entity_type, count in entity_counts.most_common(4):
+        tags.append(f"{count} {entity_type.lower()}")
+    return tags
