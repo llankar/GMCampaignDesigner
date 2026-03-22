@@ -2409,7 +2409,7 @@ class MainWindow(ctk.CTk):
         self._prime_content_frames_for_gm_screen()
         self.open_gm_screen(show_empty_message=False)
 
-    def open_gm_screen(self, *, show_empty_message=True):
+    def open_gm_screen(self, *, show_empty_message=True, scenario_name=None, initial_layout=None):
         # 1) Clear any existing content
         self.clear_current_content()
         self._gm_mode = True
@@ -2462,34 +2462,26 @@ class MainWindow(ctk.CTk):
             return str((scenario or {}).get("Title") or (scenario or {}).get("Name") or "").strip()
 
         # 5) Callback to open a selected scenario in detail
-        def on_scenario_select(entity_type, entity_name):
-            selected = next(
-                (s for s in scenarios
-                if _resolve_scenario_title(s) == entity_name),
-                None
-            )
-            if not selected:
-                messagebox.showwarning("Not Found", f"Scenario '{entity_name}' not found.")
-                return
-            # clear list and show scenario detail
+        def _show_selected_scenario(selected):
             for w in parent.winfo_children():
                 w.destroy()
             detail_container = ctk.CTkFrame(parent)
             detail_container.grid(row=0, column=0, sticky="nsew")
-            chosen_layout = selected_layout_var.get()
-            initial_layout = None if chosen_layout == default_label else chosen_layout
+            resolved_layout = initial_layout
+            if resolved_layout is None:
+                chosen_layout = selected_layout_var.get()
+                resolved_layout = None if chosen_layout == default_label else chosen_layout
             view = GMScreenView(
                 detail_container,
                 scenario_item=selected,
-                initial_layout=initial_layout,
+                initial_layout=resolved_layout,
                 layout_manager=layout_manager,
             )
             view.pack(fill="both", expand=True)
-            # track the active GM-screen view for our Ctrl+F handler
             self.current_gm_view = view
 
             default_layout = layout_manager.get_scenario_default(view.scenario_name)
-            has_saved_layout = bool(initial_layout or default_layout)
+            has_saved_layout = bool(resolved_layout or default_layout)
             if not has_saved_layout:
                 def _open_default_tabs():
                     scenario_tab = view.tabs.get(view.scenario_name)
@@ -2509,6 +2501,47 @@ class MainWindow(ctk.CTk):
 
                 view.after_idle(_open_default_tabs)
 
+        def on_scenario_select(entity_type, entity_name):
+            selected = next(
+                (s for s in scenarios if _resolve_scenario_title(s) == entity_name),
+                None
+            )
+            if not selected:
+                messagebox.showwarning("Not Found", f"Scenario '{entity_name}' not found.")
+                return
+            _show_selected_scenario(selected)
+
+        def _finalize_gm_shell():
+            # Configure banner and enable toggle in GM screen
+            self.banner_visible = True
+            try:
+                self.banner_toggle_btn.configure(text="▲", state="normal")
+                self.banner_toggle_btn._state = "normal"
+            except Exception:
+                pass
+            self.banner_visible = True
+            self.banner_toggle_btn.configure(text="▲")
+            self.banner_toggle_btn._state = "disabled"
+
+            self.content_frame.grid_rowconfigure(0, weight=0)
+            self.content_frame.grid_rowconfigure(1, weight=1)
+            self.content_frame.grid_columnconfigure(0, weight=1)
+            self.inner_content_frame.grid_rowconfigure(0, weight=1)
+            self.inner_content_frame.grid_columnconfigure(0, weight=1)
+            try:
+                self.banner_toggle_btn.configure(text="▲", state="normal")
+            except Exception:
+                pass
+
+        if scenario_name:
+            selected = next((s for s in scenarios if _resolve_scenario_title(s) == str(scenario_name).strip()), None)
+            if not selected:
+                messagebox.showwarning("Not Found", f"Scenario '{scenario_name}' not found.")
+                return
+            _show_selected_scenario(selected)
+            _finalize_gm_shell()
+            return
+
         # 6) Insert the generic list‐selection view
         list_selection = GenericListSelectionView(
             parent,
@@ -2519,33 +2552,7 @@ class MainWindow(ctk.CTk):
         )
         list_selection.pack(fill="both", expand=True)
         self.current_gm_view = None
-        # Configure banner and enable toggle in GM screen
-        self.banner_visible = True
-        try:
-            self.banner_toggle_btn.configure(text="▲", state="normal")
-            # Ensure underlying private state is also normalized where used
-            self.banner_toggle_btn._state = "normal"
-        except Exception:
-            pass
-        # 7) Lock banner and configure grid weights
-        self.banner_visible = True
-        self.banner_toggle_btn.configure(text="▲")
-        self.banner_toggle_btn._state = "disabled"
-
-        # Make row 0 (banner) fixed height, row 1 (content) expand
-        self.content_frame.grid_rowconfigure(0, weight=0)
-        self.content_frame.grid_rowconfigure(1, weight=1)
-        self.content_frame.grid_columnconfigure(0, weight=1)
-
-        # Make the inner_content_frame fully fill its cell
-        self.inner_content_frame.grid_rowconfigure(0, weight=1)
-        self.inner_content_frame.grid_columnconfigure(0, weight=1)
-        # Ensure the banner toggle is enabled for GM screen after layout
-        try:
-            self.banner_toggle_btn.configure(text="▲", state="normal")
-            self.banner_toggle_btn._state = "normal"
-        except Exception:
-            pass
+        _finalize_gm_shell()
 
     def open_character_graph_editor(self):
         self._graph_type = 'character'
