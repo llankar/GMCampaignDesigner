@@ -63,7 +63,7 @@ class CampaignGraphPanel(ctk.CTkFrame):
 
         ctk.CTkLabel(
             text_wrap,
-            text="Campaign Constellation",
+            text="Campaign overview",
             font=ctk.CTkFont(size=22, weight="bold"),
             text_color=DASHBOARD_THEME.text_primary,
             anchor="w",

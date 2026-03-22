@@ -54,7 +54,7 @@ class EntityConstellation(ctk.CTkFrame):
         header.grid_columnconfigure(0, weight=1)
         ctk.CTkLabel(
             header,
-            text="Relationship constellation",
+            text="Relationship overview",
             text_color=DASHBOARD_THEME.text_primary,
             font=ctk.CTkFont(size=18, weight="bold"),
             anchor="w",

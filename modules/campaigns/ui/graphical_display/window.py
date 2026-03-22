@@ -9,7 +9,7 @@ from .panel import CampaignGraphPanel
 class CampaignGraphWindow(ctk.CTkToplevel):
     def __init__(self, master, *, campaign_wrapper=None, scenario_wrapper=None):
         super().__init__(master)
-        self.title("Campaign Constellation")
+        self.title("Campaign Overview")
         self.geometry("1440x940")
         self.minsize(1100, 760)
         self.configure(fg_color="#0c1422")
