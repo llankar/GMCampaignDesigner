@@ -9,9 +9,17 @@ from modules.generic.generic_model_wrapper import GenericModelWrapper
 from modules.scenarios.gm_screen.dashboard.styles.dashboard_theme import DASHBOARD_THEME
 from modules.scenarios.gm_screen.dashboard.widgets.arc_display.arc_momentum_meter import ArcMomentumMeter
 
-from .components import ArcSelectorStrip, ScenarioSelectorStrip
+from .components import (
+    ArcSelectorStrip,
+    EntityConstellation,
+    ScenarioBriefingPanel,
+    ScenarioHeroStrip,
+    ScenarioIdentityPanel,
+    ScenarioSelectorStrip,
+)
 from .data import CampaignGraphArc, CampaignGraphPayload, CampaignGraphScenario, build_campaign_graph_payload, build_campaign_option_index
-from .visuals import EntityConstellation
+from modules.scenarios.gm_screen_view import GMScreenView
+from modules.scenarios.gm_layout_manager import GMScreenLayoutManager
 
 
 class CampaignGraphPanel(ctk.CTkFrame):
@@ -483,46 +491,73 @@ class CampaignGraphPanel(ctk.CTkFrame):
             on_select=self._select_scenario,
         ).grid(row=1, column=0, sticky="ew", padx=14, pady=(0, 12))
 
-        self._render_selected_scenario_card(section, selected_scenario)
+        self._render_selected_scenario_card(section, arc, selected_scenario)
 
-    def _render_selected_scenario_card(self, parent, scenario: CampaignGraphScenario) -> None:
-        card = ctk.CTkFrame(parent, fg_color="#0d1728", corner_radius=18, border_width=1, border_color="#22395d")
+    def _render_selected_scenario_card(self, parent, arc: CampaignGraphArc, scenario: CampaignGraphScenario) -> None:
+        card = ctk.CTkFrame(parent, fg_color="#0b1220", corner_radius=22, border_width=1, border_color="#22395d")
         card.grid(row=2, column=0, sticky="nsew", padx=14, pady=(0, 14))
         card.grid_columnconfigure(0, weight=1)
-        card.grid_rowconfigure(2, weight=1)
+        card.grid_rowconfigure(1, weight=1)
 
-        header = ctk.CTkFrame(card, fg_color="transparent")
-        header.grid(row=0, column=0, sticky="ew", padx=12, pady=(12, 6))
-        header.grid_columnconfigure(0, weight=1)
-        ctk.CTkLabel(
-            header,
-            text=scenario.title,
-            font=ctk.CTkFont(size=18, weight="bold"),
-            text_color=DASHBOARD_THEME.text_primary,
-            anchor="w",
-        ).grid(row=0, column=0, sticky="w")
-        ctk.CTkButton(
-            header,
-            text="Edit scenario",
-            width=116,
-            fg_color=DASHBOARD_THEME.accent,
-            hover_color=DASHBOARD_THEME.accent_hover,
-            command=lambda n=scenario.title: self._open_scenario(n),
-        ).grid(row=0, column=1, sticky="e")
+        subtitle = f"{arc.name} • Scenario {self._selected_scenario_index + 1} of {len(arc.scenarios)}"
+        gm_callback = (lambda n=scenario.title: self._open_scenario_gm_screen(n)) if scenario.record_exists else None
 
-        summary_label = ctk.CTkLabel(
+        ScenarioHeroStrip(
             card,
-            text=scenario.summary or "No synopsis written yet for this scenario.",
-            wraplength=980,
-            justify="left",
-            text_color=DASHBOARD_THEME.text_secondary,
-            anchor="w",
-        )
-        summary_label.grid(row=1, column=0, sticky="ew", padx=12, pady=(0, 10))
-        self._bind_wraplength(card, summary_label, horizontal_padding=32, minimum=320)
+            title=scenario.title,
+            subtitle=subtitle,
+            count_chips=[
+                ("linked entities", str(scenario.linked_entity_count)),
+                ("places", str(scenario.linked_places_count)),
+                ("factions", str(scenario.linked_factions_count)),
+                ("villains", str(scenario.linked_villains_count)),
+            ],
+            on_edit=lambda n=scenario.title: self._open_scenario(n),
+            on_open_gm_screen=gm_callback,
+        ).grid(row=0, column=0, sticky="ew", padx=14, pady=(14, 10))
 
-        constellation = EntityConstellation(card, links=scenario.entity_links, on_open_entity=self._open_entity)
-        constellation.grid(row=2, column=0, sticky="nsew", padx=12, pady=(0, 12))
+        content = ctk.CTkFrame(card, fg_color="transparent")
+        content.grid(row=1, column=0, sticky="nsew", padx=14, pady=(0, 14))
+        content.grid_columnconfigure(0, weight=3)
+        content.grid_columnconfigure(1, weight=2)
+        content.grid_rowconfigure(0, weight=0)
+        content.grid_rowconfigure(1, weight=1)
+
+        left_column = ctk.CTkFrame(content, fg_color="transparent")
+        left_column.grid(row=0, column=0, rowspan=2, sticky="nsew", padx=(0, 12))
+        left_column.grid_columnconfigure(0, weight=1)
+
+        identity_summary = scenario.hook or scenario.summary or "No synopsis written yet for this scenario."
+        ScenarioIdentityPanel(
+            left_column,
+            eyebrow="Mission profile",
+            title=scenario.title,
+            summary=identity_summary,
+            tags=scenario.tags,
+            progress_items=[
+                ("linked entities", str(scenario.linked_entity_count)),
+                ("primary cluster", scenario.primary_link_type or "Unassigned"),
+                ("scenes", str(scenario.scene_count or 0)),
+                ("status", "Secrets ready" if scenario.has_secrets else "Open notes"),
+            ],
+            on_edit=lambda n=scenario.title: self._open_scenario(n),
+            on_open_gm_screen=gm_callback,
+        ).grid(row=0, column=0, sticky="ew", pady=(0, 12))
+
+        ScenarioBriefingPanel(
+            left_column,
+            summary=scenario.summary,
+            objective=scenario.objective,
+            hook=scenario.hook,
+            stakes=scenario.stakes,
+        ).grid(row=1, column=0, sticky="nsew")
+
+        EntityConstellation(
+            content,
+            scenario_title=scenario.title,
+            links=scenario.entity_links,
+            on_open_entity=self._open_entity,
+        ).grid(row=0, column=1, rowspan=2, sticky="nsew")
 
     def _get_selected_arc(self, payload: CampaignGraphPayload) -> CampaignGraphArc | None:
         if not payload.arcs:
@@ -643,6 +678,22 @@ class CampaignGraphPanel(ctk.CTkFrame):
 
     def _open_scenario(self, scenario_name: str) -> None:
         self._open_entity("Scenarios", scenario_name)
+
+    def _open_scenario_gm_screen(self, scenario_name: str) -> None:
+        scenario_item = next((item for item in self._scenario_items if str(item.get("Title") or "").strip() == scenario_name), None)
+        if not isinstance(scenario_item, dict):
+            messagebox.showerror("GM screen", f"Scenario '{scenario_name}' could not be loaded.", parent=self.winfo_toplevel())
+            return
+
+        try:
+            window = ctk.CTkToplevel(self)
+            window.title(f"Scenario: {scenario_name}")
+            window.geometry("1920x1080+0+0")
+            layout_manager = GMScreenLayoutManager()
+            view = GMScreenView(window, scenario_item=scenario_item, initial_layout=None, layout_manager=layout_manager)
+            view.pack(fill="both", expand=True)
+        except Exception as exc:
+            messagebox.showerror("GM screen", f"Unable to open the GM screen for '{scenario_name}':\n{exc}", parent=self.winfo_toplevel())
 
     def _open_entity(self, entity_type: str, entity_name: str) -> None:
         try:
