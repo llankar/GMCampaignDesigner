@@ -45,7 +45,7 @@ class ArcScenarioStrip(ctk.CTkFrame):
         self.canvas.pack(fill="x", expand=True)
         self.canvas.bind("<Configure>", self._draw)
 
-    def _draw(self, _event=None) -> None:
+    def _draw(self, *_args, **_kwargs) -> None:
         self.canvas.delete("all")
         width = max(self.canvas.winfo_width(), 360)
         height = max(self.canvas.winfo_height(), 106)
@@ -95,7 +95,7 @@ class EntityConstellation(ctk.CTkFrame):
         self.canvas.pack(fill="x", expand=True)
         self.canvas.bind("<Configure>", self._draw)
 
-    def _draw(self, _event=None) -> None:
+    def _draw(self, *_args, **_kwargs) -> None:
         self.canvas.delete("all")
         width = max(self.canvas.winfo_width(), 340)
         height = max(self.canvas.winfo_height(), 210)
