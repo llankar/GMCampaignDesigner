@@ -191,7 +191,7 @@ class MainWindow(ctk.CTk):
         self.after(200, self.open_dice_bar)
         self.after(400, self.open_audio_bar)
         self.after(600, lambda: self._queue_update_check(force=True))
-        self.after(800, self._auto_open_gm_screen_if_available)
+        self.after(800, self._auto_open_campaign_overview)
 
     def _bind_global_shortcuts(self):
         root = self.winfo_toplevel()
@@ -2385,29 +2385,19 @@ class MainWindow(ctk.CTk):
 
         messagebox.showinfo("Success", f"{len(items)} {display_label} loaded successfully!")
 
-    def _auto_open_gm_screen_if_available(self):
-        """Post-initialization hook to open the GM screen if scenarios exist."""
-        scenario_wrapper = self.entity_wrappers.get("scenarios") or GenericModelWrapper("scenarios")
-        self.entity_wrappers.setdefault("scenarios", scenario_wrapper)
-
+    def _auto_open_campaign_overview(self):
+        """Post-initialization hook to show the campaign overview on launch."""
         try:
-            scenarios = scenario_wrapper.load_items()
+            self.open_campaign_graph_view()
         except Exception as exc:
             log_exception(
-                f"Failed to load scenarios for initial GM Screen: {exc}",
-                func_name="main_window.MainWindow._auto_open_gm_screen_if_available",
+                f"Failed to open campaign overview on launch: {exc}",
+                func_name="main_window.MainWindow._auto_open_campaign_overview",
             )
-            return
 
-        if not scenarios:
-            log_info(
-                "Skipping automatic GM Screen launch because no scenarios exist",
-                func_name="main_window.MainWindow._auto_open_gm_screen_if_available",
-            )
-            return
-
-        self._prime_content_frames_for_gm_screen()
-        self.open_gm_screen(show_empty_message=False)
+    def _auto_open_gm_screen_if_available(self):
+        """Backward-compatible alias that now launches the campaign overview."""
+        self._auto_open_campaign_overview()
 
     def open_gm_screen(self, *, show_empty_message=True, scenario_name=None, initial_layout=None):
         # 1) Clear any existing content
