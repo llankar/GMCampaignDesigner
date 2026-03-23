@@ -176,33 +176,8 @@ class ScenarioSelectorStrip(ctk.CTkFrame):
                 wraplength=card_width - 28,
             )
             title_label.grid(row=1, column=0, sticky="ew", padx=14)
-
-            meta = ctk.CTkFrame(card, fg_color="transparent")
-            meta.grid(row=2, column=0, sticky="w", padx=14, pady=(10, 6))
-            first_type = scenario.primary_link_type or "No links"
-            for meta_index, label in enumerate((f"{scenario.linked_entity_count} links", first_type, f"{scenario.scene_count or 0} scenes")):
-                ctk.CTkLabel(
-                    meta,
-                    text=label,
-                    fg_color="#10233a",
-                    corner_radius=999,
-                    padx=8,
-                    pady=3,
-                    text_color="#dceaff",
-                    font=ctk.CTkFont(size=10, weight="bold"),
-                ).grid(row=0, column=meta_index, padx=(0, 6))
-
-            ctk.CTkButton(
-                card,
-                text="View",
-                command=lambda idx=index: self._on_select(idx),
-                fg_color=DASHBOARD_THEME.accent if selected else "#17263d",
-                hover_color=DASHBOARD_THEME.accent_hover if selected else "#223a5f",
-                height=28,
-                width=92,
-            ).grid(row=3, column=0, sticky="w", padx=14, pady=(0, 12))
-
-            for clickable in (card, meta, title_label):
+           
+            for clickable in (card, title_label):
                 clickable.bind("<Button-1>", lambda _event, idx=index: self._on_select(idx))
                 clickable.bind("<Enter>", lambda _event, target=card: target.configure(cursor="hand2"))
                 clickable.bind("<Leave>", lambda _event, target=card: target.configure(cursor=""))
