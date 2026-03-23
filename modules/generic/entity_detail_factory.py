@@ -867,6 +867,7 @@ def insert_list_longtext(
     show_header=True,
 ):
     """Insert collapsible sections for long text lists such as scenario scenes."""
+    palette = get_detail_palette()
     if show_header:
         ctk.CTkLabel(parent, text=f"{header}:", font=("Arial", 16, "bold")) \
             .pack(anchor="w", padx=10, pady=(10, 2))
