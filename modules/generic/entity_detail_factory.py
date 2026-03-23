@@ -1,7 +1,7 @@
 import os
 import customtkinter as ctk
 from PIL import Image, ImageOps, ImageTk
-from customtkinter import CTkLabel, CTkTextbox
+from customtkinter import CTkImage, CTkLabel, CTkTextbox
 from modules.helpers.text_helpers import (
     deserialize_possible_json,
     format_longtext,
