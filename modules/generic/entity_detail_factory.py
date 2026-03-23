@@ -950,8 +950,8 @@ def insert_list_longtext(
             entity_collector.setdefault("Maps", set()).update(map_names)
         links = _coerce_links(scene_dict.get("Links"))
 
-        outer = ctk.CTkFrame(parent, fg_color="transparent")
-        outer.pack(fill="x", expand=True, padx=20, pady=4)
+        outer = ctk.CTkFrame(parent, fg_color="#0b1220", corner_radius=20, border_width=1, border_color="#22395d")
+        outer.pack(fill="x", expand=True, padx=20, pady=8)
         body = ctk.CTkFrame(outer, fg_color="transparent")
 
         scene_sections = build_scene_body_sections(
@@ -984,17 +984,24 @@ def insert_list_longtext(
                 initial_state = bool(gm_view_ref.get_scene_completion(scene_key))
             check_var = ctk.BooleanVar(master=outer, value=initial_state)
             header_row = ctk.CTkFrame(outer, fg_color="transparent")
-            header_row.pack(fill="x", expand=True)
+            header_row.pack(fill="x", expand=True, padx=14, pady=(12, 4))
             btn = ctk.CTkButton(
                 header_row,
                 text=button_text,
-                fg_color="transparent",
+                fg_color="#16243b",
+                hover_color="#223a5f",
+                text_color="#f3f4f6",
+                corner_radius=14,
                 anchor="w",
+                height=38,
             )
             checkbox = ctk.CTkCheckBox(
                 header_row,
                 text="",
                 variable=check_var,
+                fg_color="#2563eb",
+                hover_color="#1d4ed8",
+                border_color="#94a3b8",
             )
             checkbox.pack(side="right", padx=(8, 0), pady=(2, 2))
         else:
@@ -1003,8 +1010,12 @@ def insert_list_longtext(
             btn = ctk.CTkButton(
                 outer,
                 text=button_text,
-                fg_color="transparent",
+                fg_color="#16243b",
+                hover_color="#223a5f",
+                text_color="#f3f4f6",
+                corner_radius=14,
                 anchor="w",
+                height=38,
             )
 
         def _toggle(btn=btn, body=body, lbl=body_label, expanded=expanded, idx=idx, title=title_clean, key=scene_key):
@@ -1015,7 +1026,7 @@ def insert_list_longtext(
                     label += f" – {title}"
                 btn.configure(text=label)
             else:
-                body.pack(fill="x", padx=8, pady=6)
+                body.pack(fill="x", padx=14, pady=(4, 12))
                 label = f"▼ Scene {idx}"
                 if title:
                     label += f" – {title}"

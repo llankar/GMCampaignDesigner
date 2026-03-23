@@ -2,21 +2,45 @@ import customtkinter as ctk
 from customtkinter import CTkLabel
 
 
+_SURFACE_CARD = "#0d1728"
+_SURFACE_INSET = "#111f35"
+_SURFACE_SUBTLE = "#10192b"
+_BORDER = "#22395d"
+_BORDER_SUBTLE = "#243a5c"
+_TEXT_PRIMARY = "#f3f4f6"
+_TEXT_SECONDARY = "#cbd5e1"
+_TEXT_MUTED = "#8fb0dd"
+_LINK = "#7dd3fc"
+
+
+def _create_section_shell(parent):
+    shell = ctk.CTkFrame(parent, fg_color=_SURFACE_CARD, corner_radius=18, border_width=1, border_color=_BORDER)
+    shell.pack(fill="x", padx=0, pady=(0, 0))
+    shell.grid_columnconfigure(0, weight=1)
+    return shell
+
+
 def _create_section_title(parent, label_text):
-    title = ctk.CTkLabel(parent, text=label_text, font=("Arial", 13, "bold"))
-    title.pack(anchor="w", padx=12, pady=(0, 4))
+    title = ctk.CTkLabel(
+        parent,
+        text=label_text.upper(),
+        font=ctk.CTkFont(size=10, weight="bold"),
+        text_color=_TEXT_MUTED,
+        anchor="w",
+    )
+    title.pack(anchor="w", padx=14, pady=(12, 4))
     return title
 
 
 def _add_subtle_separator(parent):
-    separator = ctk.CTkFrame(parent, height=1, fg_color="#3A3A3A")
-    separator.pack(fill="x", padx=12, pady=(4, 8))
+    separator = ctk.CTkFrame(parent, height=1, fg_color=_BORDER_SUBTLE)
+    separator.pack(fill="x", padx=14, pady=(6, 10))
     return separator
 
 
 def _create_description_block(parent, body_text):
-    description_block = ctk.CTkFrame(parent, fg_color="transparent")
-    description_block.pack(fill="x", padx=4, pady=(0, 0))
+    description_block = ctk.CTkFrame(parent, fg_color=_SURFACE_INSET, corner_radius=16, border_width=1, border_color="#2d476b")
+    description_block.pack(fill="x", padx=12, pady=(12, 0))
 
     _create_section_title(description_block, "Description")
     description_label = ctk.CTkLabel(
@@ -24,9 +48,11 @@ def _create_description_block(parent, body_text):
         text=body_text or "(No scene notes)",
         wraplength=0,
         justify="left",
-        font=("Arial", 14),
+        font=ctk.CTkFont(size=13),
+        text_color=_TEXT_SECONDARY,
+        anchor="w",
     )
-    description_label.pack(fill="x", padx=12, pady=(0, 2))
+    description_label.pack(fill="x", padx=14, pady=(0, 14))
     return description_block, description_label
 
 
@@ -35,29 +61,38 @@ def _create_entities_block(parent, npc_names, villain_names, creature_names, pla
     if not has_entities:
         return None
 
-    entities_block = ctk.CTkFrame(parent, fg_color="transparent")
-    entities_block.pack(fill="x", padx=4, pady=(0, 0))
+    entities_block = ctk.CTkFrame(parent, fg_color=_SURFACE_SUBTLE, corner_radius=16, border_width=1, border_color=_BORDER_SUBTLE)
+    entities_block.pack(fill="x", padx=12, pady=(0, 0))
     _create_section_title(entities_block, "Entities")
 
     for label_text, names in (("NPCs", npc_names), ("Villains", villain_names), ("Creatures", creature_names), ("Places", place_names)):
         if not names:
             continue
-        row = ctk.CTkFrame(entities_block, fg_color="transparent")
-        row.pack(fill="x", padx=12, pady=(0, 4))
+        row = ctk.CTkFrame(row_parent := entities_block, fg_color="transparent")
+        row.pack(fill="x", padx=14, pady=(0, 8))
 
-        ctk.CTkLabel(row, text=f"{label_text}:", font=("Arial", 12, "bold")).pack(anchor="w")
+        ctk.CTkLabel(
+            row,
+            text=f"{label_text}:",
+            font=ctk.CTkFont(size=12, weight="bold"),
+            text_color=_TEXT_PRIMARY,
+        ).pack(anchor="w")
         chips = ctk.CTkFrame(row, fg_color="transparent")
-        chips.pack(fill="x", padx=10, pady=(1, 0))
+        chips.pack(fill="x", padx=0, pady=(4, 0))
 
         for name in names:
             can_open = callable(open_entity_callback)
             chip = ctk.CTkLabel(
                 chips,
                 text=name,
-                text_color="#00BFFF" if can_open else "white",
+                text_color=_LINK if can_open else _TEXT_SECONDARY,
+                fg_color="#16243b",
+                corner_radius=999,
+                padx=10,
+                pady=4,
                 cursor="hand2" if can_open else "",
             )
-            chip.pack(side="left", padx=4, pady=2)
+            chip.pack(side="left", padx=(0, 6), pady=2)
             if can_open:
                 chip.bind(
                     "<Button-1>",
@@ -71,8 +106,8 @@ def _create_maps_block(parent, map_names, gm_view_ref):
     if not map_names:
         return None
 
-    maps_block = ctk.CTkFrame(parent, fg_color="transparent")
-    maps_block.pack(fill="x", padx=4, pady=(0, 0))
+    maps_block = ctk.CTkFrame(parent, fg_color=_SURFACE_SUBTLE, corner_radius=16, border_width=1, border_color=_BORDER_SUBTLE)
+    maps_block.pack(fill="x", padx=12, pady=(0, 0))
     _create_section_title(maps_block, "Maps")
 
     interactive = bool(gm_view_ref and hasattr(gm_view_ref, "open_map_tool"))
@@ -89,7 +124,7 @@ def _create_maps_block(parent, map_names, gm_view_ref):
 
     for name in map_names:
         display_name = name or "(Unnamed Map)"
-        tile = ctk.CTkFrame(gallery, fg_color="#2F2F2F", corner_radius=6)
+        tile = ctk.CTkFrame(gallery, fg_color="#16243b", corner_radius=12, border_width=1, border_color=_BORDER_SUBTLE)
         tile.pack(side="left", padx=4, pady=4)
         tile.configure(cursor="hand2")
 
@@ -140,8 +175,8 @@ def _create_links_block(parent, links):
     if not links:
         return None
 
-    links_block = ctk.CTkFrame(parent, fg_color="transparent")
-    links_block.pack(fill="x", padx=4, pady=(0, 0))
+    links_block = ctk.CTkFrame(parent, fg_color=_SURFACE_SUBTLE, corner_radius=16, border_width=1, border_color=_BORDER_SUBTLE)
+    links_block.pack(fill="x", padx=12, pady=(0, 0))
     _create_section_title(links_block, "Links")
 
     for link in links:
@@ -159,9 +194,11 @@ def _create_links_block(parent, links):
         CTkLabel(
             links_block,
             text=f"• {text_val} → {target_display}",
-            font=("Arial", 12),
+            font=ctk.CTkFont(size=12),
             justify="left",
-        ).pack(anchor="w", padx=24, pady=1)
+            text_color=_TEXT_SECONDARY,
+            anchor="w",
+        ).pack(anchor="w", padx=14, pady=(0, 8))
 
     return links_block
 
@@ -182,12 +219,14 @@ def build_scene_body_sections(
     has_maps = bool(map_names)
     has_links = bool(links)
 
-    description_block, description_label = _create_description_block(parent, body_text)
+    shell = _create_section_shell(parent)
+
+    description_block, description_label = _create_description_block(shell, body_text)
     if has_entities or has_maps or has_links:
-        _add_subtle_separator(parent)
+        _add_subtle_separator(shell)
 
     entities_block = _create_entities_block(
-        parent,
+        shell,
         npc_names,
         villain_names,
         creature_names,
@@ -195,13 +234,13 @@ def build_scene_body_sections(
         open_entity_callback=open_entity_callback,
     )
     if entities_block is not None and (has_maps or has_links):
-        _add_subtle_separator(parent)
+        _add_subtle_separator(shell)
 
-    maps_block = _create_maps_block(parent, map_names, gm_view_ref)
+    maps_block = _create_maps_block(shell, map_names, gm_view_ref)
     if maps_block is not None and has_links:
-        _add_subtle_separator(parent)
+        _add_subtle_separator(shell)
 
-    links_block = _create_links_block(parent, links)
+    links_block = _create_links_block(shell, links)
 
     return {
         "description_block": description_block,
