@@ -1,9 +1,8 @@
 import customtkinter as ctk
 from tkinter import messagebox
-import os
 from scenarios.gm_screen_view import GMScreenView
+from modules.generic.entity_detail_factory import create_entity_detail_frame
 from modules.generic.generic_model_wrapper import GenericModelWrapper
-from modules.helpers.template_loader import load_template
 from modules.helpers.logging_helper import (
     log_function,
     log_info,
@@ -12,60 +11,38 @@ from modules.helpers.logging_helper import (
 
 log_module_import(__name__)
 
-@log_function
-def open_detached_npc(npc_name):
-    log_info(f"Opening detached NPC window: {npc_name}", func_name="open_detached_npc")
-    """
-    Opens the specified NPC in a brand-new Toplevel window
-    using a minimal GMScreenView to show the NPC data
-    (but not as a tab).
-    """
-    # 1. Load the NPC from JSON
-    npc_wrapper = GenericModelWrapper("npcs")
-    items = npc_wrapper.load_items()
-    item = next((i for i in items if i.get("Name") == npc_name), None)
+
+def _open_detached_entity_window(entity_type, entity_name, wrapper_name):
+    wrapper = GenericModelWrapper(wrapper_name)
+    items = wrapper.load_items()
+    item = next((entry for entry in items if entry.get("Name") == entity_name), None)
     if not item:
-        messagebox.showerror("Error", f"NPC '{npc_name}' not found.")
+        messagebox.showerror("Error", f"{entity_type[:-1]} '{entity_name}' not found.")
         return
 
-    # 2. Create a new Toplevel window
     window = ctk.CTkToplevel()
-    window.title(f"NPC: {npc_name}")
+    window.title(f"{entity_type[:-1]}: {entity_name}")
     window.geometry("800x600")
 
-    # 3. Create a minimal GMScreenView (or a custom UI) for display
-  
-    dummy_scenario = {"Title": f"Entity: {npc_name}"}
+    dummy_scenario = {"Title": f"Entity: {entity_name}"}
     detail_view = GMScreenView(window, scenario_item=dummy_scenario)
     detail_view.pack(fill="both", expand=True)
 
-    # 4. Create just the single NPC frame inside this detail view
-    #    (no new tabs, no attach/detach)
-    entity_frame = detail_view.create_entity_frame("NPCs", item)
-    entity_frame.pack(fill="both", expand=True)
+    create_entity_detail_frame(
+        entity_type,
+        item,
+        master=detail_view.content_area,
+        open_entity_callback=detail_view.open_entity_tab,
+    )
+
+@log_function
+def open_detached_npc(npc_name):
+    log_info(f"Opening detached NPC window: {npc_name}", func_name="open_detached_npc")
+    """Open an NPC in a detached window using the shared detail factory UI."""
+    _open_detached_entity_window("NPCs", npc_name, "npcs")
 
 @log_function
 def open_detached_pc(pc_name):
     log_info(f"Opening detached PC window: {pc_name}", func_name="open_detached_pc")
-    """
-    Opens the specified PC in a brand-new Toplevel window
-    using a minimal GMScreenView to show the PC data
-    (but not as a tab).
-    """
-    pc_wrapper = GenericModelWrapper("pcs")
-    items = pc_wrapper.load_items()
-    item = next((i for i in items if i.get("Name") == pc_name), None)
-    if not item:
-        messagebox.showerror("Error", f"PC '{pc_name}' not found.")
-        return
-
-    window = ctk.CTkToplevel()
-    window.title(f"PC: {pc_name}")
-    window.geometry("800x600")
-
-    dummy_scenario = {"Title": f"Entity: {pc_name}"}
-    detail_view = GMScreenView(window, scenario_item=dummy_scenario)
-    detail_view.pack(fill="both", expand=True)
-
-    entity_frame = detail_view.create_entity_frame("PCs", item)
-    entity_frame.pack(fill="both", expand=True)
+    """Open a PC in a detached window using the shared detail factory UI."""
+    _open_detached_entity_window("PCs", pc_name, "pcs")
