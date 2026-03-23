@@ -1126,7 +1126,7 @@ def build_user_manual(shots, menu_data, py_files):
         "<html><head><meta charset='utf-8'><title>GMCampaignDesigner User Manual</title>",
         "<link rel='stylesheet' href='user-manual.css'></head><body>",
         "<header><h1>GMCampaignDesigner User Manual</h1></header>",
-        "<nav><a href='#getting-started'>Getting Started</a><a href='#sidebar-accordion'>Sidebar Accordion</a><a href='#systems-&-data'>Systems &amp; Data</a><a href='#entity-managers'>Entity Managers</a><a href='#detail-windows'>Detail Windows</a><a href='#editor-tools'>Editor Tools</a><a href='#random-tables'>Random Tables</a><a href='#graph-editors'>Graph Editors</a><a href='#gm-screen'>GM Screen</a><a href='#scenario-tools'>Scenario Tools</a><a href='#scene-flow'>Scene Flow</a><a href='#map-tool'>Map Tool</a><a href='#whiteboard'>Whiteboard</a><a href='#world-map'>World Map</a><a href='#dice-roller'>Dice Roller</a><a href='#audio-&-music'>Audio &amp; Music</a><a href='#books'>Books</a><a href='#web-viewer'>Web Viewer</a><a href='#keyboard-shortcuts'>Keyboard Shortcuts</a><a href='#tips'>Tips</a></nav><div class='container'>"
+        "<nav><a href='#getting-started'>Getting Started</a><a href='#sidebar-accordion'>Sidebar Accordion</a><a href='#systems-&-data'>Systems &amp; Data</a><a href='#entity-managers'>Entity Managers</a><a href='#detail-windows'>Detail Windows</a><a href='#editor-tools'>Editor Tools</a><a href='#random-tables'>Random Tables</a><a href='#graph-editors'>Graph Editors</a><a href='#campaign-overview'>Campaign Overview</a><a href='#gm-screen'>GM Screen</a><a href='#scenario-tools'>Scenario Tools</a><a href='#scene-flow'>Scene Flow</a><a href='#map-tool'>Map Tool</a><a href='#whiteboard'>Whiteboard</a><a href='#world-map'>World Map</a><a href='#exports-&-handouts'>Exports &amp; Handouts</a><a href='#dice-roller'>Dice Roller</a><a href='#audio-&-music'>Audio &amp; Music</a><a href='#books'>Books</a><a href='#web-viewer'>Web Viewer</a><a href='#keyboard-shortcuts'>Keyboard Shortcuts</a><a href='#tips'>Tips</a></nav><div class='container'>"
     ]
 
     parts.append(section('Getting Started',
@@ -1243,11 +1243,24 @@ def build_user_manual(shots, menu_data, py_files):
         + img('faction_graph', 'Faction Graph') + img('scenario_graph', 'Scenario Graph')
     ))
 
+    parts.append(section('Campaign Overview',
+        "<p>The campaign overview presents a visual, campaign-facing summary built from arcs, scenarios, linked entities, and briefings. It is useful for reviewing pacing, campaign structure, and scenario dependencies without opening every editor.</p>"
+        "<ul>"
+        "<li><b>Arc and scenario navigation:</b> Move between arcs and scenarios from compact selector strips.</li>"
+        "<li><b>Scenario identity:</b> Review title, synopsis, hook, stakes, and objective in a polished dashboard layout.</li>"
+        "<li><b>Linked entities browser:</b> Open related NPCs, creatures, places, and other records directly from the overview.</li>"
+        "<li><b>Campaign-facing use:</b> This view is for overview and navigation; detailed GM prep still lives in the GM Screen.</li>"
+        "</ul>"
+    ))
+
     parts.append(section('GM Screen',
-        "<p>The GM Screen consolidates scenario prep: select a scenario to open tabs for NPCs, Places, scenes, and notes. Use <code>Ctrl+F</code> for instant search, toggle the PC banner for quick reference, and click any linked entity to open its detail frame.</p>"
+        "<p>The GM Screen consolidates scenario prep: select a scenario to open tabs for NPCs, Places, scenes, synopsis, secrets, and notes. Use <code>Ctrl+F</code> for instant search, toggle the PC banner for quick reference, and click any linked entity to open its detail frame.</p>"
         "<ul>"
         "<li><b>PC banner:</b> A one-line, scrollable summary of the party that follows the active theme.</li>"
+        "<li><b>Section sidebar:</b> The vertical <b>Sections</b> navigator lets you jump between summary, scenes, synopsis, secrets, notes, and linked-entity views.</li>"
         "<li><b>Panels:</b> Add panels such as Scene Flow, Random Tables, or World Map via the layout manager.</li>"
+        "<li><b>Scenario scenes:</b> Scenes can be expanded/collapsed individually and show description, linked entities, maps, and scene-to-scene links.</li>"
+        "<li><b>Premium entity cards:</b> NPCs, Places, Creatures, and Villains are displayed as dashboard cards with portraits, chips, and rich text sub-panels.</li>"
         "<li><b>Quick navigation:</b> Collapsible scenes, linked tables, and detail pop-outs keep prep focused.</li>"
         "</ul>"
         + img('gm_screen', 'GM Screen overview')
@@ -1259,6 +1272,7 @@ def build_user_manual(shots, menu_data, py_files):
         "<li><b>Scenario Builder Wizard:</b> Plan scenes step-by-step, link NPCs/Places/Maps, and preview a scene flow before saving.</li>"
         "<li><b>Scenario Generator:</b> Configure prompts and let the AI draft outline sections you can review and tweak.</li>"
         "<li><b>Scenario Importer:</b> Map headings from external documents into template fields before saving.</li>"
+        "<li><b>AI & web import:</b> Use AI helpers and the Web Text Import flow to turn online sources or external text into structured scenario content.</li>"
         "<li><b>PDF Importers:</b> Utilities include Creature and Equipment importers that extract entries from PDFs with a review step.</li>"
         "</ul>"
         + img('scenario_builder', 'Scenario Builder Wizard') + img('scenario_generator', 'Scenario Generator') + img('scenario_importer', 'Scenario Importer')
@@ -1338,6 +1352,17 @@ def build_user_manual(shots, menu_data, py_files):
         + img('world_map', 'World Map')
     ))
 
+    parts.append(section('Exports & Handouts',
+        "<p>GMCampaignDesigner includes multiple output paths for preparing material for players, collaborators, or VTT use.</p>"
+        "<ul>"
+        "<li><b>Export Scenarios:</b> Generate shareable scenario documents from selected records.</li>"
+        "<li><b>Campaign Dossier:</b> Assemble a broader export package covering scenario and campaign context for prep or sharing.</li>"
+        "<li><b>Session Brief export:</b> Produce a focused session-ready summary for quick table use.</li>"
+        "<li><b>Export for Foundry:</b> Convert campaign content into a Foundry-friendly format.</li>"
+        "<li><b>Newsletters & handouts:</b> Build in-world newsletter-style outputs and other player-facing handouts.</li>"
+        "</ul>"
+    ))
+
     parts.append(section('Dice Roller',
         "<p>Use the full Dice Roller for formula-based rolls with polyhedral previews, or the compact Dice Bar for always-on-top quick rolls.</p>"
         "<ul>"
@@ -1400,9 +1425,11 @@ def build_user_manual(shots, menu_data, py_files):
     ))
     parts.append(section('Tips',
         "<div class='tip'><b>Screenshots:</b> Run <code>python scripts/generate_docs.py</code> to refresh this manual after UI changes.</div>"
-        "<div class='tip'><b>Exports:</b> Use <i>Export Scenarios</i> or <i>Export for Foundry</i> (Utilities section) to share content.</div>"
+        "<div class='tip'><b>Exports:</b> Use <i>Export Scenarios</i>, <i>Campaign Dossier</i>, <i>Session Brief</i>, or <i>Export for Foundry</i> depending on the audience.</div>"
         "<div class='tip'><b>Portrait workflow:</b> Generate or link portraits from the Utilities section; double-click a portrait in any list to pop it out.</div>"
+        "<div class='tip'><b>Cross-campaign reuse:</b> Use the Cross-campaign Asset Library to move NPCs, objects, and maps between campaigns with their media.</div>"
         "<div class='tip'><b>AI settings:</b> Configure the local AI endpoint in <code>config/config.ini</code> under the <code>[AI]</code> section.</div>"
+        "<div class='tip'><b>Auto-improvement:</b> Configure the Codex CLI integration in <code>config/config.ini</code> under <code>[AutoImprove]</code> before using automated improvement workflows.</div>"
         "<div class='tip'><b>Logging:</b> Enable logs in <code>config/config.ini</code> to troubleshoot AI imports and automated workflows.</div>"
     ))
 
