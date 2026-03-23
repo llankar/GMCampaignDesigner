@@ -351,6 +351,7 @@ def screenshot_app_views():
         from modules.generic.generic_editor_window import GenericEditorWindow
         from modules.pcs.display_pcs import display_pcs_in_banner
         from modules.generic.generic_list_selection_view import GenericListSelectionView
+        from modules.generic.generic_list_view import GenericListView
     except Exception:
         return {}
 
@@ -403,6 +404,30 @@ def screenshot_app_views():
 
     capture_sidebar_sections()
 
+    def wait_for_entity_list(timeout=8.0):
+        deadline = time.time() + timeout
+        last_view = None
+        while time.time() < deadline:
+            try:
+                app.update_idletasks()
+                app.update()
+            except Exception:
+                break
+            candidates = [child for child in app.inner_content_frame.winfo_children() if isinstance(child, GenericListView)]
+            if candidates:
+                last_view = candidates[-1]
+                try:
+                    if getattr(last_view, "_initial_dataset_ready", False):
+                        tree = getattr(last_view, "tree", None)
+                        if tree is not None and tree.winfo_exists() and tree.get_children():
+                            return last_view
+                        if getattr(last_view, "filtered_items", None):
+                            return last_view
+                except Exception:
+                    pass
+            time.sleep(0.1)
+        return last_view
+
     def ensure_pc_banner():
         try:
             app.banner_frame.grid(row=0, column=0, sticky="ew")
@@ -451,7 +476,10 @@ def screenshot_app_views():
             ensure_pc_banner()
             app.open_entity(ent)
             app.update()
+            wait_for_entity_list(timeout=8.0)
             ensure_pc_banner()
+            app.update_idletasks()
+            app.update()
             shots[f"entity_{ent}"] = str(grab_widget_screenshot(app, f"entity_{ent}") or "")
         except Exception:
             pass
