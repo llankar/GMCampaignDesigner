@@ -16,7 +16,6 @@ from modules.characters.character_graph_editor import CharacterGraphEditor
 from modules.scenarios.scenario_graph_editor import ScenarioGraphEditor
 from modules.generic.generic_list_selection_view import GenericListSelectionView
 from modules.helpers.config_helper import ConfigHelper
-from modules.helpers.portrait_helper import primary_portrait, resolve_portrait_path
 import random
 from collections import deque
 from modules.helpers.logging_helper import (
@@ -2622,36 +2621,18 @@ class GMScreenView(ctk.CTkFrame):
         log_info(f"Creating entity frame for {entity_type}: {entity.get('Name') or entity.get('Title')}", func_name="GMScreenView.create_entity_frame")
         if master is None:
             master = self.content_area
-        frame = ctk.CTkFrame(master)
-        template = self.templates[entity_type]
-        portrait_value = entity.get("Portrait")
-        portrait_path = primary_portrait(portrait_value)
-        resolved_portrait = resolve_portrait_path(portrait_value, ConfigHelper.get_campaign_dir())
-        if (entity_type in {"NPCs", "PCs", "Creatures", "Factions"}) and resolved_portrait and os.path.exists(resolved_portrait):
-            img = Image.open(resolved_portrait)
-            img = img.resize((200, 200), Image.Resampling.LANCZOS)
-            ctk_image = ctk.CTkImage(light_image=img, size=(200, 200))
-            portrait_label = ctk.CTkLabel(frame, image=ctk_image, text="")
-            portrait_label.image = ctk_image
-            portrait_label.entity_name = entity["Name"]
-            portrait_label.is_portrait = True
-            self.portrait_images[entity["Name"]] = ctk_image
-            portrait_label.pack(pady=10)
-            print(f"[DEBUG] Created portrait label for {entity['Name']}: is_portrait={portrait_label.is_portrait}, entity_name={portrait_label.entity_name}")
+        frame = create_entity_detail_frame(
+            entity_type,
+            entity,
+            master=master,
+            open_entity_callback=self.open_entity_tab,
+        )
+        portrait_images = getattr(frame, "portrait_images", {})
+        if portrait_images:
+            self.portrait_images.update(portrait_images)
+        portrait_label = getattr(frame, "portrait_label", None)
+        if portrait_label is not None:
             frame.portrait_label = portrait_label
-        for field in template["fields"]:
-            field_name = field["name"]
-            field_type = field["type"]
-            if (entity_type in {"NPCs", "PCs", "Creatures", "Factions"}) and field_name == "Portrait":
-                continue
-            if field_type == "longtext":
-                self.insert_longtext(frame, field_name, entity.get(field_name, ""))
-            elif field_type == "text":
-                self.insert_text(frame, field_name, entity.get(field_name, ""))
-            elif field_type == "list":
-                linked_type = field.get("linked_type", None)
-                if linked_type:
-                    self.insert_links(frame, field_name, entity.get(field_name) or [], linked_type)
         return frame
     
     def insert_text(self, parent, header, content):
