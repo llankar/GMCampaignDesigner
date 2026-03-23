@@ -1,5 +1,6 @@
 from .editor_theme import (
     EDITOR_PALETTE,
+    get_editor_palette,
     option_menu_style,
     primary_button_style,
     section_style,
@@ -9,6 +10,7 @@ from .editor_theme import (
 
 __all__ = [
     "EDITOR_PALETTE",
+    "get_editor_palette",
     "option_menu_style",
     "primary_button_style",
     "section_style",
