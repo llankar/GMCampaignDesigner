@@ -276,6 +276,17 @@ def unique_iid(tree, base_id):
         iid = f"{base_id}_{counter}"
     return iid
 
+
+def unique_iid_from_registry(base_id, registry):
+    """Return a unique iid using a plain-Python registry, safe outside the Tk thread."""
+    iid = base_id
+    counter = 1
+    while iid in registry:
+        counter += 1
+        iid = f"{base_id}_{counter}"
+    registry.add(iid)
+    return iid
+
 class _ToolTip:
     """Simple tooltip for a Treeview showing full cell text on hover."""
     def __init__(self, widget, text_resolver=None):
@@ -355,6 +366,7 @@ class GenericListView(ctk.CTkFrame):
         self._max_display_rows = 1000000
         self._page_size = 40
         self._group_nodes = {}
+        self._payload_iid_registry = set()
         self._pending_scroll_load = False
         self._tree_loader = None
         self._freeze_selection_changes = False
@@ -746,6 +758,7 @@ class GenericListView(ctk.CTkFrame):
         self._pinned_linked_rows.clear()
         self._base_to_iids = {}
         self._group_nodes = {}
+        self._payload_iid_registry = set()
         self._seen_base_ids = set()
         self._iid_to_item = {}
         self.batch_index = 0
@@ -864,6 +877,7 @@ class GenericListView(ctk.CTkFrame):
     def _reset_tree_for_window(self):
         self._base_to_iids = {}
         self._group_nodes = {}
+        self._payload_iid_registry = set()
         if self._tree_loader:
             self._tree_loader.reset_tree()
         else:
@@ -995,26 +1009,49 @@ class GenericListView(ctk.CTkFrame):
         return new_items
 
     def _submit_payload_job(self, items, reset_tree):
+        iid_registry_snapshot = set(self._payload_iid_registry)
+        group_nodes_snapshot = dict(self._group_nodes)
+
         def build_payload_batches():
             batches = []
+            local_iid_registry = set(iid_registry_snapshot)
+            local_group_nodes = dict(group_nodes_snapshot)
             for start in range(0, len(items), self._payload_batch_size):
                 subset = items[start : start + self._payload_batch_size]
-                payloads = self._build_payloads(subset)
+                payloads = self._build_payloads(
+                    subset,
+                    iid_registry=local_iid_registry,
+                    group_nodes=local_group_nodes,
+                )
                 if payloads:
                     batches.append(payloads)
-            return batches
+            return batches, local_iid_registry, local_group_nodes
 
         def on_complete(future):
             try:
-                batches = future.result()
+                batches, built_iids, built_groups = future.result()
             except Exception:
-                batches = []
-            self.after(0, lambda: self._enqueue_payload_batches(batches, reset_tree))
+                batches, built_iids, built_groups = [], iid_registry_snapshot, group_nodes_snapshot
+            try:
+                if not self.winfo_exists():
+                    return
+                self.after(0, lambda: self._enqueue_payload_batches(batches, reset_tree, built_iids, built_groups))
+            except Exception:
+                return
 
         future = self._payload_executor.submit(build_payload_batches)
         future.add_done_callback(on_complete)
 
-    def _enqueue_payload_batches(self, batches, reset_tree):
+    def _enqueue_payload_batches(self, batches, reset_tree, built_iids=None, built_groups=None):
+        try:
+            if not self.winfo_exists():
+                return
+        except Exception:
+            return
+        if built_iids is not None:
+            self._payload_iid_registry = set(built_iids)
+        if built_groups is not None:
+            self._group_nodes = dict(built_groups)
         if not batches:
             self._on_tree_load_complete()
             return
@@ -1039,28 +1076,31 @@ class GenericListView(ctk.CTkFrame):
         else:
             self._tree_loader.append(payloads)
 
-    def _build_payloads(self, items):
+    def _build_payloads(self, items, iid_registry=None, group_nodes=None):
         payloads = []
+        iid_registry = iid_registry if iid_registry is not None else self._payload_iid_registry
+        group_nodes = group_nodes if group_nodes is not None else self._group_nodes
         if self.group_column:
             for item in items:
                 group_val = self.clean_value(item.get(self.group_column, "")) or "Unknown"
-                group_id = self._group_nodes.get(group_val)
+                group_id = group_nodes.get(group_val)
                 if not group_id:
                     base_group_id = sanitize_id(f"group_{group_val}")
-                    group_id = unique_iid(self.tree, base_group_id)
-                    self._group_nodes[group_val] = group_id
+                    group_id = unique_iid_from_registry(base_group_id, iid_registry)
+                    group_nodes[group_val] = group_id
                     payloads.append({"type": "group", "iid": group_id, "label": group_val})
-                payloads.append(self._build_row_payload(item, parent=group_id))
+                payloads.append(self._build_row_payload(item, parent=group_id, iid_registry=iid_registry))
         else:
-            payloads.extend(self._build_row_payload(item) for item in items)
+            payloads.extend(self._build_row_payload(item, iid_registry=iid_registry) for item in items)
         return payloads
 
-    def _build_row_payload(self, item, parent=""):
+    def _build_row_payload(self, item, parent="", iid_registry=None):
         raw = item.get(self.unique_field, "")
         if isinstance(raw, dict):
             raw = raw.get("text", "")
         base_id = sanitize_id(raw or f"item_{int(time.time()*1000)}").lower()
-        iid = unique_iid(self.tree, base_id)
+        iid_registry = iid_registry if iid_registry is not None else self._payload_iid_registry
+        iid = unique_iid_from_registry(base_id, iid_registry)
         name_text = self._format_cell("#0", item.get(self.unique_field, ""), iid)
         values = []
         if self._link_column:
