@@ -24,8 +24,9 @@ def get_detail_palette() -> dict:
             "surface_card": palette["surface_alt"],
             "surface_elevated": palette["surface_soft"],
             "surface_overlay": _mix_hex(palette["surface"], palette["accent"], 0.18),
-            "hero_gradient": _mix_hex(palette["surface_alt"], palette["accent"], 0.30),
+            "hero_gradient": _mix_hex(palette["surface_alt"], palette["accent"], 0.34),
             "hero_glow": _mix_hex(palette["accent"], "#FFFFFF", 0.18),
+            "hero_band": _mix_hex(palette["accent"], "#FFFFFF", 0.08),
             "link": _mix_hex(palette["accent"], "#7DD3FC", 0.28),
             "link_hover": _mix_hex(palette["accent_hover"], "#FFFFFF", 0.18),
             "pill_bg": _mix_hex(palette["surface_soft"], palette["accent"], 0.14),
@@ -115,43 +116,54 @@ def create_hero_header(
         fg_color=palette["hero_gradient"],
         border_width=1,
         border_color=palette["pill_border"],
-        corner_radius=24,
+        corner_radius=28,
     )
+
+    band = ctk.CTkFrame(hero, fg_color=palette["hero_band"], height=8, corner_radius=28)
+    band.pack(fill="x", padx=18, pady=(18, 0))
+
     content = ctk.CTkFrame(hero, fg_color="transparent")
-    content.pack(fill="both", expand=True, padx=20, pady=20)
-    content.grid_columnconfigure(0, weight=1)
+    content.pack(fill="both", expand=True, padx=26, pady=24)
+    content.grid_columnconfigure(0, weight=7)
+    content.grid_rowconfigure(0, weight=1)
     if portrait_widget is not None:
-        content.grid_columnconfigure(1, weight=0)
+        content.grid_columnconfigure(1, weight=4, minsize=260)
 
     text_col = ctk.CTkFrame(content, fg_color="transparent")
-    text_col.grid(row=0, column=0, sticky="nsew", padx=(0, 16))
+    text_col.grid(row=0, column=0, sticky="nsew", padx=(0, 18))
 
-    create_chip(text_col, category.upper(), accent=True).pack(anchor="w")
+    badge_row = ctk.CTkFrame(text_col, fg_color="transparent")
+    badge_row.pack(fill="x")
+    create_chip(badge_row, category.upper(), accent=True).pack(side="left")
+    if meta_items:
+        create_chip(badge_row, f"{len([item for item in meta_items if item])} signals").pack(side="left", padx=(8, 0))
+
     ctk.CTkLabel(
         text_col,
         text=title,
-        font=ctk.CTkFont(size=28, weight="bold"),
+        font=ctk.CTkFont(size=34, weight="bold"),
         text_color=palette["text"],
         justify="left",
-        wraplength=700,
-    ).pack(anchor="w", pady=(14, 8))
+        wraplength=820,
+    ).pack(anchor="w", pady=(18, 10))
+
     if summary:
         ctk.CTkLabel(
             text_col,
             text=summary,
-            font=ctk.CTkFont(size=13),
+            font=ctk.CTkFont(size=14),
             text_color=palette["muted_text"],
             justify="left",
-            wraplength=720,
+            wraplength=760,
         ).pack(anchor="w")
 
     if meta_items:
-        meta_row = ctk.CTkFrame(text_col, fg_color="transparent")
-        meta_row.pack(anchor="w", pady=(14, 0))
+        meta_flow = ctk.CTkFrame(text_col, fg_color="transparent")
+        meta_flow.pack(fill="x", pady=(18, 0))
         for item in meta_items:
             if not item:
                 continue
-            create_chip(meta_row, item).pack(side="left", padx=(0, 8))
+            create_chip(meta_flow, item).pack(side="left", padx=(0, 8), pady=(0, 8))
 
     if portrait_widget is not None:
         portrait_shell = ctk.CTkFrame(
@@ -159,13 +171,13 @@ def create_hero_header(
             fg_color=palette["surface_overlay"],
             border_width=1,
             border_color=palette["pill_border"],
-            corner_radius=20,
-            width=224,
-            height=224,
+            corner_radius=24,
+            width=300,
+            height=260,
         )
-        portrait_shell.grid(row=0, column=1, sticky="ne")
+        portrait_shell.grid(row=0, column=1, sticky="nsew")
         portrait_shell.grid_propagate(False)
-        portrait_widget.pack(in_=portrait_shell, expand=True, padx=12, pady=12)
+        portrait_widget.pack(in_=portrait_shell, fill="both", expand=True, padx=12, pady=12)
 
     return hero
 

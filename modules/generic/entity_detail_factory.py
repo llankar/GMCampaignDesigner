@@ -37,8 +37,12 @@ from modules.ui.vertical_section_tabs import VerticalSectionTabs
 from modules.events.ui.shared.related_events_panel import RelatedEventsPanel
 from modules.generic.detail_ui import (
     create_chip,
+    create_detail_split_layout,
     create_hero_header,
+    create_highlight_card,
     create_section_card,
+    create_spotlight_panel,
+    estimate_field_height,
     get_detail_palette,
     get_link_color,
     get_textbox_style,
@@ -48,7 +52,8 @@ from modules.generic.entities.linking import resolve_entity_label, resolve_entit
 log_module_import(__name__)
 
 # Configure portrait size.
-PORTRAIT_SIZE = (200, 200)
+PORTRAIT_SIZE = (320, 420)
+HERO_PORTRAIT_SIZE = (280, 240)
 _open_entity_windows = {}
 
 
@@ -161,6 +166,74 @@ def _adaptive_wraplength(widget, min_width=320, padding=40):
         return max(min_width, widget.winfo_width() - padding)
     except Exception:
         return min_width
+
+
+def _spotlight_fallback(entity_type: str) -> str:
+    label = entity_type[:-1] if entity_type.endswith("s") else entity_type
+    return f"No {label.lower()} portrait is linked yet."
+
+
+def _collect_highlight_lines(entity_type, entity):
+    preferred_fields = TOOLTIP_FIELDS.get(entity_type, ())
+    lines = []
+    for field in preferred_fields:
+        if field in {"Portrait", "Name", "Title"}:
+            continue
+        raw_value = entity.get(field)
+        text = _format_tooltip_value(raw_value, max_length=140)
+        if text:
+            lines.append(f"{field}: {text}")
+        if len(lines) >= 4:
+            break
+    return lines
+
+
+def _build_portrait_widget(parent, entity_type, entity, *, size):
+    portrait_value = entity.get("Portrait")
+    portrait_path = primary_portrait(portrait_value)
+    resolved_portrait = resolve_portrait_path(portrait_value, ConfigHelper.get_campaign_dir())
+    if not resolved_portrait or not os.path.exists(resolved_portrait):
+        return None, portrait_path
+    try:
+        img = Image.open(resolved_portrait).convert("RGBA")
+        fitted = img.resize(size, Image.Resampling.LANCZOS)
+        ctk_image = CTkImage(light_image=fitted, size=size)
+        portrait_widget = CTkLabel(parent, image=ctk_image, text="")
+        portrait_widget.image = ctk_image
+        portrait_widget.entity_name = entity.get("Name") or entity.get("Title") or ""
+        portrait_widget.is_portrait = True
+        _attach_portrait_tooltip(portrait_widget, entity_type, entity)
+        portrait_widget.bind(
+            "<Button-1>",
+            lambda _event=None, p=portrait_path, n=portrait_widget.entity_name: show_portrait(p, n)
+        )
+        return portrait_widget, portrait_path
+    except Exception as exc:
+        print(f"[DEBUG] Error loading portrait for {entity.get('Name') or entity.get('Title') or ''}: {exc}")
+        return None, portrait_path
+
+
+def _populate_generic_columns(columns, fields, entity, open_entity_callback):
+    column_heights = [0 for _ in columns]
+    for field in fields:
+        field_name = field["name"]
+        field_type = field["type"]
+        linked_type = field.get("linked_type")
+        value = entity.get(field_name, "")
+
+        target_index = min(range(len(columns)), key=lambda idx: column_heights[idx])
+        parent = columns[target_index]
+
+        if field_type == "longtext":
+            insert_longtext(parent, field_name, value)
+        elif field_type == "text":
+            insert_text(parent, field_name, value)
+        elif field_type == "list":
+            items = value or []
+            if linked_type:
+                insert_links(parent, field_name, items, linked_type, open_entity_callback)
+
+        column_heights[target_index] += estimate_field_height(field_type, value)
 
 
 @log_function
@@ -1538,28 +1611,14 @@ def create_entity_detail_frame(entity_type, entity, master, open_entity_callback
             messagebox.showwarning("Audio", "Unable to play the associated audio track.")
 
     content_frame.portrait_images = {}
-    portrait_widget = None
-    portrait_path = primary_portrait(entity.get("Portrait"))
-    if entity_type in {"NPCs", "PCs", "Villains", "Creatures", "Factions"}:
-        resolved_portrait = resolve_portrait_path(portrait_path, ConfigHelper.get_campaign_dir())
-        if resolved_portrait and os.path.exists(resolved_portrait):
-            try:
-                img = Image.open(resolved_portrait)
-                img = img.resize(PORTRAIT_SIZE, Image.Resampling.LANCZOS)
-                ctk_image = CTkImage(light_image=img, size=PORTRAIT_SIZE)
-                portrait_widget = CTkLabel(content_frame, image=ctk_image, text="")
-                portrait_widget.image = ctk_image
-                portrait_widget.entity_name = entity.get("Name", "")
-                portrait_widget.is_portrait = True
-                content_frame.portrait_images[entity.get("Name", "")] = ctk_image
-                _attach_portrait_tooltip(portrait_widget, entity_type, entity)
-                portrait_widget.bind(
-                    "<Button-1>",
-                    lambda e, p=portrait_path, n=portrait_widget.entity_name: show_portrait(p, n)
-                )
-                content_frame.portrait_label = portrait_widget
-            except Exception as e:
-                print(f"[DEBUG] Error loading portrait for {entity.get('Name','')}: {e}")
+    spotlight_portrait, portrait_path = _build_portrait_widget(content_frame, entity_type, entity, size=PORTRAIT_SIZE)
+    hero_portrait = None
+    if spotlight_portrait is not None:
+        hero_portrait, _ = _build_portrait_widget(content_frame, entity_type, entity, size=HERO_PORTRAIT_SIZE)
+        content_frame.portrait_images[str(entity_label)] = spotlight_portrait.image
+        if hero_portrait is not None:
+            content_frame.portrait_images[f"{entity_label}-hero"] = hero_portrait.image
+            content_frame.portrait_label = hero_portrait
 
     template = load_template(entity_type.lower())
     meta_items = []
@@ -1577,6 +1636,7 @@ def create_entity_detail_frame(entity_type, entity, master, open_entity_callback
 
     summary_candidates = [entity.get(key) for key in ("Description", "Summary", "Role", "Secret", "Subject", "Location")]
     summary = next((format_multiline_text(value, max_length=260) for value in summary_candidates if str(value or "").strip()), "")
+    highlight_lines = _collect_highlight_lines(entity_type, entity)
 
     hero = create_hero_header(
         content_frame,
@@ -1584,18 +1644,37 @@ def create_entity_detail_frame(entity_type, entity, master, open_entity_callback
         category=entity_type[:-1] if entity_type.endswith("s") else entity_type,
         summary=summary,
         meta_items=meta_items,
-        portrait_widget=portrait_widget,
+        portrait_widget=hero_portrait,
     )
-    hero.pack(fill="x", padx=10, pady=(0, 14))
+    hero.pack(fill="x", padx=10, pady=(0, 16))
+
+    shell, main_column, side_column = create_detail_split_layout(content_frame)
+    shell.pack(fill="both", expand=True, padx=10, pady=(0, 6))
+
+    create_spotlight_panel(
+        side_column,
+        title=str(entity_label),
+        subtitle="Click the portrait to open it full size." if spotlight_portrait is not None else "Give this entry a signature visual to own the right rail.",
+        portrait_widget=spotlight_portrait,
+        fallback_text=_spotlight_fallback(entity_type),
+        accent_lines=highlight_lines[:3],
+    )
+
+    create_highlight_card(
+        side_column,
+        "Highlights",
+        highlight_lines,
+        empty_state="Add signature fields like Role, Secret, Powers, or Motivation to surface a punchier overview.",
+    )
 
     if audio_value:
         audio_card, audio_body = create_section_card(
-            content_frame,
+            side_column,
             "Audio ambiance",
             "Right-click the track badge to play or stop the linked audio cue.",
             compact=True,
         )
-        audio_card.pack(fill="x", padx=10, pady=(0, 12))
+        audio_card.pack(fill="x", pady=(0, 14))
         audio_label = ctk.CTkLabel(
             audio_body,
             text=f"🎵 {_audio_display_name(audio_value)}",
@@ -1613,30 +1692,62 @@ def create_entity_detail_frame(entity_type, entity, master, open_entity_callback
 
         audio_label.bind("<Button-3>", _show_audio_menu)
 
-    body_container = ctk.CTkFrame(content_frame, fg_color="transparent")
-    body_container.pack(fill="both", expand=True)
+    grid = ctk.CTkFrame(main_column, fg_color="transparent")
+    grid.pack(fill="both", expand=True)
+    grid.grid_columnconfigure(0, weight=1)
+    grid.grid_columnconfigure(1, weight=1)
 
+    column_left = ctk.CTkFrame(grid, fg_color="transparent")
+    column_left.grid(row=0, column=0, sticky="nsew", padx=(0, 8))
+    column_right = ctk.CTkFrame(grid, fg_color="transparent")
+    column_right.grid(row=0, column=1, sticky="nsew", padx=(8, 0))
+
+    render_fields = []
     for field in template["fields"]:
         field_name = field["name"]
         field_type = field["type"]
-        if entity_type in {"NPCs", "PCs", "Villains", "Creatures", "Factions"} and field_name == "Portrait":
+        if field_name == "Portrait":
             continue
-        if field_type == "longtext":
-            insert_longtext(body_container, field_name, entity.get(field_name, ""))
-        elif field_type == "text":
-            insert_text(body_container, field_name, entity.get(field_name, ""))
-        elif field_type == "list":
-            linked_type = field.get("linked_type", None)
-            if linked_type:
-                insert_links(body_container, field_name, entity.get(field_name) or [], linked_type, open_entity_callback)
+        if field_type == "list" and not field.get("linked_type"):
+            continue
+        render_fields.append(field)
+
+    if summary:
+        summary_card, summary_body = create_section_card(
+            column_left,
+            "Overview",
+            "A quick read built for widescreen GM screens and pop-out windows.",
+        )
+        summary_card.pack(fill="x", padx=10, pady=(0, 12))
+        summary_label = CTkLabel(
+            summary_body,
+            text=summary,
+            font=ctk.CTkFont(size=14),
+            text_color=palette["text"],
+            wraplength=540,
+            justify="left",
+        )
+        summary_label.pack(fill="x", anchor="w")
+        render_fields = [field for field in render_fields if field["name"] not in {"Description", "Summary"}]
+
+        def _update_summary_wrap(_event=None):
+            try:
+                summary_label.configure(wraplength=max(280, column_left.winfo_width() - 70))
+            except Exception:
+                pass
+
+        column_left.bind("<Configure>", _update_summary_wrap, add="+")
+        column_left.after(50, _update_summary_wrap)
+
+    _populate_generic_columns([column_left, column_right], render_fields, entity, open_entity_callback)
 
     if entity_type in {"Scenarios", "Places", "Bases", "NPCs", "Villains", "Informations"}:
         related_card, related_body = create_section_card(
-            body_container,
+            side_column,
             "Related events",
             "Timeline connections and linked moments across the campaign.",
         )
-        related_card.pack(fill="x", padx=10, pady=(0, 12))
+        related_card.pack(fill="x", pady=(0, 14))
         related_events_panel = RelatedEventsPanel(
             related_body,
             entity_type=entity_type,
