@@ -45,6 +45,7 @@ from modules.scenarios.random_tables_panel import RandomTablesPanel
 from modules.whiteboard.controllers.whiteboard_controller import WhiteboardController
 from modules.puzzles.puzzle_display_window import create_puzzle_display_frame
 from modules.scenarios.gm_screen import CampaignDashboardPanel
+from modules.generic.detail_ui import get_detail_palette
 
 log_module_import(__name__)
 
@@ -58,6 +59,7 @@ class GMScreenView(ctk.CTkFrame):
         super().__init__(master, *args, **kwargs)
         # Persistent cache for portrait images
         self.portrait_images = {}
+        self._palette = get_detail_palette()
         self.scenario = scenario_item
         self.scenario_name = scenario_item.get("Title") or scenario_item.get("Name") or "Scenario"
         self.layout_manager = layout_manager or GMScreenLayoutManager()
@@ -146,15 +148,15 @@ class GMScreenView(ctk.CTkFrame):
         self.current_layout_name = None
 
         # A container to hold both the scrollable tab area and the plus button
-        self.tab_bar_container = ctk.CTkFrame(self, height=60)
+        self.tab_bar_container = ctk.CTkFrame(self, height=60, fg_color=self._palette["surface_card"], border_width=1, border_color=self._palette["muted_border"], corner_radius=18)
         self.tab_bar_container.pack(side="top", fill="x")
 
         # The scrollable canvas for tabs
-        self.tab_bar_canvas = ctk.CTkCanvas(self.tab_bar_container, height=40, highlightthickness=0, bg="#2B2B2B")
+        self.tab_bar_canvas = ctk.CTkCanvas(self.tab_bar_container, height=44, highlightthickness=0, bg=self._palette["surface_card"])
         self.tab_bar_canvas.pack(side="top", fill="x", expand=True)
 
         # Horizontal scrollbar at the bottom alongside layout status
-        self.tab_bar_bottom = ctk.CTkFrame(self.tab_bar_container)
+        self.tab_bar_bottom = ctk.CTkFrame(self.tab_bar_container, fg_color="transparent")
         self.tab_bar_bottom.pack(side="bottom", fill="x")
 
         self.h_scrollbar = ctk.CTkScrollbar(
@@ -165,7 +167,7 @@ class GMScreenView(ctk.CTkFrame):
         self.h_scrollbar.pack(side="left", fill="x", expand=True)
 
         # The actual frame that holds the tab buttons
-        self.tab_bar = ctk.CTkFrame(self.tab_bar_canvas, height=40)
+        self.tab_bar = ctk.CTkFrame(self.tab_bar_canvas, height=44, fg_color="transparent")
         self.tab_bar_id = self.tab_bar_canvas.create_window((0, 0), window=self.tab_bar, anchor="nw")
 
         # Connect the scrollbar to the canvas
@@ -179,14 +181,22 @@ class GMScreenView(ctk.CTkFrame):
         self.add_button = ctk.CTkButton(
             self.tab_bar,
             text="+",
-            width=40,
+            width=42,
+            fg_color=self._palette["surface_overlay"],
+            hover_color=self._palette["accent_hover"],
+            text_color=self._palette["text"],
+            corner_radius=14,
             command=self.add_new_tab
         )
         
         self.random_button = ctk.CTkButton(
             self.tab_bar,
             text="?",
-            width=40,
+            width=42,
+            fg_color=self._palette["surface_overlay"],
+            hover_color=self._palette["accent_hover"],
+            text_color=self._palette["text"],
+            corner_radius=14,
             command=self._add_random_entity
         )
         self.random_button.pack(side="left", padx=2, pady=5)
@@ -225,7 +235,7 @@ class GMScreenView(ctk.CTkFrame):
         self._session_controls = ctk.CTkFrame(self.tab_bar_bottom)
         self._session_controls.pack(side="right", padx=8, pady=4)
         self._build_session_controls()
-        self.layout_status_label = ctk.CTkLabel(self.tab_bar_bottom, text="")
+        self.layout_status_label = ctk.CTkLabel(self.tab_bar_bottom, text="", text_color=self._palette["muted_text"])
         self.layout_status_label.pack(side="right", padx=8, pady=5)
 
         # Main content area for scenario details
@@ -803,21 +813,50 @@ class GMScreenView(ctk.CTkFrame):
 
     def add_tab(self, name, content_frame, content_factory=None, layout_meta=None, activate=True):
         log_info(f"Adding GM screen tab: {name}", func_name="GMScreenView.add_tab")
-        tab_frame = ctk.CTkFrame(self.tab_bar)
-        tab_frame.pack(side="left", padx=2, pady=5)
+        tab_frame = ctk.CTkFrame(
+            self.tab_bar,
+            fg_color=self._palette["surface_elevated"],
+            border_width=1,
+            border_color=self._palette["muted_border"],
+            corner_radius=16,
+        )
+        tab_frame.pack(side="left", padx=4, pady=6)
 
-        tab_button = ctk.CTkButton(tab_frame, text=name, width=150,
-                                   command=lambda: self.show_tab(name))
-        tab_button.pack(side="left")
+        tab_button = ctk.CTkButton(
+            tab_frame,
+            text=name,
+            width=150,
+            height=34,
+            fg_color="transparent",
+            hover_color=self._palette["surface_overlay"],
+            text_color=self._palette["muted_text"],
+            command=lambda: self.show_tab(name),
+        )
+        tab_button.pack(side="left", padx=(4, 0), pady=4)
 
-        close_button = ctk.CTkButton(tab_frame, text="❌", width=30,
-                                     command=lambda: self.close_tab(name))
-        close_button.pack(side="left")
+        close_button = ctk.CTkButton(
+            tab_frame,
+            text="✕",
+            width=30,
+            height=34,
+            fg_color="transparent",
+            hover_color="#B91C1C",
+            text_color=self._palette["muted_text"],
+            command=lambda: self.close_tab(name),
+        )
+        close_button.pack(side="left", pady=4)
 
-        # Create the detach button and store its reference.
-        detach_button = ctk.CTkButton(tab_frame,image=self.detach_icon, text="", width=50,
-                                      command=lambda: self.toggle_detach_tab(name))
-        detach_button.pack(side="left")
+        detach_button = ctk.CTkButton(
+            tab_frame,
+            image=self.detach_icon,
+            text="",
+            width=42,
+            height=34,
+            fg_color="transparent",
+            hover_color=self._palette["surface_overlay"],
+            command=lambda: self.toggle_detach_tab(name),
+        )
+        detach_button.pack(side="left", padx=(0, 4), pady=4)
 
         portrait_label = getattr(content_frame, "portrait_label", None)
         self.tabs[name] = {
@@ -2291,9 +2330,23 @@ class GMScreenView(ctk.CTkFrame):
         if self.current_tab and self.current_tab in self.tabs:
             if not self.tabs[self.current_tab]["detached"]:
                 self.tabs[self.current_tab]["content_frame"].pack_forget()
-            self.tabs[self.current_tab]["button"].configure(fg_color=("gray75", "gray25"))
+            self.tabs[self.current_tab]["button"].configure(
+                fg_color="transparent",
+                text_color=self._palette["muted_text"],
+            )
+            self.tabs[self.current_tab]["button_frame"].configure(
+                fg_color=self._palette["surface_elevated"],
+                border_color=self._palette["muted_border"],
+            )
         self.current_tab = name
-        self.tabs[name]["button"].configure(fg_color=("gray55", "gray15"))
+        self.tabs[name]["button"].configure(
+            fg_color=self._palette["surface_overlay"],
+            text_color=self._palette["text"],
+        )
+        self.tabs[name]["button_frame"].configure(
+            fg_color=self._palette["hero_gradient"],
+            border_color=self._palette["pill_border"],
+        )
         # Only pack the content into the main content area if the tab is not detached.
         if not self.tabs[name]["detached"]:
             tab = self.tabs[name]

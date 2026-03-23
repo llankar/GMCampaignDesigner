@@ -35,6 +35,14 @@ from modules.scenarios.scene_flow_viewer import create_scene_flow_frame
 from modules.scenarios.widgets.scene_body_sections import build_scene_body_sections
 from modules.ui.vertical_section_tabs import VerticalSectionTabs
 from modules.events.ui.shared.related_events_panel import RelatedEventsPanel
+from modules.generic.detail_ui import (
+    create_chip,
+    create_hero_header,
+    create_section_card,
+    get_detail_palette,
+    get_link_color,
+    get_textbox_style,
+)
 from modules.generic.entities.linking import resolve_entity_label, resolve_entity_slug
 
 log_module_import(__name__)
@@ -148,46 +156,73 @@ def _open_book_link(parent, book_title: str) -> None:
     master = parent.winfo_toplevel() if parent is not None else None
     open_book_viewer(master, record)
 
+def _adaptive_wraplength(widget, min_width=320, padding=40):
+    try:
+        return max(min_width, widget.winfo_width() - padding)
+    except Exception:
+        return min_width
+
+
 @log_function
 def insert_text(parent, header, content):
-    label = ctk.CTkLabel(parent, text=f"{header}:", font=("Arial", 16, "bold"))
-    label.pack(anchor="w", padx=10)
-    box = ctk.CTkTextbox(parent, wrap="word", height=40)
+    card, body = create_section_card(parent, header, compact=True)
+    card.pack(fill="x", padx=10, pady=(0, 12))
+    box = ctk.CTkTextbox(body, wrap="word", height=58, **get_textbox_style())
     render_rtf_to_text_widget(box, content)
-    box.pack(fill="x", padx=10, pady=5)
+    box.configure(state="disabled")
+    box.pack(fill="x")
+
 
 @log_function
 def insert_longtext(parent, header, content):
-    ctk.CTkLabel(parent, text=f"{header}:", font=("Arial", 16, "bold")).pack(anchor="w", padx=10)
-
-    box = CTkTextbox(parent, wrap="word")
+    card, body = create_section_card(parent, header)
+    card.pack(fill="x", padx=10, pady=(0, 12))
+    box = CTkTextbox(body, wrap="word", **get_textbox_style())
     render_rtf_to_text_widget(box, content)
-    box.pack(fill="x", padx=10, pady=5)
+    box.pack(fill="x")
 
-    # Resize after layout
     def update_height():
         lines = int(box._textbox.count("1.0", "end", "lines")[0])
         font = tkfont.Font(font=box._textbox.cget("font"))
         line_px = font.metrics("linespace")
-        box.configure(height=max(2, lines+2) * line_px)
+        box.configure(height=max(4, lines + 2) * line_px)
         box.configure(state="disabled")
 
     box.after_idle(update_height)
 
+
 @log_function
 def insert_links(parent, header, items, linked_type, open_entity_callback):
-    ctk.CTkLabel(parent, text=f"{header}:", font=("Arial", 14, "bold")).pack(anchor="w", padx=10)
+    card, body = create_section_card(parent, header, compact=True)
+    card.pack(fill="x", padx=10, pady=(0, 12))
+    links_row = ctk.CTkFrame(body, fg_color="transparent")
+    links_row.pack(fill="x")
+    has_items = False
     for item in items:
-        display_text = str(item)
+        display_text = str(item).strip()
         if not display_text:
             continue
-        label = CTkLabel(parent, text=display_text, text_color="#00BFFF", cursor="hand2")
-        label.pack(anchor="w", padx=10)
+        has_items = True
+        chip = create_chip(links_row, display_text)
+        chip.pack(side="left", padx=(0, 8), pady=(0, 8))
+        label = ctk.CTkLabel(
+            chip,
+            text=display_text,
+            text_color=get_link_color(),
+            cursor="hand2",
+            font=ctk.CTkFont(size=12, weight="bold"),
+        )
+        label.place(relx=0.5, rely=0.5, anchor="center")
         if linked_type == "Books":
             label.bind("<Button-1>", lambda _event, title=display_text: _open_book_link(parent, title))
         elif open_entity_callback is not None:
-            # Capture the current values with lambda defaults.
             label.bind("<Button-1>", lambda event, l=linked_type, i=display_text: open_entity_callback(l, i))
+    if not has_items:
+        ctk.CTkLabel(
+            body,
+            text="No linked items.",
+            text_color=get_detail_palette()["muted_text"],
+        ).pack(anchor="w")
 
 
 @log_function
@@ -195,18 +230,21 @@ def insert_relationship_table(parent, header, relationships, open_entity_callbac
     if not relationships:
         return
 
-    ctk.CTkLabel(parent, text=f"{header}:", font=("Arial", 14, "bold")).pack(anchor="w", padx=10, pady=(6, 2))
+    card, table = create_section_card(parent, header, "Character ties surfaced from linked records.")
+    card.pack(fill="x", padx=10, pady=(0, 12))
 
-    table = ctk.CTkFrame(parent)
-    table.pack(fill="x", padx=10, pady=(0, 6))
-
+    palette = get_detail_palette()
     for idx in range(3):
         table.grid_columnconfigure(idx, weight=1)
 
     headers = ["Source", "Relationship", "Target"]
     for col, title in enumerate(headers):
-        CTkLabel(table, text=title, font=("Arial", 12, "bold"))\
-            .grid(row=0, column=col, padx=6, pady=2, sticky="w")
+        CTkLabel(
+            table,
+            text=title,
+            font=ctk.CTkFont(size=12, weight="bold"),
+            text_color=palette["muted_text"],
+        ).grid(row=0, column=col, padx=8, pady=(0, 10), sticky="w")
 
     for row_idx, relationship in enumerate(relationships, start=1):
         source_name = relationship.get("source_name", "")
@@ -216,11 +254,11 @@ def insert_relationship_table(parent, header, relationships, open_entity_callbac
         source_label = CTkLabel(
             table,
             text=source_name,
-            text_color="#00BFFF",
+            text_color=get_link_color(),
             cursor="hand2",
-            font=("Arial", 12, "underline"),
+            font=ctk.CTkFont(size=12, underline=True),
         )
-        source_label.grid(row=row_idx, column=0, padx=6, pady=2, sticky="w")
+        source_label.grid(row=row_idx, column=0, padx=8, pady=4, sticky="w")
         if open_entity_callback:
             source_type = relationship.get("source_type", "NPCs")
             source_label.bind(
@@ -231,17 +269,18 @@ def insert_relationship_table(parent, header, relationships, open_entity_callbac
         CTkLabel(
             table,
             text=relation_text,
-            font=("Arial", 12),
-        ).grid(row=row_idx, column=1, padx=6, pady=2, sticky="w")
+            font=ctk.CTkFont(size=12),
+            text_color=palette["text"],
+        ).grid(row=row_idx, column=1, padx=8, pady=4, sticky="w")
 
         target_label = CTkLabel(
             table,
             text=target_name,
-            text_color="#00BFFF",
+            text_color=get_link_color(),
             cursor="hand2",
-            font=("Arial", 12, "underline"),
+            font=ctk.CTkFont(size=12, underline=True),
         )
-        target_label.grid(row=row_idx, column=2, padx=6, pady=2, sticky="w")
+        target_label.grid(row=row_idx, column=2, padx=8, pady=4, sticky="w")
         if open_entity_callback:
             target_type = relationship.get("target_type", "NPCs")
             target_label.bind(
@@ -959,7 +998,8 @@ def create_scenario_detail_frame(entity_type, scenario_item, master, open_entity
     1) A header zone (Title, Summary, Secrets)
     2) Then the rest of the fields, but NPCs always before Places.
     """
-    frame = ctk.CTkFrame(master)
+    palette = get_detail_palette()
+    frame = ctk.CTkFrame(master, fg_color="transparent")
     frame.pack(fill="both", expand=True, padx=20, pady=10)
     gm_view_instance = getattr(open_entity_callback, "__self__", None)
     sections = {}
@@ -1011,7 +1051,7 @@ def create_scenario_detail_frame(entity_type, scenario_item, master, open_entity
     layout.grid_columnconfigure(1, weight=1)
     layout.grid_rowconfigure(0, weight=1)
 
-    nav_frame = ctk.CTkFrame(layout, width=220)
+    nav_frame = ctk.CTkFrame(layout, width=240, fg_color="transparent")
     nav_frame.grid(row=0, column=0, sticky="ns", padx=(0, 12))
 
     content_frame = ctk.CTkFrame(layout, fg_color="transparent")
@@ -1019,7 +1059,7 @@ def create_scenario_detail_frame(entity_type, scenario_item, master, open_entity
     content_frame.grid_rowconfigure(0, weight=1)
     content_frame.grid_columnconfigure(0, weight=1)
 
-    scrollable_frame = ctk.CTkScrollableFrame(content_frame)
+    scrollable_frame = ctk.CTkScrollableFrame(content_frame, fg_color="transparent")
     scrollable_frame.grid(row=0, column=0, sticky="nsew")
 
     def _get_section_frame(section_name):
@@ -1060,17 +1100,35 @@ def create_scenario_detail_frame(entity_type, scenario_item, master, open_entity
             tabs.set_pinned(pinned_sections)
 
     summary_section = _get_section_frame("Summary")
-    ttk.Separator(summary_section, orient="horizontal").pack(fill="x", pady=1)
-    CTkLabel(summary_section, text="Summary", font=("Arial", 18, "bold"))\
-        .pack(anchor="w", pady=(0, 6))
-    summary_text_label = CTkLabel(
+    scenario_title = str(scenario_item.get("Title") or scenario_item.get("Name") or "Scenario").strip()
+    scenario_meta = []
+    for label, key in (("Scenes", "Scenes"), ("NPCs", "NPCs"), ("Places", "Places"), ("Villains", "Villains")):
+        value = scenario_item.get(key)
+        if isinstance(value, list) and value:
+            scenario_meta.append(f"{len(value)} {label}")
+    hero = create_hero_header(
         summary_section,
+        title=scenario_title,
+        category=entity_type[:-1] if entity_type.endswith("s") else entity_type,
+        summary=format_multiline_text(scenario_item.get("Summary", "")),
+        meta_items=scenario_meta,
+    )
+    hero.pack(fill="x", padx=10, pady=(0, 12))
+    summary_card, summary_body = create_section_card(
+        summary_section,
+        "Briefing",
+        "A quick campaign-facing overview for the GM.",
+    )
+    summary_card.pack(fill="x", padx=10, pady=(0, 12))
+    summary_text_label = CTkLabel(
+        summary_body,
         text=format_multiline_text(scenario_item.get("Summary", "")),
-        font=("Arial", 16),
+        font=ctk.CTkFont(size=14),
+        text_color=palette["text"],
         wraplength=400,
         justify="left"
     )
-    summary_text_label.pack(fill="x", padx=10, pady=(0, 15), anchor="w")
+    summary_text_label.pack(fill="x", anchor="w")
 
     # ——— BODY — prepare fields in the custom order ———
     tpl = load_template(entity_type.lower())
@@ -1310,17 +1368,21 @@ def create_scenario_detail_frame(entity_type, scenario_item, master, open_entity
     )
 
     secrets_section = _get_section_frame("Secrets")
-    ttk.Separator(secrets_section, orient="horizontal").pack(fill="x", pady=1)
-    CTkLabel(secrets_section, text="Secrets", font=("Arial", 18, "bold"))\
-        .pack(anchor="w", pady=(0, 5))
-    secrets_text_label = CTkLabel(
+    secrets_card, secrets_body = create_section_card(
         secrets_section,
+        "Secrets",
+        "Hidden truths, leverage, and reveals to hold in reserve.",
+    )
+    secrets_card.pack(fill="x", padx=10, pady=(0, 12))
+    secrets_text_label = CTkLabel(
+        secrets_body,
         text=format_multiline_text(scenario_item.get("Secrets", "")),
-        font=("Arial", 16),
+        font=ctk.CTkFont(size=14),
+        text_color=palette["text"],
         wraplength=400,
         justify="left"
     )
-    secrets_text_label.pack(fill="x", padx=10, pady=(0, 15), anchor="w")
+    secrets_text_label.pack(fill="x", anchor="w")
 
     def _update_text_wraplength(_event=None):
         try:
@@ -1344,13 +1406,9 @@ def create_scenario_detail_frame(entity_type, scenario_item, master, open_entity
 
     if gm_view_instance and hasattr(gm_view_instance, "register_note_widget"):
         notes_section = _get_section_frame("Notes")
-        ctk.CTkLabel(
-            notes_section,
-            text="GM Notes",
-            font=("Arial", 16, "bold"),
-        ).pack(anchor="w", pady=(0, 6))
-
-        toolbar = ctk.CTkFrame(notes_section, fg_color="transparent")
+        notes_card, notes_body = create_section_card(notes_section, "GM Notes", "Scratchpad for timestamps, callbacks, and table reactions.")
+        notes_card.pack(fill="both", expand=True, padx=10, pady=(0, 12))
+        toolbar = ctk.CTkFrame(notes_body, fg_color="transparent")
         toolbar.pack(fill="x", pady=(0, 6))
         add_timestamp = getattr(gm_view_instance, "add_timestamped_note", None)
         if callable(add_timestamp):
@@ -1369,7 +1427,7 @@ def create_scenario_detail_frame(entity_type, scenario_item, master, open_entity
                 width=140,
             ).pack(side="left", padx=(0, 6))
 
-        note_box = CTkTextbox(notes_section, wrap="word", height=160)
+        note_box = CTkTextbox(notes_body, wrap="word", height=160, **get_textbox_style())
         note_box.pack(fill="both", expand=True)
         gm_view_instance.register_note_widget(note_box)
 
@@ -1426,17 +1484,13 @@ def create_entity_detail_frame(entity_type, entity, master, open_entity_callback
             open_entity_callback
         )
 
-    # Create the actual content frame inside the scrollable container.
-    content_frame = ctk.CTkFrame(master)
+    palette = get_detail_palette()
+    content_frame = ctk.CTkFrame(master, fg_color="transparent")
     content_frame.pack(fill="both", expand=True, padx=10, pady=10)
     gm_view_instance = getattr(open_entity_callback, "__self__", None)
 
-    # rebuild_frame will clear & re-populate this same content_frame
     def rebuild_frame(updated_item):
-        # 1) Destroy the old frame
         content_frame.destroy()
-
-        # 2) Build a fresh one and pack it
         new_frame = create_entity_detail_frame(
             entity_type,
             updated_item,
@@ -1444,12 +1498,8 @@ def create_entity_detail_frame(entity_type, entity, master, open_entity_callback
             open_entity_callback
         )
         new_frame.pack(fill="both", expand=True, padx=10, pady=10)
-
-        # 3) Update the GM-view’s tabs dict so show_tab() refers to the new widget
-        #    open_entity_callback is bound to the GMScreenView instance
         gm_view = getattr(open_entity_callback, "__self__", None)
         if gm_view is not None:
-            # pick the right key—"Title" for scenarios, else "Name"
             key_field = "Title" if entity_type == "Scenarios" else "Name"
             tab_name = updated_item.get(key_field)
             if tab_name in gm_view.tabs:
@@ -1469,19 +1519,16 @@ def create_entity_detail_frame(entity_type, entity, master, open_entity_callback
     if gm_view_instance is not None:
         content_frame.bind("<Button-3>", gm_view_instance._show_context_menu)
         content_frame.bind("<Control-Button-1>", gm_view_instance._show_context_menu)
-        
 
-    audio_value = get_entity_audio_value(entity)
     entity_label = entity.get("Name") or entity.get("Title") or entity_type[:-1]
+    audio_value = get_entity_audio_value(entity)
 
     def _audio_display_name(value: str) -> str:
         if not value:
-            return "🎵 Audio"
+            return "Audio"
         base = os.path.basename(str(value)) or "Audio"
         resolved = resolve_audio_path(value)
-        if resolved and os.path.exists(resolved):
-            return f"🎵 {base}"
-        return f"🎵 {base} (missing)"
+        return base if resolved and os.path.exists(resolved) else f"{base} (missing)"
 
     def _play_audio_from_menu() -> None:
         if not audio_value:
@@ -1490,78 +1537,113 @@ def create_entity_detail_frame(entity_type, entity, master, open_entity_callback
         if not play_entity_audio(audio_value, entity_label=str(entity_label)):
             messagebox.showwarning("Audio", "Unable to play the associated audio track.")
 
-    if audio_value:
-        button_bar = ctk.CTkFrame(content_frame)
-        button_bar.pack(fill="x", pady=(0, 10))
-
-        audio_label = ctk.CTkLabel(
-            button_bar,
-            text=_audio_display_name(audio_value),
-            cursor="hand2",
-        )
-
-        def _show_audio_menu(event) -> None:
-            menu = tk.Menu(button_bar, tearoff=0)
-            menu.add_command(label="Play Audio", command=_play_audio_from_menu)
-            menu.add_command(label="Stop Audio", command=stop_entity_audio)
-            menu.tk_popup(event.x_root, event.y_root)
-
-        audio_label.bind("<Button-3>", _show_audio_menu)
-        audio_label.pack(side="right", padx=(0, 6), pady=6)
-
-    # This local cache is used for portrait images (if any).
     content_frame.portrait_images = {}
-
-    # If the entity has a valid Portrait, load and show it for portrait-capable types.
+    portrait_widget = None
     portrait_path = primary_portrait(entity.get("Portrait"))
-    if (entity_type in {"NPCs", "PCs", "Villains", "Creatures", "Factions"}):
+    if entity_type in {"NPCs", "PCs", "Villains", "Creatures", "Factions"}:
         resolved_portrait = resolve_portrait_path(portrait_path, ConfigHelper.get_campaign_dir())
         if resolved_portrait and os.path.exists(resolved_portrait):
             try:
                 img = Image.open(resolved_portrait)
                 img = img.resize(PORTRAIT_SIZE, Image.Resampling.LANCZOS)
                 ctk_image = CTkImage(light_image=img, size=PORTRAIT_SIZE)
-                portrait_label = CTkLabel(content_frame, image=ctk_image, text="")
-                portrait_label.image = ctk_image  # persist reference
-                portrait_label.entity_name = entity.get("Name", "")
-                portrait_label.is_portrait = True
+                portrait_widget = CTkLabel(content_frame, image=ctk_image, text="")
+                portrait_widget.image = ctk_image
+                portrait_widget.entity_name = entity.get("Name", "")
+                portrait_widget.is_portrait = True
                 content_frame.portrait_images[entity.get("Name", "")] = ctk_image
-                _attach_portrait_tooltip(portrait_label, entity_type, entity)
-                portrait_label.bind(
+                _attach_portrait_tooltip(portrait_widget, entity_type, entity)
+                portrait_widget.bind(
                     "<Button-1>",
-                    lambda e, p=portrait_path, n=portrait_label.entity_name: show_portrait(p, n)
+                    lambda e, p=portrait_path, n=portrait_widget.entity_name: show_portrait(p, n)
                 )
-                portrait_label.pack(pady=10)
-                content_frame.portrait_label = portrait_label
+                content_frame.portrait_label = portrait_widget
             except Exception as e:
                 print(f"[DEBUG] Error loading portrait for {entity.get('Name','')}: {e}")
 
-    # Create fields from the template.
     template = load_template(entity_type.lower())
+    meta_items = []
+    for field in template.get("fields", []):
+        field_name = field.get("name")
+        value = entity.get(field_name)
+        if isinstance(value, list) and value:
+            meta_items.append(f"{len(value)} {field_name}")
+        elif field_name in {"Role", "Type", "Location", "Archetype"} and value:
+            meta_items.append(str(value))
+        if len(meta_items) >= 4:
+            break
+    if audio_value:
+        meta_items.append(f"🎵 {_audio_display_name(audio_value)}")
+
+    summary_candidates = [entity.get(key) for key in ("Description", "Summary", "Role", "Secret", "Subject", "Location")]
+    summary = next((format_multiline_text(value, max_length=260) for value in summary_candidates if str(value or "").strip()), "")
+
+    hero = create_hero_header(
+        content_frame,
+        title=str(entity_label),
+        category=entity_type[:-1] if entity_type.endswith("s") else entity_type,
+        summary=summary,
+        meta_items=meta_items,
+        portrait_widget=portrait_widget,
+    )
+    hero.pack(fill="x", padx=10, pady=(0, 14))
+
+    if audio_value:
+        audio_card, audio_body = create_section_card(
+            content_frame,
+            "Audio ambiance",
+            "Right-click the track badge to play or stop the linked audio cue.",
+            compact=True,
+        )
+        audio_card.pack(fill="x", padx=10, pady=(0, 12))
+        audio_label = ctk.CTkLabel(
+            audio_body,
+            text=f"🎵 {_audio_display_name(audio_value)}",
+            text_color=get_link_color(),
+            cursor="hand2",
+            font=ctk.CTkFont(size=13, weight="bold"),
+        )
+        audio_label.pack(anchor="w")
+
+        def _show_audio_menu(event) -> None:
+            menu = tk.Menu(audio_body, tearoff=0)
+            menu.add_command(label="Play Audio", command=_play_audio_from_menu)
+            menu.add_command(label="Stop Audio", command=stop_entity_audio)
+            menu.tk_popup(event.x_root, event.y_root)
+
+        audio_label.bind("<Button-3>", _show_audio_menu)
+
+    body_container = ctk.CTkFrame(content_frame, fg_color="transparent")
+    body_container.pack(fill="both", expand=True)
+
     for field in template["fields"]:
         field_name = field["name"]
         field_type = field["type"]
-        # Skip the Portrait field if already handled.
-        if (entity_type in {"NPCs", "PCs", "Villains", "Creatures", "Factions"}) and field_name == "Portrait":
+        if entity_type in {"NPCs", "PCs", "Villains", "Creatures", "Factions"} and field_name == "Portrait":
             continue
         if field_type == "longtext":
-            insert_longtext(content_frame, field_name, entity.get(field_name, ""))
+            insert_longtext(body_container, field_name, entity.get(field_name, ""))
         elif field_type == "text":
-            insert_text(content_frame, field_name, entity.get(field_name, ""))
+            insert_text(body_container, field_name, entity.get(field_name, ""))
         elif field_type == "list":
             linked_type = field.get("linked_type", None)
             if linked_type:
-                insert_links(content_frame, field_name, entity.get(field_name) or [], linked_type, open_entity_callback)
+                insert_links(body_container, field_name, entity.get(field_name) or [], linked_type, open_entity_callback)
 
     if entity_type in {"Scenarios", "Places", "Bases", "NPCs", "Villains", "Informations"}:
+        related_card, related_body = create_section_card(
+            body_container,
+            "Related events",
+            "Timeline connections and linked moments across the campaign.",
+        )
+        related_card.pack(fill="x", padx=10, pady=(0, 12))
         related_events_panel = RelatedEventsPanel(
-            content_frame,
+            related_body,
             entity_type=entity_type,
             entity_name=entity.get("Title") or entity.get("Name"),
             on_open_entity=open_entity_callback,
         )
-        related_events_panel.pack(fill="x", padx=10, pady=(4, 10))
-    # Return the scrollable container so that whoever creates the window or tab gets a frame with scrollbars.
+        related_events_panel.pack(fill="x")
     return content_frame
 
 @log_function
