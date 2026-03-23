@@ -16,6 +16,7 @@ from modules.characters.character_graph_editor import CharacterGraphEditor
 from modules.scenarios.scenario_graph_editor import ScenarioGraphEditor
 from modules.generic.generic_list_selection_view import GenericListSelectionView
 from modules.helpers.config_helper import ConfigHelper
+from modules.helpers.layout_scheduler import LayoutSettleScheduler
 import random
 from collections import deque
 from modules.helpers.logging_helper import (
@@ -67,6 +68,7 @@ class GMScreenView(ctk.CTkFrame):
         self._scene_vars = {}
         self._scene_order = []
         self._active_scene_key = None
+        self._rich_host = None
         self._note_cache = ""
         self.note_widget = None
         self._note_editor_window = None
@@ -90,6 +92,9 @@ class GMScreenView(ctk.CTkFrame):
         self._ctrl_shift_C_binding = None
         self._ctrl_shift_c_release_binding = None
         self._ctrl_shift_C_release_binding = None
+        self._layout_settle_scheduler = LayoutSettleScheduler(self)
+        self._layout_probe_signature = None
+        self._bound_layout_hosts = set()
         self.bind("<Destroy>", self._on_destroy, add="+")
         self._setup_toplevel_shortcuts()
 
@@ -241,6 +246,7 @@ class GMScreenView(ctk.CTkFrame):
         self.content_area = ctk.CTkFrame(self)
         self.content_area.pack(fill="both", expand=True)
         self.content_area._scrollable_frame = self.content_area
+        self._bind_layout_host(self.content_area)
         self._initialize_context_menu()
 
         # Example usage: create the first tab from the scenario_item
@@ -250,6 +256,81 @@ class GMScreenView(ctk.CTkFrame):
         self.after(100, self._apply_initial_layout)
 
     # -- Runtime sizing helpers -------------------------------------------------
+    def _bind_layout_host(self, host) -> None:
+        if host is None:
+            return
+        host_key = str(host)
+        if host_key in self._bound_layout_hosts:
+            return
+        self._bound_layout_hosts.add(host_key)
+        try:
+            self._layout_settle_scheduler.bind_configure(
+                host,
+                "active-tab-layout",
+                self._settle_active_tab_layout,
+                when=self._active_tab_layout_ready,
+            )
+        except Exception:
+            pass
+
+    def _ensure_rich_host(self):
+        host = self._rich_host
+        if host is None or not host.winfo_exists():
+            host = ctk.CTkFrame(self)
+            self._rich_host = host
+            self._bind_layout_host(host)
+        return host
+
+    def _get_active_attached_frame(self):
+        if not self.current_tab:
+            return None
+        tab = self.tabs.get(self.current_tab)
+        if not tab or tab.get("detached"):
+            return None
+        return tab.get("content_frame")
+
+    def _active_tab_layout_ready(self) -> bool:
+        frame = self._get_active_attached_frame()
+        if frame is None or not frame.winfo_exists():
+            return False
+        try:
+            if not frame.winfo_manager() or not frame.winfo_ismapped():
+                return False
+        except Exception:
+            return False
+        try:
+            rich_host = getattr(self, "_rich_host", None)
+            if rich_host is not None and rich_host.winfo_exists() and frame.master == rich_host:
+                viewport = rich_host
+            else:
+                viewport = self.content_area if hasattr(self, "content_area") else self
+            viewport.update_idletasks()
+            width = int(viewport.winfo_width())
+            height = int(viewport.winfo_height())
+        except Exception:
+            return False
+        if width <= 1 or height <= 1:
+            return False
+        probe_signature = (str(frame), str(viewport), width, height)
+        if self._layout_probe_signature != probe_signature:
+            self._layout_probe_signature = probe_signature
+            return False
+        return True
+
+    def _request_active_tab_layout_settle(self) -> None:
+        self._layout_probe_signature = None
+        self._layout_settle_scheduler.schedule(
+            "active-tab-layout",
+            self._settle_active_tab_layout,
+            when=self._active_tab_layout_ready,
+        )
+
+    def _settle_active_tab_layout(self) -> None:
+        frame = self._get_active_attached_frame()
+        if frame is None:
+            return
+        self._sync_fullbleed_now(frame)
+
     def _sync_fullbleed_now(self, container: ctk.CTkFrame | None):
         if not container or not container.winfo_exists():
             return
@@ -296,7 +377,6 @@ class GMScreenView(ctk.CTkFrame):
             },
             activate=True,
         )
-        self.after_idle(lambda cf=frame: self._sync_fullbleed_now(cf))
 
     def _build_add_menu(self):
         menu = tk.Menu(self, tearoff=0)
@@ -890,12 +970,6 @@ class GMScreenView(ctk.CTkFrame):
             w.bind("<ButtonRelease-1>", lambda e=None, n=name: self._on_tab_release(e, n))
 
         self.reposition_add_button()
-        # Ensure the new content is stretched to full viewport size
-        try:
-            self._sync_fullbleed_now(content_frame)
-            self.after(60, lambda cf=content_frame: self._sync_fullbleed_now(cf))
-        except Exception:
-            pass
 
     def _teardown_tab_content(self, frame):
         if frame is None:
@@ -1564,9 +1638,7 @@ class GMScreenView(ctk.CTkFrame):
             )
         elif kind in ("npc_graph", "pc_graph", "character_graph"):
             # Ensure rich host exists for graph editors
-            if getattr(self, "_rich_host", None) is None or not self._rich_host.winfo_exists():
-                self._rich_host = ctk.CTkFrame(self)
-            parent = self._rich_host
+            parent = self._ensure_rich_host()
             self.add_tab(
                 title or "Character Graph",
                 self.create_character_graph_frame(master=parent),
@@ -1574,9 +1646,7 @@ class GMScreenView(ctk.CTkFrame):
                 layout_meta={"kind": "character_graph", "host": "rich"},
             )
         elif kind == "scenario_graph":
-            if getattr(self, "_rich_host", None) is None or not self._rich_host.winfo_exists():
-                self._rich_host = ctk.CTkFrame(self)
-            parent = self._rich_host
+            parent = self._ensure_rich_host()
             self.add_tab(
                 title or "Scenario Graph Editor",
                 self.create_scenario_graph_frame(master=parent),
@@ -1914,44 +1984,14 @@ class GMScreenView(ctk.CTkFrame):
         occupy all available space. This syncs the container size to the
         viewport on resize.
         """
-        # Measure against whichever host currently owns this container.
-        # Rich tabs (scene flow/map/world map/whiteboard) live under `_rich_host`,
-        # while scroll tabs live under `content_area`.
-        try:
-            rich_host = getattr(self, "_rich_host", None)
-            if rich_host is not None and rich_host.winfo_exists() and container.master == rich_host:
-                viewport = rich_host
-            else:
-                viewport = self.content_area if hasattr(self, "content_area") else self
-        except Exception:
-            viewport = self
-
         try:
             container.pack_propagate(False)
         except Exception:
             pass
 
-        def _sync(_evt=None):
-            try:
-                w = max(1, int(viewport.winfo_width()))
-                h = max(1, int(viewport.winfo_height()))
-                container.configure(width=w, height=h)
-            except Exception:
-                pass
-
-        try:
-            viewport.bind("<Configure>", _sync, add="+")
-        except Exception:
-            pass
-        # Initial sizing once mounted
-        self.after(50, _sync)
-
     def open_whiteboard_tab(self, title=None, activate=True):
         """Open a whiteboard tab within the GM screen."""
-        if getattr(self, "_rich_host", None) is None or not self._rich_host.winfo_exists():
-            self._rich_host = ctk.CTkFrame(self)
-
-        container = ctk.CTkFrame(self._rich_host)
+        container = ctk.CTkFrame(self._ensure_rich_host())
         self._make_fullbleed(container)
         controller = WhiteboardController(container, root_app=self)
         container.whiteboard_controller = controller
@@ -1965,7 +2005,7 @@ class GMScreenView(ctk.CTkFrame):
         container.bind("<Destroy>", _on_destroy, add="+")
 
         def factory(master):
-            host_parent = master if master is not None else self._rich_host
+            host_parent = master if master is not None else self._ensure_rich_host()
             frame = ctk.CTkFrame(host_parent)
             self._make_fullbleed(frame)
             ctrl = WhiteboardController(frame, root_app=self)
@@ -1984,9 +2024,7 @@ class GMScreenView(ctk.CTkFrame):
     def open_world_map_tab(self, map_name=None, title=None):
         """Open a WorldMapPanel inside a new GM-screen tab."""
         # Mount heavy interactive views into a dedicated full-bleed host
-        if getattr(self, "_rich_host", None) is None or not self._rich_host.winfo_exists():
-            self._rich_host = ctk.CTkFrame(self)
-        container = ctk.CTkFrame(self._rich_host)
+        container = ctk.CTkFrame(self._ensure_rich_host())
         panel = WorldMapPanel(container)
         panel.pack(fill="both", expand=True)
         container.world_map_panel = panel
@@ -1999,7 +2037,8 @@ class GMScreenView(ctk.CTkFrame):
         tab_title = title or (f"World Map: {map_name}" if map_name else "World Map")
 
         def factory(master, _name=map_name):
-            c = ctk.CTkFrame(self._rich_host)
+            host_parent = master if master is not None else self._ensure_rich_host()
+            c = ctk.CTkFrame(host_parent)
             p = WorldMapPanel(c)
             p.pack(fill="both", expand=True)
             c.world_map_panel = p
@@ -2019,9 +2058,7 @@ class GMScreenView(ctk.CTkFrame):
 
     def open_map_tool_tab(self, map_name=None, title=None):
         """Open the Map Tool (DisplayMapController) inside a GM-screen tab."""
-        if getattr(self, "_rich_host", None) is None or not self._rich_host.winfo_exists():
-            self._rich_host = ctk.CTkFrame(self)
-        container = ctk.CTkFrame(self._rich_host)
+        container = ctk.CTkFrame(self._ensure_rich_host())
         maps_wrapper = GenericModelWrapper("maps")
         controller = DisplayMapController(
             container,
@@ -2039,7 +2076,8 @@ class GMScreenView(ctk.CTkFrame):
         tab_title = title or (f"Map Tool: {map_name}" if map_name else "Map Tool")
 
         def factory(master, _name=map_name):
-            c = ctk.CTkFrame(self._rich_host)
+            host_parent = master if master is not None else self._ensure_rich_host()
+            c = ctk.CTkFrame(host_parent)
             mw = GenericModelWrapper("maps")
             ctrl = DisplayMapController(
                 c,
@@ -2064,9 +2102,7 @@ class GMScreenView(ctk.CTkFrame):
 
     def open_scene_flow_tab(self, scenario_title=None, title=None):
         """Open the Scene Flow Viewer inside a GM-screen tab."""
-        if getattr(self, "_rich_host", None) is None or not self._rich_host.winfo_exists():
-            self._rich_host = ctk.CTkFrame(self)
-        container = ctk.CTkFrame(self._rich_host)
+        container = ctk.CTkFrame(self._ensure_rich_host())
         self._make_fullbleed(container)
         viewer = create_scene_flow_frame(container, scenario_title=scenario_title)
         viewer.pack(fill="both", expand=True)
@@ -2075,7 +2111,8 @@ class GMScreenView(ctk.CTkFrame):
         tab_title = title or (f"Scene Flow: {scenario_title}" if scenario_title else "Scene Flow")
 
         def factory(master, _title=scenario_title):
-            c = ctk.CTkFrame(self._rich_host)
+            host_parent = master if master is not None else self._ensure_rich_host()
+            c = ctk.CTkFrame(host_parent)
             self._make_fullbleed(c)
             v = create_scene_flow_frame(c, scenario_title=_title)
             v.pack(fill="both", expand=True)
@@ -2205,9 +2242,7 @@ class GMScreenView(ctk.CTkFrame):
             host_kind = (self.tabs[name].get("meta") or {}).get("host") or "scroll"
             parent = None
             if host_kind == "rich":
-                if getattr(self, "_rich_host", None) is None or not self._rich_host.winfo_exists():
-                    self._rich_host = ctk.CTkFrame(self)
-                parent = self._rich_host
+                parent = self._ensure_rich_host()
             else:
                 parent = getattr(self.content_area, "_scrollable_frame", self.content_area)
 
@@ -2357,10 +2392,7 @@ class GMScreenView(ctk.CTkFrame):
                     self.content_area.pack_forget()
                 except Exception:
                     pass
-                host = self._rich_host if getattr(self, "_rich_host", None) else None
-                if host is None or not host.winfo_exists():
-                    self._rich_host = ctk.CTkFrame(self)
-                    host = self._rich_host
+                host = self._ensure_rich_host()
                 host.pack(fill="both", expand=True)
             else:
                 # Show scroll area and hide rich host
@@ -2373,18 +2405,7 @@ class GMScreenView(ctk.CTkFrame):
 
             frame = tab["content_frame"]
             frame.pack(fill="both", expand=True)
-            if target_host == "rich":
-                try:
-                    self._sync_fullbleed_now(frame)
-                    self.after(60, lambda cf=frame: self._sync_fullbleed_now(cf))
-                except Exception:
-                    pass
-            else:
-                try:
-                    self._sync_fullbleed_now(frame)
-                    self.after(60, lambda cf=frame: self._sync_fullbleed_now(cf))
-                except Exception:
-                    pass
+            self._request_active_tab_layout_settle()
 
     def add_new_tab(self):
         log_info("Opening entity selection for new tab", func_name="GMScreenView.add_new_tab")
@@ -2439,9 +2460,7 @@ class GMScreenView(ctk.CTkFrame):
             self.open_plot_twist_popup()
             return
         elif entity_type == "Character Graph":
-            if getattr(self, "_rich_host", None) is None or not self._rich_host.winfo_exists():
-                self._rich_host = ctk.CTkFrame(self)
-            host_parent = self._rich_host
+            host_parent = self._ensure_rich_host()
             self.add_tab(
                 "Character Graph",
                 self.create_character_graph_frame(master=host_parent),
@@ -2451,9 +2470,7 @@ class GMScreenView(ctk.CTkFrame):
 
             return
         elif entity_type == "Scenario Graph Editor":
-            if getattr(self, "_rich_host", None) is None or not self._rich_host.winfo_exists():
-                self._rich_host = ctk.CTkFrame(self)
-            host_parent = self._rich_host
+            host_parent = self._ensure_rich_host()
             self.add_tab(
                 "Scenario Graph Editor",
                 self.create_scenario_graph_frame(master=host_parent),

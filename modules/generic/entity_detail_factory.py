@@ -19,6 +19,7 @@ from modules.ui.image_viewer import show_portrait
 from modules.ui.tooltip import ToolTip
 from modules.generic.generic_editor_window import GenericEditorWindow
 from modules.helpers.config_helper import ConfigHelper
+from modules.helpers.layout_scheduler import LayoutSettleScheduler
 from modules.audio.entity_audio import (
     get_entity_audio_value,
     play_entity_audio,
@@ -1434,6 +1435,20 @@ def create_scenario_detail_frame(entity_type, scenario_item, master, open_entity
                     except Exception:
                         return
 
+                scene_flow_layout_scheduler = LayoutSettleScheduler(scene_flow_frame)
+
+                def _scene_flow_layout_ready():
+                    try:
+                        if view_var.get() != "Scene Flow":
+                            return False
+                        if not flow_container.winfo_exists() or not flow_container.winfo_ismapped():
+                            return False
+                        return int(scenes_container.winfo_width()) > 1 and int(flow_container.winfo_width()) > 1
+                    except Exception:
+                        return False
+
+                def _settle_scene_flow_layout():
+                    _sync_scene_flow_height()
                     try:
                         scene_flow_frame._on_layout_resize()
                     except Exception:
@@ -1448,8 +1463,11 @@ def create_scenario_detail_frame(entity_type, scenario_item, master, open_entity
                     if selection == "Scene Flow":
                         list_container.pack_forget()
                         flow_container.pack(fill="x", expand=False, padx=10, pady=(6, 0))
-                        _sync_scene_flow_height()
-                        scene_flow_frame.after_idle(scene_flow_frame._on_layout_resize)
+                        scene_flow_layout_scheduler.schedule(
+                            "scene-flow-layout",
+                            _settle_scene_flow_layout,
+                            when=_scene_flow_layout_ready,
+                        )
                     else:
                         flow_container.pack_forget()
                         list_container.pack(fill="x", expand=True)
@@ -1465,17 +1483,26 @@ def create_scenario_detail_frame(entity_type, scenario_item, master, open_entity
 
                 try:
                     if hasattr(gm_view_instance, "content_area") and gm_view_instance.content_area.winfo_exists():
-                        gm_view_instance.content_area.bind("<Configure>", _sync_scene_flow_height, add="+")
+                        scene_flow_layout_scheduler.bind_configure(
+                            gm_view_instance.content_area,
+                            "scene-flow-layout",
+                            _settle_scene_flow_layout,
+                            when=_scene_flow_layout_ready,
+                        )
                 except Exception:
                     pass
                 try:
-                    scenes_container.bind("<Configure>", _sync_scene_flow_height, add="+")
+                    scene_flow_layout_scheduler.bind_configure(
+                        scenes_container,
+                        "scene-flow-layout",
+                        _settle_scene_flow_layout,
+                        when=_scene_flow_layout_ready,
+                    )
                 except Exception:
                     pass
 
                 view_toggle.configure(command=_toggle_scene_view)
                 _toggle_scene_view(persisted_scene_view)
-                scene_flow_frame.after(80, _sync_scene_flow_height)
             else:
                 insert_list_longtext(
                     section_frame,
@@ -1539,8 +1566,18 @@ def create_scenario_detail_frame(entity_type, scenario_item, master, open_entity
         except Exception:
             pass
 
-    scrollable_frame.bind("<Configure>", _update_text_wraplength, add="+")
-    scrollable_frame.after(50, _update_text_wraplength)
+    text_wrap_scheduler = LayoutSettleScheduler(scrollable_frame)
+    text_wrap_scheduler.bind_configure(
+        scrollable_frame,
+        "scenario-wraplength",
+        _update_text_wraplength,
+        when=lambda: scrollable_frame.winfo_width() > 1,
+    )
+    text_wrap_scheduler.schedule(
+        "scenario-wraplength",
+        _update_text_wraplength,
+        when=lambda: scrollable_frame.winfo_width() > 1,
+    )
 
     if entity_type in {"Scenarios", "Places", "Bases", "NPCs", "Villains", "Informations"}:
         related_events_panel = RelatedEventsPanel(
@@ -1837,8 +1874,18 @@ def create_entity_detail_frame(entity_type, entity, master, open_entity_callback
             except Exception:
                 pass
 
-        column_left.bind("<Configure>", _update_summary_wrap, add="+")
-        column_left.after(50, _update_summary_wrap)
+        summary_wrap_scheduler = LayoutSettleScheduler(column_left)
+        summary_wrap_scheduler.bind_configure(
+            column_left,
+            "summary-wraplength",
+            _update_summary_wrap,
+            when=lambda: column_left.winfo_width() > 1,
+        )
+        summary_wrap_scheduler.schedule(
+            "summary-wraplength",
+            _update_summary_wrap,
+            when=lambda: column_left.winfo_width() > 1,
+        )
 
     _populate_generic_columns([column_left, column_right], render_fields, entity, open_entity_callback)
 
