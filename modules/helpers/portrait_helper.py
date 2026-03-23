@@ -62,18 +62,43 @@ def primary_portrait(value) -> str:
     return portraits[0] if portraits else ""
 
 
+def normalize_portrait_path(path: str) -> str:
+    return str(path or "").strip().replace("\\", "/")
+
+
 def resolve_portrait_candidate(path: str, campaign_dir: Optional[str] = None) -> Optional[str]:
     if not path:
         return None
-    candidate = Path(path)
-    if candidate.is_absolute() and candidate.exists():
-        return str(candidate)
     base_dir = Path(campaign_dir or ConfigHelper.get_campaign_dir())
-    resolved = base_dir / candidate
-    if resolved.exists():
-        return str(resolved)
-    if candidate.exists():
-        return str(candidate)
+
+    candidate = Path(path)
+    normalized_path = normalize_portrait_path(path)
+    normalized_candidate = Path(normalized_path) if normalized_path else None
+
+    candidate_variants = []
+
+    if candidate.is_absolute():
+        candidate_variants.append(candidate)
+    if normalized_candidate and normalized_candidate.is_absolute():
+        candidate_variants.append(normalized_candidate)
+
+    if normalized_candidate and not normalized_candidate.is_absolute():
+        candidate_variants.append(base_dir / normalized_candidate)
+    if not candidate.is_absolute():
+        candidate_variants.append(base_dir / candidate)
+
+    candidate_variants.append(candidate)
+    if normalized_candidate is not None:
+        candidate_variants.append(normalized_candidate)
+
+    seen = set()
+    for variant in candidate_variants:
+        variant_key = str(variant)
+        if not variant_key or variant_key in seen:
+            continue
+        seen.add(variant_key)
+        if variant.exists():
+            return str(variant)
     return None
 
 

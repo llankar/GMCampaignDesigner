@@ -88,8 +88,9 @@ class EntitySelectionDialog(ctk.CTkToplevel):
         col_index = 0
 
         if self.has_portrait:
-            portrait_path = primary_portrait(item.get("Portrait", ""))
-            resolved_portrait = resolve_portrait_path(portrait_path, ConfigHelper.get_campaign_dir())
+            portrait_value = item.get("Portrait", "")
+            portrait_path = primary_portrait(portrait_value)
+            resolved_portrait = resolve_portrait_path(portrait_value, ConfigHelper.get_campaign_dir())
             if resolved_portrait and os.path.exists(resolved_portrait):
                 if resolved_portrait not in self.image_cache:
                     img = Image.open(resolved_portrait)

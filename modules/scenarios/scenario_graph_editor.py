@@ -1364,8 +1364,9 @@ class ScenarioGraphEditor(ctk.CTkFrame):
             messagebox.showerror("Error", f"Entity '{name_key}' not found.")
             return
 
-        portrait_path = primary_portrait(entity_data.get("Portrait", ""))
-        resolved_portrait = resolve_portrait_path(portrait_path, ConfigHelper.get_campaign_dir())
+        portrait_value = entity_data.get("Portrait", "")
+        portrait_path = primary_portrait(portrait_value)
+        resolved_portrait = resolve_portrait_path(portrait_value, ConfigHelper.get_campaign_dir())
         if not resolved_portrait or not os.path.exists(resolved_portrait):
             messagebox.showerror("Error", "No valid portrait found for this entity.")
             return
