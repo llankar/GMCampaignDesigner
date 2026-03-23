@@ -1,6 +1,6 @@
 import os
 import customtkinter as ctk
-from PIL import Image, ImageTk
+from PIL import Image, ImageOps, ImageTk
 from customtkinter import CTkLabel, CTkTextbox
 from modules.helpers.text_helpers import (
     deserialize_possible_json,
@@ -234,12 +234,12 @@ def _build_portrait_widget(parent, entity_type, entity, *, size):
     try:
         _portrait_debug(entity_type, entity, f"loading portrait image from '{resolved_portrait}'")
         img = Image.open(resolved_portrait).convert("RGBA")
-        framed_image = Image.new("RGBA", size, (0, 0, 0, 0))
-        image_copy = img.copy()
-        image_copy.thumbnail(size, Image.Resampling.LANCZOS)
-        offset_x = max((size[0] - image_copy.width) // 2, 0)
-        offset_y = max((size[1] - image_copy.height) // 2, 0)
-        framed_image.paste(image_copy, (offset_x, offset_y), image_copy)
+        framed_image = ImageOps.fit(
+            img,
+            size,
+            method=Image.Resampling.LANCZOS,
+            centering=(0.5, 0.5),
+        )
 
         portrait_shell = ctk.CTkFrame(parent, fg_color="transparent")
         portrait_shell.pack_propagate(False)
@@ -270,7 +270,7 @@ def _build_portrait_widget(parent, entity_type, entity, *, size):
             entity,
             (
                 f"portrait widget ready using source={portrait_path!r}, resolved={resolved_portrait!r}, "
-                f"thumbnail={image_copy.width}x{image_copy.height}, offsets=({offset_x}, {offset_y})"
+                f"cover_image={framed_image.width}x{framed_image.height}, fitted_to={size}"
             ),
         )
         return portrait_shell, portrait_path
