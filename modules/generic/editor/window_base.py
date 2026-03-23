@@ -78,24 +78,9 @@ class GenericEditorWindowBase(ctk.CTkToplevel):
 
         self.create_action_bar()
 
-        # Instead of a fixed geometry, update layout and compute the required size.
         self.update_idletasks()
-        req_width = self.winfo_reqwidth()
-        req_height = self.winfo_reqheight()
-        # Responsive width on smaller screens while preserving comfortable defaults.
-        screen_w = max(self.winfo_screenwidth(), 1200)
-        screen_h = self.winfo_screenheight()
-        min_width = min(1000, int(screen_w * 0.92))
-        min_height = min(900, int(screen_h * 0.88))
-        req_width = max(min_width, min(req_width, int(screen_w * 0.94)))
-        # Force the generic editor to open at 1080px tall (capped by screen size
-        # on smaller displays) so the window consistently fills a 1080p screen.
-        req_height = min(1080, screen_h)
-        self.geometry(f"{req_width}x{req_height}")
-        self.minsize(min_width, min_height)
-
-        # Optionally, adjust window position.
-        position_window_at_top(self)
+        self.geometry("1920x1080+0+0")
+        self.minsize(1000, 900)
         self.bind("<Control-s>", lambda e: self.save())
         self.bind("<KeyRelease>", self._mark_dirty, add="+")
         # Lazy AI client init
