@@ -1678,18 +1678,9 @@ def create_entity_detail_frame(entity_type, entity, master, open_entity_callback
             messagebox.showwarning("Audio", "Unable to play the associated audio track.")
 
     content_frame.portrait_images = {}
-    spotlight_portrait = None
-    hero_portrait = None
-
-    _portrait_debug(
-        entity_type,
-        entity,
-        f"opening detail view with placement='{DEFAULT_PORTRAIT_PLACEMENT}'",
-    )
-
-    if DEFAULT_PORTRAIT_PLACEMENT in {"spotlight", "both"}:
-        spotlight_portrait, spotlight_path = _build_portrait_widget(
-            content_frame,
+    def _make_spotlight_portrait(parent):
+        portrait_widget, portrait_path = _build_portrait_widget(
+            parent,
             entity_type,
             entity,
             size=PORTRAIT_SIZE,
@@ -1697,14 +1688,15 @@ def create_entity_detail_frame(entity_type, entity, master, open_entity_callback
         _portrait_debug(
             entity_type,
             entity,
-            f"spotlight result widget_created={spotlight_portrait is not None}, source={spotlight_path!r}",
+            f"spotlight result widget_created={portrait_widget is not None}, source={portrait_path!r}",
         )
-        if spotlight_portrait is not None:
-            content_frame.portrait_images[str(entity_label)] = spotlight_portrait.image
+        if portrait_widget is not None:
+            content_frame.portrait_images[str(entity_label)] = portrait_widget.image
+        return portrait_widget
 
-    if DEFAULT_PORTRAIT_PLACEMENT in {"hero", "both"}:
-        hero_portrait, hero_path = _build_portrait_widget(
-            content_frame,
+    def _make_hero_portrait(parent):
+        portrait_widget, portrait_path = _build_portrait_widget(
+            parent,
             entity_type,
             entity,
             size=HERO_PORTRAIT_SIZE,
@@ -1712,11 +1704,18 @@ def create_entity_detail_frame(entity_type, entity, master, open_entity_callback
         _portrait_debug(
             entity_type,
             entity,
-            f"hero result widget_created={hero_portrait is not None}, source={hero_path!r}",
+            f"hero result widget_created={portrait_widget is not None}, source={portrait_path!r}",
         )
-        if hero_portrait is not None:
-            content_frame.portrait_images[f"{entity_label}-hero"] = hero_portrait.image
-            content_frame.portrait_label = hero_portrait
+        if portrait_widget is not None:
+            content_frame.portrait_images[f"{entity_label}-hero"] = portrait_widget.image
+            content_frame.portrait_label = portrait_widget
+        return portrait_widget
+
+    _portrait_debug(
+        entity_type,
+        entity,
+        f"opening detail view with placement='{DEFAULT_PORTRAIT_PLACEMENT}'",
+    )
 
     template = load_template(entity_type.lower())
     meta_items = []
@@ -1742,7 +1741,7 @@ def create_entity_detail_frame(entity_type, entity, master, open_entity_callback
         category=entity_type[:-1] if entity_type.endswith("s") else entity_type,
         summary=summary,
         meta_items=meta_items,
-        portrait_widget=hero_portrait,
+        portrait_builder=_make_hero_portrait if DEFAULT_PORTRAIT_PLACEMENT in {"hero", "both"} else None,
     )
     hero.pack(fill="x", padx=10, pady=(0, 16))
 
@@ -1752,8 +1751,8 @@ def create_entity_detail_frame(entity_type, entity, master, open_entity_callback
     create_spotlight_panel(
         side_column,
         title=str(entity_label),
-        subtitle="Click the portrait to open it full size." if spotlight_portrait is not None else "Give this entry a signature visual to own the right rail.",
-        portrait_widget=spotlight_portrait,
+        subtitle="Click the portrait to open it full size." if DEFAULT_PORTRAIT_PLACEMENT in {"spotlight", "both"} else "Give this entry a signature visual to own the right rail.",
+        portrait_builder=_make_spotlight_portrait if DEFAULT_PORTRAIT_PLACEMENT in {"spotlight", "both"} else None,
         fallback_text=_spotlight_fallback(entity_type),
         accent_lines=highlight_lines[:3],
     )
