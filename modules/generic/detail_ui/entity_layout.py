@@ -5,6 +5,8 @@ from typing import Iterable
 
 import customtkinter as ctk
 
+from modules.helpers.layout_scheduler import LayoutSettleScheduler
+
 from .theme import create_chip, create_section_card, get_detail_palette
 
 
@@ -35,6 +37,9 @@ def create_detail_split_layout(parent, *, sidebar_width: int = 380):
     side_inner = ctk.CTkFrame(side_column, fg_color="transparent")
     side_inner.pack(fill="both", expand=True, padx=18, pady=18)
 
+    layout_scheduler = LayoutSettleScheduler(shell)
+    layout_probe = {"width": None}
+
     def _stack_layout():
         if not shell.winfo_exists():
             return
@@ -49,8 +54,25 @@ def create_detail_split_layout(parent, *, sidebar_width: int = 380):
             main_column.grid_configure(row=0, column=0, columnspan=1, padx=(0, 14), pady=0)
             side_column.grid_configure(row=0, column=1, columnspan=1, sticky="nsew")
 
-    shell.bind("<Configure>", lambda _event: _stack_layout(), add="+")
-    shell.after(30, _stack_layout)
+    def _layout_ready():
+        try:
+            width = int(shell.winfo_width())
+        except Exception:
+            return False
+        if width <= 1:
+            return False
+        if layout_probe["width"] != width:
+            layout_probe["width"] = width
+            return False
+        return True
+
+    layout_scheduler.bind_configure(
+        shell,
+        "detail-split-layout",
+        _stack_layout,
+        when=_layout_ready,
+    )
+    layout_scheduler.schedule("detail-split-layout", _stack_layout, when=_layout_ready)
     return shell, main_column, side_inner
 
 
