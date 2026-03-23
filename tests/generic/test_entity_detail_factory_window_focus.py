@@ -66,6 +66,12 @@ class _DummyWindow:
     def winfo_exists(self):
         return self._exists
 
+    def winfo_screenwidth(self):
+        return 1920
+
+    def winfo_screenheight(self):
+        return 1080
+
 
 class _DummyScrollableFrame(_DummyFrame):
     pass
@@ -173,6 +179,8 @@ def test_open_entity_tab_makes_new_window_topmost_relative_to_master():
 
     window = _DummyWindow.instances[-1]
     assert window.parent is master.top
+    assert ("geometry", "1920x1080+0+0") in window.calls
+    assert ("minsize", 1000, 600) in window.calls
     assert ("transient", master.top) in window.calls
     assert ("lift",) in window.calls
     assert ("focus_force",) in window.calls
