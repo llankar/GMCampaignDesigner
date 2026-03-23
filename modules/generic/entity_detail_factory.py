@@ -502,7 +502,7 @@ def unwrap_value(val):
     return str(val)
 
 
-def _create_entity_dashboard_card(list_wrap, *, title, portrait_label, portrait_click=None, tooltip_type=None, tooltip_data=None, title_click=None, chips=None, sections=None):
+def _create_entity_dashboard_card(list_wrap, *, title, portrait_builder=None, portrait_click=None, tooltip_type=None, tooltip_data=None, title_click=None, chips=None, sections=None):
     palette = get_detail_palette()
     row_card = ctk.CTkFrame(
         list_wrap,
@@ -526,12 +526,16 @@ def _create_entity_dashboard_card(list_wrap, *, title, portrait_label, portrait_
     portrait_shell.grid(row=0, column=0, rowspan=2, sticky="nw", padx=14, pady=14)
     portrait_shell.grid_propagate(False)
 
-    portrait_widget = portrait_label
+    portrait_widget = portrait_builder(portrait_shell) if callable(portrait_builder) else CTkLabel(
+        portrait_shell,
+        text="",
+        text_color=palette["muted_text"],
+    )
     if tooltip_type and isinstance(tooltip_data, dict):
         _attach_portrait_tooltip(portrait_widget, tooltip_type, tooltip_data)
     if callable(portrait_click):
         portrait_widget.bind("<Button-1>", portrait_click)
-    portrait_widget.place(in_=portrait_shell, relx=0.5, rely=0.5, anchor="center")
+    portrait_widget.place(relx=0.5, rely=0.5, anchor="center")
 
     title_row = ctk.CTkFrame(row_card, fg_color="transparent")
     title_row.grid(row=0, column=1, columnspan=2, sticky="ew", padx=(0, 14), pady=(14, 8))
@@ -608,15 +612,18 @@ def insert_npc_table(parent, header, npc_names, open_entity_callback):
         if resolved_portrait and os.path.exists(resolved_portrait):
             img = Image.open(resolved_portrait).resize((56, 56), Image.Resampling.LANCZOS)
             photo = CTkImage(light_image=img, size=(56, 56))
-            widget = CTkLabel(list_wrap, image=photo, text="")
-            widget.image = photo
+            def _portrait_builder(parent, image=photo):
+                label = CTkLabel(parent, image=image, text="")
+                label.image = image
+                return label
         else:
-            widget = CTkLabel(list_wrap, text="NPC", text_color=palette["muted_text"])
+            def _portrait_builder(parent, text="NPC", color=palette["muted_text"]):
+                return CTkLabel(parent, text=text, text_color=color)
 
         row_card = _create_entity_dashboard_card(
             list_wrap,
             title=name,
-            portrait_label=widget,
+            portrait_builder=_portrait_builder,
             portrait_click=(lambda _event=None, p=portrait_path, n=name: show_portrait(p, n)) if portrait_path else None,
             tooltip_type="NPCs",
             tooltip_data=data,
@@ -652,15 +659,18 @@ def insert_creature_table(parent, header, creature_names, open_entity_callback):
         if resolved_portrait and os.path.exists(resolved_portrait):
             img = Image.open(resolved_portrait).resize((56, 56), Image.Resampling.LANCZOS)
             photo = CTkImage(light_image=img, size=(56, 56))
-            widget = CTkLabel(list_wrap, image=photo, text="")
-            widget.image = photo
+            def _portrait_builder(parent, image=photo):
+                label = CTkLabel(parent, image=image, text="")
+                label.image = image
+                return label
         else:
-            widget = CTkLabel(list_wrap, text="Creature", text_color=palette["muted_text"])
+            def _portrait_builder(parent, text="Creature", color=palette["muted_text"]):
+                return CTkLabel(parent, text=text, text_color=color)
 
         row_card = _create_entity_dashboard_card(
             list_wrap,
             title=name,
-            portrait_label=widget,
+            portrait_builder=_portrait_builder,
             portrait_click=(lambda _event=None, p=portrait_path, n=name: show_portrait(p, n)) if portrait_path else None,
             tooltip_type="Creatures",
             tooltip_data=data,
@@ -697,10 +707,13 @@ def insert_villain_table(parent, header, villain_names, open_entity_callback):
         if resolved_portrait and os.path.exists(resolved_portrait):
             img = Image.open(resolved_portrait).resize((56, 56), Image.Resampling.LANCZOS)
             photo = CTkImage(light_image=img, size=(56, 56))
-            widget = CTkLabel(list_wrap, image=photo, text="")
-            widget.image = photo
+            def _portrait_builder(parent, image=photo):
+                label = CTkLabel(parent, image=image, text="")
+                label.image = image
+                return label
         else:
-            widget = CTkLabel(list_wrap, text="Villain", text_color=palette["muted_text"])
+            def _portrait_builder(parent, text="Villain", color=palette["muted_text"]):
+                return CTkLabel(parent, text=text, text_color=color)
 
         chips = []
         for key in ("Archetype", "ThreatLevel"):
@@ -711,7 +724,7 @@ def insert_villain_table(parent, header, villain_names, open_entity_callback):
         row_card = _create_entity_dashboard_card(
             list_wrap,
             title=name,
-            portrait_label=widget,
+            portrait_builder=_portrait_builder,
             portrait_click=(lambda _event=None, p=portrait_path, n=name: show_portrait(p, n)) if portrait_path else None,
             tooltip_type="Villains",
             tooltip_data=data,
@@ -1287,10 +1300,28 @@ def create_scenario_detail_frame(entity_type, scenario_item, master, open_entity
             if name in visible_sections:
                 sections[name].pack(fill="both", expand=True, padx=10, pady=(0, 12))
 
+    def _reset_scroll_position():
+        try:
+            scrollable_frame.update_idletasks()
+            parent_canvas = getattr(scrollable_frame, "_parent_canvas", None)
+            if parent_canvas is not None:
+                try:
+                    bbox = parent_canvas.bbox("all")
+                    if bbox is not None:
+                        parent_canvas.configure(scrollregion=bbox)
+                except Exception:
+                    pass
+                if hasattr(parent_canvas, "yview_moveto"):
+                    parent_canvas.yview_moveto(0.0)
+        except Exception:
+            pass
+
     def show_section(section_name):
         nonlocal active_section
         active_section = section_name
         _apply_section_visibility()
+        scrollable_frame.after_idle(_reset_scroll_position)
+        scrollable_frame.after(25, _reset_scroll_position)
 
     tabs = None
 
