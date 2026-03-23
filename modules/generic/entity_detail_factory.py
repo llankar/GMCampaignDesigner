@@ -1262,22 +1262,6 @@ def create_scenario_detail_frame(entity_type, scenario_item, master, open_entity
         meta_items=scenario_meta,
     )
     hero.pack(fill="x", padx=10, pady=(0, 12))
-    summary_card, summary_body = create_section_card(
-        summary_section,
-        "Briefing",
-        "A quick campaign-facing overview for the GM.",
-    )
-    summary_card.pack(fill="x", padx=10, pady=(0, 12))
-    summary_text_label = CTkLabel(
-        summary_body,
-        text=format_multiline_text(scenario_item.get("Summary", "")),
-        font=ctk.CTkFont(size=14),
-        text_color=palette["text"],
-        wraplength=400,
-        justify="left"
-    )
-    summary_text_label.pack(fill="x", anchor="w")
-
     # ——— BODY — prepare fields in the custom order ———
     tpl = load_template(entity_type.lower())
     scene_entity_tracker = {"NPCs": set(), "Villains": set(), "Creatures": set(), "Places": set(), "Maps": set()}

@@ -10,6 +10,7 @@ from modules.scenarios.gm_screen.dashboard.styles.dashboard_theme import DASHBOA
 from .components import (
     CampaignOverviewHero,
     ArcSelectorStrip,
+    ScenarioBriefingPanel,
     ScenarioEntityBrowser,
     ScenarioHeroStrip,
     ScenarioIdentityPanel,
@@ -459,6 +460,14 @@ class CampaignGraphPanel(ctk.CTkFrame):
             on_edit=lambda n=scenario.title: self._open_scenario(n),
             on_open_gm_screen=gm_callback,
         ).grid(row=0, column=0, sticky="ew", pady=(0, 12))
+
+        ScenarioBriefingPanel(
+            left_column,
+            summary=scenario.briefing or scenario.summary,
+            objective=scenario.objective,
+            hook=scenario.hook,
+            stakes=scenario.stakes,
+        ).grid(row=1, column=0, sticky="nsew")
 
         ScenarioEntityBrowser(
             content,
