@@ -60,6 +60,7 @@ def create_spotlight_panel(
     title: str,
     subtitle: str | None = None,
     portrait_widget=None,
+    portrait_builder=None,
     fallback_text: str = "No portrait linked yet.",
     accent_lines: Iterable[str] | None = None,
 ):
@@ -105,8 +106,9 @@ def create_spotlight_panel(
     portrait_shell.pack(fill="x", padx=18, pady=(0, 16))
     portrait_shell.pack_propagate(False)
 
-    if portrait_widget is not None:
-        portrait_widget.pack(in_=portrait_shell, fill="both", expand=True, padx=10, pady=10)
+    rendered_portrait = portrait_widget or (portrait_builder(portrait_shell) if portrait_builder is not None else None)
+    if rendered_portrait is not None:
+        rendered_portrait.pack(fill="both", expand=True, padx=10, pady=10)
     else:
         empty = ctk.CTkFrame(portrait_shell, fg_color="transparent")
         empty.pack(fill="both", expand=True, padx=18, pady=18)

@@ -109,6 +109,7 @@ def create_hero_header(
     summary: str | None = None,
     meta_items: list[str] | None = None,
     portrait_widget=None,
+    portrait_builder=None,
 ):
     palette = get_detail_palette()
     hero = ctk.CTkFrame(
@@ -126,7 +127,7 @@ def create_hero_header(
     content.pack(fill="both", expand=True, padx=26, pady=24)
     content.grid_columnconfigure(0, weight=7)
     content.grid_rowconfigure(0, weight=1)
-    if portrait_widget is not None:
+    if portrait_widget is not None or portrait_builder is not None:
         content.grid_columnconfigure(1, weight=4, minsize=260)
 
     text_col = ctk.CTkFrame(content, fg_color="transparent")
@@ -165,7 +166,7 @@ def create_hero_header(
                 continue
             create_chip(meta_flow, item).pack(side="left", padx=(0, 8), pady=(0, 8))
 
-    if portrait_widget is not None:
+    if portrait_widget is not None or portrait_builder is not None:
         portrait_shell = ctk.CTkFrame(
             content,
             fg_color=palette["surface_overlay"],
@@ -177,7 +178,9 @@ def create_hero_header(
         )
         portrait_shell.grid(row=0, column=1, sticky="nsew")
         portrait_shell.grid_propagate(False)
-        portrait_widget.pack(in_=portrait_shell, fill="both", expand=True, padx=12, pady=12)
+        rendered_portrait = portrait_widget or (portrait_builder(portrait_shell) if portrait_builder is not None else None)
+        if rendered_portrait is not None:
+            rendered_portrait.pack(fill="both", expand=True, padx=12, pady=12)
 
     return hero
 
