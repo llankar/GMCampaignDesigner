@@ -1131,6 +1131,23 @@ def _collect_character_relationships(scenario_npcs=None):
     )
     return relationships
 
+
+def _replace_detail_frame(current_frame, updated_item, entity_type, open_entity_callback, builder):
+    parent = current_frame.master
+    current_frame.destroy()
+
+    replacement_frame = builder(updated_item, parent)
+    replacement_frame.pack(fill="both", expand=True)
+
+    gm_view = getattr(open_entity_callback, "__self__", None)
+    if gm_view is not None:
+        key_field = "Title" if entity_type == "Scenarios" else "Name"
+        tab_name = updated_item.get(key_field)
+        if tab_name in gm_view.tabs:
+            gm_view.tabs[tab_name]["content_frame"] = replacement_frame
+
+    return replacement_frame
+
 @log_function
 def create_scenario_detail_frame(entity_type, scenario_item, master, open_entity_callback=None):
     """
@@ -1140,7 +1157,6 @@ def create_scenario_detail_frame(entity_type, scenario_item, master, open_entity
     """
     palette = get_detail_palette()
     frame = ctk.CTkFrame(master, fg_color="transparent")
-    frame.pack(fill="both", expand=True, padx=20, pady=10)
     gm_view_instance = getattr(open_entity_callback, "__self__", None)
     sections = {}
     pinned_sections = set()
@@ -1148,27 +1164,18 @@ def create_scenario_detail_frame(entity_type, scenario_item, master, open_entity
     section_order = ["Summary", "Scenes", "NPCs", "Villains", "Creatures", "Places", "Secrets", "Notes"]
     section_names = []
     def rebuild_frame(updated_item):
-        # 1) Destroy the old frame
-        frame.destroy()
-
-        # 2) Build a fresh one and pack it
-        new_frame = create_scenario_detail_frame(
-            entity_type,
+        _replace_detail_frame(
+            frame,
             updated_item,
-            master,
-            open_entity_callback
+            entity_type,
+            open_entity_callback,
+            lambda item, parent: create_scenario_detail_frame(
+                entity_type,
+                item,
+                parent,
+                open_entity_callback,
+            ),
         )
-        new_frame.pack(fill="both", expand=True, padx=10, pady=10)
-
-        # 3) Update the GM-view’s tabs dict so show_tab() refers to the new widget
-        #    open_entity_callback is bound to the GMScreenView instance
-        gm_view = getattr(open_entity_callback, "__self__", None)
-        if gm_view is not None:
-            # pick the right key—"Title" for scenarios, else "Name"
-            key_field = "Title" if entity_type == "Scenarios" else "Name"
-            tab_name = updated_item.get(key_field)
-            if tab_name in gm_view.tabs:
-                gm_view.tabs[tab_name]["content_frame"] = new_frame
 
     def _edit_entity():
         EditWindow(
@@ -1626,24 +1633,21 @@ def create_entity_detail_frame(entity_type, entity, master, open_entity_callback
 
     palette = get_detail_palette()
     content_frame = ctk.CTkFrame(master, fg_color="transparent")
-    content_frame.pack(fill="both", expand=True, padx=10, pady=10)
     gm_view_instance = getattr(open_entity_callback, "__self__", None)
 
     def rebuild_frame(updated_item):
-        content_frame.destroy()
-        new_frame = create_entity_detail_frame(
-            entity_type,
+        _replace_detail_frame(
+            content_frame,
             updated_item,
-            master,
-            open_entity_callback
+            entity_type,
+            open_entity_callback,
+            lambda item, parent: create_entity_detail_frame(
+                entity_type,
+                item,
+                parent,
+                open_entity_callback,
+            ),
         )
-        new_frame.pack(fill="both", expand=True, padx=10, pady=10)
-        gm_view = getattr(open_entity_callback, "__self__", None)
-        if gm_view is not None:
-            key_field = "Title" if entity_type == "Scenarios" else "Name"
-            tab_name = updated_item.get(key_field)
-            if tab_name in gm_view.tabs:
-                gm_view.tabs[tab_name]["content_frame"] = new_frame
 
     def _edit_entity():
         EditWindow(
