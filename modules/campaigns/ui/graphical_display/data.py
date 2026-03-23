@@ -19,6 +19,7 @@ class ScenarioEntityLink:
 class CampaignGraphScenario:
     title: str
     summary: str
+    briefing: str = ""
     objective: str = ""
     hook: str = ""
     stakes: str = ""
@@ -141,6 +142,14 @@ def _build_scenario_payload(title: str, scenario_index: dict[str, dict[str, Any]
     title = coerce_text(title).strip()
     scenario = scenario_index.get(title, {})
     summary = coerce_text(scenario.get("Summary")).strip()
+    briefing = _pick_first_text(
+        scenario,
+        "Briefing",
+        "ScenarioBriefing",
+        "GMBriefing",
+        "SessionBriefing",
+        "Brief",
+    )
     entity_links: list[ScenarioEntityLink] = []
 
     for entity_type, field_name in iter_scenario_link_fields():
@@ -183,6 +192,7 @@ def _build_scenario_payload(title: str, scenario_index: dict[str, dict[str, Any]
     return CampaignGraphScenario(
         title=title or "Untitled scenario",
         summary=summary,
+        briefing=briefing,
         objective=objective,
         hook=hook,
         stakes=stakes,

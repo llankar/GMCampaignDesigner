@@ -463,7 +463,7 @@ class CampaignGraphPanel(ctk.CTkFrame):
 
         ScenarioBriefingPanel(
             left_column,
-            summary=scenario.summary,
+            summary=scenario.briefing or scenario.summary,
             objective=scenario.objective,
             hook=scenario.hook,
             stakes=scenario.stakes,
