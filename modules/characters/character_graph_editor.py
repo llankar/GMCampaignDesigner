@@ -666,8 +666,9 @@ class CharacterGraphEditor(ctk.CTkFrame):
             messagebox.showerror("Error", f"{entity_type.upper()} '{entity_name}' not found.")
             return
 
-        portrait_path = primary_portrait(entity_data.get("Portrait", ""))
-        resolved_portrait = resolve_portrait_path(portrait_path, ConfigHelper.get_campaign_dir())
+        portrait_value = entity_data.get("Portrait", "")
+        portrait_path = primary_portrait(portrait_value)
+        resolved_portrait = resolve_portrait_path(portrait_value, ConfigHelper.get_campaign_dir())
         if not resolved_portrait or not os.path.exists(resolved_portrait):
             messagebox.showerror("Error", "No valid portrait found for this character.")
             return
@@ -1603,8 +1604,9 @@ class CharacterGraphEditor(ctk.CTkFrame):
                 # ── Load & scale portrait ─────────────────────────────────
                 portrait_img = None
                 p_w = p_h = 0
-                portrait_path = primary_portrait(data.get("Portrait", ""))
-                resolved_portrait = resolve_portrait_path(portrait_path, ConfigHelper.get_campaign_dir())
+                portrait_value = data.get("Portrait", "")
+                portrait_path = primary_portrait(portrait_value)
+                resolved_portrait = resolve_portrait_path(portrait_value, ConfigHelper.get_campaign_dir())
                 if resolved_portrait and os.path.exists(resolved_portrait):
                     img = Image.open(resolved_portrait)
                     ow, oh = img.size

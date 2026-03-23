@@ -1,5 +1,4 @@
 import os
-from pathlib import Path
 import customtkinter as ctk
 from PIL import Image
 from customtkinter import CTkLabel, CTkImage, CTkTextbox
@@ -192,17 +191,21 @@ def _collect_highlight_lines(entity_type, entity):
 
 
 def _build_portrait_widget(parent, entity_type, entity, *, size):
-    portrait_value = entity.get("Portrait")
-    portrait_path = primary_portrait(portrait_value)
-    resolved_portrait = resolve_portrait_path(portrait_value, ConfigHelper.get_campaign_dir())
-    if not resolved_portrait and portrait_path:
-        campaign_dir = Path(ConfigHelper.get_campaign_dir())
-        candidate = Path(str(portrait_path).strip())
-        resolved_candidate = candidate if candidate.is_absolute() else campaign_dir / candidate
-        if resolved_candidate.exists():
-            resolved_portrait = str(resolved_candidate)
-    if not resolved_portrait or not os.path.exists(resolved_portrait):
+    portrait_sources = (
+        entity.get("Portrait"),
+        entity.get("Image"),
+    )
+    portrait_path = ""
+    resolved_portrait = None
+
+    for portrait_value in portrait_sources:
+        portrait_path = primary_portrait(portrait_value)
+        resolved_portrait = resolve_portrait_path(portrait_value, ConfigHelper.get_campaign_dir())
+        if resolved_portrait and os.path.exists(resolved_portrait):
+            break
+    else:
         return None, portrait_path
+
     try:
         img = Image.open(resolved_portrait).convert("RGBA")
         fitted = Image.new("RGBA", size, (0, 0, 0, 0))
@@ -482,8 +485,9 @@ def insert_npc_table(parent, header, npc_names, open_entity_callback):
         data = npc_map.get(name, {}) or {}
 
         # portrait
-        portrait_path = primary_portrait(data.get("Portrait"))
-        resolved_portrait = resolve_portrait_path(portrait_path, ConfigHelper.get_campaign_dir())
+        portrait_value = data.get("Portrait")
+        portrait_path = primary_portrait(portrait_value)
+        resolved_portrait = resolve_portrait_path(portrait_value, ConfigHelper.get_campaign_dir())
         if resolved_portrait and os.path.exists(resolved_portrait):
             img = Image.open(resolved_portrait).resize((40,40), Image.Resampling.LANCZOS)
             photo = CTkImage(light_image=img, size=(40,40))
@@ -571,8 +575,9 @@ def insert_creature_table(parent, header, creature_names, open_entity_callback):
         data = creature_map.get(name, {}) or {}
 
         # portrait
-        portrait_path = primary_portrait(data.get("Portrait"))
-        resolved_portrait = resolve_portrait_path(portrait_path, ConfigHelper.get_campaign_dir())
+        portrait_value = data.get("Portrait")
+        portrait_path = primary_portrait(portrait_value)
+        resolved_portrait = resolve_portrait_path(portrait_value, ConfigHelper.get_campaign_dir())
         if resolved_portrait and os.path.exists(resolved_portrait):
             img = Image.open(resolved_portrait).resize((40,40), Image.Resampling.LANCZOS)
             photo = CTkImage(light_image=img, size=(40,40))

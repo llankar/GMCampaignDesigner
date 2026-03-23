@@ -45,8 +45,9 @@ def show_entity_on_second_screen(item, title, fields):
     # Optional portrait at top if requested
     portrait_label = None
     if any(f.lower() == "portrait" for f in fields):
-        portrait_rel = primary_portrait(item.get("Portrait", ""))
-        portrait_abs = resolve_portrait_path(portrait_rel, ConfigHelper.get_campaign_dir())
+        portrait_value = item.get("Portrait", "")
+        portrait_rel = primary_portrait(portrait_value)
+        portrait_abs = resolve_portrait_path(portrait_value, ConfigHelper.get_campaign_dir())
         if portrait_abs:
             try:
                 img = Image.open(portrait_abs)

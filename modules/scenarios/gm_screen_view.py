@@ -2624,8 +2624,9 @@ class GMScreenView(ctk.CTkFrame):
             master = self.content_area
         frame = ctk.CTkFrame(master)
         template = self.templates[entity_type]
-        portrait_path = primary_portrait(entity.get("Portrait"))
-        resolved_portrait = resolve_portrait_path(portrait_path, ConfigHelper.get_campaign_dir())
+        portrait_value = entity.get("Portrait")
+        portrait_path = primary_portrait(portrait_value)
+        resolved_portrait = resolve_portrait_path(portrait_value, ConfigHelper.get_campaign_dir())
         if (entity_type in {"NPCs", "PCs", "Creatures", "Factions"}) and resolved_portrait and os.path.exists(resolved_portrait):
             img = Image.open(resolved_portrait)
             img = img.resize((200, 200), Image.Resampling.LANCZOS)
