@@ -40,6 +40,8 @@ class VerticalSectionTabs(ctk.CTkFrame):
         self._button_container = ctk.CTkFrame(self, fg_color="transparent")
         self._button_container.pack(fill="both", expand=True, padx=8, pady=(0, 8))
 
+        self._inactive_border_color = palette["surface_card"]
+
         for section in sections:
             button = ctk.CTkButton(
                 self._button_container,
@@ -52,7 +54,7 @@ class VerticalSectionTabs(ctk.CTkFrame):
                 corner_radius=14,
                 height=38,
                 border_width=1,
-                border_color="transparent",
+                border_color=self._inactive_border_color,
                 command=lambda name=section: self._on_select(name),
             )
             button.bind("<Button-3>", lambda event, name=section: self._on_pin_toggle(name))
@@ -89,7 +91,7 @@ class VerticalSectionTabs(ctk.CTkFrame):
             button.configure(
                 font=self._font_bold if is_active else self._font_normal,
                 fg_color=self._palette["surface_overlay"] if is_active else "transparent",
-                border_color=self._palette["pill_border"] if is_active else "transparent",
+                border_color=self._palette["pill_border"] if is_active else self._inactive_border_color,
                 text_color=self._palette["text"] if is_active else self._palette["muted_text"],
             )
             self._resize_button(name)
