@@ -56,6 +56,7 @@ log_module_import(__name__)
 # Configure portrait size.
 PORTRAIT_SIZE = (320, 420)
 HERO_PORTRAIT_SIZE = (280, 240)
+DEFAULT_PORTRAIT_PLACEMENT = "spotlight"
 _open_entity_windows = {}
 
 
@@ -1623,11 +1624,26 @@ def create_entity_detail_frame(entity_type, entity, master, open_entity_callback
             messagebox.showwarning("Audio", "Unable to play the associated audio track.")
 
     content_frame.portrait_images = {}
-    spotlight_portrait, portrait_path = _build_portrait_widget(content_frame, entity_type, entity, size=PORTRAIT_SIZE)
+    spotlight_portrait = None
     hero_portrait = None
-    if spotlight_portrait is not None:
-        hero_portrait, _ = _build_portrait_widget(content_frame, entity_type, entity, size=HERO_PORTRAIT_SIZE)
-        content_frame.portrait_images[str(entity_label)] = spotlight_portrait.image
+
+    if DEFAULT_PORTRAIT_PLACEMENT in {"spotlight", "both"}:
+        spotlight_portrait, _ = _build_portrait_widget(
+            content_frame,
+            entity_type,
+            entity,
+            size=PORTRAIT_SIZE,
+        )
+        if spotlight_portrait is not None:
+            content_frame.portrait_images[str(entity_label)] = spotlight_portrait.image
+
+    if DEFAULT_PORTRAIT_PLACEMENT in {"hero", "both"}:
+        hero_portrait, _ = _build_portrait_widget(
+            content_frame,
+            entity_type,
+            entity,
+            size=HERO_PORTRAIT_SIZE,
+        )
         if hero_portrait is not None:
             content_frame.portrait_images[f"{entity_label}-hero"] = hero_portrait.image
             content_frame.portrait_label = hero_portrait
