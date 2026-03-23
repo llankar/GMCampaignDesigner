@@ -1,4 +1,5 @@
 import os
+from pathlib import Path
 import customtkinter as ctk
 from PIL import Image
 from customtkinter import CTkLabel, CTkImage, CTkTextbox
@@ -47,6 +48,7 @@ from modules.generic.detail_ui import (
     get_link_color,
     get_textbox_style,
 )
+from modules.generic.detail_ui.window_geometry import apply_fullscreen_top_left
 from modules.generic.entities.linking import resolve_entity_label, resolve_entity_slug
 
 log_module_import(__name__)
@@ -192,11 +194,22 @@ def _build_portrait_widget(parent, entity_type, entity, *, size):
     portrait_value = entity.get("Portrait")
     portrait_path = primary_portrait(portrait_value)
     resolved_portrait = resolve_portrait_path(portrait_value, ConfigHelper.get_campaign_dir())
+    if not resolved_portrait and portrait_path:
+        campaign_dir = Path(ConfigHelper.get_campaign_dir())
+        candidate = Path(str(portrait_path).strip())
+        resolved_candidate = candidate if candidate.is_absolute() else campaign_dir / candidate
+        if resolved_candidate.exists():
+            resolved_portrait = str(resolved_candidate)
     if not resolved_portrait or not os.path.exists(resolved_portrait):
         return None, portrait_path
     try:
         img = Image.open(resolved_portrait).convert("RGBA")
-        fitted = img.resize(size, Image.Resampling.LANCZOS)
+        fitted = Image.new("RGBA", size, (0, 0, 0, 0))
+        image_copy = img.copy()
+        image_copy.thumbnail(size, Image.Resampling.LANCZOS)
+        offset_x = max((size[0] - image_copy.width) // 2, 0)
+        offset_y = max((size[1] - image_copy.height) // 2, 0)
+        fitted.paste(image_copy, (offset_x, offset_y), image_copy)
         ctk_image = CTkImage(light_image=fitted, size=size)
         portrait_widget = CTkLabel(parent, image=ctk_image, text="")
         portrait_widget.image = ctk_image
@@ -398,8 +411,7 @@ def open_entity_tab(entity_type, name, master):
     parent_window = master.winfo_toplevel() if master is not None else None
     new_window = ctk.CTkToplevel(parent_window) if parent_window is not None else ctk.CTkToplevel()
     new_window.title(f"{resolved_label}: {name}")
-    new_window.geometry("1000x600")
-    new_window.minsize(1000, 600)
+    apply_fullscreen_top_left(new_window)
     new_window.configure(padx=10, pady=10)
 
     # 4) Build the scrollable detail frame inside it
@@ -1770,8 +1782,7 @@ def open_entity_window(entity_type, name):
 
     new_window = ctk.CTkToplevel()
     new_window.title(f"{entity_type[:-1]}: {name}")
-    new_window.geometry("1000x600")
-    new_window.minsize(1000, 600)
+    apply_fullscreen_top_left(new_window)
     new_window.configure(padx=10, pady=10)
 
     scrollable_container = ctk.CTkScrollableFrame(new_window)
