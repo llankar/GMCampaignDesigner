@@ -1,7 +1,7 @@
 import os
 import customtkinter as ctk
-from PIL import Image
-from customtkinter import CTkLabel, CTkImage, CTkTextbox
+from PIL import Image, ImageTk
+from customtkinter import CTkLabel, CTkTextbox
 from modules.helpers.text_helpers import (
     deserialize_possible_json,
     format_longtext,
@@ -208,23 +208,38 @@ def _build_portrait_widget(parent, entity_type, entity, *, size):
 
     try:
         img = Image.open(resolved_portrait).convert("RGBA")
-        fitted = Image.new("RGBA", size, (0, 0, 0, 0))
+        framed_image = Image.new("RGBA", size, (0, 0, 0, 0))
         image_copy = img.copy()
         image_copy.thumbnail(size, Image.Resampling.LANCZOS)
         offset_x = max((size[0] - image_copy.width) // 2, 0)
         offset_y = max((size[1] - image_copy.height) // 2, 0)
-        fitted.paste(image_copy, (offset_x, offset_y), image_copy)
-        ctk_image = CTkImage(light_image=fitted, size=size)
-        portrait_widget = CTkLabel(parent, image=ctk_image, text="")
-        portrait_widget.image = ctk_image
-        portrait_widget.entity_name = entity.get("Name") or entity.get("Title") or ""
-        portrait_widget.is_portrait = True
+        framed_image.paste(image_copy, (offset_x, offset_y), image_copy)
+
+        portrait_shell = ctk.CTkFrame(parent, fg_color="transparent")
+        portrait_shell.pack_propagate(False)
+        portrait_shell.configure(width=size[0], height=size[1])
+
+        photo_image = ImageTk.PhotoImage(framed_image)
+        portrait_widget = tk.Label(
+            portrait_shell,
+            image=photo_image,
+            text="",
+            bg=portrait_shell._apply_appearance_mode(["#DBDBDB", "#2B2B2B"]),
+            borderwidth=0,
+            highlightthickness=0,
+            cursor="hand2",
+        )
+        portrait_widget.pack(fill="both", expand=True)
+        portrait_widget.image = photo_image
+        portrait_shell.image = photo_image
+        portrait_shell.entity_name = entity.get("Name") or entity.get("Title") or ""
+        portrait_shell.is_portrait = True
         _attach_portrait_tooltip(portrait_widget, entity_type, entity)
         portrait_widget.bind(
             "<Button-1>",
-            lambda _event=None, p=portrait_path, n=portrait_widget.entity_name: show_portrait(p, n)
+            lambda _event=None, p=portrait_path, n=portrait_shell.entity_name: show_portrait(p, n)
         )
-        return portrait_widget, portrait_path
+        return portrait_shell, portrait_path
     except Exception as exc:
         print(f"[DEBUG] Error loading portrait for {entity.get('Name') or entity.get('Title') or ''}: {exc}")
         return None, portrait_path
