@@ -1008,7 +1008,7 @@ def insert_list_longtext(
             entity_collector.setdefault("Maps", set()).update(map_names)
         links = _coerce_links(scene_dict.get("Links"))
 
-        outer = ctk.CTkFrame(parent, fg_color="#0b1220", corner_radius=20, border_width=1, border_color="#22395d")
+        outer = ctk.CTkFrame(parent, fg_color=palette["surface_card"], corner_radius=20, border_width=1, border_color=palette["muted_border"])
         outer.pack(fill="x", expand=True, padx=20, pady=8)
         body = ctk.CTkFrame(outer, fg_color="transparent")
 
@@ -1046,9 +1046,9 @@ def insert_list_longtext(
             btn = ctk.CTkButton(
                 header_row,
                 text=button_text,
-                fg_color="#16243b",
-                hover_color="#223a5f",
-                text_color="#f3f4f6",
+                fg_color=palette["surface_overlay"],
+                hover_color=palette["hero_band"],
+                text_color=palette["text"],
                 corner_radius=14,
                 anchor="w",
                 height=38,
@@ -1057,9 +1057,9 @@ def insert_list_longtext(
                 header_row,
                 text="",
                 variable=check_var,
-                fg_color="#2563eb",
-                hover_color="#1d4ed8",
-                border_color="#94a3b8",
+                fg_color=palette["accent"],
+                hover_color=palette["accent_hover"],
+                border_color=palette["pill_border"],
             )
             checkbox.pack(side="right", padx=(8, 0), pady=(2, 2))
         else:
@@ -1068,9 +1068,9 @@ def insert_list_longtext(
             btn = ctk.CTkButton(
                 outer,
                 text=button_text,
-                fg_color="#16243b",
-                hover_color="#223a5f",
-                text_color="#f3f4f6",
+                fg_color=palette["surface_overlay"],
+                hover_color=palette["hero_band"],
+                text_color=palette["text"],
                 corner_radius=14,
                 anchor="w",
                 height=38,
