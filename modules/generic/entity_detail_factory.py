@@ -503,11 +503,11 @@ def unwrap_value(val):
 
 @log_function
 def insert_npc_table(parent, header, npc_names, open_entity_callback):
-    CTkLabel(parent, text=f"{header}:", font=("Arial", 14, "bold"))\
-        .pack(anchor="w", padx=10, pady=(1, 2))
+    card, body = create_section_card(parent, header, compact=True)
+    card.pack(fill="both", expand=True, padx=10, pady=(0, 12))
 
-    table = ctk.CTkFrame(parent)
-    table.pack(fill="both", expand=True, padx=10, pady=(0,0))
+    table = ctk.CTkFrame(body, fg_color="transparent")
+    table.pack(fill="both", expand=True)
 
     cols         = ["Portrait", "Name", "Secret", "Background",  "Traits", "Factions"]
     weights      = [0,         1,       2,        2,            4,          1     ]
@@ -523,8 +523,12 @@ def insert_npc_table(parent, header, npc_names, open_entity_callback):
 
     # header row
     for c, col_name in enumerate(cols):
-        CTkLabel(table, text=col_name, font=("Arial", 12, "bold"))\
-            .grid(row=0, column=c, padx=5, pady=1, sticky="nsew")
+        CTkLabel(
+            table,
+            text=col_name,
+            font=ctk.CTkFont(size=12, weight="bold"),
+            text_color=get_detail_palette()["muted_text"],
+        ).grid(row=0, column=c, padx=5, pady=(0, 8), sticky="nsew")
 
     # load data
     wrapper = GenericModelWrapper("npcs")
@@ -562,7 +566,7 @@ def insert_npc_table(parent, header, npc_names, open_entity_callback):
         values = [name, secret, background, traits, factions]
         for c, txt in enumerate(values, start=1):
             if c in text_heights:
-                cell = CTkTextbox(table, wrap="word", height=text_heights[c])
+                cell = CTkTextbox(table, wrap="word", height=text_heights[c], **get_textbox_style())
                 cell.insert = cell._textbox.insert
                 cell.insert("1.0", txt)
                 cell.configure(state="disabled")
@@ -571,8 +575,8 @@ def insert_npc_table(parent, header, npc_names, open_entity_callback):
                     cell = CTkLabel(
                         table,
                         text=txt,
-                        text_color="#00BFFF",
-                        font=("Arial", 12, "underline"),
+                        text_color=get_link_color(),
+                        font=ctk.CTkFont(size=12, underline=True),
                         cursor="hand2",
                         anchor="center",
                         justify="center"
@@ -599,11 +603,11 @@ def insert_npc_table(parent, header, npc_names, open_entity_callback):
 
 @log_function
 def insert_creature_table(parent, header, creature_names, open_entity_callback):
-    CTkLabel(parent, text=f"{header}:", font=("Arial", 14, "bold")) \
-        .pack(anchor="w", padx=10, pady=(1, 2))
+    card, body = create_section_card(parent, header, compact=True)
+    card.pack(fill="both", expand=True, padx=10, pady=(0, 12))
 
-    table = ctk.CTkFrame(parent)
-    table.pack(fill="both", expand=True, padx=10, pady=(0,0))
+    table = ctk.CTkFrame(body, fg_color="transparent")
+    table.pack(fill="both", expand=True)
 
     cols         = ["Portrait", "Name", "Weakness", "Powers", "Stats"]
     weights      = [0,         1,       3,          3,        2     ]
@@ -614,8 +618,12 @@ def insert_creature_table(parent, header, creature_names, open_entity_callback):
         table.grid_columnconfigure(idx, weight=w)
 
     for c, col in enumerate(cols):
-        CTkLabel(table, text=col, font=("Arial", 12, "bold")) \
-            .grid(row=0, column=c, padx=5, pady=1, sticky="nsew")
+        CTkLabel(
+            table,
+            text=col,
+            font=ctk.CTkFont(size=12, weight="bold"),
+            text_color=get_detail_palette()["muted_text"],
+        ).grid(row=0, column=c, padx=5, pady=(0, 8), sticky="nsew")
 
     wrapper       = GenericModelWrapper("creatures")
     all_creatures = wrapper.load_items()
@@ -650,7 +658,7 @@ def insert_creature_table(parent, header, creature_names, open_entity_callback):
         values = [name, weakness, powers, stats]
         for c, txt in enumerate(values, start=1):
             if c in text_heights:
-                cell = CTkTextbox(table, wrap="word", height=text_heights[c])
+                cell = CTkTextbox(table, wrap="word", height=text_heights[c], **get_textbox_style())
                 cell.insert = cell._textbox.insert
                 cell.insert("1.0", txt)
                 cell.configure(state="disabled")
@@ -659,8 +667,8 @@ def insert_creature_table(parent, header, creature_names, open_entity_callback):
                     cell = CTkLabel(
                         table,
                         text=txt,
-                        text_color="#00BFFF",
-                        font=("Arial", 12, "underline"),
+                        text_color=get_link_color(),
+                        font=ctk.CTkFont(size=12, underline=True),
                         cursor="hand2",
                         anchor="center",
                         justify="center"
@@ -689,13 +697,11 @@ def insert_places_table(parent, header, place_names, open_entity_callback):
     Render a table of Places (excluding PlayerDisplay) with columns:
     Portrait, Name, Description, NPCs, Secrets
     """
-    # Section header
-    CTkLabel(parent, text=f"{header}:", font=("Arial", 14, "bold")) \
-        .pack(anchor="w", padx=10, pady=(1, 2))
+    card, body = create_section_card(parent, header, compact=True)
+    card.pack(fill="both", expand=True, padx=10, pady=(0, 12))
 
-    # Table container
-    table = ctk.CTkFrame(parent)
-    table.pack(fill="both", expand=True, padx=10, pady=(0, 0))
+    table = ctk.CTkFrame(body, fg_color="transparent")
+    table.pack(fill="both", expand=True)
 
     # Column defs
     cols         = ["Portrait", "Name", "Description", "NPCs", "Secrets"]
@@ -710,8 +716,12 @@ def insert_places_table(parent, header, place_names, open_entity_callback):
 
     # header row
     for c, col_name in enumerate(cols):
-        CTkLabel(table, text=col_name, font=("Arial", 12, "bold")) \
-            .grid(row=0, column=c, padx=5, pady=1, sticky="nsew")
+        CTkLabel(
+            table,
+            text=col_name,
+            font=ctk.CTkFont(size=12, weight="bold"),
+            text_color=get_detail_palette()["muted_text"],
+        ).grid(row=0, column=c, padx=5, pady=(0, 8), sticky="nsew")
 
     # load place data once
     place_map = {
@@ -731,7 +741,7 @@ def insert_places_table(parent, header, place_names, open_entity_callback):
         for c, val in enumerate(values):
             # scrollable for Description & Secrets
             if c in text_heights:
-                cell = CTkTextbox(table, wrap="word", height=text_heights[c])
+                cell = CTkTextbox(table, wrap="word", height=text_heights[c], **get_textbox_style())
                 cell.insert = cell._textbox.insert
                 cell.insert("1.0", val)
                 cell.configure(state="disabled")
@@ -756,7 +766,7 @@ def insert_places_table(parent, header, place_names, open_entity_callback):
             elif c == 1:
                 cell = CTkLabel(
                     table, text=val,
-                    text_color="#00BFFF", font=("Arial", 12, "underline"),
+                    text_color=get_link_color(), font=ctk.CTkFont(size=12, underline=True),
                     cursor="hand2", anchor="center",
                     height=60
                 )
@@ -1318,16 +1328,18 @@ def create_scenario_detail_frame(entity_type, scenario_item, master, open_entity
             insert_text(section_frame, name, value)
         elif ftype == "list_longtext":
             if name == "Scenes" and gm_view_instance is not None:
-                scenes_container = ctk.CTkFrame(section_frame, fg_color="transparent")
-                scenes_container.pack(fill="both", expand=True, padx=10, pady=(10, 2))
+                scenes_card, scenes_body = create_section_card(
+                    section_frame,
+                    "Scenes",
+                    "Run the scenario as a scene list or switch to scene flow.",
+                )
+                scenes_card.pack(fill="both", expand=True, padx=10, pady=(0, 12))
+
+                scenes_container = ctk.CTkFrame(scenes_body, fg_color="transparent")
+                scenes_container.pack(fill="both", expand=True)
 
                 header_row = ctk.CTkFrame(scenes_container, fg_color="transparent")
-                header_row.pack(fill="x", padx=10, pady=(0, 4))
-                ctk.CTkLabel(
-                    header_row,
-                    text="Scenes:",
-                    font=("Arial", 16, "bold"),
-                ).pack(side="left")
+                header_row.pack(fill="x", pady=(0, 4))
 
                 scenario_title = str(
                     scenario_item.get("Title") or scenario_item.get("Name") or ""
