@@ -139,6 +139,7 @@ def _load_module():
         "modules.helpers.logging_helper",
         log_function=lambda func: func,
         log_info=lambda *args, **kwargs: None,
+        log_warning=lambda *args, **kwargs: None,
         log_module_import=lambda *args, **kwargs: None,
     )
     _stub_module("modules.scenarios.scene_flow_viewer", create_scene_flow_frame=lambda *args, **kwargs: None)
