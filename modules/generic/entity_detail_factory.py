@@ -43,6 +43,31 @@ log_module_import(__name__)
 PORTRAIT_SIZE = (200, 200)
 _open_entity_windows = {}
 
+
+def _bring_window_to_front(window, parent=None):
+    try:
+        if parent is not None:
+            window.transient(parent)
+    except Exception:
+        pass
+    try:
+        window.deiconify()
+    except Exception:
+        pass
+    try:
+        window.lift()
+    except Exception:
+        pass
+    try:
+        window.focus_force()
+    except Exception:
+        pass
+    try:
+        window.attributes("-topmost", True)
+        window.after_idle(lambda: window.attributes("-topmost", False))
+    except Exception:
+        pass
+
 TOOLTIP_FIELDS = {
     "NPCs": ("Role", "Secret", "Traits", "Motivation"),
     "Villains": ("Archetype", "ThreatLevel", "Scheme", "CurrentObjective"),
@@ -238,8 +263,8 @@ def open_entity_tab(entity_type, name, master):
     if existing:
         alive = existing.winfo_exists()
         if alive:
-            existing.deiconify()
-            existing.lift()
+            parent_window = master.winfo_toplevel() if master is not None else None
+            _bring_window_to_front(existing, parent=parent_window)
             return
         else:
             _open_entity_windows.pop(window_key, None)
@@ -258,7 +283,8 @@ def open_entity_tab(entity_type, name, master):
         return
 
     # 3) Create a new Toplevel window
-    new_window = ctk.CTkToplevel()
+    parent_window = master.winfo_toplevel() if master is not None else None
+    new_window = ctk.CTkToplevel(parent_window) if parent_window is not None else ctk.CTkToplevel()
     new_window.title(f"{resolved_label}: {name}")
     new_window.geometry("1000x600")
     new_window.minsize(1000, 600)
@@ -283,6 +309,7 @@ def open_entity_tab(entity_type, name, master):
         new_window.destroy()
 
     new_window.protocol("WM_DELETE_WINDOW", _on_close)
+    _bring_window_to_front(new_window, parent=parent_window)
     
 @log_function
 def unwrap_value(val):
