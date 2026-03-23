@@ -22,20 +22,35 @@ class VerticalSectionTabs(ctk.CTkFrame):
         self._font_normal = ctk.CTkFont(size=13, weight="normal")
         self._font_bold = ctk.CTkFont(size=13, weight="bold")
 
-        header = ctk.CTkFrame(self, fg_color="transparent")
-        header.pack(fill="x", padx=12, pady=(12, 8))
+        header = ctk.CTkFrame(
+            self,
+            fg_color=palette["surface_overlay"],
+            corner_radius=16,
+            border_width=1,
+            border_color=palette["pill_border"],
+        )
+        header.pack(fill="x", padx=12, pady=(12, 10))
+
+        eyebrow = ctk.CTkFrame(header, fg_color="transparent")
+        eyebrow.pack(fill="x", padx=14, pady=(12, 4))
+        ctk.CTkLabel(
+            eyebrow,
+            text="GM NAVIGATION",
+            font=ctk.CTkFont(size=10, weight="bold"),
+            text_color=palette["muted_text"],
+        ).pack(anchor="w")
         ctk.CTkLabel(
             header,
             text="Sections",
-            font=ctk.CTkFont(size=15, weight="bold"),
+            font=ctk.CTkFont(size=17, weight="bold"),
             text_color=palette["text"],
-        ).pack(anchor="w")
+        ).pack(anchor="w", padx=14)
         ctk.CTkLabel(
             header,
             text="Click to focus · right-click to pin",
             font=ctk.CTkFont(size=11),
             text_color=palette["muted_text"],
-        ).pack(anchor="w", pady=(2, 0))
+        ).pack(anchor="w", padx=14, pady=(4, 12))
 
         self._button_container = ctk.CTkFrame(self, fg_color="transparent")
         self._button_container.pack(fill="both", expand=True, padx=8, pady=(0, 8))
@@ -48,11 +63,11 @@ class VerticalSectionTabs(ctk.CTkFrame):
                 text=section,
                 anchor="w",
                 font=self._font_normal,
-                fg_color="transparent",
+                fg_color=palette["surface_elevated"],
                 hover_color=palette["surface_overlay"],
                 text_color=palette["muted_text"],
-                corner_radius=14,
-                height=38,
+                corner_radius=16,
+                height=42,
                 border_width=1,
                 border_color=self._inactive_border_color,
                 command=lambda name=section: self._on_select(name),
@@ -90,7 +105,7 @@ class VerticalSectionTabs(ctk.CTkFrame):
             is_active = name == section_name
             button.configure(
                 font=self._font_bold if is_active else self._font_normal,
-                fg_color=self._palette["surface_overlay"] if is_active else "transparent",
+                fg_color=self._palette["surface_overlay"] if is_active else self._palette["surface_elevated"],
                 border_color=self._palette["pill_border"] if is_active else self._inactive_border_color,
                 text_color=self._palette["text"] if is_active else self._palette["muted_text"],
             )
