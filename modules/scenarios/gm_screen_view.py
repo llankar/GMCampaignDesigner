@@ -1730,6 +1730,9 @@ class GMScreenView(ctk.CTkFrame):
             elif self.tab_order:
                 self.show_tab(self.tab_order[0])
 
+            for tab_name in list(self.tabs.keys()):
+                self._reset_tab_scroll_state(tab_name)
+
             if set_default:
                 self.layout_manager.set_scenario_default(self.scenario_name, layout_name)
             elif layout.get("scenario") == self.scenario_name and layout_name == self.layout_manager.get_scenario_default(self.scenario_name):
@@ -2358,6 +2361,45 @@ class GMScreenView(ctk.CTkFrame):
         frame = self.tabs.get(name, {}).get("content_frame") if name else None
         return frame, name
 
+    def _reset_scrollable_widget_position(self, widget):
+        if widget is None:
+            return
+        try:
+            widget.update_idletasks()
+        except Exception:
+            return
+
+        candidates = [widget]
+        inner = getattr(widget, "_scrollable_frame", None)
+        canvas = getattr(widget, "_parent_canvas", None)
+        if inner is not None:
+            candidates.append(inner)
+        if canvas is not None:
+            candidates.append(canvas)
+
+        for candidate in candidates:
+            try:
+                if hasattr(candidate, "bbox") and canvas is not None:
+                    bbox = canvas.bbox("all")
+                    if bbox is not None:
+                        canvas.configure(scrollregion=bbox)
+            except Exception:
+                pass
+            try:
+                if hasattr(candidate, "yview_moveto"):
+                    candidate.yview_moveto(0.0)
+            except Exception:
+                pass
+
+    def _reset_tab_scroll_state(self, tab_name):
+        tab = self.tabs.get(tab_name) or {}
+        frame = tab.get("content_frame")
+        if frame is None:
+            return
+        self._reset_scrollable_widget_position(frame)
+        self.after_idle(lambda f=frame: self._reset_scrollable_widget_position(f))
+        self.after(25, lambda f=frame: self._reset_scrollable_widget_position(f))
+
     def show_tab(self, name):
         log_info(f"Showing tab: {name}", func_name="GMScreenView.show_tab")
         # Hide content for the current tab if it's not detached.
@@ -2405,6 +2447,7 @@ class GMScreenView(ctk.CTkFrame):
 
             frame = tab["content_frame"]
             frame.pack(fill="both", expand=True)
+            self._reset_tab_scroll_state(name)
             self._request_active_tab_layout_settle()
 
     def add_new_tab(self):
