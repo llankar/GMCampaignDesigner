@@ -59,6 +59,14 @@ DEFAULT_PORTRAIT_PLACEMENT = "spotlight"
 _open_entity_windows = {}
 
 
+def _portrait_debug(entity_type, entity, message):
+    entity_name = ""
+    if isinstance(entity, dict):
+        entity_name = str(entity.get("Name") or entity.get("Title") or "").strip()
+    label = entity_name or "<unnamed>"
+    print(f"[PORTRAIT DEBUG] {entity_type} | {label} | {message}")
+
+
 def _bring_window_to_front(window, parent=None):
     try:
         if parent is not None:
@@ -192,21 +200,39 @@ def _collect_highlight_lines(entity_type, entity):
 
 def _build_portrait_widget(parent, entity_type, entity, *, size):
     portrait_sources = (
-        entity.get("Portrait"),
-        entity.get("Image"),
+        ("Portrait", entity.get("Portrait")),
+        ("Image", entity.get("Image")),
     )
     portrait_path = ""
     resolved_portrait = None
+    campaign_dir = ConfigHelper.get_campaign_dir()
 
-    for portrait_value in portrait_sources:
+    _portrait_debug(
+        entity_type,
+        entity,
+        f"starting widget build with size={size}, campaign_dir='{campaign_dir}'",
+    )
+
+    for field_name, portrait_value in portrait_sources:
         portrait_path = primary_portrait(portrait_value)
-        resolved_portrait = resolve_portrait_path(portrait_value, ConfigHelper.get_campaign_dir())
-        if resolved_portrait and os.path.exists(resolved_portrait):
+        resolved_portrait = resolve_portrait_path(portrait_value, campaign_dir)
+        resolved_exists = bool(resolved_portrait and os.path.exists(resolved_portrait))
+        _portrait_debug(
+            entity_type,
+            entity,
+            (
+                f"field={field_name}, raw={portrait_value!r}, primary={portrait_path!r}, "
+                f"resolved={resolved_portrait!r}, exists={resolved_exists}"
+            ),
+        )
+        if resolved_exists:
             break
     else:
+        _portrait_debug(entity_type, entity, "no usable portrait path found; returning without widget")
         return None, portrait_path
 
     try:
+        _portrait_debug(entity_type, entity, f"loading portrait image from '{resolved_portrait}'")
         img = Image.open(resolved_portrait).convert("RGBA")
         framed_image = Image.new("RGBA", size, (0, 0, 0, 0))
         image_copy = img.copy()
@@ -239,9 +265,17 @@ def _build_portrait_widget(parent, entity_type, entity, *, size):
             "<Button-1>",
             lambda _event=None, p=portrait_path, n=portrait_shell.entity_name: show_portrait(p, n)
         )
+        _portrait_debug(
+            entity_type,
+            entity,
+            (
+                f"portrait widget ready using source={portrait_path!r}, resolved={resolved_portrait!r}, "
+                f"thumbnail={image_copy.width}x{image_copy.height}, offsets=({offset_x}, {offset_y})"
+            ),
+        )
         return portrait_shell, portrait_path
     except Exception as exc:
-        print(f"[DEBUG] Error loading portrait for {entity.get('Name') or entity.get('Title') or ''}: {exc}")
+        _portrait_debug(entity_type, entity, f"error loading portrait: {exc}")
         return None, portrait_path
 
 
@@ -1647,22 +1681,38 @@ def create_entity_detail_frame(entity_type, entity, master, open_entity_callback
     spotlight_portrait = None
     hero_portrait = None
 
+    _portrait_debug(
+        entity_type,
+        entity,
+        f"opening detail view with placement='{DEFAULT_PORTRAIT_PLACEMENT}'",
+    )
+
     if DEFAULT_PORTRAIT_PLACEMENT in {"spotlight", "both"}:
-        spotlight_portrait, _ = _build_portrait_widget(
+        spotlight_portrait, spotlight_path = _build_portrait_widget(
             content_frame,
             entity_type,
             entity,
             size=PORTRAIT_SIZE,
         )
+        _portrait_debug(
+            entity_type,
+            entity,
+            f"spotlight result widget_created={spotlight_portrait is not None}, source={spotlight_path!r}",
+        )
         if spotlight_portrait is not None:
             content_frame.portrait_images[str(entity_label)] = spotlight_portrait.image
 
     if DEFAULT_PORTRAIT_PLACEMENT in {"hero", "both"}:
-        hero_portrait, _ = _build_portrait_widget(
+        hero_portrait, hero_path = _build_portrait_widget(
             content_frame,
             entity_type,
             entity,
             size=HERO_PORTRAIT_SIZE,
+        )
+        _portrait_debug(
+            entity_type,
+            entity,
+            f"hero result widget_created={hero_portrait is not None}, source={hero_path!r}",
         )
         if hero_portrait is not None:
             content_frame.portrait_images[f"{entity_label}-hero"] = hero_portrait.image
