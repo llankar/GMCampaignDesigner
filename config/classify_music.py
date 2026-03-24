@@ -73,7 +73,7 @@ def classify(name):
     best = max(scores, key=scores.get)
 
     if scores[best] == 0:
-        return "no category"
+        return "no mood"
 
     return best
 
