@@ -110,6 +110,7 @@ def create_hero_header(
     meta_items: list[str] | None = None,
     portrait_widget=None,
     portrait_builder=None,
+    adaptive_wrap: bool = True,
 ):
     palette = get_detail_palette()
     hero = ctk.CTkFrame(
@@ -139,24 +140,27 @@ def create_hero_header(
     if meta_items:
         create_chip(badge_row, f"{len([item for item in meta_items if item])} signals").pack(side="left", padx=(8, 0))
 
-    ctk.CTkLabel(
+    title_label = ctk.CTkLabel(
         text_col,
         text=title,
         font=ctk.CTkFont(size=34, weight="bold"),
         text_color=palette["text"],
         justify="left",
         wraplength=820,
-    ).pack(anchor="w", pady=(18, 10))
+    )
+    title_label.pack(anchor="w", fill="x", pady=(18, 10))
 
+    summary_label = None
     if summary:
-        ctk.CTkLabel(
+        summary_label = ctk.CTkLabel(
             text_col,
             text=summary,
             font=ctk.CTkFont(size=14),
             text_color=palette["muted_text"],
             justify="left",
             wraplength=760,
-        ).pack(anchor="w")
+        )
+        summary_label.pack(anchor="w", fill="x")
 
     if meta_items:
         meta_flow = ctk.CTkFrame(text_col, fg_color="transparent")
@@ -181,6 +185,29 @@ def create_hero_header(
         rendered_portrait = portrait_widget or (portrait_builder(portrait_shell) if portrait_builder is not None else None)
         if rendered_portrait is not None:
             rendered_portrait.pack(fill="both", expand=True, padx=12, pady=12)
+
+    if adaptive_wrap:
+        def _update_wrap(_event=None):
+            try:
+                text_width = int(text_col.winfo_width())
+            except Exception:
+                return
+            if text_width <= 1:
+                return
+            title_wrap = max(320, text_width - 8)
+            summary_wrap = max(320, text_width - 8)
+            try:
+                title_label.configure(wraplength=title_wrap)
+            except Exception:
+                pass
+            if summary_label is not None:
+                try:
+                    summary_label.configure(wraplength=summary_wrap)
+                except Exception:
+                    pass
+
+        text_col.bind("<Configure>", _update_wrap, add="+")
+        hero.after_idle(_update_wrap)
 
     return hero
 
