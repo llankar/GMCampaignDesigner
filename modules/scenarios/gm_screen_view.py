@@ -2582,12 +2582,18 @@ class GMScreenView(ctk.CTkFrame):
         if existing:
             self._focus_existing_tab(existing)
             return
-        wrapper = self.wrappers[entity_type]
+
+        wrapper = self.map_wrapper if entity_type == "Maps" else self.wrappers.get(entity_type)
+        if wrapper is None:
+            messagebox.showerror("Error", f"Entity type '{entity_type}' is not available.")
+            return
+
         items = wrapper.load_items()
-        key = "Title" if (entity_type == "Scenarios" or entity_type == "Informations") else "Name"
+        key = "Title" if entity_type in {"Scenarios", "Informations"} else "Name"
         item = next((i for i in items if i.get(key) == name), None)
         if not item:
-            messagebox.showerror("Error", f"{entity_type[:-1]} '{name}' not found.")
+            singular = entity_type[:-1] if entity_type.endswith("s") else entity_type
+            messagebox.showerror("Error", f"{singular} '{name}' not found.")
             return
         # Use the shared factory function and pass self.open_entity_tab as the callback.
         frame = create_entity_detail_frame(entity_type, item, master=self.content_area, open_entity_callback=self.open_entity_tab)
