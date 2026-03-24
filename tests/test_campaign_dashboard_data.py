@@ -3,7 +3,7 @@ from pathlib import Path
 
 
 MODULE_PATH = Path("modules/scenarios/gm_screen/dashboard/campaign_dashboard_data.py")
-spec = spec_from_file_location("campaign_dashboard_data", MODULE_PATH)
+spec = spec_from_file_location("root_campaign_dashboard_data", MODULE_PATH)
 assert spec and spec.loader
 campaign_dashboard_data = module_from_spec(spec)
 spec.loader.exec_module(campaign_dashboard_data)

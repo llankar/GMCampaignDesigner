@@ -11,9 +11,6 @@ from modules.helpers.logging_helper import log_module_import
 
 log_module_import(__name__)
 
-ctk.set_appearance_mode("Dark")
-theme_manager.apply_theme(theme_manager.get_theme())
-
 class FactionGraphEditor(ctk.CTkFrame):
     def __init__(self, master, faction_wrapper: GenericModelWrapper, *args, **kwargs):
         super().__init__(master, *args, **kwargs)

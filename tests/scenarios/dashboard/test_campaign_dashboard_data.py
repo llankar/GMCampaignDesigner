@@ -2,7 +2,7 @@ import importlib.util
 from pathlib import Path
 
 MODULE_PATH = Path("modules/scenarios/gm_screen/dashboard/campaign_dashboard_data.py")
-spec = importlib.util.spec_from_file_location("campaign_dashboard_data", MODULE_PATH)
+spec = importlib.util.spec_from_file_location("scenario_dashboard_campaign_data", MODULE_PATH)
 module = importlib.util.module_from_spec(spec)
 assert spec and spec.loader
 spec.loader.exec_module(module)

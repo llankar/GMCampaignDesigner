@@ -54,8 +54,6 @@ try:
     RESAMPLE_MODE = Image.Resampling.LANCZOS
 except AttributeError:  # Pillow < 9.1 fallback
     RESAMPLE_MODE = Image.LANCZOS
-ctk.set_appearance_mode("Dark")
-theme_manager.apply_theme(theme_manager.get_theme())
 
 
 class LinkEditDialog(ctk.CTkToplevel):

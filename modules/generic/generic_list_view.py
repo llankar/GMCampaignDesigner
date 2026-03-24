@@ -43,8 +43,6 @@ from modules.generic.entities.linking import entity_label_map, resolve_entity_sl
 log_module_import(__name__)
 
 PORTRAIT_FOLDER = os.path.join(ConfigHelper.get_campaign_dir(), "assets", "portraits")
-ctk.set_appearance_mode("Dark")
-theme_manager.apply_theme(theme_manager.get_theme())
 
 SCENARIO_LINK_FIELDS = {
     "npcs": "NPCs",

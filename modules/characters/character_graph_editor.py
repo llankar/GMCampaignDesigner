@@ -38,9 +38,6 @@ from modules.characters.graph_tabs import (
 
 log_module_import(__name__)
 
-ctk.set_appearance_mode("Dark")
-theme_manager.apply_theme(theme_manager.get_theme())
-
 #logging.basicConfig(level=logging.ERROR)
 
 # Constants for portrait folder and max portrait size

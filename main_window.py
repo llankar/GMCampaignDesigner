@@ -123,10 +123,11 @@ initialize_logging()
 install_global_exception_hooks()
 log_module_import(__name__)
 
-# Set up CustomTkinter appearance
-ctk.set_appearance_mode("Dark")
-# Apply configured theme palette (default/medieval/sf)
-theme_manager.apply_theme(theme_manager.get_theme())
+
+def configure_ui_defaults() -> None:
+    """Apply global CustomTkinter defaults explicitly at app startup."""
+    ctk.set_appearance_mode("Dark")
+    theme_manager.apply_theme(theme_manager.get_theme())
 
 # Global process variable for SwarmUI
 SWARMUI_PROCESS = None
@@ -137,6 +138,7 @@ SWARMUI_PROCESS = None
 @log_methods
 class MainWindow(ctk.CTk):
     def __init__(self):
+        configure_ui_defaults()
         super().__init__()
 
         log_info("Initializing MainWindow", func_name="main_window.MainWindow.__init__")

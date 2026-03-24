@@ -113,7 +113,6 @@ MASKS_DIR = os.path.join(ConfigHelper.get_campaign_dir(), "masks")
 MAX_ZOOM = 3.0
 MIN_ZOOM = 0.1
 ZOOM_STEP = 0.1  # 10% per wheel notch
-ctk.set_appearance_mode("dark")
 
 LINK_PATTERN = re.compile(r"(https?://|www\.)[^\s<>]+", re.IGNORECASE)
 
