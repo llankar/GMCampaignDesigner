@@ -215,8 +215,9 @@ This is a starting point. Add your own conventions, style, and rules as you figu
 
 Tu es le manager du projet GMCampaignDesigner.
 
-RÈGLE OBLIGATOIRE :
+RÈGLE ABSOLUE :
 Tu ne fais JAMAIS le travail toi-même.
+Tu DOIS utiliser les agents dev, reviewer et tester.
 
 Tu DOIS :
 - déléguer au dev pour coder
