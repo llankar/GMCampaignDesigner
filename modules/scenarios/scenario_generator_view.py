@@ -90,8 +90,17 @@ class ScenarioGeneratorView(ctk.CTkFrame):
                 font=("Helvetica", 14),
             )
             title_lbl.pack(anchor="w", padx=8, pady=(4, 0))
-            desc_lbl.pack(anchor="w", padx=8, pady=(0, 6))
+            desc_lbl.pack(anchor="w", fill="x", padx=8, pady=(0, 6))
             card.pack(fill="x", expand=True, padx=5, pady=5)
+
+            def _update_desc_wrap(_event=None, label=desc_lbl, parent=card):
+                try:
+                    label.configure(wraplength=max(320, parent.winfo_width() - 24))
+                except Exception:
+                    pass
+
+            card.bind("<Configure>", _update_desc_wrap, add="+")
+            self.after_idle(_update_desc_wrap)
 
         self.export_btn.configure(state="normal")
         self.add_btn.configure(state="normal")

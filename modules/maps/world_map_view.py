@@ -2001,6 +2001,7 @@ class WorldMapPanel(ctk.CTkFrame):
             self._render_summary_message("No synthesis data available yet. Add notes for richer context.")
             return
         self._clear_summary_sections()
+        wrap_labels = []
         for title, values in sections.items():
             frame = ctk.CTkFrame(self.summary_container, fg_color="#141C30", corner_radius=12)
             frame.pack(fill="x", pady=(0, 12))
@@ -2012,14 +2013,33 @@ class WorldMapPanel(ctk.CTkFrame):
             ).pack(anchor="w", padx=12, pady=(12, 6))
             content = values if values else ["No details have been recorded yet."]
             for value in content:
-                ctk.CTkLabel(
+                label = ctk.CTkLabel(
                     frame,
                     text=value,
                     font=("Segoe UI", 12),
                     wraplength=500,
                     justify="left",
                     anchor="w",
-                ).pack(fill="x", padx=12, pady=(0, 8))
+                )
+                label.pack(fill="x", padx=12, pady=(0, 8))
+                wrap_labels.append(label)
+
+        def _update_summary_wrap(_event=None):
+            try:
+                available = max(260, self.summary_container.winfo_width() - 36)
+            except Exception:
+                return
+            for label in wrap_labels:
+                try:
+                    label.configure(wraplength=available)
+                except Exception:
+                    pass
+
+        try:
+            self.summary_container.bind("<Configure>", _update_summary_wrap, add="+")
+            self.after_idle(_update_summary_wrap)
+        except Exception:
+            pass
 
     def _populate_summary_tab(self, sections: dict[str, list[str]]) -> None:
         self._render_summary_sections(sections)

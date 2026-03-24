@@ -1040,6 +1040,15 @@ class ChatbotDialog(ctk.CTkToplevel):
         )
         self.selection_label.grid(row=2, column=0, sticky="ew", pady=(10, 4))
 
+        def _update_selection_wrap(_event=None):
+            try:
+                self.selection_label.configure(wraplength=max(280, results_frame.winfo_width() - 24))
+            except Exception:
+                pass
+
+        results_frame.bind("<Configure>", _update_selection_wrap, add="+")
+        self.after_idle(_update_selection_wrap)
+
         notes_frame = ctk.CTkFrame(
             self,
             corner_radius=12,
