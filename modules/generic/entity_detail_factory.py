@@ -65,8 +65,7 @@ def _portrait_debug(entity_type, entity, message):
     if isinstance(entity, dict):
         entity_name = str(entity.get("Name") or entity.get("Title") or "").strip()
     label = entity_name or "<unnamed>"
-    print(f"[PORTRAIT DEBUG] {entity_type} | {label} | {message}")
-
+  
 
 def _bring_window_to_front(window, parent=None):
     try:
