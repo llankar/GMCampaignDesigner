@@ -11,6 +11,7 @@ from modules.ai.local_ai_client import LocalAIClient
 from modules.audio.audio_library import AUDIO_EXTENSIONS
 from modules.audio.audio_controller import AudioController, get_audio_controller
 from modules.audio.audio_constants import SECTION_TITLES
+from modules.audio.services.music_mood_classifier import NO_MOOD
 from modules.helpers.window_helper import position_window_at_top
 from modules.helpers.logging_helper import log_exception, log_module_import
 
@@ -77,9 +78,21 @@ class SoundManagerWindow(ctk.CTkToplevel):
         category_frame.grid_rowconfigure(1, weight=1)
         category_frame.grid_columnconfigure(0, weight=1)
 
-        ctk.CTkLabel(category_frame, text="Types", font=("Segoe UI", 16, "bold")).grid(
+        group_label_var = tk.StringVar(value="Types")
+        ctk.CTkLabel(category_frame, textvariable=group_label_var, font=("Segoe UI", 16, "bold")).grid(
             row=0, column=0, sticky="w", padx=8, pady=(8, 4)
         )
+        browse_mode_var = tk.StringVar(value="category")
+        browse_mode = ctk.CTkOptionMenu(
+            category_frame,
+            variable=browse_mode_var,
+            values=["category", "mood"],
+            command=lambda _value, s=section: self._on_browse_mode_changed(s),
+        )
+        if section != "music":
+            browse_mode.configure(values=["category"], state="disabled")
+            browse_mode_var.set("category")
+        browse_mode.grid(row=0, column=1, sticky="e", padx=(4, 8), pady=(8, 4))
 
         category_list = tk.Listbox(
             category_frame,
@@ -152,7 +165,7 @@ class SoundManagerWindow(ctk.CTkToplevel):
         track_list.configure(yscrollcommand=track_scroll.set)
         track_buttons = ctk.CTkFrame(tracks_frame)
         track_buttons.grid(row=2, column=0, columnspan=2, sticky="ew", padx=8, pady=(0, 8))
-        for idx in range(5):
+        for idx in range(6):
             track_buttons.grid_columnconfigure(idx, weight=1)
 
         ctk.CTkButton(
@@ -185,7 +198,13 @@ class SoundManagerWindow(ctk.CTkToplevel):
             fg_color="#8b1d1d",
             hover_color="#6f1414",
             command=lambda s=section: self._remove_tracks(s),
-        ).grid(row=0, column=4, sticky="ew", padx=(6, 0))
+        ).grid(row=0, column=4, sticky="ew", padx=3)
+
+        ctk.CTkButton(
+            track_buttons,
+            text="Classify Moods",
+            command=lambda s=section: self._classify_moods(s),
+        ).grid(row=0, column=5, sticky="ew", padx=(3, 0))
         playback_frame = ctk.CTkFrame(tracks_frame)
         playback_frame.grid(row=3, column=0, columnspan=2, sticky="ew", padx=8, pady=(0, 8))
         for idx in range(7):
@@ -333,6 +352,8 @@ class SoundManagerWindow(ctk.CTkToplevel):
             "volume_value_var": volume_value_var,
             "track_items": [],
             "current_category": None,
+            "group_label_var": group_label_var,
+            "browse_mode_var": browse_mode_var,
         }
         return state
     def _register_controller_callbacks(self) -> None:
@@ -484,18 +505,21 @@ class SoundManagerWindow(ctk.CTkToplevel):
         return state
     def _refresh_categories(self, section: str) -> None:
         state = self._get_state(section)
-        categories = self.library.get_categories(section)
+        mode = self._get_browse_mode(section)
+        categories = self.library.get_categories(section) if mode == "category" else self.library.get_moods(section)
         listbox = state["category_list"]
         listbox.delete(0, "end")
         for name in categories:
             listbox.insert("end", name)
+        state["group_label_var"].set("Types" if mode == "category" else "Moods")
 
         if not categories:
             state["current_category"] = None
             state["track_items"] = []
             state["track_list"].delete(0, "end")
             state["directories_var"].set("Folders: none")
-            state["status_var"].set("No types configured yet.")
+            empty_text = "No types configured yet." if mode == "category" else "No moods available yet."
+            state["status_var"].set(empty_text)
             return
 
         current = state.get("current_category")
@@ -525,22 +549,24 @@ class SoundManagerWindow(ctk.CTkToplevel):
     def _refresh_tracks(self, section: str) -> None:
         state = self._get_state(section)
         category = state.get("current_category")
+        mode = self._get_browse_mode(section)
         listbox = state["track_list"]
         listbox.delete(0, "end")
         if not category:
             state["track_items"] = []
-            state["status_var"].set("Select a type to see tracks.")
+            state["status_var"].set("Select a type to see tracks." if mode == "category" else "Select a mood to see tracks.")
             state["directories_var"].set("Folders: none")
             return
 
-        tracks = self.library.list_tracks(section, category)
+        tracks = self.library.list_tracks(section, category) if mode == "category" else self.library.list_tracks_by_mood(section, category)
         state["track_items"] = tracks
         for track in tracks:
             name = track.get("name") or os.path.basename(track.get("path", ""))
-            listbox.insert("end", name)
+            mood = str(track.get("mood", NO_MOOD) or NO_MOOD)
+            listbox.insert("end", f"{name} [{mood}]")
 
         state["status_var"].set(f"{len(tracks)} track(s) in {category}.")
-        directories = self.library.get_directories(section, category)
+        directories = self.library.get_directories(section, category) if mode == "category" else []
         self._update_directories_label(state, directories)
 
     def _update_directories_label(self, state: dict[str, Any], directories: list[str]) -> None:
@@ -562,6 +588,9 @@ class SoundManagerWindow(ctk.CTkToplevel):
         return state["category_list"].get(selection[0])
 
     def _add_category(self, section: str) -> None:
+        if self._get_browse_mode(section) != "category":
+            messagebox.showinfo("Add Type", "Switch to category mode to manage types.", parent=self)
+            return
         name = simpledialog.askstring("Add Type", "Enter a name for the new type:", parent=self)
         if not name:
             return
@@ -573,6 +602,9 @@ class SoundManagerWindow(ctk.CTkToplevel):
         self._refresh_categories(section)
 
     def _rename_category(self, section: str) -> None:
+        if self._get_browse_mode(section) != "category":
+            messagebox.showinfo("Rename Type", "Switch to category mode to manage types.", parent=self)
+            return
         current = self._get_selected_category(section)
         if not current:
             messagebox.showinfo("Rename Type", "Select a type to rename.", parent=self)
@@ -588,6 +620,9 @@ class SoundManagerWindow(ctk.CTkToplevel):
         self._refresh_categories(section)
 
     def _remove_category(self, section: str) -> None:
+        if self._get_browse_mode(section) != "category":
+            messagebox.showinfo("Remove Type", "Switch to category mode to manage types.", parent=self)
+            return
         current = self._get_selected_category(section)
         if not current:
             messagebox.showinfo("Remove Type", "Select a type to remove.", parent=self)
@@ -620,6 +655,9 @@ class SoundManagerWindow(ctk.CTkToplevel):
         return os.getcwd()
 
     def _add_tracks_via_files(self, section: str) -> None:
+        if self._get_browse_mode(section) != "category":
+            messagebox.showinfo("Add Files", "Switch to category mode to add tracks.", parent=self)
+            return
         state = self._get_state(section)
         category = state.get("current_category")
         if not category:
@@ -644,6 +682,9 @@ class SoundManagerWindow(ctk.CTkToplevel):
         self._refresh_tracks(section)
 
     def _add_tracks_via_folder(self, section: str) -> None:
+        if self._get_browse_mode(section) != "category":
+            messagebox.showinfo("Add Folder", "Switch to category mode to add tracks.", parent=self)
+            return
         state = self._get_state(section)
         category = state.get("current_category")
         if not category:
@@ -669,6 +710,9 @@ class SoundManagerWindow(ctk.CTkToplevel):
         self._refresh_tracks(section)
 
     def _remove_tracks(self, section: str) -> None:
+        if self._get_browse_mode(section) != "category":
+            messagebox.showinfo("Remove Tracks", "Switch to category mode to remove tracks.", parent=self)
+            return
         state = self._get_state(section)
         category = state.get("current_category")
         if not category:
@@ -695,6 +739,9 @@ class SoundManagerWindow(ctk.CTkToplevel):
         self._refresh_tracks(section)
 
     def _rescan_category(self, section: str) -> None:
+        if self._get_browse_mode(section) != "category":
+            messagebox.showinfo("Rescan", "Switch to category mode to rescan folders.", parent=self)
+            return
         state = self._get_state(section)
         category = state.get("current_category")
         if not category:
@@ -950,16 +997,20 @@ class SoundManagerWindow(ctk.CTkToplevel):
     def _play_selected(self, section: str) -> None:
         state = self._get_state(section)
         category = state.get("current_category")
+        mode = self._get_browse_mode(section)
         if not category:
-            messagebox.showinfo("Play", "Select a type first.", parent=self)
+            label = "type" if mode == "category" else "mood"
+            messagebox.showinfo("Play", f"Select a {label} first.", parent=self)
             return
         tracks = state.get("track_items", [])
         if not tracks:
-            messagebox.showinfo("Play", "No tracks available in this type.", parent=self)
+            label = "type" if mode == "category" else "mood"
+            messagebox.showinfo("Play", f"No tracks available in this {label}.", parent=self)
             return
         selection = state["track_list"].curselection()
         index = selection[0] if selection else 0
-        self.controller.set_playlist(section, list(tracks), category=category)
+        playlist_category = category if mode == "category" else None
+        self.controller.set_playlist(section, list(tracks), category=playlist_category)
         if self.controller.play(section, start_index=index):
             track = tracks[index]
             name = track.get("name") or os.path.basename(track.get("path", ""))
@@ -968,6 +1019,30 @@ class SoundManagerWindow(ctk.CTkToplevel):
             details = self.controller.get_last_error(section) or "Failed to start playback."
             state["status_var"].set(f"Error: {details}")
             messagebox.showerror("Playback", f"Failed to start playback:\n{details}", parent=self)
+
+    def _get_browse_mode(self, section: str) -> str:
+        state = self._get_state(section)
+        value = str(state["browse_mode_var"].get()).strip().lower()
+        if section != "music":
+            return "category"
+        return "mood" if value == "mood" else "category"
+
+    def _on_browse_mode_changed(self, section: str) -> None:
+        state = self._get_state(section)
+        state["current_category"] = None
+        self._refresh_categories(section)
+
+    def _classify_moods(self, section: str) -> None:
+        if section != "music":
+            messagebox.showinfo("Classify Moods", "Mood classification is available for music only.", parent=self)
+            return
+        result = self.library.classify_section_moods(section)
+        updated = int(result.get("updated", 0))
+        self._refresh_categories(section)
+        if updated:
+            self._set_status(section, f"Mood classification complete ({updated} track(s) updated).")
+        else:
+            self._set_status(section, "Mood classification complete (no changes).")
 
     def _next_track(self, section: str) -> None:
         if self.controller.next(section):
@@ -1012,9 +1087,6 @@ class SoundManagerWindow(ctk.CTkToplevel):
     def _on_close(self) -> None:
         self._detach_controller_listener()
         self.destroy()
-
-
-
 
 
 
