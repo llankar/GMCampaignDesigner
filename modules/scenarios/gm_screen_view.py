@@ -350,26 +350,55 @@ class GMScreenView(ctk.CTkFrame):
         except Exception:
             pass
 
+    def _build_hidden_tab_content(self, host_parent, content_factory):
+        container = ctk.CTkFrame(host_parent, fg_color="transparent")
+        built = content_factory(container)
+        if built is not None and built is not container:
+            try:
+                if not built.winfo_manager():
+                    built.pack(fill="both", expand=True)
+            except Exception:
+                pass
+
+        def _proxy_attr(attr_name):
+            if built is None or not hasattr(built, attr_name):
+                return
+            try:
+                setattr(container, attr_name, getattr(built, attr_name))
+            except Exception:
+                pass
+
+        for attr in (
+            "edit_entity",
+            "portrait_label",
+            "portrait_images",
+            "text_box",
+            "get_state",
+            "refresh",
+            "reload",
+        ):
+            _proxy_attr(attr)
+
+        if built is not None:
+            container.content_inner = built
+        return container
+
     def _create_initial_scenario_tab(self):
         scenario_name = self.scenario.get("Title", "Unnamed Scenario")
-        frame = create_entity_detail_frame(
+        factory = lambda master: create_entity_detail_frame(
             "Scenarios",
             self.scenario,
-            master=self.content_area,
+            master=master,
             open_entity_callback=self.open_entity_tab,
         )
+        frame = self._build_hidden_tab_content(self.content_area, factory)
 
         # Make sure the frame can get focus so the binding works
         self.focus_set()
         self.add_tab(
             scenario_name,
             frame,
-            content_factory=lambda master: create_entity_detail_frame(
-                "Scenarios",
-                self.scenario,
-                master=master,
-                open_entity_callback=self.open_entity_tab,
-            ),
+            content_factory=lambda master: self._build_hidden_tab_content(master, factory),
             layout_meta={
                 "kind": "entity",
                 "entity_type": "Scenarios",
@@ -1764,16 +1793,17 @@ class GMScreenView(ctk.CTkFrame):
 
     def _open_entity_from_layout(self, entity_type, entity_name):
         if entity_type == "Scenarios" and (self.scenario.get("Title") == entity_name or self.scenario.get("Name") == entity_name):
-            frame = create_entity_detail_frame(
+            factory = lambda master: create_entity_detail_frame(
                 "Scenarios",
                 self.scenario,
-                master=self.content_area,
+                master=master,
                 open_entity_callback=self.open_entity_tab,
             )
+            frame = self._build_hidden_tab_content(self.content_area, factory)
             self.add_tab(
                 entity_name,
                 frame,
-                content_factory=lambda master: create_entity_detail_frame("Scenarios", self.scenario, master=master, open_entity_callback=self.open_entity_tab),
+                content_factory=lambda master: self._build_hidden_tab_content(master, factory),
                 layout_meta={
                     "kind": "entity",
                     "entity_type": "Scenarios",
@@ -2596,12 +2626,18 @@ class GMScreenView(ctk.CTkFrame):
             messagebox.showerror("Error", f"{singular} '{name}' not found.")
             return
         # Use the shared factory function and pass self.open_entity_tab as the callback.
-        frame = create_entity_detail_frame(entity_type, item, master=self.content_area, open_entity_callback=self.open_entity_tab)
-        
+        factory = lambda master: create_entity_detail_frame(
+            entity_type,
+            item,
+            master=master,
+            open_entity_callback=self.open_entity_tab,
+        )
+        frame = self._build_hidden_tab_content(self.content_area, factory)
+
         self.add_tab(
             name,
             frame,
-            content_factory=lambda master: create_entity_detail_frame(entity_type, item, master=master, open_entity_callback=self.open_entity_tab),
+            content_factory=lambda master: self._build_hidden_tab_content(master, factory),
             layout_meta={
                 "kind": "entity",
                 "entity_type": entity_type,
@@ -2622,19 +2658,16 @@ class GMScreenView(ctk.CTkFrame):
             self.show_tab(existing_tab)
             return
 
-        frame = CampaignDashboardPanel(
-            self.content_area,
+        factory = lambda master: CampaignDashboardPanel(
+            master,
             wrappers=self.wrappers,
             open_entity_callback=self.open_entity_tab,
         )
+        frame = self._build_hidden_tab_content(self.content_area, factory)
         self.add_tab(
             title,
             frame,
-            content_factory=lambda master: CampaignDashboardPanel(
-                master,
-                wrappers=self.wrappers,
-                open_entity_callback=self.open_entity_tab,
-            ),
+            content_factory=lambda master: self._build_hidden_tab_content(master, factory),
             layout_meta={"kind": "campaign_dashboard"},
         )
 
