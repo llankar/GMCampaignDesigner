@@ -242,6 +242,10 @@ class SoundManagerWindow(ctk.CTkToplevel):
                     state["current_mood"] = None
                     self._refresh_moods(section)
 
+        mood = data.get("mood")
+        if isinstance(mood, str) and mood:
+            state["current_mood"] = mood
+
         track = data.get("current_track") or {}
         last_error = data.get("last_error", "")
         if track:
@@ -352,8 +356,13 @@ class SoundManagerWindow(ctk.CTkToplevel):
             return
 
         current_mood = state.get("current_mood")
+        remembered_category = str(self.library.get_setting(section, "last_category", "") or "")
+        remembered_mood = str(self.library.get_setting(section, "last_mood", "") or "")
         if current_mood in moods:
             index = moods.index(current_mood)
+        elif category == remembered_category and remembered_mood in moods:
+            index = moods.index(remembered_mood)
+            current_mood = remembered_mood
         else:
             index = 0
             current_mood = moods[0]
@@ -462,6 +471,8 @@ class SoundManagerWindow(ctk.CTkToplevel):
         state = self._get_state(section)
         state["current_category"] = selected
         state["current_mood"] = None
+        self.library.set_setting(section, "last_category", selected)
+        self.library.set_setting(section, "last_mood", "")
         self._refresh_moods(section)
 
     def _on_mood_selected(self, section: str) -> None:
@@ -470,6 +481,8 @@ class SoundManagerWindow(ctk.CTkToplevel):
             return
         state = self._get_state(section)
         state["current_mood"] = selected
+        self.library.set_setting(section, "last_category", str(state.get("current_category") or ""))
+        self.library.set_setting(section, "last_mood", selected)
         self._refresh_tracks(section)
 
     def _add_mood(self, section: str) -> None:
@@ -540,7 +553,8 @@ class SoundManagerWindow(ctk.CTkToplevel):
     def _add_tracks_via_files(self, section: str) -> None:
         state = self._get_state(section)
         category = state.get("current_category")
-        if not category:
+        mood = state.get("current_mood")
+        if not category or not mood:
             messagebox.showinfo("Add Files", "Sélectionne une catégorie puis un mood.", parent=self)
             return
         initialdir = self._get_initial_dir(section, category)
@@ -552,11 +566,11 @@ class SoundManagerWindow(ctk.CTkToplevel):
         )
         if not paths:
             return
-        added = self.library.add_tracks(section, category, paths)
+        added = self.library.add_tracks(section, category, mood, paths)
         if added:
             directory = os.path.dirname(added[0]["path"])
             self.library.set_setting(section, "last_directory", directory)
-            self._set_status(section, f"Added {len(added)} track(s) to {category}.")
+            self._set_status(section, f"Added {len(added)} track(s) to {category}/{mood}.")
         else:
             self._set_status(section, "No new audio files were added.")
         self._refresh_moods(section)
@@ -564,7 +578,8 @@ class SoundManagerWindow(ctk.CTkToplevel):
     def _add_tracks_via_folder(self, section: str) -> None:
         state = self._get_state(section)
         category = state.get("current_category")
-        if not category:
+        mood = state.get("current_mood")
+        if not category or not mood:
             messagebox.showinfo("Add Folder", "Sélectionne une catégorie puis un mood.", parent=self)
             return
         initialdir = self._get_initial_dir(section, category)
@@ -576,7 +591,7 @@ class SoundManagerWindow(ctk.CTkToplevel):
         if not directory:
             return
         try:
-            added = self.library.add_directory(section, category, directory, recursive=True)
+            added = self.library.add_directory(section, category, mood, directory, recursive=True)
             self.library.set_setting(section, "last_directory", directory)
             if added:
                 self._set_status(section, f"Added {len(added)} track(s) from folder.")
@@ -605,7 +620,7 @@ class SoundManagerWindow(ctk.CTkToplevel):
                 track = state["track_items"][idx]
             except IndexError:
                 continue
-            if self.library.remove_track(section, category, track.get("id", "")):
+            if self.library.remove_track(section, category, mood, track.get("id", "")):
                 removed += 1
         if removed:
             self._set_status(section, f"Removed {removed} track(s) from {category}.")
@@ -616,17 +631,18 @@ class SoundManagerWindow(ctk.CTkToplevel):
     def _rescan_category(self, section: str) -> None:
         state = self._get_state(section)
         category = state.get("current_category")
-        if not category:
+        mood = state.get("current_mood")
+        if not category or not mood:
             messagebox.showinfo("Rescan", "Sélectionne une catégorie puis un mood.", parent=self)
             return
         try:
-            result = self.library.rescan_category(section, category)
+            result = self.library.rescan_mood(section, category, mood)
         except Exception as exc:
             messagebox.showerror("Error", str(exc), parent=self)
             return
         added = len(result.get("added", []))
         removed = len(result.get("removed", []))
-        self._set_status(section, f"Rescan complete. Added {added}, removed {removed}.")
+        self._set_status(section, f"Rescan complete for {category}/{mood}. Added {added}, removed {removed}.")
         self._refresh_moods(section)
 
     def _ai_sort_directory(self, section: str) -> None:
@@ -815,7 +831,7 @@ class SoundManagerWindow(ctk.CTkToplevel):
                 added_counts[category] = 0
                 continue
             try:
-                added = self.library.add_tracks(section, category, unique_paths)
+                added = self.library.add_tracks(section, category, NO_MOOD, unique_paths)
             except KeyError:
                 added_counts[category] = 0
                 continue
@@ -879,7 +895,7 @@ class SoundManagerWindow(ctk.CTkToplevel):
             return
         selection = state["track_list"].curselection()
         index = selection[0] if selection else 0
-        self.controller.set_playlist(section, list(tracks), category=category)
+        self.controller.set_playlist(section, list(tracks), category=category, mood=mood)
         if self.controller.play(section, start_index=index):
             track = tracks[index]
             name = track.get("name") or os.path.basename(track.get("path", ""))
