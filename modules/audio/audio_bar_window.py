@@ -366,18 +366,13 @@ class AudioBarWindow(ctk.CTkToplevel):
         if not resolved_category:
             return
 
-        mood_values = moods or ["No mood"]
+        mood_values = ["No mood", *moods] if moods else ["No mood"]
         self._syncing_filters = True
         try:
             self.mood_menu.configure(values=mood_values)
-            if moods:
-                default_mood = resolved_mood or moods[0]
-                self.mood_var.set(default_mood)
-                self.mood_menu.configure(state="normal")
-            else:
-                default_mood = None
-                self.mood_var.set("No mood")
-                self.mood_menu.configure(state="disabled")
+            default_mood = resolved_mood or "No mood"
+            self.mood_var.set(default_mood)
+            self.mood_menu.configure(state="normal")
         finally:
             self._syncing_filters = False
 
@@ -644,13 +639,13 @@ class AudioBarWindow(ctk.CTkToplevel):
         self._syncing_filters = True
         try:
             category_values = options.categories or ["No category"]
-            mood_values = options.moods or ["No mood"]
+            mood_values = ["No mood", *options.moods] if options.moods else ["No mood"]
             self.category_menu.configure(values=category_values)
             self.mood_menu.configure(values=mood_values)
             self.category_var.set(options.category or "No category")
             self.mood_var.set(options.mood or "No mood")
             self.category_menu.configure(state="normal" if options.categories else "disabled")
-            self.mood_menu.configure(state="normal" if options.moods else "disabled")
+            self.mood_menu.configure(state="normal" if options.category else "disabled")
         finally:
             self._syncing_filters = False
 

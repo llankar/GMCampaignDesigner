@@ -22,7 +22,7 @@ def build_audio_bar_filter_options(
     categories = list(_safe_list_categories(library, section))
     category = _pick_value(categories, preferred_category)
     moods = list(_safe_list_moods(library, section, category)) if category else []
-    mood = _pick_value(moods, preferred_mood)
+    mood = preferred_mood if preferred_mood in moods else ""
     return AudioBarFilterOptions(
         categories=categories,
         moods=moods,
