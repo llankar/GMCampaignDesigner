@@ -93,16 +93,46 @@ class AudioController:
         player = self._get_player(section)
         playlist = list(tracks)
         player.set_playlist(playlist)
+
+        def _track_in_playlist(track: Optional[Dict[str, Any]], playlist_items: List[Dict[str, Any]]) -> bool:
+            if not isinstance(track, dict):
+                return False
+
+            track_id = track.get("id")
+            track_path = track.get("path")
+
+            for item in playlist_items:
+                if not isinstance(item, dict):
+                    continue
+                if track_id and item.get("id") == track_id:
+                    return True
+                if track_path and item.get("path") == track_path:
+                    return True
+            return False
+
         with self._lock:
             state = self._state[section]
             state["playlist"] = list(playlist)
             state["category"] = category
             state["mood"] = mood
             state["last_error"] = ""
+
+            if not _track_in_playlist(state.get("current_track"), playlist):
+                state["current_track"] = None
+
+            if not _track_in_playlist(state.get("last_track"), playlist):
+                state["last_track"] = None
+
         if category:
             self.library.set_setting(section, "last_category", category)
+        else:
+            self.library.set_setting(section, "last_category", "")
+
         if mood:
             self.library.set_setting(section, "last_mood", mood)
+        else:
+            self.library.set_setting(section, "last_mood", "")
+
         self._emit("playlist_set", section, playlist=list(playlist), category=category, mood=mood)
         self._emit("state_changed", section, state=self.get_state(section))
 
