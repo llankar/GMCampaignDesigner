@@ -3210,6 +3210,20 @@ class MainWindow(ctk.CTk):
             )
             messagebox.showerror("Error", f"Failed to open Campaign Builder:\n{exc}")
 
+    def _build_hidden_main_content(self, host_parent, content_factory):
+        """Build a heavy content view off-screen, then let the caller display it once ready."""
+        container = ctk.CTkFrame(host_parent, fg_color="transparent")
+        built = content_factory(container)
+        if built is not None and built is not container:
+            try:
+                if not built.winfo_manager():
+                    built.pack(fill="both", expand=True)
+            except Exception:
+                pass
+        if built is not None:
+            container.content_inner = built
+        return container
+
     def open_campaign_graph_view(self):
         try:
             campaign_wrapper = self.entity_wrappers.get("campaigns") or GenericModelWrapper("campaigns")
@@ -3221,19 +3235,22 @@ class MainWindow(ctk.CTk):
             self.clear_current_content()
             self._prepare_campaign_overview_layout()
             parent = self.get_content_container()
-            container = ctk.CTkFrame(parent, fg_color="transparent")
-            container.grid(row=0, column=0, sticky="nsew")
             parent.grid_rowconfigure(0, weight=1)
             parent.grid_columnconfigure(0, weight=1)
 
             from modules.campaigns.ui.graphical_display import CampaignGraphPanel
 
-            panel = CampaignGraphPanel(
-                container,
+            factory = lambda master: CampaignGraphPanel(
+                master,
                 campaign_wrapper=campaign_wrapper,
                 scenario_wrapper=scenario_wrapper,
             )
-            panel.pack(fill="both", expand=True)
+            container = self._build_hidden_main_content(parent, factory)
+            try:
+                container.update_idletasks()
+            except Exception:
+                pass
+            container.grid(row=0, column=0, sticky="nsew")
             self.current_open_view = container
             self.current_open_entity = None
         except Exception as exc:

@@ -60,3 +60,23 @@ def test_open_campaign_graph_view_prepares_center_layout_before_selecting_parent
     assert "get_content_container" in call_names
     assert call_names.index("clear_current_content") < call_names.index("_prepare_campaign_overview_layout")
     assert call_names.index("_prepare_campaign_overview_layout") < call_names.index("get_content_container")
+
+
+def test_open_campaign_graph_view_builds_hidden_content_before_gridding() -> None:
+    method = _get_method("open_campaign_graph_view")
+    call_names: list[str] = []
+
+    class _CallVisitor(ast.NodeVisitor):
+        def visit_Call(self, node: ast.Call) -> None:
+            if isinstance(node.func, ast.Attribute):
+                if isinstance(node.func.value, ast.Name) and node.func.value.id == "self":
+                    call_names.append(f"self.{node.func.attr}")
+                elif isinstance(node.func.value, ast.Name) and node.func.value.id == "container":
+                    call_names.append(f"container.{node.func.attr}")
+            self.generic_visit(node)
+
+    _CallVisitor().visit(method)
+
+    assert "self._build_hidden_main_content" in call_names
+    assert "container.grid" in call_names
+    assert call_names.index("self._build_hidden_main_content") < call_names.index("container.grid")
