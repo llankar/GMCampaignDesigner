@@ -422,6 +422,7 @@ class AudioBarWindow(ctk.CTkToplevel):
     def _apply_search_result(self, info: Dict[str, Any]) -> None:
         track = info.get("track")
         category = info.get("category")
+        mood = (track or {}).get("mood") if isinstance(track, dict) else None
         identifier = str(info.get("identifier") or "")
         if not track or not category or not identifier:
             return
@@ -453,7 +454,7 @@ class AudioBarWindow(ctk.CTkToplevel):
             self._format_track_label(track) or self._remembered_track_label or "",
             self._now_playing_label_max_chars,
         ) or self._remembered_track_label
-        self.controller.set_playlist(self._active_section, playlist, category=category)
+        self.controller.set_playlist(self._active_section, playlist, category=category, mood=mood)
 
     def _clear_search_results(self) -> None:
         menu = getattr(self, "search_results_menu", None)
@@ -811,4 +812,3 @@ class AudioBarWindow(ctk.CTkToplevel):
     def _on_close(self) -> None:
         self._detach_controller_listener()
         self.destroy()
-
