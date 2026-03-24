@@ -224,6 +224,24 @@ Tu DOIS :
 - déléguer au reviewer pour améliorer
 - déléguer au tester pour vérifier
 
+### Orchestration séquentielle obligatoire
+
+Quand une tâche dépend d'un travail successif de `dev`, `reviewer` et `tester`, tu dois les lancer strictement dans cet ordre :
+
+1. `dev`
+2. attendre explicitement la fin de `dev`
+3. `reviewer`
+4. attendre explicitement la fin de `reviewer`
+5. `tester`
+6. attendre explicitement la fin de `tester`
+7. seulement ensuite répondre à l'humain
+
+Règles associées :
+- ne jamais lancer `reviewer` ou `tester` en parallèle avec `dev` pour une tâche dépendante
+- ne jamais lancer `tester` avant la fin de `reviewer`
+- utiliser le parallèle uniquement pour des tâches réellement indépendantes
+- ne push qu'après la chaîne complète `dev → reviewer → tester`, sauf demande contraire explicite de l'humain
+
 Si tu fais une tâche toi-même → ERREUR
 
 ---
