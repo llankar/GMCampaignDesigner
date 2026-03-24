@@ -108,6 +108,13 @@ from modules.maps.world_map_view import WorldMapWindow
 from modules.generic.custom_fields_editor import CustomFieldsEditor
 from modules.generic.new_entity_type_dialog import NewEntityTypeDialog
 from modules.auto_improve.ui.auto_improve_panel import AutoImprovePanel
+from modules.campaigns.services import (
+    ensure_campaign_directory,
+    ensure_campaign_support_tables,
+    load_startup_model_config,
+    normalize_campaign_db_path,
+    seed_default_templates,
+)
 from modules.campaigns.ui.campaign_builder_wizard import CampaignBuilderWizard
 from modules.campaigns.ui.graphical_display import CampaignGraphPanel
 
@@ -2046,9 +2053,9 @@ class MainWindow(ctk.CTk):
             self._hide_busy_modal()
 
     def load_model_config(self):
-        self.models_path = ConfigHelper.get("Paths", "models_path",
-                                            fallback=r"E:\SwarmUI\SwarmUI\Models\Stable-diffusion")
-        self.model_options = get_available_models()
+        startup_config = load_startup_model_config()
+        self.models_path = startup_config.models_path
+        self.model_options = startup_config.model_options
         log_debug(
             f"Models path resolved to {self.models_path}",
             func_name="main_window.MainWindow.load_model_config",
@@ -3253,9 +3260,9 @@ class MainWindow(ctk.CTk):
         if not new_db_path:
             return
 
-        normalized_path = os.path.abspath(os.path.normpath(new_db_path))
+        normalized_path = normalize_campaign_db_path(new_db_path)
         try:
-            os.makedirs(os.path.dirname(normalized_path), exist_ok=True)
+            normalized_path = ensure_campaign_directory(normalized_path)
         except Exception:
             log_exception(
                 f"Failed to prepare campaign directory for {normalized_path}",
@@ -3266,33 +3273,7 @@ class MainWindow(ctk.CTk):
 
         if is_new_db:
             try:
-                from shutil import copyfile
-
-                entities = (
-                    "pcs",
-                    "npcs",
-                    "scenarios",
-                    "factions",
-                    "bases",
-                    "places",
-                    "objects",
-                    "creatures",
-                    "informations",
-                    "clues",
-                    "maps",
-                    "books",
-                )
-                camp_dir = os.path.abspath(os.path.dirname(normalized_path))
-                tpl_dir = os.path.join(camp_dir, "templates")
-                os.makedirs(tpl_dir, exist_ok=True)
-                for entity in entities:
-                    src = os.path.join("modules", entity, f"{entity}_template.json")
-                    dst = os.path.join(tpl_dir, f"{entity}_template.json")
-                    try:
-                        if not os.path.exists(dst):
-                            copyfile(src, dst)
-                    except Exception:
-                        pass
+                seed_default_templates(normalized_path)
             except Exception:
                 log_exception(
                     "Failed to seed default templates for new campaign.",
@@ -3302,46 +3283,10 @@ class MainWindow(ctk.CTk):
         initialize_db()
         self._reload_active_campaign_system()
 
-        conn = sqlite3.connect(normalized_path)
-        cursor = conn.cursor()
-
-        for entity in load_entity_definitions().keys():
-            ensure_entity_schema(entity)
-
-        cursor.execute("""
-            CREATE TABLE IF NOT EXISTS nodes (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                npc_name TEXT,
-                x INTEGER,
-                y INTEGER,
-                color TEXT
-            )
-        """)
-        cursor.execute("""
-            CREATE TABLE IF NOT EXISTS links (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                npc_name1 TEXT,
-                npc_name2 TEXT,
-                text TEXT,
-                arrow_mode TEXT
-            )
-        """)
-        cursor.execute("""
-            CREATE TABLE IF NOT EXISTS shapes (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                type TEXT,
-                x INTEGER,
-                y INTEGER,
-                w INTEGER,
-                h INTEGER,
-                color TEXT,
-                tag TEXT,
-                z INTEGER
-            )
-        """)
-
-        conn.commit()
-        conn.close()
+        with sqlite3.connect(normalized_path) as conn:
+            for entity in load_entity_definitions().keys():
+                ensure_entity_schema(entity)
+            ensure_campaign_support_tables(conn)
 
         self.refresh_entities()
 
