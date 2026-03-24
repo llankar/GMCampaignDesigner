@@ -12,6 +12,7 @@ from modules.helpers import theme_manager
 from modules.audio.audio_constants import DEFAULT_SECTION, SECTION_TITLES
 from modules.audio.audio_controller import AudioController, get_audio_controller
 from modules.audio.ui.audio_bar_filters import build_audio_bar_filter_options
+from modules.audio.ui.filter_selection_resolver import resolve_category_mood_selection
 from modules.helpers.logging_helper import log_exception, log_module_import
 
 log_module_import(__name__)
@@ -352,7 +353,35 @@ class AudioBarWindow(ctk.CTkToplevel):
     def _on_category_selected(self, choice: str) -> None:
         if self._syncing_filters:
             return
-        self._apply_selected_filters(category=choice)
+        library = getattr(self.controller, "library", None)
+        if library is None:
+            return
+
+        resolved_category, resolved_mood, moods = resolve_category_mood_selection(
+            library=library,
+            section=self._active_section,
+            category=choice,
+            preferred_mood=self.mood_var.get() or None,
+        )
+        if not resolved_category:
+            return
+
+        mood_values = moods or ["No mood"]
+        self._syncing_filters = True
+        try:
+            self.mood_menu.configure(values=mood_values)
+            if moods:
+                default_mood = resolved_mood or moods[0]
+                self.mood_var.set(default_mood)
+                self.mood_menu.configure(state="normal")
+            else:
+                default_mood = None
+                self.mood_var.set("No mood")
+                self.mood_menu.configure(state="disabled")
+        finally:
+            self._syncing_filters = False
+
+        self._apply_selected_filters(category=resolved_category, mood=default_mood)
 
     def _on_mood_selected(self, choice: str) -> None:
         if self._syncing_filters:
@@ -638,21 +667,30 @@ class AudioBarWindow(ctk.CTkToplevel):
         selected_mood = mood if mood is not None else (self.mood_var.get() or "")
         if not selected_category or selected_category == "No category":
             return
-        if selected_mood in {"", "No mood"}:
-            selected_mood = None
+
+        selected_mood = None if selected_mood in {"", "No mood"} else selected_mood
+        resolved_category, resolved_mood, _ = resolve_category_mood_selection(
+            library=library,
+            section=self._active_section,
+            category=selected_category,
+            preferred_mood=selected_mood,
+        )
+        if not resolved_category:
+            return
+
         try:
             tracks = library.list_tracks(
                 self._active_section,
-                selected_category,
-                mood=selected_mood,
+                resolved_category,
+                mood=resolved_mood,
             )
         except KeyError:
             return
         self.controller.set_playlist(
             self._active_section,
             tracks,
-            category=selected_category,
-            mood=selected_mood,
+            category=resolved_category,
+            mood=resolved_mood,
         )
 
     def _apply_volume(self, value: Any) -> None:

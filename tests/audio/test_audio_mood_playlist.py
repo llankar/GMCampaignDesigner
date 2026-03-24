@@ -2,6 +2,7 @@ from pathlib import Path
 
 from modules.audio.audio_controller import AudioController
 from modules.audio.library.service import AudioLibraryService
+from modules.audio.ui.filter_selection_resolver import resolve_category_mood_selection
 
 
 def _make_audio_file(base: Path, name: str) -> str:
@@ -66,3 +67,39 @@ def test_playlist_stays_coherent_when_switching_mood(tmp_path: Path) -> None:
     assert tense_state["mood"] == "tense"
     assert [track["id"] for track in tense_state["playlist"]] == [track["id"] for track in tense_tracks]
     assert [track["id"] for track in tense_state["playlist"]] != [track["id"] for track in calm_tracks]
+
+
+def test_category_switch_with_incompatible_mood_falls_back_to_full_category_playlist(tmp_path: Path) -> None:
+    service = _new_service(tmp_path)
+    service.add_category("music", "Ambience")
+    service.add_category("music", "Battle")
+    service.add_mood("music", "Ambience", "calm")
+    service.add_mood("music", "Battle", "epic")
+
+    _ = service.add_tracks("music", "Ambience", "calm", [_make_audio_file(tmp_path, "forest.mp3")])
+    battle_tracks = service.add_tracks(
+        "music",
+        "Battle",
+        "epic",
+        [_make_audio_file(tmp_path, "drums.mp3"), _make_audio_file(tmp_path, "choir.mp3")],
+    )
+
+    selected_category, selected_mood, battle_moods = resolve_category_mood_selection(
+        library=service,
+        section="music",
+        category="Battle",
+        preferred_mood="calm",
+    )
+
+    assert selected_category == "Battle"
+    assert battle_moods == ["epic", "no mood"]
+    assert selected_mood is None
+
+    controller = AudioController(library=service)
+    resolved_tracks = service.list_tracks("music", selected_category, mood=selected_mood)
+    controller.set_playlist("music", resolved_tracks, category=selected_category, mood=selected_mood)
+
+    state = controller.get_state("music")
+    assert state["category"] == "Battle"
+    assert state["mood"] is None
+    assert {track["id"] for track in state["playlist"]} == {track["id"] for track in battle_tracks}
