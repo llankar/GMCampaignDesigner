@@ -3,6 +3,7 @@ import os
 import uuid
 from typing import Any, Dict, Iterable, List, Optional
 
+from modules.audio.services.music_mood_classifier import NO_MOOD, classify_track_mood
 from modules.helpers.logging_helper import log_info, log_warning, log_error, log_module_import
 
 log_module_import(__name__)
@@ -185,7 +186,9 @@ class AudioLibrary:
             "name": name.strip(),
             "path": normalized,
             "category": category,
+            "mood": self._sanitize_mood(data.get("mood", NO_MOOD)),
         }
+
 
     def _normalize_path(self, value: str) -> str:
         try:
@@ -194,6 +197,12 @@ class AudioLibrary:
             return os.path.normpath(absolute)
         except Exception:  # pragma: no cover - defensive
             return value
+
+    def _sanitize_mood(self, value: Any) -> str:
+        if not isinstance(value, str):
+            return NO_MOOD
+        mood = value.strip().casefold()
+        return mood or NO_MOOD
     # ------------------------------------------------------------------
     # Category operations
     # ------------------------------------------------------------------
@@ -297,6 +306,30 @@ class AudioLibrary:
         payload = self._get_category(section, category)
         return list(payload.get("tracks", []))
 
+    def list_tracks_by_mood(self, section: str, mood: str) -> List[Dict[str, Any]]:
+        mood_key = (mood or "").strip().casefold()
+        if not mood_key:
+            return []
+        items: List[Dict[str, Any]] = []
+        for category_name in self.get_categories(section):
+            tracks = self.list_tracks(section, category_name)
+            for track in tracks:
+                track_mood = str(track.get("mood", NO_MOOD) or NO_MOOD).strip().casefold()
+                if track_mood == mood_key:
+                    items.append(track)
+        items.sort(key=lambda item: str(item.get("name", "")).lower())
+        return items
+
+    def get_moods(self, section: str) -> List[str]:
+        moods: set[str] = set()
+        for category_name in self.get_categories(section):
+            tracks = self.list_tracks(section, category_name)
+            for track in tracks:
+                mood = str(track.get("mood", NO_MOOD) or NO_MOOD).strip().casefold()
+                moods.add(mood)
+        ordered = sorted(moods, key=str.lower)
+        return ordered
+
     def add_tracks(self, section: str, category: str, paths: Iterable[str]) -> List[Dict[str, Any]]:
         payload = self._get_category(section, category)
         tracks: List[Dict[str, Any]] = payload.setdefault("tracks", [])
@@ -322,6 +355,7 @@ class AudioLibrary:
                 "name": os.path.splitext(os.path.basename(normalized))[0],
                 "path": normalized,
                 "category": category,
+                "mood": NO_MOOD,
             }
             tracks.append(track)
             added.append(track)
@@ -335,6 +369,22 @@ class AudioLibrary:
                 func_name="AudioLibrary.add_tracks",
             )
         return added
+
+    def classify_section_moods(self, section: str) -> Dict[str, int]:
+        categories = self._get_categories_dict(section)
+        updated = 0
+        for category_name, payload in categories.items():
+            tracks: List[Dict[str, Any]] = payload.get("tracks", [])
+            for track in tracks:
+                track_name = str(track.get("name", ""))
+                mood = classify_track_mood(track_name)
+                if track.get("mood") != mood:
+                    track["mood"] = mood
+                    track["category"] = category_name
+                    updated += 1
+        if updated:
+            self.save()
+        return {"updated": updated}
 
     def remove_track(self, section: str, category: str, track_id: str) -> Optional[Dict[str, Any]]:
         payload = self._get_category(section, category)
