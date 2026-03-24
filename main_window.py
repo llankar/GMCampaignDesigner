@@ -5,7 +5,6 @@ import sqlite3
 import subprocess
 import time
 from datetime import date, datetime
-import requests
 import shutil
 import re
 import unicodedata
@@ -26,7 +25,6 @@ from tkinter import ttk
 
 import customtkinter as ctk
 from PIL import Image
-from docx import Document
 
 # Modular helper imports
 from modules.helpers.window_helper import position_window_at_top
@@ -66,30 +64,18 @@ from modules.ui.database_manager_dialog import DatabaseManagerDialog
 from modules.ui.system_manager_dialog import SystemManagerDialog
 from modules.ui.menu_bar import AppMenuBar
 from modules.events.ui.dock import CalendarDock
-from modules.events.ui.full import CalendarWindow
-from modules.events.ui.full.timeline_simulator_dialog import TimelineSimulatorDialog
 from modules.events.models.event_types import get_event_type
 from modules.events.services.timeline_simulator import CampaignTimelineSimulator
 from modules.events.services.entity_link_service import EntityLinkService
 from modules.events.services.calendar_state_store import CalendarStateStore
-from modules.events.ui.shared.color_utils import normalize_hex_color
 
 from modules.generic.generic_list_view import GenericListView
 from modules.generic.generic_model_wrapper import GenericModelWrapper
-from modules.scenarios.gm_screen_view import GMScreenView
 from modules.scenarios.gm_layout_manager import GMScreenLayoutManager
-from modules.characters.character_graph_editor import CharacterGraphEditor
-from modules.scenarios.scenario_graph_editor import ScenarioGraphEditor
 from modules.scenarios.scenario_importer import ScenarioImportWindow
 from modules.objects.object_importer import ObjectImportWindow
 from modules.scenarios.scenario_generator_view import ScenarioGeneratorView
-from modules.scenarios.scenario_builder_wizard import ScenarioBuilderWizard
 from modules.scenarios.random_tables_editor import RandomTableEditorDialog
-from modules.generic.export_for_foundry import preview_and_export_foundry
-from modules.generic.cross_campaign_asset_library import CrossCampaignAssetLibraryWindow
-from modules.exports.campaign_dossier.dialog import (
-    open_campaign_dossier_exporter as open_campaign_dossier_exporter_dialog,
-)
 from modules.exports.campaign_dossier.layouts import (
     DEFAULT_LAYOUT_KEY,
     apply_layout,
@@ -99,12 +85,9 @@ from modules.exports.campaign_dossier.layouts import (
 from modules.helpers import text_helpers, dice_markup
 from db.db import initialize_db, ensure_entity_schema
 from modules.factions.faction_graph_editor import FactionGraphEditor
-from modules.whiteboard.controllers.whiteboard_controller import WhiteboardController
 from modules.pcs.display_pcs import display_pcs_in_banner
 from modules.pcs.character_creation import CharacterCreationView
 from modules.generic.generic_list_selection_view import GenericListSelectionView
-from modules.maps.controllers.display_map_controller import DisplayMapController
-from modules.maps.world_map_view import WorldMapWindow
 from modules.generic.custom_fields_editor import CustomFieldsEditor
 from modules.generic.new_entity_type_dialog import NewEntityTypeDialog
 from modules.auto_improve.ui.auto_improve_panel import AutoImprovePanel
@@ -115,16 +98,11 @@ from modules.campaigns.services import (
     normalize_campaign_db_path,
     seed_default_templates,
 )
-from modules.campaigns.ui.campaign_builder_wizard import CampaignBuilderWizard
-from modules.campaigns.ui.graphical_display import CampaignGraphPanel
 
 
 from modules.dice.dice_roller_window import DiceRollerWindow
 from modules.dice.dice_bar_window import DiceBarWindow
-from modules.audio.audio_bar_window import AudioBarWindow
 from modules.audio.audio_controller import get_audio_controller
-from modules.audio.sound_manager_window import SoundManagerWindow
-from modules.timer.ui.timer_window import TimerWindow
 
 initialize_logging()
 install_global_exception_hooks()
@@ -135,6 +113,21 @@ def configure_ui_defaults() -> None:
     """Apply global CustomTkinter defaults explicitly at app startup."""
     ctk.set_appearance_mode("Dark")
     theme_manager.apply_theme(theme_manager.get_theme())
+
+
+_HEX_COLOR_PATTERN = re.compile(r"^#?[0-9a-fA-F]{6}$")
+
+
+def normalize_hex_color(value, fallback="#4F8EF7"):
+    text = str(value or "").strip()
+    if not text:
+        return fallback
+    if not _HEX_COLOR_PATTERN.match(text):
+        return fallback
+    if not text.startswith("#"):
+        text = f"#{text}"
+    return text.upper()
+
 
 # Global process variable for SwarmUI
 SWARMUI_PROCESS = None
@@ -396,6 +389,8 @@ class MainWindow(ctk.CTk):
                 "Opening Cross-campaign Asset Library",
                 func_name="main_window.MainWindow.open_cross_campaign_asset_library",
             )
+            from modules.generic.cross_campaign_asset_library import CrossCampaignAssetLibraryWindow
+
             window = CrossCampaignAssetLibraryWindow(self)
             window.bind("<Destroy>", lambda _evt: setattr(self, "_asset_library_window", None))
             self._asset_library_window = window
@@ -1154,6 +1149,8 @@ class MainWindow(ctk.CTk):
 
         window = getattr(self, "_calendar_full_window", None)
         if window is None or not window.winfo_exists():
+            from modules.events.ui.full import CalendarWindow
+
             window = CalendarWindow(
                 self,
                 get_events_for_day=self._get_events_for_day,
@@ -1258,6 +1255,8 @@ class MainWindow(ctk.CTk):
         dialog_parent = parent or self
         current_date = CampaignTimelineSimulator.current_campaign_date()
         initial_target = self._parse_event_date(target_date) or current_date
+        from modules.events.ui.full.timeline_simulator_dialog import TimelineSimulatorDialog
+
         TimelineSimulatorDialog(
             dialog_parent,
             current_date=current_date,
@@ -1788,6 +1787,8 @@ class MainWindow(ctk.CTk):
 
             # re‐instantiate the proper editor type, then restore its state
             if self._graph_type == 'character':
+                from modules.characters.character_graph_editor import CharacterGraphEditor
+
                 editor = CharacterGraphEditor(
                     new_container,
                     self.npc_wrapper,
@@ -1809,6 +1810,8 @@ class MainWindow(ctk.CTk):
             elif self._graph_type == 'faction':
                 editor = FactionGraphEditor(new_container, self.faction_wrapper)
             else:  # 'scenario'
+                from modules.scenarios.scenario_graph_editor import ScenarioGraphEditor
+
                 editor = ScenarioGraphEditor(
                     new_container,
                     GenericModelWrapper("scenarios"),
@@ -2512,6 +2515,8 @@ class MainWindow(ctk.CTk):
             if resolved_layout is None:
                 chosen_layout = selected_layout_var.get()
                 resolved_layout = None if chosen_layout == default_label else chosen_layout
+            from modules.scenarios.gm_screen_view import GMScreenView
+
             view = GMScreenView(
                 detail_container,
                 scenario_item=selected,
@@ -2596,6 +2601,8 @@ class MainWindow(ctk.CTk):
         _finalize_gm_shell()
 
     def open_character_graph_editor(self):
+        from modules.characters.character_graph_editor import CharacterGraphEditor
+
         self._graph_type = 'character'
         self.current_gm_view = None
         self.clear_current_content()
@@ -2621,6 +2628,8 @@ class MainWindow(ctk.CTk):
         self.current_open_entity = None
 
     def open_villain_graph_editor(self):
+        from modules.characters.character_graph_editor import CharacterGraphEditor
+
         self._graph_type = 'villain'
         self.current_gm_view = None
         self.clear_current_content()
@@ -2667,14 +2676,26 @@ class MainWindow(ctk.CTk):
             existing.attributes("-topmost", True)
             existing.after_idle(lambda: existing.attributes("-topmost", False))
             return
-        window = WorldMapWindow(self)
-        window.lift()
-        window.focus_force()
-        window.attributes("-topmost", True)
-        window.after_idle(lambda: window.attributes("-topmost", False))
-        self._world_map_window = window
+
+        try:
+            from modules.maps.world_map_view import WorldMapWindow
+
+            window = WorldMapWindow(self)
+            window.lift()
+            window.focus_force()
+            window.attributes("-topmost", True)
+            window.after_idle(lambda: window.attributes("-topmost", False))
+            self._world_map_window = window
+        except Exception as exc:
+            log_exception(
+                f"Failed to open World Map window: {exc}",
+                func_name="main_window.MainWindow.open_world_map",
+            )
+            messagebox.showerror("Error", f"Failed to open World Map window:\n{exc}")
 
     def open_scenario_graph_editor(self):
+        from modules.scenarios.scenario_graph_editor import ScenarioGraphEditor
+
         self._graph_type = 'scenario'
         self.current_gm_view = None
         self.clear_current_content()
@@ -2730,7 +2751,16 @@ class MainWindow(ctk.CTk):
         self._scene_flow_window = window
 
     def export_foundry(self):
-        preview_and_export_foundry(self)
+        try:
+            from modules.generic.export_for_foundry import preview_and_export_foundry
+
+            preview_and_export_foundry(self)
+        except Exception as exc:
+            log_exception(
+                f"Failed to export for Foundry: {exc}",
+                func_name="main_window.MainWindow.export_foundry",
+            )
+            messagebox.showerror("Error", f"Failed to export for Foundry:\n{exc}")
 
     def _queue_update_check(self, *, force: bool = False):
         try:
@@ -3144,6 +3174,8 @@ class MainWindow(ctk.CTk):
 
     def open_scenario_builder(self):
         try:
+            from modules.scenarios.scenario_builder_wizard import ScenarioBuilderWizard
+
             wizard = ScenarioBuilderWizard(self, on_saved=self._on_scenario_built)
             wizard.grab_set()
             wizard.focus_force()
@@ -3156,6 +3188,8 @@ class MainWindow(ctk.CTk):
 
     def open_campaign_builder(self):
         try:
+            from modules.campaigns.ui.campaign_builder_wizard import CampaignBuilderWizard
+
             campaign_wrapper = self.entity_wrappers.get("campaigns") or GenericModelWrapper("campaigns")
             self.entity_wrappers.setdefault("campaigns", campaign_wrapper)
 
@@ -3191,6 +3225,8 @@ class MainWindow(ctk.CTk):
             container.grid(row=0, column=0, sticky="nsew")
             parent.grid_rowconfigure(0, weight=1)
             parent.grid_columnconfigure(0, weight=1)
+
+            from modules.campaigns.ui.graphical_display import CampaignGraphPanel
 
             panel = CampaignGraphPanel(
                 container,
@@ -3445,6 +3481,8 @@ class MainWindow(ctk.CTk):
         conn.close()
 
     def generate_portrait_for_npc(self, npc):
+        import requests
+
         self.launch_swarmui()
         SWARM_API_URL = "http://127.0.0.1:7801"
         try:
@@ -3500,6 +3538,8 @@ class MainWindow(ctk.CTk):
             print(f"Error generating portrait for NPC '{npc.get('Name', 'Unknown')}': {e}")
 
     def generate_portrait_for_creature(self, creature):
+        import requests
+
         self.launch_swarmui()
         SWARM_API_URL = "http://127.0.0.1:7801"
         try:
@@ -3635,7 +3675,18 @@ class MainWindow(ctk.CTk):
         if not file_path:
             return
 
-        doc = Document()
+        try:
+            from docx import Document
+
+            doc = Document()
+        except Exception as exc:
+            log_exception(
+                f"Failed to initialize Word export: {exc}",
+                func_name="main_window.MainWindow.preview_and_save",
+            )
+            messagebox.showerror("Error", f"Failed to initialize Word export:\n{exc}")
+            return
+
         preset = apply_layout(doc, layout_key)
         doc.add_heading("Campaign Scenarios", level=1)
         for scenario in selected_scenarios:
@@ -3757,7 +3808,18 @@ class MainWindow(ctk.CTk):
         messagebox.showinfo("Export Successful", f"Scenario exported successfully to:\n{file_path}")
 
     def open_campaign_dossier_exporter(self):
-        open_campaign_dossier_exporter_dialog(self)
+        try:
+            from modules.exports.campaign_dossier.dialog import (
+                open_campaign_dossier_exporter as open_campaign_dossier_exporter_dialog,
+            )
+
+            open_campaign_dossier_exporter_dialog(self)
+        except Exception as exc:
+            log_exception(
+                f"Failed to open campaign dossier exporter: {exc}",
+                func_name="main_window.MainWindow.open_campaign_dossier_exporter",
+            )
+            messagebox.showerror("Error", f"Failed to open campaign dossier exporter:\n{exc}")
 
     def apply_formatting(self, run, formatting):
         if formatting.get('bold'):
@@ -3849,6 +3911,8 @@ class MainWindow(ctk.CTk):
             window = None
         try:
             if window is None or not window.winfo_exists():
+                from modules.audio.audio_bar_window import AudioBarWindow
+
                 self.audio_bar_window = AudioBarWindow(self, controller=self.audio_controller)
                 self.audio_bar_window.bind("<Destroy>", self._on_audio_bar_destroyed)
                 window = self.audio_bar_window
@@ -3964,6 +4028,8 @@ class MainWindow(ctk.CTk):
             window = None
         try:
             if window is None or not window.winfo_exists():
+                from modules.audio.sound_manager_window import SoundManagerWindow
+
                 self.sound_manager_window = SoundManagerWindow(self, controller=self.audio_controller)
                 self.sound_manager_window.bind("<Destroy>", self._on_sound_manager_destroyed)
                 window = self.sound_manager_window
@@ -3999,6 +4065,8 @@ class MainWindow(ctk.CTk):
         try:
             window = self.timer_window
             if window is None:
+                from modules.timer.ui.timer_window import TimerWindow
+
                 self.timer_window = TimerWindow(self)
                 window = self.timer_window
             if hasattr(window, "show"):
@@ -4016,25 +4084,34 @@ class MainWindow(ctk.CTk):
 
     def open_whiteboard(self):
         log_info("Opening Whiteboard", func_name="main_window.MainWindow.open_whiteboard")
-        self.clear_current_content()
-        parent = self.get_content_container()
+        try:
+            self.clear_current_content()
+            parent = self.get_content_container()
 
-        container = ctk.CTkFrame(parent)
-        container.grid(row=0, column=0, sticky="nsew")
-        parent.grid_rowconfigure(0, weight=1)
-        parent.grid_columnconfigure(0, weight=1)
+            container = ctk.CTkFrame(parent)
+            container.grid(row=0, column=0, sticky="nsew")
+            parent.grid_rowconfigure(0, weight=1)
+            parent.grid_columnconfigure(0, weight=1)
 
-        board_frame = ctk.CTkFrame(container)
-        board_frame.pack(fill="both", expand=True)
+            board_frame = ctk.CTkFrame(container)
+            board_frame.pack(fill="both", expand=True)
 
-        self.whiteboard_controller = WhiteboardController(board_frame, root_app=self)
+            from modules.whiteboard.controllers.whiteboard_controller import WhiteboardController
 
-        def _on_destroy(_event=None):
-            self._teardown_whiteboard_controller()
+            self.whiteboard_controller = WhiteboardController(board_frame, root_app=self)
 
-        container.bind("<Destroy>", _on_destroy)
-        self.current_open_view = container
-        self.current_open_entity = None
+            def _on_destroy(_event=None):
+                self._teardown_whiteboard_controller()
+
+            container.bind("<Destroy>", _on_destroy)
+            self.current_open_view = container
+            self.current_open_entity = None
+        except Exception as exc:
+            log_exception(
+                f"Failed to open Whiteboard: {exc}",
+                func_name="main_window.MainWindow.open_whiteboard",
+            )
+            messagebox.showerror("Error", f"Failed to open Whiteboard:\n{exc}")
 
     def map_tool(self, map_name=None):
         log_info(
@@ -4061,43 +4138,52 @@ class MainWindow(ctk.CTk):
                 controller.open_map_by_name(map_name)
             return
 
-        maps_wrapper = GenericModelWrapper("maps")
+        try:
+            maps_wrapper = GenericModelWrapper("maps")
 
-        top = ctk.CTkToplevel(self)
-        top.lift()
-        top.focus_force()
-        top.attributes("-topmost", True)
-        top.after_idle(lambda: top.attributes("-topmost", False))
-        top.title("Map Tool")
-        top.geometry("1920x1080+0+0")
+            top = ctk.CTkToplevel(self)
+            top.lift()
+            top.focus_force()
+            top.attributes("-topmost", True)
+            top.after_idle(lambda: top.attributes("-topmost", False))
+            top.title("Map Tool")
+            top.geometry("1920x1080+0+0")
 
-        map_frame = ctk.CTkFrame(top)
-        map_frame.pack(fill="both", expand=True)
+            map_frame = ctk.CTkFrame(top)
+            map_frame.pack(fill="both", expand=True)
 
-        self.map_controller = DisplayMapController(
-            map_frame,
-            maps_wrapper,
-            load_template("maps"),
-            root_app=self,
-        )
-        if map_name and hasattr(self.map_controller, "open_map_by_name"):
-            # Fit to the window on initial open
-            self.map_controller.open_map_by_name(map_name)
+            from modules.maps.controllers.display_map_controller import DisplayMapController
 
-        def _on_close():
-            try:
-                controller = getattr(self, "map_controller", None)
-                if controller is not None:
-                    controller.close_web_display()
-            except Exception:
-                log_exception("Error while closing web display")
-            finally:
-                self._map_tool_window = None
-                self.map_controller = None
-                top.destroy()
+            self.map_controller = DisplayMapController(
+                map_frame,
+                maps_wrapper,
+                load_template("maps"),
+                root_app=self,
+            )
+            if map_name and hasattr(self.map_controller, "open_map_by_name"):
+                # Fit to the window on initial open
+                self.map_controller.open_map_by_name(map_name)
 
-        top.protocol("WM_DELETE_WINDOW", _on_close)
-        self._map_tool_window = top
+            def _on_close():
+                try:
+                    controller = getattr(self, "map_controller", None)
+                    if controller is not None:
+                        controller.close_web_display()
+                except Exception:
+                    log_exception("Error while closing web display")
+                finally:
+                    self._map_tool_window = None
+                    self.map_controller = None
+                    top.destroy()
+
+            top.protocol("WM_DELETE_WINDOW", _on_close)
+            self._map_tool_window = top
+        except Exception as exc:
+            log_exception(
+                f"Failed to open Map Tool: {exc}",
+                func_name="main_window.MainWindow.map_tool",
+            )
+            messagebox.showerror("Error", f"Failed to open Map Tool:\n{exc}")
 
 if __name__ == "__main__":
     if "--webview" in sys.argv:
