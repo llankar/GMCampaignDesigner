@@ -88,6 +88,7 @@ class AudioController:
         tracks: Iterable[Dict[str, Any]],
         *,
         category: Optional[str] = None,
+        mood: Optional[str] = None,
     ) -> None:
         player = self._get_player(section)
         playlist = list(tracks)
@@ -96,10 +97,13 @@ class AudioController:
             state = self._state[section]
             state["playlist"] = list(playlist)
             state["category"] = category
+            state["mood"] = mood
             state["last_error"] = ""
         if category:
             self.library.set_setting(section, "last_category", category)
-        self._emit("playlist_set", section, playlist=list(playlist), category=category)
+        if mood:
+            self.library.set_setting(section, "last_mood", mood)
+        self._emit("playlist_set", section, playlist=list(playlist), category=category, mood=mood)
         self._emit("state_changed", section, state=self.get_state(section))
 
     def play(
@@ -191,17 +195,20 @@ class AudioController:
             "last_track": None,
             "playlist": [],
             "category": None,
+            "mood": None,
             "last_error": "",
         }
 
     def _restore_last_playlist(self, section: str) -> None:
         category = str(self.library.get_setting(section, "last_category", "") or "")
+        mood = str(self.library.get_setting(section, "last_mood", "") or "")
         if not category:
             return
         try:
-            tracks = self.library.list_tracks(section, category)
+            tracks = self.library.list_tracks(section, category, mood=mood or None)
         except KeyError:
             self.library.set_setting(section, "last_category", "")
+            self.library.set_setting(section, "last_mood", "")
             self.library.set_setting(section, "last_track_id", "")
             return
         if not tracks:
@@ -221,6 +228,7 @@ class AudioController:
             state = self._state[section]
             state["playlist"] = list(tracks)
             state["category"] = category
+            state["mood"] = mood or None
             if selected_track is not None:
                 state["last_track"] = copy.deepcopy(selected_track)
 
@@ -248,8 +256,13 @@ class AudioController:
                     if track_id:
                         self.library.set_setting(section, "last_track_id", str(track_id))
                     category = track.get("category") or state.get("category")
+                    mood = track.get("mood") or state.get("mood")
                     if category:
+                        state["category"] = category
                         self.library.set_setting(section, "last_category", category)
+                    if mood:
+                        state["mood"] = mood
+                        self.library.set_setting(section, "last_mood", mood)
                 elif track is not None:
                     state["last_track"] = track
                 state["is_playing"] = True
@@ -311,4 +324,3 @@ __all__ = [
     "ControllerListener",
     "get_audio_controller",
 ]
-

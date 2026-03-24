@@ -148,7 +148,15 @@ class AudioLibraryService:
         payload = self._get_category(section, category)
         return list(payload.get("directories", []))
 
-    def add_directory(self, section: str, category: str, directory: str, *, recursive: bool = True) -> List[Dict[str, Any]]:
+    def add_directory(
+        self,
+        section: str,
+        category: str,
+        mood: str,
+        directory: str,
+        *,
+        recursive: bool = True,
+    ) -> List[Dict[str, Any]]:
         normalized = self.repository.normalize_path(directory)
         if not os.path.isdir(normalized):
             raise ValueError(f"Directory '{directory}' does not exist.")
@@ -160,35 +168,54 @@ class AudioLibraryService:
             directories.sort(key=str.lower)
 
         discovered = self.repository.collect_audio_files(normalized, recursive=recursive)
-        added = self.add_tracks(section, category, discovered)
+        added = self.add_tracks(section, category, mood, discovered)
         if not added:
             self.save()
         return added
 
-    def rescan_category(self, section: str, category: str) -> Dict[str, List[Dict[str, Any]]]:
+    def rescan_mood(self, section: str, category: str, mood: str) -> Dict[str, List[Dict[str, Any]]]:
         payload = self._get_category(section, category)
+        mood_key = self.repository.sanitize_mood(mood)
+        moods = payload.get("moods", {})
+        bucket = moods.get(mood_key, {}) if isinstance(moods, dict) else {}
+        tracks = bucket.get("tracks", []) if isinstance(bucket, dict) else []
+
         removed: List[Dict[str, Any]] = []
-        for mood_name in self.get_moods(section, category):
-            tracks = payload["moods"][mood_name].get("tracks", [])
-            for track in list(tracks):
-                if not os.path.exists(track["path"]):
-                    tracks.remove(track)
-                    removed.append(track)
+        for track in list(tracks):
+            if not os.path.exists(track["path"]):
+                tracks.remove(track)
+                removed.append(track)
 
         discovered_paths: List[str] = []
         for directory in payload.get("directories", []):
             discovered_paths.extend(self.repository.collect_audio_files(directory, recursive=True))
 
-        added = self.add_tracks(section, category, discovered_paths)
+        added = self.add_tracks(section, category, mood_key, discovered_paths)
         if removed and not added:
             self.save()
 
         return {"added": added, "removed": removed}
 
-    def add_tracks(self, section: str, category: str, paths: Iterable[str]) -> List[Dict[str, Any]]:
+    def rescan_category(self, section: str, category: str) -> Dict[str, List[Dict[str, Any]]]:
+        all_added: List[Dict[str, Any]] = []
+        all_removed: List[Dict[str, Any]] = []
+        for mood in self.get_moods(section, category):
+            result = self.rescan_mood(section, category, mood)
+            all_added.extend(result.get("added", []))
+            all_removed.extend(result.get("removed", []))
+        return {"added": all_added, "removed": all_removed}
+
+    def add_tracks(
+        self,
+        section: str,
+        category: str,
+        mood: str,
+        paths: Iterable[str],
+    ) -> List[Dict[str, Any]]:
         payload = self._get_category(section, category)
         moods = payload.setdefault("moods", {})
-        default_bucket = moods.setdefault(NO_MOOD, {"tracks": []})
+        mood_key = self.repository.sanitize_mood(mood)
+        target_bucket = moods.setdefault(mood_key, {"tracks": []})
 
         existing_paths = {
             track["path"]
@@ -214,9 +241,9 @@ class AudioLibraryService:
                 "name": os.path.splitext(os.path.basename(normalized))[0],
                 "path": normalized,
                 "category": category,
-                "mood": NO_MOOD,
+                "mood": mood_key,
             }
-            default_bucket.setdefault("tracks", []).append(track)
+            target_bucket.setdefault("tracks", []).append(track)
             added.append(track)
             existing_paths.add(normalized)
 
@@ -224,7 +251,9 @@ class AudioLibraryService:
             for bucket in moods.values():
                 bucket["tracks"].sort(key=lambda item: item["name"].lower())
             self.save()
-            log_info(f"AudioLibraryService.add_tracks - added {len(added)} tracks to {section}/{category}")
+            log_info(
+                f"AudioLibraryService.add_tracks - added {len(added)} tracks to {section}/{category}/{mood_key}"
+            )
         return added
 
     def classify_section_moods(self, section: str) -> Dict[str, int]:
@@ -248,15 +277,17 @@ class AudioLibraryService:
             self.save()
         return {"updated": updated}
 
-    def remove_track(self, section: str, category: str, track_id: str) -> Optional[Dict[str, Any]]:
+    def remove_track(self, section: str, category: str, mood: str, track_id: str) -> Optional[Dict[str, Any]]:
         payload = self._get_category(section, category)
-        for mood in payload.get("moods", {}).values():
-            tracks = mood.get("tracks", [])
-            for index, track in enumerate(tracks):
-                if track.get("id") == track_id:
-                    removed = tracks.pop(index)
-                    self.save()
-                    return removed
+        mood_key = self.repository.sanitize_mood(mood)
+        moods = payload.get("moods", {})
+        bucket = moods.get(mood_key, {}) if isinstance(moods, dict) else {}
+        tracks = bucket.get("tracks", []) if isinstance(bucket, dict) else []
+        for index, track in enumerate(tracks):
+            if track.get("id") == track_id:
+                removed = tracks.pop(index)
+                self.save()
+                return removed
         return None
 
     def get_setting(self, section: str, key: str, default: Any = None) -> Any:
