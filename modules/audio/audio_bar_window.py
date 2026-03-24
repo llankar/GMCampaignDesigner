@@ -11,6 +11,7 @@ from modules.helpers import theme_manager
 
 from modules.audio.audio_constants import DEFAULT_SECTION, SECTION_TITLES
 from modules.audio.audio_controller import AudioController, get_audio_controller
+from modules.audio.ui.audio_bar_filters import build_audio_bar_filter_options
 from modules.helpers.logging_helper import log_exception, log_module_import
 
 log_module_import(__name__)
@@ -36,6 +37,7 @@ class AudioBarWindow(ctk.CTkToplevel):
         self._selected_track_key: Optional[str] = None
         self._search_results_lookup: Dict[str, Dict[str, Any]] = {}
         self._pending_search_track_id: Optional[str] = None
+        self._syncing_filters = False
 
         self.overrideredirect(True)
         self.resizable(False, False)
@@ -45,6 +47,8 @@ class AudioBarWindow(ctk.CTkToplevel):
 
         self.section_toggle_var = tk.StringVar(value=self._section_button_label(self._active_section))
         self.now_playing_var = tk.StringVar(value="No tracks available")
+        self.category_var = tk.StringVar(value="Category")
+        self.mood_var = tk.StringVar(value="Mood")
         self.status_var = tk.StringVar(value="Status: Idle")
         self.shuffle_var = tk.BooleanVar(value=False)
         self.loop_var = tk.BooleanVar(value=False)
@@ -98,9 +102,11 @@ class AudioBarWindow(ctk.CTkToplevel):
         content.grid_columnconfigure(0, weight=0)
         content.grid_columnconfigure(1, weight=1)
         content.grid_columnconfigure(2, weight=1)
-        content.grid_columnconfigure(3, weight=2)
-        content.grid_columnconfigure(13, weight=3)
-        content.grid_columnconfigure(15, weight=2)
+        content.grid_columnconfigure(3, weight=1)
+        content.grid_columnconfigure(4, weight=1)
+        content.grid_columnconfigure(5, weight=2)
+        content.grid_columnconfigure(14, weight=3)
+        content.grid_columnconfigure(16, weight=2)
         self._content_frame = content
 
         self.section_toggle_button = ctk.CTkButton(
@@ -122,6 +128,26 @@ class AudioBarWindow(ctk.CTkToplevel):
         self.search_entry.bind("<KP_Enter>", self._on_search_submitted)
         self.search_entry.bind("<KeyRelease>", self._on_search_text_changed)
 
+        self.category_menu = ctk.CTkOptionMenu(
+            content,
+            variable=self.category_var,
+            values=["Category"],
+            command=self._on_category_selected,
+            width=170,
+        )
+        self.category_menu.grid(row=0, column=2, padx=4, pady=4, sticky="ew")
+        self.category_menu.configure(state="disabled")
+
+        self.mood_menu = ctk.CTkOptionMenu(
+            content,
+            variable=self.mood_var,
+            values=["Mood"],
+            command=self._on_mood_selected,
+            width=140,
+        )
+        self.mood_menu.grid(row=0, column=3, padx=4, pady=4, sticky="ew")
+        self.mood_menu.configure(state="disabled")
+
         self._search_results_menu_width = 200
         self._now_playing_menu_width = 320
         self.search_results_var = tk.StringVar(value="No results")
@@ -132,7 +158,7 @@ class AudioBarWindow(ctk.CTkToplevel):
             command=self._on_search_result_selected,
             width=self._search_results_menu_width,
         )
-        self.search_results_menu.grid(row=0, column=2, padx=4, pady=4, sticky="ew")
+        self.search_results_menu.grid(row=0, column=4, padx=4, pady=4, sticky="ew")
         self.search_results_menu.configure(state="disabled")
         self.search_results_var.trace_add("write", self._keep_search_dropdown_width)
 
@@ -143,7 +169,7 @@ class AudioBarWindow(ctk.CTkToplevel):
             command=self._on_track_selected,
             width=self._now_playing_menu_width,
         )
-        self.now_playing_menu.grid(row=0, column=3, padx=4, pady=4, sticky="ew")
+        self.now_playing_menu.grid(row=0, column=5, padx=4, pady=4, sticky="ew")
         self.now_playing_menu.configure(state="disabled")
         self.now_playing_var.trace_add("write", self._keep_now_playing_dropdown_width)
 
@@ -151,13 +177,13 @@ class AudioBarWindow(ctk.CTkToplevel):
             content, text="Prev", command=self._on_prev_clicked, width=70,
             fg_color=tokens.get("accent_button_fg"), hover_color=tokens.get("accent_button_hover")
         )
-        self.prev_button.grid(row=0, column=4, padx=4, pady=4, sticky="ew")
+        self.prev_button.grid(row=0, column=6, padx=4, pady=4, sticky="ew")
 
         self.play_button = ctk.CTkButton(
             content, text="Play", command=self._on_play_clicked, width=70,
             fg_color=tokens.get("accent_button_fg"), hover_color=tokens.get("accent_button_hover")
         )
-        self.play_button.grid(row=0, column=5, padx=4, pady=4, sticky="ew")
+        self.play_button.grid(row=0, column=7, padx=4, pady=4, sticky="ew")
 
         #self.pause_button = ctk.CTkButton(content, text="Pause", command=self._on_pause_clicked, width=70)
         #self.pause_button.grid(row=0, column=6, padx=4, pady=4, sticky="ew")
@@ -166,13 +192,13 @@ class AudioBarWindow(ctk.CTkToplevel):
             content, text="Stop", command=self._on_stop_clicked, width=70,
             fg_color=tokens.get("accent_button_fg"), hover_color=tokens.get("accent_button_hover")
         )
-        self.stop_button.grid(row=0, column=7, padx=4, pady=4, sticky="ew")
+        self.stop_button.grid(row=0, column=8, padx=4, pady=4, sticky="ew")
 
         self.next_button = ctk.CTkButton(
             content, text="Next", command=self._on_next_clicked, width=70,
             fg_color=tokens.get("accent_button_fg"), hover_color=tokens.get("accent_button_hover")
         )
-        self.next_button.grid(row=0, column=8, padx=4, pady=4, sticky="ew")
+        self.next_button.grid(row=0, column=9, padx=4, pady=4, sticky="ew")
 
         self.shuffle_checkbox = ctk.CTkCheckBox(
             content,
@@ -180,7 +206,7 @@ class AudioBarWindow(ctk.CTkToplevel):
             variable=self.shuffle_var,
             command=self._on_shuffle_toggle,
         )
-        self.shuffle_checkbox.grid(row=0, column=9, padx=(2, 0), pady=4, sticky="w")
+        self.shuffle_checkbox.grid(row=0, column=10, padx=(2, 0), pady=4, sticky="w")
 
         self.loop_checkbox = ctk.CTkCheckBox(
             content,
@@ -188,7 +214,7 @@ class AudioBarWindow(ctk.CTkToplevel):
             variable=self.loop_var,
             command=self._on_loop_toggle,
         )
-        self.loop_checkbox.grid(row=0, column=10, padx=(2, 0), pady=4, sticky="w")
+        self.loop_checkbox.grid(row=0, column=11, padx=(2, 0), pady=4, sticky="w")
 
         self.continue_checkbox = ctk.CTkCheckBox(
             content,
@@ -196,10 +222,10 @@ class AudioBarWindow(ctk.CTkToplevel):
             variable=self.continue_var,
             command=self._on_continue_toggle,
         )
-        self.continue_checkbox.grid(row=0, column=11, padx=(2, 4), pady=4, sticky="w")
+        self.continue_checkbox.grid(row=0, column=12, padx=(2, 4), pady=4, sticky="w")
 
         volume_label = ctk.CTkLabel(content, text="Volume")
-        volume_label.grid(row=0, column=12, padx=(12, 4), pady=4, sticky="e")
+        volume_label.grid(row=0, column=13, padx=(12, 4), pady=4, sticky="e")
 
         self.volume_slider = ctk.CTkSlider(
             content,
@@ -207,13 +233,13 @@ class AudioBarWindow(ctk.CTkToplevel):
             to=100,
             command=self._on_volume_changed,
         )
-        self.volume_slider.grid(row=0, column=13, padx=4, pady=4, sticky="ew")
+        self.volume_slider.grid(row=0, column=14, padx=4, pady=4, sticky="ew")
 
         self.volume_value_label = ctk.CTkLabel(content, textvariable=self.volume_value_var, width=60)
-        self.volume_value_label.grid(row=0, column=14, padx=(4, 12), pady=4, sticky="e")
+        self.volume_value_label.grid(row=0, column=15, padx=(4, 12), pady=4, sticky="e")
 
         self.status_label = ctk.CTkLabel(content, textvariable=self.status_var, anchor="w")
-        self.status_label.grid(row=0, column=15, padx=(8, 4), pady=4, sticky="ew")
+        self.status_label.grid(row=0, column=16, padx=(8, 4), pady=4, sticky="ew")
 
         self._building_ui = False
         self._update_collapse_button()
@@ -322,6 +348,16 @@ class AudioBarWindow(ctk.CTkToplevel):
             self.search_var.set("")
         self._clear_search_results()
         self._refresh_from_state(self._active_section)
+
+    def _on_category_selected(self, choice: str) -> None:
+        if self._syncing_filters:
+            return
+        self._apply_selected_filters(category=choice)
+
+    def _on_mood_selected(self, choice: str) -> None:
+        if self._syncing_filters:
+            return
+        self._apply_selected_filters(mood=choice)
 
     def _on_track_selected(self, choice: str) -> None:
         if choice not in self._playlist_lookup:
@@ -518,6 +554,7 @@ class AudioBarWindow(ctk.CTkToplevel):
     def _refresh_from_state(self, section: Optional[str] = None) -> None:
         section = section or self._active_section
         state = self.controller.get_state(section)
+        self._refresh_filter_menus(state)
         playlist = (state or {}).get("playlist") or []
         self._update_playlist_menu(playlist)
 
@@ -562,6 +599,61 @@ class AudioBarWindow(ctk.CTkToplevel):
         self._update_status_from_state(section)
         self._update_button_states(state or {})
         self._apply_pending_selection()
+
+    def _refresh_filter_menus(self, state: Optional[Dict[str, Any]]) -> None:
+        library = getattr(self.controller, "library", None)
+        if library is None:
+            return
+        preferred_category = str((state or {}).get("category") or self.category_var.get() or "")
+        preferred_mood = str((state or {}).get("mood") or self.mood_var.get() or "")
+        options = build_audio_bar_filter_options(
+            library=library,
+            section=self._active_section,
+            preferred_category=preferred_category,
+            preferred_mood=preferred_mood,
+        )
+        self._syncing_filters = True
+        try:
+            category_values = options.categories or ["No category"]
+            mood_values = options.moods or ["No mood"]
+            self.category_menu.configure(values=category_values)
+            self.mood_menu.configure(values=mood_values)
+            self.category_var.set(options.category or "No category")
+            self.mood_var.set(options.mood or "No mood")
+            self.category_menu.configure(state="normal" if options.categories else "disabled")
+            self.mood_menu.configure(state="normal" if options.moods else "disabled")
+        finally:
+            self._syncing_filters = False
+
+    def _apply_selected_filters(
+        self,
+        *,
+        category: Optional[str] = None,
+        mood: Optional[str] = None,
+    ) -> None:
+        library = getattr(self.controller, "library", None)
+        if library is None:
+            return
+        selected_category = category if category is not None else (self.category_var.get() or "")
+        selected_mood = mood if mood is not None else (self.mood_var.get() or "")
+        if not selected_category or selected_category == "No category":
+            return
+        if selected_mood in {"", "No mood"}:
+            selected_mood = None
+        try:
+            tracks = library.list_tracks(
+                self._active_section,
+                selected_category,
+                mood=selected_mood,
+            )
+        except KeyError:
+            return
+        self.controller.set_playlist(
+            self._active_section,
+            tracks,
+            category=selected_category,
+            mood=selected_mood,
+        )
 
     def _apply_volume(self, value: Any) -> None:
         try:
