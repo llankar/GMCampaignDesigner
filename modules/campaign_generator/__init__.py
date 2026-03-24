@@ -1,8 +1,6 @@
-"""Legacy compatibility facade for the campaign generator UI and services."""
-
-from modules.campaign_generator import (
+from .exporters import export_to_docx
+from .services import (
     GENERATOR_FUNCTIONS,
-    CampaignGeneratorApp,
     append_scenario_to_json_file,
     build_scenario_export_payload,
     compose_detailed_distance,
@@ -16,7 +14,6 @@ from modules.campaign_generator import (
     compose_detailed_region,
     compose_detailed_reward,
     compose_detailed_starting,
-    export_to_docx,
     generate_distance,
     generate_fantasy_campaign,
     generate_modern_campaign,
@@ -34,10 +31,4 @@ from modules.campaign_generator import (
     generate_starting_location,
     roll,
 )
-
-def main() -> None:
-    app = CampaignGeneratorApp()
-    app.mainloop()
-
-if __name__ == "__main__":
-    main()
+from .ui import CampaignGeneratorApp
