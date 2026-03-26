@@ -5,6 +5,11 @@ from typing import Any
 from modules.campaigns.services.ai.arc_scenario_entities import build_existing_entity_lookup
 from modules.campaigns.services.ai.json_parsing import parse_json_relaxed
 from modules.campaigns.services.ai.prompt_builders import build_arc_scenario_expansion_prompt
+from modules.campaigns.services.ai.scenes import (
+    SceneBlueprintError,
+    validate_and_fix_scene_entity_links,
+    normalize_scene_blueprints,
+)
 
 
 class ArcScenarioExpansionValidationError(ValueError):
@@ -134,15 +139,16 @@ class ArcScenarioExpansionService:
                     f"Arc '{raw_arc_name}' must contain exactly 2 generated scenarios"
                 )
 
-            normalized_scenarios = [
-                self._normalize_scenario_payload(
-                    scenario_payload,
-                    parent_arc=arc_context_lookup[arc_key],
-                    used_titles=used_titles,
-                    existing_entities=existing_entities,
+            normalized_scenarios = []
+            for scenario_payload in raw_scenarios:
+                normalized_scenarios.append(
+                    self._normalize_scenario_payload(
+                        scenario_payload,
+                        parent_arc=arc_context_lookup[arc_key],
+                        used_titles=used_titles,
+                        existing_entities=existing_entities,
+                    )
                 )
-                for scenario_payload in raw_scenarios
-            ]
             normalized_groups.append(
                 {
                     "arc_name": expected_lookup[arc_key],
@@ -158,8 +164,8 @@ class ArcScenarioExpansionService:
 
         return {"arcs": normalized_groups}
 
-    @staticmethod
     def _normalize_scenario_payload(
+        self,
         payload: Any,
         *,
         parent_arc: dict[str, Any],
@@ -188,7 +194,12 @@ class ArcScenarioExpansionService:
         traceability_block = ArcScenarioExpansionService._build_traceability_block(parent_arc)
         entity_creations = ArcScenarioExpansionService._normalize_entity_creations(payload.get("EntityCreations"))
 
-        scenes = ArcScenarioExpansionService._normalize_string_list(payload.get("Scenes"))
+        try:
+            scenes, scene_entities = normalize_scene_blueprints(payload.get("Scenes"))
+        except SceneBlueprintError as exc:
+            raise ArcScenarioExpansionValidationError(
+                f"Generated scenario '{title}' for arc '{parent_arc_name}' has invalid Scenes: {exc}"
+            ) from exc
         if len(scenes) < 3:
             raise ArcScenarioExpansionValidationError(
                 f"Generated scenario '{title}' for arc '{parent_arc_name}' must include at least 3 scenes"
@@ -213,6 +224,26 @@ class ArcScenarioExpansionService:
             entity_creations=entity_creations,
             existing_entities=existing_entities,
         )
+
+        links, scene_entities, entity_creations = validate_and_fix_scene_entity_links(
+            title=title,
+            ai_client=self.ai_client,
+            links={
+                "places": places,
+                "npcs": npcs,
+                "villains": villains,
+                "creatures": creatures,
+                "factions": factions,
+            },
+            scene_entities=scene_entities,
+            entity_creations=entity_creations,
+            existing_entities=existing_entities,
+        )
+        places = links["places"]
+        npcs = links["npcs"]
+        villains = links["villains"]
+        creatures = links["creatures"]
+        factions = links["factions"]
 
         places = ArcScenarioExpansionService._ensure_created_links_present(places, entity_creations["places"])
         villains = ArcScenarioExpansionService._ensure_created_links_present(villains, entity_creations["villains"])

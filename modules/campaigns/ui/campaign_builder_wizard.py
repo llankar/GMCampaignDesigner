@@ -334,6 +334,12 @@ class CampaignBuilderWizard(ctk.CTkToplevel):
         ctk.CTkButton(buttons, text="Add Arc", command=self._add_arc, **primary_button_style()).pack(side="left", padx=4)
         ctk.CTkButton(buttons, text="Generate Arcs from Scenarios", command=self._generate_arcs_from_scenarios, **primary_button_style()).pack(side="left", padx=4)
         ctk.CTkButton(buttons, text="Generate 2 Scenarios per Arc", command=self._generate_scenarios_per_arc, **primary_button_style()).pack(side="left", padx=4)
+        ctk.CTkButton(
+            buttons,
+            text="Generate + Validate Scenes (DB)",
+            command=self._generate_db_aware_scenarios_per_arc,
+            **primary_button_style(),
+        ).pack(side="left", padx=4)
         ctk.CTkButton(buttons, text="Edit Arc", command=self._edit_selected_arc, **primary_button_style()).pack(side="left", padx=4)
         ctk.CTkButton(buttons, text="Move Up", command=self._move_arc_up, **primary_button_style()).pack(side="left", padx=4)
         ctk.CTkButton(buttons, text="Move Down", command=self._move_arc_down, **primary_button_style()).pack(side="left", padx=4)
@@ -516,6 +522,10 @@ class CampaignBuilderWizard(ctk.CTkToplevel):
             f"Saved {saved_count} generated scenario(s) across {len(saved_groups)} arc(s).",
             parent=self,
         )
+
+    def _generate_db_aware_scenarios_per_arc(self):
+        """Explicit user action for DB-aware scene generation and validation."""
+        self._generate_scenarios_per_arc()
 
     def _validate_arcs_for_scenario_generation(self):
         if not self.arcs:
