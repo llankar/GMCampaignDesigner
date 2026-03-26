@@ -262,7 +262,12 @@ def build_arc_generation_prompt(foundation: dict[str, Any], scenarios: list[dict
     )
 
 
-def build_arc_scenario_expansion_prompt(foundation: dict[str, Any], arcs: list[dict[str, Any]]) -> str:
+def build_arc_scenario_expansion_prompt(
+    foundation: dict[str, Any],
+    arcs: list[dict[str, Any]],
+    *,
+    existing_scenarios: list[dict[str, Any]] | None = None,
+) -> str:
     """Build the strict JSON prompt used to generate two new scenarios per arc."""
 
     foundation_payload = {
@@ -296,6 +301,15 @@ def build_arc_scenario_expansion_prompt(foundation: dict[str, Any], arcs: list[d
         for arc in arcs
         if _clean(arc.get("name"))
     ]
+    existing_scenario_payload = [
+        {
+            "title": _scenario_title(scenario),
+            "summary": _scenario_summary(scenario),
+            "scenes": _scenario_scene_titles(scenario),
+        }
+        for scenario in (existing_scenarios or [])
+        if _scenario_title(scenario)
+    ]
 
     return (
         "You are an expert tabletop RPG scenario writer.\n"
@@ -311,6 +325,8 @@ def build_arc_scenario_expansion_prompt(foundation: dict[str, Any], arcs: list[d
         f"{json.dumps(foundation_payload, ensure_ascii=False, indent=2)}\n\n"
         "Arc seeds:\n"
         f"{json.dumps(arc_payload, ensure_ascii=False, indent=2)}\n\n"
+        "Existing scenario and scene catalog (parse these before generating anything new):\n"
+        f"{json.dumps(existing_scenario_payload, ensure_ascii=False, indent=2)}\n\n"
         "Required JSON schema:\n"
         f"{json.dumps(ARC_SCENARIO_EXPANSION_SCHEMA, ensure_ascii=False, indent=2)}\n\n"
         "Rules:\n"
@@ -352,6 +368,21 @@ def _scenario_details(scenario: dict[str, Any]) -> dict[str, Any]:
         if text_value:
             details[key] = text_value
     return details
+
+
+def _scenario_scene_titles(scenario: dict[str, Any]) -> list[str]:
+    scenes = scenario.get("Scenes")
+    if not isinstance(scenes, list):
+        return []
+    titles: list[str] = []
+    for scene in scenes:
+        if isinstance(scene, dict):
+            title = _clean(scene.get("Title"))
+        else:
+            title = _clean(scene)
+        if title:
+            titles.append(title)
+    return titles
 
 
 def _clean(value: Any) -> str:
