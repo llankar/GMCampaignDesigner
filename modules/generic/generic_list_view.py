@@ -3217,22 +3217,42 @@ class GenericListView(ctk.CTkFrame):
         self.filtered_items = list(self.items)
         self.refresh_list()
 
-    def add_items(self, items):
-        log_info(f"Adding batch of {len(items)} items to {self.model_wrapper.entity_type}", func_name="GenericListView.add_items")
+    def add_items(self, items, overwrite=True):
+        log_info(
+            f"Adding batch of {len(items)} items to {self.model_wrapper.entity_type}",
+            func_name="GenericListView.add_items"
+        )
         added = 0
+        updated = 0
         for itm in items:
             nid = sanitize_id(str(itm.get(self.unique_field, ""))).lower()
-            if not any(
-                sanitize_id(str(i.get(self.unique_field, ""))).lower() == nid
-                for i in self.items
-            ):
+            # 🔍 Find existing item
+            existing_index = None
+            for idx, i in enumerate(self.items):
+                existing_nid = sanitize_id(str(i.get(self.unique_field, ""))).lower()
+                if existing_nid == nid:
+                    existing_index = idx
+                    break
+            # ➕ Not found → add
+            if existing_index is None:
                 self.items.append(itm)
                 added += 1
-        if added:
+            # 🔁 Found → update
+            else:
+                if overwrite:
+                    self.items[existing_index] = itm
+                    updated += 1
+                # else → skip silently
+        # 💾 Save only if something changed
+        if added or updated:
             self.model_wrapper.save_items(self.items)
             self._save_list_order()
             self.filter_items(self.search_var.get())
-
+        log_info(
+            f"{added} added, {updated} updated",
+            func_name="GenericListView.add_items"
+        )
+        
     def merge_duplicate_entities(self):
         func_name = "GenericListView.merge_duplicate_entities"
         if not self.unique_field:
