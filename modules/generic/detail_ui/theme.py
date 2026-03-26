@@ -122,10 +122,10 @@ def create_hero_header(
     )
 
     band = ctk.CTkFrame(hero, fg_color=palette["hero_band"], height=8, corner_radius=28)
-    band.pack(fill="x", padx=18, pady=(18, 0))
+    band.pack(fill="x", padx=18, pady=(0, 0))
 
     content = ctk.CTkFrame(hero, fg_color="transparent")
-    content.pack(fill="both", expand=True, padx=26, pady=24)
+    content.pack(fill="both", expand=True, padx=26, pady=(14, 20))
     content.grid_columnconfigure(0, weight=7)
     content.grid_rowconfigure(0, weight=1)
     if portrait_widget is not None or portrait_builder is not None:
