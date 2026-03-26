@@ -19,7 +19,7 @@ from .components import (
 from .data import CampaignGraphArc, CampaignGraphPayload, CampaignGraphScenario, build_campaign_graph_payload, build_campaign_option_index
 from modules.scenarios.gm_screen_view import GMScreenView
 from modules.scenarios.gm_layout_manager import GMScreenLayoutManager
-from .services import open_scenario_in_embedded_gm_screen
+from .services import CampaignOverviewSelectionStore, open_scenario_in_embedded_gm_screen
 
 
 class CampaignGraphPanel(ctk.CTkFrame):
@@ -33,6 +33,7 @@ class CampaignGraphPanel(ctk.CTkFrame):
         self._campaign_items = self._safe_load(self.campaign_wrapper)
         self._scenario_items = self._safe_load(self.scenario_wrapper)
         self._campaign_options, self._campaign_index = build_campaign_option_index(self._campaign_items)
+        self._selection_store = CampaignOverviewSelectionStore()
         self._selected_campaign: CampaignGraphPayload | None = None
         self._selected_arc_index = 0
         self._selected_scenario_index = 0
@@ -143,8 +144,58 @@ class CampaignGraphPanel(ctk.CTkFrame):
         self._selected_campaign = build_campaign_graph_payload(campaign, self._scenario_items)
         self._selected_arc_index = 0
         self._selected_scenario_index = 0
+        self._apply_saved_focus_state(campaign)
         self._scroll_to_top()
         self._refresh_campaign_content()
+
+    def _apply_saved_focus_state(self, campaign_record: dict | None) -> None:
+        payload = self._selected_campaign
+        if payload is None or not payload.arcs:
+            return
+
+        saved_state = self._selection_store.load(campaign_record)
+        if saved_state.arc_name:
+            matching_arc_index = next(
+                (index for index, arc in enumerate(payload.arcs) if arc.name == saved_state.arc_name),
+                0,
+            )
+            self._selected_arc_index = self._clamp_index(matching_arc_index, len(payload.arcs))
+
+        selected_arc = self._get_selected_arc(payload)
+        if selected_arc is None or not selected_arc.scenarios:
+            self._selected_scenario_index = 0
+            return
+
+        if saved_state.scenario_title:
+            matching_scenario_index = next(
+                (
+                    index
+                    for index, scenario in enumerate(selected_arc.scenarios)
+                    if scenario.title == saved_state.scenario_title
+                ),
+                0,
+            )
+            self._selected_scenario_index = self._clamp_index(matching_scenario_index, len(selected_arc.scenarios))
+
+    def _persist_focus_state(self) -> None:
+        payload = self._selected_campaign
+        if payload is None:
+            return
+
+        campaign_record = self._campaign_index.get(payload.name)
+        selected_arc = self._get_selected_arc(payload)
+        selected_scenario_title = ""
+        if selected_arc and selected_arc.scenarios:
+            selected_scenario = selected_arc.scenarios[self._selected_scenario_index]
+            selected_scenario_title = selected_scenario.title
+
+        updated_record = self._selection_store.save(
+            campaign_record,
+            arc_name=selected_arc.name if selected_arc else "",
+            scenario_title=selected_scenario_title,
+        )
+        if isinstance(updated_record, dict):
+            self._campaign_index[payload.name] = updated_record
 
     def _refresh_campaign_content(self) -> None:
         payload = self._selected_campaign
@@ -487,6 +538,7 @@ class CampaignGraphPanel(ctk.CTkFrame):
             return
         self._selected_arc_index = self._clamp_index(self._selected_arc_index + step, len(payload.arcs))
         self._selected_scenario_index = 0
+        self._persist_focus_state()
         self._refresh_arc_focus()
 
     def _shift_scenario(self, step: int) -> None:
@@ -495,6 +547,7 @@ class CampaignGraphPanel(ctk.CTkFrame):
         if selected_arc is None or not selected_arc.scenarios:
             return
         self._selected_scenario_index = self._clamp_index(self._selected_scenario_index + step, len(selected_arc.scenarios))
+        self._persist_focus_state()
         self._refresh_scenario_focus()
 
     def _select_arc(self, index: int) -> None:
@@ -503,6 +556,7 @@ class CampaignGraphPanel(ctk.CTkFrame):
             return
         self._selected_arc_index = self._clamp_index(index, len(payload.arcs))
         self._selected_scenario_index = 0
+        self._persist_focus_state()
         self._refresh_arc_focus()
 
     def _select_scenario(self, index: int) -> None:
@@ -511,6 +565,7 @@ class CampaignGraphPanel(ctk.CTkFrame):
         if selected_arc is None or not selected_arc.scenarios:
             return
         self._selected_scenario_index = self._clamp_index(index, len(selected_arc.scenarios))
+        self._persist_focus_state()
         self._refresh_scenario_focus()
 
     def _preserve_scroll_position(self, callback) -> None:
