@@ -25,7 +25,7 @@ class CampaignDashboardPanel(ctk.CTkFrame):
 
     _COMPACT_VALUE_MAX_LENGTH = 80
     _TEXTBOX_MIN_HEIGHT = 36
-    _TEXTBOX_MAX_HEIGHT = 120
+    _TEXTBOX_MAX_HEIGHT = 220
     _TEXTBOX_LINE_HEIGHT = 18
     _TEXTBOX_WIDTH_CHARS = 72
     _HIGHLIGHT_BG_COLOR = "#61482A"
@@ -392,6 +392,7 @@ class CampaignDashboardPanel(ctk.CTkFrame):
             parent,
             height=textbox_height,
             wrap="word",
+            activate_scrollbars=True,
             fg_color=DASHBOARD_THEME.panel_bg,
             border_width=1,
             border_color=DASHBOARD_THEME.card_border,

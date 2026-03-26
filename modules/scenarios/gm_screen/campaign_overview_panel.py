@@ -19,7 +19,7 @@ class CampaignOverviewPanel(ctk.CTkFrame):
 
     _COMPACT_VALUE_MAX_LENGTH = 80
     _TEXTBOX_MIN_HEIGHT = 36
-    _TEXTBOX_MAX_HEIGHT = 120
+    _TEXTBOX_MAX_HEIGHT = 220
     _TEXTBOX_LINE_HEIGHT = 18
     _TEXTBOX_WIDTH_CHARS = 72
 
@@ -80,7 +80,7 @@ class CampaignOverviewPanel(ctk.CTkFrame):
             anchor="w",
         ).grid(row=1, column=0, sticky="ew", padx=16, pady=(0, 8))
 
-        summary_box = ctk.CTkTextbox(parent, height=120, wrap="word")
+        summary_box = ctk.CTkTextbox(parent, height=120, wrap="word", activate_scrollbars=True)
         summary_box.grid(row=2, column=0, sticky="ew", padx=8)
         summary_box.insert("1.0", summary)
         summary_box.configure(state="disabled")
@@ -242,7 +242,7 @@ class CampaignOverviewPanel(ctk.CTkFrame):
             return
 
         textbox_height = self._compute_textbox_height(value)
-        body = ctk.CTkTextbox(parent, height=textbox_height, wrap="word")
+        body = ctk.CTkTextbox(parent, height=textbox_height, wrap="word", activate_scrollbars=True)
         body.grid(row=1, column=0, sticky="ew", padx=10, pady=(0, 8))
         body.insert("1.0", value)
         body.configure(state="disabled")
