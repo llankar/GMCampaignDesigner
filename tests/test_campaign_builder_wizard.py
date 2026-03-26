@@ -463,3 +463,15 @@ def test_generate_scenarios_per_arc_links_saved_titles_back_to_parent_arc(monkey
         "Ash Dock Reckoning",
     ]
     assert refresh_calls == {"preview": 1, "review": 1}
+
+
+def test_generate_db_aware_scenarios_button_handler_calls_generation_flow():
+    wizard = campaign_builder_wizard.CampaignBuilderWizard.__new__(
+        campaign_builder_wizard.CampaignBuilderWizard
+    )
+    calls = {"count": 0}
+    wizard._generate_scenarios_per_arc = lambda: calls.__setitem__("count", calls["count"] + 1)
+
+    wizard._generate_db_aware_scenarios_per_arc()
+
+    assert calls["count"] == 1

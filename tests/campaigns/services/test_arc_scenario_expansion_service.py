@@ -48,6 +48,100 @@ class _FakeScenarioWrapper:
         self.saved_items = [dict(item) for item in items]
 
 
+def test_arc_scenario_expansion_accepts_structured_playable_scenes():
+    ai_client = _FakeAIClient(
+        """
+        {
+          "arcs": [
+            {
+              "arc_name": "Guild War",
+              "scenarios": [
+                {
+                  "Title": "Rainmarket Ultimatum",
+                  "Summary": "The crew traces the conspiracy into Rainmarket.",
+                  "Secrets": "A broker carries the ledger fragment.",
+                  "Scenes": [
+                    {
+                      "Title": "Stakeout at Rainmarket",
+                      "Objective": "Identify who receives the ledger fragment.",
+                      "Setup": "The market is under curfew and entry is controlled by Marshals.",
+                      "Challenge": "Get eyes on the broker without exposing the crew's presence.",
+                      "Stakes": "If spotted, the ledger handoff vanishes into the alleys.",
+                      "Twists": "A false courier appears to bait surveillance teams.",
+                      "GMNotes": "Offer stealth, social, and bribery approaches for entry.",
+                      "Outcome": "The true courier is traced to a compact safehouse.",
+                      "Entities": {"NPCs": ["Rika Vale"], "Places": ["Rainmarket"], "Villains": ["Marshal Vey"], "Factions": ["Rainmarket Compact"]}
+                    },
+                    {
+                      "Title": "Safehouse Pressure",
+                      "Objective": "Extract the ledger location from compact operatives.",
+                      "Setup": "The safehouse has hidden exits and panicked scouts.",
+                      "Challenge": "Contain exits while negotiating or forcing cooperation.",
+                      "Stakes": "Failing fast gives Vey enough time to burn evidence.",
+                      "Twists": "The broker is willing to switch sides for protection.",
+                      "GMNotes": "Use countdown pressure and escalating alarms.",
+                      "Outcome": "The ledger route points to Ash Dock.",
+                      "Entities": {"NPCs": ["Rika Vale"], "Places": ["Rainmarket"], "Villains": ["Marshal Vey"], "Factions": ["Rainmarket Compact"]}
+                    },
+                    {
+                      "Title": "Crackdown Escape",
+                      "Objective": "Get the broker out before Marshal teams close the district.",
+                      "Setup": "Barricades lock down all main exits.",
+                      "Challenge": "Navigate back channels while hunted by compact enforcers.",
+                      "Stakes": "Capture exposes the investigation and allies.",
+                      "Twists": "A compact lieutenant offers a truce in exchange for the broker.",
+                      "GMNotes": "Reward improvised routes and leverage over witnesses.",
+                      "Outcome": "The crew escapes with a lead on the dock conspiracy.",
+                      "Entities": {"NPCs": ["Rika Vale"], "Places": ["Rainmarket"], "Villains": ["Marshal Vey"], "Factions": ["Rainmarket Compact"]}
+                    }
+                  ],
+                  "Places": ["Rainmarket"],
+                  "NPCs": ["Rika Vale"],
+                  "Villains": ["Marshal Vey"],
+                  "Creatures": [],
+                  "Factions": ["Rainmarket Compact"],
+                  "Objects": ["Ledger Fragment"]
+                },
+                {
+                  "Title": "Ash Dock Reckoning",
+                  "Summary": "A trap at Ash Dock forces the crew to expose the mole.",
+                  "Secrets": "The dockmaster answers to the same patron.",
+                  "Scenes": ["Follow the dock rumor", "Survive the ambush", "Corner the mole"],
+                  "Places": ["Ash Dock"],
+                  "NPCs": ["Dockmaster Neral"],
+                  "Villains": ["Marshal Vey"],
+                  "Creatures": [],
+                  "Factions": ["Rainmarket Compact"],
+                  "Objects": []
+                }
+              ]
+            }
+          ]
+        }
+        """
+    )
+    service = ArcScenarioExpansionService(ai_client)
+
+    result = service.generate_scenarios(
+        {"name": "Stormfront", "tone": "Noir"},
+        [
+            {
+                "name": "Guild War",
+                "summary": "Street-level pressure escalates.",
+                "objective": "Identify the patron behind the gang war.",
+                "thread": "Hidden conspiracy",
+                "scenarios": ["Cold Open"],
+            }
+        ],
+    )
+
+    first_scene = result["arcs"][0]["scenarios"][0]["Scenes"][0]
+    assert "Objective:" in first_scene
+    assert "Challenge:" in first_scene
+    assert "GM Notes:" in first_scene
+    assert "Villains: Marshal Vey" in first_scene
+
+
 def test_arc_scenario_expansion_requires_linked_scenarios():
     service = ArcScenarioExpansionService(_FakeAIClient('{"arcs": []}'))
 
@@ -465,3 +559,85 @@ def test_arc_scenario_expansion_rejects_missing_required_links():
         )
 
     assert "at least 1 villain" in str(exc.value)
+
+
+def test_arc_scenario_expansion_auto_fixes_scene_entity_typos_from_db_catalog():
+    ai_client = _FakeAIClient(
+        """
+        {
+          "arcs": [
+            {
+              "arc_name": "Guild War",
+              "scenarios": [
+                {
+                  "Title": "Rainmarket Ultimatum",
+                  "Summary": "The crew traces the conspiracy into Rainmarket.",
+                  "Secrets": "A broker carries the ledger fragment.",
+                  "Scenes": [
+                    {
+                      "Title": "Stakeout",
+                      "Objective": "Find the broker",
+                      "Setup": "The market is busy.",
+                      "Challenge": "Track covert signals.",
+                      "Stakes": "Lose the target.",
+                      "Twists": "A decoy appears.",
+                      "GMNotes": "Run as a tense skill challenge.",
+                      "Outcome": "The courier route is identified.",
+                      "Entities": {"NPCs": ["Rika Vaal"], "Places": ["Rainmarrket"], "Villains": ["Marshal Vey"], "Factions": ["Rainmarket Compact"]}
+                    },
+                    {"Title": "Pressure", "Objective": "Close in", "Setup": "Safehouse", "Challenge": "Negotiate", "Stakes": "Evidence burns", "Twists": "Double agent", "GMNotes": "Escalate clocks", "Outcome": "Dock lead", "Entities": {"Places": ["Rainmarrket"]}},
+                    {"Title": "Escape", "Objective": "Get out", "Setup": "Barricades", "Challenge": "Outrun teams", "Stakes": "Capture", "Twists": "False ally", "GMNotes": "Offer risky shortcuts", "Outcome": "Crew survives", "Entities": {"NPCs": ["Rika Vaal"]}}
+                  ],
+                  "Places": ["Rainmarrket"],
+                  "NPCs": ["Rika Vaal"],
+                  "Villains": ["Marshal Vey"],
+                  "Creatures": [],
+                  "Factions": ["Rainmarket Compact"],
+                  "Objects": []
+                },
+                {
+                  "Title": "Ash Dock Reckoning",
+                  "Summary": "A trap at Ash Dock forces the crew to expose the mole.",
+                  "Secrets": "The dockmaster answers to the same patron.",
+                  "Scenes": ["Follow the dock rumor", "Survive the ambush", "Corner the mole"],
+                  "Places": ["Ash Dock"],
+                  "NPCs": ["Dockmaster Neral"],
+                  "Villains": ["Marshal Vey"],
+                  "Creatures": [],
+                  "Factions": ["Rainmarket Compact"],
+                  "Objects": []
+                }
+              ]
+            }
+          ]
+        }
+        """
+    )
+    service = ArcScenarioExpansionService(ai_client)
+
+    result = service.generate_scenarios(
+        {
+            "name": "Stormfront",
+            "tone": "Noir",
+            "existing_entities": {
+                "villains": ["Marshal Vey"],
+                "factions": ["Rainmarket Compact"],
+                "places": ["Rainmarket", "Ash Dock"],
+                "npcs": ["Rika Vale", "Dockmaster Neral"],
+                "creatures": [],
+            },
+        },
+        [
+            {
+                "name": "Guild War",
+                "summary": "Street-level pressure escalates.",
+                "objective": "Identify the patron behind the gang war.",
+                "thread": "Hidden conspiracy",
+                "scenarios": ["Cold Open"],
+            }
+        ],
+    )
+
+    first = result["arcs"][0]["scenarios"][0]
+    assert first["Places"] == ["Rainmarket"]
+    assert first["NPCs"] == ["Rika Vale"]

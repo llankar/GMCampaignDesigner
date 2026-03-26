@@ -43,9 +43,60 @@ ARC_SCENARIO_EXPANSION_SCHEMA = {
                     "Summary": "string",
                     "Secrets": "string",
                     "Scenes": [
-                        "Detailed scene 1",
-                        "Detailed scene 2",
-                        "Detailed scene 3+",
+                        {
+                            "Title": "string",
+                            "Objective": "string",
+                            "Setup": "string",
+                            "Challenge": "string",
+                            "Stakes": "string",
+                            "Twists": "string",
+                            "GMNotes": "string",
+                            "Outcome": "string",
+                            "Entities": {
+                                "NPCs": ["NPC names"],
+                                "Creatures": ["Creature names"],
+                                "Places": ["Place names"],
+                                "Villains": ["Villain names"],
+                                "Factions": ["Faction names"],
+                                "Objects": ["Object names"],
+                            },
+                        },
+                        {
+                            "Title": "string",
+                            "Objective": "string",
+                            "Setup": "string",
+                            "Challenge": "string",
+                            "Stakes": "string",
+                            "Twists": "string",
+                            "GMNotes": "string",
+                            "Outcome": "string",
+                            "Entities": {
+                                "NPCs": [],
+                                "Creatures": [],
+                                "Places": [],
+                                "Villains": [],
+                                "Factions": [],
+                                "Objects": [],
+                            },
+                        },
+                        {
+                            "Title": "string",
+                            "Objective": "string",
+                            "Setup": "string",
+                            "Challenge": "string",
+                            "Stakes": "string",
+                            "Twists": "string",
+                            "GMNotes": "string",
+                            "Outcome": "string",
+                            "Entities": {
+                                "NPCs": [],
+                                "Creatures": [],
+                                "Places": [],
+                                "Villains": [],
+                                "Factions": [],
+                                "Objects": [],
+                            },
+                        },
                     ],
                     "Places": ["Existing or new place names if needed"],
                     "NPCs": ["Existing or new NPC names if needed"],
@@ -113,7 +164,26 @@ ARC_SCENARIO_EXPANSION_SCHEMA = {
                     "Title": "string",
                     "Summary": "string",
                     "Secrets": "string",
-                    "Scenes": ["Detailed scene list"],
+                    "Scenes": [
+                        {
+                            "Title": "string",
+                            "Objective": "string",
+                            "Setup": "string",
+                            "Challenge": "string",
+                            "Stakes": "string",
+                            "Twists": "string",
+                            "GMNotes": "string",
+                            "Outcome": "string",
+                            "Entities": {
+                                "NPCs": ["NPC names"],
+                                "Creatures": ["Creature names"],
+                                "Places": ["Place names"],
+                                "Villains": ["Villain names"],
+                                "Factions": ["Faction names"],
+                                "Objects": ["Object names"],
+                            },
+                        }
+                    ],
                     "Places": ["Existing or new place names if needed"],
                     "NPCs": ["Existing or new NPC names if needed"],
                     "Villains": ["At least 1 villain name"],
@@ -247,7 +317,9 @@ def build_arc_scenario_expansion_prompt(foundation: dict[str, Any], arcs: list[d
         "- Make every generated Title unique within the full response.\n"
         "- Summary should read like a ready-to-run scenario hook and clearly continue the arc thread.\n"
         "- Secrets should include a short traceability block referencing the parent arc and source scenarios.\n"
-        "- Scenes must always be a JSON array with at least 3 playable scenes.\n"
+        "- Scenes must always be a JSON array with at least 3 playable scene objects.\n"
+        "- Every scene must include concrete GM-facing details (setup, challenge, stakes, twists, and outcome), not vague summaries.\n"
+        "- Scene Entities lists must reference campaign foundation.existing_entities or matching EntityCreations records.\n"
         "- Each scenario must include at least 1 villain, at least 1 faction, and at least 1 place.\n"
         "- NPCs and Creatures are optional, but include them whenever the premise naturally needs them.\n"
         "- Places, NPCs, Villains, Creatures, Factions, and Objects must always be JSON arrays, even when empty.\n"
