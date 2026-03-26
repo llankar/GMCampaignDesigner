@@ -37,6 +37,7 @@ from modules.scenarios.widgets.scene_body_sections import build_scene_body_secti
 from modules.ui.vertical_section_tabs import VerticalSectionTabs
 from modules.events.ui.shared.related_events_panel import RelatedEventsPanel
 from modules.generic.detail_ui import (
+    build_scroll_host,
     create_chip,
     create_detail_split_layout,
     create_hero_header,
@@ -90,77 +91,6 @@ def _bring_window_to_front(window, parent=None):
         window.after_idle(lambda: window.attributes("-topmost", False))
     except Exception:
         pass
-
-
-def _build_scrollable_window_container(window):
-    """Create a detail host with an always-visible vertical scrollbar."""
-    if not hasattr(window, "tk"):
-        fallback = ctk.CTkScrollableFrame(window)
-        fallback.pack(fill="both", expand=True)
-        return fallback
-
-    shell = ctk.CTkFrame(window, fg_color="transparent")
-    shell.pack(fill="both", expand=True)
-
-    try:
-        canvas = tk.Canvas(
-            shell,
-            highlightthickness=0,
-            bd=0,
-            background=window.cget("fg_color") if hasattr(window, "cget") else "#1f1f1f",
-        )
-    except Exception:
-        fallback = ctk.CTkScrollableFrame(window)
-        fallback.pack(fill="both", expand=True)
-        return fallback
-    canvas.pack(side="left", fill="both", expand=True)
-
-    scrollbar = ctk.CTkScrollbar(shell, orientation="vertical", command=canvas.yview)
-    scrollbar.pack(side="right", fill="y", padx=(8, 0))
-    canvas.configure(yscrollcommand=scrollbar.set)
-
-    content = ctk.CTkFrame(canvas, fg_color="transparent")
-    window_id = canvas.create_window((0, 0), window=content, anchor="nw")
-
-    def _on_content_configure(_event=None):
-        try:
-            canvas.configure(scrollregion=canvas.bbox("all"))
-        except Exception:
-            pass
-
-    def _on_canvas_configure(event):
-        try:
-            canvas.itemconfigure(window_id, width=max(1, event.width))
-        except Exception:
-            pass
-        _on_content_configure()
-
-    def _on_mousewheel(event):
-        delta = getattr(event, "delta", 0)
-        if delta:
-            direction = -1 if delta > 0 else 1
-        elif getattr(event, "num", None) == 4:
-            direction = -1
-        elif getattr(event, "num", None) == 5:
-            direction = 1
-        else:
-            return
-        try:
-            canvas.yview_scroll(direction, "units")
-        except Exception:
-            return
-        return "break"
-
-    content.bind("<Configure>", _on_content_configure, add="+")
-    canvas.bind("<Configure>", _on_canvas_configure, add="+")
-    for widget in (window, shell, canvas, content):
-        widget.bind("<MouseWheel>", _on_mousewheel, add="+")
-        widget.bind("<Button-4>", _on_mousewheel, add="+")
-        widget.bind("<Button-5>", _on_mousewheel, add="+")
-
-    content._scroll_canvas = canvas
-    content._scrollbar = scrollbar
-    return content
 
 
 TOOLTIP_FIELDS = {
@@ -540,7 +470,7 @@ def open_entity_tab(entity_type, name, master):
     new_window.configure(padx=10, pady=10)
 
     # 4) Build the scrollable detail frame inside it
-    scrollable_container = _build_scrollable_window_container(new_window)
+    scrollable_container = build_scroll_host(new_window)
     frame = create_entity_detail_frame(
         entity_type,
         item,
@@ -2065,7 +1995,7 @@ def open_entity_window(entity_type, name):
     apply_fullscreen_top_left(new_window)
     new_window.configure(padx=10, pady=10)
 
-    scrollable_container = _build_scrollable_window_container(new_window)
+    scrollable_container = build_scroll_host(new_window)
 
     detail_frame = create_entity_detail_frame(
         entity_type, entity, master=scrollable_container,
