@@ -947,7 +947,7 @@ class ScenesPlanningStep(WizardStep):
             entity_slug,
             wrapper,
             template,
-            on_select_callback=lambda _et, name, win=top: (result.__setitem__("name", name), win.destroy()),
+            on_select_callback=lambda _et, name, _item, win=top: (result.__setitem__("name", name), win.destroy()),
         )
         view.pack(fill="both", expand=True)
         top.transient(self.winfo_toplevel())
@@ -1769,7 +1769,7 @@ class EntityLinkingStep(WizardStep):
             entity_type,
             wrapper,
             template,
-            on_select_callback=lambda et, name, f=field, win=top: self._on_entity_selected(f, name, win),
+            on_select_callback=lambda _et, name, _item, f=field, win=top: self._on_entity_selected(f, name, win),
         )
         selection.pack(fill="both", expand=True)
         top.transient(self.winfo_toplevel())
