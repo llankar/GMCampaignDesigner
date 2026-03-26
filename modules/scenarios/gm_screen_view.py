@@ -353,7 +353,8 @@ class GMScreenView(ctk.CTkFrame):
 
     def _build_hidden_tab_content(self, host_parent, content_factory, *, scrollable=False):
         container = ctk.CTkFrame(host_parent, fg_color="transparent")
-        build_parent = build_scroll_host(container) if scrollable else container
+        scroll_host = build_scroll_host(container) if scrollable else None
+        build_parent = scroll_host if scroll_host is not None else container
         built = content_factory(build_parent)
         if built is not None and built is not container:
             try:
@@ -380,6 +381,13 @@ class GMScreenView(ctk.CTkFrame):
             "reload",
         ):
             _proxy_attr(attr)
+
+        if scroll_host is not None:
+            for attr in ("_parent_canvas", "_scroll_canvas", "_scrollbar"):
+                try:
+                    setattr(container, attr, getattr(scroll_host, attr, None))
+                except Exception:
+                    pass
 
         if built is not None:
             container.content_inner = built
@@ -2393,7 +2401,7 @@ class GMScreenView(ctk.CTkFrame):
         frame = self.tabs.get(name, {}).get("content_frame") if name else None
         return frame, name
 
-    def _reset_scrollable_widget_position(self, widget):
+    def _reset_scrollable_widget_position(self, widget, *, schedule_after_idle=True):
         if widget is None:
             return
         try:
@@ -2404,24 +2412,49 @@ class GMScreenView(ctk.CTkFrame):
         candidates = [widget]
         inner = getattr(widget, "_scrollable_frame", None)
         canvas = getattr(widget, "_parent_canvas", None)
+        scroll_canvas = getattr(widget, "_scroll_canvas", None)
+        scrollbar = getattr(widget, "_scrollbar", None)
         if inner is not None:
             candidates.append(inner)
+            inner_canvas = getattr(inner, "_parent_canvas", None)
+            inner_scroll_canvas = getattr(inner, "_scroll_canvas", None)
+            if inner_canvas is not None:
+                candidates.append(inner_canvas)
+            if inner_scroll_canvas is not None:
+                candidates.append(inner_scroll_canvas)
         if canvas is not None:
             candidates.append(canvas)
+        if scroll_canvas is not None:
+            candidates.append(scroll_canvas)
+        if scrollbar is not None:
+            candidates.append(scrollbar)
 
-        for candidate in candidates:
-            try:
-                if hasattr(candidate, "bbox") and canvas is not None:
-                    bbox = canvas.bbox("all")
+        real_canvas = scroll_canvas or canvas
+        if real_canvas is not None and real_canvas not in candidates:
+            candidates.append(real_canvas)
+
+        def _apply_reset():
+            if real_canvas is not None:
+                try:
+                    bbox = real_canvas.bbox("all")
                     if bbox is not None:
-                        canvas.configure(scrollregion=bbox)
-            except Exception:
-                pass
-            try:
-                if hasattr(candidate, "yview_moveto"):
-                    candidate.yview_moveto(0.0)
-            except Exception:
-                pass
+                        real_canvas.configure(scrollregion=bbox)
+                except Exception:
+                    pass
+                try:
+                    real_canvas.yview_moveto(0.0)
+                except Exception:
+                    pass
+            for candidate in candidates:
+                try:
+                    if hasattr(candidate, "yview_moveto"):
+                        candidate.yview_moveto(0.0)
+                except Exception:
+                    pass
+
+        _apply_reset()
+        if schedule_after_idle:
+            self.after_idle(lambda w=widget: self._reset_scrollable_widget_position(w, schedule_after_idle=False))
 
     def _reset_tab_scroll_state(self, tab_name):
         tab = self.tabs.get(tab_name) or {}

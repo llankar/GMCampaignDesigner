@@ -74,6 +74,7 @@ def build_scroll_host(parent):
         widget.bind("<Button-4>", _on_mousewheel, add="+")
         widget.bind("<Button-5>", _on_mousewheel, add="+")
 
+    content._parent_canvas = canvas
     content._scroll_canvas = canvas
     content._scrollbar = scrollbar
     return content
