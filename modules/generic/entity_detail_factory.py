@@ -1277,7 +1277,8 @@ def create_scenario_detail_frame(entity_type, scenario_item, master, open_entity
     content_frame.grid_rowconfigure(0, weight=1)
     content_frame.grid_columnconfigure(0, weight=1)
 
-    scrollable_frame = build_scroll_host(content_frame)
+    scrollable_frame = ctk.CTkScrollableFrame(content_frame, fg_color="transparent")
+    scrollable_frame.grid(row=0, column=0, sticky="nsew")
     frame._scrollable_frame = scrollable_frame
     for attr in ("_parent_canvas", "_scroll_canvas", "_scrollbar"):
         try:
