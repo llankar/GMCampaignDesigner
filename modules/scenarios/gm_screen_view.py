@@ -46,6 +46,7 @@ from modules.whiteboard.controllers.whiteboard_controller import WhiteboardContr
 from modules.puzzles.puzzle_display_window import create_puzzle_display_frame
 from modules.scenarios.gm_screen import CampaignDashboardPanel
 from modules.generic.detail_ui import get_detail_palette
+from modules.generic.detail_ui.scroll_host import build_scroll_host
 
 log_module_import(__name__)
 
@@ -350,9 +351,10 @@ class GMScreenView(ctk.CTkFrame):
         except Exception:
             pass
 
-    def _build_hidden_tab_content(self, host_parent, content_factory):
+    def _build_hidden_tab_content(self, host_parent, content_factory, *, scrollable=False):
         container = ctk.CTkFrame(host_parent, fg_color="transparent")
-        built = content_factory(container)
+        build_parent = build_scroll_host(container) if scrollable else container
+        built = content_factory(build_parent)
         if built is not None and built is not container:
             try:
                 if not built.winfo_manager():
@@ -1799,11 +1801,11 @@ class GMScreenView(ctk.CTkFrame):
                 master=master,
                 open_entity_callback=self.open_entity_tab,
             )
-            frame = self._build_hidden_tab_content(self.content_area, factory)
+            frame = self._build_hidden_tab_content(self.content_area, factory, scrollable=False)
             self.add_tab(
                 entity_name,
                 frame,
-                content_factory=lambda master: self._build_hidden_tab_content(master, factory),
+                content_factory=lambda master: self._build_hidden_tab_content(master, factory, scrollable=False),
                 layout_meta={
                     "kind": "entity",
                     "entity_type": "Scenarios",
@@ -2632,12 +2634,13 @@ class GMScreenView(ctk.CTkFrame):
             master=master,
             open_entity_callback=self.open_entity_tab,
         )
-        frame = self._build_hidden_tab_content(self.content_area, factory)
+        needs_scroll = entity_type != "Scenarios"
+        frame = self._build_hidden_tab_content(self.content_area, factory, scrollable=needs_scroll)
 
         self.add_tab(
             name,
             frame,
-            content_factory=lambda master: self._build_hidden_tab_content(master, factory),
+            content_factory=lambda master: self._build_hidden_tab_content(master, factory, scrollable=needs_scroll),
             layout_meta={
                 "kind": "entity",
                 "entity_type": entity_type,

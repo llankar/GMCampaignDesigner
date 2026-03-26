@@ -13,6 +13,7 @@ from .theme import (
     get_textbox_style,
     resolve_color,
 )
+from .scroll_host import build_scroll_host
 
 __all__ = [
     "create_chip",
@@ -26,4 +27,5 @@ __all__ = [
     "get_link_color",
     "get_textbox_style",
     "resolve_color",
+    "build_scroll_host",
 ]
