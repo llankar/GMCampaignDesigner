@@ -351,13 +351,27 @@ def test_arc_scenario_expansion_prompt_includes_existing_entity_catalog():
                 "scenarios": ["Cold Open"],
             }
         ],
+        existing_scenarios=[
+            {
+                "Title": "Cold Open",
+                "Summary": "The opening salvo between rival crews.",
+                "Scenes": [
+                    {"Title": "Neon Alley Stakeout"},
+                    {"Title": "The First Betrayal"},
+                    "Bridge Escape",
+                ],
+            }
+        ],
     )
 
     prompt = ai_client.messages[1]["content"]
     assert '"existing_entities"' in prompt
+    assert "Existing scenario and scene catalog" in prompt
     assert "Marshal Vey" in prompt
     assert "Rika Vale" in prompt
     assert "Rainmarket Compact" in prompt
+    assert "Cold Open" in prompt
+    assert "Neon Alley Stakeout" in prompt
 
 
 def test_arc_scenario_expansion_backfills_missing_entity_creation_records():

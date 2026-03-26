@@ -22,10 +22,20 @@ class ArcScenarioExpansionService:
     def __init__(self, ai_client):
         self.ai_client = ai_client
 
-    def generate_scenarios(self, foundation: dict[str, Any], arcs: list[dict[str, Any]]) -> dict[str, Any]:
+    def generate_scenarios(
+        self,
+        foundation: dict[str, Any],
+        arcs: list[dict[str, Any]],
+        *,
+        existing_scenarios: list[dict[str, Any]] | None = None,
+    ) -> dict[str, Any]:
         normalized_arcs = self._normalize_input_arcs(arcs)
         existing_entities = build_existing_entity_lookup(foundation)
-        prompt = build_arc_scenario_expansion_prompt(foundation=foundation, arcs=normalized_arcs)
+        prompt = build_arc_scenario_expansion_prompt(
+            foundation=foundation,
+            arcs=normalized_arcs,
+            existing_scenarios=existing_scenarios,
+        )
         messages = [
             {
                 "role": "system",

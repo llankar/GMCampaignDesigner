@@ -488,7 +488,7 @@ class CampaignBuilderWizard(ctk.CTkToplevel):
             ),
         }
 
-    def _generate_scenarios_per_arc(self):
+    def _generate_scenarios_per_arc(self, *, existing_scenarios: list[dict] | None = None):
         try:
             self._validate_arcs_for_scenario_generation()
         except ArcScenarioExpansionValidationError as exc:
@@ -497,7 +497,11 @@ class CampaignBuilderWizard(ctk.CTkToplevel):
 
         try:
             service = ArcScenarioExpansionService(self._get_ai())
-            generated_payload = service.generate_scenarios(self._build_arc_generation_foundation(), self.arcs)
+            generated_payload = service.generate_scenarios(
+                self._build_arc_generation_foundation(),
+                self.arcs,
+                existing_scenarios=existing_scenarios,
+            )
         except Exception as exc:
             messagebox.showerror("Scenario generation failed", f"Unable to generate scenarios: {exc}", parent=self)
             return
@@ -525,7 +529,11 @@ class CampaignBuilderWizard(ctk.CTkToplevel):
 
     def _generate_db_aware_scenarios_per_arc(self):
         """Explicit user action for DB-aware scene generation and validation."""
-        self._generate_scenarios_per_arc()
+        try:
+            existing_scenarios = self.scenario_wrapper.load_items() if self.scenario_wrapper else []
+        except Exception:
+            existing_scenarios = []
+        self._generate_scenarios_per_arc(existing_scenarios=existing_scenarios)
 
     def _validate_arcs_for_scenario_generation(self):
         if not self.arcs:
