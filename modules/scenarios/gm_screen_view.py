@@ -416,13 +416,18 @@ class GMScreenView(ctk.CTkFrame):
             "get_state",
             "refresh",
             "reload",
+            "_scrollable_frame",
+            "_parent_canvas",
+            "_scroll_canvas",
+            "_scrollbar",
         ):
             _proxy_attr(attr)
 
-        if scroll_host is not None:
-            for attr in ("_parent_canvas", "_scroll_canvas", "_scrollbar"):
+        scroll_ref_source = scroll_host if scroll_host is not None else built
+        if scroll_ref_source is not None:
+            for attr in ("_scrollable_frame", "_parent_canvas", "_scroll_canvas", "_scrollbar"):
                 try:
-                    setattr(container, attr, getattr(scroll_host, attr, None))
+                    setattr(container, attr, getattr(scroll_ref_source, attr, None))
                 except Exception:
                     pass
 
@@ -2736,11 +2741,11 @@ class GMScreenView(ctk.CTkFrame):
             wrappers=self.wrappers,
             open_entity_callback=self.open_entity_tab,
         )
-        frame = self._build_hidden_tab_content(self.content_area, factory)
+        frame = self._build_hidden_tab_content(self.content_area, factory, scrollable=True)
         self.add_tab(
             title,
             frame,
-            content_factory=lambda master: self._build_hidden_tab_content(master, factory),
+            content_factory=lambda master: self._build_hidden_tab_content(master, factory, scrollable=True),
             layout_meta={"kind": "campaign_dashboard"},
         )
 
