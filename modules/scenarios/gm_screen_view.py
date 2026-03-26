@@ -330,7 +330,44 @@ class GMScreenView(ctk.CTkFrame):
         frame = self._get_active_attached_frame()
         if frame is None:
             return
-        self._sync_fullbleed_now(frame)
+
+        tab_meta = {}
+        if self.current_tab in self.tabs:
+            tab_meta = self.tabs[self.current_tab].get("meta") or {}
+
+        if self._should_sync_fullbleed(frame, tab_meta):
+            self._sync_fullbleed_now(frame)
+            return
+
+        self._refresh_scrollregion(frame)
+
+    def _should_sync_fullbleed(self, frame, tab_meta: dict | None = None) -> bool:
+        meta = tab_meta or {}
+        if meta.get("host") == "rich":
+            return True
+        rich_kinds = {"world_map", "map_tool", "whiteboard", "character_graph", "scenario_graph", "scene_flow"}
+        if meta.get("kind") in rich_kinds:
+            return True
+        if getattr(frame, "_scroll_canvas", None) is None and getattr(frame, "_parent_canvas", None) is None:
+            return True
+        return False
+
+    def _refresh_scrollregion(self, container) -> None:
+        canvases = []
+        scroll_canvas = getattr(container, "_scroll_canvas", None)
+        parent_canvas = getattr(container, "_parent_canvas", None)
+        if scroll_canvas is not None:
+            canvases.append(scroll_canvas)
+        if parent_canvas is not None and parent_canvas not in canvases:
+            canvases.append(parent_canvas)
+
+        for canvas in canvases:
+            try:
+                bbox = canvas.bbox("all")
+                if bbox:
+                    canvas.configure(scrollregion=bbox)
+            except Exception:
+                continue
 
     def _sync_fullbleed_now(self, container: ctk.CTkFrame | None):
         if not container or not container.winfo_exists():
