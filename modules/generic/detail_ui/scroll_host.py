@@ -2,6 +2,30 @@ import tkinter as tk
 import customtkinter as ctk
 
 
+def _resolve_canvas_background(widget) -> str:
+    """Return a Tk-compatible solid background color for the scroll canvas."""
+    fallback = "#1f1f1f"
+    current = widget
+
+    while current is not None:
+        if hasattr(current, "cget"):
+            try:
+                fg_color = current.cget("fg_color")
+            except Exception:
+                fg_color = None
+            if isinstance(fg_color, (list, tuple)) and fg_color:
+                appearance = ctk.get_appearance_mode()
+                index = 1 if appearance == "Dark" else 0
+                fg_color = fg_color[min(index, len(fg_color) - 1)]
+            if isinstance(fg_color, str):
+                candidate = fg_color.strip()
+                if candidate and candidate.lower() != "transparent":
+                    return candidate
+        current = getattr(current, "master", None)
+
+    return fallback
+
+
 def build_scroll_host(parent):
     """Create a resilient vertically scrollable host frame."""
     if not hasattr(parent, "tk"):
@@ -12,14 +36,7 @@ def build_scroll_host(parent):
     shell = ctk.CTkFrame(parent, fg_color="transparent")
     shell.pack(fill="both", expand=True)
 
-    background = "#1f1f1f"
-    if hasattr(parent, "cget"):
-        try:
-            fg_color = parent.cget("fg_color")
-            if isinstance(fg_color, str) and fg_color:
-                background = fg_color
-        except Exception:
-            pass
+    background = _resolve_canvas_background(parent)
 
     try:
         canvas = tk.Canvas(shell, highlightthickness=0, bd=0, background=background)
@@ -74,6 +91,7 @@ def build_scroll_host(parent):
         widget.bind("<Button-4>", _on_mousewheel, add="+")
         widget.bind("<Button-5>", _on_mousewheel, add="+")
 
+    content._scrollable_frame = content
     content._parent_canvas = canvas
     content._scroll_canvas = canvas
     content._scrollbar = scrollbar
