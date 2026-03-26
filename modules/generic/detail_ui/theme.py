@@ -143,19 +143,19 @@ def create_hero_header(
     title_label = ctk.CTkLabel(
         text_col,
         text=title,
-        font=ctk.CTkFont(size=34, weight="bold"),
+        font=ctk.CTkFont(size=28, weight="bold"),
         text_color=palette["text"],
         justify="left",
         wraplength=820,
     )
-    title_label.pack(anchor="w", fill="x", pady=(18, 10))
+    title_label.pack(anchor="w", fill="x", pady=(12, 8))
 
     summary_label = None
     if summary:
         summary_label = ctk.CTkLabel(
             text_col,
             text=summary,
-            font=ctk.CTkFont(size=14),
+            font=ctk.CTkFont(size=13),
             text_color=palette["muted_text"],
             justify="left",
             wraplength=760,
@@ -164,7 +164,7 @@ def create_hero_header(
 
     if meta_items:
         meta_flow = ctk.CTkFrame(text_col, fg_color="transparent")
-        meta_flow.pack(fill="x", pady=(18, 0))
+        meta_flow.pack(fill="x", pady=(14, 0))
         for item in meta_items:
             if not item:
                 continue
