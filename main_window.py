@@ -2558,26 +2558,34 @@ class MainWindow(ctk.CTk):
             _show_selected_scenario(selected)
 
         def _finalize_gm_shell():
+            def _safe_update_banner_toggle(**kwargs):
+                button = getattr(self, "banner_toggle_btn", None)
+                if button is None:
+                    return
+                if not getattr(button, "winfo_exists", lambda: 0)():
+                    return
+                try:
+                    button.configure(**kwargs)
+                except Exception:
+                    return
+                if "state" in kwargs:
+                    try:
+                        button._state = kwargs["state"]
+                    except Exception:
+                        pass
+
             # Configure banner and enable toggle in GM screen
             self.banner_visible = True
-            try:
-                self.banner_toggle_btn.configure(text="▲", state="normal")
-                self.banner_toggle_btn._state = "normal"
-            except Exception:
-                pass
+            _safe_update_banner_toggle(text="▲", state="normal")
             self.banner_visible = True
-            self.banner_toggle_btn.configure(text="▲")
-            self.banner_toggle_btn._state = "disabled"
+            _safe_update_banner_toggle(text="▲", state="disabled")
 
             self.content_frame.grid_rowconfigure(0, weight=0)
             self.content_frame.grid_rowconfigure(1, weight=1)
             self.content_frame.grid_columnconfigure(0, weight=1)
             self.inner_content_frame.grid_rowconfigure(0, weight=1)
             self.inner_content_frame.grid_columnconfigure(0, weight=1)
-            try:
-                self.banner_toggle_btn.configure(text="▲", state="normal")
-            except Exception:
-                pass
+            _safe_update_banner_toggle(text="▲", state="normal")
 
         if scenario_name:
             selected = next((s for s in scenarios if _resolve_scenario_title(s) == str(scenario_name).strip()), None)

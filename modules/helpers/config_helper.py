@@ -51,7 +51,19 @@ class ConfigHelper:
     def getboolean(cls, section, key, fallback=False):
         cls.load_config()
         try:
-            return cls._config.getboolean(section, key, fallback=fallback)
+            value = cls._config.get(section, key, raw=True, fallback=fallback)
+            if isinstance(value, list):
+                value = value[0] if value else fallback
+            if isinstance(value, bool):
+                return value
+            if value is None:
+                return bool(fallback)
+            normalized = str(value).strip().lower()
+            if normalized in {"1", "yes", "true", "on"}:
+                return True
+            if normalized in {"0", "no", "false", "off"}:
+                return False
+            return bool(fallback)
         except Exception as e:
             print(f"Config error: [{section}] {key} â€” {e}")
             return fallback
