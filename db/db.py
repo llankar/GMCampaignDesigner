@@ -118,6 +118,16 @@ def _ensure_campaign_metadata_tables(cursor):
         """
     )
 
+    cursor.execute(
+        """
+        CREATE TABLE IF NOT EXISTS campaign_config (
+            campaign_name TEXT PRIMARY KEY,
+            overview_selected_arc TEXT,
+            overview_selected_scenario TEXT
+        )
+        """
+    )
+
 
 _DEFAULT_SYSTEMS: List[Dict[str, Optional[str]]] = [
     {
@@ -280,5 +290,3 @@ def set_selected_system_slug(slug: str) -> None:
 if __name__ == "__main__":
     initialize_db()
     print("Database initialized.")
-
-
