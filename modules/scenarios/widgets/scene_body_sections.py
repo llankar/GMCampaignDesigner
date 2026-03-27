@@ -71,9 +71,7 @@ def _create_description_block_fallback(parent, body_text, *, description_font_si
 def _build_hero_text(raw_intro, sections):
     intro = str(raw_intro or "").strip()
     if intro:
-        candidates = [line.strip() for line in intro.splitlines() if line.strip()]
-        if not candidates:
-            candidates = [intro]
+        return intro
     else:
         candidates = []
         for section in sections:
@@ -87,8 +85,6 @@ def _build_hero_text(raw_intro, sections):
         compact = " ".join(str(line).split())
         if not compact:
             continue
-        if len(compact) > 180:
-            compact = compact[:177].rstrip() + "…"
         hero_lines.append(compact)
         if len(hero_lines) == 3:
             break
