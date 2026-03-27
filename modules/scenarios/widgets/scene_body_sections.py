@@ -4,6 +4,7 @@ from customtkinter import CTkLabel
 from modules.generic.detail_ui import get_detail_palette
 from modules.scenarios.widgets.scene_body import create_entities_groups_grid, prepare_entities_for_group
 from modules.scenarios.widgets.scene_density import get_scene_density_style
+from modules.scenarios.widgets.scene_sections_parser import parse_scene_body_sections
 
 
 def _create_section_shell(parent):
@@ -34,7 +35,7 @@ def _add_subtle_separator(parent):
     return separator
 
 
-def _create_description_block(parent, body_text, *, description_font_size=13):
+def _create_description_block_fallback(parent, body_text, *, description_font_size=13):
     palette = get_detail_palette()
     description_block = ctk.CTkFrame(parent, fg_color=palette["surface_overlay"], corner_radius=16, border_width=1, border_color=palette["pill_border"])
     description_block.pack(fill="x", padx=12, pady=(12, 0))
@@ -64,6 +65,187 @@ def _create_description_block(parent, body_text, *, description_font_size=13):
 
     description_block.bind("<Configure>", _refresh_description_wrap, add="+")
     _refresh_description_wrap()
+    return description_block, description_label
+
+
+def _build_hero_text(raw_intro, sections):
+    intro = str(raw_intro or "").strip()
+    if intro:
+        candidates = [line.strip() for line in intro.splitlines() if line.strip()]
+        if not candidates:
+            candidates = [intro]
+    else:
+        candidates = []
+        for section in sections:
+            if section.get("items"):
+                candidates.extend(section["items"][:2])
+            if len(candidates) >= 3:
+                break
+
+    hero_lines = []
+    for line in candidates:
+        compact = " ".join(str(line).split())
+        if not compact:
+            continue
+        if len(compact) > 180:
+            compact = compact[:177].rstrip() + "…"
+        hero_lines.append(compact)
+        if len(hero_lines) == 3:
+            break
+
+    return "\n".join(hero_lines).strip()
+
+
+def _render_card_bullets(container, items, *, expanded, font_size):
+    for child in container.winfo_children():
+        child.destroy()
+
+    shown_items = items if expanded else items[:4]
+    labels = []
+    for item in shown_items:
+        text = " ".join(str(item).split())
+        if not expanded and len(text) > 170:
+            text = text[:167].rstrip() + "…"
+        label = ctk.CTkLabel(
+            container,
+            text=f"• {text}",
+            justify="left",
+            anchor="w",
+            text_color=get_detail_palette()["muted_text"],
+            wraplength=0,
+            font=ctk.CTkFont(size=max(11, font_size - 1)),
+        )
+        label.pack(fill="x", padx=10, pady=(0, 4))
+        labels.append(label)
+
+    if not labels:
+        empty = ctk.CTkLabel(
+            container,
+            text="• —",
+            justify="left",
+            anchor="w",
+            text_color=get_detail_palette()["muted_text"],
+            font=ctk.CTkFont(size=max(11, font_size - 1), slant="italic"),
+        )
+        empty.pack(fill="x", padx=10, pady=(0, 4))
+        labels.append(empty)
+
+    def _refresh_wrap(_event=None):
+        wrap_px = max(180, container.winfo_width() - 20)
+        for current in labels:
+            current.configure(wraplength=wrap_px)
+
+    container.bind("<Configure>", _refresh_wrap, add="+")
+    _refresh_wrap()
+
+
+def _create_description_block(parent, body_text, *, description_font_size=13):
+    palette = get_detail_palette()
+    parsed = parse_scene_body_sections(body_text)
+    if not parsed.get("has_sections"):
+        return _create_description_block_fallback(parent, body_text, description_font_size=description_font_size)
+
+    description_block = ctk.CTkFrame(parent, fg_color=palette["surface_overlay"], corner_radius=16, border_width=1, border_color=palette["pill_border"])
+    description_block.pack(fill="x", padx=12, pady=(12, 0))
+    _create_section_title(description_block, "Description")
+
+    hero_strip = ctk.CTkFrame(
+        description_block,
+        fg_color=palette["hero_band"],
+        corner_radius=12,
+        border_width=1,
+        border_color=palette["muted_border"],
+    )
+    hero_strip.pack(fill="x", padx=12, pady=(0, 10))
+
+    hero_text = _build_hero_text(parsed.get("intro_text"), parsed.get("sections") or []) or "Aucune note de mise en scène"
+    description_label = ctk.CTkLabel(
+        hero_strip,
+        text=hero_text,
+        justify="left",
+        anchor="w",
+        wraplength=0,
+        text_color=palette["text"],
+        font=ctk.CTkFont(size=description_font_size, weight="bold"),
+    )
+    description_label.pack(fill="x", padx=12, pady=(10, 10))
+
+    cards_grid = ctk.CTkFrame(description_block, fg_color="transparent")
+    cards_grid.pack(fill="x", padx=12, pady=(0, 10))
+    cards_grid.grid_columnconfigure(0, weight=1)
+    cards_grid.grid_columnconfigure(1, weight=1)
+
+    for index, section in enumerate(parsed.get("sections") or []):
+        row = index // 2
+        col = index % 2
+        card = ctk.CTkFrame(
+            cards_grid,
+            fg_color=palette["surface_card"],
+            corner_radius=12,
+            border_width=1,
+            border_color=palette["muted_border"],
+        )
+        card.grid(row=row, column=col, sticky="nsew", padx=4, pady=4)
+
+        title = ctk.CTkLabel(
+            card,
+            text=f"{section.get('emoji', '•')} {section.get('title', '')}",
+            justify="left",
+            anchor="w",
+            text_color=palette["text"],
+            font=ctk.CTkFont(size=max(12, description_font_size - 1), weight="bold"),
+        )
+        title.pack(fill="x", padx=10, pady=(8, 6))
+
+        bullet_container = ctk.CTkFrame(card, fg_color="transparent")
+        bullet_container.pack(fill="x", padx=0, pady=(0, 2))
+
+        items = section.get("items") or [section.get("raw_text")]
+        is_expanded = ctk.BooleanVar(master=card, value=False)
+
+        def _refresh_card(*, container=bullet_container, values=items, state=is_expanded):
+            _render_card_bullets(
+                container,
+                values,
+                expanded=state.get(),
+                font_size=description_font_size,
+            )
+
+        _refresh_card()
+
+        if len(items) > 4:
+            toggle = ctk.CTkButton(
+                card,
+                text="Voir plus",
+                height=24,
+                corner_radius=8,
+                fg_color="transparent",
+                hover_color=palette["surface_overlay"],
+                text_color=palette["accent"],
+                border_width=1,
+                border_color=palette["pill_border"],
+            )
+            toggle.pack(anchor="w", padx=10, pady=(0, 8))
+
+            def _toggle_section(
+                *,
+                state=is_expanded,
+                button=toggle,
+                refresh=_refresh_card,
+            ):
+                state.set(not state.get())
+                button.configure(text="Voir moins" if state.get() else "Voir plus")
+                refresh()
+
+            toggle.configure(command=_toggle_section)
+
+    def _refresh_hero_wrap(_event=None):
+        wrap_px = max(220, hero_strip.winfo_width() - 24)
+        description_label.configure(wraplength=wrap_px)
+
+    hero_strip.bind("<Configure>", _refresh_hero_wrap, add="+")
+    _refresh_hero_wrap()
+
     return description_block, description_label
 
 
