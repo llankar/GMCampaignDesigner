@@ -223,7 +223,7 @@ class CampaignGraphPanel(ctk.CTkFrame):
         card.grid_rowconfigure(3, weight=1)
 
         header = ctk.CTkFrame(card, fg_color="transparent")
-        header.grid(row=0, column=0, sticky="ew", padx=14, pady=(14, 8))
+        header.grid(row=0, column=0, sticky="ew", padx=14, pady=(10, 4))
         header.grid_columnconfigure(1, weight=1)
 
         self._render_stepper_controls(
@@ -292,23 +292,25 @@ class CampaignGraphPanel(ctk.CTkFrame):
             label_wrap,
             text=title.upper(),
             text_color="#8fb0dd",
-            font=ctk.CTkFont(size=10, weight="bold"),
+            font=ctk.CTkFont(size=9, weight="bold"),
             anchor="w",
         ).grid(row=0, column=0, sticky="w")
         ctk.CTkLabel(
             label_wrap,
             text=subtitle,
             text_color=DASHBOARD_THEME.text_secondary,
-            font=ctk.CTkFont(size=12),
+            font=ctk.CTkFont(size=11),
             anchor="w",
         ).grid(row=1, column=0, sticky="w", pady=(2, 0))
 
         ctk.CTkLabel(
             parent,
             text=current_label,
-            font=ctk.CTkFont(size=24, weight="bold"),
+            font=ctk.CTkFont(size=16, weight="bold"),
             text_color=DASHBOARD_THEME.text_primary,
             anchor="w",
+            wraplength=760,
+            justify="left",
         ).grid(row=row + 1, column=0, sticky="w")
 
         ctk.CTkLabel(
@@ -316,10 +318,10 @@ class CampaignGraphPanel(ctk.CTkFrame):
             text=status_label,
             fg_color=self._status_color(status_label),
             corner_radius=999,
-            padx=12,
-            pady=5,
+            padx=10,
+            pady=3,
             text_color="#f8fbff",
-            font=ctk.CTkFont(size=11, weight="bold"),
+            font=ctk.CTkFont(size=10, weight="bold"),
         ).grid(row=row + 1, column=1, sticky="e", padx=(8, 0))
 
         controls = ctk.CTkFrame(parent, fg_color="transparent")
@@ -327,22 +329,26 @@ class CampaignGraphPanel(ctk.CTkFrame):
         ctk.CTkButton(
             controls,
             text="← Previous",
-            width=104,
+            width=96,
+            height=30,
             command=prev_command,
             state="normal" if prev_enabled else "disabled",
             fg_color="#17263d",
             hover_color="#223a5f",
             text_color="#f2f6ff",
+            font=ctk.CTkFont(size=11),
         ).grid(row=0, column=0, padx=(0, 8))
         ctk.CTkButton(
             controls,
             text="Next →",
-            width=104,
+            width=96,
+            height=30,
             command=next_command,
             state="normal" if next_enabled else "disabled",
             fg_color=DASHBOARD_THEME.accent,
             hover_color=DASHBOARD_THEME.accent_hover,
             text_color="#f8fbff",
+            font=ctk.CTkFont(size=11),
         ).grid(row=0, column=1)
 
     def _render_focus_tile(self, parent, *, column: int, title: str, body: str, accent: str) -> None:
@@ -384,7 +390,7 @@ class CampaignGraphPanel(ctk.CTkFrame):
         selected_scenario = arc.scenarios[self._selected_scenario_index]
 
         header = ctk.CTkFrame(section, fg_color="transparent")
-        header.grid(row=0, column=0, sticky="ew", padx=14, pady=(14, 8))
+        header.grid(row=0, column=0, sticky="ew", padx=14, pady=(10, 4))
         header.grid_columnconfigure(1, weight=1)
         self._render_stepper_controls(
             header,
