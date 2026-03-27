@@ -1,4 +1,4 @@
-from modules.scenarios.widgets.scene_body_sections import _build_hero_text
+from modules.scenarios.widgets.scene_body_sections import _build_hero_text, _compute_wraplength
 
 
 def test_build_hero_text_keeps_full_intro_without_truncation():
@@ -9,3 +9,13 @@ def test_build_hero_text_keeps_full_intro_without_truncation():
     )
 
     assert _build_hero_text(long_intro, []) == long_intro
+
+
+def test_compute_wraplength_reserves_right_side_gutter():
+    # 320px container with 12px left/right padding keeps a safety gutter
+    # so the last characters of wrapped lines remain visible.
+    assert _compute_wraplength(320, horizontal_padding=12, min_wrap=220) == 286
+
+
+def test_compute_wraplength_honors_minimum_for_small_containers():
+    assert _compute_wraplength(120, horizontal_padding=12, min_wrap=220) == 220
