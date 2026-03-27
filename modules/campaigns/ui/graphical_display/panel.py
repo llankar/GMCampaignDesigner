@@ -50,7 +50,7 @@ class CampaignGraphPanel(ctk.CTkFrame):
 
     def _build_body(self) -> None:
         self.scroll = ctk.CTkScrollableFrame(self, fg_color=DASHBOARD_THEME.panel_bg)
-        self.scroll.grid(row=0, column=0, sticky="nsew", padx=16, pady=16)
+        self.scroll.grid(row=0, column=0, sticky="nsew", padx=2, pady=2)
         self.scroll.grid_columnconfigure(0, weight=1)
 
         self._empty_state_label = ctk.CTkLabel(
@@ -211,14 +211,14 @@ class CampaignGraphPanel(ctk.CTkFrame):
             row=0,
             column=0,
             sticky="ew",
-            padx=8,
-            pady=(0, 12),
+            padx=2,
+            pady=(0, 8),
         )
 
     def _render_arc_focus(self, payload: CampaignGraphPayload, selected_index: int) -> None:
         selected_arc = payload.arcs[selected_index]
         card = ctk.CTkFrame(self._arc_focus_container, fg_color=DASHBOARD_THEME.card_bg, corner_radius=22, border_width=1, border_color="#2b4161")
-        card.grid(row=0, column=0, sticky="nsew", padx=8, pady=(0, 12))
+        card.grid(row=0, column=0, sticky="nsew", padx=2, pady=(0, 8))
         card.grid_columnconfigure(0, weight=1)
         card.grid_rowconfigure(3, weight=1)
 
