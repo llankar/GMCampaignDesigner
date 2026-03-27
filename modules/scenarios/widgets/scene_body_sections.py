@@ -211,7 +211,7 @@ def _create_maps_block(parent, map_names, gm_view_ref):
     return maps_block
 
 
-def _create_links_block(parent, links):
+def _create_links_block(parent, links, open_scene_callback=None):
     palette = get_detail_palette()
     if not links:
         return None
@@ -220,9 +220,12 @@ def _create_links_block(parent, links):
     links_block.pack(fill="x", padx=12, pady=(0, 0))
     _create_section_title(links_block, "Links")
 
+    selected_link = {"button": None}
+
     for link in links:
         text_val = str(link.get("text") or "").strip()
         target_val = link.get("target")
+        resolved_target = link.get("resolved_target_key")
         if isinstance(target_val, (int, float)):
             target_display = f"Scene {int(target_val)}"
         elif target_val:
@@ -231,15 +234,45 @@ def _create_links_block(parent, links):
             target_display = "(unspecified)"
         if not text_val:
             text_val = "(no link text)"
+        is_clickable = bool(open_scene_callback and resolved_target)
 
-        CTkLabel(
+        link_button = ctk.CTkButton(
             links_block,
-            text=f"• {text_val} → {target_display}",
-            font=ctk.CTkFont(size=12),
-            justify="left",
-            text_color=palette["muted_text"],
+            text=f"➤ {text_val} → {target_display}",
             anchor="w",
-        ).pack(anchor="w", padx=14, pady=(0, 8))
+            height=30,
+            corner_radius=10,
+            border_width=1,
+            border_color=palette["muted_border"],
+            fg_color=palette["surface_overlay"],
+            hover_color=palette["hero_band"],
+            text_color=palette["text"],
+            state="normal" if is_clickable else "disabled",
+        )
+        link_button.pack(fill="x", padx=14, pady=(0, 8))
+
+        if not is_clickable:
+            continue
+
+        def _on_link_click(target=resolved_target, button=link_button):
+            opened = bool(open_scene_callback(target))
+            if not opened:
+                return
+            previous_button = selected_link.get("button")
+            if previous_button is not None and previous_button.winfo_exists():
+                previous_button.configure(
+                    fg_color=palette["surface_overlay"],
+                    border_color=palette["muted_border"],
+                    text_color=palette["text"],
+                )
+            button.configure(
+                fg_color=palette["accent"],
+                border_color=palette["accent_hover"],
+                text_color=palette["text"],
+            )
+            selected_link["button"] = button
+
+        link_button.configure(command=_on_link_click)
 
     return links_block
 
@@ -254,6 +287,7 @@ def build_scene_body_sections(
     map_names,
     links,
     open_entity_callback=None,
+    open_scene_callback=None,
     gm_view_ref=None,
 ):
     has_entities = bool(npc_names or villain_names or creature_names or place_names)
@@ -281,7 +315,7 @@ def build_scene_body_sections(
     if maps_block is not None and has_links:
         _add_subtle_separator(shell)
 
-    links_block = _create_links_block(shell, links)
+    links_block = _create_links_block(shell, links, open_scene_callback=open_scene_callback)
 
     return {
         "description_block": description_block,
