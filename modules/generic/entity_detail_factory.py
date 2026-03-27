@@ -1275,7 +1275,13 @@ def insert_list_longtext(
                     label += f" · {_truncate_label(title, max_len=32)}"
                 btn.configure(text=label)
                 outer.update_idletasks()
-                wrap_px = max(200, lbl.winfo_width())
+                wrap_candidates = [lbl.winfo_width(), body.winfo_width(), outer.winfo_width()]
+                try:
+                    parent_width = body.master.winfo_width() if body.master is not None else 0
+                except Exception:
+                    parent_width = 0
+                wrap_candidates.append(parent_width)
+                wrap_px = max(200, max(int(width or 0) for width in wrap_candidates) - 32)
                 lbl.configure(wraplength=wrap_px)
                 if gm_view_ref and hasattr(gm_view_ref, "set_active_scene"):
                     gm_view_ref.set_active_scene(key)
