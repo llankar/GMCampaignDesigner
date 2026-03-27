@@ -39,77 +39,18 @@ class CampaignGraphPanel(ctk.CTkFrame):
         self._selected_scenario_index = 0
         self._scenario_focus_container = None
 
-        self.grid_rowconfigure(1, weight=1)
+        self.grid_rowconfigure(0, weight=1)
         self.grid_columnconfigure(0, weight=1)
-
-        self._build_header()
-        self._build_body()
-        self._load_initial_campaign()
-
-    def _build_header(self) -> None:
-        header = ctk.CTkFrame(self, fg_color=DASHBOARD_THEME.panel_alt_bg, corner_radius=20)
-        header.grid(row=0, column=0, sticky="ew", padx=16, pady=(16, 10))
-        header.grid_columnconfigure(1, weight=1)
-        header.grid_columnconfigure(2, weight=0)
-
-        crest = ctk.CTkFrame(header, fg_color="#20123f", corner_radius=16, width=68, height=68)
-        crest.grid(row=0, column=0, padx=(14, 10), pady=14)
-        crest.grid_propagate(False)
-        ctk.CTkLabel(crest, text="✦", font=ctk.CTkFont(size=28, weight="bold"), text_color="#f7d774").place(relx=0.5, rely=0.4, anchor="center")
-        ctk.CTkLabel(crest, text="GM", font=ctk.CTkFont(size=11, weight="bold"), text_color="#f3e8ff").place(relx=0.5, rely=0.72, anchor="center")
-
-        text_wrap = ctk.CTkFrame(header, fg_color="transparent")
-        text_wrap.grid(row=0, column=1, sticky="ew", pady=14)
-        text_wrap.grid_columnconfigure(0, weight=1)
-
-        ctk.CTkLabel(
-            text_wrap,
-            text="Campaign overview",
-            font=ctk.CTkFont(size=22, weight="bold"),
-            text_color=DASHBOARD_THEME.text_primary,
-            anchor="w",
-        ).grid(row=0, column=0, sticky="w")
-
-        ctk.CTkLabel(
-            text_wrap,
-            text="Focus on one arc and one scenario at a time.",
-            font=ctk.CTkFont(size=12),
-            text_color=DASHBOARD_THEME.text_secondary,
-            anchor="w",
-        ).grid(row=1, column=0, sticky="w", pady=(4, 0))
-
-        selector_wrap = ctk.CTkFrame(header, fg_color="#16243b", corner_radius=16)
-        selector_wrap.grid(row=0, column=2, sticky="e", padx=(10, 14), pady=14)
-        selector_wrap.grid_columnconfigure(0, weight=1)
-
-        ctk.CTkLabel(
-            selector_wrap,
-            text="Displayed campaign",
-            text_color=DASHBOARD_THEME.text_secondary,
-            font=ctk.CTkFont(size=12, weight="bold"),
-        ).grid(row=0, column=0, sticky="w", padx=12, pady=(10, 2))
 
         values = self._campaign_options or ["No campaigns"]
         self.campaign_var = tk.StringVar(value=values[0])
-        self.campaign_selector = ctk.CTkOptionMenu(
-            selector_wrap,
-            variable=self.campaign_var,
-            values=values,
-            command=self._on_campaign_selected,
-            width=260,
-            fg_color=DASHBOARD_THEME.input_bg,
-            button_color=DASHBOARD_THEME.input_button,
-            button_hover_color=DASHBOARD_THEME.input_hover,
-            text_color=DASHBOARD_THEME.text_primary,
-            dropdown_fg_color=DASHBOARD_THEME.card_bg,
-            dropdown_hover_color=DASHBOARD_THEME.button_hover,
-            dropdown_text_color=DASHBOARD_THEME.text_primary,
-        )
-        self.campaign_selector.grid(row=1, column=0, sticky="ew", padx=12, pady=(0, 12))
+
+        self._build_body()
+        self._load_initial_campaign()
 
     def _build_body(self) -> None:
         self.scroll = ctk.CTkScrollableFrame(self, fg_color=DASHBOARD_THEME.panel_bg)
-        self.scroll.grid(row=1, column=0, sticky="nsew", padx=16, pady=(0, 16))
+        self.scroll.grid(row=0, column=0, sticky="nsew", padx=16, pady=16)
         self.scroll.grid_columnconfigure(0, weight=1)
 
         self._empty_state_label = ctk.CTkLabel(
@@ -260,7 +201,13 @@ class CampaignGraphPanel(ctk.CTkFrame):
         self._preserve_scroll_position(_refresh)
 
     def _render_campaign_hero(self, payload: CampaignGraphPayload) -> None:
-        CampaignOverviewHero(self._hero_container, payload=payload).grid(
+        CampaignOverviewHero(
+            self._hero_container,
+            payload=payload,
+            campaign_var=self.campaign_var,
+            campaign_values=self._campaign_options or ["No campaigns"],
+            on_campaign_selected=self._on_campaign_selected,
+        ).grid(
             row=0,
             column=0,
             sticky="ew",
