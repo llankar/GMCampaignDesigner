@@ -1212,27 +1212,27 @@ def insert_list_longtext(
         quick_actions = ctk.CTkFrame(header_row, fg_color="transparent")
         quick_actions.pack(side="right")
 
-        def _set_scene_active(key=scene_key):
-            if gm_view_ref and hasattr(gm_view_ref, "set_active_scene"):
-                gm_view_ref.set_active_scene(key)
-                refreshers = getattr(gm_view_ref, "_scene_state_refreshers", {})
+        def _set_scene_active(*, key=scene_key, gm_view=gm_view_ref):
+            if gm_view and hasattr(gm_view, "set_active_scene"):
+                gm_view.set_active_scene(key)
+                refreshers = getattr(gm_view, "_scene_state_refreshers", {})
                 for refresher in list(refreshers.values()):
                     try:
                         refresher()
                     except Exception:
                         continue
 
-        def _mark_scene_done():
-            if check_var is None:
+        def _mark_scene_done(*, check=check_var):
+            if check is None:
                 return
-            check_var.set(True)
+            check.set(True)
             _set_scene_active()
 
-        def _add_scene_note():
-            if gm_view_ref and hasattr(gm_view_ref, "_append_scene_to_notes"):
-                gm_view_ref._append_scene_to_notes(scene_key)
-            elif gm_view_ref and hasattr(gm_view_ref, "add_timestamped_note"):
-                gm_view_ref.add_timestamped_note()
+        def _add_scene_note(*, gm_view=gm_view_ref, key=scene_key):
+            if gm_view and hasattr(gm_view, "_append_scene_to_notes"):
+                gm_view._append_scene_to_notes(key)
+            elif gm_view and hasattr(gm_view, "add_timestamped_note"):
+                gm_view.add_timestamped_note()
 
         active_btn = ctk.CTkButton(
             quick_actions,
@@ -1268,9 +1268,16 @@ def insert_list_longtext(
         )
         note_btn.pack(side="left")
 
-        def _refresh_scene_state():
-            is_completed = bool(check_var.get()) if check_var is not None else False
-            is_active = bool(gm_view_ref and getattr(gm_view_ref, "_active_scene_key", None) == scene_key)
+        def _refresh_scene_state(
+            *,
+            check=check_var,
+            gm_view=gm_view_ref,
+            key=scene_key,
+            card_outer=outer,
+            complete_btn=done_btn,
+        ):
+            is_completed = bool(check.get()) if check is not None else False
+            is_active = bool(gm_view and getattr(gm_view, "_active_scene_key", None) == key)
             border_color = palette["muted_border"]
             border_width = 1
             if is_active and not is_completed:
@@ -1279,8 +1286,8 @@ def insert_list_longtext(
             if is_completed:
                 border_color = completed_border_color
                 border_width = 2
-            outer.configure(border_color=border_color, border_width=border_width)
-            done_btn.configure(text="✓✓" if is_completed else "✓")
+            card_outer.configure(border_color=border_color, border_width=border_width)
+            complete_btn.configure(text="✓✓" if is_completed else "✓")
 
         if gm_view_ref:
             refreshers = getattr(gm_view_ref, "_scene_state_refreshers", None)
@@ -1332,12 +1339,12 @@ def insert_list_longtext(
                 _refresh_scene_state()
             expanded.set(not expanded.get())
 
-        def _open_scene_from_link():
-            if not expanded.get():
+        def _open_scene_from_link(*, expanded_state=expanded, key=scene_key):
+            if not expanded_state.get():
                 _toggle()
                 return
             if gm_view_ref and hasattr(gm_view_ref, "set_active_scene"):
-                gm_view_ref.set_active_scene(scene_key)
+                gm_view_ref.set_active_scene(key)
             _refresh_scene_state()
 
         scene_open_handlers[scene_key] = _open_scene_from_link
