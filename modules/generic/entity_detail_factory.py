@@ -868,9 +868,18 @@ def insert_list_longtext(
 ):
     """Insert collapsible sections for long text lists such as scenario scenes."""
     palette = get_detail_palette()
+    active_border_color = palette.get("accent", palette["muted_border"])
+    completed_border_color = palette.get("success", palette["muted_border"])
+
     if show_header:
         ctk.CTkLabel(parent, text=f"{header}:", font=("Arial", 16, "bold")) \
             .pack(anchor="w", padx=10, pady=(10, 2))
+
+    def _truncate_label(text, max_len=34):
+        cleaned = str(text or "").strip()
+        if len(cleaned) <= max_len:
+            return cleaned
+        return f"{cleaned[:max(0, max_len - 1)].rstrip()}…"
 
     def _flatten_strings(value):
         parsed = deserialize_possible_json(value)
@@ -1028,78 +1037,160 @@ def insert_list_longtext(
         body_label = scene_sections["description_label"]
 
         expanded = ctk.BooleanVar(value=False)
-        button_text = f"▶ Scene {idx}"
-        if title_clean:
-            button_text += f" – {title_clean}"
+        short_title = _truncate_label(title_clean, max_len=32)
+        scene_label = f"{idx}"
+        if short_title:
+            scene_label += f" · {short_title}"
+        button_text = f"▶ {scene_label}"
         note_title = f"Scene {idx}"
         if title_clean:
             note_title += f" – {title_clean}"
 
         scene_key = _build_scene_key(idx, scene_dict)
+        initial_state = False
+        if gm_view_ref and hasattr(gm_view_ref, "get_scene_completion"):
+            initial_state = bool(gm_view_ref.get_scene_completion(scene_key))
+        check_var = ctk.BooleanVar(master=outer, value=initial_state) if gm_view_ref else None
+        checkbox = None
+
+        header_row = ctk.CTkFrame(outer, fg_color="transparent")
+        header_row.pack(fill="x", expand=True, padx=14, pady=(12, 4))
+
+        left_actions = ctk.CTkFrame(header_row, fg_color="transparent")
+        left_actions.pack(side="left", fill="x", expand=True, padx=(0, 8))
+
+        btn = ctk.CTkButton(
+            left_actions,
+            text=button_text,
+            fg_color=palette["surface_overlay"],
+            hover_color=palette["hero_band"],
+            text_color=palette["text"],
+            corner_radius=14,
+            anchor="w",
+            height=38,
+        )
+        btn.pack(side="left", fill="x", expand=True)
+
+        tags_row = ctk.CTkFrame(header_row, fg_color="transparent")
+        tags_row.pack(side="left", padx=(0, 8))
+        create_chip(tags_row, f"NPC {len(npc_names)}").pack(side="left", padx=(0, 6))
+        create_chip(tags_row, f"Lieux {len(place_names)}").pack(side="left", padx=(0, 6))
+        create_chip(tags_row, f"Liens {len(links)}").pack(side="left", padx=(0, 6))
+        create_chip(tags_row, f"Map {'✓' if bool(map_names) else '—'}").pack(side="left")
+
+        quick_actions = ctk.CTkFrame(header_row, fg_color="transparent")
+        quick_actions.pack(side="right")
+
+        def _set_scene_active(key=scene_key):
+            if gm_view_ref and hasattr(gm_view_ref, "set_active_scene"):
+                gm_view_ref.set_active_scene(key)
+                refreshers = getattr(gm_view_ref, "_scene_state_refreshers", {})
+                for refresher in list(refreshers.values()):
+                    try:
+                        refresher()
+                    except Exception:
+                        continue
+
+        def _mark_scene_done():
+            if check_var is None:
+                return
+            check_var.set(True)
+            _set_scene_active()
+
+        def _add_scene_note():
+            if gm_view_ref and hasattr(gm_view_ref, "_append_scene_to_notes"):
+                gm_view_ref._append_scene_to_notes(scene_key)
+            elif gm_view_ref and hasattr(gm_view_ref, "add_timestamped_note"):
+                gm_view_ref.add_timestamped_note()
+
+        active_btn = ctk.CTkButton(
+            quick_actions,
+            text="◎",
+            width=30,
+            height=30,
+            corner_radius=999,
+            fg_color=palette["surface_overlay"],
+            hover_color=palette["hero_band"],
+            command=_set_scene_active,
+        )
+        active_btn.pack(side="left", padx=(0, 4))
+        done_btn = ctk.CTkButton(
+            quick_actions,
+            text="✓",
+            width=30,
+            height=30,
+            corner_radius=999,
+            fg_color=palette["surface_overlay"],
+            hover_color=palette["hero_band"],
+            command=_mark_scene_done,
+        )
+        done_btn.pack(side="left", padx=(0, 4))
+        note_btn = ctk.CTkButton(
+            quick_actions,
+            text="✎",
+            width=30,
+            height=30,
+            corner_radius=999,
+            fg_color=palette["surface_overlay"],
+            hover_color=palette["hero_band"],
+            command=_add_scene_note,
+        )
+        note_btn.pack(side="left")
+
+        def _refresh_scene_state():
+            is_completed = bool(check_var.get()) if check_var is not None else False
+            is_active = bool(gm_view_ref and getattr(gm_view_ref, "_active_scene_key", None) == scene_key)
+            border_color = palette["muted_border"]
+            border_width = 1
+            if is_active and not is_completed:
+                border_color = active_border_color
+                border_width = 2
+            if is_completed:
+                border_color = completed_border_color
+                border_width = 2
+            outer.configure(border_color=border_color, border_width=border_width)
+            done_btn.configure(text="✓✓" if is_completed else "✓")
 
         if gm_view_ref:
-            initial_state = False
-            if hasattr(gm_view_ref, "get_scene_completion"):
-                initial_state = bool(gm_view_ref.get_scene_completion(scene_key))
-            check_var = ctk.BooleanVar(master=outer, value=initial_state)
-            header_row = ctk.CTkFrame(outer, fg_color="transparent")
-            header_row.pack(fill="x", expand=True, padx=14, pady=(12, 4))
-            btn = ctk.CTkButton(
-                header_row,
-                text=button_text,
-                fg_color=palette["surface_overlay"],
-                hover_color=palette["hero_band"],
-                text_color=palette["text"],
-                corner_radius=14,
-                anchor="w",
-                height=38,
-            )
-            checkbox = ctk.CTkCheckBox(
-                header_row,
-                text="",
-                variable=check_var,
-                fg_color=palette["accent"],
-                hover_color=palette["accent_hover"],
-                border_color=palette["pill_border"],
-            )
-            checkbox.pack(side="right", padx=(8, 0), pady=(2, 2))
-        else:
-            check_var = None
-            checkbox = None
-            btn = ctk.CTkButton(
-                outer,
-                text=button_text,
-                fg_color=palette["surface_overlay"],
-                hover_color=palette["hero_band"],
-                text_color=palette["text"],
-                corner_radius=14,
-                anchor="w",
-                height=38,
-            )
+            refreshers = getattr(gm_view_ref, "_scene_state_refreshers", None)
+            if not isinstance(refreshers, dict):
+                refreshers = {}
+                setattr(gm_view_ref, "_scene_state_refreshers", refreshers)
+            refreshers[scene_key] = _refresh_scene_state
 
         def _toggle(btn=btn, body=body, lbl=body_label, expanded=expanded, idx=idx, title=title_clean, key=scene_key):
             if expanded.get():
                 body.pack_forget()
-                label = f"▶ Scene {idx}"
+                label = f"▶ {idx}"
                 if title:
-                    label += f" – {title}"
+                    label += f" · {_truncate_label(title, max_len=32)}"
                 btn.configure(text=label)
             else:
                 body.pack(fill="x", padx=14, pady=(4, 12))
-                label = f"▼ Scene {idx}"
+                label = f"▼ {idx}"
                 if title:
-                    label += f" – {title}"
+                    label += f" · {_truncate_label(title, max_len=32)}"
                 btn.configure(text=label)
                 outer.update_idletasks()
                 wrap_px = max(200, lbl.winfo_width())
                 lbl.configure(wraplength=wrap_px)
                 if gm_view_ref and hasattr(gm_view_ref, "set_active_scene"):
                     gm_view_ref.set_active_scene(key)
+                _refresh_scene_state()
             expanded.set(not expanded.get())
 
         btn.configure(command=_toggle)
         if gm_view_ref:
-            btn.pack(fill="x", expand=True, padx=(0, 4))
+            checkbox = ctk.CTkCheckBox(
+                quick_actions,
+                text="",
+                variable=check_var,
+                width=18,
+                fg_color=palette["accent"],
+                hover_color=palette["accent_hover"],
+                border_color=palette["pill_border"],
+            )
+            checkbox.pack(side="left", padx=(8, 0), pady=(2, 2))
             if hasattr(gm_view_ref, "register_scene_widget") and check_var is not None:
                 gm_view_ref.register_scene_widget(
                     scene_key,
@@ -1113,6 +1204,7 @@ def insert_list_longtext(
             def _on_check(key=scene_key):
                 if gm_view_ref and hasattr(gm_view_ref, "set_active_scene"):
                     gm_view_ref.set_active_scene(key)
+                _refresh_scene_state()
 
             checkbox.configure(command=_on_check)
             if hasattr(gm_view_ref, "set_active_scene"):
@@ -1124,8 +1216,7 @@ def insert_list_longtext(
             if callable(menu_handler):
                 btn.bind("<Button-3>", menu_handler)
                 btn.bind("<Control-Button-1>", menu_handler)
-        else:
-            btn.pack(fill="x", expand=True)
+        _refresh_scene_state()
 
 @log_function
 def _collect_character_relationships(scenario_npcs=None):
