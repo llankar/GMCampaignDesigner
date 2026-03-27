@@ -58,6 +58,7 @@ from modules.generic.detail_ui import (
 )
 from modules.generic.detail_ui.window_geometry import apply_fullscreen_top_left
 from modules.generic.entities.linking import resolve_entity_label, resolve_entity_slug
+from modules.generic.scene_indicator_payload import build_scene_indicator_payload
 
 log_module_import(__name__)
 
@@ -1042,16 +1043,18 @@ def insert_list_longtext(
         if title_clean:
             scene_dict["Title"] = title_clean
 
+        indicator_payload = build_scene_indicator_payload(scene_dict, body_text)
+
         return {
             "scene_dict": scene_dict,
             "body_text": body_text,
             "title_clean": title_clean,
-            "npc_names": _coerce_names(scene_dict.get("NPCs")),
-            "villain_names": _coerce_names(scene_dict.get("Villains")),
-            "creature_names": _coerce_names(scene_dict.get("Creatures")),
-            "place_names": _coerce_names(scene_dict.get("Places")),
-            "map_names": _coerce_names(scene_dict.get("Maps")),
-            "links": _coerce_links(scene_dict.get("Links")),
+            "npc_names": indicator_payload["npc_names"],
+            "villain_names": indicator_payload["villain_names"],
+            "creature_names": indicator_payload["creature_names"],
+            "place_names": indicator_payload["place_names"],
+            "map_names": indicator_payload["map_names"],
+            "links": indicator_payload["links"],
         }
 
     scene_entries = [_normalize_scene_entry(entry) for entry in items]
