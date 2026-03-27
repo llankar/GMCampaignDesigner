@@ -1,4 +1,5 @@
 import os
+import re
 import customtkinter as ctk
 from PIL import Image, ImageOps, ImageTk
 from customtkinter import CTkImage, CTkLabel, CTkTextbox
@@ -976,7 +977,7 @@ def insert_list_longtext(
                 return f"{index}:{value}"
         return str(index)
 
-    for idx, entry in enumerate(items, start=1):
+    def _normalize_scene_entry(entry):
         parsed_entry = deserialize_possible_json(entry)
         if isinstance(parsed_entry, dict):
             scene_dict = {key: deserialize_possible_json(val) for key, val in parsed_entry.items()}
@@ -1005,18 +1006,95 @@ def insert_list_longtext(
         if title_clean:
             scene_dict["Title"] = title_clean
 
-        npc_names = _coerce_names(scene_dict.get("NPCs"))
-        villain_names = _coerce_names(scene_dict.get("Villains"))
-        creature_names = _coerce_names(scene_dict.get("Creatures"))
-        place_names = _coerce_names(scene_dict.get("Places"))
-        map_names = _coerce_names(scene_dict.get("Maps"))
+        return {
+            "scene_dict": scene_dict,
+            "body_text": body_text,
+            "title_clean": title_clean,
+            "npc_names": _coerce_names(scene_dict.get("NPCs")),
+            "villain_names": _coerce_names(scene_dict.get("Villains")),
+            "creature_names": _coerce_names(scene_dict.get("Creatures")),
+            "place_names": _coerce_names(scene_dict.get("Places")),
+            "map_names": _coerce_names(scene_dict.get("Maps")),
+            "links": _coerce_links(scene_dict.get("Links")),
+        }
+
+    scene_entries = [_normalize_scene_entry(entry) for entry in items]
+    scene_key_by_reference = {}
+    scene_open_handlers = {}
+
+    def _add_scene_reference(reference, scene_key):
+        if reference is None:
+            return
+        text = str(reference).strip()
+        if not text:
+            return
+        lowered = text.lower()
+        scene_key_by_reference.setdefault(lowered, scene_key)
+        digits_only = re.match(r"^\s*scene\s+(\d+)\s*$", lowered)
+        if digits_only:
+            scene_key_by_reference.setdefault(digits_only.group(1), scene_key)
+
+    for idx, scene_data in enumerate(scene_entries, start=1):
+        scene_dict = scene_data["scene_dict"]
+        scene_key = _build_scene_key(idx, scene_dict)
+        _add_scene_reference(idx, scene_key)
+        _add_scene_reference(scene_key, scene_key)
+        for key_name in ("Id", "ID", "Scene", "scene", "Title", "title"):
+            _add_scene_reference(scene_dict.get(key_name), scene_key)
+
+    def _resolve_scene_target(target):
+        if target is None:
+            return None
+        if isinstance(target, (int, float)):
+            return scene_key_by_reference.get(str(int(target)))
+        raw_text = str(target).strip()
+        if not raw_text:
+            return None
+        lowered = raw_text.lower()
+        resolved = scene_key_by_reference.get(lowered)
+        if resolved:
+            return resolved
+        scene_match = re.match(r"^scene\s+(\d+)$", lowered)
+        if scene_match:
+            return scene_key_by_reference.get(scene_match.group(1))
+        if lowered.isdigit():
+            return scene_key_by_reference.get(str(int(lowered)))
+        return None
+
+    def _open_scene_target(scene_key):
+        handler = scene_open_handlers.get(scene_key)
+        if not callable(handler):
+            return False
+        try:
+            handler()
+            return True
+        except Exception:
+            return False
+
+    for idx, scene_data in enumerate(scene_entries, start=1):
+        scene_dict = scene_data["scene_dict"]
+        body_text = scene_data["body_text"]
+        title_clean = scene_data["title_clean"]
+        npc_names = scene_data["npc_names"]
+        villain_names = scene_data["villain_names"]
+        creature_names = scene_data["creature_names"]
+        place_names = scene_data["place_names"]
+        map_names = scene_data["map_names"]
+        scene_key = _build_scene_key(idx, scene_dict)
+        links = [
+            {
+                **link,
+                "resolved_target_key": _resolve_scene_target(link.get("target")),
+            }
+            for link in scene_data["links"]
+        ]
+
         if entity_collector is not None:
             entity_collector.setdefault("NPCs", set()).update(npc_names)
             entity_collector.setdefault("Villains", set()).update(villain_names)
             entity_collector.setdefault("Creatures", set()).update(creature_names)
             entity_collector.setdefault("Places", set()).update(place_names)
             entity_collector.setdefault("Maps", set()).update(map_names)
-        links = _coerce_links(scene_dict.get("Links"))
 
         outer = ctk.CTkFrame(parent, fg_color=palette["surface_card"], corner_radius=20, border_width=1, border_color=palette["muted_border"])
         outer.pack(fill="x", expand=True, padx=20, pady=8)
@@ -1032,6 +1110,7 @@ def insert_list_longtext(
             map_names=map_names,
             links=links,
             open_entity_callback=open_entity_callback,
+            open_scene_callback=_open_scene_target,
             gm_view_ref=gm_view_ref,
         )
         body_label = scene_sections["description_label"]
@@ -1046,7 +1125,6 @@ def insert_list_longtext(
         if title_clean:
             note_title += f" – {title_clean}"
 
-        scene_key = _build_scene_key(idx, scene_dict)
         initial_state = False
         if gm_view_ref and hasattr(gm_view_ref, "get_scene_completion"):
             initial_state = bool(gm_view_ref.get_scene_completion(scene_key))
@@ -1179,6 +1257,15 @@ def insert_list_longtext(
                 _refresh_scene_state()
             expanded.set(not expanded.get())
 
+        def _open_scene_from_link():
+            if not expanded.get():
+                _toggle()
+                return
+            if gm_view_ref and hasattr(gm_view_ref, "set_active_scene"):
+                gm_view_ref.set_active_scene(scene_key)
+            _refresh_scene_state()
+
+        scene_open_handlers[scene_key] = _open_scene_from_link
         btn.configure(command=_toggle)
         if gm_view_ref:
             checkbox = ctk.CTkCheckBox(
