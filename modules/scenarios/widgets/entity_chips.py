@@ -40,6 +40,7 @@ def create_entity_chip(
     entity_name = entity_payload["name"]
     entity_role = entity_payload["role"]
     avatar_data = entity_payload["avatar"]
+    importance_level = str(entity_payload.get("importance") or "").strip()
 
     chip = ctk.CTkFrame(
         parent,
@@ -81,6 +82,20 @@ def create_entity_chip(
     text_col = ctk.CTkFrame(row, fg_color="transparent")
     text_col.pack(side="left", padx=(8, 0))
 
+    badge_label = None
+    if importance_level:
+        badge_label = ctk.CTkLabel(
+            row,
+            text=importance_level,
+            font=ctk.CTkFont(size=9, weight="bold"),
+            text_color=palette["muted_text"],
+            fg_color=palette["pill_bg"],
+            corner_radius=999,
+            padx=7,
+            pady=1,
+        )
+        badge_label.pack(side="right", padx=(10, 0), pady=(2, 0), anchor="n")
+
     name_label = ctk.CTkLabel(
         text_col,
         text=entity_name,
@@ -110,7 +125,7 @@ def create_entity_chip(
             group_label=group_label,
             entity_name=entity_name,
         )
-        for widget in (row, avatar_shell, avatar_label, text_col, name_label, role_label):
+        for widget in (row, avatar_shell, avatar_label, text_col, name_label, role_label, badge_label):
             if widget is None:
                 continue
             widget.configure(cursor="hand2")

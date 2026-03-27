@@ -2,7 +2,7 @@ import customtkinter as ctk
 from customtkinter import CTkLabel
 
 from modules.generic.detail_ui import get_detail_palette
-from modules.scenarios.widgets.scene_body import create_entities_groups_grid
+from modules.scenarios.widgets.scene_body import create_entities_groups_grid, prepare_entities_for_group
 from modules.scenarios.widgets.scene_density import get_scene_density_style
 
 
@@ -80,10 +80,10 @@ def _create_entities_block(parent, npc_names, villain_names, creature_names, pla
     create_entities_groups_grid(
         entities_block,
         groups=(
-            ("NPCs", npc_names or []),
-            ("Villains", villain_names or []),
-            ("Creatures", creature_names or []),
-            ("Places", place_names or []),
+            ("NPCs", prepare_entities_for_group(npc_names or [])),
+            ("Villains", prepare_entities_for_group(villain_names or [])),
+            ("Creatures", prepare_entities_for_group(creature_names or [])),
+            ("Places", prepare_entities_for_group(place_names or [])),
         ),
         palette=palette,
         open_entity_callback=open_entity_callback,

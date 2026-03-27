@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import customtkinter as ctk
 
-from modules.scenarios.widgets.entity_chips import create_entity_chip, normalize_entity_payload
+from modules.scenarios.widgets.entity_chips import create_entity_chip
 
 
 COMPACT_GRID_BREAKPOINT = 760
@@ -25,17 +25,10 @@ def create_entities_groups_grid(
 
     cards = []
     for group_label, entities in groups:
-        normalized_entities = []
-        for entry in entities:
-            payload = normalize_entity_payload(entry)
-            if payload["name"]:
-                normalized_entities.append(payload)
-        if not normalized_entities:
-            continue
         card = _create_group_card(
             cards_grid,
             group_label=group_label,
-            entities=normalized_entities,
+            entities=entities or [],
             palette=palette,
             open_entity_callback=open_entity_callback,
             visible_limit=visible_limit,
@@ -79,20 +72,10 @@ def _create_group_card(parent, *, group_label, entities, palette, open_entity_ca
     header.pack(fill="x", padx=10, pady=(10, 6))
     ctk.CTkLabel(
         header,
-        text=group_label,
+        text=f"{group_label} ({len(entities)})",
         font=ctk.CTkFont(size=11, weight="bold"),
         text_color=palette["text"],
     ).pack(side="left", anchor="w")
-    ctk.CTkLabel(
-        header,
-        text=str(len(entities)),
-        font=ctk.CTkFont(size=10, weight="bold"),
-        text_color=palette["muted_text"],
-        fg_color=palette["pill_bg"],
-        corner_radius=999,
-        padx=8,
-        pady=2,
-    ).pack(side="right", anchor="e")
 
     chips_container = ctk.CTkFrame(card, fg_color="transparent")
     chips_container.pack(fill="x", padx=10, pady=(0, 8))
@@ -100,6 +83,16 @@ def _create_group_card(parent, *, group_label, entities, palette, open_entity_ca
     max_visible = max(1, int(visible_limit or DEFAULT_VISIBLE_CHIPS))
     initial_entities = entities[:max_visible]
     hidden_entities = entities[max_visible:]
+
+    if not entities:
+        ctk.CTkLabel(
+            chips_container,
+            text="Aucune entité",
+            font=ctk.CTkFont(size=10, slant="italic"),
+            text_color=palette["muted_text"],
+            anchor="w",
+        ).pack(fill="x", pady=(0, 6))
+        return card
 
     for entity_payload in initial_entities:
         create_entity_chip(
