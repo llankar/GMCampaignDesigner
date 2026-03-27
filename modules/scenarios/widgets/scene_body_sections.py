@@ -2,7 +2,8 @@ import customtkinter as ctk
 import textwrap
 from customtkinter import CTkLabel
 
-from modules.generic.detail_ui import create_chip, get_detail_palette
+from modules.generic.detail_ui import get_detail_palette
+from modules.scenarios.widgets.scene_body import create_entities_groups_grid
 
 
 def _create_section_shell(parent):
@@ -124,39 +125,18 @@ def _create_entities_block(parent, npc_names, villain_names, creature_names, pla
     entities_block.pack(fill="x", padx=12, pady=(0, 0))
     _create_section_title(entities_block, "Entities")
 
-    for label_text, names in (("NPCs", npc_names), ("Villains", villain_names), ("Creatures", creature_names), ("Places", place_names)):
-        if not names:
-            continue
-        row = ctk.CTkFrame(row_parent := entities_block, fg_color="transparent")
-        row.pack(fill="x", padx=14, pady=(0, 8))
-
-        ctk.CTkLabel(
-            row,
-            text=f"{label_text}:",
-            font=ctk.CTkFont(size=12, weight="bold"),
-            text_color=palette["text"],
-        ).pack(anchor="w")
-        chips = ctk.CTkFrame(row, fg_color="transparent")
-        chips.pack(fill="x", padx=0, pady=(4, 0))
-
-        for name in names:
-            can_open = callable(open_entity_callback)
-            chip = create_chip(chips, name)
-            chip.pack(side="left", padx=(0, 6), pady=2)
-            if can_open:
-                chip.configure(cursor="hand2")
-                for child in chip.winfo_children():
-                    child.configure(cursor="hand2")
-            if can_open:
-                chip.bind(
-                    "<Button-1>",
-                    lambda _event=None, t=label_text, n=name: open_entity_callback(t, n),
-                )
-                for child in chip.winfo_children():
-                    child.bind(
-                        "<Button-1>",
-                        lambda _event=None, t=label_text, n=name: open_entity_callback(t, n),
-                    )
+    create_entities_groups_grid(
+        entities_block,
+        groups=(
+            ("NPCs", npc_names or []),
+            ("Villains", villain_names or []),
+            ("Creatures", creature_names or []),
+            ("Places", place_names or []),
+        ),
+        palette=palette,
+        open_entity_callback=open_entity_callback,
+        visible_limit=6,
+    )
 
     return entities_block
 
