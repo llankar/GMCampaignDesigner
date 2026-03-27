@@ -35,6 +35,12 @@ from modules.helpers.logging_helper import (
 )
 from modules.scenarios.scene_flow_viewer import create_scene_flow_frame
 from modules.scenarios.widgets.scene_body_sections import build_scene_body_sections
+from modules.scenarios.widgets.scene_density import (
+    DEFAULT_SCENE_DENSITY,
+    SCENE_DENSITY_MODES,
+    get_scene_density_style,
+    normalize_scene_density,
+)
 from modules.ui.vertical_section_tabs import VerticalSectionTabs
 from modules.events.ui.shared.related_events_panel import RelatedEventsPanel
 from modules.generic.detail_ui import (
@@ -866,6 +872,7 @@ def insert_list_longtext(
     entity_collector=None,
     gm_view=None,
     show_header=True,
+    scene_density=DEFAULT_SCENE_DENSITY,
 ):
     """Insert collapsible sections for long text lists such as scenario scenes."""
     palette = get_detail_palette()
@@ -1034,6 +1041,9 @@ def insert_list_longtext(
         if digits_only:
             scene_key_by_reference.setdefault(digits_only.group(1), scene_key)
 
+    normalized_density = normalize_scene_density(scene_density)
+    density_style = get_scene_density_style(normalized_density)
+
     for idx, scene_data in enumerate(scene_entries, start=1):
         scene_dict = scene_data["scene_dict"]
         scene_key = _build_scene_key(idx, scene_dict)
@@ -1097,7 +1107,12 @@ def insert_list_longtext(
             entity_collector.setdefault("Maps", set()).update(map_names)
 
         outer = ctk.CTkFrame(parent, fg_color=palette["surface_card"], corner_radius=20, border_width=1, border_color=palette["muted_border"])
-        outer.pack(fill="x", expand=True, padx=20, pady=8)
+        outer.pack(
+            fill="x",
+            expand=True,
+            padx=density_style["outer_padx"],
+            pady=density_style["outer_pady"],
+        )
         body = ctk.CTkFrame(outer, fg_color="transparent")
 
         scene_sections = build_scene_body_sections(
@@ -1112,6 +1127,7 @@ def insert_list_longtext(
             open_entity_callback=open_entity_callback,
             open_scene_callback=_open_scene_target,
             gm_view_ref=gm_view_ref,
+            scene_density=normalized_density,
         )
         body_label = scene_sections["description_label"]
 
@@ -1132,7 +1148,12 @@ def insert_list_longtext(
         checkbox = None
 
         header_row = ctk.CTkFrame(outer, fg_color="transparent")
-        header_row.pack(fill="x", expand=True, padx=14, pady=(12, 4))
+        header_row.pack(
+            fill="x",
+            expand=True,
+            padx=density_style["header_padx"],
+            pady=density_style["header_pady"],
+        )
 
         left_actions = ctk.CTkFrame(header_row, fg_color="transparent")
         left_actions.pack(side="left", fill="x", expand=True, padx=(0, 8))
@@ -1145,7 +1166,7 @@ def insert_list_longtext(
             text_color=palette["text"],
             corner_radius=14,
             anchor="w",
-            height=38,
+            height=density_style["header_height"],
         )
         btn.pack(side="left", fill="x", expand=True)
 
@@ -1244,7 +1265,11 @@ def insert_list_longtext(
                     label += f" · {_truncate_label(title, max_len=32)}"
                 btn.configure(text=label)
             else:
-                body.pack(fill="x", padx=14, pady=(4, 12))
+                body.pack(
+                    fill="x",
+                    padx=density_style["body_padx"],
+                    pady=density_style["body_pady"],
+                )
                 label = f"▼ {idx}"
                 if title:
                     label += f" · {_truncate_label(title, max_len=32)}"
@@ -1638,18 +1663,44 @@ def create_scenario_detail_frame(entity_type, scenario_item, master, open_entity
                 )
                 view_toggle.pack(side="right")
 
+                persisted_scene_density = DEFAULT_SCENE_DENSITY
+                if gm_view_instance is not None and hasattr(gm_view_instance, "layout_manager"):
+                    try:
+                        persisted_scene_density = (
+                            gm_view_instance.layout_manager.get_scene_list_density(scenario_title)
+                            or DEFAULT_SCENE_DENSITY
+                        )
+                    except Exception:
+                        persisted_scene_density = DEFAULT_SCENE_DENSITY
+                persisted_scene_density = normalize_scene_density(persisted_scene_density)
+
+                density_var = tk.StringVar(value=persisted_scene_density)
+                density_toggle = ctk.CTkSegmentedButton(
+                    header_row,
+                    values=list(SCENE_DENSITY_MODES),
+                    variable=density_var,
+                )
+                density_toggle.pack(side="right", padx=(0, 8))
+
                 list_container = ctk.CTkFrame(scenes_container, fg_color="transparent")
                 list_container.pack(fill="x", expand=True)
 
-                insert_list_longtext(
-                    list_container,
-                    name,
-                    value,
-                    open_entity_callback,
-                    entity_collector=scene_entity_tracker,
-                    gm_view=gm_view_instance,
-                    show_header=False,
-                )
+                def _render_scene_list(selected_density):
+                    normalized_density = normalize_scene_density(selected_density)
+                    for child in list_container.winfo_children():
+                        child.destroy()
+                    insert_list_longtext(
+                        list_container,
+                        name,
+                        value,
+                        open_entity_callback,
+                        entity_collector=scene_entity_tracker,
+                        gm_view=gm_view_instance,
+                        show_header=False,
+                        scene_density=normalized_density,
+                    )
+
+                _render_scene_list(persisted_scene_density)
 
                 flow_container = ctk.CTkFrame(scenes_container, fg_color="transparent")
                 flow_container.pack_propagate(False)
@@ -1728,6 +1779,7 @@ def create_scenario_detail_frame(entity_type, scenario_item, master, open_entity
                         )
                     else:
                         flow_container.pack_forget()
+                        _render_scene_list(density_var.get())
                         list_container.pack(fill="x", expand=True)
 
                     if gm_view_instance and hasattr(gm_view_instance, "layout_manager"):
@@ -1735,6 +1787,20 @@ def create_scenario_detail_frame(entity_type, scenario_item, master, open_entity
                             gm_view_instance.layout_manager.update_scenario_state(
                                 scenario_title,
                                 scene_view_mode=selection,
+                            )
+                        except Exception:
+                            pass
+
+                def _toggle_scene_density(selected_density=None):
+                    density_selection = normalize_scene_density(selected_density or density_var.get())
+                    density_var.set(density_selection)
+                    if view_var.get() == "List":
+                        _render_scene_list(density_selection)
+                    if gm_view_instance and hasattr(gm_view_instance, "layout_manager"):
+                        try:
+                            gm_view_instance.layout_manager.update_scenario_state(
+                                scenario_title,
+                                scene_list_density=density_selection,
                             )
                         except Exception:
                             pass
@@ -1760,6 +1826,7 @@ def create_scenario_detail_frame(entity_type, scenario_item, master, open_entity
                     pass
 
                 view_toggle.configure(command=_toggle_scene_view)
+                density_toggle.configure(command=_toggle_scene_density)
                 _toggle_scene_view(persisted_scene_view)
             else:
                 insert_list_longtext(
