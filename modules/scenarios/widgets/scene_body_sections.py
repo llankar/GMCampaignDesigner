@@ -7,6 +7,11 @@ from modules.scenarios.widgets.scene_density import get_scene_density_style
 from modules.scenarios.widgets.scene_sections_parser import parse_scene_body_sections
 
 
+def _compute_wraplength(container_width, *, horizontal_padding, min_wrap, safety_margin=10):
+    available = max(0, int(container_width) - (horizontal_padding * 2))
+    return max(min_wrap, available - max(0, int(safety_margin)))
+
+
 def _create_section_shell(parent):
     palette = get_detail_palette()
     shell = ctk.CTkFrame(parent, fg_color=palette["surface_card"], corner_radius=18, border_width=1, border_color=palette["muted_border"])
@@ -60,7 +65,7 @@ def _create_description_block_fallback(parent, body_text, *, description_font_si
     description_label.pack(fill="x", padx=14, pady=(0, 8 if has_description else 14))
 
     def _refresh_description_wrap(_event=None):
-        wrap_px = max(200, description_block.winfo_width() - 32)
+        wrap_px = _compute_wraplength(description_block.winfo_width(), horizontal_padding=14, min_wrap=200)
         description_label.configure(wraplength=wrap_px, text=full_text)
 
     description_block.bind("<Configure>", _refresh_description_wrap, add="+")
@@ -127,7 +132,7 @@ def _render_card_bullets(container, items, *, expanded, font_size):
         labels.append(empty)
 
     def _refresh_wrap(_event=None):
-        wrap_px = max(180, container.winfo_width() - 20)
+        wrap_px = _compute_wraplength(container.winfo_width(), horizontal_padding=10, min_wrap=180)
         for current in labels:
             current.configure(wraplength=wrap_px)
 
@@ -236,7 +241,7 @@ def _create_description_block(parent, body_text, *, description_font_size=13):
             toggle.configure(command=_toggle_section)
 
     def _refresh_hero_wrap(_event=None):
-        wrap_px = max(220, hero_strip.winfo_width() - 24)
+        wrap_px = _compute_wraplength(hero_strip.winfo_width(), horizontal_padding=12, min_wrap=220)
         description_label.configure(wraplength=wrap_px)
 
     hero_strip.bind("<Configure>", _refresh_hero_wrap, add="+")
