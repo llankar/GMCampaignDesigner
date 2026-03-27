@@ -102,9 +102,9 @@ class ArcSelectorStrip(_CanvasSelector):
                 font=("Segoe UI", 9, "bold"),
                 tags=(tag,),
             )
-            canvas.tag_bind(tag, "<Button-1>", lambda _e, idx=index: self._on_select(idx))
-            canvas.tag_bind(tag, "<Enter>", lambda _e: canvas.configure(cursor="hand2"))
-            canvas.tag_bind(tag, "<Leave>", lambda _e: canvas.configure(cursor=""))
+            canvas.tag_bind(tag, "<Button-1>", lambda _e=None, idx=index: self._on_select(idx))
+            canvas.tag_bind(tag, "<Enter>", lambda _e=None: canvas.configure(cursor="hand2"))
+            canvas.tag_bind(tag, "<Leave>", lambda _e=None: canvas.configure(cursor=""))
 
 
 class ScenarioSelectorStrip(ctk.CTkFrame):

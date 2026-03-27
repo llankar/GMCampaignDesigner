@@ -115,7 +115,7 @@ class ArcScenarioExpansionService:
         if not isinstance(payload, dict):
             raise ArcScenarioExpansionValidationError("AI scenario generation must return a JSON object")
 
-        raw_arc_groups = self._coerce_json_array(payload.get("arcs"))
+        raw_arc_groups = self._extract_arc_groups(payload)
         if not isinstance(raw_arc_groups, list):
             raise ArcScenarioExpansionValidationError("The 'arcs' field must be a JSON array")
 
@@ -193,13 +193,49 @@ class ArcScenarioExpansionService:
         if isinstance(parsed, list):
             return parsed
         if isinstance(parsed, dict):
-            nested = parsed.get("arcs")
+            nested = ArcScenarioExpansionService._get_case_insensitive_value(parsed, "arcs")
             if nested is not None:
                 return ArcScenarioExpansionService._coerce_json_array(nested)
-            text_payload = parsed.get("text") or parsed.get("Text")
+            text_payload = ArcScenarioExpansionService._get_case_insensitive_value(parsed, "text")
             if text_payload not in (None, ""):
                 return ArcScenarioExpansionService._coerce_json_array(text_payload)
         return parsed
+
+    @classmethod
+    def _extract_arc_groups(cls, value: Any) -> Any:
+        parsed = cls._coerce_json_object(value)
+        if isinstance(parsed, list):
+            return parsed
+        if not isinstance(parsed, dict):
+            return parsed
+
+        nested_arcs = cls._get_case_insensitive_value(parsed, "arcs")
+        if nested_arcs is not None:
+            return cls._coerce_json_array(nested_arcs)
+
+        for wrapper_key in ("response", "result", "data", "payload", "content"):
+            wrapper_value = cls._get_case_insensitive_value(parsed, wrapper_key)
+            if wrapper_value is None:
+                continue
+            wrapper_groups = cls._extract_arc_groups(wrapper_value)
+            if isinstance(wrapper_groups, list):
+                return wrapper_groups
+
+        text_payload = cls._get_case_insensitive_value(parsed, "text")
+        if text_payload not in (None, ""):
+            nested_text = cls._extract_arc_groups(text_payload)
+            if isinstance(nested_text, list):
+                return nested_text
+
+        return parsed
+
+    @staticmethod
+    def _get_case_insensitive_value(payload: dict[str, Any], key: str) -> Any:
+        target = key.casefold()
+        for candidate_key, candidate_value in payload.items():
+            if str(candidate_key).casefold() == target:
+                return candidate_value
+        return None
 
     def _normalize_scenario_payload(
         self,
