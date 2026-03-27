@@ -4,6 +4,7 @@ from customtkinter import CTkLabel
 
 from modules.generic.detail_ui import get_detail_palette
 from modules.scenarios.widgets.scene_body import create_entities_groups_grid
+from modules.scenarios.widgets.scene_density import get_scene_density_style
 
 
 def _create_section_shell(parent):
@@ -34,7 +35,7 @@ def _add_subtle_separator(parent):
     return separator
 
 
-def _create_description_block(parent, body_text):
+def _create_description_block(parent, body_text, *, description_font_size=13):
     palette = get_detail_palette()
     description_block = ctk.CTkFrame(parent, fg_color=palette["surface_overlay"], corner_radius=16, border_width=1, border_color=palette["pill_border"])
     description_block.pack(fill="x", padx=12, pady=(12, 0))
@@ -46,8 +47,8 @@ def _create_description_block(parent, body_text):
     fallback_text = "Aucune note de mise en scène"
     full_text = clean_text if has_description else fallback_text
 
-    description_font = ctk.CTkFont(size=13)
-    fallback_font = ctk.CTkFont(size=13, slant="italic")
+    description_font = ctk.CTkFont(size=description_font_size)
+    fallback_font = ctk.CTkFont(size=description_font_size, slant="italic")
     description_label = ctk.CTkLabel(
         description_block,
         text=full_text,
@@ -289,14 +290,20 @@ def build_scene_body_sections(
     open_entity_callback=None,
     open_scene_callback=None,
     gm_view_ref=None,
+    scene_density="Normal",
 ):
+    density_style = get_scene_density_style(scene_density)
     has_entities = bool(npc_names or villain_names or creature_names or place_names)
     has_maps = bool(map_names)
     has_links = bool(links)
 
     shell = _create_section_shell(parent)
 
-    description_block, description_label = _create_description_block(shell, body_text)
+    description_block, description_label = _create_description_block(
+        shell,
+        body_text,
+        description_font_size=density_style["description_font_size"],
+    )
     if has_entities or has_maps or has_links:
         _add_subtle_separator(shell)
 
@@ -317,10 +324,59 @@ def build_scene_body_sections(
 
     links_block = _create_links_block(shell, links, open_scene_callback=open_scene_callback)
 
+    secondary_toggles = {}
+    if density_style["collapse_secondary_by_default"]:
+        for block_name, block_widget in (("Maps", maps_block), ("Links", links_block)):
+            if block_widget is None:
+                continue
+            toggle_holder = ctk.CTkFrame(shell, fg_color="transparent")
+            toggle_holder.pack(fill="x", padx=12, pady=(0, 8), before=block_widget)
+
+            collapsed = ctk.BooleanVar(master=toggle_holder, value=True)
+            toggle_button = ctk.CTkButton(
+                toggle_holder,
+                text=f"▶ {block_name}",
+                anchor="w",
+                height=24,
+                corner_radius=10,
+                fg_color="transparent",
+                hover_color=get_detail_palette()["surface_card"],
+                text_color=get_detail_palette()["muted_text"],
+                border_width=1,
+                border_color=get_detail_palette()["muted_border"],
+            )
+            toggle_button.pack(fill="x")
+            block_widget.pack_forget()
+
+            def _toggle_section(
+                *,
+                section=block_name,
+                button=toggle_button,
+                block=block_widget,
+                state=collapsed,
+                holder=toggle_holder,
+            ):
+                now_collapsed = not state.get()
+                state.set(now_collapsed)
+                if now_collapsed:
+                    block.pack_forget()
+                    button.configure(text=f"▶ {section}")
+                else:
+                    block.pack(fill="x", padx=12, pady=(0, 0), after=holder)
+                    button.configure(text=f"▼ {section}")
+
+            toggle_button.configure(command=_toggle_section)
+            secondary_toggles[block_name.lower()] = {
+                "button": toggle_button,
+                "collapsed": collapsed,
+                "block": block_widget,
+            }
+
     return {
         "description_block": description_block,
         "entities_block": entities_block,
         "maps_block": maps_block,
         "links_block": links_block,
         "description_label": description_label,
+        "secondary_toggles": secondary_toggles,
     }

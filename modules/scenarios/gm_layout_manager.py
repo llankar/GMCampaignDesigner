@@ -121,6 +121,13 @@ class GMScreenLayoutManager:
             return mode
         return None
 
+    def get_scene_list_density(self, scenario_title: str) -> Optional[str]:
+        state = self.get_scenario_state(scenario_title)
+        density = state.get("scene_list_density")
+        if density in {"Compact", "Normal", "Focus"}:
+            return density
+        return None
+
     def update_scenario_state(
         self,
         scenario_title: str,
@@ -128,6 +135,7 @@ class GMScreenLayoutManager:
         scenes: Optional[Dict[str, Any]] = None,
         notes: Optional[str] = None,
         scene_view_mode: Optional[str] = None,
+        scene_list_density: Optional[str] = None,
     ) -> None:
         if not scenario_title:
             return
@@ -152,6 +160,12 @@ class GMScreenLayoutManager:
                 entry["scene_view_mode"] = scene_view_mode
             else:
                 entry.pop("scene_view_mode", None)
+
+        if scene_list_density is not None:
+            if scene_list_density in {"Compact", "Normal", "Focus"}:
+                entry["scene_list_density"] = scene_list_density
+            else:
+                entry.pop("scene_list_density", None)
 
         if not entry:
             store.pop(scenario_title, None)
