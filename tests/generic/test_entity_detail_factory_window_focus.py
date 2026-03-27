@@ -115,9 +115,15 @@ def _load_module():
 
     pil_module = types.ModuleType("PIL")
     pil_image_module = types.ModuleType("PIL.Image")
+    pil_image_ops_module = types.ModuleType("PIL.ImageOps")
+    pil_image_tk_module = types.ModuleType("PIL.ImageTk")
     pil_module.Image = pil_image_module
+    pil_module.ImageOps = pil_image_ops_module
+    pil_module.ImageTk = pil_image_tk_module
     sys.modules["PIL"] = pil_module
     sys.modules["PIL.Image"] = pil_image_module
+    sys.modules["PIL.ImageOps"] = pil_image_ops_module
+    sys.modules["PIL.ImageTk"] = pil_image_tk_module
 
     _stub_module(
         "modules.helpers.text_helpers",
@@ -205,3 +211,28 @@ def test_open_entity_tab_refocuses_existing_window_instead_of_creating_a_second_
     assert ("lift",) in first_window.calls
     assert ("focus_force",) in first_window.calls
     assert ("attributes", "-topmost", True) in first_window.calls
+
+
+def test_compute_wraplength_from_widths_uses_the_narrowest_container():
+    module = _load_module()
+
+    # The label's own natural width must not drive the wrap width, or the
+    # expanded scene text will clip before wrapping in the GM screen.
+    assert module._compute_wraplength_from_widths(900, 560, 540, minimum=200, safety_margin=32) == 508
+
+
+def test_configure_wraplength_if_changed_skips_duplicate_relayout():
+    module = _load_module()
+
+    class _DummyLabel:
+        def __init__(self):
+            self.calls = []
+
+        def configure(self, **kwargs):
+            self.calls.append(kwargs)
+
+    label = _DummyLabel()
+
+    assert module._configure_wraplength_if_changed(label, 900, 560, 540, minimum=200, safety_margin=32) == 508
+    assert module._configure_wraplength_if_changed(label, 900, 560, 540, minimum=200, safety_margin=32) == 508
+    assert label.calls == [{"wraplength": 508}]

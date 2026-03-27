@@ -100,6 +100,35 @@ def _bring_window_to_front(window, parent=None):
         pass
 
 
+def _compute_wraplength_from_widths(*candidate_widths, minimum=200, safety_margin=32):
+    """Return a conservative wrap length from the narrowest usable container width."""
+
+    usable_widths = []
+    for width in candidate_widths:
+        try:
+            width_value = int(width or 0)
+        except Exception:
+            continue
+        if width_value > 1:
+            usable_widths.append(width_value)
+    if not usable_widths:
+        return minimum
+    return max(minimum, min(usable_widths) - max(0, int(safety_margin)))
+
+
+def _configure_wraplength_if_changed(label, *candidate_widths, minimum=200, safety_margin=32):
+    wrap_px = _compute_wraplength_from_widths(
+        *candidate_widths,
+        minimum=minimum,
+        safety_margin=safety_margin,
+    )
+    if getattr(label, "_last_wraplength", None) == wrap_px:
+        return wrap_px
+    label._last_wraplength = wrap_px
+    label.configure(wraplength=wrap_px)
+    return wrap_px
+
+
 TOOLTIP_FIELDS = {
     "NPCs": ("Role", "Secret", "Traits", "Motivation"),
     "Villains": ("Archetype", "ThreatLevel", "Scheme", "CurrentObjective"),
@@ -1275,14 +1304,26 @@ def insert_list_longtext(
                     label += f" · {_truncate_label(title, max_len=32)}"
                 btn.configure(text=label)
                 outer.update_idletasks()
-                wrap_candidates = [lbl.winfo_width(), body.winfo_width(), outer.winfo_width()]
-                try:
-                    parent_width = body.master.winfo_width() if body.master is not None else 0
-                except Exception:
-                    parent_width = 0
-                wrap_candidates.append(parent_width)
-                wrap_px = max(200, max(int(width or 0) for width in wrap_candidates) - 32)
-                lbl.configure(wraplength=wrap_px)
+
+                def _refresh_body_wrap(_event=None, *, target_label=lbl, target_body=body, target_outer=outer):
+                    try:
+                        parent_width = target_body.master.winfo_width() if target_body.master is not None else 0
+                    except Exception:
+                        parent_width = 0
+                    _configure_wraplength_if_changed(
+                        target_label,
+                        target_body.winfo_width(),
+                        target_outer.winfo_width(),
+                        parent_width,
+                        minimum=200,
+                        safety_margin=32,
+                    )
+
+                if not getattr(lbl, "_wraplength_bound", False):
+                    body.bind("<Configure>", _refresh_body_wrap, add="+")
+                    outer.bind("<Configure>", _refresh_body_wrap, add="+")
+                    lbl._wraplength_bound = True
+                _refresh_body_wrap()
                 if gm_view_ref and hasattr(gm_view_ref, "set_active_scene"):
                     gm_view_ref.set_active_scene(key)
                 _refresh_scene_state()
