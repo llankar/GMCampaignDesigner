@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import customtkinter as ctk
 
+from modules.scenarios.widgets.entity_chips import create_entity_chip, normalize_entity_payload
+
 
 COMPACT_GRID_BREAKPOINT = 760
 DEFAULT_VISIBLE_CHIPS = 6
@@ -22,14 +24,18 @@ def create_entities_groups_grid(
     cards_grid.pack(fill="x", padx=14, pady=(0, 10))
 
     cards = []
-    for group_label, names in groups:
-        normalized_names = [str(name).strip() for name in names if str(name).strip()]
-        if not normalized_names:
+    for group_label, entities in groups:
+        normalized_entities = []
+        for entry in entities:
+            payload = normalize_entity_payload(entry)
+            if payload["name"]:
+                normalized_entities.append(payload)
+        if not normalized_entities:
             continue
         card = _create_group_card(
             cards_grid,
             group_label=group_label,
-            names=normalized_names,
+            entities=normalized_entities,
             palette=palette,
             open_entity_callback=open_entity_callback,
             visible_limit=visible_limit,
@@ -60,7 +66,7 @@ def create_entities_groups_grid(
     return cards_grid
 
 
-def _create_group_card(parent, *, group_label, names, palette, open_entity_callback=None, visible_limit=DEFAULT_VISIBLE_CHIPS):
+def _create_group_card(parent, *, group_label, entities, palette, open_entity_callback=None, visible_limit=DEFAULT_VISIBLE_CHIPS):
     card = ctk.CTkFrame(
         parent,
         fg_color=palette["surface_overlay"],
@@ -79,7 +85,7 @@ def _create_group_card(parent, *, group_label, names, palette, open_entity_callb
     ).pack(side="left", anchor="w")
     ctk.CTkLabel(
         header,
-        text=str(len(names)),
+        text=str(len(entities)),
         font=ctk.CTkFont(size=10, weight="bold"),
         text_color=palette["muted_text"],
         fg_color=palette["pill_bg"],
@@ -92,21 +98,22 @@ def _create_group_card(parent, *, group_label, names, palette, open_entity_callb
     chips_container.pack(fill="x", padx=10, pady=(0, 8))
 
     max_visible = max(1, int(visible_limit or DEFAULT_VISIBLE_CHIPS))
-    initial_names = names[:max_visible]
-    hidden_names = names[max_visible:]
+    initial_entities = entities[:max_visible]
+    hidden_entities = entities[max_visible:]
 
-    for entity_name in initial_names:
-        _create_entity_chip(
+    for entity_payload in initial_entities:
+        create_entity_chip(
             chips_container,
             group_label=group_label,
-            entity_name=entity_name,
+            entity_payload=entity_payload,
+            palette=palette,
             open_entity_callback=open_entity_callback,
         ).pack(side="left", padx=(0, 6), pady=(0, 6))
 
-    if hidden_names:
+    if hidden_entities:
         overflow_button = ctk.CTkButton(
             chips_container,
-            text=f"+{len(hidden_names)}",
+            text=f"+{len(hidden_entities)}",
             width=0,
             height=28,
             corner_radius=999,
@@ -121,34 +128,15 @@ def _create_group_card(parent, *, group_label, names, palette, open_entity_callb
 
         def _show_remaining():
             overflow_button.destroy()
-            for hidden_name in hidden_names:
-                _create_entity_chip(
+            for hidden_payload in hidden_entities:
+                create_entity_chip(
                     chips_container,
                     group_label=group_label,
-                    entity_name=hidden_name,
+                    entity_payload=hidden_payload,
+                    palette=palette,
                     open_entity_callback=open_entity_callback,
                 ).pack(side="left", padx=(0, 6), pady=(0, 6))
 
         overflow_button.configure(command=_show_remaining)
 
     return card
-
-
-def _create_entity_chip(parent, *, group_label, entity_name, open_entity_callback=None):
-    from modules.generic.detail_ui import create_chip
-
-    chip = create_chip(parent, entity_name)
-    if not callable(open_entity_callback):
-        return chip
-
-    chip.configure(cursor="hand2")
-    for child in chip.winfo_children():
-        child.configure(cursor="hand2")
-
-    def _open_entity(_event=None):
-        open_entity_callback(group_label, entity_name)
-
-    chip.bind("<Button-1>", _open_entity)
-    for child in chip.winfo_children():
-        child.bind("<Button-1>", _open_entity)
-    return chip
