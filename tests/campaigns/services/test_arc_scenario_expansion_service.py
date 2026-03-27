@@ -374,6 +374,33 @@ def test_arc_scenario_expansion_prompt_includes_existing_entity_catalog():
     assert "Neon Alley Stakeout" in prompt
 
 
+def test_arc_scenario_expansion_accepts_stringified_arcs_payload():
+    ai_client = _FakeAIClient(
+        """
+        {
+          "arcs": "{\"arcs\": [{\"arc_name\": \"Guild War\", \"scenarios\": [{\"Title\": \"Rainmarket Ultimatum\", \"Summary\": \"The crew traces the conspiracy into Rainmarket.\", \"Secrets\": \"A broker carries the ledger fragment.\", \"Scenes\": [\"Stake out the market\", \"Interrogate the broker\", \"Escape the crackdown\"], \"Places\": [\"Rainmarket\"], \"NPCs\": [\"Rika Vale\"], \"Villains\": [\"Marshal Vey\"], \"Creatures\": [], \"Factions\": [\"Rainmarket Compact\"], \"Objects\": [\"Ledger Fragment\"]}, {\"Title\": \"Ash Dock Reckoning\", \"Summary\": \"A trap at Ash Dock forces the crew to expose the mole.\", \"Secrets\": \"The dockmaster answers to the same patron.\", \"Scenes\": [\"Follow the dock rumor\", \"Survive the ambush\", \"Corner the mole\"], \"Places\": [\"Ash Dock\"], \"NPCs\": [\"Dockmaster Neral\"], \"Villains\": [\"Marshal Vey\"], \"Creatures\": [], \"Factions\": [\"Rainmarket Compact\"], \"Objects\": []}]}]}"
+        }
+        """
+    )
+    service = ArcScenarioExpansionService(ai_client)
+
+    result = service.generate_scenarios(
+        {"name": "Stormfront", "tone": "Noir"},
+        [
+            {
+                "name": "Guild War",
+                "summary": "Street-level pressure escalates.",
+                "objective": "Identify the patron behind the gang war.",
+                "thread": "Hidden conspiracy",
+                "scenarios": ["Cold Open"],
+            }
+        ],
+    )
+
+    assert result["arcs"][0]["arc_name"] == "Guild War"
+    assert result["arcs"][0]["scenarios"][0]["Title"] == "Rainmarket Ultimatum"
+
+
 def test_arc_scenario_expansion_backfills_missing_entity_creation_records():
     ai_client = _FakeAIClient(
         """

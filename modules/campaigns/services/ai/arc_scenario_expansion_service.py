@@ -5,6 +5,7 @@ from typing import Any
 from modules.campaigns.services.ai.arc_scenario_entities import build_existing_entity_lookup
 from modules.campaigns.services.ai.json_parsing import parse_json_relaxed
 from modules.campaigns.services.ai.prompt_builders import build_arc_scenario_expansion_prompt
+from modules.helpers.text_helpers import deserialize_possible_json
 from modules.campaigns.services.ai.scenes import (
     SceneBlueprintError,
     validate_and_fix_scene_entity_links,
@@ -110,10 +111,11 @@ class ArcScenarioExpansionService:
         *,
         existing_entities: dict[str, set[str]] | None = None,
     ) -> dict[str, Any]:
+        payload = self._coerce_json_object(payload)
         if not isinstance(payload, dict):
             raise ArcScenarioExpansionValidationError("AI scenario generation must return a JSON object")
 
-        raw_arc_groups = payload.get("arcs")
+        raw_arc_groups = self._coerce_json_array(payload.get("arcs"))
         if not isinstance(raw_arc_groups, list):
             raise ArcScenarioExpansionValidationError("The 'arcs' field must be a JSON array")
 
@@ -173,6 +175,31 @@ class ArcScenarioExpansionService:
             )
 
         return {"arcs": normalized_groups}
+
+    @staticmethod
+    def _coerce_json_object(value: Any) -> Any:
+        parsed = deserialize_possible_json(value)
+        if isinstance(parsed, dict):
+            text_payload = parsed.get("text") or parsed.get("Text")
+            if text_payload not in (None, ""):
+                nested = deserialize_possible_json(text_payload)
+                if isinstance(nested, dict):
+                    return nested
+        return parsed
+
+    @staticmethod
+    def _coerce_json_array(value: Any) -> Any:
+        parsed = deserialize_possible_json(value)
+        if isinstance(parsed, list):
+            return parsed
+        if isinstance(parsed, dict):
+            nested = parsed.get("arcs")
+            if nested is not None:
+                return ArcScenarioExpansionService._coerce_json_array(nested)
+            text_payload = parsed.get("text") or parsed.get("Text")
+            if text_payload not in (None, ""):
+                return ArcScenarioExpansionService._coerce_json_array(text_payload)
+        return parsed
 
     def _normalize_scenario_payload(
         self,
