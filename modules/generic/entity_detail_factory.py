@@ -1604,6 +1604,8 @@ def create_scenario_detail_frame(entity_type, scenario_item, master, open_entity
             insert_text(section_frame, name, value)
         elif ftype == "list_longtext":
             if name == "Scenes" and gm_view_instance is not None:
+                scenes_field_name = name
+                scenes_items = value if isinstance(value, list) else []
                 scenes_card, scenes_body = create_section_card(
                     section_frame,
                     "Scenes",
@@ -1636,7 +1638,7 @@ def create_scenario_detail_frame(entity_type, scenario_item, master, open_entity
                     return len(str(text_payload or "").strip())
 
                 long_text_threshold = 450
-                scene_entries = value if isinstance(value, list) else []
+                scene_entries = scenes_items
                 scene_lengths = [_extract_scene_text_length(entry) for entry in scene_entries]
                 average_scene_length = (
                     sum(scene_lengths) / len(scene_lengths)
@@ -1691,8 +1693,8 @@ def create_scenario_detail_frame(entity_type, scenario_item, master, open_entity
                         child.destroy()
                     insert_list_longtext(
                         list_container,
-                        name,
-                        value,
+                        scenes_field_name,
+                        scenes_items,
                         open_entity_callback,
                         entity_collector=scene_entity_tracker,
                         gm_view=gm_view_instance,
