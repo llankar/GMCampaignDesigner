@@ -35,8 +35,9 @@ class CampaignOverviewHero(ctk.CTkFrame):
 
     def _build_control_strip(self) -> None:
         controls = ctk.CTkFrame(self, fg_color="transparent")
-        controls.grid(row=0, column=0, columnspan=2, sticky="ew", padx=18, pady=(14, 0))
+        controls.grid(row=0, column=0, columnspan=2, sticky="ew", padx=18, pady=(12, 0))
         controls.grid_columnconfigure(0, weight=1)
+        controls.grid_columnconfigure(1, weight=0)
 
         ctk.CTkLabel(
             controls,
@@ -46,23 +47,25 @@ class CampaignOverviewHero(ctk.CTkFrame):
             anchor="w",
         ).grid(row=0, column=0, sticky="w")
 
-        selector_wrap = ctk.CTkFrame(controls, fg_color="#16243b", corner_radius=14)
-        selector_wrap.grid(row=0, column=1, sticky="e")
-        selector_wrap.grid_columnconfigure(0, weight=1)
+        selector_row = ctk.CTkFrame(controls, fg_color="transparent")
+        selector_row.grid(row=0, column=1, sticky="e")
+        selector_row.grid_columnconfigure(1, weight=1)
 
         ctk.CTkLabel(
-            selector_wrap,
-            text="Displayed campaign",
+            selector_row,
+            text="Campaign:",
             text_color=DASHBOARD_THEME.text_secondary,
             font=ctk.CTkFont(size=11, weight="bold"),
-        ).grid(row=0, column=0, sticky="w", padx=10, pady=(8, 1))
+            anchor="e",
+        ).grid(row=0, column=0, sticky="e", padx=(0, 8))
 
         ctk.CTkOptionMenu(
-            selector_wrap,
+            selector_row,
             variable=self._campaign_var,
             values=self._campaign_values,
             command=self._on_campaign_selected,
-            width=230,
+            width=180,
+            height=30,
             fg_color=DASHBOARD_THEME.input_bg,
             button_color=DASHBOARD_THEME.input_button,
             button_hover_color=DASHBOARD_THEME.input_hover,
@@ -70,7 +73,10 @@ class CampaignOverviewHero(ctk.CTkFrame):
             dropdown_fg_color=DASHBOARD_THEME.card_bg,
             dropdown_hover_color=DASHBOARD_THEME.button_hover,
             dropdown_text_color=DASHBOARD_THEME.text_primary,
-        ).grid(row=1, column=0, sticky="ew", padx=10, pady=(0, 10))
+            corner_radius=999,
+            anchor="w",
+            dynamic_resizing=False,
+        ).grid(row=0, column=1, sticky="e")
 
     def _build_identity_column(self) -> None:
         identity = ctk.CTkFrame(self, fg_color="transparent")
