@@ -229,7 +229,7 @@ class CampaignGraphPanel(ctk.CTkFrame):
         self._render_stepper_controls(
             header,
             row=0,
-            title="Current arc",
+            title="",
             subtitle=f"Arc {selected_index + 1} of {len(payload.arcs)}",
             current_label=selected_arc.name,
             status_label=selected_arc.status,
@@ -288,20 +288,24 @@ class CampaignGraphPanel(ctk.CTkFrame):
     ) -> None:
         label_wrap = ctk.CTkFrame(parent, fg_color="transparent")
         label_wrap.grid(row=row, column=0, columnspan=2, sticky="w")
-        ctk.CTkLabel(
-            label_wrap,
-            text=title.upper(),
-            text_color="#8fb0dd",
-            font=ctk.CTkFont(size=9, weight="bold"),
-            anchor="w",
-        ).grid(row=0, column=0, sticky="w")
+        subtitle_row = 0
+        if title:
+            ctk.CTkLabel(
+                label_wrap,
+                text=title.upper(),
+                text_color="#8fb0dd",
+                font=ctk.CTkFont(size=9, weight="bold"),
+                anchor="w",
+            ).grid(row=0, column=0, sticky="w")
+            subtitle_row = 1
+
         ctk.CTkLabel(
             label_wrap,
             text=subtitle,
             text_color=DASHBOARD_THEME.text_secondary,
             font=ctk.CTkFont(size=11),
             anchor="w",
-        ).grid(row=1, column=0, sticky="w", pady=(2, 0))
+        ).grid(row=subtitle_row, column=0, sticky="w", pady=(2, 0) if subtitle_row else 0)
 
         ctk.CTkLabel(
             parent,
@@ -395,7 +399,7 @@ class CampaignGraphPanel(ctk.CTkFrame):
         self._render_stepper_controls(
             header,
             row=0,
-            title="Current scenario",
+            title="",
             subtitle=f"Scenario {self._selected_scenario_index + 1} of {len(arc.scenarios)}",
             current_label=selected_scenario.title,
             status_label=f"{len(selected_scenario.entity_links)} links",
