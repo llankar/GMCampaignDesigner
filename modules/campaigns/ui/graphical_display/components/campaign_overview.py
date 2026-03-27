@@ -10,19 +10,71 @@ from ..data import CampaignGraphPayload
 class CampaignOverviewHero(ctk.CTkFrame):
     """Compact campaign summary header used by the graphical overview."""
 
-    def __init__(self, parent, *, payload: CampaignGraphPayload):
+    def __init__(
+        self,
+        parent,
+        *,
+        payload: CampaignGraphPayload,
+        campaign_var,
+        campaign_values: list[str],
+        on_campaign_selected,
+    ):
         super().__init__(parent, fg_color="#10192b", corner_radius=22, border_width=1, border_color="#223554")
         self._payload = payload
+        self._campaign_var = campaign_var
+        self._campaign_values = campaign_values
+        self._on_campaign_selected = on_campaign_selected
 
         self.grid_columnconfigure(0, weight=3)
         self.grid_columnconfigure(1, weight=2)
 
+        self._build_control_strip()
         self._build_identity_column()
         self._build_sidebar_column()
 
+
+    def _build_control_strip(self) -> None:
+        controls = ctk.CTkFrame(self, fg_color="transparent")
+        controls.grid(row=0, column=0, columnspan=2, sticky="ew", padx=18, pady=(14, 0))
+        controls.grid_columnconfigure(0, weight=1)
+
+        ctk.CTkLabel(
+            controls,
+            text="Campaign overview",
+            font=ctk.CTkFont(size=18, weight="bold"),
+            text_color=DASHBOARD_THEME.text_primary,
+            anchor="w",
+        ).grid(row=0, column=0, sticky="w")
+
+        selector_wrap = ctk.CTkFrame(controls, fg_color="#16243b", corner_radius=14)
+        selector_wrap.grid(row=0, column=1, sticky="e")
+        selector_wrap.grid_columnconfigure(0, weight=1)
+
+        ctk.CTkLabel(
+            selector_wrap,
+            text="Displayed campaign",
+            text_color=DASHBOARD_THEME.text_secondary,
+            font=ctk.CTkFont(size=11, weight="bold"),
+        ).grid(row=0, column=0, sticky="w", padx=10, pady=(8, 1))
+
+        ctk.CTkOptionMenu(
+            selector_wrap,
+            variable=self._campaign_var,
+            values=self._campaign_values,
+            command=self._on_campaign_selected,
+            width=230,
+            fg_color=DASHBOARD_THEME.input_bg,
+            button_color=DASHBOARD_THEME.input_button,
+            button_hover_color=DASHBOARD_THEME.input_hover,
+            text_color=DASHBOARD_THEME.text_primary,
+            dropdown_fg_color=DASHBOARD_THEME.card_bg,
+            dropdown_hover_color=DASHBOARD_THEME.button_hover,
+            dropdown_text_color=DASHBOARD_THEME.text_primary,
+        ).grid(row=1, column=0, sticky="ew", padx=10, pady=(0, 10))
+
     def _build_identity_column(self) -> None:
         identity = ctk.CTkFrame(self, fg_color="transparent")
-        identity.grid(row=0, column=0, sticky="nsew", padx=(18, 12), pady=16)
+        identity.grid(row=1, column=0, sticky="nsew", padx=(18, 12), pady=(12, 16))
         identity.grid_columnconfigure(0, weight=1)
 
         header = ctk.CTkFrame(identity, fg_color="transparent")
@@ -85,7 +137,7 @@ class CampaignOverviewHero(ctk.CTkFrame):
 
     def _build_sidebar_column(self) -> None:
         sidebar = ctk.CTkFrame(self, fg_color="transparent")
-        sidebar.grid(row=0, column=1, sticky="nsew", padx=(0, 18), pady=16)
+        sidebar.grid(row=1, column=1, sticky="nsew", padx=(0, 18), pady=(12, 16))
         for column in range(2):
             sidebar.grid_columnconfigure(column, weight=1)
 
