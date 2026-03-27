@@ -10,9 +10,11 @@ _SECTION_DEFINITIONS = (
 )
 
 _HEADER_PATTERN = re.compile(
-    r"^\s*[-*>#]*\s*\**\s*(key beats|conflicts/obstacles|clues/hooks|transitions|important locations|involved npcs)\s*\**\s*:?\s*$",
+    r"^\s*[-*>#•·●▪]*\s*\**\s*(key beats|conflicts/obstacles|clues/hooks|transitions|important locations|involved npcs)\s*\**\s*:?\s*$",
     re.IGNORECASE,
 )
+
+_HEADER_BULLET_PREFIX = re.compile(r"^[•·●▪\-\*]\s*")
 
 
 def _normalize_line(line):
@@ -58,7 +60,8 @@ def parse_scene_body_sections(body_text):
 
     for raw_line in lines:
         line = raw_line.rstrip()
-        header_match = _HEADER_PATTERN.match(line)
+        line_without_bullet = _HEADER_BULLET_PREFIX.sub("", line, count=1)
+        header_match = _HEADER_PATTERN.match(line_without_bullet)
         if header_match:
             current_key = header_match.group(1).strip().lower()
             sections_buffer.setdefault(current_key, [])
