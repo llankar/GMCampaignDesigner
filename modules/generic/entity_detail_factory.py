@@ -44,6 +44,7 @@ from modules.scenarios.widgets.scene_density import (
 from modules.ui.vertical_section_tabs import VerticalSectionTabs
 from modules.events.ui.shared.related_events_panel import RelatedEventsPanel
 from modules.generic.detail_ui import (
+    bind_context_menu_recursively,
     build_scroll_host,
     create_chip,
     create_detail_split_layout,
@@ -2011,6 +2012,9 @@ def create_scenario_detail_frame(entity_type, scenario_item, master, open_entity
     if section_names:
         tabs.set_active(section_names[0])
         show_section(section_names[0])
+
+    if gm_view_instance is not None:
+        bind_context_menu_recursively(frame, gm_view_instance._show_context_menu)
     return frame
 
 @log_function
@@ -2287,6 +2291,9 @@ def create_entity_detail_frame(entity_type, entity, master, open_entity_callback
             on_open_entity=open_entity_callback,
         )
         related_events_panel.pack(fill="x")
+
+    if gm_view_instance is not None:
+        bind_context_menu_recursively(content_frame, gm_view_instance._show_context_menu)
     return content_frame
 
 @log_function

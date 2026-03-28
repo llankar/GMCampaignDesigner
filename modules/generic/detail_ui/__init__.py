@@ -13,6 +13,7 @@ from .theme import (
     get_textbox_style,
     resolve_color,
 )
+from .context_menu_binding import bind_context_menu_recursively
 from .scroll_host import build_scroll_host
 
 __all__ = [
@@ -28,4 +29,5 @@ __all__ = [
     "get_textbox_style",
     "resolve_color",
     "build_scroll_host",
+    "bind_context_menu_recursively",
 ]
