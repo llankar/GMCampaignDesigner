@@ -1437,10 +1437,17 @@ class GMScreenView(ctk.CTkFrame):
         handler = self._get_active_entity_edit_handler()
         if not handler:
             return
-        try:
-            handler()
-        except Exception as exc:
-            messagebox.showerror("Edit Entity", f"Unable to open editor: {exc}")
+
+        def _open_editor():
+            try:
+                handler()
+            except Exception as exc:
+                messagebox.showerror("Edit Entity", f"Unable to open editor: {exc}")
+
+        # Opening the modal editor directly from the tk.Menu callback can leave
+        # the menu grab active while EditWindow waits on the dialog, which blocks
+        # all interaction. Deferring to idle lets tk_popup unwind cleanly first.
+        self.after_idle(_open_editor)
 
     def _show_context_menu(self, event):
         if not self._context_menu:
