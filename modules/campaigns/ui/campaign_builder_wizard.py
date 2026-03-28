@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import re
+import time
 import customtkinter as ctk
 from tkinter import messagebox
 
@@ -24,7 +25,7 @@ from modules.campaigns.ui.campaign_forge_preview_dialog import preview_campaign_
 from modules.campaigns.ui.widgets import CampaignDateField
 from modules.generic.generic_model_wrapper import GenericModelWrapper
 from modules.generic.generic_list_selection_view import GenericListSelectionView
-from modules.helpers.logging_helper import log_exception
+from modules.helpers.logging_helper import log_error, log_exception, log_info, log_warning
 from modules.helpers.template_loader import load_template
 from modules.helpers.window_helper import position_window_at_top
 from modules.scenarios.scenario_builder_wizard import ScenarioBuilderWizard
@@ -648,12 +649,30 @@ class CampaignBuilderWizard(ctk.CTkToplevel):
         ]
         progress_dialog = self._create_pipeline_progress_dialog("Forging full campaign...", stages)
         saved_groups: list[dict] = []
+        pipeline_started = time.perf_counter()
+        self._log_forge_event(
+            "campaign_forge.ui.pipeline.start",
+            "pipeline_started",
+            arc_count=len(self.arcs),
+            scenario_title_count=len(self.scenario_titles),
+        )
         try:
             self._set_interactive_controls_enabled(False)
-            self._update_pipeline_progress(progress_dialog, 0, "Building campaign arcs...")
+            stage_started = time.perf_counter()
+            self._update_pipeline_progress(progress_dialog, 0, "Arcs")
+            self._log_forge_event("campaign_forge.ui.stage.start", "arcs_started", stage="arcs")
             self._forge_pipeline_generate_or_normalize_arcs()
+            self._log_forge_event(
+                "campaign_forge.ui.stage.end",
+                "arcs_completed",
+                stage="arcs",
+                elapsed_ms=self._elapsed_ms(stage_started),
+                arc_count=len(self.arcs),
+            )
 
-            self._update_pipeline_progress(progress_dialog, 1, "Generating scenarios for each arc...")
+            stage_started = time.perf_counter()
+            self._update_pipeline_progress(progress_dialog, 1, "Scenarios")
+            self._log_forge_event("campaign_forge.ui.stage.start", "scenario_generation_started", stage="scenarios")
             self._validate_arcs_for_scenario_generation()
             existing_scenarios = self._load_existing_scenarios_for_pipeline()
             service = ArcScenarioExpansionService(self._get_ai())
@@ -662,15 +681,42 @@ class CampaignBuilderWizard(ctk.CTkToplevel):
                 self.arcs,
                 existing_scenarios=existing_scenarios,
             )
+            generated_counts = self._summarize_generated_counts(generated_payload)
+            self._log_forge_event(
+                "campaign_forge.ui.stage.end",
+                "scenario_generation_completed",
+                stage="scenarios",
+                elapsed_ms=self._elapsed_ms(stage_started),
+                existing_scenario_count=len(existing_scenarios),
+                generated_arc_count=generated_counts["arc_count"],
+                generated_scenario_count=generated_counts["scenario_count"],
+                generated_scene_count=generated_counts["scene_count"],
+            )
 
-            self._update_pipeline_progress(progress_dialog, 2, "Validating and enriching generated scenes/entities...")
-            self._update_pipeline_progress(progress_dialog, 3, "Opening summary preview...")
+            self._update_pipeline_progress(progress_dialog, 2, "Validation")
+            self._log_forge_event(
+                "campaign_forge.ui.stage.end",
+                "validation_completed",
+                stage="validation",
+                generated_arc_count=generated_counts["arc_count"],
+                generated_scenario_count=generated_counts["scenario_count"],
+                generated_scene_count=generated_counts["scene_count"],
+            )
+            self._update_pipeline_progress(progress_dialog, 3, "Preview")
             accepted_payload = self._preview_generated_arc_scenarios(generated_payload)
             if not accepted_payload:
+                self._log_forge_event(
+                    "campaign_forge.ui.stage.warning",
+                    "preview_cancelled",
+                    level="warning",
+                    stage="preview",
+                )
                 messagebox.showinfo("Forge cancelled", "Campaign forging cancelled during preview.", parent=self)
                 return
 
-            self._update_pipeline_progress(progress_dialog, 4, "Saving campaign and scenarios...")
+            stage_started = time.perf_counter()
+            self._update_pipeline_progress(progress_dialog, 4, "Saving")
+            self._log_forge_event("campaign_forge.ui.stage.start", "save_started", stage="save")
             persistence = CampaignForgePersistence(
                 self.scenario_wrapper,
                 campaign_wrapper=self.campaign_wrapper,
@@ -682,6 +728,12 @@ class CampaignBuilderWizard(ctk.CTkToplevel):
                 save_mode=SAVE_MODE_REPLACE_GENERATED_ONLY,
             )
             if not self._confirm_campaign_forge_dry_run(dry_run, title="Forge save preview"):
+                self._log_forge_event(
+                    "campaign_forge.ui.stage.warning",
+                    "save_preview_cancelled",
+                    level="warning",
+                    stage="save",
+                )
                 messagebox.showinfo("Forge cancelled", "Campaign forging cancelled during save preview.", parent=self)
                 return
 
@@ -697,10 +749,35 @@ class CampaignBuilderWizard(ctk.CTkToplevel):
             self.original_campaign_name = payload.get("Name")
             self._refresh_arcs_preview()
             self._refresh_review()
+            saved_count = sum(len(group.get("scenarios") or []) for group in saved_groups)
+            self._log_forge_event(
+                "campaign_forge.ui.stage.end",
+                "save_completed",
+                stage="save",
+                elapsed_ms=self._elapsed_ms(stage_started),
+                saved_group_count=len(saved_groups),
+                saved_scenario_count=saved_count,
+            )
         except ArcScenarioExpansionValidationError as exc:
+            self._log_forge_event(
+                "campaign_forge.ui.pipeline.validation_error",
+                "pipeline_validation_error",
+                level="warning",
+                error_type=type(exc).__name__,
+                detail=str(exc),
+                elapsed_ms=self._elapsed_ms(pipeline_started),
+            )
             messagebox.showwarning("Pipeline validation failed", str(exc), parent=self)
             return
         except Exception as exc:
+            self._log_forge_event(
+                "campaign_forge.ui.pipeline.error",
+                "pipeline_failed",
+                level="error",
+                error_type=type(exc).__name__,
+                detail=str(exc),
+                elapsed_ms=self._elapsed_ms(pipeline_started),
+            )
             messagebox.showerror("Forge failed", f"Unable to forge full campaign: {exc}", parent=self)
             return
         finally:
@@ -709,6 +786,14 @@ class CampaignBuilderWizard(ctk.CTkToplevel):
                 progress_dialog["window"].destroy()
 
         saved_count = sum(len(group.get("scenarios") or []) for group in saved_groups)
+        self._log_forge_event(
+            "campaign_forge.ui.pipeline.completed",
+            "pipeline_completed",
+            elapsed_ms=self._elapsed_ms(pipeline_started),
+            arc_count=len(self.arcs),
+            saved_group_count=len(saved_groups),
+            saved_scenario_count=saved_count,
+        )
         messagebox.showinfo(
             "Campaign forged",
             f"Saved campaign '{self.form_vars['name'].get().strip()}' and {saved_count} generated scenario(s).",
@@ -823,6 +908,42 @@ class CampaignBuilderWizard(ctk.CTkToplevel):
         stage_box.insert("1.0", "\n".join(stage_lines))
         stage_box.configure(state="disabled")
         self.update()
+
+    def _log_forge_event(self, event: str, action: str, *, level: str = "info", **details):
+        detail_parts = [f"{key}={details[key]!r}" for key in sorted(details.keys())]
+        message = f"event={event} action={action}"
+        if detail_parts:
+            message = f"{message} {' '.join(detail_parts)}"
+
+        if level == "error":
+            log_error(message, func_name="campaign_forge.wizard")
+            return
+        if level == "warning":
+            log_warning(message, func_name="campaign_forge.wizard")
+            return
+        log_info(message, func_name="campaign_forge.wizard")
+
+    @staticmethod
+    def _elapsed_ms(started_at: float) -> int:
+        return max(0, int((time.perf_counter() - started_at) * 1000))
+
+    @staticmethod
+    def _summarize_generated_counts(payload: dict) -> dict[str, int]:
+        arc_groups = [item for item in (payload.get("arcs") or []) if isinstance(item, dict)]
+        scenario_count = 0
+        scene_count = 0
+        for group in arc_groups:
+            scenarios = [item for item in (group.get("scenarios") or []) if isinstance(item, dict)]
+            scenario_count += len(scenarios)
+            for scenario in scenarios:
+                scenes = scenario.get("scene_ideas") or scenario.get("scenes") or []
+                if isinstance(scenes, list):
+                    scene_count += len([scene for scene in scenes if isinstance(scene, dict)])
+        return {
+            "arc_count": len(arc_groups),
+            "scenario_count": scenario_count,
+            "scene_count": scene_count,
+        }
 
     def _register_interactive_control(self, *widgets):
         for widget in widgets:

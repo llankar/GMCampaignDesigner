@@ -59,11 +59,11 @@ def test_happy_path_full_generation(monkeypatch):
     assert [arc["name"] for arc in result.arcs] == ["Arc Alpha"]
     assert result.generated_payload == result.preview_payload == result.persistence_payload
     assert result.generated_payload["arcs"][0]["scenarios"][0]["Title"] == "Rainmarket Ultimatum"
-    assert result.diagnostics == {
-        "arc_count": 1,
-        "existing_scenario_count": 0,
-        "generated_scenario_count": 2,
-    }
+    assert result.diagnostics["arc_count"] == 1
+    assert result.diagnostics["existing_scenario_count"] == 0
+    assert result.diagnostics["generated_scenario_count"] == 2
+    assert result.diagnostics["generated_scene_count"] >= 0
+    assert result.diagnostics["elapsed_ms"] >= 0
 
 
 def test_malformed_ai_payload_is_normalized_before_validation(monkeypatch):
