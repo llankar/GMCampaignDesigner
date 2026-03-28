@@ -62,8 +62,12 @@ def build_full_draft_prompt(request: StoryForgeRequest, selected_option: dict, e
     }
     return (
         "Write the full scenario draft. "
+        "Each scene must reference a subset of the proposed entities. "
+        "Every proposed NPC/place/object should appear in at least one scene unless explicitly marked optional. "
         "Output schema: {\"title\": str, \"summary\": str, \"secrets\": str, "
-        "\"scenes\": [{\"Title\": str, \"Summary\": str, \"SceneType\": str}], "
+        "\"scenes\": [{\"Title\": str, \"Summary\": str, \"SceneType\": str, "
+        "\"NPCs\": [str], \"Creatures\": [str], \"Bases\": [str], \"Places\": [str], \"Maps\": [str], "
+        "\"Factions\": [str] (optional), \"Objects\": [str] (optional)}], "
         "\"entities\": {\"NPCs\": [str], \"Creatures\": [str], \"Bases\": [str], \"Places\": [str], \"Maps\": [str], \"Factions\": [str], \"Objects\": [str]}}.\n"
         f"Context JSON:\n{json.dumps(context, ensure_ascii=False)}"
     )
