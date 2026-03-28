@@ -1465,6 +1465,8 @@ class GMScreenView(ctk.CTkFrame):
     def _show_context_menu(self, event):
         if not self._context_menu:
             return
+        if self.current_tab == self.scenario_name:
+            return
         edit_available = self._get_active_entity_edit_handler() is not None
         if not edit_available:
             return
