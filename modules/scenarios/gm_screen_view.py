@@ -1440,6 +1440,19 @@ class GMScreenView(ctk.CTkFrame):
 
         def _open_editor():
             try:
+                if self._context_menu is not None:
+                    try:
+                        # Explicitly close any visible menu before opening the
+                        # editor window. Some Tk builds can keep the menu
+                        # posted (and effectively modal) even after the command
+                        # callback starts running.
+                        self._context_menu.unpost()
+                    except Exception:
+                        pass
+                    try:
+                        self._context_menu.grab_release()
+                    except Exception:
+                        pass
                 handler()
             except Exception as exc:
                 messagebox.showerror("Edit Entity", f"Unable to open editor: {exc}")
