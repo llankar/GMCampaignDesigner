@@ -6,35 +6,6 @@ from modules.helpers.logging_helper import log_module_import
 
 log_module_import(__name__)
 
-def format_longtext(data, max_length=30000):
-    """Format a longtext field for list display (abridged + multi-line)."""
-    if isinstance(data, dict):
-        text = data.get("text", "")
-    else:
-        text = str(data)
-
-    text = text.replace("\n", " ").strip()
-
-    if len(text) > max_length:
-        return text[:max_length] + "..."
-    return text
-
-def format_multiline_text(data, max_length=30000):
-    """Like format_longtext but *preserves* newlines for HTML <pre‑wrap> output."""
-    if isinstance(data, dict):
-        text = data.get("text", "")
-    else:
-        text = str(data)
-
-    # keep your paragraph breaks
-    text = text.replace("\r\n", "\n").strip()
-
-    # truncate if too long
-    if len(text) > max_length:
-        return text[:max_length] + "…"
-    return text
-
-
 def deserialize_possible_json(value):
     """Attempt to deserialize a JSON or Python literal string.
 
@@ -424,6 +395,12 @@ def coerce_text(val):
     return _coerce_text(val)
 
 def format_longtext(data, max_length=30000):
+    """Format long text for list/table display.
+
+    - Normalizes rich payloads via ``_coerce_text``.
+    - Collapses line breaks to spaces for compact single-line rendering.
+    - Truncates to ``max_length`` and appends ``...``.
+    """
     text = _coerce_text(data)
     text = text.replace("\n", " ").strip()
     if len(text) > max_length:
@@ -431,8 +408,14 @@ def format_longtext(data, max_length=30000):
     return text
 
 def format_multiline_text(data, max_length=30000):
+    """Format text for multi-line display (e.g. web ``pre-wrap`` blocks).
+
+    - Normalizes rich payloads via ``_coerce_text``.
+    - Preserves paragraph breaks by keeping ``\\n`` line separators.
+    - Truncates to ``max_length`` and appends an ellipsis.
+    """
     text = _coerce_text(data)
     text = text.replace("\r\n", "\n").strip()
     if len(text) > max_length:
-        return text[:max_length] + "�?�"
+        return text[:max_length] + "…"
     return text
