@@ -82,12 +82,21 @@ def normalize_entities(payload: dict[str, Any]) -> dict[str, list[str]]:
 
 
 def normalize_full_draft(payload: dict[str, Any], fallback_option: dict[str, str], fallback_entities: dict[str, list[str]]) -> dict[str, Any]:
+    def _normalize_list_field(raw: Any) -> list[str]:
+        if isinstance(raw, str):
+            raw = [raw]
+        if isinstance(raw, list):
+            return list(dict.fromkeys(str(item).strip() for item in raw if str(item).strip()))
+        return []
+
+    scene_entity_keys = ("NPCs", "Creatures", "Bases", "Places", "Maps", "Factions", "Objects")
+
     title = str(payload.get("title") or fallback_option.get("title") or "Scenario Draft").strip()
     summary = str(payload.get("summary") or fallback_option.get("summary") or "").strip()
     secrets = str(payload.get("secrets") or "").strip()
 
     scenes_raw = payload.get("scenes")
-    scenes: list[dict[str, str]] = []
+    scenes: list[dict[str, Any]] = []
     if isinstance(scenes_raw, list):
         for idx, scene in enumerate(scenes_raw):
             if not isinstance(scene, dict):
@@ -95,10 +104,21 @@ def normalize_full_draft(payload: dict[str, Any], fallback_option: dict[str, str
             scene_title = str(scene.get("Title") or scene.get("title") or f"Scene {idx + 1}").strip()
             scene_summary = str(scene.get("Summary") or scene.get("summary") or "").strip()
             scene_type = str(scene.get("SceneType") or scene.get("type") or "Auto").strip()
-            scenes.append({"Title": scene_title, "Summary": scene_summary, "Text": scene_summary, "SceneType": scene_type})
+            normalized_scene: dict[str, Any] = {
+                "Title": scene_title,
+                "Summary": scene_summary,
+                "Text": scene_summary,
+                "SceneType": scene_type,
+            }
+            for key in scene_entity_keys:
+                normalized_scene[key] = _normalize_list_field(scene.get(key))
+            scenes.append(normalized_scene)
 
     if not scenes:
-        scenes = [{"Title": "Scene 1", "Summary": summary, "Text": summary, "SceneType": "Setup"}]
+        default_scene: dict[str, Any] = {"Title": "Scene 1", "Summary": summary, "Text": summary, "SceneType": "Setup"}
+        for key in scene_entity_keys:
+            default_scene[key] = []
+        scenes = [default_scene]
 
     entities = normalize_entities(payload)
     for key, values in fallback_entities.items():
