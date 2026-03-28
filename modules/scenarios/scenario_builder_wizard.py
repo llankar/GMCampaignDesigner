@@ -9,6 +9,10 @@ from tkinter import messagebox
 import customtkinter as ctk
 from PIL import Image
 
+from modules.ai.story_forge.contracts import StoryForgeRequest, StoryForgeResponse
+from modules.ai.story_forge.entity_catalog import load_campaign_arc_context, load_db_entity_catalog
+from modules.ai.story_forge.orchestrator import StoryForgeOrchestrator
+from modules.ai.story_forge.persistence_payloads import build_embedded_result_payload
 from modules.generic.generic_editor_window import GenericEditorWindow
 from modules.generic.generic_list_selection_view import GenericListSelectionView
 from modules.generic.generic_model_wrapper import GenericModelWrapper
@@ -2212,13 +2216,28 @@ class ReviewStep(WizardStep):
 class ScenarioBuilderWizard(ctk.CTkToplevel):
     """Interactive wizard guiding users through building a scenario."""
 
-    def __init__(self, master, on_saved=None, *, initial_scenario=None):
+    def __init__(
+        self,
+        master,
+        on_saved=None,
+        *,
+        initial_scenario=None,
+        mode="standalone",
+        campaign_context=None,
+        arc_context=None,
+        on_embedded_result=None,
+    ):
         super().__init__(master)
         self.title("Scenario Builder Wizard")
         self.geometry("1920x1080+0+0")
         self.minsize(1100, 700)
         self.transient(master)
         self.on_saved = on_saved
+        self.mode = "embedded" if str(mode).lower() == "embedded" else "standalone"
+        self.campaign_context = campaign_context or {}
+        self.arc_context = arc_context or {}
+        self.on_embedded_result = on_embedded_result
+        self.story_forge = StoryForgeOrchestrator()
 
         # NOTE: Avoid shadowing the inherited ``state()`` method from Tk by
         # storing wizard data on a dedicated attribute.
@@ -2343,7 +2362,7 @@ class ScenarioBuilderWizard(ctk.CTkToplevel):
 
         nav = ctk.CTkFrame(self)
         nav.grid(row=2, column=0, sticky="ew")
-        nav.grid_columnconfigure((0, 1, 2, 3), weight=1)
+        nav.grid_columnconfigure((0, 1, 2, 3, 4), weight=1)
 
         self.back_btn = ctk.CTkButton(nav, text="Back", command=self.go_back)
         self.back_btn.grid(row=0, column=0, padx=10, pady=10, sticky="ew")
@@ -2353,6 +2372,8 @@ class ScenarioBuilderWizard(ctk.CTkToplevel):
         self.finish_btn.grid(row=0, column=2, padx=10, pady=10, sticky="ew")
         self.cancel_btn = ctk.CTkButton(nav, text="Cancel", command=self.cancel)
         self.cancel_btn.grid(row=0, column=3, padx=10, pady=10, sticky="ew")
+        self.story_forge_btn = ctk.CTkButton(nav, text="Story Forge Draft", command=self._run_story_forge)
+        self.story_forge_btn.grid(row=0, column=4, padx=10, pady=10, sticky="ew")
 
     def _create_steps(self):  # pragma: no cover - UI layout
         entity_wrappers = dict(self.entity_wrappers)
@@ -2523,6 +2544,53 @@ class ScenarioBuilderWizard(ctk.CTkToplevel):
     def cancel(self):  # pragma: no cover - UI navigation
         self.destroy()
 
+    def _run_story_forge(self):  # pragma: no cover - UI interaction
+        brief = (self.wizard_state.get("Summary") or "").strip()
+        if not brief:
+            messagebox.showwarning(
+                "Story Forge",
+                "Add a short summary first (Visual Builder > Edit Notes) to seed Story Forge.",
+            )
+            return
+
+        existing_scenarios = []
+        try:
+            existing_scenarios = [
+                str(item.get("Title") or item.get("Name") or "").strip()
+                for item in (self.scenario_wrapper.load_items() or [])
+                if isinstance(item, dict)
+            ]
+            existing_scenarios = [name for name in existing_scenarios if name]
+        except Exception:
+            existing_scenarios = []
+
+        context = load_campaign_arc_context(self.campaign_context, self.arc_context)
+        request = StoryForgeRequest(
+            brief=brief,
+            campaign_name=context.get("campaign_name", ""),
+            campaign_summary=context.get("campaign_summary", ""),
+            arc_name=context.get("arc_name", ""),
+            arc_summary=context.get("arc_summary", ""),
+            arc_objective=context.get("arc_objective", ""),
+            arc_thread=context.get("arc_thread", ""),
+            existing_scenarios=existing_scenarios,
+            entity_catalog=load_db_entity_catalog(),
+        )
+
+        try:
+            result = self.story_forge.run(request)
+        except Exception as exc:
+            log_exception(
+                f"Story Forge failed: {exc}",
+                func_name="ScenarioBuilderWizard._run_story_forge",
+            )
+            messagebox.showerror("Story Forge", f"Unable to generate a draft: {exc}")
+            return
+
+        payload = result.to_scenario_payload()
+        self.load_existing_scenario(payload)
+        messagebox.showinfo("Story Forge", "Scenario draft applied. Review and adjust before finishing.")
+
     def finish(self):  # pragma: no cover - UI navigation
         step = self.steps[self.current_step_index][1]
         if not step.save_state(self.wizard_state):
@@ -2555,11 +2623,39 @@ class ScenarioBuilderWizard(ctk.CTkToplevel):
             self.next_btn: self.next_btn.cget("state"),
             self.finish_btn: self.finish_btn.cget("state"),
             self.cancel_btn: self.cancel_btn.cget("state"),
+            self.story_forge_btn: self.story_forge_btn.cget("state"),
         }
         for btn in buttons:
             btn.configure(state="disabled")
 
         try:
+            if self.mode == "embedded":
+                if callable(self.on_embedded_result):
+                    try:
+                        callback_payload = build_embedded_result_payload(
+                            StoryForgeResponse(
+                                title=payload["Title"],
+                                summary=payload.get("Summary", ""),
+                                secrets=payload.get("Secrets", ""),
+                                scenes=payload.get("Scenes", []),
+                                entities={field: payload.get(field, []) for field in SCENARIO_ENTITY_FIELD_NAMES},
+                            ),
+                            campaign_context=self.campaign_context,
+                            arc_context=self.arc_context,
+                        )
+                        self.on_embedded_result(callback_payload)
+                    except Exception as exc:
+                        log_exception(
+                            f"Embedded scenario callback failed: {exc}",
+                            func_name="ScenarioBuilderWizard.finish",
+                        )
+                        messagebox.showerror(
+                            "Embedded Save Error",
+                            "The scenario draft was created but could not be returned to the caller.",
+                        )
+                        return
+                self.destroy()
+                return
             while True:
                 try:
                     items = self.scenario_wrapper.load_items()

@@ -23,6 +23,7 @@ from modules.generic.generic_list_selection_view import GenericListSelectionView
 from modules.helpers.logging_helper import log_exception
 from modules.helpers.template_loader import load_template
 from modules.helpers.window_helper import position_window_at_top
+from modules.scenarios.scenario_builder_wizard import ScenarioBuilderWizard
 from modules.generic.editor.styles import (
     EDITOR_PALETTE,
     option_menu_style,
@@ -341,6 +342,12 @@ class CampaignBuilderWizard(ctk.CTkToplevel):
             **primary_button_style(),
         ).pack(side="left", padx=4)
         ctk.CTkButton(buttons, text="Edit Arc", command=self._edit_selected_arc, **primary_button_style()).pack(side="left", padx=4)
+        ctk.CTkButton(
+            buttons,
+            text="Create Scenario for selected arc",
+            command=self._create_scenario_for_selected_arc,
+            **primary_button_style(),
+        ).pack(side="left", padx=4)
         ctk.CTkButton(buttons, text="Move Up", command=self._move_arc_up, **primary_button_style()).pack(side="left", padx=4)
         ctk.CTkButton(buttons, text="Move Down", command=self._move_arc_down, **primary_button_style()).pack(side="left", padx=4)
         ctk.CTkButton(buttons, text="Duplicate", command=self._duplicate_selected_arc, **primary_button_style()).pack(side="left", padx=4)
@@ -410,6 +417,49 @@ class CampaignBuilderWizard(ctk.CTkToplevel):
             self.arcs[selected_index] = dlg.result
             self.current_arc_index = selected_index
             self._refresh_arcs_preview()
+
+    def _create_scenario_for_selected_arc(self):
+        selected_index = self._get_selected_arc_index()
+        if selected_index is None:
+            messagebox.showinfo("No arc", "Select or add an arc first.", parent=self)
+            return
+
+        arc = self.arcs[selected_index]
+        campaign_context = {
+            "name": self.form_vars["name"].get().strip(),
+            "summary": self.logline_box.get("1.0", "end").strip(),
+        }
+
+        def _on_embedded_result(payload):
+            self._on_embedded_scenario_created(payload, selected_index)
+
+        wizard = ScenarioBuilderWizard(
+            self,
+            mode="embedded",
+            campaign_context=campaign_context,
+            arc_context=arc,
+            on_embedded_result=_on_embedded_result,
+        )
+        wizard.grab_set()
+        wizard.focus_force()
+
+    def _on_embedded_scenario_created(self, payload: dict, arc_index: int):
+        if arc_index < 0 or arc_index >= len(self.arcs):
+            return
+        scenario = (payload or {}).get("scenario") or {}
+        title = str((payload or {}).get("scenario_title") or scenario.get("Title") or "").strip()
+        if not title:
+            return
+
+        arc = self.arcs[arc_index]
+        scenarios = [str(name).strip() for name in (arc.get("scenarios") or []) if str(name).strip()]
+        if title not in scenarios:
+            scenarios.append(title)
+        arc["scenarios"] = list(dict.fromkeys(scenarios))
+        self.scenario_titles = list(dict.fromkeys([*self.scenario_titles, title]))
+        self.current_arc_index = arc_index
+        self._refresh_arcs_preview()
+        self._refresh_review()
 
     def _move_arc_up(self):
         selected_index = self._get_selected_arc_index()
