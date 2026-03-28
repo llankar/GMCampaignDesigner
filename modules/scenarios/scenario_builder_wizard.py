@@ -2545,6 +2545,10 @@ class ScenarioBuilderWizard(ctk.CTkToplevel):
         self.destroy()
 
     def _run_story_forge(self):  # pragma: no cover - UI interaction
+        step = self.steps[self.current_step_index][1]
+        if not step.save_state(self.wizard_state):
+            return
+
         brief = (self.wizard_state.get("Summary") or "").strip()
         if not brief:
             messagebox.showwarning(
