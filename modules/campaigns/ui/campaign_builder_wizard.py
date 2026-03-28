@@ -56,6 +56,7 @@ class CampaignBuilderWizard(ctk.CTkToplevel):
         self._ai_client = None
         self.current_step = 0
         self.steps: list[ctk.CTkFrame] = []
+        self._interactive_controls: list[ctk.CTkBaseClass] = []
 
         self._build_layout()
         self._show_step(0)
@@ -83,12 +84,14 @@ class CampaignBuilderWizard(ctk.CTkToplevel):
 
         load_row = ctk.CTkFrame(root, fg_color="transparent")
         load_row.pack(fill="x", pady=(0, 8))
-        ctk.CTkButton(
+        self.load_campaign_btn = ctk.CTkButton(
             load_row,
             text="Load Existing Campaign",
             command=self._load_existing_campaign,
             **primary_button_style(),
-        ).pack(side="left")
+        )
+        self.load_campaign_btn.pack(side="left")
+        self._register_interactive_control(self.load_campaign_btn)
 
         self.content = ctk.CTkFrame(root, fg_color="transparent")
         self.content.pack(fill="both", expand=True)
@@ -105,14 +108,16 @@ class CampaignBuilderWizard(ctk.CTkToplevel):
         self.back_btn.pack(side="left")
         self.next_btn = ctk.CTkButton(nav, text="Next", command=self._go_next, **primary_button_style())
         self.next_btn.pack(side="right", padx=6)
-        ctk.CTkButton(
+        self.cancel_btn = ctk.CTkButton(
             nav,
             text="Cancel",
             command=self.destroy,
             fg_color="transparent",
             border_width=1,
             border_color=EDITOR_PALETTE["border"],
-        ).pack(side="right", padx=6)
+        )
+        self.cancel_btn.pack(side="right", padx=6)
+        self._register_interactive_control(self.back_btn, self.next_btn, self.cancel_btn)
 
     def _build_foundation_step(self, parent):
         frame = ctk.CTkFrame(parent, **section_style())
@@ -332,26 +337,56 @@ class CampaignBuilderWizard(ctk.CTkToplevel):
 
         buttons = ctk.CTkFrame(frame, fg_color="transparent")
         buttons.pack(fill="x", pady=(8, 12), padx=12)
-        ctk.CTkButton(buttons, text="Add Arc", command=self._add_arc, **primary_button_style()).pack(side="left", padx=4)
-        ctk.CTkButton(buttons, text="Generate Arcs from Scenarios", command=self._generate_arcs_from_scenarios, **primary_button_style()).pack(side="left", padx=4)
-        ctk.CTkButton(buttons, text="Generate 2 Scenarios per Arc", command=self._generate_scenarios_per_arc, **primary_button_style()).pack(side="left", padx=4)
-        ctk.CTkButton(
+        self.add_arc_btn = ctk.CTkButton(buttons, text="Add Arc", command=self._add_arc, **primary_button_style())
+        self.add_arc_btn.pack(side="left", padx=4)
+        self.generate_arcs_btn = ctk.CTkButton(buttons, text="Generate Arcs from Scenarios", command=self._generate_arcs_from_scenarios, **primary_button_style())
+        self.generate_arcs_btn.pack(side="left", padx=4)
+        self.generate_scenarios_btn = ctk.CTkButton(buttons, text="Generate 2 Scenarios per Arc", command=self._generate_scenarios_per_arc, **primary_button_style())
+        self.generate_scenarios_btn.pack(side="left", padx=4)
+        self.generate_validate_btn = ctk.CTkButton(
             buttons,
             text="Generate + Validate Scenes (DB)",
             command=self._generate_db_aware_scenarios_per_arc,
             **primary_button_style(),
-        ).pack(side="left", padx=4)
-        ctk.CTkButton(buttons, text="Edit Arc", command=self._edit_selected_arc, **primary_button_style()).pack(side="left", padx=4)
-        ctk.CTkButton(
+        )
+        self.generate_validate_btn.pack(side="left", padx=4)
+        self.forge_campaign_btn = ctk.CTkButton(
+            buttons,
+            text="Forge Full Campaign",
+            command=self._forge_full_campaign,
+            **primary_button_style(),
+        )
+        self.forge_campaign_btn.pack(side="left", padx=4)
+        self.edit_arc_btn = ctk.CTkButton(buttons, text="Edit Arc", command=self._edit_selected_arc, **primary_button_style())
+        self.edit_arc_btn.pack(side="left", padx=4)
+        self.create_scenario_btn = ctk.CTkButton(
             buttons,
             text="Create Scenario for selected arc",
             command=self._create_scenario_for_selected_arc,
             **primary_button_style(),
-        ).pack(side="left", padx=4)
-        ctk.CTkButton(buttons, text="Move Up", command=self._move_arc_up, **primary_button_style()).pack(side="left", padx=4)
-        ctk.CTkButton(buttons, text="Move Down", command=self._move_arc_down, **primary_button_style()).pack(side="left", padx=4)
-        ctk.CTkButton(buttons, text="Duplicate", command=self._duplicate_selected_arc, **primary_button_style()).pack(side="left", padx=4)
-        ctk.CTkButton(buttons, text="Delete", command=self._delete_selected_arc, **primary_button_style()).pack(side="left", padx=4)
+        )
+        self.create_scenario_btn.pack(side="left", padx=4)
+        self.move_up_btn = ctk.CTkButton(buttons, text="Move Up", command=self._move_arc_up, **primary_button_style())
+        self.move_up_btn.pack(side="left", padx=4)
+        self.move_down_btn = ctk.CTkButton(buttons, text="Move Down", command=self._move_arc_down, **primary_button_style())
+        self.move_down_btn.pack(side="left", padx=4)
+        self.duplicate_arc_btn = ctk.CTkButton(buttons, text="Duplicate", command=self._duplicate_selected_arc, **primary_button_style())
+        self.duplicate_arc_btn.pack(side="left", padx=4)
+        self.delete_arc_btn = ctk.CTkButton(buttons, text="Delete", command=self._delete_selected_arc, **primary_button_style())
+        self.delete_arc_btn.pack(side="left", padx=4)
+        self._register_interactive_control(
+            self.add_arc_btn,
+            self.generate_arcs_btn,
+            self.generate_scenarios_btn,
+            self.generate_validate_btn,
+            self.forge_campaign_btn,
+            self.edit_arc_btn,
+            self.create_scenario_btn,
+            self.move_up_btn,
+            self.move_down_btn,
+            self.duplicate_arc_btn,
+            self.delete_arc_btn,
+        )
 
         return frame
 
@@ -585,6 +620,172 @@ class CampaignBuilderWizard(ctk.CTkToplevel):
             existing_scenarios = []
         self._generate_scenarios_per_arc(existing_scenarios=existing_scenarios)
 
+    def _forge_full_campaign(self):
+        stages = [
+            "1. Generate/normalize arcs",
+            "2. Generate scenarios for each arc",
+            "3. Validate and enrich scenes/entities",
+            "4. Preview summary",
+            "5. Save campaign + scenarios",
+        ]
+        progress_dialog = self._create_pipeline_progress_dialog("Forging full campaign...", stages)
+        saved_groups: list[dict] = []
+        try:
+            self._set_interactive_controls_enabled(False)
+            self._update_pipeline_progress(progress_dialog, 0, "Building campaign arcs...")
+            self._forge_pipeline_generate_or_normalize_arcs()
+
+            self._update_pipeline_progress(progress_dialog, 1, "Generating scenarios for each arc...")
+            self._validate_arcs_for_scenario_generation()
+            existing_scenarios = self._load_existing_scenarios_for_pipeline()
+            service = ArcScenarioExpansionService(self._get_ai())
+            generated_payload = service.generate_scenarios(
+                self._build_arc_generation_foundation(),
+                self.arcs,
+                existing_scenarios=existing_scenarios,
+            )
+
+            self._update_pipeline_progress(progress_dialog, 2, "Validating and enriching generated scenes/entities...")
+            self._update_pipeline_progress(progress_dialog, 3, "Opening summary preview...")
+            accepted_payload = self._preview_generated_arc_scenarios(generated_payload)
+            if not accepted_payload:
+                messagebox.showinfo("Forge cancelled", "Campaign forging cancelled during preview.", parent=self)
+                return
+
+            self._update_pipeline_progress(progress_dialog, 4, "Saving campaign and scenarios...")
+            persistence = GeneratedScenarioPersistence(GenericModelWrapper("scenarios"))
+            saved_groups = persistence.save_generated_arc_scenarios(accepted_payload, self.arcs)
+            self._refresh_scenario_titles_from_saved_groups(saved_groups)
+            payload = self._build_campaign_save_payload()
+            self.campaign_wrapper.save_item(payload, key_field="Name", original_key_value=self.original_campaign_name)
+            self.original_campaign_name = payload.get("Name")
+            self._refresh_arcs_preview()
+            self._refresh_review()
+        except ArcScenarioExpansionValidationError as exc:
+            messagebox.showwarning("Pipeline validation failed", str(exc), parent=self)
+            return
+        except Exception as exc:
+            messagebox.showerror("Forge failed", f"Unable to forge full campaign: {exc}", parent=self)
+            return
+        finally:
+            self._set_interactive_controls_enabled(True)
+            if progress_dialog["window"].winfo_exists():
+                progress_dialog["window"].destroy()
+
+        saved_count = sum(len(group.get("scenarios") or []) for group in saved_groups)
+        messagebox.showinfo(
+            "Campaign forged",
+            f"Saved campaign '{self.form_vars['name'].get().strip()}' and {saved_count} generated scenario(s).",
+            parent=self,
+        )
+
+    def _load_existing_scenarios_for_pipeline(self) -> list[dict]:
+        try:
+            return self.scenario_wrapper.load_items() if self.scenario_wrapper else []
+        except Exception:
+            return []
+
+    def _forge_pipeline_generate_or_normalize_arcs(self):
+        if self.arcs:
+            self.arcs = [self._normalize_arc_dict(arc) for arc in self.arcs if (arc.get("name") or "").strip()]
+            self.current_arc_index = 0 if self.arcs else None
+            self._refresh_arcs_preview()
+            if self.arcs:
+                return
+
+        if not self.scenario_titles:
+            raise ArcScenarioExpansionValidationError(
+                "No scenarios available to generate arcs. Add scenarios or create arcs manually first."
+            )
+
+        service = ArcGenerationService(self._get_ai(), self.scenario_wrapper)
+        result = service.generate_arcs(self._build_arc_generation_foundation())
+        generated_arcs = [dict(arc) for arc in (result.get("arcs") or []) if isinstance(arc, dict)]
+        if not generated_arcs:
+            raise ArcScenarioExpansionValidationError("The AI did not return usable arcs for this campaign.")
+        self._apply_generated_arcs(generated_arcs, merge=False)
+
+    def _build_campaign_save_payload(self) -> dict:
+        return build_campaign_payload(
+            form_data={
+                **{k: var.get() for k, var in self.form_vars.items()},
+                "start_date": self.start_date_field.get(),
+                "end_date": self.end_date_field.get(),
+                "logline": self.logline_box.get("1.0", "end").strip(),
+                "setting": self.setting_box.get("1.0", "end").strip(),
+                "main_objective": self.objective_box.get("1.0", "end").strip(),
+                "stakes": self.stakes_box.get("1.0", "end").strip(),
+                "themes": self.themes_box.get("1.0", "end").strip(),
+                "notes": self.notes_box.get("1.0", "end").strip(),
+            },
+            arcs_data=self.arcs,
+        )
+
+    def _create_pipeline_progress_dialog(self, title: str, stages: list[str]):
+        dialog = ctk.CTkToplevel(self)
+        dialog.title("Campaign Forge Progress")
+        dialog.geometry("560x320")
+        dialog.resizable(False, False)
+        dialog.transient(self)
+        dialog.grab_set()
+        position_window_at_top(dialog)
+
+        ctk.CTkLabel(dialog, text=title, font=("Arial", 16, "bold"), text_color=EDITOR_PALETTE["text"]).pack(
+            anchor="w", padx=16, pady=(16, 8)
+        )
+        stage_var = ctk.StringVar(value="Preparing...")
+        ctk.CTkLabel(dialog, textvariable=stage_var, text_color=EDITOR_PALETTE["muted_text"]).pack(
+            anchor="w", padx=16, pady=(0, 8)
+        )
+        progress_bar = ctk.CTkProgressBar(dialog, height=16)
+        progress_bar.pack(fill="x", padx=16, pady=(0, 12))
+        progress_bar.set(0)
+
+        stage_list = ctk.CTkTextbox(dialog, height=180, fg_color=EDITOR_PALETTE["surface_soft"])
+        stage_list.pack(fill="both", expand=True, padx=16, pady=(0, 16))
+        stage_list.insert("1.0", "\n".join(f"○ {stage}" for stage in stages))
+        stage_list.configure(state="disabled")
+        dialog.protocol("WM_DELETE_WINDOW", lambda: None)
+        self.update_idletasks()
+        return {
+            "window": dialog,
+            "stage_var": stage_var,
+            "progress_bar": progress_bar,
+            "stage_list": stage_list,
+            "stages": stages,
+        }
+
+    def _update_pipeline_progress(self, progress_dialog: dict, stage_index: int, message: str):
+        progress_dialog["stage_var"].set(message)
+        total_stages = max(1, len(progress_dialog["stages"]))
+        progress_dialog["progress_bar"].set((stage_index + 1) / total_stages)
+        stage_lines = []
+        for idx, label in enumerate(progress_dialog["stages"]):
+            if idx < stage_index:
+                prefix = "✓"
+            elif idx == stage_index:
+                prefix = "▶"
+            else:
+                prefix = "○"
+            stage_lines.append(f"{prefix} {label}")
+        stage_box = progress_dialog["stage_list"]
+        stage_box.configure(state="normal")
+        stage_box.delete("1.0", "end")
+        stage_box.insert("1.0", "\n".join(stage_lines))
+        stage_box.configure(state="disabled")
+        self.update()
+
+    def _register_interactive_control(self, *widgets):
+        for widget in widgets:
+            if widget and widget not in self._interactive_controls:
+                self._interactive_controls.append(widget)
+
+    def _set_interactive_controls_enabled(self, enabled: bool):
+        state = "normal" if enabled else "disabled"
+        for widget in self._interactive_controls:
+            if widget.winfo_exists():
+                widget.configure(state=state)
+
     def _validate_arcs_for_scenario_generation(self):
         if not self.arcs:
             raise ArcScenarioExpansionValidationError("Add at least one arc before generating scenarios.")
@@ -784,20 +985,7 @@ class CampaignBuilderWizard(ctk.CTkToplevel):
 
     def _save_campaign(self):
         try:
-            payload = build_campaign_payload(
-                form_data={
-                    **{k: var.get() for k, var in self.form_vars.items()},
-                    "start_date": self.start_date_field.get(),
-                    "end_date": self.end_date_field.get(),
-                    "logline": self.logline_box.get("1.0", "end").strip(),
-                    "setting": self.setting_box.get("1.0", "end").strip(),
-                    "main_objective": self.objective_box.get("1.0", "end").strip(),
-                    "stakes": self.stakes_box.get("1.0", "end").strip(),
-                    "themes": self.themes_box.get("1.0", "end").strip(),
-                    "notes": self.notes_box.get("1.0", "end").strip(),
-                },
-                arcs_data=self.arcs,
-            )
+            payload = self._build_campaign_save_payload()
             self.campaign_wrapper.save_item(
                 payload,
                 key_field="Name",
