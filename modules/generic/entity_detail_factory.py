@@ -1510,11 +1510,15 @@ def create_scenario_detail_frame(entity_type, scenario_item, master, open_entity
         )
 
     def _edit_entity():
+        wrapper = _wrapper_for(entity_type)
+        if wrapper is None:
+            messagebox.showerror("Edit Entity", f"{entity_type} storage is not available.")
+            return
         EditWindow(
             frame,
             scenario_item,
             load_template(entity_type.lower()),
-            wrappers[entity_type],
+            wrapper,
             creation_mode=False,
             on_save=rebuild_frame,
         )
@@ -2075,11 +2079,15 @@ def create_entity_detail_frame(entity_type, entity, master, open_entity_callback
         )
 
     def _edit_entity():
+        wrapper = _wrapper_for(entity_type)
+        if wrapper is None:
+            messagebox.showerror("Edit Entity", f"{entity_type} storage is not available.")
+            return
         EditWindow(
             content_frame,
             entity,
             load_template(entity_type.lower()),
-            wrappers[entity_type],
+            wrapper,
             creation_mode=False,
             on_save=rebuild_frame,
         )

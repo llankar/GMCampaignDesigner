@@ -1076,20 +1076,6 @@ class GMScreenView(ctk.CTkFrame):
 
         self._context_menu = tk.Menu(self, tearoff=0)
         self._context_menu.add_command(
-            label="Mark Active Scene Complete",
-            command=self.mark_active_scene_complete,
-        )
-        self._context_menu.add_command(
-            label="Mark Next Scene Complete",
-            command=self.mark_next_scene_complete,
-        )
-        self._context_menu.add_separator()
-        self._context_menu.add_command(
-            label="Add Timestamped Note",
-            command=self.add_timestamped_note,
-        )
-        self._context_menu.add_separator()
-        self._context_menu.add_command(
             label=self._edit_menu_label,
             command=self._edit_current_entity,
             state="disabled",
@@ -1460,6 +1446,8 @@ class GMScreenView(ctk.CTkFrame):
         if not self._context_menu:
             return
         edit_available = self._get_active_entity_edit_handler() is not None
+        if not edit_available:
+            return
         try:
             self._context_menu.entryconfig(
                 self._edit_menu_label,
