@@ -14,6 +14,7 @@ from modules.ai.story_forge.prompt_builders import (
     build_full_draft_prompt,
     build_rewrite_options_prompt,
 )
+from modules.ai.story_forge.scene_entity_assignment import assign_unused_entities_to_scenes
 
 
 class StoryForgeOrchestrator:
@@ -35,17 +36,21 @@ class StoryForgeOrchestrator:
         draft_raw = self._chat(build_full_draft_prompt(request, selected_option, entities))
         draft_payload = parse_json_strict_with_fallback(draft_raw, fallback={})
         normalized_draft = normalize_full_draft(draft_payload, selected_option, entities)
+        scenes_with_assignments, assignment_diagnostics = assign_unused_entities_to_scenes(
+            normalized_draft["scenes"], normalized_draft["entities"], include_diagnostics=True
+        )
 
         return StoryForgeResponse(
             title=normalized_draft["title"],
             summary=normalized_draft["summary"],
             secrets=normalized_draft["secrets"],
-            scenes=normalized_draft["scenes"],
+            scenes=scenes_with_assignments,
             entities=normalized_draft["entities"],
             raw_steps={
                 "rewrite": rewrite_payload,
                 "entities": entities_payload,
                 "draft": draft_payload,
+                "entity_scene_assignments": assignment_diagnostics,
             },
         )
 
