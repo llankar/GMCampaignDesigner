@@ -9,7 +9,10 @@ from modules.campaigns.services import (
     ArcGenerationService,
     ArcScenarioExpansionService,
     ArcScenarioExpansionValidationError,
-    GeneratedScenarioPersistence,
+    CampaignForgePersistence,
+    CampaignForgePersistenceError,
+    SAVE_MODE_MERGE_KEEP_EXISTING,
+    SAVE_MODE_REPLACE_GENERATED_ONLY,
     build_campaign_payload,
     build_form_state_from_campaign,
     list_campaign_presets,
@@ -54,6 +57,7 @@ class CampaignBuilderWizard(ctk.CTkToplevel):
         self._arc_line_ranges: list[tuple[int, int, int]] = []
         self.original_campaign_name: str | None = None
         self._ai_client = None
+        self._last_unsaved_generated_payload: dict | None = None
         self.current_step = 0
         self.steps: list[ctk.CTkFrame] = []
         self._interactive_controls: list[ctk.CTkBaseClass] = []
@@ -595,9 +599,22 @@ class CampaignBuilderWizard(ctk.CTkToplevel):
         if not accepted_payload:
             return
 
-        persistence = GeneratedScenarioPersistence(GenericModelWrapper("scenarios"))
+        persistence = CampaignForgePersistence(self.scenario_wrapper)
+        dry_run = persistence.build_dry_run_report(
+            accepted_payload,
+            self.arcs,
+            save_mode=SAVE_MODE_MERGE_KEEP_EXISTING,
+        )
+        if not self._confirm_campaign_forge_dry_run(dry_run, title="Scenario save preview"):
+            return
+
         try:
-            saved_groups = persistence.save_generated_arc_scenarios(accepted_payload, self.arcs)
+            save_result = persistence.save_from_dry_run(accepted_payload, self.arcs, dry_run)
+            saved_groups = save_result.get("saved_groups") or []
+        except CampaignForgePersistenceError as exc:
+            self._last_unsaved_generated_payload = persistence.unsaved_generated_payload
+            messagebox.showerror("Scenario save failed", str(exc), parent=self)
+            return
         except Exception as exc:
             messagebox.showerror("Scenario save failed", f"Unable to save generated scenarios: {exc}", parent=self)
             return
@@ -653,11 +670,29 @@ class CampaignBuilderWizard(ctk.CTkToplevel):
                 return
 
             self._update_pipeline_progress(progress_dialog, 4, "Saving campaign and scenarios...")
-            persistence = GeneratedScenarioPersistence(GenericModelWrapper("scenarios"))
-            saved_groups = persistence.save_generated_arc_scenarios(accepted_payload, self.arcs)
-            self._refresh_scenario_titles_from_saved_groups(saved_groups)
+            persistence = CampaignForgePersistence(
+                self.scenario_wrapper,
+                campaign_wrapper=self.campaign_wrapper,
+            )
             payload = self._build_campaign_save_payload()
-            self.campaign_wrapper.save_item(payload, key_field="Name", original_key_value=self.original_campaign_name)
+            dry_run = persistence.build_dry_run_report(
+                accepted_payload,
+                self.arcs,
+                save_mode=SAVE_MODE_REPLACE_GENERATED_ONLY,
+            )
+            if not self._confirm_campaign_forge_dry_run(dry_run, title="Forge save preview"):
+                messagebox.showinfo("Forge cancelled", "Campaign forging cancelled during save preview.", parent=self)
+                return
+
+            save_result = persistence.save_from_dry_run(
+                accepted_payload,
+                self.arcs,
+                dry_run,
+                campaign_metadata=payload,
+                campaign_original_key=self.original_campaign_name,
+            )
+            saved_groups = save_result.get("saved_groups") or []
+            self._refresh_scenario_titles_from_saved_groups(saved_groups)
             self.original_campaign_name = payload.get("Name")
             self._refresh_arcs_preview()
             self._refresh_review()
@@ -720,6 +755,19 @@ class CampaignBuilderWizard(ctk.CTkToplevel):
             },
             arcs_data=self.arcs,
         )
+
+
+    def _confirm_campaign_forge_dry_run(self, dry_run: dict, *, title: str) -> bool:
+        scenarios_summary = dry_run.get("scenarios", {}).get("summary", {})
+        arc_summary = dry_run.get("arc_linkage", {}).get("summary", {})
+        message = (
+            "Review before saving:\n\n"
+            f"Scenarios: {int(scenarios_summary.get('new', 0))} new, "
+            f"{int(scenarios_summary.get('updated', 0))} updated, "
+            f"{int(scenarios_summary.get('skipped', 0))} skipped.\n"
+            f"Arc links updated: {int(arc_summary.get('updated', 0))}."
+        )
+        return messagebox.askyesno(title, message, parent=self)
 
     def _create_pipeline_progress_dialog(self, title: str, stages: list[str]):
         dialog = ctk.CTkToplevel(self)
