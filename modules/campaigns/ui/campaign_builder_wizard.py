@@ -20,6 +20,7 @@ from modules.campaigns.services import (
 from modules.campaigns.services.ai.arc_scenario_entities import load_existing_entity_catalog
 from modules.campaigns.shared.arc_status import canonicalize_arc_status
 from modules.campaigns.ui.arc_editor_dialog import ArcEditorDialog
+from modules.campaigns.ui.campaign_forge_preview_dialog import preview_campaign_forge_payload
 from modules.campaigns.ui.widgets import CampaignDateField
 from modules.generic.generic_model_wrapper import GenericModelWrapper
 from modules.generic.generic_list_selection_view import GenericListSelectionView
@@ -844,23 +845,32 @@ class CampaignBuilderWizard(ctk.CTkToplevel):
                 raise ArcScenarioExpansionValidationError(error_message)
 
     def _preview_generated_arc_scenarios(self, generated_payload: dict) -> dict | None:
-        preview_lines: list[str] = []
-        for group in generated_payload.get("arcs") or []:
-            preview_lines.append(f"Arc: {group.get('arc_name', '')}")
-            for scenario in group.get("scenarios") or []:
-                preview_lines.append(f" - {scenario.get('Title', '')}")
-                summary = str(scenario.get("Summary") or "").strip()
-                if summary:
-                    preview_lines.append(f"   {summary}")
-            preview_lines.append("")
-
-        preview_text = "\n".join(preview_lines).strip() or "No generated scenarios."
-        accepted = messagebox.askyesno(
-            "Preview generated scenarios",
-            f"{preview_text}\n\nSave these generated scenarios?",
-            parent=self,
+        arc_metadata_by_name = {
+            str(arc.get("name") or "").strip().casefold(): arc for arc in self.arcs if isinstance(arc, dict)
+        }
+        return preview_campaign_forge_payload(
+            self,
+            campaign_summary=self._build_campaign_forge_summary(),
+            generated_payload=generated_payload,
+            arc_metadata_by_name=arc_metadata_by_name,
         )
-        return generated_payload if accepted else None
+
+    def _build_campaign_forge_summary(self) -> str:
+        name = self.form_vars["name"].get().strip() if hasattr(self, "form_vars") else ""
+        genre = self.form_vars["genre"].get().strip() if hasattr(self, "form_vars") else ""
+        tone = self.form_vars["tone"].get().strip() if hasattr(self, "form_vars") else ""
+        main_objective = self.objective_box.get("1.0", "end").strip() if hasattr(self, "objective_box") else ""
+        stakes = self.stakes_box.get("1.0", "end").strip() if hasattr(self, "stakes_box") else ""
+        arc_count = len(self.arcs)
+        summary_bits = [
+            f"Name: {name or 'Unnamed campaign'}",
+            f"Genre: {genre or '—'}",
+            f"Tone: {tone or '—'}",
+            f"Main objective: {main_objective or '—'}",
+            f"Stakes: {stakes or '—'}",
+            f"Current arc cards: {arc_count}",
+        ]
+        return "\n".join(summary_bits)
 
     def _confirm_generated_arc_action(self, generated_count: int) -> str:
         if not self.arcs:
