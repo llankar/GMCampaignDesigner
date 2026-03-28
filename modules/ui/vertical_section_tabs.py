@@ -6,7 +6,15 @@ from modules.generic.detail_ui import get_detail_palette
 
 
 class VerticalSectionTabs(ctk.CTkFrame):
-    def __init__(self, parent, sections, show_section, on_pin_toggle=None, **kwargs):
+    def __init__(
+        self,
+        parent,
+        sections,
+        show_section,
+        on_pin_toggle=None,
+        on_right_click=None,
+        **kwargs,
+    ):
         palette = get_detail_palette()
         kwargs.setdefault("fg_color", palette["surface_card"])
         kwargs.setdefault("corner_radius", 18)
@@ -16,6 +24,7 @@ class VerticalSectionTabs(ctk.CTkFrame):
         self._palette = palette
         self._show_section = show_section
         self._on_pin_toggle_callback = on_pin_toggle
+        self._on_right_click_callback = on_right_click
         self._buttons = {}
         self._button_labels = {}
         self._active_section = None
@@ -45,9 +54,14 @@ class VerticalSectionTabs(ctk.CTkFrame):
             font=ctk.CTkFont(size=17, weight="bold"),
             text_color=palette["text"],
         ).pack(anchor="w", padx=14)
+        right_click_hint = (
+            "Click to focus · right-click for actions · Shift+right-click to pin"
+            if callable(on_right_click)
+            else "Click to focus · right-click to pin"
+        )
         ctk.CTkLabel(
             header,
-            text="Click to focus · right-click to pin",
+            text=right_click_hint,
             font=ctk.CTkFont(size=11),
             text_color=palette["muted_text"],
         ).pack(anchor="w", padx=14, pady=(4, 12))
@@ -72,7 +86,8 @@ class VerticalSectionTabs(ctk.CTkFrame):
                 border_color=self._inactive_border_color,
                 command=lambda name=section: self._on_select(name),
             )
-            button.bind("<Button-3>", lambda event, name=section: self._on_pin_toggle(name))
+            button.bind("<Button-3>", lambda event, name=section: self._on_right_click(event, name))
+            button.bind("<Control-Button-1>", lambda event, name=section: self._on_right_click(event, name))
             button.pack(fill="x", padx=6, pady=4)
             self._buttons[section] = button
             self._button_labels[section] = section
@@ -93,6 +108,18 @@ class VerticalSectionTabs(ctk.CTkFrame):
     def _on_pin_toggle(self, section_name):
         if self._on_pin_toggle_callback is not None:
             self._on_pin_toggle_callback(section_name)
+
+    def _on_right_click(self, event, section_name):
+        try:
+            if int(getattr(event, "state", 0)) & 0x0001:
+                self._on_pin_toggle(section_name)
+                return
+        except Exception:
+            pass
+        if callable(self._on_right_click_callback):
+            self._on_right_click_callback(event)
+            return
+        self._on_pin_toggle(section_name)
 
     def _on_select(self, section_name):
         self.set_active(section_name)

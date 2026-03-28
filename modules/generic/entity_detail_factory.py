@@ -2004,7 +2004,14 @@ def create_scenario_detail_frame(entity_type, scenario_item, master, open_entity
         if name not in section_names:
             section_names.append(name)
 
-    tabs = VerticalSectionTabs(nav_frame, section_names, show_section, on_pin_toggle=_toggle_pin)
+    menu_handler = getattr(gm_view_instance, "_show_context_menu", None)
+    tabs = VerticalSectionTabs(
+        nav_frame,
+        section_names,
+        show_section,
+        on_pin_toggle=_toggle_pin,
+        on_right_click=menu_handler if callable(menu_handler) else None,
+    )
     tabs.pack(fill="x", padx=8, pady=8)
     tabs.set_pinned(pinned_sections)
 
