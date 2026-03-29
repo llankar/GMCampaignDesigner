@@ -1,6 +1,11 @@
 import copy
 
-GUIDED_FLOW = (
+GUIDED_BOUNDARY_FLOW = (
+    ("Hook", "Setup"),
+    ("Fallout", "Outcome"),
+)
+
+LEGACY_GUIDED_FLOW = (
     ("Hook", "Setup"),
     ("Rising action", "Choice"),
     ("Climax", "Combat"),
@@ -78,9 +83,33 @@ def canonicalise_scene(scene, *, index=0):
 
 def scenes_to_guided_cards(scenes):
     canonical = [canonicalise_scene(scene, index=i) for i, scene in enumerate(scenes or [])]
+    legacy_four_scene_payload = len(canonical) == len(LEGACY_GUIDED_FLOW)
+    if not canonical:
+        canonical = [{}, {}]
+    elif len(canonical) == 1:
+        canonical = [canonical[0], {}]
+
+    first_stage, first_type = GUIDED_BOUNDARY_FLOW[0]
+    last_stage, last_type = GUIDED_BOUNDARY_FLOW[-1]
+
     cards = []
-    for idx, (stage, default_type) in enumerate(GUIDED_FLOW):
-        scene = canonical[idx] if idx < len(canonical) else {}
+    for idx, scene in enumerate(canonical):
+        is_first = idx == 0
+        is_last = idx == len(canonical) - 1
+        stage = ""
+        default_type = ""
+        if is_first:
+            stage = first_stage
+            default_type = first_type
+        elif is_last:
+            stage = last_stage
+            default_type = last_type
+        else:
+            if legacy_four_scene_payload and idx < len(LEGACY_GUIDED_FLOW):
+                stage, default_type = LEGACY_GUIDED_FLOW[idx]
+            else:
+                stage = f"Scene {idx + 1}"
+                default_type = "Choice"
         cards.append(
             {
                 "stage": stage,
@@ -95,9 +124,27 @@ def scenes_to_guided_cards(scenes):
 
 
 def guided_cards_to_scenes(cards):
+    raw_cards = [card for card in (cards or []) if isinstance(card, dict)]
+    if not raw_cards:
+        raw_cards = [{}, {}]
+    elif len(raw_cards) == 1:
+        raw_cards = [raw_cards[0], {}]
+
     prepared = []
-    for idx, (stage, default_type) in enumerate(GUIDED_FLOW):
-        card = cards[idx] if idx < len(cards) else {}
+    last_index = len(raw_cards) - 1
+    for idx, card in enumerate(raw_cards):
+        is_first = idx == 0
+        is_last = idx == last_index
+        stage = ""
+        default_type = ""
+        if is_first:
+            stage, default_type = GUIDED_BOUNDARY_FLOW[0]
+        elif is_last:
+            stage, default_type = GUIDED_BOUNDARY_FLOW[-1]
+        else:
+            stage = str(card.get("stage") or f"Scene {idx + 1}").strip() or f"Scene {idx + 1}"
+            default_type = "Choice"
+
         title = str(card.get("Title") or stage).strip() or stage
         summary = str(card.get("Summary") or "").strip()
         scene = {
