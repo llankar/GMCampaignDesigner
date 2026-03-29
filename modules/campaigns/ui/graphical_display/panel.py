@@ -315,21 +315,24 @@ class CampaignGraphPanel(ctk.CTkFrame):
             anchor="w",
             wraplength=760,
             justify="left",
-        ).grid(row=row + 1, column=0, sticky="w")
+        ).grid(row=row + 1, column=0, columnspan=2, sticky="w", padx=(0, 18))
+
+        status_stack = ctk.CTkFrame(parent, fg_color="transparent")
+        status_stack.grid(row=row, column=2, rowspan=2, sticky="e", padx=(22, 0))
 
         ctk.CTkLabel(
-            parent,
+            status_stack,
             text=status_label,
             fg_color=self._status_color(status_label),
             corner_radius=999,
-            padx=10,
-            pady=3,
-            text_color="#f8fbff",
+            padx=12,
+            pady=4,
+            text_color=self._status_text_color(status_label),
             font=ctk.CTkFont(size=10, weight="bold"),
-        ).grid(row=row + 1, column=1, sticky="e", padx=(8, 0))
+        ).grid(row=0, column=0, sticky="e")
 
-        controls = ctk.CTkFrame(parent, fg_color="transparent")
-        controls.grid(row=row, column=2, rowspan=2, sticky="e")
+        controls = ctk.CTkFrame(status_stack, fg_color="transparent")
+        controls.grid(row=1, column=0, sticky="e", pady=(8, 0))
         ctk.CTkButton(
             controls,
             text="← Previous",
@@ -586,9 +589,16 @@ class CampaignGraphPanel(ctk.CTkFrame):
         status = status_label.lower()
         if "completed" in status:
             return DASHBOARD_THEME.arc_complete
-        if "progress" in status or "link" in status:
+        if "link" in status:
+            return DASHBOARD_THEME.button_fg
+        if "progress" in status:
             return DASHBOARD_THEME.arc_active
         return DASHBOARD_THEME.arc_planned
+
+    def _status_text_color(self, status_label: str) -> str:
+        if "link" in status_label.lower():
+            return DASHBOARD_THEME.text_primary
+        return "#f8fbff"
 
     def refresh_theme(self) -> None:
         """Repaint campaign overview widgets with current theme tokens."""
