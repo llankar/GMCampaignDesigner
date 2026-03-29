@@ -2227,6 +2227,7 @@ class ScenarioBuilderWizard(ctk.CTkToplevel):
         campaign_context=None,
         arc_context=None,
         on_embedded_result=None,
+        persist_on_finish=False,
     ):
         super().__init__(master)
         self.title("Scenario Builder Wizard")
@@ -2238,6 +2239,7 @@ class ScenarioBuilderWizard(ctk.CTkToplevel):
         self.campaign_context = campaign_context or {}
         self.arc_context = arc_context or {}
         self.on_embedded_result = on_embedded_result
+        self.persist_on_finish = bool(persist_on_finish)
         self.story_forge = StoryForgeOrchestrator()
 
         # NOTE: Avoid shadowing the inherited ``state()`` method from Tk by
@@ -2625,6 +2627,45 @@ class ScenarioBuilderWizard(ctk.CTkToplevel):
 
         threading.Thread(target=_runner, daemon=True).start()
 
+    def _persist_scenario_payload(self, title, payload):
+        while True:
+            try:
+                items = self.scenario_wrapper.load_items()
+                break
+            except (sqlite3.Error, json.JSONDecodeError):
+                log_exception(
+                    "Failed to load scenarios for ScenarioBuilderWizard.",
+                    func_name="ScenarioBuilderWizard.finish",
+                )
+                if not messagebox.askretrycancel(
+                    "Load Error",
+                    "An error occurred while loading scenarios. Retry?",
+                ):
+                    return False, False
+
+        replaced = False
+        for idx, existing in enumerate(items):
+            if existing.get("Title") == title:
+                if not messagebox.askyesno(
+                    "Overwrite Scenario",
+                    f"A scenario titled '{title}' already exists. Overwrite it?",
+                ):
+                    return False, False
+                items[idx] = payload
+                replaced = True
+                break
+
+        if not replaced:
+            items.append(payload)
+
+        log_info(
+            f"Saving scenario '{title}' via builder wizard (replaced={replaced})",
+            func_name="ScenarioBuilderWizard.finish",
+        )
+
+        self.scenario_wrapper.save_items(items)
+        return True, replaced
+
     def finish(self):  # pragma: no cover - UI navigation
         step = self.steps[self.current_step_index][1]
         if not step.save_state(self.wizard_state):
@@ -2664,6 +2705,10 @@ class ScenarioBuilderWizard(ctk.CTkToplevel):
 
         try:
             if self.mode == "embedded":
+                if self.persist_on_finish:
+                    persisted, _ = self._persist_scenario_payload(title, payload)
+                    if not persisted:
+                        return
                 if callable(self.on_embedded_result):
                     try:
                         callback_payload = build_embedded_result_payload(
@@ -2690,41 +2735,9 @@ class ScenarioBuilderWizard(ctk.CTkToplevel):
                         return
                 self.destroy()
                 return
-            while True:
-                try:
-                    items = self.scenario_wrapper.load_items()
-                    break
-                except (sqlite3.Error, json.JSONDecodeError):
-                    log_exception(
-                        "Failed to load scenarios for ScenarioBuilderWizard.",
-                        func_name="ScenarioBuilderWizard.finish",
-                    )
-                    if not messagebox.askretrycancel(
-                        "Load Error",
-                        "An error occurred while loading scenarios. Retry?",
-                    ):
-                        return
-            replaced = False
-            for idx, existing in enumerate(items):
-                if existing.get("Title") == title:
-                    if not messagebox.askyesno(
-                        "Overwrite Scenario",
-                        f"A scenario titled '{title}' already exists. Overwrite it?",
-                    ):
-                        return
-                    items[idx] = payload
-                    replaced = True
-                    break
-
-            if not replaced:
-                items.append(payload)
-
-            log_info(
-                f"Saving scenario '{title}' via builder wizard (replaced={replaced})",
-                func_name="ScenarioBuilderWizard.finish",
-            )
-
-            self.scenario_wrapper.save_items(items)
+            persisted, _ = self._persist_scenario_payload(title, payload)
+            if not persisted:
+                return
             messagebox.showinfo("Scenario Saved", f"Scenario '{title}' has been saved.")
             if callable(self.on_saved):
                 try:

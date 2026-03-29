@@ -196,6 +196,16 @@ class _RecordingScenarioWrapper:
         self.saved_items = list(items)
 
 
+def _attach_wizard_buttons(wizard):
+    wizard.back_btn = _DummyButton()
+    wizard.next_btn = _DummyButton()
+    wizard.finish_btn = _DummyButton()
+    wizard.cancel_btn = _DummyButton()
+    wizard.story_forge_btn = _DummyButton()
+    wizard.mode = "standalone"
+    wizard.persist_on_finish = False
+
+
 def test_finish_shows_retry_dialog_on_load_failure(monkeypatch):
     wizard = scenario_builder_wizard.ScenarioBuilderWizard.__new__(
         scenario_builder_wizard.ScenarioBuilderWizard
@@ -215,10 +225,7 @@ def test_finish_shows_retry_dialog_on_load_failure(monkeypatch):
     }
     wizard.on_saved = None
     wizard.destroy = lambda: None
-    wizard.back_btn = _DummyButton()
-    wizard.next_btn = _DummyButton()
-    wizard.finish_btn = _DummyButton()
-    wizard.cancel_btn = _DummyButton()
+    _attach_wizard_buttons(wizard)
 
     load_calls = []
 
@@ -302,10 +309,7 @@ def test_finish_saves_all_selected_entity_links(monkeypatch):
     }
     wizard.on_saved = None
     wizard.destroy = lambda: None
-    wizard.back_btn = _DummyButton()
-    wizard.next_btn = _DummyButton()
-    wizard.finish_btn = _DummyButton()
-    wizard.cancel_btn = _DummyButton()
+    _attach_wizard_buttons(wizard)
     wizard.scenario_wrapper = _RecordingScenarioWrapper()
 
     monkeypatch.setattr(scenario_builder_wizard.messagebox, "showwarning", lambda *args, **kwargs: None)
@@ -347,6 +351,52 @@ def test_normalise_scene_collects_nested_text_fragments():
     scene = step._normalise_scene(entry, 1)
 
     assert scene["Summary"] == "First part.\n\nSecond part.\n\nThird part."
+
+
+def test_finish_embedded_can_persist_before_callback(monkeypatch):
+    wizard = scenario_builder_wizard.ScenarioBuilderWizard.__new__(
+        scenario_builder_wizard.ScenarioBuilderWizard
+    )
+    wizard.current_step_index = 0
+    wizard.steps = [("Review", _DummyStep())]
+    wizard.wizard_state = {
+        "Title": "Arc Embedded Scenario",
+        "Summary": "From Story Forge",
+        "Secrets": "Twist",
+        "Scenes": [{"Title": "Intro"}],
+        "ScenarioCharacterGraph": {},
+        "ScenarioCharacterGraphSync": False,
+    }
+    for field in scenario_builder_wizard.SCENARIO_ENTITY_FIELD_NAMES:
+        wizard.wizard_state[field] = []
+    wizard.campaign_context = {"name": "Campaign"}
+    wizard.arc_context = {"name": "Arc 1"}
+    wizard.on_saved = None
+    wizard.destroy = lambda: None
+    _attach_wizard_buttons(wizard)
+    wizard.mode = "embedded"
+    wizard.persist_on_finish = True
+    wizard.scenario_wrapper = _RecordingScenarioWrapper(items=[{"Title": "Legacy", "Scenes": []}])
+
+    callbacks = []
+    wizard.on_embedded_result = lambda payload: callbacks.append(payload)
+
+    monkeypatch.setattr(scenario_builder_wizard.messagebox, "showwarning", lambda *args, **kwargs: None)
+    monkeypatch.setattr(scenario_builder_wizard.messagebox, "showinfo", lambda *args, **kwargs: None)
+    monkeypatch.setattr(scenario_builder_wizard.messagebox, "askyesno", lambda *args, **kwargs: True)
+    monkeypatch.setattr(scenario_builder_wizard.messagebox, "askretrycancel", lambda *args, **kwargs: True)
+    monkeypatch.setattr(
+        scenario_builder_wizard,
+        "build_embedded_result_payload",
+        lambda *_args, **_kwargs: {"scenario_title": "Arc Embedded Scenario", "scenario": {"Title": "Arc Embedded Scenario"}},
+    )
+
+    wizard.finish()
+
+    assert wizard.scenario_wrapper.saved_items is not None
+    persisted_titles = [item.get("Title") for item in wizard.scenario_wrapper.saved_items]
+    assert "Arc Embedded Scenario" in persisted_titles
+    assert len(callbacks) == 1
 
 
 def test_load_existing_scenario_uses_selected_payload_directly():

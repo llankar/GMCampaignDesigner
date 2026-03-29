@@ -524,6 +524,7 @@ class CampaignBuilderWizard(ctk.CTkToplevel):
             mode="embedded",
             campaign_context=campaign_context,
             arc_context=arc,
+            persist_on_finish=True,
             on_embedded_result=_on_embedded_result,
         )
         wizard.grab_set()
