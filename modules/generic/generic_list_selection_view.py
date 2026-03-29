@@ -224,8 +224,7 @@ class GenericListSelectionView(ctk.CTkFrame):
                 self.on_multi_select_callback(self.entity_type, selected_items)
             elif self.on_select_callback:
                 for item in selected_items:
-                    entity_name = self._resolve_entity_name(item)
-                    self.on_select_callback(self.entity_type, entity_name)
+                    self._emit_selection(item)
             return
 
         if selection_ids:
