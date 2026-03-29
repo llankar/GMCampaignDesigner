@@ -1,4 +1,6 @@
 from modules.generic.editor.window_context import *
+from modules.campaigns.services.ai.generation_policy import build_hard_constraints_block
+from modules.campaigns.services.generation_defaults_service import CampaignGenerationDefaultsService
 
 
 class GenericEditorWindowAIScenarioGeneration:
@@ -278,24 +280,22 @@ class GenericEditorWindowAIScenarioGeneration:
                 if t:
                     examples.append(f"- {t}: {str(s)[:140] if s else ''}")
             examples_text = "\n".join(examples)
+            hard_constraints_block = _load_editor_hard_constraints_block()
 
             system = (
                 "You are an RPG scenario generator. Produce concise, game-ready content. "
                 "Write evocative but brief prose. Return ONLY compact JSON without code fences."
             )
-            user = (
-                f"Theme: {theme}\n"
-                f"Use EXACTLY these selected entities (names must match; do not rename or invent new proper nouns):\n{', '.join(selected_npcs or [])} | {', '.join(selected_places or [])} | {', '.join(selected_creatures or [])} | {', '.join(selected_factions or [])} | {', '.join(selected_objects or [])}\n\n"
-                f"Entity details for coherence:\n{entities_context}\n\n"
-                f"Existing examples (optional):\n{examples_text}\n\n"
-                "Task: Generate a scenario object with fields:\n"
-                "{\n"
-                "  \"Title\": string,\n"
-                "  \"Summary\": string (1-3 short paragraphs, Markdown allowed),\n"
-                "  \"Secrets\": string (a single compact secret),\n"
-                "  \"Scenes\": [string, ...] (3-5 concise scene beats; reference the selected entities by NAME)\n"
-                "}\n"
-                "Constraints: Integrate the selected entities coherently. No extra keys. No code blocks. Keep within ~600 words."
+            user = _build_one_click_scenario_user_prompt(
+                theme=theme,
+                selected_npcs=selected_npcs,
+                selected_places=selected_places,
+                selected_creatures=selected_creatures,
+                selected_factions=selected_factions,
+                selected_objects=selected_objects,
+                entities_context=entities_context,
+                examples_text=examples_text,
+                hard_constraints_block=hard_constraints_block,
             )
             # Build prompt and call AI
             content = run_ai_editor_chat(
@@ -394,3 +394,50 @@ class GenericEditorWindowAIScenarioGeneration:
 
         except Exception as e:
             messagebox.showerror("AI Error", f"Failed to generate scenario: {e}")
+
+
+def _load_editor_hard_constraints_block(
+    generation_defaults_service: CampaignGenerationDefaultsService | None = None,
+) -> str:
+    service = generation_defaults_service or CampaignGenerationDefaultsService()
+    try:
+        generation_defaults = service.load()
+    except Exception:
+        generation_defaults = {}
+    return build_hard_constraints_block(generation_defaults)
+
+
+def _format_editor_prompt_block(block: str) -> str:
+    if not block:
+        return ""
+    return f"{block}\n"
+
+
+def _build_one_click_scenario_user_prompt(
+    *,
+    theme: str,
+    selected_npcs: list[str],
+    selected_places: list[str],
+    selected_creatures: list[str],
+    selected_factions: list[str],
+    selected_objects: list[str],
+    entities_context: str,
+    examples_text: str,
+    hard_constraints_block: str,
+) -> str:
+    return (
+        f"Theme: {theme}\n"
+        "Use EXACTLY these selected entities (names must match; do not rename or invent new proper nouns):\n"
+        f"{', '.join(selected_npcs or [])} | {', '.join(selected_places or [])} | {', '.join(selected_creatures or [])} | {', '.join(selected_factions or [])} | {', '.join(selected_objects or [])}\n\n"
+        f"Entity details for coherence:\n{entities_context}\n\n"
+        f"Existing examples (optional):\n{examples_text}\n\n"
+        "Task: Generate a scenario object with fields:\n"
+        "{\n"
+        "  \"Title\": string,\n"
+        "  \"Summary\": string (1-3 short paragraphs, Markdown allowed),\n"
+        "  \"Secrets\": string (a single compact secret),\n"
+        "  \"Scenes\": [string, ...] (3-5 concise scene beats; reference the selected entities by NAME)\n"
+        "}\n"
+        "Constraints: Integrate the selected entities coherently. No extra keys. No code blocks. Keep within ~600 words.\n"
+        f"{_format_editor_prompt_block(hard_constraints_block)}"
+    )
