@@ -1,5 +1,10 @@
 import copy
 
+from modules.scenarios.wizard_steps.scenes.scene_entity_fields import (
+    SCENE_ENTITY_FIELDS,
+    normalise_entity_list,
+)
+
 GUIDED_BOUNDARY_FLOW = (
     ("Hook", "Setup"),
     ("Fallout", "Outcome"),
@@ -14,14 +19,7 @@ LEGACY_GUIDED_FLOW = (
 
 
 def _split_to_list(value):
-    if value is None:
-        return []
-    if isinstance(value, list):
-        return [str(item).strip() for item in value if str(item).strip()]
-    if isinstance(value, str):
-        parts = [part.strip() for part in value.replace(";", ",").split(",")]
-        return [part for part in parts if part]
-    return [str(value).strip()]
+    return normalise_entity_list(value)
 
 
 def normalise_scene_links(scene):
@@ -71,11 +69,15 @@ def canonicalise_scene(scene, *, index=0):
         "LinkData": links,
         "NextScenes": [link["target"] for link in links],
         "_canvas": copy.deepcopy(data.get("_canvas") or {}),
+        **{
+            field_name: normalise_entity_list(data.get(field_name))
+            for field_name in SCENE_ENTITY_FIELDS
+        },
         "_extra_fields": {
             k: copy.deepcopy(v)
             for k, v in data.items()
             if k not in {
-                "Title", "Name", "Summary", "Text", "SceneType", "Type", "LinkData", "Links", "NextScenes", "_canvas"
+                "Title", "Name", "Summary", "Text", "SceneType", "Type", "LinkData", "Links", "NextScenes", "_canvas", *SCENE_ENTITY_FIELDS
             }
         },
     }
@@ -117,6 +119,10 @@ def scenes_to_guided_cards(scenes):
                 "Summary": scene.get("Summary") or "",
                 "SceneType": scene.get("SceneType") or default_type,
                 "_canvas": copy.deepcopy(scene.get("_canvas") or {}),
+                **{
+                    field_name: normalise_entity_list(scene.get(field_name))
+                    for field_name in SCENE_ENTITY_FIELDS
+                },
                 "_extra_fields": copy.deepcopy(scene.get("_extra_fields") or {}),
             }
         )
@@ -154,6 +160,10 @@ def guided_cards_to_scenes(cards):
             "LinkData": [],
             "NextScenes": [],
             "_canvas": copy.deepcopy(card.get("_canvas") or {}),
+            **{
+                field_name: normalise_entity_list(card.get(field_name))
+                for field_name in SCENE_ENTITY_FIELDS
+            },
         }
         extras = card.get("_extra_fields")
         if isinstance(extras, dict):
