@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import json
-import re
 import threading
 import time
 import customtkinter as ctk
@@ -22,6 +21,7 @@ from modules.campaigns.services import (
 from modules.campaigns.services.ai.arc_scenario_entities import load_existing_entity_catalog
 from modules.campaigns.shared.arc_status import canonicalize_arc_status
 from modules.campaigns.ui.arc_editor_dialog import ArcEditorDialog
+from modules.campaigns.ui.arc_studio import ArcCardList, ArcDetailForm
 from modules.campaigns.ui.campaign_forge_preview_dialog import preview_campaign_forge_payload
 from modules.campaigns.ui.widgets import CampaignDateField
 from modules.generic.generic_model_wrapper import GenericModelWrapper
@@ -65,7 +65,6 @@ class CampaignBuilderWizard(ctk.CTkToplevel):
 
         self.arcs: list[dict] = []
         self.current_arc_index: int | None = None
-        self._arc_line_ranges: list[tuple[int, int, int]] = []
         self.original_campaign_name: str | None = None
         self._ai_client = None
         self._last_unsaved_generated_payload: dict | None = None
@@ -344,47 +343,65 @@ class CampaignBuilderWizard(ctk.CTkToplevel):
         frame = ctk.CTkFrame(parent, **section_style())
         ctk.CTkLabel(frame, text="Arcs Planner", font=("Arial", 16, "bold"), text_color=EDITOR_PALETTE["text"]).pack(anchor="w", pady=(12, 6), padx=12)
 
-        self.arcs_list = ctk.CTkTextbox(frame, height=420, fg_color=EDITOR_PALETTE["surface_soft"], border_width=1, border_color=EDITOR_PALETTE["border"])
-        self.arcs_list.pack(fill="both", expand=True, padx=12)
-        self.arcs_list.bind("<Button-1>", self._on_arcs_preview_click)
-        self.arcs_list.bind("<Double-Button-1>", self._on_arcs_preview_double_click)
-        self.arcs_list.configure(state="disabled", cursor="hand2")
+        workspace = ctk.CTkFrame(frame, fg_color="transparent")
+        workspace.pack(fill="both", expand=True, padx=12, pady=(0, 12))
+        workspace.grid_columnconfigure(0, weight=3)
+        workspace.grid_columnconfigure(1, weight=5)
+        workspace.grid_columnconfigure(2, weight=3)
+        workspace.grid_rowconfigure(1, weight=1)
 
-        buttons = ctk.CTkFrame(frame, fg_color="transparent")
-        buttons.pack(fill="x", pady=(8, 12), padx=12)
-        buttons.grid_columnconfigure(0, weight=1)
+        left_header = ctk.CTkFrame(workspace, fg_color="transparent")
+        left_header.grid(row=0, column=0, sticky="ew", padx=(0, 8), pady=(0, 6))
+        ctk.CTkLabel(left_header, text="Arc Library", font=("Arial", 14, "bold")).pack(side="left")
+        self.add_arc_btn = ctk.CTkButton(left_header, text="+ New Arc", width=120, command=self._add_arc, **primary_button_style())
+        self.add_arc_btn.pack(side="right")
 
-        top_button_row = ctk.CTkFrame(buttons, fg_color="transparent")
-        top_button_row.grid(row=0, column=0, sticky="w")
-        bottom_button_row = ctk.CTkFrame(buttons, fg_color="transparent")
-        bottom_button_row.grid(row=1, column=0, sticky="w", pady=(6, 0))
+        self.arc_search_var = ctk.StringVar()
+        self.arc_search_entry = ctk.CTkEntry(
+            workspace,
+            textvariable=self.arc_search_var,
+            placeholder_text="Search arcs, objectives, scenarios…",
+            **toolbar_entry_style(),
+        )
+        self.arc_search_entry.grid(row=2, column=0, sticky="ew", padx=(0, 8), pady=(6, 0))
+        self.arc_search_var.trace_add("write", lambda *_args: self._refresh_arcs_preview())
+        self.arc_cards = ArcCardList(workspace, on_select=self._on_arc_card_selected)
+        self.arc_cards.grid(row=1, column=0, sticky="nsew", padx=(0, 8))
 
-        self.add_arc_btn = ctk.CTkButton(top_button_row, text="Add Arc", command=self._add_arc, **primary_button_style())
-        self.generate_arcs_btn = ctk.CTkButton(top_button_row, text="Generate Arcs from Scenarios", command=self._generate_arcs_from_scenarios, **primary_button_style())
-        self.generate_scenarios_btn = ctk.CTkButton(top_button_row, text="Generate 2 Scenarios per Arc", command=self._generate_scenarios_per_arc, **primary_button_style())
+        self.arc_detail_form = ArcDetailForm(workspace, on_change=self._on_arc_details_changed)
+        self.arc_detail_form.grid(row=0, column=1, rowspan=3, sticky="nsew", padx=4)
+
+        tools_panel = ctk.CTkFrame(workspace, fg_color=EDITOR_PALETTE["surface_soft"], corner_radius=12)
+        tools_panel.grid(row=0, column=2, rowspan=3, sticky="nsew", padx=(8, 0))
+        ctk.CTkLabel(tools_panel, text="Arc Operations", font=("Arial", 14, "bold")).pack(anchor="w", padx=12, pady=(10, 8))
+        tools_buttons = ctk.CTkFrame(tools_panel, fg_color="transparent")
+        tools_buttons.pack(fill="x", padx=12, pady=(0, 12))
+
+        self.generate_arcs_btn = ctk.CTkButton(tools_buttons, text="Generate Arcs from Scenarios", command=self._generate_arcs_from_scenarios, **primary_button_style())
+        self.generate_scenarios_btn = ctk.CTkButton(tools_buttons, text="Generate 2 Scenarios per Arc", command=self._generate_scenarios_per_arc, **primary_button_style())
         self.generate_validate_btn = ctk.CTkButton(
-            top_button_row,
+            tools_buttons,
             text="Generate + Validate Scenes (DB)",
             command=self._generate_db_aware_scenarios_per_arc,
             **primary_button_style(),
         )
         self.forge_campaign_btn = ctk.CTkButton(
-            top_button_row,
+            tools_buttons,
             text="Forge Full Campaign",
             command=self._forge_full_campaign,
             **primary_button_style(),
         )
-        self.edit_arc_btn = ctk.CTkButton(top_button_row, text="Edit Arc", command=self._edit_selected_arc, **primary_button_style())
+        self.edit_arc_btn = ctk.CTkButton(tools_buttons, text="Focus Arc Name", command=self._edit_selected_arc, **primary_button_style())
         self.create_scenario_btn = ctk.CTkButton(
-            bottom_button_row,
+            tools_buttons,
             text="Create Scenario for selected arc",
             command=self._create_scenario_for_selected_arc,
             **primary_button_style(),
         )
-        self.move_up_btn = ctk.CTkButton(bottom_button_row, text="Move Up", command=self._move_arc_up, **primary_button_style())
-        self.move_down_btn = ctk.CTkButton(bottom_button_row, text="Move Down", command=self._move_arc_down, **primary_button_style())
-        self.duplicate_arc_btn = ctk.CTkButton(bottom_button_row, text="Duplicate", command=self._duplicate_selected_arc, **primary_button_style())
-        self.delete_arc_btn = ctk.CTkButton(bottom_button_row, text="Delete", command=self._delete_selected_arc, **primary_button_style())
+        self.move_up_btn = ctk.CTkButton(tools_buttons, text="Move Up", command=self._move_arc_up, **primary_button_style())
+        self.move_down_btn = ctk.CTkButton(tools_buttons, text="Move Down", command=self._move_arc_down, **primary_button_style())
+        self.duplicate_arc_btn = ctk.CTkButton(tools_buttons, text="Duplicate", command=self._duplicate_selected_arc, **primary_button_style())
+        self.delete_arc_btn = ctk.CTkButton(tools_buttons, text="Delete", command=self._delete_selected_arc, **primary_button_style())
 
         for button in (
             self.add_arc_btn,
@@ -399,9 +416,10 @@ class CampaignBuilderWizard(ctk.CTkToplevel):
             self.duplicate_arc_btn,
             self.delete_arc_btn,
         ):
-            button.pack(side="left", padx=4)
+            button.pack(fill="x", pady=4)
         self._register_interactive_control(
             self.add_arc_btn,
+            self.arc_search_entry,
             self.generate_arcs_btn,
             self.generate_scenarios_btn,
             self.generate_validate_btn,
@@ -460,24 +478,31 @@ class CampaignBuilderWizard(ctk.CTkToplevel):
         self._show_step(self.current_step + 1)
 
     def _add_arc(self):
-        dlg = ArcEditorDialog(self, self.scenario_titles)
-        self.wait_window(dlg)
-        if dlg.result:
-            self.arcs.append(dlg.result)
-            self.current_arc_index = len(self.arcs) - 1
-            self._refresh_arcs_preview()
+        arc_name = f"Arc {len(self.arcs) + 1}"
+        self.arcs.append(
+            self._normalize_arc_dict(
+                {
+                    "name": arc_name,
+                    "summary": "",
+                    "objective": "",
+                    "status": "Planned",
+                    "thread": "",
+                    "scenarios": [],
+                }
+            )
+        )
+        self.current_arc_index = len(self.arcs) - 1
+        self._refresh_arcs_preview()
+        self.after(50, lambda: self.arc_detail_form.name_entry.focus_set())
 
     def _edit_selected_arc(self):
         selected_index = self._get_selected_arc_index()
         if selected_index is None:
             messagebox.showinfo("No arc", "Add at least one arc first.", parent=self)
             return
-        dlg = ArcEditorDialog(self, self.scenario_titles, initial_data=self.arcs[selected_index])
-        self.wait_window(dlg)
-        if dlg.result:
-            self.arcs[selected_index] = dlg.result
-            self.current_arc_index = selected_index
-            self._refresh_arcs_preview()
+        self.current_arc_index = selected_index
+        self._refresh_arcs_preview()
+        self.arc_detail_form.name_entry.focus_set()
 
     def _create_scenario_for_selected_arc(self):
         selected_index = self._get_selected_arc_index()
@@ -550,6 +575,14 @@ class CampaignBuilderWizard(ctk.CTkToplevel):
     def _delete_selected_arc(self):
         selected_index = self._get_selected_arc_index()
         if selected_index is None:
+            return
+        arc_name = str(self.arcs[selected_index].get("name") or f"Arc {selected_index + 1}").strip()
+        should_delete = messagebox.askyesno(
+            "Delete arc",
+            f"Delete '{arc_name}'?\n\nThis action removes the arc from the campaign plan.",
+            parent=self,
+        )
+        if not should_delete:
             return
         self.arcs.pop(selected_index)
         if not self.arcs:
@@ -1199,46 +1232,20 @@ class CampaignBuilderWizard(ctk.CTkToplevel):
             self.current_arc_index = len(self.arcs) - 1
         return self.current_arc_index
 
-    @staticmethod
-    def _extract_arc_index_from_preview_line(line_text: str) -> int | None:
-        match = re.match(r"\s*Order\s+(\d+):", line_text or "")
-        if not match:
-            return None
-        try:
-            return max(0, int(match.group(1)) - 1)
-        except ValueError:
-            return None
-
-    def _on_arcs_preview_click(self, event):
-        selected_index = self._select_arc_from_preview_event(event)
-        if selected_index is None:
-            return "break"
-        return "break"
-
-    def _on_arcs_preview_double_click(self, event):
-        selected_index = self._select_arc_from_preview_event(event)
-        if selected_index is None:
-            return "break"
-        self._edit_selected_arc()
-        return "break"
-
-    def _select_arc_from_preview_event(self, event) -> int | None:
-        if not self.arcs:
-            return None
-
-        self.arcs_list.configure(state="normal")
-        try:
-            line_index = int(self.arcs_list.index(f"@{event.x},{event.y}").split(".")[0])
-        finally:
-            self.arcs_list.configure(state="disabled")
-
-        selected_index = self._find_arc_index_for_line(line_index)
-        if selected_index is None:
-            return None
-
-        self.current_arc_index = min(selected_index, len(self.arcs) - 1)
+    def _on_arc_card_selected(self, selected_index: int):
+        if selected_index < 0 or selected_index >= len(self.arcs):
+            return
+        self.current_arc_index = selected_index
         self._refresh_arcs_preview()
-        return self.current_arc_index
+
+    def _on_arc_details_changed(self):
+        selected_index = self._get_selected_arc_index()
+        if selected_index is None:
+            return
+        updated = self._normalize_arc_dict(self.arc_detail_form.get_arc_data())
+        self.arcs[selected_index] = updated
+        self._refresh_arcs_preview()
+        self._refresh_review()
 
     def _refresh_arcs_preview(self):
         if not self.arcs:
@@ -1248,41 +1255,10 @@ class CampaignBuilderWizard(ctk.CTkToplevel):
         else:
             self.current_arc_index = max(0, min(self.current_arc_index, len(self.arcs) - 1))
 
-        self.arcs_list.configure(state="normal")
-        self.arcs_list.delete("1.0", "end")
-        self.arcs_list.tag_delete("arc_selected")
-        self._arc_line_ranges = []
-
-        try:
-            self.arcs_list.tag_config(
-                "arc_selected",
-                background=EDITOR_PALETTE["accent"],
-                foreground="#FFFFFF",
-            )
-        except Exception:
-            # Some Tk themes can reject tag-level color overrides.
-            pass
-
-        if not self.arcs:
-            self.arcs_list.insert("end", "No arc yet. Add one to structure your campaign progression.")
-        for idx, arc in enumerate(self.arcs, start=1):
-            block_start_line = int(float(self.arcs_list.index("end-1c")))
-            self.arcs_list.insert("end", f"Order {idx}: {arc.get('name')} [{arc.get('status', 'Planned')}]\n")
-            self.arcs_list.insert("end", f"   Objective: {arc.get('objective', '')}\n")
-            self.arcs_list.insert("end", f"   Thread: {arc.get('thread', '') or '—'}\n")
-            self.arcs_list.insert("end", f"   Scenarios: {', '.join(arc.get('scenarios') or [])}\n\n")
-            block_end_line = max(block_start_line, int(float(self.arcs_list.index("end-1c"))) - 1)
-            self._arc_line_ranges.append((block_start_line, block_end_line, idx - 1))
-
-            if self.current_arc_index == idx - 1:
-                self.arcs_list.tag_add("arc_selected", f"{block_start_line}.0", f"{block_end_line}.end")
-        self.arcs_list.configure(state="disabled")
-
-    def _find_arc_index_for_line(self, line_index: int) -> int | None:
-        for start_line, end_line, arc_index in self._arc_line_ranges:
-            if start_line <= line_index <= end_line:
-                return arc_index
-        return None
+        search_text = self.arc_search_var.get() if hasattr(self, "arc_search_var") else ""
+        self.arc_cards.render(self.arcs, self.current_arc_index, search_text=search_text)
+        selected_arc = self.arcs[self.current_arc_index] if self.current_arc_index is not None else None
+        self.arc_detail_form.set_arc(selected_arc)
 
     def _refresh_review(self):
         if not hasattr(self, "review_box"):
