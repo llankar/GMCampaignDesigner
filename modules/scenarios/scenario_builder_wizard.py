@@ -35,6 +35,9 @@ from modules.scenarios.wizard_steps.scenes.scene_entity_fields import (
     SCENE_ENTITY_FIELDS as SCENE_CARD_ENTITY_FIELDS,
     normalise_entity_list,
 )
+from modules.scenarios.wizard_steps.scenes.scene_entity_aggregator import (
+    collect_scene_entity_names,
+)
 from modules.scenarios.wizard_steps.scenes.scene_mode_adapters import (
     canonicalise_scene,
     guided_cards_to_scenes,
@@ -1223,10 +1226,12 @@ class CharacterRelationsStep(WizardStep):
 
     def load_state(self, state):  # pragma: no cover - UI synchronization
         self.sync_to_global_var.set(bool(state.get("ScenarioCharacterGraphSync")))
+        scene_npcs = collect_scene_entity_names(state.get("Scenes"), "NPCs")
+        merged_npcs = list(dict.fromkeys((state.get("NPCs") or []) + scene_npcs))
         graph_data = state.get("ScenarioCharacterGraph") or {}
         graph_data = build_scenario_graph_with_links(
             graph_data,
-            state.get("NPCs") or [],
+            merged_npcs,
             state.get("PCs") or [],
         )
         self.graph_editor.load_graph_data(graph_data)
