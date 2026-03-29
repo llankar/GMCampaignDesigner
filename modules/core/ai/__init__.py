@@ -5,6 +5,9 @@ from .events import (
     EVENT_AI_PIPELINE_PHASE,
     EVENT_AI_PIPELINE_STARTED,
     ai_pipeline_events,
+    normalize_local_ai_metadata,
+    publish_local_ai_event,
+    timed_local_ai_chat,
 )
 
 __all__ = [
@@ -14,4 +17,7 @@ __all__ = [
     "EVENT_AI_PIPELINE_PHASE",
     "EVENT_AI_PIPELINE_STARTED",
     "ai_pipeline_events",
+    "normalize_local_ai_metadata",
+    "publish_local_ai_event",
+    "timed_local_ai_chat",
 ]
