@@ -1350,9 +1350,12 @@ class ReviewStep(WizardStep):
         self.secrets_label.configure(text=f"Secrets: {secrets_preview}")
 
         scenes = copy.deepcopy(state.get("Scenes") or [])
-        for scene in scenes:
-            if isinstance(scene, dict):
-                normalise_scene_links(scene, ScenesPlanningStep._split_to_list)
+        for idx, scene in enumerate(scenes):
+            if not isinstance(scene, dict):
+                continue
+            canonical_scene = canonicalise_scene(scene, index=idx)
+            scene["LinkData"] = copy.deepcopy(canonical_scene.get("LinkData") or [])
+            scene["NextScenes"] = list(canonical_scene.get("NextScenes") or [])
         self.flow_preview.render(scenes, selected_index=None)
 
         scene_count = len(scenes)
