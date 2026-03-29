@@ -88,16 +88,46 @@ class ArcDetailForm(ctk.CTkFrame):
         self.scenarios_list.grid(row=0, column=0, sticky="nsew", padx=(6, 0), pady=6)
         self.scenarios_list.bind("<<ListboxSelect>>", lambda _event: self._sync_remove_button_state())
         self.scenarios_list.bind("<Delete>", lambda _event: self._remove_selected_scenario())
+        self.scenarios_list.bind("<Alt-Up>", lambda _event: self._move_selected_scenario_up())
+        self.scenarios_list.bind("<Alt-Down>", lambda _event: self._move_selected_scenario_down())
 
         actions = ctk.CTkFrame(scenarios_panel, fg_color="transparent")
         actions.grid(row=0, column=1, sticky="ns", padx=(6, 6), pady=6)
+        self.move_scenario_up_btn = ctk.CTkButton(
+            actions,
+            text="Move up",
+            width=118,
+            command=self._move_selected_scenario_up,
+        )
+        self.move_scenario_up_btn.pack(anchor="n")
+        self.move_scenario_down_btn = ctk.CTkButton(
+            actions,
+            text="Move down",
+            width=118,
+            command=self._move_selected_scenario_down,
+        )
+        self.move_scenario_down_btn.pack(anchor="n", pady=(6, 0))
         self.remove_scenario_btn = ctk.CTkButton(
             actions,
             text="Delete selected",
             width=118,
             command=self._remove_selected_scenario,
         )
-        self.remove_scenario_btn.pack(anchor="n")
+        self.remove_scenario_btn.pack(anchor="n", pady=(6, 0))
+        self.sort_scenarios_btn = ctk.CTkButton(
+            actions,
+            text="Sort A → Z",
+            width=118,
+            command=self._sort_scenarios,
+        )
+        self.sort_scenarios_btn.pack(anchor="n", pady=(6, 0))
+        self.clear_scenarios_btn = ctk.CTkButton(
+            actions,
+            text="Clear all",
+            width=118,
+            command=self._clear_scenarios,
+        )
+        self.clear_scenarios_btn.pack(anchor="n", pady=(6, 0))
 
         add_row = ctk.CTkFrame(self, fg_color="transparent")
         add_row.pack(fill="x", padx=12, pady=(0, 8))
@@ -186,8 +216,16 @@ class ArcDetailForm(ctk.CTkFrame):
 
     def _sync_remove_button_state(self):
         selected = bool(self.scenarios_list.curselection())
+        selected_index = self._selected_scenario_index()
+        selected_count = len(self._scenario_items)
         is_enabled = str(self.scenarios_list.cget("state")) == "normal"
+        can_move_up = is_enabled and selected_index is not None and selected_index > 0
+        can_move_down = is_enabled and selected_index is not None and selected_index < selected_count - 1
         self.remove_scenario_btn.configure(state="normal" if selected and is_enabled else "disabled")
+        self.move_scenario_up_btn.configure(state="normal" if can_move_up else "disabled")
+        self.move_scenario_down_btn.configure(state="normal" if can_move_down else "disabled")
+        self.sort_scenarios_btn.configure(state="normal" if is_enabled and selected_count > 1 else "disabled")
+        self.clear_scenarios_btn.configure(state="normal" if is_enabled and selected_count > 0 else "disabled")
 
     def _add_scenario_from_entry(self):
         title = self.scenario_entry_var.get().strip()
@@ -200,10 +238,9 @@ class ArcDetailForm(ctk.CTkFrame):
         self._notify_change()
 
     def _remove_selected_scenario(self):
-        selection = self.scenarios_list.curselection()
-        if not selection:
+        index = self._selected_scenario_index()
+        if index is None:
             return
-        index = selection[0]
         if index < 0 or index >= len(self._scenario_items):
             return
         del self._scenario_items[index]
@@ -213,3 +250,54 @@ class ArcDetailForm(ctk.CTkFrame):
             self.scenarios_list.selection_set(new_index)
         self._sync_remove_button_state()
         self._notify_change()
+
+    def _move_selected_scenario_up(self):
+        index = self._selected_scenario_index()
+        if index is None or index <= 0:
+            return
+        self._scenario_items[index - 1], self._scenario_items[index] = self._scenario_items[index], self._scenario_items[index - 1]
+        self._render_scenarios(selected_index=index - 1)
+        self._notify_change()
+
+    def _move_selected_scenario_down(self):
+        index = self._selected_scenario_index()
+        if index is None or index >= len(self._scenario_items) - 1:
+            return
+        self._scenario_items[index + 1], self._scenario_items[index] = self._scenario_items[index], self._scenario_items[index + 1]
+        self._render_scenarios(selected_index=index + 1)
+        self._notify_change()
+
+    def _sort_scenarios(self):
+        if len(self._scenario_items) < 2:
+            return
+        selected_title = None
+        index = self._selected_scenario_index()
+        if index is not None and 0 <= index < len(self._scenario_items):
+            selected_title = self._scenario_items[index]
+        self._scenario_items.sort(key=str.casefold)
+        selected_index = self._scenario_items.index(selected_title) if selected_title in self._scenario_items else None
+        self._render_scenarios(selected_index=selected_index)
+        self._notify_change()
+
+    def _clear_scenarios(self):
+        if not self._scenario_items:
+            return
+        self._scenario_items.clear()
+        self._render_scenarios(selected_index=None)
+        self._notify_change()
+
+    def _render_scenarios(self, selected_index: int | None):
+        self.scenarios_list.delete(0, tk.END)
+        for scenario in self._scenario_items:
+            self.scenarios_list.insert(tk.END, scenario)
+        if selected_index is not None and 0 <= selected_index < len(self._scenario_items):
+            self.scenarios_list.selection_clear(0, tk.END)
+            self.scenarios_list.selection_set(selected_index)
+            self.scenarios_list.activate(selected_index)
+        self._sync_remove_button_state()
+
+    def _selected_scenario_index(self) -> int | None:
+        selection = self.scenarios_list.curselection()
+        if not selection:
+            return None
+        return selection[0]
