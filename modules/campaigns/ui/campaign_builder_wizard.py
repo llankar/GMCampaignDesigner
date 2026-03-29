@@ -1151,11 +1151,11 @@ class CampaignBuilderWizard(ctk.CTkToplevel):
                 worker()
             except Exception as exc:  # pragma: no cover - threaded failure path
                 if on_error:
-                    self.after(0, lambda: on_error(exc))
+                    self.after(0, lambda err=exc: on_error(err))
                 else:
                     self.after(
                         0,
-                        lambda: messagebox.showerror("Unexpected Error", str(exc), parent=self),
+                        lambda err=exc: messagebox.showerror("Unexpected Error", str(err), parent=self),
                     )
 
         threading.Thread(target=_runner, daemon=True).start()
