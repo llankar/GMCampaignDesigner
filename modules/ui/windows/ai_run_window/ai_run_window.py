@@ -14,7 +14,7 @@ class AIRunWindow(ctk.CTkToplevel):
         super().__init__(master)
         self._on_close_requested = on_close_requested
         self.title("AI Run")
-        self.geometry("760x620")
+        self.geometry("760x700")
         self.resizable(True, True)
 
         self._phase_var = ctk.StringVar(value="Idle")
