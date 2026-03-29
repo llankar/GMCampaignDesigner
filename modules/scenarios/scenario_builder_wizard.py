@@ -22,14 +22,20 @@ from modules.helpers.logging_helper import log_module_import, log_info, log_exce
 from modules.helpers.template_loader import load_template, load_entity_definitions
 from modules.helpers.text_helpers import coerce_text
 from modules.scenarios.scene_flow_components import (
-    SceneCanvas,
     SceneFlowPreview,
-    normalise_scene_links,
 )
 from modules.scenarios.scenario_character_graph import (
     ScenarioCharacterGraphEditor,
     build_scenario_graph_with_links,
     sync_scenario_graph_to_global,
+)
+from modules.scenarios.wizard_steps.scenes.canvas_scene_planner import CanvasScenePlanner
+from modules.scenarios.wizard_steps.scenes.guided_scene_planner import GuidedScenePlanner
+from modules.scenarios.wizard_steps.scenes.scene_mode_adapters import (
+    canonicalise_scene,
+    guided_cards_to_scenes,
+    normalise_scene_links,
+    scenes_to_guided_cards,
 )
 
 try:
@@ -193,26 +199,6 @@ class BasicInfoStep(WizardStep):
 
 
 class ScenesPlanningStep(WizardStep):
-    ENTITY_FIELDS = {
-        "NPCs": ("npcs", "Key NPCs", "NPC"),
-        "Creatures": ("creatures", "Creatures / Foes", "Creature"),
-        "Bases": ("bases", "Bases / Domains", "Base"),
-        "Places": ("places", "Locations / Places", "Place"),
-        "Maps": ("maps", "Maps & Handouts", "Map"),
-    }
-
-    SCENE_TYPES = [
-        "Auto",
-        "Setup",
-        "Choice",
-        "Investigation",
-        "Combat",
-        "Outcome",
-        "Social",
-        "Travel",
-        "Downtime",
-    ]
-
     ROOT_KNOWN_FIELDS = {
         "Title",
         "Summary",
@@ -230,1107 +216,213 @@ class ScenesPlanningStep(WizardStep):
         "Objects",
     }
 
-    SCENE_KNOWN_FIELDS = {
-        "Title",
-        "Summary",
-        "SceneSummary",
-        "Text",
-        "SceneText",
-        "Description",
-        "Body",
-        "Details",
-        "SceneDetails",
-        "Notes",
-        "Content",
-        "Synopsis",
-        "Overview",
-        "SceneType",
-        "Type",
-        "NPCs",
-        "Creatures",
-        "Bases",
-        "Places",
-        "Maps",
-        "NextScenes",
-        "Links",
-        "LinkData",
-        "_canvas",
-        "_extra_fields",
-    }
-
-    def __init__(
-        self,
-        master,
-        entity_wrappers,
-        *,
-        scenario_wrapper=None,
-        finale_planner_callback=None,
-    ):
+    def __init__(self, master, entity_wrappers, *, scenario_wrapper=None, finale_planner_callback=None):
         super().__init__(master)
         self.entity_wrappers = entity_wrappers or {}
         self.scenario_wrapper = scenario_wrapper
-        self.scenes = []
-        self.selected_index = None
-        self._scenario_summary = ""
-        self._scenario_secrets = ""
-        self._inline_editor = None
-        self._link_label_editor = None
         self._state_ref = None
         self._on_state_change = None
         self._finale_planner_callback = finale_planner_callback
+        self._scenario_summary = ""
+        self._scenario_secrets = ""
         self._root_extra_fields = {}
-
         self.scenario_title_var = ctk.StringVar()
+        self.mode_var = ctk.StringVar(value="guided")
 
         root = ctk.CTkFrame(self, fg_color="transparent")
         root.pack(fill="both", expand=True)
-        root.grid_rowconfigure(1, weight=1)
+        root.grid_rowconfigure(2, weight=1)
         root.grid_columnconfigure(0, weight=1)
-
-        available_types = [
-            field
-            for field, (slug, _, _) in self.ENTITY_FIELDS.items()
-            if slug in self.entity_wrappers
-        ]
-        if not available_types:
-            available_types = list(self.ENTITY_FIELDS.keys())
-        self._available_entity_types = available_types
 
         toolbar = ctk.CTkFrame(root, fg_color="#101827", corner_radius=14)
         toolbar.grid(row=0, column=0, sticky="ew", padx=12, pady=(12, 6))
         toolbar.grid_columnconfigure(0, weight=1)
-        ctk.CTkLabel(toolbar, text="Scenario Title", font=ctk.CTkFont(size=15, weight="bold")).grid(
-            row=0, column=0, sticky="w", padx=16, pady=(12, 4)
-        )
-        self.scenario_title_entry = ctk.CTkEntry(
-            toolbar, textvariable=self.scenario_title_var, font=ctk.CTkFont(size=18, weight="bold")
-        )
+        ctk.CTkLabel(toolbar, text="Scenario Title", font=ctk.CTkFont(size=15, weight="bold")).grid(row=0, column=0, sticky="w", padx=16, pady=(12, 4))
+        self.scenario_title_entry = ctk.CTkEntry(toolbar, textvariable=self.scenario_title_var, font=ctk.CTkFont(size=18, weight="bold"))
         self.scenario_title_entry.grid(row=1, column=0, sticky="ew", padx=16)
 
         btn_row = ctk.CTkFrame(toolbar, fg_color="transparent")
         btn_row.grid(row=1, column=1, padx=16, pady=(0, 12))
-        self.load_scenario_btn = ctk.CTkButton(
-            btn_row, text="Load Scenario", command=self._load_existing_scenario
-        )
+        self.load_scenario_btn = ctk.CTkButton(btn_row, text="Load Scenario", command=self._load_existing_scenario)
         self.load_scenario_btn.pack(side="left")
         if self._finale_planner_callback:
-            self.finale_planner_btn = ctk.CTkButton(
-                btn_row,
-                text="Epic Finale Planner",
-                command=self._switch_to_epic_finale_planner,
-            )
+            self.finale_planner_btn = ctk.CTkButton(btn_row, text="Epic Finale Planner", command=self._switch_to_epic_finale_planner)
             self.finale_planner_btn.pack(side="left", padx=(6, 0))
         self.notes_btn = ctk.CTkButton(btn_row, text="Edit Notes", command=self._edit_scenario_info)
         self.notes_btn.pack(side="left", padx=(6, 0))
-        self.add_scene_btn = ctk.CTkButton(btn_row, text="Add Scene", command=self.add_scene)
-        self.add_scene_btn.pack(side="left", padx=(6, 0))
-        self.dup_scene_btn = ctk.CTkButton(btn_row, text="Duplicate", command=self.duplicate_scene)
-        self.dup_scene_btn.pack(side="left", padx=6)
-        self.remove_scene_btn = ctk.CTkButton(btn_row, text="Remove", command=self.remove_scene)
-        self.remove_scene_btn.pack(side="left")
 
-        icon_hint = "/".join(
-            f"+{SceneCanvas.ICON_LABELS.get(field, field[:1].upper())}"
-            for field in self._available_entity_types
-            if SceneCanvas.ICON_LABELS.get(field)
-        )
-        if not icon_hint:
-            icon_hint = "+N/+C/+P"
-        ctk.CTkLabel(
-            toolbar,
-            text=(
-                "Double-click a scene to edit it inline, use the "
-                f"{icon_hint} icons to link entities, drag from the title bar to move, "
-                "or drag from the body to create scene links."
-            ),
-            text_color="#9db4d1",
-            wraplength=420,
-            justify="left",
-        ).grid(row=2, column=0, columnspan=2, sticky="w", padx=16, pady=(0, 10))
+        mode_row = ctk.CTkFrame(root, fg_color="transparent")
+        mode_row.grid(row=1, column=0, sticky="ew", padx=12, pady=(0, 6))
+        ctk.CTkLabel(mode_row, text="Planning mode", text_color="#9db4d1").pack(side="left", padx=(2, 8))
+        self.mode_switch = ctk.CTkSegmentedButton(mode_row, values=["guided", "canvas"], variable=self.mode_var, command=self._on_mode_changed)
+        self.mode_switch.pack(side="left")
 
-        main = ctk.CTkFrame(root, fg_color="transparent")
-        main.grid(row=1, column=0, sticky="nsew", padx=12, pady=(0, 12))
-        main.grid_columnconfigure(0, weight=1)
-        main.grid_rowconfigure(0, weight=1)
-        self._main_frame = main
+        self._planner_holder = ctk.CTkFrame(root, fg_color="transparent")
+        self._planner_holder.grid(row=2, column=0, sticky="nsew", padx=12, pady=(0, 12))
+        self._planner_holder.grid_columnconfigure(0, weight=1)
+        self._planner_holder.grid_rowconfigure(0, weight=1)
 
-        self.canvas = SceneCanvas(
-            main,
-            on_select=self._on_canvas_select,
-            on_move=self._on_canvas_move,
-            on_edit=self._edit_scene_via_canvas,
-            on_context=self._show_canvas_menu,
-            on_add_entity=self._add_entity_to_scene,
-            on_link=self._link_scenes_via_drag,
-            on_link_text_edit=self._start_link_label_edit,
-            available_entity_types=self._available_entity_types,
-        )
-        self.canvas.grid(row=0, column=0, sticky="nsew")
+        self.guided_planner = GuidedScenePlanner(self._planner_holder)
+        self.canvas_planner = CanvasScenePlanner(self._planner_holder)
+        self._active_mode = None
+        self.scenes = []
+        self._set_mode("guided", remap=False)
 
     def set_state_binding(self, state, on_state_change=None):
         self._state_ref = state
         self._on_state_change = on_state_change
 
-    def _switch_to_epic_finale_planner(self):  # pragma: no cover - UI interaction
-        if not self._finale_planner_callback:
+    def _on_mode_changed(self, value):
+        self._set_mode(value, remap=True)
+
+    def _set_mode(self, mode, *, remap):
+        mode = "canvas" if str(mode).strip().lower() == "canvas" else "guided"
+        if self._active_mode == mode and remap:
             return
-        if self._state_ref is None:
-            messagebox.showerror(
-                "Unavailable",
-                "The finale planner cannot be opened until the wizard has initialised.",
-            )
+        current_scenes = self._collect_active_scenes() if remap else self.scenes
+        if mode == "guided":
+            self.guided_planner.grid(row=0, column=0, sticky="nsew")
+            self.canvas_planner.grid_forget()
+            cards = scenes_to_guided_cards(current_scenes)
+            self.guided_planner.load_cards(cards)
+            self.scenes = guided_cards_to_scenes(self.guided_planner.export_cards())
+        else:
+            self.canvas_planner.grid(row=0, column=0, sticky="nsew")
+            self.guided_planner.grid_forget()
+            scenes = guided_cards_to_scenes(self.guided_planner.export_cards()) if self._active_mode == "guided" and remap else current_scenes
+            self.canvas_planner.load_scenes(scenes)
+            self.scenes = self.canvas_planner.export_scenes()
+        self._active_mode = mode
+        self.mode_var.set(mode)
+
+    def _collect_active_scenes(self):
+        if self._active_mode == "guided":
+            return guided_cards_to_scenes(self.guided_planner.export_cards())
+        return self.canvas_planner.export_scenes()
+
+    def _switch_to_epic_finale_planner(self):
+        if not self._finale_planner_callback or self._state_ref is None:
             return
         if not self.save_state(self._state_ref):
             return
-        try:
-            payload = copy.deepcopy(self._state_ref)
-            self._finale_planner_callback(payload)
-        except Exception as exc:  # pragma: no cover - defensive path
-            log_exception(
-                f"Failed to switch to Epic Finale Planner: {exc}",
-                func_name="ScenesPlanningStep._switch_to_epic_finale_planner",
-            )
-            messagebox.showerror(
-                "Error",
-                "Unable to open the Epic Finale Planner from the wizard.",
-            )
-
-    def _get_scene_links(self, scene):
-        return normalise_scene_links(scene, self._split_to_list)
-
-    def _on_canvas_select(self, index):
-        if index is None or index >= len(self.scenes):
-            self.selected_index = None
-        else:
-            if (
-                self._inline_editor is not None
-                and getattr(self._inline_editor, "scene_index", None) != index
-            ):
-                self._close_inline_scene_editor()
-            self.selected_index = index
-        self._close_link_label_editor()
-        self.canvas.set_scenes(self.scenes, index)
-        self._update_buttons()
-
-    def _on_canvas_move(self, index, x, y):
-        if index is None or index >= len(self.scenes):
-            return
-        layout = self.scenes[index].setdefault("_canvas", {})
-        layout["x"] = x
-        layout["y"] = y
+        payload = copy.deepcopy(self._state_ref)
+        self._finale_planner_callback(payload)
 
     def _edit_scenario_info(self):
-        dialog = ScenarioInfoDialog(
-            self.winfo_toplevel(),
-            title=self.scenario_title_var.get().strip() or "Scenario Notes",
-            summary=self._scenario_summary,
-            secrets=self._scenario_secrets,
-        )
+        dialog = ScenarioInfoDialog(self.winfo_toplevel(), title=self.scenario_title_var.get().strip() or "Scenario Notes", summary=self._scenario_summary, secrets=self._scenario_secrets)
         self.wait_window(dialog)
         if dialog.result:
             self._scenario_summary = dialog.result.get("summary", "")
             self._scenario_secrets = dialog.result.get("secrets", "")
 
-    def _load_existing_scenario(self):  # pragma: no cover - UI interaction
+    def _load_existing_scenario(self):
         if not self.scenario_wrapper:
             messagebox.showerror("Unavailable", "No scenario library is available to load from.")
             return
-
         scenario_choice = self._choose_existing_scenario()
         if not scenario_choice:
             return
-
         if isinstance(scenario_choice, dict):
             self.load_from_payload(copy.deepcopy(scenario_choice))
             return
-
         scenario_name = str(scenario_choice).strip()
         if not scenario_name:
             return
-
-        try:
-            scenarios = self.scenario_wrapper.load_items()
-        except Exception as exc:  # pragma: no cover - defensive path
-            log_exception(
-                f"Failed to load scenarios: {exc}",
-                func_name="ScenesPlanningStep._load_existing_scenario",
-            )
-            messagebox.showerror("Load Error", "Unable to load scenarios from the database.")
-            return
-
-        normalized_choice = scenario_name.casefold()
-        match = None
-        for entry in scenarios or []:
-            title = str(entry.get("Title") or entry.get("Name") or "").strip()
-            if title and title.casefold() == normalized_choice:
-                match = entry
-                break
-
+        scenarios = self.scenario_wrapper.load_items()
+        match = next((entry for entry in (scenarios or []) if str(entry.get("Title") or entry.get("Name") or "").strip().casefold() == scenario_name.casefold()), None)
         if not match:
             messagebox.showerror("Not Found", f"Scenario '{scenario_name}' was not found.")
             return
-
         self.load_from_payload(copy.deepcopy(match))
 
-    def _choose_existing_scenario(self):  # pragma: no cover - UI interaction
-        try:
-            template = load_template("scenarios")
-        except Exception as exc:
-            log_exception(
-                f"Failed to load scenario template: {exc}",
-                func_name="ScenesPlanningStep._choose_existing_scenario",
-            )
-            messagebox.showerror("Template Error", "Unable to load the scenario list.")
-            return None
-
+    def _choose_existing_scenario(self):
+        template = load_template("scenarios")
         dialog = ctk.CTkToplevel(self)
         dialog.title("Select Scenario")
         dialog.geometry("1100x720")
         dialog.minsize(1100, 720)
         result = {"name": None, "payload": None}
-
-        view = GenericListSelectionView(
-            dialog,
-            "scenarios",
-            self.scenario_wrapper,
-            template,
-            on_select_callback=lambda _et, name, item=None, win=dialog: (
-                result.__setitem__("name", name),
-                result.__setitem__("payload", copy.deepcopy(item) if isinstance(item, dict) else None),
-                win.destroy(),
-            ),
-        )
+        view = GenericListSelectionView(dialog, "scenarios", self.scenario_wrapper, template, on_select_callback=lambda _et, name, item=None, win=dialog: (result.__setitem__("name", name), result.__setitem__("payload", copy.deepcopy(item) if isinstance(item, dict) else None), win.destroy()))
         view.pack(fill="both", expand=True)
         dialog.transient(self.winfo_toplevel())
         dialog.grab_set()
         self.wait_window(dialog)
         return result["payload"] if result["payload"] is not None else result["name"]
 
-    def load_from_payload(self, scenario):  # pragma: no cover - UI synchronization
+    def load_from_payload(self, scenario):
         if not isinstance(scenario, dict):
             return
         self._apply_loaded_scenario(copy.deepcopy(scenario))
 
     def _apply_loaded_scenario(self, scenario):
         title = scenario.get("Title") or scenario.get("Name") or ""
-        summary = coerce_text(scenario.get("Summary"))
-        if not summary:
-            summary = coerce_text(scenario.get("Text"))
-        secrets = coerce_text(scenario.get("Secrets"))
-        if not secrets:
-            secrets = coerce_text(scenario.get("Secret"))
-
         self.scenario_title_var.set(str(title))
-        self._scenario_summary = str(summary)
-        self._scenario_secrets = str(secrets)
-
-        scenes_payload = scenario.get("Scenes")
-        self.scenes = self._coerce_scenes(copy.deepcopy(scenes_payload))
+        self._scenario_summary = coerce_text(scenario.get("Summary") or scenario.get("Text"))
+        self._scenario_secrets = coerce_text(scenario.get("Secrets") or scenario.get("Secret"))
+        scenes_payload = [canonicalise_scene(scene, index=i) for i, scene in enumerate(scenario.get("Scenes") or [])]
         layout = scenario.get("_SceneLayout")
         if isinstance(layout, list):
-            for idx, scene in enumerate(self.scenes):
+            for idx, scene in enumerate(scenes_payload):
                 if idx < len(layout) and isinstance(layout[idx], dict):
                     scene.setdefault("_canvas", {}).update(layout[idx])
+        self.scenes = scenes_payload
+        self._set_mode("guided", remap=False)
+        self.guided_planner.load_cards(scenes_to_guided_cards(self.scenes))
 
-        self.selected_index = 0 if self.scenes else None
-        self._close_inline_scene_editor()
-        self._close_link_label_editor()
-        self.canvas.set_scenes(self.scenes, self.selected_index)
-        self._update_buttons()
-
-        if self._state_ref is None:
-            return
-
-        self._state_ref["Title"] = str(title)
-        self._state_ref["Summary"] = summary
-        self._state_ref["Secrets"] = secrets
-        self._state_ref["Secret"] = secrets
-
-        # Replace the character graph with the one from the loaded scenario (or reset).
-        graph_payload = scenario.get("ScenarioCharacterGraph") or {"nodes": [], "links": [], "shapes": []}
-        try:
-            graph_payload = copy.deepcopy(graph_payload)
-        except Exception:
-            graph_payload = {"nodes": [], "links": [], "shapes": []}
-        self._state_ref["ScenarioCharacterGraph"] = graph_payload
-        self._state_ref["ScenarioCharacterGraphSync"] = bool(
-            scenario.get("ScenarioCharacterGraphSync")
-        )
-
-        if isinstance(layout, list):
-            self._state_ref["_SceneLayout"] = copy.deepcopy(layout)
-        else:
-            self._state_ref["_SceneLayout"] = []
-
-        for field in SCENARIO_ENTITY_FIELD_NAMES:
-            values = scenario.get(field) or []
-            if isinstance(values, str):
-                values = self._split_to_list(values)
-            elif isinstance(values, list):
-                values = [str(item).strip() for item in values if str(item).strip()]
-            elif values:
-                values = [str(values).strip()]
-            else:
-                values = []
-            self._state_ref[field] = list(dict.fromkeys(values))
-
-        self._root_extra_fields = {
-            key: copy.deepcopy(value)
-            for key, value in scenario.items()
-            if key not in self.ROOT_KNOWN_FIELDS
-        }
-
-        self.save_state(self._state_ref)
-        if callable(self._on_state_change):
-            try:
-                self._on_state_change(source=self)
-            except TypeError:
-                self._on_state_change()
-
-    def _edit_scene_via_canvas(self, index):
-        if index is None or index >= len(self.scenes):
-            return
-        self._open_inline_scene_editor(index)
-
-    def _open_inline_scene_editor(self, index):
-        bbox = self.canvas.get_card_bbox(index)
-        if not bbox:
-            return
-        self._close_inline_scene_editor()
-        self._close_link_label_editor()
-        scene = self.scenes[index]
-        x1, y1, x2, y2 = bbox
-        width = max(120, (x2 - x1) - 16)
-        height = max(120, (y2 - y1) - 16)
-        editor = InlineSceneEditor(
-            self.canvas,
-            scene,
-            scene_types=self.SCENE_TYPES,
-            on_save=lambda data, idx=index: self._apply_inline_scene_update(idx, data),
-            on_cancel=self._close_inline_scene_editor,
-            width=width,
-            height=height,
-        )
-        editor.scene_index = index
-        editor.place(
-            x=x1 + 8,
-            y=y1 + 8,
-        )
-        self._inline_editor = editor
-
-    def _close_inline_scene_editor(self):
-        if self._inline_editor is None:
-            return
-        try:
-            self._inline_editor.destroy()
-        except Exception:
-            pass
-        self._inline_editor = None
-
-    def _apply_inline_scene_update(self, index, data):
-        if index is None or index >= len(self.scenes):
-            return
-        scene = self.scenes[index]
-        scene["Title"] = data.get("Title", scene.get("Title", "")).strip() or scene.get(
-            "Title", f"Scene {index + 1}"
-        )
-        scene["SceneType"] = data.get("SceneType", "")
-        summary = data.get("Summary", "")
-        scene["Summary"] = summary
-        scene["Text"] = summary
-        self._close_inline_scene_editor()
-        self._close_link_label_editor()
-        self.canvas.set_scenes(self.scenes, self.selected_index)
-        self._update_buttons()
-
-    def _show_canvas_menu(self, event, index):
-        if index is None:
-            self._show_background_menu(event)
-        else:
-            self._show_scene_menu(event, index)
-
-    def _show_background_menu(self, event):
-        menu = tk.Menu(self, tearoff=0)
-        menu.add_command(label="Add Scene", command=self.add_scene)
-        menu.add_command(label="Edit Scenario Notes", command=self._edit_scenario_info)
-        try:
-            menu.tk_popup(event.x_root, event.y_root)
-        finally:
-            menu.grab_release()
-
-    def _show_scene_menu(self, event, index):
-        self.selected_index = index
-        self.canvas.set_scenes(self.scenes, index)
-        self._update_buttons()
-
-        menu = tk.Menu(self, tearoff=0)
-        menu.add_command(
-            label="Edit Scene Inline",
-            command=lambda idx=index: self._open_inline_scene_editor(idx),
-        )
-        menu.add_separator()
-        menu.add_command(label="Duplicate Scene", command=lambda idx=index: self.duplicate_scene(idx))
-        menu.add_command(label="Remove Scene", command=lambda idx=index: self.remove_scene(idx))
-
-        menu.add_separator()
-        for field, (slug, _, singular_label) in self.ENTITY_FIELDS.items():
-            if slug in self.entity_wrappers:
-                menu.add_command(
-                    label=f"Create {singular_label}",
-                    command=lambda f=field, idx=index: self._create_entity_for_scene(idx, f),
-                )
-            else:
-                menu.add_command(label=f"Create {singular_label}", state="disabled")
-
-        menu.add_separator()
-        for field, (_, _, singular_label) in self.ENTITY_FIELDS.items():
-            entries = []
-            if 0 <= index < len(self.scenes):
-                bucket = self.scenes[index].get(field)
-                if isinstance(bucket, list):
-                    entries = [item for item in bucket if str(item).strip()]
-            if entries:
-                remove_menu = tk.Menu(menu, tearoff=0)
-                for name in entries:
-                    display = str(name).strip()
-                    if not display:
-                        display = f"(Unnamed {singular_label})"
-                    remove_menu.add_command(
-                        label=display,
-                        command=lambda value=name, idx=index, f=field: self._remove_entity_from_scene(idx, f, value),
-                    )
-                remove_menu.add_separator()
-                remove_menu.add_command(
-                    label="Clear All",
-                    command=lambda idx=index, f=field: self._clear_entities_from_scene(idx, f),
-                )
-                menu.add_cascade(label=f"Remove {singular_label}s", menu=remove_menu)
-            else:
-                menu.add_command(label=f"Remove {singular_label}s", state="disabled")
-
-        existing_links = self._get_scene_links(self.scenes[index])
-        if existing_links:
-            remove_menu = tk.Menu(menu, tearoff=0)
-            for link in existing_links:
-                target = link.get("target") or ""
-                label = link.get("text") or target
-                display = label if label == target else f"{label} → {target}"
-                remove_menu.add_command(
-                    label=display,
-                    command=lambda tgt=target, idx=index: self._remove_link_between(idx, tgt),
-                )
-            remove_menu.add_separator()
-            remove_menu.add_command(
-                label="Clear All", command=lambda idx=index: self._clear_links(idx)
-            )
-            menu.add_cascade(label="Remove Link", menu=remove_menu)
-        else:
-            menu.add_command(label="Remove Link", state="disabled")
-
-        try:
-            menu.tk_popup(event.x_root, event.y_root)
-        finally:
-            menu.grab_release()
-
-    def _add_link_between(self, source_index, target_title, label=None):
-        if source_index is None or source_index >= len(self.scenes):
-            return
-        scene = self.scenes[source_index]
-        links = self._get_scene_links(scene)
-        if any(link.get("target") == target_title for link in links):
-            return
-        display_label = (label or target_title).strip() or target_title
-        links.append({"target": target_title, "text": display_label})
-        scene["LinkData"] = links
-        scene["NextScenes"] = [link["target"] for link in links]
-        self._close_link_label_editor()
-        self.canvas.set_scenes(self.scenes, self.selected_index)
-
-    def _remove_link_between(self, source_index, target_title):
-        if source_index is None or source_index >= len(self.scenes):
-            return
-        scene = self.scenes[source_index]
-        links = [link for link in self._get_scene_links(scene) if link.get("target") != target_title]
-        scene["LinkData"] = links
-        scene["NextScenes"] = [link["target"] for link in links]
-        self._close_link_label_editor()
-        self.canvas.set_scenes(self.scenes, self.selected_index)
-
-    def _clear_links(self, source_index):
-        if source_index is None or source_index >= len(self.scenes):
-            return
-        scene = self.scenes[source_index]
-        scene["LinkData"] = []
-        scene["NextScenes"] = []
-        self._close_link_label_editor()
-        self.canvas.set_scenes(self.scenes, self.selected_index)
-
-    def _remove_entity_from_scene(self, scene_index, field, name):
-        if scene_index is None or scene_index >= len(self.scenes):
-            return
-        if field not in self.ENTITY_FIELDS:
-            return
-        scene = self.scenes[scene_index]
-        bucket = scene.get(field)
-        if not isinstance(bucket, list) or not bucket:
-            return
-        target = str(name).strip().lower()
-        filtered = [item for item in bucket if str(item).strip().lower() != target]
-        if len(filtered) == len(bucket):
-            return
-        scene[field] = filtered
-        self.canvas.set_scenes(self.scenes, self.selected_index)
-
-    def _clear_entities_from_scene(self, scene_index, field):
-        if scene_index is None or scene_index >= len(self.scenes):
-            return
-        if field not in self.ENTITY_FIELDS:
-            return
-        scene = self.scenes[scene_index]
-        if isinstance(scene.get(field), list) and scene.get(field):
-            scene[field] = []
-            self.canvas.set_scenes(self.scenes, self.selected_index)
-
-    def _add_entity_to_scene(self, scene_index, entity_type):
-        if scene_index is None or scene_index >= len(self.scenes):
-            return
-        config = self.ENTITY_FIELDS.get(entity_type)
-        if not config:
-            return
-        slug, _, singular_label = config
-        selected = self._choose_entity_from_library(slug, singular_label)
-        if not selected:
-            return
-        scene = self.scenes[scene_index]
-        bucket = scene.setdefault(entity_type, [])
-        if selected not in bucket:
-            bucket.append(selected)
-            bucket.sort(key=lambda value: value.lower() if isinstance(value, str) else str(value))
-        self.canvas.set_scenes(self.scenes, self.selected_index)
-
-    def _create_entity_for_scene(self, scene_index, entity_type):
-        if scene_index is None or scene_index >= len(self.scenes):
-            return
-        config = self.ENTITY_FIELDS.get(entity_type)
-        if not config:
-            return
-        slug, _, singular_label = config
-        name = self._create_entity_in_library(slug, singular_label)
-        if not name:
-            return
-        scene = self.scenes[scene_index]
-        bucket = scene.setdefault(entity_type, [])
-        if name not in bucket:
-            bucket.append(name)
-            bucket.sort(key=lambda value: value.lower() if isinstance(value, str) else str(value))
-        self.canvas.set_scenes(self.scenes, self.selected_index)
-
-    def _link_scenes_via_drag(self, source_index, target_index):
-        if (
-            source_index is None
-            or target_index is None
-            or source_index >= len(self.scenes)
-            or target_index >= len(self.scenes)
-        ):
-            return
-        target_title = (
-            self.scenes[target_index].get("Title")
-            or self.scenes[target_index].get("Name")
-            or f"Scene {target_index + 1}"
-        )
-        self._add_link_between(source_index, target_title, label=target_title)
-
-    def _start_link_label_edit(self, source_index, target_index, target_value, bbox):
-        if source_index is None or source_index >= len(self.scenes):
-            return
-        scene = self.scenes[source_index]
-        links = self._get_scene_links(scene)
-        target_str = str(target_value)
-        link = next((l for l in links if str(l.get("target")) == target_str), None)
-        if link is None and target_index is not None and target_index < len(self.scenes):
-            fallback = self.scenes[target_index].get("Title") or f"Scene {target_index + 1}"
-            link = next((l for l in links if str(l.get("target")) == fallback), None)
-            target_str = fallback
-        if link is None:
-            return
-        self._close_link_label_editor()
-        x1, y1, x2, y2 = bbox
-        width = max(160, int(x2 - x1 + 24))
-        entry = ctk.CTkEntry(self.canvas, width=width, height=30)
-        entry.insert(0, link.get("text") or target_str)
-        entry.place(x=x1 - 12, y=y1 - 10)
-        entry.focus_set()
-        entry.select_range(0, "end")
-        state = {
-            "widget": entry,
-            "source": source_index,
-            "target": target_str,
-        }
-        self._link_label_editor = state
-
-        entry.bind("<Return>", lambda _e: self._commit_link_label_editor(save=True))
-        entry.bind("<Escape>", lambda _e: self._commit_link_label_editor(save=False))
-        entry.bind("<FocusOut>", lambda _e: self._commit_link_label_editor(save=True))
-
-    def _commit_link_label_editor(self, save=True):
-        if not self._link_label_editor:
-            return
-        state = self._link_label_editor
-        entry = state.get("widget")
-        if entry is None:
-            self._link_label_editor = None
-            return
-        try:
-            entry.unbind("<FocusOut>")
-        except Exception:
-            pass
-        text_value = ""
-        if save:
-            try:
-                text_value = entry.get().strip()
-            except Exception:
-                text_value = ""
-        try:
-            entry.destroy()
-        except Exception:
-            pass
-        self._link_label_editor = None
-        if not save:
-            self.canvas.set_scenes(self.scenes, self.selected_index)
-            return
-        if not text_value:
-            text_value = state.get("target", "")
-        source_index = state.get("source")
-        if source_index is None or source_index >= len(self.scenes):
-            self.canvas.set_scenes(self.scenes, self.selected_index)
-            return
-        scene = self.scenes[source_index]
-        links = self._get_scene_links(scene)
-        target_str = state.get("target")
-        for link in links:
-            if str(link.get("target")) == target_str:
-                link["text"] = text_value
-                break
-        scene["LinkData"] = links
-        scene["NextScenes"] = [link["target"] for link in links]
-        self.canvas.set_scenes(self.scenes, self.selected_index)
-
-    def _close_link_label_editor(self):
-        if not self._link_label_editor:
-            return
-        entry = self._link_label_editor.get("widget")
-        self._link_label_editor = None
-        if entry is not None:
-            try:
-                entry.destroy()
-            except Exception:
-                pass
-
-    def _choose_entity_from_library(self, entity_slug, singular_label):
-        wrapper = self.entity_wrappers.get(entity_slug)
-        if not wrapper:
-            messagebox.showerror("Unavailable", f"No {singular_label} library available")
-            return None
-        try:
-            template = load_template(entity_slug)
-        except Exception as exc:
-            log_exception(
-                f"Failed to load template for {entity_slug}: {exc}",
-                func_name="ScenesPlanningStep._choose_entity_from_library",
-            )
-            messagebox.showerror("Template Error", f"Unable to load {singular_label} list")
-            return None
-
-        top = ctk.CTkToplevel(self)
-        top.title(f"Select {singular_label}")
-        top.geometry("1100x720")
-        top.minsize(1100, 720)
-        result = {"name": None}
-
-        view = GenericListSelectionView(
-            top,
-            entity_slug,
-            wrapper,
-            template,
-            on_select_callback=lambda _et, name, _item, win=top: (result.__setitem__("name", name), win.destroy()),
-        )
-        view.pack(fill="both", expand=True)
-        top.transient(self.winfo_toplevel())
-        top.grab_set()
-        self.wait_window(top)
-        return result["name"]
-
-    def _create_entity_in_library(self, entity_slug, singular_label):
-        wrapper = self.entity_wrappers.get(entity_slug)
-        if not wrapper:
-            messagebox.showerror("Unavailable", f"No {singular_label} data available for creation.")
-            return None
-        try:
-            template = load_template(entity_slug)
-        except Exception as exc:
-            log_exception(
-                f"Failed to load template for {entity_slug}: {exc}",
-                func_name="ScenesPlanningStep._create_entity_in_library",
-            )
-            messagebox.showerror("Template Error", f"Unable to load the {singular_label} template.")
-            return None
-
-        new_item = {}
-        editor = GenericEditorWindow(
-            self.winfo_toplevel(),
-            new_item,
-            template,
-            wrapper,
-            creation_mode=True,
-        )
-        self.wait_window(editor)
-        if not getattr(editor, "saved", False):
-            return None
-
-        try:
-            items = wrapper.load_items()
-        except Exception:
-            items = []
-        name = editor.item.get("Name") or editor.item.get("Title")
-        replaced = False
-        if name:
-            for idx, existing in enumerate(items):
-                existing_name = existing.get("Name") or existing.get("Title")
-                if existing_name and existing_name == name:
-                    items[idx] = editor.item
-                    replaced = True
-                    break
-        if not replaced:
-            items.append(editor.item)
-        try:
-            wrapper.save_items(items)
-        except Exception as exc:
-            log_exception(
-                f"Failed to save {entity_slug}: {exc}",
-                func_name="ScenesPlanningStep._create_entity_in_library",
-            )
-            messagebox.showerror("Save Error", f"Unable to save the new {singular_label}.")
-            return None
-        return name
-
-    def add_scene(self):
-        scene = {
-            "Title": f"Scene {len(self.scenes) + 1}",
-            "Summary": "",
-            "SceneType": "",
-            "NPCs": [],
-            "Creatures": [],
-            "Places": [],
-            "Maps": [],
-            "NextScenes": [],
-            "LinkData": [],
-        }
-        self._assign_default_position(scene)
-        self.scenes.append(scene)
-        self.selected_index = len(self.scenes) - 1
-        self._close_link_label_editor()
-        self.canvas.set_scenes(self.scenes, self.selected_index)
-        self._update_buttons()
-
-    def duplicate_scene(self, index=None):
-        if index is None:
-            index = self.selected_index
-        if index is None or index >= len(self.scenes):
-            return
-        source = copy.deepcopy(self.scenes[index])
-        source.pop("_canvas", None)
-        dup = copy.deepcopy(source)
-        dup["Title"] = self._unique_title(source.get("Title") or "Scene")
-        dup["_canvas"] = {}
-        self._assign_default_position(dup)
-        insert_at = index + 1
-        self.scenes.insert(insert_at, dup)
-        self.selected_index = insert_at
-        self._close_link_label_editor()
-        self.canvas.set_scenes(self.scenes, self.selected_index)
-        self._update_buttons()
-
-    def remove_scene(self, index=None):
-        if index is None:
-            index = self.selected_index
-        if index is None or index >= len(self.scenes):
-            return
-        removed_scene = self.scenes.pop(index)
-        removed_title = (removed_scene.get("Title") or "").strip()
-
-        for scene in self.scenes:
-            links = self._get_scene_links(scene)
-            filtered = [link for link in links if link.get("target") != removed_title]
-            if len(filtered) != len(links):
-                scene["LinkData"] = filtered
-                scene["NextScenes"] = [link["target"] for link in filtered]
-
-        if not self.scenes:
-            self.selected_index = None
-        elif index >= len(self.scenes):
-            self.selected_index = len(self.scenes) - 1
-        else:
-            self.selected_index = index
-
-        self.canvas.set_scenes(self.scenes, self.selected_index)
-        self._update_buttons()
-
-    def _update_buttons(self):
-        state = "normal" if self.selected_index is not None else "disabled"
-        self.dup_scene_btn.configure(state=state)
-        self.remove_scene_btn.configure(state=state)
-
-    def _assign_default_position(self, scene):
-        layout = scene.setdefault("_canvas", {})
-        layout.setdefault("x", 180 + len(self.scenes) * 40)
-        layout.setdefault("y", 160 + len(self.scenes) * 40)
-
-    def _unique_title(self, base):
-        base = base or "Scene"
-        used = {s.get("Title", "").lower() for s in self.scenes}
-        if base.lower() not in used:
-            return base
-        counter = 2
-        while f"{base} ({counter})".lower() in used:
-            counter += 1
-        return f"{base} ({counter})"
-
-    # ------------------------------------------------------------------
-    # WizardStep overrides
-    # ------------------------------------------------------------------
     def load_state(self, state):
         self.scenario_title_var.set(state.get("Title", ""))
         self._scenario_summary = state.get("Summary", "")
         self._scenario_secrets = state.get("Secrets") or state.get("Secret") or ""
-        self.scenes = self._coerce_scenes(state.get("Scenes"))
+        scenes = [canonicalise_scene(scene, index=i) for i, scene in enumerate(state.get("Scenes") or [])]
         layout = state.get("_SceneLayout")
         if isinstance(layout, list):
-            for idx, scene in enumerate(self.scenes):
+            for idx, scene in enumerate(scenes):
                 if idx < len(layout) and isinstance(layout[idx], dict):
                     scene.setdefault("_canvas", {}).update(layout[idx])
-        self.selected_index = None
-        self._close_inline_scene_editor()
-        self._close_link_label_editor()
-        self.canvas.set_scenes(self.scenes, None)
-        self._update_buttons()
-
-        self._root_extra_fields = {
-            key: copy.deepcopy(value)
-            for key, value in (state or {}).items()
-            if key not in self.ROOT_KNOWN_FIELDS
-        }
+        self.scenes = scenes
+        self._root_extra_fields = {key: copy.deepcopy(value) for key, value in (state or {}).items() if key not in self.ROOT_KNOWN_FIELDS}
+        self._set_mode("guided", remap=False)
+        self.guided_planner.load_cards(scenes_to_guided_cards(self.scenes))
 
     def save_state(self, state):
-        self._close_inline_scene_editor()
-        self._close_link_label_editor()
+        self.scenes = self._collect_active_scenes()
         state["Title"] = self.scenario_title_var.get().strip()
-        summary = (self._scenario_summary or "").strip()
+        state["Summary"] = (self._scenario_summary or "").strip()
         secrets = (self._scenario_secrets or "").strip()
-        state["Summary"] = summary
         state["Secrets"] = secrets
         state["Secret"] = secrets
 
         payload = []
         layout = []
         for scene in self.scenes:
-            if not scene:
-                continue
             record = {
                 "Title": scene.get("Title", "Scene"),
                 "Summary": scene.get("Summary", ""),
                 "Text": scene.get("Summary", ""),
-                "NPCs": list(scene.get("NPCs", [])),
-                "Creatures": list(scene.get("Creatures", [])),
-                "Bases": list(scene.get("Bases", [])),
-                "Places": list(scene.get("Places", [])),
-                "Maps": list(scene.get("Maps", [])),
             }
-            if scene.get("SceneType"):
-                record["SceneType"] = scene["SceneType"]
-                record["Type"] = scene["SceneType"]
-            links = self._get_scene_links(scene)
+            scene_type = scene.get("SceneType", "")
+            if scene_type:
+                record["SceneType"] = scene_type
+                record["Type"] = scene_type
+            links = normalise_scene_links(scene)
             if links:
                 record["NextScenes"] = [link["target"] for link in links]
-                record["Links"] = [
-                    {"target": link["target"], "text": link.get("text") or link["target"]}
-                    for link in links
-                ]
+                record["Links"] = [{"target": link["target"], "text": link.get("text") or link["target"]} for link in links]
             extras = scene.get("_extra_fields")
             if isinstance(extras, dict):
                 for key, value in extras.items():
                     if key not in record:
                         record[key] = copy.deepcopy(value)
             payload.append(record)
-            layout.append(scene.get("_canvas", {}))
+            layout.append(copy.deepcopy(scene.get("_canvas") or {}))
         state["Scenes"] = payload
         state["_SceneLayout"] = layout
-
-        for field in ("NPCs", "Creatures", "Bases", "Places", "Maps"):
-            merged = self._dedupe(self._split_to_list(state.get(field, [])))
-            for scene in self.scenes:
-                merged.extend(scene.get(field, []))
-            state[field] = self._dedupe(merged)
 
         if isinstance(self._root_extra_fields, dict):
             for key, value in self._root_extra_fields.items():
                 state.setdefault(key, copy.deepcopy(value))
         return True
 
-    # ------------------------------------------------------------------
-    # Data helpers
-    # ------------------------------------------------------------------
-    @staticmethod
-    def _split_to_list(value):
-        if value is None:
-            return []
-        if isinstance(value, list):
-            return [str(item).strip() for item in value if str(item).strip()]
-        if isinstance(value, str):
-            parts = [part.strip() for part in value.replace(";", ",").split(",")]
-            return [part for part in parts if part]
-        return [str(value).strip()]
-
-    @staticmethod
-    def _dedupe(items):
-        seen = set()
-        result = []
-        for item in items:
-            key = str(item).strip().lower()
-            if key and key not in seen:
-                seen.add(key)
-                result.append(str(item).strip())
-        return result
-
-    def _coerce_scenes(self, raw):
-        if not raw:
-            return []
-        if isinstance(raw, list):
-            result = []
-            for idx, entry in enumerate(raw):
-                scene = self._normalise_scene(entry, idx)
-                if scene:
-                    result.append(scene)
-            return result
-        if isinstance(raw, dict):
-            return [self._normalise_scene(raw, 0)]
-        return []
-
-    def _normalise_scene(self, entry, index):
-        if not isinstance(entry, dict):
-            summary = coerce_text(entry).strip()
-            title = f"Scene {index + 1}"
-            if summary:
-                first_line = summary.splitlines()[0].strip()
-                if first_line:
-                    title = first_line if len(first_line) <= 60 else f"{first_line[:57]}..."
-            return {
-                "Title": title,
-                "Summary": summary,
-                "SceneType": "",
-                "NPCs": [],
-                "Creatures": [],
-                "Places": [],
-                "Maps": [],
-                "NextScenes": [],
-                "LinkData": [],
-            }
-        next_refs = self._split_to_list(entry.get("NextScenes"))
-        links_data = []
-        raw_links = entry.get("Links")
-        if isinstance(raw_links, list):
-            for item in raw_links:
-                if isinstance(item, dict):
-                    target = str(item.get("target") or item.get("Scene") or item.get("Next") or "").strip()
-                    if not target:
-                        continue
-                    text = str(item.get("text") or target).strip()
-                    links_data.append({"target": target, "text": text})
-                elif isinstance(item, str):
-                    target = item.strip()
-                    if target:
-                        links_data.append({"target": target, "text": target})
-        if not links_data:
-            for target in next_refs:
-                if target:
-                    links_data.append({"target": target, "text": target})
-        deduped = []
-        seen = set()
-        for link in links_data:
-            target = link["target"]
-            text = link.get("text") or target
-            key = (target.lower(), text.lower())
-            if key in seen:
-                continue
-            seen.add(key)
-            deduped.append({"target": target, "text": text})
-        summary_fragments = []
-        seen_fragments = set()
-
-        def _register_fragment(value):
-            if value is None:
-                return
-            if isinstance(value, (list, tuple, set)):
-                for item in value:
-                    _register_fragment(item)
-                return
-            if isinstance(value, dict):
-                text_value = value.get("text")
-                if text_value is not None:
-                    _register_fragment(text_value)
-                else:
-                    for item in value.values():
-                        _register_fragment(item)
-                return
-            fragment = coerce_text(value).strip()
-            normalised = " ".join(fragment.split())
-            if not normalised:
-                return
-            key = normalised.lower()
-            if key in seen_fragments:
-                return
-            seen_fragments.add(key)
-            summary_fragments.append(fragment)
-
-        if isinstance(entry, dict):
-            for key in (
-                "Summary",
-                "SceneSummary",
-                "Text",
-                "SceneText",
-                "Description",
-                "Body",
-                "Details",
-                "SceneDetails",
-                "Notes",
-                "Content",
-                "Synopsis",
-                "Overview",
-            ):
-                _register_fragment(entry.get(key))
-        else:
-            _register_fragment(entry)
-
-        summary = "\n\n".join(fragment for fragment in summary_fragments if fragment)
-        scene = {
-            "Title": entry.get("Title") or entry.get("Name") or f"Scene {index + 1}",
-            "Summary": coerce_text(summary),
-            "SceneType": entry.get("SceneType") or entry.get("Type") or "",
-            "NPCs": self._split_to_list(entry.get("NPCs")),
-            "Creatures": self._split_to_list(entry.get("Creatures")),
-            "Bases": self._split_to_list(entry.get("Bases")),
-            "Places": self._split_to_list(entry.get("Places")),
-            "Maps": self._split_to_list(entry.get("Maps")),
-            "NextScenes": [link["target"] for link in deduped],
-            "LinkData": deduped,
-        }
-        extras = {
-            key: copy.deepcopy(value)
-            for key, value in entry.items()
-            if key not in self.SCENE_KNOWN_FIELDS
-        }
-        if extras:
-            scene["_extra_fields"] = extras
-        return scene
 
 
 class ScenarioInfoDialog(ctk.CTkToplevel):
