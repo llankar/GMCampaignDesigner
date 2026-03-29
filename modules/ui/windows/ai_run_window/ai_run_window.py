@@ -5,6 +5,7 @@ import customtkinter as ctk
 from modules.core.ai.state.request_state import AIRequestState
 from modules.helpers.window_helper import position_window_at_top
 from .viewmodel import AIRunWindowViewModel
+from .widgets.prompt_response_panel import PromptResponsePanel
 from .widgets.step_timeline import StepTimeline
 
 
@@ -13,8 +14,8 @@ class AIRunWindow(ctk.CTkToplevel):
         super().__init__(master)
         self._on_close_requested = on_close_requested
         self.title("AI Run")
-        self.geometry("560x340")
-        self.resizable(False, False)
+        self.geometry("760x620")
+        self.resizable(True, True)
 
         self._phase_var = ctk.StringVar(value="Idle")
         self._status_var = ctk.StringVar(value="Waiting")
@@ -23,8 +24,11 @@ class AIRunWindow(ctk.CTkToplevel):
         ctk.CTkLabel(self, textvariable=self._phase_var).pack(anchor="w", padx=16, pady=(0, 4))
         ctk.CTkLabel(self, textvariable=self._status_var).pack(anchor="w", padx=16, pady=(0, 8))
 
-        self.timeline = StepTimeline(self, height=200)
-        self.timeline.pack(fill="both", expand=True, padx=16, pady=(0, 12))
+        self.timeline = StepTimeline(self, height=160)
+        self.timeline.pack(fill="x", padx=16, pady=(0, 8))
+
+        self.prompt_response_panel = PromptResponsePanel(self)
+        self.prompt_response_panel.pack(fill="both", expand=True, padx=16, pady=(0, 12))
 
         ctk.CTkButton(self, text="Close", command=self._on_close).pack(anchor="e", padx=16, pady=(0, 12))
         self.protocol("WM_DELETE_WINDOW", self._on_close)
@@ -45,3 +49,4 @@ class AIRunWindow(ctk.CTkToplevel):
         self._phase_var.set(AIRunWindowViewModel.phase_text(state))
         self._status_var.set(f"Status: {state.status}")
         self.timeline.render_items(state.timeline)
+        self.prompt_response_panel.render(state)
