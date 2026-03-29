@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import re
+import threading
 import time
 import customtkinter as ctk
 from tkinter import messagebox
@@ -562,24 +563,31 @@ class CampaignBuilderWizard(ctk.CTkToplevel):
             messagebox.showwarning("No scenarios", "Load or create scenarios before generating arcs.", parent=self)
             return
 
-        try:
+        foundation = self._build_arc_generation_foundation()
+        self._set_interactive_controls_enabled(False)
+
+        def _worker():
             service = ArcGenerationService(self._get_ai(), self.scenario_wrapper)
-            result = service.generate_arcs(self._build_arc_generation_foundation())
-        except Exception as exc:
+            result = service.generate_arcs(foundation)
+            generated_arcs = [dict(arc) for arc in (result.get("arcs") or []) if isinstance(arc, dict)]
+            self.after(0, lambda: _on_success(generated_arcs))
+
+        def _on_success(generated_arcs: list[dict]):
+            self._set_interactive_controls_enabled(True)
+            if not generated_arcs:
+                messagebox.showwarning("No arcs", "The AI did not return any usable arcs.", parent=self)
+                return
+            action = self._confirm_generated_arc_action(len(generated_arcs))
+            if action == "cancel":
+                return
+            self._apply_generated_arcs(generated_arcs, merge=(action == "merge"))
+            messagebox.showinfo("Arcs generated", f"Applied {len(generated_arcs)} AI-generated arc(s).", parent=self)
+
+        def _on_error(exc: Exception):
+            self._set_interactive_controls_enabled(True)
             messagebox.showerror("Arc generation failed", f"Unable to generate arcs: {exc}", parent=self)
-            return
 
-        generated_arcs = [dict(arc) for arc in (result.get("arcs") or []) if isinstance(arc, dict)]
-        if not generated_arcs:
-            messagebox.showwarning("No arcs", "The AI did not return any usable arcs.", parent=self)
-            return
-
-        action = self._confirm_generated_arc_action(len(generated_arcs))
-        if action == "cancel":
-            return
-
-        self._apply_generated_arcs(generated_arcs, merge=(action == "merge"))
-        messagebox.showinfo("Arcs generated", f"Applied {len(generated_arcs)} AI-generated arc(s).", parent=self)
+        self._run_in_worker(_worker, on_error=_on_error)
 
     def _build_arc_generation_foundation(self) -> dict:
         return {
@@ -605,50 +613,60 @@ class CampaignBuilderWizard(ctk.CTkToplevel):
             messagebox.showwarning("Arc validation failed", str(exc), parent=self)
             return
 
-        try:
+        foundation = self._build_arc_generation_foundation()
+        arcs_snapshot = [self._normalize_arc_dict(arc) for arc in self.arcs]
+        self._set_interactive_controls_enabled(False)
+
+        def _worker():
             service = ArcScenarioExpansionService(self._get_ai())
             generated_payload = service.generate_scenarios(
-                self._build_arc_generation_foundation(),
-                self.arcs,
+                foundation,
+                arcs_snapshot,
                 existing_scenarios=existing_scenarios,
             )
-        except Exception as exc:
+            self.after(0, lambda: _on_generated(generated_payload))
+
+        def _on_generated(generated_payload: dict):
+            self._set_interactive_controls_enabled(True)
+            accepted_payload = self._preview_generated_arc_scenarios(generated_payload)
+            if not accepted_payload:
+                return
+
+            persistence = CampaignForgePersistence(self.scenario_wrapper)
+            dry_run = persistence.build_dry_run_report(
+                accepted_payload,
+                self.arcs,
+                save_mode=SAVE_MODE_MERGE_KEEP_EXISTING,
+            )
+            if not self._confirm_campaign_forge_dry_run(dry_run, title="Scenario save preview"):
+                return
+
+            try:
+                save_result = persistence.save_from_dry_run(accepted_payload, self.arcs, dry_run)
+                saved_groups = save_result.get("saved_groups") or []
+            except CampaignForgePersistenceError as exc:
+                self._last_unsaved_generated_payload = persistence.unsaved_generated_payload
+                messagebox.showerror("Scenario save failed", str(exc), parent=self)
+                return
+            except Exception as exc:
+                messagebox.showerror("Scenario save failed", f"Unable to save generated scenarios: {exc}", parent=self)
+                return
+
+            self._refresh_scenario_titles_from_saved_groups(saved_groups)
+            self._refresh_arcs_preview()
+            self._refresh_review()
+            saved_count = sum(len(group.get("scenarios") or []) for group in saved_groups)
+            messagebox.showinfo(
+                "Scenarios generated",
+                f"Saved {saved_count} generated scenario(s) across {len(saved_groups)} arc(s).",
+                parent=self,
+            )
+
+        def _on_error(exc: Exception):
+            self._set_interactive_controls_enabled(True)
             messagebox.showerror("Scenario generation failed", f"Unable to generate scenarios: {exc}", parent=self)
-            return
 
-        accepted_payload = self._preview_generated_arc_scenarios(generated_payload)
-        if not accepted_payload:
-            return
-
-        persistence = CampaignForgePersistence(self.scenario_wrapper)
-        dry_run = persistence.build_dry_run_report(
-            accepted_payload,
-            self.arcs,
-            save_mode=SAVE_MODE_MERGE_KEEP_EXISTING,
-        )
-        if not self._confirm_campaign_forge_dry_run(dry_run, title="Scenario save preview"):
-            return
-
-        try:
-            save_result = persistence.save_from_dry_run(accepted_payload, self.arcs, dry_run)
-            saved_groups = save_result.get("saved_groups") or []
-        except CampaignForgePersistenceError as exc:
-            self._last_unsaved_generated_payload = persistence.unsaved_generated_payload
-            messagebox.showerror("Scenario save failed", str(exc), parent=self)
-            return
-        except Exception as exc:
-            messagebox.showerror("Scenario save failed", f"Unable to save generated scenarios: {exc}", parent=self)
-            return
-
-        self._refresh_scenario_titles_from_saved_groups(saved_groups)
-        self._refresh_arcs_preview()
-        self._refresh_review()
-        saved_count = sum(len(group.get("scenarios") or []) for group in saved_groups)
-        messagebox.showinfo(
-            "Scenarios generated",
-            f"Saved {saved_count} generated scenario(s) across {len(saved_groups)} arc(s).",
-            parent=self,
-        )
+        self._run_in_worker(_worker, on_error=_on_error)
 
     def _generate_db_aware_scenarios_per_arc(self):
         """Explicit user action for DB-aware scene generation and validation."""
@@ -660,8 +678,10 @@ class CampaignBuilderWizard(ctk.CTkToplevel):
 
     def _forge_full_campaign(self):
         request_id = self._resolve_ai_request_id()
-        saved_groups: list[dict] = []
         pipeline_started = time.perf_counter()
+        foundation = self._build_arc_generation_foundation()
+        arcs_snapshot = [dict(arc) for arc in self.arcs]
+        scenario_titles_snapshot = list(self.scenario_titles)
         ai_pipeline_events.emit(
             AIPipelineEvent(
                 event_type=EVENT_AI_PIPELINE_STARTED,
@@ -673,11 +693,12 @@ class CampaignBuilderWizard(ctk.CTkToplevel):
         self._log_forge_event(
             "campaign_forge.ui.pipeline.start",
             "pipeline_started",
-            arc_count=len(self.arcs),
-            scenario_title_count=len(self.scenario_titles),
+            arc_count=len(arcs_snapshot),
+            scenario_title_count=len(scenario_titles_snapshot),
         )
-        try:
-            self._set_interactive_controls_enabled(False)
+        self._set_interactive_controls_enabled(False)
+
+        def _worker():
             stage_started = time.perf_counter()
             ai_pipeline_events.emit(
                 AIPipelineEvent(
@@ -688,13 +709,23 @@ class CampaignBuilderWizard(ctk.CTkToplevel):
                 )
             )
             self._log_forge_event("campaign_forge.ui.stage.start", "arcs_started", stage="arcs")
-            self._forge_pipeline_generate_or_normalize_arcs()
+            arcs_for_pipeline = [self._normalize_arc_dict(arc) for arc in arcs_snapshot if (arc.get("name") or "").strip()]
+            if not arcs_for_pipeline:
+                if not scenario_titles_snapshot:
+                    raise ArcScenarioExpansionValidationError(
+                        "No scenarios available to generate arcs. Add scenarios or create arcs manually first."
+                    )
+                service = ArcGenerationService(self._get_ai(), self.scenario_wrapper)
+                result = service.generate_arcs(foundation)
+                arcs_for_pipeline = [dict(arc) for arc in (result.get("arcs") or []) if isinstance(arc, dict)]
+                if not arcs_for_pipeline:
+                    raise ArcScenarioExpansionValidationError("The AI did not return usable arcs for this campaign.")
             self._log_forge_event(
                 "campaign_forge.ui.stage.end",
                 "arcs_completed",
                 stage="arcs",
                 elapsed_ms=self._elapsed_ms(stage_started),
-                arc_count=len(self.arcs),
+                arc_count=len(arcs_for_pipeline),
             )
 
             stage_started = time.perf_counter()
@@ -707,12 +738,11 @@ class CampaignBuilderWizard(ctk.CTkToplevel):
                 )
             )
             self._log_forge_event("campaign_forge.ui.stage.start", "scenario_generation_started", stage="scenarios")
-            self._validate_arcs_for_scenario_generation()
             existing_scenarios = self._load_existing_scenarios_for_pipeline()
             service = ArcScenarioExpansionService(self._get_ai())
             generated_payload = service.generate_scenarios(
-                self._build_arc_generation_foundation(),
-                self.arcs,
+                foundation,
+                arcs_for_pipeline,
                 existing_scenarios=existing_scenarios,
             )
             generated_counts = self._summarize_generated_counts(generated_payload)
@@ -726,52 +756,102 @@ class CampaignBuilderWizard(ctk.CTkToplevel):
                 generated_scenario_count=generated_counts["scenario_count"],
                 generated_scene_count=generated_counts["scene_count"],
             )
+            self.after(0, lambda: self._on_forge_generation_ready(
+                request_id=request_id,
+                pipeline_started=pipeline_started,
+                arcs_for_pipeline=arcs_for_pipeline,
+                generated_payload=generated_payload,
+                generated_counts=generated_counts,
+            ))
 
+        def _on_error(exc: Exception):
             ai_pipeline_events.emit(
                 AIPipelineEvent(
-                    event_type=EVENT_AI_PIPELINE_PHASE,
+                    event_type=EVENT_AI_PIPELINE_FAILED,
                     request_id=request_id,
-                    phase="validation",
-                    message="Validating and enriching scenes/entities",
+                    phase="validation" if isinstance(exc, ArcScenarioExpansionValidationError) else "error",
+                    message=str(exc),
+                    is_terminal=True,
                 )
             )
             self._log_forge_event(
-                "campaign_forge.ui.stage.end",
-                "validation_completed",
-                stage="validation",
-                generated_arc_count=generated_counts["arc_count"],
-                generated_scenario_count=generated_counts["scenario_count"],
-                generated_scene_count=generated_counts["scene_count"],
+                "campaign_forge.ui.pipeline.validation_error"
+                if isinstance(exc, ArcScenarioExpansionValidationError)
+                else "campaign_forge.ui.pipeline.error",
+                "pipeline_validation_error" if isinstance(exc, ArcScenarioExpansionValidationError) else "pipeline_failed",
+                level="warning" if isinstance(exc, ArcScenarioExpansionValidationError) else "error",
+                error_type=type(exc).__name__,
+                detail=str(exc),
+                elapsed_ms=self._elapsed_ms(pipeline_started),
             )
-            ai_pipeline_events.emit(
-                AIPipelineEvent(
-                    event_type=EVENT_AI_PIPELINE_PHASE,
-                    request_id=request_id,
-                    phase="preview",
-                    message="Previewing generated results",
-                )
-            )
-            accepted_payload = self._preview_generated_arc_scenarios(generated_payload)
-            if not accepted_payload:
-                self._log_forge_event(
-                    "campaign_forge.ui.stage.warning",
-                    "preview_cancelled",
-                    level="warning",
-                    stage="preview",
-                )
-                messagebox.showinfo("Forge cancelled", "Campaign forging cancelled during preview.", parent=self)
+            self._set_interactive_controls_enabled(True)
+            if isinstance(exc, ArcScenarioExpansionValidationError):
+                messagebox.showwarning("Pipeline validation failed", str(exc), parent=self)
                 return
+            messagebox.showerror("Forge failed", f"Unable to forge full campaign: {exc}", parent=self)
 
-            stage_started = time.perf_counter()
-            ai_pipeline_events.emit(
-                AIPipelineEvent(
-                    event_type=EVENT_AI_PIPELINE_PHASE,
-                    request_id=request_id,
-                    phase="save",
-                    message="Saving campaign + scenarios",
-                )
+        self._run_in_worker(_worker, on_error=_on_error)
+
+    def _on_forge_generation_ready(
+        self,
+        *,
+        request_id: str,
+        pipeline_started: float,
+        arcs_for_pipeline: list[dict],
+        generated_payload: dict,
+        generated_counts: dict[str, int],
+    ):
+        self.arcs = [self._normalize_arc_dict(arc) for arc in arcs_for_pipeline if (arc.get("name") or "").strip()]
+        self.current_arc_index = 0 if self.arcs else None
+        self._refresh_arcs_preview()
+        self._refresh_review()
+        ai_pipeline_events.emit(
+            AIPipelineEvent(
+                event_type=EVENT_AI_PIPELINE_PHASE,
+                request_id=request_id,
+                phase="validation",
+                message="Validating and enriching scenes/entities",
             )
-            self._log_forge_event("campaign_forge.ui.stage.start", "save_started", stage="save")
+        )
+        self._log_forge_event(
+            "campaign_forge.ui.stage.end",
+            "validation_completed",
+            stage="validation",
+            generated_arc_count=generated_counts["arc_count"],
+            generated_scenario_count=generated_counts["scenario_count"],
+            generated_scene_count=generated_counts["scene_count"],
+        )
+        ai_pipeline_events.emit(
+            AIPipelineEvent(
+                event_type=EVENT_AI_PIPELINE_PHASE,
+                request_id=request_id,
+                phase="preview",
+                message="Previewing generated results",
+            )
+        )
+        accepted_payload = self._preview_generated_arc_scenarios(generated_payload)
+        if not accepted_payload:
+            self._log_forge_event(
+                "campaign_forge.ui.stage.warning",
+                "preview_cancelled",
+                level="warning",
+                stage="preview",
+            )
+            self._set_interactive_controls_enabled(True)
+            messagebox.showinfo("Forge cancelled", "Campaign forging cancelled during preview.", parent=self)
+            return
+
+        stage_started = time.perf_counter()
+        ai_pipeline_events.emit(
+            AIPipelineEvent(
+                event_type=EVENT_AI_PIPELINE_PHASE,
+                request_id=request_id,
+                phase="save",
+                message="Saving campaign + scenarios",
+            )
+        )
+        self._log_forge_event("campaign_forge.ui.stage.start", "save_started", stage="save")
+        try:
             persistence = CampaignForgePersistence(
                 self.scenario_wrapper,
                 campaign_wrapper=self.campaign_wrapper,
@@ -789,6 +869,7 @@ class CampaignBuilderWizard(ctk.CTkToplevel):
                     level="warning",
                     stage="save",
                 )
+                self._set_interactive_controls_enabled(True)
                 messagebox.showinfo("Forge cancelled", "Campaign forging cancelled during save preview.", parent=self)
                 return
 
@@ -813,50 +894,12 @@ class CampaignBuilderWizard(ctk.CTkToplevel):
                 saved_group_count=len(saved_groups),
                 saved_scenario_count=saved_count,
             )
-        except ArcScenarioExpansionValidationError as exc:
-            ai_pipeline_events.emit(
-                AIPipelineEvent(
-                    event_type=EVENT_AI_PIPELINE_FAILED,
-                    request_id=request_id,
-                    phase="validation",
-                    message=str(exc),
-                    is_terminal=True,
-                )
-            )
-            self._log_forge_event(
-                "campaign_forge.ui.pipeline.validation_error",
-                "pipeline_validation_error",
-                level="warning",
-                error_type=type(exc).__name__,
-                detail=str(exc),
-                elapsed_ms=self._elapsed_ms(pipeline_started),
-            )
-            messagebox.showwarning("Pipeline validation failed", str(exc), parent=self)
-            return
         except Exception as exc:
-            ai_pipeline_events.emit(
-                AIPipelineEvent(
-                    event_type=EVENT_AI_PIPELINE_FAILED,
-                    request_id=request_id,
-                    phase="error",
-                    message=str(exc),
-                    is_terminal=True,
-                )
-            )
-            self._log_forge_event(
-                "campaign_forge.ui.pipeline.error",
-                "pipeline_failed",
-                level="error",
-                error_type=type(exc).__name__,
-                detail=str(exc),
-                elapsed_ms=self._elapsed_ms(pipeline_started),
-            )
+            self._set_interactive_controls_enabled(True)
             messagebox.showerror("Forge failed", f"Unable to forge full campaign: {exc}", parent=self)
             return
-        finally:
-            self._set_interactive_controls_enabled(True)
 
-        saved_count = sum(len(group.get("scenarios") or []) for group in saved_groups)
+        self._set_interactive_controls_enabled(True)
         ai_pipeline_events.emit(
             AIPipelineEvent(
                 event_type=EVENT_AI_PIPELINE_COMPLETED,
@@ -1042,6 +1085,21 @@ class CampaignBuilderWizard(ctk.CTkToplevel):
         for widget in self._interactive_controls:
             if widget.winfo_exists():
                 widget.configure(state=state)
+
+    def _run_in_worker(self, worker, *, on_error=None):
+        def _runner():
+            try:
+                worker()
+            except Exception as exc:  # pragma: no cover - threaded failure path
+                if on_error:
+                    self.after(0, lambda: on_error(exc))
+                else:
+                    self.after(
+                        0,
+                        lambda: messagebox.showerror("Unexpected Error", str(exc), parent=self),
+                    )
+
+        threading.Thread(target=_runner, daemon=True).start()
 
     def _validate_arcs_for_scenario_generation(self):
         if not self.arcs:
