@@ -4,6 +4,10 @@ import tkinter as tk
 import customtkinter as ctk
 
 from modules.scenarios.scene_flow_components import SceneCanvas
+from modules.scenarios.wizard_steps.scenes.scene_entity_fields import (
+    SCENE_ENTITY_FIELDS,
+    normalise_entity_list,
+)
 from modules.scenarios.wizard_steps.scenes.scene_mode_adapters import normalise_scene_links
 
 
@@ -57,13 +61,14 @@ class InlineSceneEditor(ctk.CTkFrame):
 class CanvasScenePlanner(ctk.CTkFrame):
     SCENE_TYPES = ["Auto", "Setup", "Choice", "Investigation", "Combat", "Outcome", "Social", "Travel", "Downtime"]
 
-    def __init__(self, master):
+    def __init__(self, master, *, entity_selector_callbacks=None):
         super().__init__(master, fg_color="transparent")
         self.grid_rowconfigure(1, weight=1)
         self.grid_columnconfigure(0, weight=1)
         self.scenes = []
         self.selected_index = None
         self._inline_editor = None
+        self.entity_selector_callbacks = entity_selector_callbacks or {}
 
         buttons = ctk.CTkFrame(self, fg_color="transparent")
         buttons.grid(row=0, column=0, sticky="ew", padx=12, pady=(8, 6))
@@ -80,10 +85,10 @@ class CanvasScenePlanner(ctk.CTkFrame):
             on_move=self._on_canvas_move,
             on_edit=self._open_inline_scene_editor,
             on_context=self._show_canvas_menu,
-            on_add_entity=lambda *_: None,
+            on_add_entity=self._on_add_entity_to_scene,
             on_link=self._link_scenes_via_drag,
             on_link_text_edit=lambda *_: None,
-            available_entity_types=[],
+            available_entity_types=["NPCs", "Creatures", "Places", "Bases", "Maps"],
         )
         self.canvas.grid(row=1, column=0, sticky="nsew", padx=12, pady=(0, 12))
         self._update_buttons()
@@ -95,7 +100,14 @@ class CanvasScenePlanner(ctk.CTkFrame):
         self._update_buttons()
 
     def export_scenes(self):
-        return [copy.deepcopy(scene) for scene in self.scenes]
+        exported = []
+        for scene in self.scenes:
+            record = copy.deepcopy(scene)
+            for entity_field in SCENE_ENTITY_FIELDS:
+                if entity_field in record:
+                    record[entity_field] = normalise_entity_list(record.get(entity_field))
+            exported.append(record)
+        return exported
 
     def add_scene(self):
         scene = {"Title": f"Scene {len(self.scenes) + 1}", "Summary": "", "SceneType": "", "LinkData": [], "NextScenes": [], "_canvas": {}}
@@ -200,6 +212,21 @@ class CanvasScenePlanner(ctk.CTkFrame):
         links.append({"target": target_title, "text": target_title})
         source["LinkData"] = links
         source["NextScenes"] = [link["target"] for link in links]
+        self.canvas.set_scenes(self.scenes, self.selected_index)
+
+    def _on_add_entity_to_scene(self, index, entity_type):
+        if index is None or index >= len(self.scenes):
+            return
+        selector = self.entity_selector_callbacks.get(entity_type)
+        if not callable(selector):
+            return
+        scene = self.scenes[index]
+        current_values = normalise_entity_list(scene.get(entity_type))
+        selected_values = normalise_entity_list(selector(current_values))
+        if not selected_values:
+            return
+        merged_values = normalise_entity_list(current_values + selected_values)
+        scene[entity_type] = merged_values
         self.canvas.set_scenes(self.scenes, self.selected_index)
 
     def _assign_default_position(self, scene):
