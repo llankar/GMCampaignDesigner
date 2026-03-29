@@ -184,6 +184,36 @@ class _DummyButton:
             self._state = kwargs["state"]
 
 
+class _RecordingLabel:
+    def __init__(self):
+        self.kwargs = {}
+
+    def configure(self, **kwargs):
+        self.kwargs.update(kwargs)
+
+
+class _RecordingTextbox:
+    def __init__(self):
+        self.content = ""
+
+    def configure(self, **_kwargs):
+        return None
+
+    def delete(self, *_args, **_kwargs):
+        self.content = ""
+
+    def insert(self, *_args):
+        self.content = _args[-1] if _args else ""
+
+
+class _RecordingFlowPreview:
+    def __init__(self):
+        self.calls = []
+
+    def render(self, scenes, selected_index=None):
+        self.calls.append((scenes, selected_index))
+
+
 class _RecordingScenarioWrapper:
     def __init__(self, items=None):
         self._items = list(items or [])
@@ -540,3 +570,42 @@ def test_select_scene_entities_cancel_keeps_existing_state(monkeypatch):
     selected = step._select_scene_entities("places", "Places", ["Old Town"])
 
     assert selected == ["Old Town"]
+
+
+def test_review_step_load_state_normalises_scene_links_for_preview_render():
+    step = scenario_builder_wizard.ReviewStep.__new__(scenario_builder_wizard.ReviewStep)
+    step.title_label = _RecordingLabel()
+    step.summary_label = _RecordingLabel()
+    step.secrets_label = _RecordingLabel()
+    step.stats_label = _RecordingLabel()
+    step.details_text = _RecordingTextbox()
+    step.flow_preview = _RecordingFlowPreview()
+
+    state = {
+        "Title": "Flow Scenario",
+        "Summary": "A branch-heavy outline",
+        "Secrets": "Hidden agenda",
+        "Scenes": [
+            {
+                "Title": "Arrival",
+                "LinkData": [{"target": "Market", "text": "Go to market"}],
+            },
+            {
+                "Title": "Market",
+                "NextScenes": "Finale",
+            },
+            {
+                "Title": "Finale",
+                "NextScenes": "",
+            },
+        ],
+    }
+
+    step.load_state(state)
+
+    assert step.flow_preview.calls, "Expected ReviewStep.load_state to call flow_preview.render"
+    scenes, selected_index = step.flow_preview.calls[-1]
+    assert selected_index is None
+    assert scenes[0]["NextScenes"] == ["Market"]
+    assert scenes[1]["NextScenes"] == ["Finale"]
+    assert scenes[2]["NextScenes"] == []
