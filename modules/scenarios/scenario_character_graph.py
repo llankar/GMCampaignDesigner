@@ -435,32 +435,50 @@ def build_scenario_graph_with_links(
     base_graph.setdefault("links", [])
     base_graph.setdefault("shapes", [])
     ensure_graph_tabs(base_graph)
-    if not base_graph["nodes"]:
-        added_nodes = []
-        seen_tags = set()
-        for entity_type, names in (("npc", scenario_npcs), ("pc", scenario_pcs)):
-            for name in names or []:
-                if not name:
-                    continue
-                base = f"{entity_type}_{name.replace(' ', '_')}"
-                tag = base
-                index = 1
-                while tag in seen_tags:
-                    tag = f"{base}_{index}"
-                    index += 1
-                node = {
-                    "entity_type": entity_type,
-                    "entity_name": name,
-                    "tag": tag,
-                    "x": 200,
-                    "y": 200,
-                    "color": "#1D3572",
-                    "collapsed": True,
-                }
-                base_graph["nodes"].append(node)
-                added_nodes.append(node)
-                seen_tags.add(tag)
-        _layout_new_scenario_nodes(base_graph, added_nodes)
+    added_nodes = []
+    seen_tags = {
+        node.get("tag")
+        for node in base_graph.get("nodes", [])
+        if isinstance(node, dict) and node.get("tag")
+    }
+    existing_entities = {
+        (
+            (node.get("entity_type") or "").strip().lower(),
+            (node.get("entity_name") or node.get("npc_name") or node.get("pc_name") or "").strip().casefold(),
+        )
+        for node in base_graph.get("nodes", [])
+        if isinstance(node, dict)
+    }
+
+    for entity_type, names in (("npc", scenario_npcs), ("pc", scenario_pcs)):
+        for name in names or []:
+            clean_name = str(name or "").strip()
+            if not clean_name:
+                continue
+            entity_key = (entity_type, clean_name.casefold())
+            if entity_key in existing_entities:
+                continue
+            base = f"{entity_type}_{clean_name.replace(' ', '_')}"
+            tag = base
+            index = 1
+            while tag in seen_tags:
+                tag = f"{base}_{index}"
+                index += 1
+            node = {
+                "entity_type": entity_type,
+                "entity_name": clean_name,
+                "tag": tag,
+                "x": 200,
+                "y": 200,
+                "color": "#1D3572",
+                "collapsed": True,
+            }
+            base_graph["nodes"].append(node)
+            added_nodes.append(node)
+            seen_tags.add(tag)
+            existing_entities.add(entity_key)
+
+    _layout_new_scenario_nodes(base_graph, added_nodes)
 
     node_tags = {
         node.get("tag") for node in base_graph.get("nodes", []) if isinstance(node, dict)
