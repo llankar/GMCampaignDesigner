@@ -15,6 +15,12 @@ from modules.ui.windows.ai_run_window.ai_run_window import AIRunWindow
 
 
 class AIRunWindowController:
+    @staticmethod
+    def _metadata_text(event: AIPipelineEvent, key: str) -> str:
+        metadata = event.metadata or {}
+        value = metadata.get(key)
+        return str(value).strip() if value is not None else ""
+
     def __init__(self, app, menu_bar):
         self.app = app
         self.menu_bar = menu_bar
@@ -57,6 +63,8 @@ class AIRunWindowController:
                 phase_text=event.message or "Running",
                 active=True,
                 has_recent=True,
+                prompt_text=self._metadata_text(event, "prompt_text"),
+                response_text=self._metadata_text(event, "response_text"),
             )
             ai_request_state.append_timeline({"phase": event.phase or "Start", "message": event.message, "status": "active"})
             if ai_request_state.state.window_visibility == "hidden":
@@ -68,7 +76,12 @@ class AIRunWindowController:
             if timeline:
                 timeline[-1]["status"] = "done"
             ai_request_state.append_timeline({"phase": event.phase, "message": event.message, "status": "active"})
-            ai_request_state.update(phase=event.phase, phase_text=event.message or event.phase)
+            ai_request_state.update(
+                phase=event.phase,
+                phase_text=event.message or event.phase,
+                prompt_text=self._metadata_text(event, "prompt_text") or ai_request_state.state.prompt_text,
+                response_text=self._metadata_text(event, "response_text") or ai_request_state.state.response_text,
+            )
             if ai_request_state.state.window_visibility == "hidden" and ai_request_state.state.active:
                 self.open_window()
             return
@@ -84,6 +97,8 @@ class AIRunWindowController:
                 phase_text=event.message or status,
                 active=False,
                 has_recent=True,
+                prompt_text=self._metadata_text(event, "prompt_text") or ai_request_state.state.prompt_text,
+                response_text=self._metadata_text(event, "response_text") or ai_request_state.state.response_text,
             )
             self.open_window()
             self._schedule_auto_close_if_needed(event.event_type == EVENT_AI_PIPELINE_COMPLETED)

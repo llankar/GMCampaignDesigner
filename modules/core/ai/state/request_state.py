@@ -15,6 +15,8 @@ class AIRequestState:
     has_recent: bool = False
     auto_close_on_success_seconds: int = 0
     timeline: list[dict] = field(default_factory=list)
+    prompt_text: str = ""
+    response_text: str = ""
 
 
 class AIRequestStateStore:
