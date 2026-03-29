@@ -89,4 +89,11 @@ def get_dashboard_theme() -> DashboardTheme:
     )
 
 
-DASHBOARD_THEME = get_dashboard_theme()
+class _LiveDashboardTheme:
+    """Resolve dashboard colors lazily so runtime theme changes are reflected."""
+
+    def __getattr__(self, item: str):
+        return getattr(get_dashboard_theme(), item)
+
+
+DASHBOARD_THEME = _LiveDashboardTheme()

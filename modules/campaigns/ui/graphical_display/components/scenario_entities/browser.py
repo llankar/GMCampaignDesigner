@@ -50,7 +50,7 @@ class ScenarioEntityBrowser(ctk.CTkFrame):
         links: Iterable[ScenarioEntityLink],
         on_open_entity: Callable[[str, str], None],
     ):
-        super().__init__(parent, fg_color="#0d1728", corner_radius=20, border_width=1, border_color="#22395d")
+        super().__init__(parent, fg_color=DASHBOARD_THEME.panel_alt_bg, corner_radius=20, border_width=1, border_color=DASHBOARD_THEME.card_border)
         self._scenario_title = scenario_title
         self._groups = group_scenario_entities(links)
         self._on_open_entity = on_open_entity
@@ -83,7 +83,7 @@ class ScenarioEntityBrowser(ctk.CTkFrame):
         ).grid(row=1, column=0, sticky="w", pady=(4, 0))
 
     def _build_overview(self) -> None:
-        overview = ctk.CTkFrame(self, fg_color="#111f35", corner_radius=18, border_width=1, border_color="#2d476b")
+        overview = ctk.CTkFrame(self, fg_color=DASHBOARD_THEME.panel_bg, corner_radius=18, border_width=1, border_color=DASHBOARD_THEME.card_border)
         overview.grid(row=1, column=0, sticky="ew", padx=16, pady=(0, 12))
         for column in range(3):
             overview.grid_columnconfigure(column, weight=1)
@@ -104,7 +104,7 @@ class ScenarioEntityBrowser(ctk.CTkFrame):
             ("Primary pressure", dominant, _entity_color(dominant)),
         ]
         for index, (label, value, accent) in enumerate(metrics):
-            card = ctk.CTkFrame(overview, fg_color="#0d1728", corner_radius=16, border_width=1, border_color="#243a5c")
+            card = ctk.CTkFrame(overview, fg_color=DASHBOARD_THEME.panel_alt_bg, corner_radius=16, border_width=1, border_color=DASHBOARD_THEME.card_border)
             card.grid(row=1, column=index, sticky="nsew", padx=8, pady=(6, 12))
             card.grid_columnconfigure(0, weight=1)
             ctk.CTkLabel(
@@ -124,7 +124,7 @@ class ScenarioEntityBrowser(ctk.CTkFrame):
 
     def _build_body(self) -> None:
         if not self._groups:
-            empty = ctk.CTkFrame(self, fg_color="#09111f", corner_radius=18)
+            empty = ctk.CTkFrame(self, fg_color=DASHBOARD_THEME.panel_bg, corner_radius=18)
             empty.grid(row=2, column=0, sticky="nsew", padx=16, pady=(0, 16))
             empty.grid_columnconfigure(0, weight=1)
             ctk.CTkLabel(
@@ -143,13 +143,13 @@ class ScenarioEntityBrowser(ctk.CTkFrame):
             ).grid(row=1, column=0, pady=(0, 32), padx=24)
             return
 
-        body = ctk.CTkScrollableFrame(self, fg_color="#09111f", corner_radius=18)
+        body = ctk.CTkScrollableFrame(self, fg_color=DASHBOARD_THEME.panel_bg, corner_radius=18)
         body.grid(row=2, column=0, sticky="nsew", padx=16, pady=(0, 16))
         body.grid_columnconfigure(0, weight=1)
 
         for row, group in enumerate(self._groups):
             accent = _entity_color(group["entity_type"])
-            section = ctk.CTkFrame(body, fg_color="#0d1728", corner_radius=18, border_width=1, border_color="#22395d")
+            section = ctk.CTkFrame(body, fg_color=DASHBOARD_THEME.panel_alt_bg, corner_radius=18, border_width=1, border_color=DASHBOARD_THEME.card_border)
             section.grid(row=row, column=0, sticky="ew", pady=(0, 12))
             section.grid_columnconfigure(0, weight=1)
 
@@ -179,7 +179,7 @@ class ScenarioEntityBrowser(ctk.CTkFrame):
             ctk.CTkLabel(
                 header,
                 text=f"Focus {row + 1}",
-                fg_color="#10233a",
+                fg_color=DASHBOARD_THEME.button_fg,
                 corner_radius=999,
                 padx=10,
                 pady=4,
@@ -193,13 +193,7 @@ class ScenarioEntityBrowser(ctk.CTkFrame):
                 entity_grid.grid_columnconfigure(column, weight=1)
 
             for index, entity_name in enumerate(group["entities"]):
-                card = ctk.CTkFrame(
-                    entity_grid,
-                    fg_color="#111f35",
-                    corner_radius=14,
-                    border_width=1,
-                    border_color="#2d476b",
-                )
+                card = ctk.CTkFrame(entity_grid, fg_color=DASHBOARD_THEME.panel_bg, corner_radius=14, border_width=1, border_color=DASHBOARD_THEME.card_border)
                 card.grid(row=index // 2, column=index % 2, sticky="ew", padx=(0, 10), pady=(0, 10))
                 card.grid_columnconfigure(0, weight=1)
                 ctk.CTkLabel(
@@ -214,7 +208,7 @@ class ScenarioEntityBrowser(ctk.CTkFrame):
                     text=entity_name,
                     command=lambda entity_type=group["entity_type"], name=entity_name: self._on_open_entity(entity_type, name),
                     fg_color="transparent",
-                    hover_color="#1a2d47",
+                    hover_color=DASHBOARD_THEME.button_hover,
                     text_color=DASHBOARD_THEME.text_primary,
                     anchor="w",
                     border_spacing=0,

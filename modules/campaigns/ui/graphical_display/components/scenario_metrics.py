@@ -8,7 +8,7 @@ from .pill import OutlinedPill
 
 class ScenarioMetricChip(ctk.CTkFrame):
     def __init__(self, parent, *, label: str, value: str, accent: str = "#66c0ff"):
-        super().__init__(parent, fg_color="#14233a", corner_radius=16, border_width=1, border_color="#22395d")
+        super().__init__(parent, fg_color=DASHBOARD_THEME.card_bg, corner_radius=16, border_width=1, border_color=DASHBOARD_THEME.card_border)
         self.grid_columnconfigure(0, weight=1)
         ctk.CTkLabel(
             self,
@@ -33,8 +33,8 @@ class ScenarioTagRow(ctk.CTkFrame):
             OutlinedPill(
                 self,
                 text=tag,
-                text_color="#e7f1ff",
-                fg_color="#10233a",
+                text_color=DASHBOARD_THEME.text_primary,
+                fg_color=DASHBOARD_THEME.button_fg,
                 border_color=accent,
                 font=ctk.CTkFont(size=11, weight="bold"),
             ).grid(row=index // 3, column=index % 3, sticky="w", padx=(0, 8), pady=(0, 8))

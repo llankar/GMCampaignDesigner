@@ -19,7 +19,7 @@ class CampaignOverviewHero(ctk.CTkFrame):
         campaign_values: list[str],
         on_campaign_selected,
     ):
-        super().__init__(parent, fg_color="#10192b", corner_radius=22, border_width=1, border_color="#223554")
+        super().__init__(parent, fg_color=DASHBOARD_THEME.panel_alt_bg, corner_radius=22, border_width=1, border_color=DASHBOARD_THEME.card_border)
         self._payload = payload
         self._campaign_var = campaign_var
         self._campaign_values = campaign_values
@@ -87,7 +87,7 @@ class CampaignOverviewHero(ctk.CTkFrame):
         header.grid(row=0, column=0, sticky="ew")
         header.grid_columnconfigure(1, weight=1)
 
-        crest = ctk.CTkFrame(header, fg_color="#20123f", corner_radius=14, width=54, height=54)
+        crest = ctk.CTkFrame(header, fg_color=DASHBOARD_THEME.button_fg, corner_radius=14, width=54, height=54)
         crest.grid(row=0, column=0, padx=(0, 12), sticky="n")
         crest.grid_propagate(False)
         ctk.CTkLabel(crest, text="✦", font=ctk.CTkFont(size=22, weight="bold"), text_color="#f7d774").place(relx=0.5, rely=0.38, anchor="center")
@@ -121,7 +121,7 @@ class CampaignOverviewHero(ctk.CTkFrame):
         for value in [self._payload.genre, self._payload.tone, self._payload.status]:
             if not value:
                 continue
-            _CompactChip(chips, text=value, fg_color="#1b3150", text_color="#d8ebff").grid(
+            _CompactChip(chips, text=value, fg_color=DASHBOARD_THEME.button_fg, text_color=DASHBOARD_THEME.text_primary).grid(
                 row=0,
                 column=chip_index,
                 padx=(0, 8),
@@ -147,7 +147,7 @@ class CampaignOverviewHero(ctk.CTkFrame):
         for column in range(2):
             sidebar.grid_columnconfigure(column, weight=1)
 
-        progress = ctk.CTkFrame(sidebar, fg_color="#120f28", corner_radius=18)
+        progress = ctk.CTkFrame(sidebar, fg_color=DASHBOARD_THEME.panel_bg, corner_radius=18)
         progress.grid(row=0, column=0, rowspan=2, sticky="nsew", padx=(0, 10))
         ArcMomentumMeter(
             progress,
@@ -192,12 +192,12 @@ class _CompactChip(ctk.CTkFrame):
 
 class _StatCard(ctk.CTkFrame):
     def __init__(self, parent, *, label: str, value: str):
-        super().__init__(parent, fg_color="#14233a", corner_radius=14, border_width=1, border_color="#223554")
+        super().__init__(parent, fg_color=DASHBOARD_THEME.card_bg, corner_radius=14, border_width=1, border_color=DASHBOARD_THEME.card_border)
         self.grid_columnconfigure(0, weight=1)
         ctk.CTkLabel(
             self,
             text=label.upper(),
-            text_color="#8fb0dd",
+            text_color=DASHBOARD_THEME.text_secondary,
             font=ctk.CTkFont(size=10, weight="bold"),
             anchor="w",
         ).grid(row=0, column=0, sticky="w", padx=12, pady=(8, 2))
@@ -212,12 +212,12 @@ class _StatCard(ctk.CTkFrame):
 
 class _FactTile(ctk.CTkFrame):
     def __init__(self, parent, *, label: str, value: str):
-        super().__init__(parent, fg_color="#162239", corner_radius=14)
+        super().__init__(parent, fg_color=DASHBOARD_THEME.card_bg, corner_radius=14)
         self.grid_columnconfigure(0, weight=1)
         ctk.CTkLabel(
             self,
             text=label.upper(),
-            text_color="#8fb0dd",
+            text_color=DASHBOARD_THEME.text_secondary,
             font=ctk.CTkFont(size=10, weight="bold"),
             anchor="w",
         ).grid(row=0, column=0, sticky="w", padx=12, pady=(8, 1))
