@@ -162,10 +162,10 @@ class MainWindow(ctk.CTk):
         self.entity_definitions = load_entity_definitions()
         self.load_icons()
         self.create_menu_bar()
-        self.ai_run_window_controller = AIRunWindowController(self, self.menu_bar)
         self.entity_wrappers = {}
         self.create_content_area()
         self.create_exit_button()
+        self.ai_run_window_controller = AIRunWindowController(self, self.menu_bar)
         self.load_model_config()
         self.init_wrappers()
         self._normalize_entity_media_paths()
