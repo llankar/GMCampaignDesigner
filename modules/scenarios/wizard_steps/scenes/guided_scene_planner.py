@@ -1,14 +1,19 @@
 import customtkinter as ctk
 
 from modules.scenarios.wizard_steps.scenes.scene_mode_adapters import GUIDED_BOUNDARY_FLOW
+from modules.scenarios.wizard_steps.scenes.scene_entity_fields import (
+    SCENE_ENTITY_FIELDS,
+    normalise_entity_list,
+)
 
 
 class GuidedScenePlanner(ctk.CTkFrame):
-    def __init__(self, master):
+    def __init__(self, master, *, entity_selector_callbacks=None):
         super().__init__(master, fg_color="transparent")
         self.grid_columnconfigure(0, weight=1)
         self.grid_rowconfigure(1, weight=1)
         self._cards = []
+        self._entity_selector_callbacks = dict(entity_selector_callbacks or {})
 
         info = ctk.CTkLabel(
             self,
@@ -23,8 +28,8 @@ class GuidedScenePlanner(ctk.CTkFrame):
         self._container.grid(row=1, column=0, sticky="nsew", padx=12, pady=(0, 12))
         self._container.grid_columnconfigure(0, weight=1)
 
-    def _new_card_data(self, *, title="", summary="", scene_type="Choice", stage="", canvas=None, extra_fields=None):
-        return {
+    def _new_card_data(self, *, title="", summary="", scene_type="Choice", stage="", canvas=None, extra_fields=None, entities=None):
+        card = {
             "stage": stage or "Scene",
             "Title": title,
             "Summary": summary,
@@ -32,6 +37,12 @@ class GuidedScenePlanner(ctk.CTkFrame):
             "_canvas": dict(canvas or {}),
             "_extra_fields": dict(extra_fields or {}),
         }
+        incoming_entities = entities or {}
+        for field_name in SCENE_ENTITY_FIELDS:
+            card[field_name] = normalise_entity_list(
+                incoming_entities.get(field_name) if isinstance(incoming_entities, dict) else None
+            )
+        return card
 
     def _card_heading(self, index):
         total = len(self._cards)
@@ -57,6 +68,7 @@ class GuidedScenePlanner(ctk.CTkFrame):
             stage=stage,
             canvas=payload.get("_canvas"),
             extra_fields=payload.get("_extra_fields"),
+            entities={field_name: payload.get(field_name) for field_name in SCENE_ENTITY_FIELDS},
         )
 
     def _render_cards(self):
@@ -106,8 +118,49 @@ class GuidedScenePlanner(ctk.CTkFrame):
             summary.grid(row=2, column=0, sticky="ew", padx=12, pady=(8, 12))
             summary.insert("1.0", payload["Summary"])
 
+            entities_section = ctk.CTkFrame(card, fg_color="#111827", corner_radius=10)
+            entities_section.grid(row=3, column=0, sticky="ew", padx=12, pady=(0, 12))
+            entities_section.grid_columnconfigure(0, weight=1)
+            ctk.CTkLabel(
+                entities_section,
+                text="Scene Entities",
+                font=ctk.CTkFont(size=12, weight="bold"),
+                text_color="#b8c7e2",
+                anchor="w",
+            ).grid(row=0, column=0, sticky="w", padx=10, pady=(8, 4))
+
+            entity_vars = {}
+            for row_offset, field_name in enumerate(SCENE_ENTITY_FIELDS, start=1):
+                row = ctk.CTkFrame(entities_section, fg_color="transparent")
+                row.grid(row=row_offset, column=0, sticky="ew", padx=10, pady=(0, 6))
+                row.grid_columnconfigure(1, weight=1)
+                ctk.CTkLabel(row, text=f"{field_name}", width=82, anchor="w", text_color="#8fa6cc").grid(row=0, column=0, sticky="w")
+                entity_var = ctk.StringVar(value=", ".join(normalise_entity_list(payload.get(field_name))))
+                ctk.CTkEntry(row, textvariable=entity_var).grid(row=0, column=1, sticky="ew", padx=(8, 6))
+                selector = self._entity_selector_callbacks.get(field_name)
+                select_btn_state = "normal" if callable(selector) else "disabled"
+                ctk.CTkButton(
+                    row,
+                    text="Select",
+                    width=72,
+                    state=select_btn_state,
+                    command=lambda f=field_name, v=entity_var: self._open_entity_selector(f, v),
+                ).grid(row=0, column=2, sticky="e")
+                entity_vars[field_name] = entity_var
+
             payload["title_var"] = title_var
             payload["summary_widget"] = summary
+            payload["entity_vars"] = entity_vars
+
+    def _open_entity_selector(self, field_name, entity_var):
+        selector = self._entity_selector_callbacks.get(field_name)
+        if not callable(selector):
+            return
+        current = normalise_entity_list(entity_var.get())
+        selected = selector(current)
+        if selected is None:
+            return
+        entity_var.set(", ".join(normalise_entity_list(selected)))
 
     def _snapshot_ui(self):
         snapshot = []
@@ -120,6 +173,11 @@ class GuidedScenePlanner(ctk.CTkFrame):
             base = self._normalise_card_data(payload, idx, total)
             base["Title"] = title or base["stage"]
             base["Summary"] = summary
+            entity_vars = payload.get("entity_vars") or {}
+            for field_name in SCENE_ENTITY_FIELDS:
+                field_var = entity_vars.get(field_name)
+                if field_var is not None:
+                    base[field_name] = normalise_entity_list(field_var.get())
             snapshot.append(base)
         self._cards = snapshot
 

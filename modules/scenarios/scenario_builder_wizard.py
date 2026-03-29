@@ -31,6 +31,10 @@ from modules.scenarios.scenario_character_graph import (
 )
 from modules.scenarios.wizard_steps.scenes.canvas_scene_planner import CanvasScenePlanner
 from modules.scenarios.wizard_steps.scenes.guided_scene_planner import GuidedScenePlanner
+from modules.scenarios.wizard_steps.scenes.scene_entity_fields import (
+    SCENE_ENTITY_FIELDS as SCENE_CARD_ENTITY_FIELDS,
+    normalise_entity_list,
+)
 from modules.scenarios.wizard_steps.scenes.scene_mode_adapters import (
     canonicalise_scene,
     guided_cards_to_scenes,
@@ -262,11 +266,65 @@ class ScenesPlanningStep(WizardStep):
         self._planner_holder.grid_columnconfigure(0, weight=1)
         self._planner_holder.grid_rowconfigure(0, weight=1)
 
-        self.guided_planner = GuidedScenePlanner(self._planner_holder)
+        self.guided_planner = GuidedScenePlanner(
+            self._planner_holder,
+            entity_selector_callbacks=self._build_entity_selector_callbacks(),
+        )
         self.canvas_planner = CanvasScenePlanner(self._planner_holder)
         self._active_mode = None
         self.scenes = []
         self._set_mode("guided", remap=False)
+
+    def _build_entity_selector_callbacks(self):
+        callbacks = {}
+        for field_name in SCENE_CARD_ENTITY_FIELDS:
+            entity_type = field_name.lower()
+            wrapper = self.entity_wrappers.get(entity_type)
+            if not wrapper:
+                continue
+            callbacks[field_name] = (
+                lambda current, f=field_name, et=entity_type: self._select_scene_entities(et, f, current)
+            )
+        return callbacks
+
+    def _select_scene_entities(self, entity_type, field_name, current_values):  # pragma: no cover - UI interaction
+        wrapper = self.entity_wrappers.get(entity_type)
+        if not wrapper:
+            return normalise_entity_list(current_values)
+        template = load_template(entity_type)
+        dialog = ctk.CTkToplevel(self)
+        dialog.title(f"Select {field_name}")
+        dialog.geometry("1100x720")
+        dialog.minsize(1100, 720)
+        selected_values = set(normalise_entity_list(current_values))
+        result = {"confirmed": False}
+        selection = GenericListSelectionView(
+            dialog,
+            entity_type,
+            wrapper,
+            template,
+            on_select_callback=lambda _et, name, _item: selected_values.add(str(name).strip()) if str(name).strip() else None,
+        )
+        selection.pack(fill="both", expand=True)
+
+        controls = ctk.CTkFrame(dialog)
+        controls.pack(fill="x", padx=12, pady=12)
+        ctk.CTkButton(
+            controls,
+            text="Cancel",
+            command=dialog.destroy,
+        ).pack(side="right")
+        ctk.CTkButton(
+            controls,
+            text="Apply Selection",
+            command=lambda: (result.__setitem__("confirmed", True), dialog.destroy()),
+        ).pack(side="right", padx=(0, 8))
+        dialog.transient(self.winfo_toplevel())
+        dialog.grab_set()
+        self.wait_window(dialog)
+        if not result["confirmed"]:
+            return normalise_entity_list(current_values)
+        return normalise_entity_list(selected_values)
 
     def set_state_binding(self, state, on_state_change=None):
         self._state_ref = state
@@ -408,6 +466,8 @@ class ScenesPlanningStep(WizardStep):
             if links:
                 record["NextScenes"] = [link["target"] for link in links]
                 record["Links"] = [{"target": link["target"], "text": link.get("text") or link["target"]} for link in links]
+            for field_name in SCENE_CARD_ENTITY_FIELDS:
+                record[field_name] = normalise_entity_list(scene.get(field_name))
             extras = scene.get("_extra_fields")
             if isinstance(extras, dict):
                 for key, value in extras.items():
