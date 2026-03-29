@@ -299,19 +299,57 @@ class ScenesPlanningStep(WizardStep):
         dialog.title(f"Select {field_name}")
         dialog.geometry("1100x720")
         dialog.minsize(1100, 720)
-        selected_values = set(normalise_entity_list(current_values))
+        selected_values = list(normalise_entity_list(current_values))
+        selected_lookup = {value.casefold() for value in selected_values}
         result = {"confirmed": False}
+
+        status_var = ctk.StringVar()
+
+        def _update_status():
+            preview = ", ".join(selected_values[:6])
+            if len(selected_values) > 6:
+                preview = f"{preview}, +{len(selected_values) - 6} more"
+            if preview:
+                status_var.set(
+                    f"Queued: {len(selected_values)} · {preview}\n"
+                    "Double-click to queue, then Apply Queued Selection."
+                )
+            else:
+                status_var.set("No entities queued yet. Double-click to queue, then Apply Queued Selection.")
+
+        def _queue_selected_entity(_et, name, _item):
+            cleaned = str(name).strip()
+            if not cleaned:
+                return
+            lookup_key = cleaned.casefold()
+            if lookup_key in selected_lookup:
+                return
+            selected_lookup.add(lookup_key)
+            selected_values.append(cleaned)
+            _update_status()
+
+        _update_status()
+
         selection = GenericListSelectionView(
             dialog,
             entity_type,
             wrapper,
             template,
-            on_select_callback=lambda _et, name, _item: selected_values.add(str(name).strip()) if str(name).strip() else None,
+            allow_multi_select=True,
+            double_click_action="emit_selection",
+            on_select_callback=_queue_selected_entity,
         )
         selection.pack(fill="both", expand=True)
 
         controls = ctk.CTkFrame(dialog)
         controls.pack(fill="x", padx=12, pady=12)
+        ctk.CTkLabel(
+            controls,
+            textvariable=status_var,
+            justify="left",
+            anchor="w",
+            text_color="#9db4d1",
+        ).pack(side="left", padx=(0, 12))
         ctk.CTkButton(
             controls,
             text="Cancel",
@@ -319,7 +357,7 @@ class ScenesPlanningStep(WizardStep):
         ).pack(side="right")
         ctk.CTkButton(
             controls,
-            text="Apply Selection",
+            text="Apply Queued Selection",
             command=lambda: (result.__setitem__("confirmed", True), dialog.destroy()),
         ).pack(side="right", padx=(0, 8))
         dialog.transient(self.winfo_toplevel())
