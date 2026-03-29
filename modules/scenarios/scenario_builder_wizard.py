@@ -270,7 +270,10 @@ class ScenesPlanningStep(WizardStep):
             self._planner_holder,
             entity_selector_callbacks=self._build_entity_selector_callbacks(),
         )
-        self.canvas_planner = CanvasScenePlanner(self._planner_holder)
+        self.canvas_planner = CanvasScenePlanner(
+            self._planner_holder,
+            entity_selector_callbacks=self._build_entity_selector_callbacks(),
+        )
         self._active_mode = None
         self.scenes = []
         self._set_mode("guided", remap=False)
