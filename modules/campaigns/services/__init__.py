@@ -16,6 +16,7 @@ from .campaign_storage import (
     seed_default_templates,
 )
 from .startup_config import DEFAULT_MODELS_PATH, StartupModelConfig, load_startup_model_config
+from .generation_defaults_service import CampaignGenerationDefaultsService
 from .tone_contract import CampaignToneContract, format_tone_contract_guidance, load_campaign_tone_contract
 from .ai import (
     ArcGenerationService,
@@ -42,6 +43,7 @@ __all__ = [
     "DEFAULT_MODELS_PATH",
     "StartupModelConfig",
     "load_startup_model_config",
+    "CampaignGenerationDefaultsService",
     "CampaignToneContract",
     "load_campaign_tone_contract",
     "format_tone_contract_guidance",
