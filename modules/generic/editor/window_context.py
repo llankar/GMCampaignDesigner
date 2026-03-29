@@ -22,7 +22,7 @@ from modules.helpers.text_helpers import format_longtext
 from modules.helpers.text_helpers import ai_text_to_rtf_json
 from modules.helpers.dice_markup import parse_inline_actions
 from modules.ai.local_ai_client import LocalAIClient
-from modules.ai.pipeline import execute_ai_chat
+from modules.ai.pipeline import execute_ai_chat, run_ai_editor_chat
 from modules.events.ui.shared.schedule_widgets import EventDatePickerField, EventTimePickerField
 import json
 import ast

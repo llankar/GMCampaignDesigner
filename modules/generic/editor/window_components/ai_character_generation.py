@@ -42,13 +42,16 @@ class GenericEditorWindowAICharacterGeneration:
                 "Constraints: No extra keys. No code blocks. Keep within ~400 words."
             )
             # Build prompt and call AI
-            content = execute_ai_chat(
+            content = run_ai_editor_chat(
                 self._get_ai(),
                 [
                     {"role": "system", "content": system},
                     {"role": "user", "content": user},
                 ],
                 pipeline_name="editor.character_generation.npc",
+                feature="character_generation",
+                entity_type="npcs",
+                action_label="Generate NPC",
                 phase="npc_generation",
                 phase_message="Generating NPC content",
             )
@@ -145,13 +148,16 @@ class GenericEditorWindowAICharacterGeneration:
                 "Constraints: No extra keys. No code blocks. Keep within ~300-400 words."
             )
             # Build prompt and call AI
-            content = execute_ai_chat(
+            content = run_ai_editor_chat(
                 self._get_ai(),
                 [
                     {"role": "system", "content": system},
                     {"role": "user", "content": user},
                 ],
                 pipeline_name="editor.character_generation.creature",
+                feature="character_generation",
+                entity_type="creatures",
+                action_label="Generate Creature",
                 phase="creature_generation",
                 phase_message="Generating creature content",
             )
