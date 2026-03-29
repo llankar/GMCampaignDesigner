@@ -3,6 +3,11 @@ from __future__ import annotations
 import json
 from typing import Any
 
+from modules.campaigns.services.ai.generation_policy import (
+    build_hard_constraints_block,
+    resolve_generation_defaults,
+)
+from modules.campaigns.services.generation_defaults_service import CampaignGenerationDefaultsService
 from modules.helpers.text_helpers import coerce_text
 from .constraints import minimum_scenarios_per_arc
 
@@ -204,8 +209,17 @@ ARC_SCENARIO_EXPANSION_SCHEMA = {
 }
 
 
-def build_arc_generation_prompt(foundation: dict[str, Any], scenarios: list[dict[str, Any]]) -> str:
+def build_arc_generation_prompt(
+    foundation: dict[str, Any],
+    scenarios: list[dict[str, Any]],
+    *,
+    generation_defaults_service: CampaignGenerationDefaultsService | None = None,
+) -> str:
     """Build the strict JSON prompt used to generate campaign arcs from scenarios."""
+    generation_defaults = resolve_generation_defaults(
+        foundation,
+        generation_defaults_service=generation_defaults_service,
+    )
 
     scenario_catalog = [
         {
@@ -233,18 +247,17 @@ def build_arc_generation_prompt(foundation: dict[str, Any], scenarios: list[dict
             for entity_type in ("villains", "factions", "places", "npcs", "creatures")
         },
         "generation_defaults": {
-            "main_pc_factions": [_clean(name) for name in (foundation.get("generation_defaults", {}).get("main_pc_factions") or []) if _clean(name)],
-            "protected_factions": [_clean(name) for name in (foundation.get("generation_defaults", {}).get("protected_factions") or []) if _clean(name)],
+            "main_pc_factions": [_clean(name) for name in (generation_defaults.get("main_pc_factions") or []) if _clean(name)],
+            "protected_factions": [_clean(name) for name in (generation_defaults.get("protected_factions") or []) if _clean(name)],
             "forbidden_antagonist_factions": [
                 _clean(name)
-                for name in (foundation.get("generation_defaults", {}).get("forbidden_antagonist_factions") or [])
+                for name in (generation_defaults.get("forbidden_antagonist_factions") or [])
                 if _clean(name)
             ],
-            "allow_optional_conflicts": bool(
-                (foundation.get("generation_defaults", {}) or {}).get("allow_optional_conflicts", True)
-            ),
+            "allow_optional_conflicts": bool(generation_defaults.get("allow_optional_conflicts", True)),
         },
     }
+    hard_constraints_block = build_hard_constraints_block(generation_defaults)
 
     min_scenarios = minimum_scenarios_per_arc(len(scenario_catalog))
 
@@ -267,9 +280,7 @@ def build_arc_generation_prompt(foundation: dict[str, Any], scenarios: list[dict
         "Rules:\n"
         "- Use concise but actionable summaries and objectives.\n"
         "- Keep status realistic for a planning workflow; default to Planned unless campaign state strongly implies otherwise.\n"
-        "- Treat generation_defaults.main_pc_factions as player-side anchors for recurring alliance framing.\n"
-        "- Never cast generation_defaults.forbidden_antagonist_factions as antagonists.\n"
-        "- Respect generation_defaults.protected_factions; avoid direct villain framing unless allow_optional_conflicts is true and tension stays nuanced.\n"
+        f"{_format_prompt_block(hard_constraints_block)}"
         "- The thread field on each arc must match one of the generated thread names.\n"
         "- Prefer broad campaign continuity over isolated arc ideas.\n"
         f"- Do not create arcs with fewer than {min_scenarios} scenarios unless the full scenario catalog itself contains fewer than that many scenarios.\n"
@@ -282,8 +293,13 @@ def build_arc_scenario_expansion_prompt(
     arcs: list[dict[str, Any]],
     *,
     existing_scenarios: list[dict[str, Any]] | None = None,
+    generation_defaults_service: CampaignGenerationDefaultsService | None = None,
 ) -> str:
     """Build the strict JSON prompt used to generate two new scenarios per arc."""
+    generation_defaults = resolve_generation_defaults(
+        foundation,
+        generation_defaults_service=generation_defaults_service,
+    )
 
     foundation_payload = {
         "name": _clean(foundation.get("name")),
@@ -307,24 +323,23 @@ def build_arc_scenario_expansion_prompt(
         "generation_defaults": {
             "main_pc_factions": [
                 _clean(name)
-                for name in (foundation.get("generation_defaults", {}).get("main_pc_factions") or [])
+                for name in (generation_defaults.get("main_pc_factions") or [])
                 if _clean(name)
             ],
             "protected_factions": [
                 _clean(name)
-                for name in (foundation.get("generation_defaults", {}).get("protected_factions") or [])
+                for name in (generation_defaults.get("protected_factions") or [])
                 if _clean(name)
             ],
             "forbidden_antagonist_factions": [
                 _clean(name)
-                for name in (foundation.get("generation_defaults", {}).get("forbidden_antagonist_factions") or [])
+                for name in (generation_defaults.get("forbidden_antagonist_factions") or [])
                 if _clean(name)
             ],
-            "allow_optional_conflicts": bool(
-                (foundation.get("generation_defaults", {}) or {}).get("allow_optional_conflicts", True)
-            ),
+            "allow_optional_conflicts": bool(generation_defaults.get("allow_optional_conflicts", True)),
         },
     }
+    hard_constraints_block = build_hard_constraints_block(generation_defaults)
     arc_payload = [
         {
             "name": _clean(arc.get("name")),
@@ -377,7 +392,14 @@ def build_arc_scenario_expansion_prompt(
         "- Reuse names from campaign foundation.existing_entities whenever they fit.\n"
         "- If you use any villain, faction, place, NPC, or creature name that is not in campaign foundation.existing_entities, include it in EntityCreations with a matching Name.\n"
         "- Keep each scenario self-contained enough to save directly as a scenario record.\n"
+        f"{_format_prompt_block(hard_constraints_block)}"
     )
+
+
+def _format_prompt_block(block: str) -> str:
+    if not block:
+        return ""
+    return f"{block}\n"
 
 
 def _scenario_title(scenario: dict[str, Any]) -> str:
