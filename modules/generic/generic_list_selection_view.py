@@ -19,6 +19,7 @@ class GenericListSelectionView(ctk.CTkFrame):
         *args,
         allow_multi_select=False,
         on_multi_select_callback=None,
+        double_click_action=None,
         **kwargs,
     ):
         super().__init__(master, *args, **kwargs)
@@ -28,6 +29,11 @@ class GenericListSelectionView(ctk.CTkFrame):
         self.on_select_callback = on_select_callback
         self.on_multi_select_callback = on_multi_select_callback
         self.allow_multi_select = allow_multi_select
+        self.double_click_action = (
+            str(double_click_action).strip().lower()
+            if double_click_action
+            else ("emit_selection" if self.allow_multi_select else "open_selected")
+        )
 
         # Load items and prepare columns
         self.items = self.model_wrapper.load_items()
@@ -190,6 +196,12 @@ class GenericListSelectionView(ctk.CTkFrame):
         item_id = self.tree.identify_row(event.y) or self.tree.focus()
         if not item_id:
             return
+
+        if self.double_click_action == "open_selected":
+            self.tree.selection_set(item_id)
+            self.open_selected()
+            return
+
         selected_item = self.item_by_id.get(item_id)
         if selected_item:
             self._emit_selection(selected_item)

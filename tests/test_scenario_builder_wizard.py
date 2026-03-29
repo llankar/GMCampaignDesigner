@@ -419,3 +419,124 @@ def test_load_existing_scenario_uses_selected_payload_directly():
             "NPCs": ["Morgan"],
         }
     ]
+
+
+def test_select_scene_entities_double_click_queues_until_apply(monkeypatch):
+    step = _build_scenes_step()
+    step.entity_wrappers = {"npcs": object()}
+    step.winfo_toplevel = lambda: object()
+
+    class _Dialog:
+        def __init__(self, *_args, **_kwargs):
+            self.destroyed = False
+
+        def title(self, *_args, **_kwargs):
+            return None
+
+        def geometry(self, *_args, **_kwargs):
+            return None
+
+        def minsize(self, *_args, **_kwargs):
+            return None
+
+        def transient(self, *_args, **_kwargs):
+            return None
+
+        def grab_set(self, *_args, **_kwargs):
+            return None
+
+        def destroy(self):
+            self.destroyed = True
+
+    buttons = {}
+    queued_labels = []
+
+    class _Button:
+        def __init__(self, _master, text, command):
+            buttons[text] = command
+
+        def pack(self, *_args, **_kwargs):
+            return None
+
+    class _Label:
+        def __init__(self, _master, textvariable=None, **_kwargs):
+            self._text_var = textvariable
+
+        def pack(self, *_args, **_kwargs):
+            if self._text_var:
+                queued_labels.append(self._text_var.get())
+            return None
+
+    class _SelectionView:
+        def __init__(self, _dialog, _entity_type, _wrapper, _template, **kwargs):
+            self.kwargs = kwargs
+            step._selection_kwargs = kwargs
+            step._on_select_callback = kwargs["on_select_callback"]
+
+        def pack(self, *_args, **_kwargs):
+            return None
+
+    monkeypatch.setattr(scenario_builder_wizard.ctk, "CTkToplevel", _Dialog)
+    monkeypatch.setattr(scenario_builder_wizard.ctk, "CTkButton", _Button)
+    monkeypatch.setattr(scenario_builder_wizard.ctk, "CTkLabel", _Label)
+    monkeypatch.setattr(scenario_builder_wizard, "GenericListSelectionView", _SelectionView)
+    monkeypatch.setattr(scenario_builder_wizard, "load_template", lambda _entity_type: {"fields": [{"name": "Name"}]})
+
+    def _wait_window(_dialog):
+        step._on_select_callback("npcs", "Morgan", {})
+        buttons["Apply Queued Selection"]()
+
+    step.wait_window = _wait_window
+
+    selected = step._select_scene_entities("npcs", "NPCs", ["Avery"])
+
+    assert selected == ["Avery", "Morgan"]
+    assert step._selection_kwargs["allow_multi_select"] is True
+    assert step._selection_kwargs["double_click_action"] == "emit_selection"
+    assert queued_labels and "Double-click to queue, then Apply Queued Selection." in queued_labels[0]
+
+
+def test_select_scene_entities_cancel_keeps_existing_state(monkeypatch):
+    step = _build_scenes_step()
+    step.entity_wrappers = {"places": object()}
+    step.winfo_toplevel = lambda: object()
+
+    class _Dialog:
+        def __init__(self, *_args, **_kwargs):
+            return None
+
+        def title(self, *_args, **_kwargs):
+            return None
+
+        def geometry(self, *_args, **_kwargs):
+            return None
+
+        def minsize(self, *_args, **_kwargs):
+            return None
+
+        def transient(self, *_args, **_kwargs):
+            return None
+
+        def grab_set(self, *_args, **_kwargs):
+            return None
+
+        def destroy(self):
+            return None
+
+    class _SelectionView:
+        def __init__(self, *_args, **kwargs):
+            step._on_select_callback = kwargs["on_select_callback"]
+
+        def pack(self, *_args, **_kwargs):
+            return None
+
+    monkeypatch.setattr(scenario_builder_wizard.ctk, "CTkToplevel", _Dialog)
+    monkeypatch.setattr(scenario_builder_wizard, "GenericListSelectionView", _SelectionView)
+    monkeypatch.setattr(scenario_builder_wizard, "load_template", lambda _entity_type: {"fields": [{"name": "Name"}]})
+
+    # Keep default widget stubs for frame/label/button and exit without applying.
+    step.wait_window = lambda _dialog: step._on_select_callback("places", "Dockside", {})
+
+    selected = step._select_scene_entities("places", "Places", ["Old Town"])
+
+    assert selected == ["Old Town"]
