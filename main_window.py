@@ -755,6 +755,39 @@ class MainWindow(ctk.CTk):
             self._refresh_theme_buttons(tokens)
         except Exception:
             pass
+        try:
+            self._refresh_current_content_theme()
+        except Exception:
+            pass
+
+    def _refresh_current_content_theme(self) -> None:
+        """Ask the active content view to repaint itself after a theme switch."""
+        current_view = getattr(self, "current_open_view", None)
+        if current_view is None:
+            return
+
+        queue = [current_view]
+        visited: set[int] = set()
+        while queue:
+            widget = queue.pop(0)
+            widget_id = id(widget)
+            if widget_id in visited:
+                continue
+            visited.add(widget_id)
+
+            refresh_fn = getattr(widget, "refresh_theme", None)
+            if callable(refresh_fn):
+                try:
+                    refresh_fn()
+                except Exception:
+                    pass
+
+            children_getter = getattr(widget, "winfo_children", None)
+            if callable(children_getter):
+                try:
+                    queue.extend(children_getter())
+                except Exception:
+                    continue
 
     def _refresh_theme_buttons(self, tokens: dict) -> None:
         button_fg = tokens.get("button_fg")
