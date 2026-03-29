@@ -37,19 +37,33 @@ class AIPipelineRunner:
         *,
         phase: str = "llm_call",
         phase_message: str = "Calling AI model",
+        context_metadata: dict | None = None,
         **chat_kwargs,
     ):
+        context_metadata = context_metadata or {}
+        action_label = str(context_metadata.get("action_label") or "").strip()
+        metadata = {"pipeline": self.pipeline_name, **context_metadata}
+        start_message = "AI pipeline started"
+        if action_label:
+            start_message = f"{action_label} started"
+        prepare_message = "Preparing AI request"
+        if action_label:
+            prepare_message = f"Preparing request: {action_label}"
+        effective_phase_message = phase_message or "Calling AI model"
+        if action_label and phase_message == "Calling AI model":
+            effective_phase_message = action_label
+
         ai_pipeline_events.emit(
             AIPipelineEvent(
                 event_type=EVENT_AI_PIPELINE_STARTED,
                 request_id=self.request_id,
                 phase="start",
-                message="AI pipeline started",
-                metadata={"pipeline": self.pipeline_name},
+                message=start_message,
+                metadata=metadata,
             )
         )
-        self.emit_phase("prepare_request", "Preparing AI request")
-        self.emit_phase(phase, phase_message)
+        self.emit_phase("prepare_request", prepare_message, **context_metadata)
+        self.emit_phase(phase, effective_phase_message, **context_metadata)
         try:
             response = self.ai_client.chat(messages, **chat_kwargs)
         except Exception as exc:
@@ -60,7 +74,7 @@ class AIPipelineRunner:
                     phase=phase,
                     message=str(exc),
                     is_terminal=True,
-                    metadata={"pipeline": self.pipeline_name},
+                    metadata=metadata,
                 )
             )
             raise
@@ -72,7 +86,7 @@ class AIPipelineRunner:
                 phase="completed",
                 message="AI pipeline completed",
                 is_terminal=True,
-                metadata={"pipeline": self.pipeline_name},
+                metadata=metadata,
             )
         )
         return response
@@ -86,6 +100,7 @@ def execute_ai_chat(
     request_id: str | None = None,
     phase: str = "llm_call",
     phase_message: str = "Calling AI model",
+    context_metadata: dict | None = None,
     **chat_kwargs,
 ):
     runner = AIPipelineRunner(ai_client=ai_client, pipeline_name=pipeline_name, request_id=request_id)
@@ -93,5 +108,6 @@ def execute_ai_chat(
         messages,
         phase=phase,
         phase_message=phase_message,
+        context_metadata=context_metadata,
         **chat_kwargs,
     )

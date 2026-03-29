@@ -298,13 +298,16 @@ class GenericEditorWindowAIScenarioGeneration:
                 "Constraints: Integrate the selected entities coherently. No extra keys. No code blocks. Keep within ~600 words."
             )
             # Build prompt and call AI
-            content = execute_ai_chat(
+            content = run_ai_editor_chat(
                 self._get_ai(),
                 [
                     {"role": "system", "content": system},
                     {"role": "user", "content": user},
                 ],
                 pipeline_name="editor.scenario_generation.full",
+                feature="scenario_generation",
+                entity_type="scenarios",
+                action_label="Generate Scenario",
                 phase="scenario_generation",
                 phase_message="Generating scenario content",
             )

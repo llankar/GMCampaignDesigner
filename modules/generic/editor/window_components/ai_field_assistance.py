@@ -64,13 +64,16 @@ class GenericEditorWindowAIFieldAssistance:
             tone_contract = self._tone_contract_guidance()
             if tone_contract:
                 system = f"{system}\n\n{tone_contract}"
-            content = execute_ai_chat(
+            content = run_ai_editor_chat(
                 self._get_ai(),
                 [
                     {"role": "system", "content": system},
                     {"role": "user", "content": user},
                 ],
                 pipeline_name="editor.field_assistance.improve",
+                feature="field_assistance",
+                entity_type=self.model_wrapper.entity_type,
+                action_label=f"Improve field {field_name}",
                 phase="field_improvement",
                 phase_message=f"Improving field {field_name}",
             )
@@ -121,13 +124,16 @@ class GenericEditorWindowAIFieldAssistance:
             tone_contract = self._tone_contract_guidance()
             if tone_contract:
                 system = f"{system}\n\n{tone_contract}"
-            content = execute_ai_chat(
+            content = run_ai_editor_chat(
                 self._get_ai(),
                 [
                     {"role": "system", "content": system},
                     {"role": "user", "content": user},
                 ],
                 pipeline_name="editor.field_assistance.draft",
+                feature="field_assistance",
+                entity_type=self.model_wrapper.entity_type,
+                action_label=f"Draft field {field_name}",
                 phase="field_drafting",
                 phase_message=f"Drafting field {field_name}",
             )
