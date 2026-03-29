@@ -368,7 +368,11 @@ class CampaignBuilderWizard(ctk.CTkToplevel):
         self.arc_cards = ArcCardList(workspace, on_select=self._on_arc_card_selected)
         self.arc_cards.grid(row=1, column=0, sticky="nsew", padx=(0, 8))
 
-        self.arc_detail_form = ArcDetailForm(workspace, on_change=self._on_arc_details_changed)
+        self.arc_detail_form = ArcDetailForm(
+            workspace,
+            on_change=self._on_arc_details_changed,
+            get_available_scenarios=lambda: list(self.scenario_titles),
+        )
         self.arc_detail_form.grid(row=0, column=1, rowspan=3, sticky="nsew", padx=4)
 
         tools_panel = ctk.CTkFrame(workspace, fg_color=EDITOR_PALETTE["surface_soft"], corner_radius=12)
