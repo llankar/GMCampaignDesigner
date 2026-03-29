@@ -4,15 +4,17 @@ import tkinter as tk
 import customtkinter as ctk
 
 from modules.campaigns.shared.arc_status import canonicalize_arc_status
+from modules.campaigns.ui.arc_studio.scenario_picker_dialog import choose_scenario
 from modules.generic.editor.styles import EDITOR_PALETTE, option_menu_style, toolbar_entry_style
 
 
 class ArcDetailForm(ctk.CTkFrame):
     """Editor for one selected arc."""
 
-    def __init__(self, master, on_change):
+    def __init__(self, master, on_change, *, get_available_scenarios=None):
         super().__init__(master, fg_color=EDITOR_PALETTE["surface_soft"], corner_radius=12)
         self._on_change = on_change
+        self._get_available_scenarios = get_available_scenarios or (lambda: [])
         self._is_loading = False
 
         self.name_var = tk.StringVar()
@@ -138,7 +140,7 @@ class ArcDetailForm(ctk.CTkFrame):
             **toolbar_entry_style(),
         )
         self.scenario_entry.pack(side="left", fill="x", expand=True)
-        self.add_scenario_btn = ctk.CTkButton(add_row, text="Add", width=80, command=self._add_scenario_from_entry)
+        self.add_scenario_btn = ctk.CTkButton(add_row, text="Add", width=80, command=self._add_scenario_from_picker)
         self.add_scenario_btn.pack(side="left", padx=(8, 0))
         self.scenario_entry.bind("<Return>", lambda _event: self._add_scenario_from_entry())
 
@@ -236,6 +238,17 @@ class ArcDetailForm(ctk.CTkFrame):
         self.scenario_entry_var.set("")
         self._sync_remove_button_state()
         self._notify_change()
+
+    def _add_scenario_from_picker(self):
+        available_scenarios = [title for title in self._get_available_scenarios() if title not in self._scenario_items]
+        if not available_scenarios:
+            self._add_scenario_from_entry()
+            return
+        title = choose_scenario(self, available_scenarios)
+        if not title:
+            return
+        self.scenario_entry_var.set(title)
+        self._add_scenario_from_entry()
 
     def _remove_selected_scenario(self):
         index = self._selected_scenario_index()

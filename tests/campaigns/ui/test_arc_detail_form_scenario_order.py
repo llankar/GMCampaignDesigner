@@ -51,6 +51,17 @@ class _FakeButton:
             self.state = kwargs["state"]
 
 
+class _FakeScenarioVar:
+    def __init__(self, value=""):
+        self._value = value
+
+    def get(self):
+        return self._value
+
+    def set(self, value):
+        self._value = value
+
+
 def _build_form(items, selected_index):
     form = ArcDetailForm.__new__(ArcDetailForm)
     form._scenario_items = list(items)
@@ -60,8 +71,10 @@ def _build_form(items, selected_index):
     form.move_scenario_down_btn = _FakeButton()
     form.sort_scenarios_btn = _FakeButton()
     form.clear_scenarios_btn = _FakeButton()
+    form.scenario_entry_var = _FakeScenarioVar("")
     form._notify_calls = 0
     form._notify_change = lambda: setattr(form, "_notify_calls", form._notify_calls + 1)
+    form._get_available_scenarios = lambda: []
     return form
 
 
@@ -125,3 +138,27 @@ def test_sync_remove_button_state_handles_move_actions():
     form._sync_remove_button_state()
     assert form.move_scenario_up_btn.state == "normal"
     assert form.move_scenario_down_btn.state == "disabled"
+
+
+def test_add_scenario_from_picker_adds_selected_value(monkeypatch):
+    form = _build_form(["Alpha"], selected_index=None)
+    form._get_available_scenarios = lambda: ["Alpha", "Bravo", "Charlie"]
+
+    monkeypatch.setattr("modules.campaigns.ui.arc_studio.detail_form.choose_scenario", lambda _master, _titles: "Bravo")
+
+    form._add_scenario_from_picker()
+
+    assert form._scenario_items == ["Alpha", "Bravo"]
+    assert form.scenarios_list.items == ["Alpha", "Bravo"]
+    assert form._notify_calls == 1
+
+
+def test_add_scenario_from_picker_falls_back_to_entry_when_no_candidates():
+    form = _build_form(["Alpha"], selected_index=None)
+    form._get_available_scenarios = lambda: ["Alpha"]
+    form.scenario_entry_var.set("Beta")
+
+    form._add_scenario_from_picker()
+
+    assert form._scenario_items == ["Alpha", "Beta"]
+    assert form.scenarios_list.items == ["Alpha", "Beta"]
