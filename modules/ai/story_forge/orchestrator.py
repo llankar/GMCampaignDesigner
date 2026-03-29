@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from time import perf_counter
 from uuid import uuid4
 
 from modules.ai.local_ai_client import LocalAIClient
@@ -18,12 +19,11 @@ from modules.ai.story_forge.prompt_builders import (
 )
 from modules.ai.story_forge.scene_entity_assignment import assign_unused_entities_to_scenes
 from modules.core.ai import (
-    AIPipelineEvent,
     EVENT_AI_PIPELINE_COMPLETED,
     EVENT_AI_PIPELINE_FAILED,
     EVENT_AI_PIPELINE_PHASE,
     EVENT_AI_PIPELINE_STARTED,
-    ai_pipeline_events,
+    publish_local_ai_event,
 )
 
 
@@ -32,6 +32,7 @@ class StoryForgeOrchestrator:
 
     def __init__(self, ai_client: LocalAIClient | None = None):
         self.ai_client = ai_client or LocalAIClient()
+        self._last_step_metadata: dict = {"feature": "story_forge"}
 
     def run(self, request: StoryForgeRequest, request_id: str | None = None) -> StoryForgeResponse:
         ai_request_id = request_id or uuid4().hex
@@ -78,59 +79,60 @@ class StoryForgeOrchestrator:
         return response
 
     def _chat(self, prompt: str) -> str:
-        return self.ai_client.chat(
+        started = perf_counter()
+        response = self.ai_client.chat(
             [
                 {"role": "system", "content": SYSTEM_PROMPT},
                 {"role": "user", "content": prompt},
             ]
         )
+        self._last_step_metadata = {
+            "prompt_text": prompt,
+            "response_text": response,
+            "model": getattr(self.ai_client, "model", ""),
+            "duration_ms": int((perf_counter() - started) * 1000),
+            "feature": "story_forge",
+        }
+        return response
 
     @staticmethod
     def _emit_started(request_id: str) -> None:
-        ai_pipeline_events.emit(
-            AIPipelineEvent(
-                event_type=EVENT_AI_PIPELINE_STARTED,
-                request_id=request_id,
-                phase="start",
-                message="Story Forge started",
-                metadata={"pipeline": "story_forge"},
-            )
+        publish_local_ai_event(
+            event_type=EVENT_AI_PIPELINE_STARTED,
+            request_id=request_id,
+            phase="start",
+            message="Story Forge started",
+            feature="story_forge",
         )
 
-    @staticmethod
-    def _emit_phase(request_id: str, phase: str, message: str) -> None:
-        ai_pipeline_events.emit(
-            AIPipelineEvent(
-                event_type=EVENT_AI_PIPELINE_PHASE,
-                request_id=request_id,
-                phase=phase,
-                message=message,
-                metadata={"pipeline": "story_forge"},
-            )
+    def _emit_phase(self, request_id: str, phase: str, message: str) -> None:
+        publish_local_ai_event(
+            event_type=EVENT_AI_PIPELINE_PHASE,
+            request_id=request_id,
+            phase=phase,
+            message=message,
+            metadata=getattr(self, "_last_step_metadata", {}),
+            feature="story_forge",
         )
 
-    @staticmethod
-    def _emit_completed(request_id: str) -> None:
-        ai_pipeline_events.emit(
-            AIPipelineEvent(
-                event_type=EVENT_AI_PIPELINE_COMPLETED,
-                request_id=request_id,
-                phase="completed",
-                message="Story Forge completed",
-                is_terminal=True,
-                metadata={"pipeline": "story_forge"},
-            )
+    def _emit_completed(self, request_id: str) -> None:
+        publish_local_ai_event(
+            event_type=EVENT_AI_PIPELINE_COMPLETED,
+            request_id=request_id,
+            phase="completed",
+            message="Story Forge completed",
+            is_terminal=True,
+            metadata=self._last_step_metadata,
+            feature="story_forge",
         )
 
-    @staticmethod
-    def _emit_failed(request_id: str, exc: Exception) -> None:
-        ai_pipeline_events.emit(
-            AIPipelineEvent(
-                event_type=EVENT_AI_PIPELINE_FAILED,
-                request_id=request_id,
-                phase="error",
-                message=str(exc),
-                is_terminal=True,
-                metadata={"pipeline": "story_forge"},
-            )
+    def _emit_failed(self, request_id: str, exc: Exception) -> None:
+        publish_local_ai_event(
+            event_type=EVENT_AI_PIPELINE_FAILED,
+            request_id=request_id,
+            phase="error",
+            message=str(exc),
+            is_terminal=True,
+            metadata=getattr(self, "_last_step_metadata", {}),
+            feature="story_forge",
         )
