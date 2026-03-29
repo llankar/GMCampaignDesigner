@@ -343,43 +343,54 @@ class CampaignBuilderWizard(ctk.CTkToplevel):
 
         buttons = ctk.CTkFrame(frame, fg_color="transparent")
         buttons.pack(fill="x", pady=(8, 12), padx=12)
-        self.add_arc_btn = ctk.CTkButton(buttons, text="Add Arc", command=self._add_arc, **primary_button_style())
-        self.add_arc_btn.pack(side="left", padx=4)
-        self.generate_arcs_btn = ctk.CTkButton(buttons, text="Generate Arcs from Scenarios", command=self._generate_arcs_from_scenarios, **primary_button_style())
-        self.generate_arcs_btn.pack(side="left", padx=4)
-        self.generate_scenarios_btn = ctk.CTkButton(buttons, text="Generate 2 Scenarios per Arc", command=self._generate_scenarios_per_arc, **primary_button_style())
-        self.generate_scenarios_btn.pack(side="left", padx=4)
+        buttons.grid_columnconfigure(0, weight=1)
+
+        top_button_row = ctk.CTkFrame(buttons, fg_color="transparent")
+        top_button_row.grid(row=0, column=0, sticky="w")
+        bottom_button_row = ctk.CTkFrame(buttons, fg_color="transparent")
+        bottom_button_row.grid(row=1, column=0, sticky="w", pady=(6, 0))
+
+        self.add_arc_btn = ctk.CTkButton(top_button_row, text="Add Arc", command=self._add_arc, **primary_button_style())
+        self.generate_arcs_btn = ctk.CTkButton(top_button_row, text="Generate Arcs from Scenarios", command=self._generate_arcs_from_scenarios, **primary_button_style())
+        self.generate_scenarios_btn = ctk.CTkButton(top_button_row, text="Generate 2 Scenarios per Arc", command=self._generate_scenarios_per_arc, **primary_button_style())
         self.generate_validate_btn = ctk.CTkButton(
-            buttons,
+            top_button_row,
             text="Generate + Validate Scenes (DB)",
             command=self._generate_db_aware_scenarios_per_arc,
             **primary_button_style(),
         )
-        self.generate_validate_btn.pack(side="left", padx=4)
         self.forge_campaign_btn = ctk.CTkButton(
-            buttons,
+            top_button_row,
             text="Forge Full Campaign",
             command=self._forge_full_campaign,
             **primary_button_style(),
         )
-        self.forge_campaign_btn.pack(side="left", padx=4)
-        self.edit_arc_btn = ctk.CTkButton(buttons, text="Edit Arc", command=self._edit_selected_arc, **primary_button_style())
-        self.edit_arc_btn.pack(side="left", padx=4)
+        self.edit_arc_btn = ctk.CTkButton(top_button_row, text="Edit Arc", command=self._edit_selected_arc, **primary_button_style())
         self.create_scenario_btn = ctk.CTkButton(
-            buttons,
+            bottom_button_row,
             text="Create Scenario for selected arc",
             command=self._create_scenario_for_selected_arc,
             **primary_button_style(),
         )
-        self.create_scenario_btn.pack(side="left", padx=4)
-        self.move_up_btn = ctk.CTkButton(buttons, text="Move Up", command=self._move_arc_up, **primary_button_style())
-        self.move_up_btn.pack(side="left", padx=4)
-        self.move_down_btn = ctk.CTkButton(buttons, text="Move Down", command=self._move_arc_down, **primary_button_style())
-        self.move_down_btn.pack(side="left", padx=4)
-        self.duplicate_arc_btn = ctk.CTkButton(buttons, text="Duplicate", command=self._duplicate_selected_arc, **primary_button_style())
-        self.duplicate_arc_btn.pack(side="left", padx=4)
-        self.delete_arc_btn = ctk.CTkButton(buttons, text="Delete", command=self._delete_selected_arc, **primary_button_style())
-        self.delete_arc_btn.pack(side="left", padx=4)
+        self.move_up_btn = ctk.CTkButton(bottom_button_row, text="Move Up", command=self._move_arc_up, **primary_button_style())
+        self.move_down_btn = ctk.CTkButton(bottom_button_row, text="Move Down", command=self._move_arc_down, **primary_button_style())
+        self.duplicate_arc_btn = ctk.CTkButton(bottom_button_row, text="Duplicate", command=self._duplicate_selected_arc, **primary_button_style())
+        self.delete_arc_btn = ctk.CTkButton(bottom_button_row, text="Delete", command=self._delete_selected_arc, **primary_button_style())
+
+        for button in (
+            self.add_arc_btn,
+            self.generate_arcs_btn,
+            self.generate_scenarios_btn,
+            self.generate_validate_btn,
+            self.forge_campaign_btn,
+            self.edit_arc_btn,
+            self.create_scenario_btn,
+            self.move_up_btn,
+            self.move_down_btn,
+            self.duplicate_arc_btn,
+            self.delete_arc_btn,
+        ):
+            button.pack(side="left", padx=4)
         self._register_interactive_control(
             self.add_arc_btn,
             self.generate_arcs_btn,
