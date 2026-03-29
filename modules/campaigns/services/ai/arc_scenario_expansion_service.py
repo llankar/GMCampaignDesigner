@@ -11,6 +11,7 @@ from modules.campaigns.services.ai.scenes import (
     validate_and_fix_scene_entity_links,
     normalize_scene_blueprints,
 )
+from modules.ai.runtime import AIPipelineRunner
 
 
 class ArcScenarioExpansionValidationError(ValueError):
@@ -45,9 +46,18 @@ class ArcScenarioExpansionService:
             {"role": "user", "content": prompt},
         ]
 
+        runner = AIPipelineRunner(self.ai_client, pipeline_name="campaign.scenario_expansion")
         last_error: Exception | None = None
         for attempt in range(2):
-            raw_response = self.ai_client.chat(messages)
+            raw_response = runner.run_chat(
+                messages,
+                phase="scenario_expansion",
+                phase_message=f"Generating arc scenarios (attempt {attempt + 1}/2)",
+                context_metadata={
+                    "feature": "campaign_builder",
+                    "action_label": "Generate scenarios per arc",
+                },
+            )
             try:
                 parsed = parse_json_relaxed(raw_response)
                 return self._normalize_generated_payload(

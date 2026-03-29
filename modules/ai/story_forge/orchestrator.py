@@ -1,9 +1,9 @@
 from __future__ import annotations
 
-from time import perf_counter
 from uuid import uuid4
 
 from modules.ai.local_ai_client import LocalAIClient
+from modules.ai.runtime import AIPipelineRunner
 from modules.ai.story_forge.contracts import StoryForgeRequest, StoryForgeResponse
 from modules.ai.story_forge.normalizers import (
     normalize_entities,
@@ -32,6 +32,7 @@ class StoryForgeOrchestrator:
 
     def __init__(self, ai_client: LocalAIClient | None = None):
         self.ai_client = ai_client or LocalAIClient()
+        self._runner = AIPipelineRunner(self.ai_client, pipeline_name="story_forge")
         self._last_step_metadata: dict = {"feature": "story_forge"}
 
     def run(self, request: StoryForgeRequest, request_id: str | None = None) -> StoryForgeResponse:
@@ -79,20 +80,14 @@ class StoryForgeOrchestrator:
         return response
 
     def _chat(self, prompt: str) -> str:
-        started = perf_counter()
-        response = self.ai_client.chat(
+        response, metadata = self._runner.chat_once(
             [
                 {"role": "system", "content": SYSTEM_PROMPT},
                 {"role": "user", "content": prompt},
             ]
         )
-        self._last_step_metadata = {
-            "prompt_text": prompt,
-            "response_text": response,
-            "model": getattr(self.ai_client, "model", ""),
-            "duration_ms": int((perf_counter() - started) * 1000),
-            "feature": "story_forge",
-        }
+        metadata["feature"] = "story_forge"
+        self._last_step_metadata = metadata
         return response
 
     @staticmethod
@@ -111,7 +106,7 @@ class StoryForgeOrchestrator:
             request_id=request_id,
             phase=phase,
             message=message,
-            metadata=getattr(self, "_last_step_metadata", {}),
+            metadata=self._last_step_metadata,
             feature="story_forge",
         )
 
@@ -133,6 +128,6 @@ class StoryForgeOrchestrator:
             phase="error",
             message=str(exc),
             is_terminal=True,
-            metadata=getattr(self, "_last_step_metadata", {}),
+            metadata=self._last_step_metadata,
             feature="story_forge",
         )
