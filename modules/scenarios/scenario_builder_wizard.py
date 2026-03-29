@@ -2,6 +2,7 @@ import copy
 import json
 import os
 import sqlite3
+import threading
 import textwrap
 import tkinter as tk
 from tkinter import messagebox
@@ -2581,19 +2582,48 @@ class ScenarioBuilderWizard(ctk.CTkToplevel):
             entity_catalog=load_db_entity_catalog(),
         )
 
-        try:
+        self._set_navigation_enabled(False)
+
+        def _worker():
             result = self.story_forge.run(request)
-        except Exception as exc:
+            payload = result.to_scenario_payload()
+            self.after(0, lambda: _on_success(payload))
+
+        def _on_success(payload: dict):
+            self._set_navigation_enabled(True)
+            self.load_existing_scenario(payload)
+            messagebox.showinfo("Story Forge", "Scenario draft applied. Review and adjust before finishing.")
+
+        def _on_error(exc: Exception):
+            self._set_navigation_enabled(True)
             log_exception(
                 f"Story Forge failed: {exc}",
                 func_name="ScenarioBuilderWizard._run_story_forge",
             )
             messagebox.showerror("Story Forge", f"Unable to generate a draft: {exc}")
-            return
 
-        payload = result.to_scenario_payload()
-        self.load_existing_scenario(payload)
-        messagebox.showinfo("Story Forge", "Scenario draft applied. Review and adjust before finishing.")
+        self._run_in_worker(_worker, on_error=_on_error)
+
+    def _set_navigation_enabled(self, enabled: bool):  # pragma: no cover - UI interaction
+        state = "normal" if enabled else "disabled"
+        for btn in (self.back_btn, self.next_btn, self.finish_btn, self.cancel_btn, self.story_forge_btn):
+            try:
+                if btn.winfo_exists():
+                    btn.configure(state=state)
+            except Exception:
+                continue
+
+    def _run_in_worker(self, worker, *, on_error=None):
+        def _runner():
+            try:
+                worker()
+            except Exception as exc:  # pragma: no cover - threaded failure path
+                if on_error:
+                    self.after(0, lambda: on_error(exc))
+                else:
+                    self.after(0, lambda: messagebox.showerror("Unexpected Error", str(exc)))
+
+        threading.Thread(target=_runner, daemon=True).start()
 
     def finish(self):  # pragma: no cover - UI navigation
         step = self.steps[self.current_step_index][1]
