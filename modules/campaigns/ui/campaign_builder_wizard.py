@@ -28,6 +28,14 @@ from modules.generic.generic_list_selection_view import GenericListSelectionView
 from modules.helpers.logging_helper import log_error, log_exception, log_info, log_warning
 from modules.helpers.template_loader import load_template
 from modules.helpers.window_helper import position_window_at_top
+from modules.core.ai.events import (
+    AIPipelineEvent,
+    EVENT_AI_PIPELINE_COMPLETED,
+    EVENT_AI_PIPELINE_FAILED,
+    EVENT_AI_PIPELINE_PHASE,
+    EVENT_AI_PIPELINE_STARTED,
+    ai_pipeline_events,
+)
 from modules.scenarios.scenario_builder_wizard import ScenarioBuilderWizard
 from modules.generic.editor.styles import (
     EDITOR_PALETTE,
@@ -640,16 +648,17 @@ class CampaignBuilderWizard(ctk.CTkToplevel):
         self._generate_scenarios_per_arc(existing_scenarios=existing_scenarios)
 
     def _forge_full_campaign(self):
-        stages = [
-            "1. Generate/normalize arcs",
-            "2. Generate scenarios for each arc",
-            "3. Validate and enrich scenes/entities",
-            "4. Preview summary",
-            "5. Save campaign + scenarios",
-        ]
-        progress_dialog = self._create_pipeline_progress_dialog("Forging full campaign...", stages)
+        request_id = self._resolve_ai_request_id()
         saved_groups: list[dict] = []
         pipeline_started = time.perf_counter()
+        ai_pipeline_events.emit(
+            AIPipelineEvent(
+                event_type=EVENT_AI_PIPELINE_STARTED,
+                request_id=request_id,
+                phase="start",
+                message="Forging full campaign...",
+            )
+        )
         self._log_forge_event(
             "campaign_forge.ui.pipeline.start",
             "pipeline_started",
@@ -659,7 +668,14 @@ class CampaignBuilderWizard(ctk.CTkToplevel):
         try:
             self._set_interactive_controls_enabled(False)
             stage_started = time.perf_counter()
-            self._update_pipeline_progress(progress_dialog, 0, "Arcs")
+            ai_pipeline_events.emit(
+                AIPipelineEvent(
+                    event_type=EVENT_AI_PIPELINE_PHASE,
+                    request_id=request_id,
+                    phase="arcs",
+                    message="Generating/normalizing arcs",
+                )
+            )
             self._log_forge_event("campaign_forge.ui.stage.start", "arcs_started", stage="arcs")
             self._forge_pipeline_generate_or_normalize_arcs()
             self._log_forge_event(
@@ -671,7 +687,14 @@ class CampaignBuilderWizard(ctk.CTkToplevel):
             )
 
             stage_started = time.perf_counter()
-            self._update_pipeline_progress(progress_dialog, 1, "Scenarios")
+            ai_pipeline_events.emit(
+                AIPipelineEvent(
+                    event_type=EVENT_AI_PIPELINE_PHASE,
+                    request_id=request_id,
+                    phase="scenarios",
+                    message="Generating scenarios for each arc",
+                )
+            )
             self._log_forge_event("campaign_forge.ui.stage.start", "scenario_generation_started", stage="scenarios")
             self._validate_arcs_for_scenario_generation()
             existing_scenarios = self._load_existing_scenarios_for_pipeline()
@@ -693,7 +716,14 @@ class CampaignBuilderWizard(ctk.CTkToplevel):
                 generated_scene_count=generated_counts["scene_count"],
             )
 
-            self._update_pipeline_progress(progress_dialog, 2, "Validation")
+            ai_pipeline_events.emit(
+                AIPipelineEvent(
+                    event_type=EVENT_AI_PIPELINE_PHASE,
+                    request_id=request_id,
+                    phase="validation",
+                    message="Validating and enriching scenes/entities",
+                )
+            )
             self._log_forge_event(
                 "campaign_forge.ui.stage.end",
                 "validation_completed",
@@ -702,7 +732,14 @@ class CampaignBuilderWizard(ctk.CTkToplevel):
                 generated_scenario_count=generated_counts["scenario_count"],
                 generated_scene_count=generated_counts["scene_count"],
             )
-            self._update_pipeline_progress(progress_dialog, 3, "Preview")
+            ai_pipeline_events.emit(
+                AIPipelineEvent(
+                    event_type=EVENT_AI_PIPELINE_PHASE,
+                    request_id=request_id,
+                    phase="preview",
+                    message="Previewing generated results",
+                )
+            )
             accepted_payload = self._preview_generated_arc_scenarios(generated_payload)
             if not accepted_payload:
                 self._log_forge_event(
@@ -715,7 +752,14 @@ class CampaignBuilderWizard(ctk.CTkToplevel):
                 return
 
             stage_started = time.perf_counter()
-            self._update_pipeline_progress(progress_dialog, 4, "Saving")
+            ai_pipeline_events.emit(
+                AIPipelineEvent(
+                    event_type=EVENT_AI_PIPELINE_PHASE,
+                    request_id=request_id,
+                    phase="save",
+                    message="Saving campaign + scenarios",
+                )
+            )
             self._log_forge_event("campaign_forge.ui.stage.start", "save_started", stage="save")
             persistence = CampaignForgePersistence(
                 self.scenario_wrapper,
@@ -759,6 +803,15 @@ class CampaignBuilderWizard(ctk.CTkToplevel):
                 saved_scenario_count=saved_count,
             )
         except ArcScenarioExpansionValidationError as exc:
+            ai_pipeline_events.emit(
+                AIPipelineEvent(
+                    event_type=EVENT_AI_PIPELINE_FAILED,
+                    request_id=request_id,
+                    phase="validation",
+                    message=str(exc),
+                    is_terminal=True,
+                )
+            )
             self._log_forge_event(
                 "campaign_forge.ui.pipeline.validation_error",
                 "pipeline_validation_error",
@@ -770,6 +823,15 @@ class CampaignBuilderWizard(ctk.CTkToplevel):
             messagebox.showwarning("Pipeline validation failed", str(exc), parent=self)
             return
         except Exception as exc:
+            ai_pipeline_events.emit(
+                AIPipelineEvent(
+                    event_type=EVENT_AI_PIPELINE_FAILED,
+                    request_id=request_id,
+                    phase="error",
+                    message=str(exc),
+                    is_terminal=True,
+                )
+            )
             self._log_forge_event(
                 "campaign_forge.ui.pipeline.error",
                 "pipeline_failed",
@@ -782,10 +844,17 @@ class CampaignBuilderWizard(ctk.CTkToplevel):
             return
         finally:
             self._set_interactive_controls_enabled(True)
-            if progress_dialog["window"].winfo_exists():
-                progress_dialog["window"].destroy()
 
         saved_count = sum(len(group.get("scenarios") or []) for group in saved_groups)
+        ai_pipeline_events.emit(
+            AIPipelineEvent(
+                event_type=EVENT_AI_PIPELINE_COMPLETED,
+                request_id=request_id,
+                phase="completed",
+                message=f"Campaign forged. Saved {saved_count} scenario(s).",
+                is_terminal=True,
+            )
+        )
         self._log_forge_event(
             "campaign_forge.ui.pipeline.completed",
             "pipeline_completed",
@@ -841,6 +910,13 @@ class CampaignBuilderWizard(ctk.CTkToplevel):
             },
             arcs_data=self.arcs,
         )
+
+    def _resolve_ai_request_id(self) -> str:
+        root = self.winfo_toplevel()
+        controller = getattr(root, "ai_run_window_controller", None)
+        if controller and hasattr(controller, "new_request_id"):
+            return controller.new_request_id()
+        return f"campaign-forge-{int(time.time() * 1000)}"
 
 
     def _confirm_campaign_forge_dry_run(self, dry_run: dict, *, title: str) -> bool:

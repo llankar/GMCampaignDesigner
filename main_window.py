@@ -63,6 +63,7 @@ from modules.ui.system_selector_dialog import CampaignSystemSelectorDialog
 from modules.ui.database_manager_dialog import DatabaseManagerDialog
 from modules.ui.system_manager_dialog import SystemManagerDialog
 from modules.ui.menu_bar import AppMenuBar
+from modules.ui.controllers import AIRunWindowController
 from modules.events.ui.dock import CalendarDock
 from modules.events.models.event_types import get_event_type
 from modules.events.services.timeline_simulator import CampaignTimelineSimulator
@@ -161,6 +162,7 @@ class MainWindow(ctk.CTk):
         self.entity_definitions = load_entity_definitions()
         self.load_icons()
         self.create_menu_bar()
+        self.ai_run_window_controller = AIRunWindowController(self, self.menu_bar)
         self.entity_wrappers = {}
         self.create_content_area()
         self.create_exit_button()
