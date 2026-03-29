@@ -42,7 +42,7 @@ class ArcSelectorStrip(_CanvasSelector):
         self._arcs = list(arcs)
         self._selected_index = selected_index
         self._on_select = on_select
-        super().__init__(parent, height=124, bg_color="#0d1728")
+        super().__init__(parent, height=124, bg_color=DASHBOARD_THEME.panel_alt_bg)
 
     def _render(self, *_args, **_kwargs) -> None:
         canvas = getattr(self, "canvas", None)
@@ -68,8 +68,8 @@ class ArcSelectorStrip(_CanvasSelector):
             y2 = height - 18
             selected = index == self._selected_index
             tag = f"arc:{index}"
-            fill = "#173454" if selected else "#101f34"
-            outline = "#66c0ff" if selected else "#22395d"
+            fill = DASHBOARD_THEME.button_fg if selected else DASHBOARD_THEME.panel_bg
+            outline = DASHBOARD_THEME.accent_soft if selected else DASHBOARD_THEME.card_border
             title_color = "#f8fbff" if selected else DASHBOARD_THEME.text_primary
             meta_color = "#d6e9ff" if selected else DASHBOARD_THEME.text_secondary
 
@@ -118,7 +118,7 @@ class ScenarioSelectorStrip(ctk.CTkFrame):
         selected_index: int,
         on_select: Callable[[int], None],
     ):
-        super().__init__(parent, fg_color="#0d1728", corner_radius=18)
+        super().__init__(parent, fg_color=DASHBOARD_THEME.panel_alt_bg, corner_radius=18)
         self._scenarios = list(scenarios)
         self._selected_index = selected_index
         self._on_select = on_select
@@ -126,13 +126,13 @@ class ScenarioSelectorStrip(ctk.CTkFrame):
         self.grid_columnconfigure(0, weight=1)
         self.grid_rowconfigure(0, weight=1)
 
-        self.canvas = tk.Canvas(self, height=124, bg="#0d1728", highlightthickness=0, bd=0)
+        self.canvas = tk.Canvas(self, height=124, bg=DASHBOARD_THEME.panel_alt_bg, highlightthickness=0, bd=0)
         self.canvas.grid(row=0, column=0, sticky="ew")
         self.scrollbar = ctk.CTkScrollbar(self, orientation="horizontal", command=self.canvas.xview)
         self.scrollbar.grid(row=1, column=0, sticky="ew", padx=10, pady=(0, 8))
         self.canvas.configure(xscrollcommand=self.scrollbar.set)
 
-        self.inner = ctk.CTkFrame(self.canvas, fg_color="#0d1728")
+        self.inner = ctk.CTkFrame(self.canvas, fg_color=DASHBOARD_THEME.panel_alt_bg)
         self.canvas_window = self.canvas.create_window((0, 0), window=self.inner, anchor="nw")
         self.inner.bind("<Configure>", self._sync_scrollregion)
         self.canvas.bind("<Configure>", self._resize_window)
@@ -148,10 +148,10 @@ class ScenarioSelectorStrip(ctk.CTkFrame):
             selected = index == self._selected_index
             card = ctk.CTkFrame(
                 self.inner,
-                fg_color="#183252" if selected else "#122038",
+                fg_color=DASHBOARD_THEME.button_fg if selected else DASHBOARD_THEME.panel_bg,
                 corner_radius=14,
                 border_width=2 if selected else 1,
-                border_color="#66c0ff" if selected else "#243a5c",
+                border_color=DASHBOARD_THEME.accent_soft if selected else DASHBOARD_THEME.card_border,
                 width=card_width,
                 height=104,
             )

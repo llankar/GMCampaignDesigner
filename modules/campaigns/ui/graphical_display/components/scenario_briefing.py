@@ -7,7 +7,7 @@ from modules.scenarios.gm_screen.dashboard.styles.dashboard_theme import DASHBOA
 
 class ScenarioBriefingPanel(ctk.CTkFrame):
     def __init__(self, parent, *, summary: str, objective: str = "", hook: str = "", stakes: str = ""):
-        super().__init__(parent, fg_color="#0d1728", corner_radius=20, border_width=1, border_color="#22395d")
+        super().__init__(parent, fg_color=DASHBOARD_THEME.panel_alt_bg, corner_radius=20, border_width=1, border_color=DASHBOARD_THEME.card_border)
         self.grid_columnconfigure(0, weight=1)
 
         ctk.CTkLabel(
@@ -18,7 +18,7 @@ class ScenarioBriefingPanel(ctk.CTkFrame):
             anchor="w",
         ).grid(row=0, column=0, sticky="w", padx=16, pady=(16, 10))
 
-        summary_block = ctk.CTkFrame(self, fg_color="#111f35", corner_radius=16, border_width=1, border_color="#2d476b")
+        summary_block = ctk.CTkFrame(self, fg_color=DASHBOARD_THEME.panel_bg, corner_radius=16, border_width=1, border_color=DASHBOARD_THEME.card_border)
         summary_block.grid(row=1, column=0, sticky="ew", padx=16, pady=(0, 12))
         summary_block.grid_columnconfigure(0, weight=1)
         ctk.CTkLabel(
@@ -46,7 +46,7 @@ class ScenarioBriefingPanel(ctk.CTkFrame):
         ):
             if not value:
                 continue
-            panel = ctk.CTkFrame(self, fg_color="#10192b", corner_radius=16, border_width=1, border_color="#243a5c")
+            panel = ctk.CTkFrame(self, fg_color=DASHBOARD_THEME.panel_bg, corner_radius=16, border_width=1, border_color=DASHBOARD_THEME.card_border)
             panel.grid(row=row, column=0, sticky="ew", padx=16, pady=(0, 10))
             panel.grid_columnconfigure(0, weight=1)
             ctk.CTkLabel(

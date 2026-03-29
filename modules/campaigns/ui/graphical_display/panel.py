@@ -337,9 +337,9 @@ class CampaignGraphPanel(ctk.CTkFrame):
             height=30,
             command=prev_command,
             state="normal" if prev_enabled else "disabled",
-            fg_color="#17263d",
-            hover_color="#223a5f",
-            text_color="#f2f6ff",
+            fg_color=DASHBOARD_THEME.button_fg,
+            hover_color=DASHBOARD_THEME.button_hover,
+            text_color=DASHBOARD_THEME.text_primary,
             font=ctk.CTkFont(size=11),
         ).grid(row=0, column=0, padx=(0, 8))
         ctk.CTkButton(
@@ -356,7 +356,7 @@ class CampaignGraphPanel(ctk.CTkFrame):
         ).grid(row=0, column=1)
 
     def _render_focus_tile(self, parent, *, column: int, title: str, body: str, accent: str) -> None:
-        tile = ctk.CTkFrame(parent, fg_color="#0d1728", corner_radius=18, border_width=1, border_color="#22395d")
+        tile = ctk.CTkFrame(parent, fg_color=DASHBOARD_THEME.panel_alt_bg, corner_radius=18, border_width=1, border_color=DASHBOARD_THEME.card_border)
         tile.grid(row=0, column=column, sticky="nsew", padx=6)
         tile.grid_columnconfigure(0, weight=1)
 
@@ -377,7 +377,7 @@ class CampaignGraphPanel(ctk.CTkFrame):
         ).grid(row=1, column=0, sticky="ew", padx=14, pady=(0, 14))
 
     def _render_scenario_focus(self, arc: CampaignGraphArc) -> None:
-        section = ctk.CTkFrame(self._scenario_focus_container, fg_color="#111a2c", corner_radius=20)
+        section = ctk.CTkFrame(self._scenario_focus_container, fg_color=DASHBOARD_THEME.panel_bg, corner_radius=20)
         section.grid(row=0, column=0, sticky="nsew", padx=14, pady=(0, 14))
         section.grid_columnconfigure(0, weight=1)
         section.grid_rowconfigure(2, weight=1)
@@ -419,7 +419,7 @@ class CampaignGraphPanel(ctk.CTkFrame):
         self._render_selected_scenario_card(section, arc, selected_scenario)
 
     def _render_selected_scenario_card(self, parent, arc: CampaignGraphArc, scenario: CampaignGraphScenario) -> None:
-        card = ctk.CTkFrame(parent, fg_color="#0b1220", corner_radius=22, border_width=1, border_color="#22395d")
+        card = ctk.CTkFrame(parent, fg_color=DASHBOARD_THEME.panel_alt_bg, corner_radius=22, border_width=1, border_color=DASHBOARD_THEME.card_border)
         card.grid(row=2, column=0, sticky="nsew", padx=14, pady=(0, 14))
         card.grid_columnconfigure(0, weight=1)
         card.grid_rowconfigure(1, weight=1)
@@ -585,10 +585,17 @@ class CampaignGraphPanel(ctk.CTkFrame):
     def _status_color(self, status_label: str) -> str:
         status = status_label.lower()
         if "completed" in status:
-            return "#15803d"
+            return DASHBOARD_THEME.arc_complete
         if "progress" in status or "link" in status:
-            return "#6d28d9"
-        return "#1f4c7d"
+            return DASHBOARD_THEME.arc_active
+        return DASHBOARD_THEME.arc_planned
+
+    def refresh_theme(self) -> None:
+        """Repaint campaign overview widgets with current theme tokens."""
+        self.configure(fg_color=DASHBOARD_THEME.panel_bg)
+        if hasattr(self, "scroll"):
+            self.scroll.configure(fg_color=DASHBOARD_THEME.panel_bg)
+        self._refresh_campaign_content()
 
     def _clamp_index(self, index: int, length: int) -> int:
         if length <= 0:
