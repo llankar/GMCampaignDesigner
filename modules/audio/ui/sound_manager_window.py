@@ -8,6 +8,7 @@ import customtkinter as ctk
 from typing import Any
 
 from modules.ai.local_ai_client import LocalAIClient
+from modules.ai.pipeline import execute_ai_chat
 from modules.audio.audio_library import AUDIO_EXTENSIONS
 from modules.audio.audio_controller import AudioController, get_audio_controller
 from modules.audio.audio_constants import SECTION_TITLES
@@ -709,7 +710,8 @@ class SoundManagerWindow(ctk.CTkToplevel):
             f"Files (JSON):\n{json.dumps(payload, ensure_ascii=False, indent=2)}"
         )
 
-        response = client.chat(
+        response = execute_ai_chat(
+            client,
             [
                 {
                     "role": "system",
@@ -717,6 +719,9 @@ class SoundManagerWindow(ctk.CTkToplevel):
                 },
                 {"role": "user", "content": prompt},
             ],
+            pipeline_name="audio.sound_manager.ai_sort",
+            phase="audio_sort",
+            phase_message=f"Classifying {len(audio_files)} audio files",
             temperature=0.2,
             max_tokens=800,
         )

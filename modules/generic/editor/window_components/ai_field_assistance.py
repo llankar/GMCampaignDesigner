@@ -64,10 +64,16 @@ class GenericEditorWindowAIFieldAssistance:
             tone_contract = self._tone_contract_guidance()
             if tone_contract:
                 system = f"{system}\n\n{tone_contract}"
-            content = self._get_ai().chat([
-                {"role": "system", "content": system},
-                {"role": "user", "content": user},
-            ])
+            content = execute_ai_chat(
+                self._get_ai(),
+                [
+                    {"role": "system", "content": system},
+                    {"role": "user", "content": user},
+                ],
+                pipeline_name="editor.field_assistance.improve",
+                phase="field_improvement",
+                phase_message=f"Improving field {field_name}",
+            )
             if content:
                 self._set_field_text(field_name, content)
         except Exception as e:
@@ -115,10 +121,16 @@ class GenericEditorWindowAIFieldAssistance:
             tone_contract = self._tone_contract_guidance()
             if tone_contract:
                 system = f"{system}\n\n{tone_contract}"
-            content = self._get_ai().chat([
-                {"role": "system", "content": system},
-                {"role": "user", "content": user},
-            ])
+            content = execute_ai_chat(
+                self._get_ai(),
+                [
+                    {"role": "system", "content": system},
+                    {"role": "user", "content": user},
+                ],
+                pipeline_name="editor.field_assistance.draft",
+                phase="field_drafting",
+                phase_message=f"Drafting field {field_name}",
+            )
             if content:
                 self._set_field_text(field_name, content)
         except Exception as e:

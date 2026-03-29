@@ -38,6 +38,7 @@ from modules.helpers.logging_helper import (
     log_warning,
 )
 from modules.objects.object_constants import OBJECT_CATEGORY_ALLOWED
+from modules.ai.pipeline import execute_ai_chat
 from modules.generic.entities.linking import entity_label_map, resolve_entity_slug
 
 log_module_import(__name__)
@@ -3807,7 +3808,14 @@ class GenericListView(ctk.CTkFrame):
             },
             {"role": "user", "content": user_content},
         ]
-        raw = client.chat(messages, timeout=240)
+        raw = execute_ai_chat(
+            client,
+            messages,
+            pipeline_name="generic_list.objects.auto_categorization",
+            phase="object_categorization",
+            phase_message=f"Categorizing {len(payload)} objects",
+            timeout=240,
+        )
         preview = raw.strip().replace("\r", " ").replace("\n", " ") if isinstance(raw, str) else str(raw)
         if len(preview) > 500:
             preview = preview[:497] + "..."

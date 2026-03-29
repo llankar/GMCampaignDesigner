@@ -42,10 +42,16 @@ class GenericEditorWindowAICharacterGeneration:
                 "Constraints: No extra keys. No code blocks. Keep within ~400 words."
             )
             # Build prompt and call AI
-            content = self._get_ai().chat([
-                {"role": "system", "content": system},
-                {"role": "user", "content": user},
-            ])
+            content = execute_ai_chat(
+                self._get_ai(),
+                [
+                    {"role": "system", "content": system},
+                    {"role": "user", "content": user},
+                ],
+                pipeline_name="editor.character_generation.npc",
+                phase="npc_generation",
+                phase_message="Generating NPC content",
+            )
             try:
                 data = LocalAIClient._parse_json_safe(content)
             except Exception:
@@ -139,10 +145,16 @@ class GenericEditorWindowAICharacterGeneration:
                 "Constraints: No extra keys. No code blocks. Keep within ~300-400 words."
             )
             # Build prompt and call AI
-            content = self._get_ai().chat([
-                {"role": "system", "content": system},
-                {"role": "user", "content": user},
-            ])
+            content = execute_ai_chat(
+                self._get_ai(),
+                [
+                    {"role": "system", "content": system},
+                    {"role": "user", "content": user},
+                ],
+                pipeline_name="editor.character_generation.creature",
+                phase="creature_generation",
+                phase_message="Generating creature content",
+            )
             try:
                 data = LocalAIClient._parse_json_safe(content)
             except Exception:
