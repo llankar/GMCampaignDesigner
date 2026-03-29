@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from .pipeline_runner import AIPipelineRunner
+from modules.ai.runtime import AIPipelineRunner
 
 
 def run_ai_editor_chat(

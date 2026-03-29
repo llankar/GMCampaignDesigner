@@ -8,6 +8,7 @@ from modules.campaigns.services.ai.json_parsing import (
 )
 from modules.campaigns.services.ai.prompt_builders import build_arc_generation_prompt
 from modules.campaigns.shared.arc_status import canonicalize_arc_status
+from modules.ai.runtime import AIPipelineRunner
 
 
 class ArcGenerationService:
@@ -34,9 +35,18 @@ class ArcGenerationService:
             {"role": "user", "content": prompt},
         ]
 
+        runner = AIPipelineRunner(self.ai_client, pipeline_name="campaign.arc_generation")
         last_error: Exception | None = None
         for attempt in range(2):
-            raw_response = self.ai_client.chat(messages)
+            raw_response = runner.run_chat(
+                messages,
+                phase="arc_generation",
+                phase_message=f"Generating campaign arcs (attempt {attempt + 1}/2)",
+                context_metadata={
+                    "feature": "campaign_builder",
+                    "action_label": "Generate campaign arcs",
+                },
+            )
             try:
                 parsed = parse_json_relaxed(raw_response)
                 normalized = normalize_arc_generation_payload(parsed, available_scenarios=available_titles)
