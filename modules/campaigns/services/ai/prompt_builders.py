@@ -232,6 +232,18 @@ def build_arc_generation_prompt(foundation: dict[str, Any], scenarios: list[dict
             entity_type: [_clean(name) for name in (foundation.get("existing_entities", {}).get(entity_type) or []) if _clean(name)]
             for entity_type in ("villains", "factions", "places", "npcs", "creatures")
         },
+        "generation_defaults": {
+            "main_pc_factions": [_clean(name) for name in (foundation.get("generation_defaults", {}).get("main_pc_factions") or []) if _clean(name)],
+            "protected_factions": [_clean(name) for name in (foundation.get("generation_defaults", {}).get("protected_factions") or []) if _clean(name)],
+            "forbidden_antagonist_factions": [
+                _clean(name)
+                for name in (foundation.get("generation_defaults", {}).get("forbidden_antagonist_factions") or [])
+                if _clean(name)
+            ],
+            "allow_optional_conflicts": bool(
+                (foundation.get("generation_defaults", {}) or {}).get("allow_optional_conflicts", True)
+            ),
+        },
     }
 
     min_scenarios = minimum_scenarios_per_arc(len(scenario_catalog))
@@ -255,6 +267,9 @@ def build_arc_generation_prompt(foundation: dict[str, Any], scenarios: list[dict
         "Rules:\n"
         "- Use concise but actionable summaries and objectives.\n"
         "- Keep status realistic for a planning workflow; default to Planned unless campaign state strongly implies otherwise.\n"
+        "- Treat generation_defaults.main_pc_factions as player-side anchors for recurring alliance framing.\n"
+        "- Never cast generation_defaults.forbidden_antagonist_factions as antagonists.\n"
+        "- Respect generation_defaults.protected_factions; avoid direct villain framing unless allow_optional_conflicts is true and tension stays nuanced.\n"
         "- The thread field on each arc must match one of the generated thread names.\n"
         "- Prefer broad campaign continuity over isolated arc ideas.\n"
         f"- Do not create arcs with fewer than {min_scenarios} scenarios unless the full scenario catalog itself contains fewer than that many scenarios.\n"
@@ -288,6 +303,26 @@ def build_arc_scenario_expansion_prompt(
                 if _clean(name)
             ]
             for entity_type in ("villains", "factions", "places", "npcs", "creatures")
+        },
+        "generation_defaults": {
+            "main_pc_factions": [
+                _clean(name)
+                for name in (foundation.get("generation_defaults", {}).get("main_pc_factions") or [])
+                if _clean(name)
+            ],
+            "protected_factions": [
+                _clean(name)
+                for name in (foundation.get("generation_defaults", {}).get("protected_factions") or [])
+                if _clean(name)
+            ],
+            "forbidden_antagonist_factions": [
+                _clean(name)
+                for name in (foundation.get("generation_defaults", {}).get("forbidden_antagonist_factions") or [])
+                if _clean(name)
+            ],
+            "allow_optional_conflicts": bool(
+                (foundation.get("generation_defaults", {}) or {}).get("allow_optional_conflicts", True)
+            ),
         },
     }
     arc_payload = [

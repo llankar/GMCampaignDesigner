@@ -10,6 +10,7 @@ from modules.campaigns.services import (
     ArcGenerationService,
     ArcScenarioExpansionService,
     ArcScenarioExpansionValidationError,
+    CampaignGenerationDefaultsService,
     CampaignForgePersistence,
     CampaignForgePersistenceError,
     SAVE_MODE_MERGE_KEEP_EXISTING,
@@ -23,6 +24,7 @@ from modules.campaigns.shared.arc_status import canonicalize_arc_status
 from modules.campaigns.ui.arc_editor_dialog import ArcEditorDialog
 from modules.campaigns.ui.arc_studio import ArcCardList, ArcDetailForm
 from modules.campaigns.ui.campaign_forge_preview_dialog import preview_campaign_forge_payload
+from modules.campaigns.ui.generation_defaults import CampaignGenerationDefaultsDialog
 from modules.campaigns.ui.widgets import CampaignDateField
 from modules.generic.generic_model_wrapper import GenericModelWrapper
 from modules.generic.generic_list_selection_view import GenericListSelectionView
@@ -71,6 +73,8 @@ class CampaignBuilderWizard(ctk.CTkToplevel):
         self.current_step = 0
         self.steps: list[ctk.CTkFrame] = []
         self._interactive_controls: list[ctk.CTkBaseClass] = []
+        self._generation_defaults_service = CampaignGenerationDefaultsService()
+        self.generation_defaults = self._generation_defaults_service.load()
 
         self._build_layout()
         self._show_step(0)
@@ -395,6 +399,12 @@ class CampaignBuilderWizard(ctk.CTkToplevel):
             command=self._forge_full_campaign,
             **primary_button_style(),
         )
+        self.generation_defaults_btn = ctk.CTkButton(
+            tools_buttons,
+            text="AI Generation Defaults",
+            command=self._open_generation_defaults_dialog,
+            **primary_button_style(),
+        )
         self.edit_arc_btn = ctk.CTkButton(tools_buttons, text="Focus Arc Name", command=self._edit_selected_arc, **primary_button_style())
         self.create_scenario_btn = ctk.CTkButton(
             tools_buttons,
@@ -413,6 +423,7 @@ class CampaignBuilderWizard(ctk.CTkToplevel):
             self.generate_scenarios_btn,
             self.generate_validate_btn,
             self.forge_campaign_btn,
+            self.generation_defaults_btn,
             self.edit_arc_btn,
             self.create_scenario_btn,
             self.move_up_btn,
@@ -428,6 +439,7 @@ class CampaignBuilderWizard(ctk.CTkToplevel):
             self.generate_scenarios_btn,
             self.generate_validate_btn,
             self.forge_campaign_btn,
+            self.generation_defaults_btn,
             self.edit_arc_btn,
             self.create_scenario_btn,
             self.move_up_btn,
@@ -642,7 +654,16 @@ class CampaignBuilderWizard(ctk.CTkToplevel):
             "existing_entities": load_existing_entity_catalog(
                 ("villains", "factions", "places", "npcs", "creatures")
             ),
+            "generation_defaults": dict(getattr(self, "generation_defaults", {})),
         }
+
+    def _open_generation_defaults_dialog(self):
+        dialog = CampaignGenerationDefaultsDialog(self, initial_state=self.generation_defaults)
+        self.wait_window(dialog)
+        if not dialog.result_state:
+            return
+        self.generation_defaults = self._generation_defaults_service.save(dialog.result_state)
+        messagebox.showinfo("Defaults saved", "AI generation defaults saved for this campaign database.", parent=self)
 
     def _generate_scenarios_per_arc(self, *, existing_scenarios: list[dict] | None = None):
         try:
