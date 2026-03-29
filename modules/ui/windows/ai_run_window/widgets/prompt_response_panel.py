@@ -3,6 +3,7 @@ from __future__ import annotations
 import customtkinter as ctk
 
 from modules.core.ai.state.request_state import AIRequestState
+from modules.ui.windows.ai_run_window.formatters import format_ai_prompt_for_humans
 from .raw_text_view import RawTextView
 
 
@@ -31,5 +32,5 @@ class PromptResponsePanel(ctk.CTkFrame):
         self._response_view.set_copy_label("Copy response")
 
     def render(self, state: AIRequestState) -> None:
-        self._prompt_view.render_text(state.prompt_text)
+        self._prompt_view.render_text(format_ai_prompt_for_humans(state.prompt_text))
         self._response_view.render_text(state.response_text)
