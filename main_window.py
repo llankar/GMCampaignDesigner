@@ -1988,6 +1988,11 @@ class MainWindow(ctk.CTk):
             hover_color="#AA0000",
             width=20,
         )
+        self.banner_toggle_btn = self.menu_bar.create_action_button(
+            text="▼",
+            width=44,
+            command=self._toggle_banner,
+        )
         self.timer_mj_button = self.menu_bar.create_action_button(
             text="Timer",
             command=self.open_timer_window,
@@ -1998,11 +2003,7 @@ class MainWindow(ctk.CTk):
             command=self._toggle_calendar_dock,
             width=130,
         )
-        self.banner_toggle_btn = self.menu_bar.create_action_button(
-            text="▼",
-            width=44,
-            command=self._toggle_banner,
-        )
+        
 
        
 
