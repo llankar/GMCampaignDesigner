@@ -919,7 +919,7 @@ class CampaignBuilderWizard(ctk.CTkToplevel):
             dry_run = persistence.build_dry_run_report(
                 accepted_payload,
                 self.arcs,
-                save_mode=SAVE_MODE_REPLACE_GENERATED_ONLY,
+                save_mode=SAVE_MODE_MERGE_KEEP_EXISTING,
             )
             if not self._confirm_campaign_forge_dry_run(dry_run, title="Forge save preview"):
                 self._log_forge_event(

@@ -475,3 +475,67 @@ def test_generate_db_aware_scenarios_button_handler_calls_generation_flow():
     wizard._generate_db_aware_scenarios_per_arc()
 
     assert calls["count"] == 1
+
+
+def test_forge_full_campaign_save_preview_keeps_existing_arc_scenarios(monkeypatch):
+    wizard = campaign_builder_wizard.CampaignBuilderWizard.__new__(
+        campaign_builder_wizard.CampaignBuilderWizard
+    )
+    wizard.arcs = [
+        {
+            "name": "Arc One",
+            "summary": "Setup",
+            "objective": "Investigate",
+            "status": "Planned",
+            "thread": "Guild War",
+            "scenarios": ["Chosen Legacy Scenario"],
+        }
+    ]
+    wizard.current_arc_index = 0
+    wizard.scenario_wrapper = object()
+    wizard.campaign_wrapper = object()
+    wizard.original_campaign_name = None
+    wizard._set_interactive_controls_enabled = lambda _enabled: None
+    wizard._refresh_arcs_preview = lambda: None
+    wizard._refresh_review = lambda: None
+    wizard._log_forge_event = lambda *args, **kwargs: None
+    wizard._preview_generated_arc_scenarios = lambda payload: payload
+    wizard._build_campaign_save_payload = lambda: {"Name": "Stormfront"}
+    wizard._refresh_scenario_titles_from_saved_groups = lambda _groups: None
+    wizard._confirm_campaign_forge_dry_run = lambda _dry_run, title=None: False
+    wizard._elapsed_ms = lambda _started: 0
+
+    captured = {}
+
+    class _FakePersistence:
+        def __init__(self, scenario_wrapper, campaign_wrapper=None):
+            captured["scenario_wrapper"] = scenario_wrapper
+            captured["campaign_wrapper"] = campaign_wrapper
+
+        def build_dry_run_report(self, generated_payload, arcs, *, save_mode):
+            captured["generated_payload"] = generated_payload
+            captured["arcs"] = arcs
+            captured["save_mode"] = save_mode
+            return {"scenarios": {"summary": {}}, "arc_linkage": {"summary": {}, "items": []}}
+
+    monkeypatch.setattr(campaign_builder_wizard, "CampaignForgePersistence", _FakePersistence)
+    monkeypatch.setattr(campaign_builder_wizard.ai_pipeline_events, "emit", lambda _event: None)
+    monkeypatch.setattr(campaign_builder_wizard.messagebox, "showinfo", lambda *args, **kwargs: None)
+
+    generated_payload = {
+        "arcs": [
+            {
+                "arc_name": "Arc One",
+                "scenarios": [{"Title": "Fresh Scenario 1"}, {"Title": "Fresh Scenario 2"}],
+            }
+        ]
+    }
+    wizard._on_forge_generation_ready(
+        request_id="req-1",
+        pipeline_started=0.0,
+        arcs_for_pipeline=wizard.arcs,
+        generated_payload=generated_payload,
+        generated_counts={"arc_count": 1, "scenario_count": 2, "scene_count": 0},
+    )
+
+    assert captured["save_mode"] == campaign_builder_wizard.SAVE_MODE_MERGE_KEEP_EXISTING
