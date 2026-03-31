@@ -5,11 +5,15 @@ from dataclasses import dataclass
 from pathlib import Path
 import base64
 
+import PIL
 from PIL import Image, ImageDraw
 
 from modules.campaigns.ui.graphical_display.data import CampaignGraphPayload
 
 from .models import DEFAULT_POSTER_THEME, PosterTheme
+
+
+ImageFont = getattr(PIL, "ImageFont", None)
 
 
 @dataclass(frozen=True, slots=True)
@@ -41,19 +45,17 @@ def render_campaign_poster(
 
     image = Image.new("RGB", (width, height), _hex(theme.background))
     draw = ImageDraw.Draw(image)
-    title_font = None
-    body_font = None
-    small_font = None
+    title_font, body_font, small_font = _load_fonts(height=height)
 
     margin = 44
-    _draw_header(draw, payload, theme, title_font, body_font, margin, width)
+    _draw_header(draw, payload, theme, title_font, body_font, margin, width, height)
 
     arcs = payload.arcs[:4]
-    arc_cards = _layout_arc_cards(arcs, margin=margin, top=160, canvas_width=width)
+    arc_cards = _layout_arc_cards(arcs, margin=margin, top=176, canvas_width=width)
     for card in arc_cards:
         _draw_card(draw, card, theme, body_font, small_font)
 
-    scenario_cards = _layout_scenario_cards(payload, arc_cards, top=360, max_per_arc=3)
+    scenario_cards = _layout_scenario_cards(payload, arc_cards, top=392, max_per_arc=3)
     for card in scenario_cards:
         _draw_connector(draw, card, arc_cards, theme)
         _draw_card(draw, card, theme, body_font, small_font)
@@ -63,15 +65,31 @@ def render_campaign_poster(
     return destination
 
 
-def _draw_header(draw: ImageDraw.ImageDraw, payload: CampaignGraphPayload, theme: PosterTheme, title_font, body_font, margin: int, width: int) -> None:
-    draw.rounded_rectangle((margin, 28, width - margin, 136), radius=20, fill=_hex(theme.surface), outline=_hex(theme.border), width=2)
-    draw.text((margin + 24, 50), payload.name or "Campaign Atlas", fill=_hex(theme.text_primary), font=title_font)
+def _draw_header(
+    draw: ImageDraw.ImageDraw,
+    payload: CampaignGraphPayload,
+    theme: PosterTheme,
+    title_font,
+    body_font,
+    margin: int,
+    width: int,
+    height: int,
+) -> None:
+    header_bottom = 162 if height >= 1080 else 146
+    draw.rounded_rectangle(
+        (margin, 28, width - margin, header_bottom),
+        radius=20,
+        fill=_hex(theme.surface),
+        outline=_hex(theme.border),
+        width=2,
+    )
+    draw.text((margin + 26, 46), payload.name or "Campaign Atlas", fill=_hex(theme.text_primary), font=title_font)
 
     subtitle = payload.logline or payload.setting or "Campaign update"
-    draw.text((margin + 24, 86), _truncate(subtitle, 100), fill=_hex(theme.text_secondary), font=body_font)
+    draw.text((margin + 26, 98), _truncate(subtitle, 100), fill=_hex(theme.text_secondary), font=body_font)
 
     meta = f"Arcs: {len(payload.arcs)}   Scenarios: {payload.linked_scenario_count}"
-    draw.text((width - margin - 300, 50), meta, fill=_hex(theme.accent), font=body_font)
+    draw.text((width - margin - 420, 50), meta, fill=_hex(theme.accent), font=body_font)
 
 
 def _layout_arc_cards(arcs, *, margin: int, top: int, canvas_width: int) -> list[_NodeCard]:
@@ -127,8 +145,8 @@ def _draw_card(draw: ImageDraw.ImageDraw, card: _NodeCard, theme: PosterTheme, b
     fill = _hex(theme.elevated if card.highlighted else theme.surface)
     border = _hex(theme.accent if card.highlighted else theme.border)
     draw.rounded_rectangle((card.x, card.y, card.x + card.width, card.y + card.height), radius=14, fill=fill, outline=border, width=2)
-    draw.text((card.x + 14, card.y + 12), card.title, fill=_hex(theme.text_primary), font=body_font)
-    draw.text((card.x + 14, card.y + 44), card.subtitle, fill=_hex(theme.text_secondary), font=small_font)
+    draw.text((card.x + 18, card.y + 14), card.title, fill=_hex(theme.text_primary), font=body_font)
+    draw.text((card.x + 18, card.y + 54), card.subtitle, fill=_hex(theme.text_secondary), font=small_font)
 
 
 def _draw_connector(draw: ImageDraw.ImageDraw, card: _NodeCard, arc_cards: list[_NodeCard], theme: PosterTheme) -> None:
@@ -173,3 +191,32 @@ def _write_placeholder_png(path: Path) -> None:
         "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO7Z4x8AAAAASUVORK5CYII="
     )
     path.write_bytes(base64.b64decode(transparent_pixel))
+
+
+def _load_fonts(*, height: int):
+    if ImageFont is None:
+        return None, None, None
+
+    scale = max(height / 1080, 0.75)
+    title_size = max(20, int(round(42 * scale)))
+    body_size = max(14, int(round(28 * scale)))
+    small_size = max(12, int(round(24 * scale)))
+
+    font_candidates = [
+        "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+        "/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf",
+        "/System/Library/Fonts/Supplemental/Arial.ttf",
+        "C:/Windows/Fonts/arial.ttf",
+    ]
+
+    for font_path in font_candidates:
+        try:
+            title = ImageFont.truetype(font_path, title_size)
+            body = ImageFont.truetype(font_path, body_size)
+            small = ImageFont.truetype(font_path, small_size)
+            return title, body, small
+        except OSError:
+            continue
+
+    fallback_font = ImageFont.load_default()
+    return fallback_font, fallback_font, fallback_font
