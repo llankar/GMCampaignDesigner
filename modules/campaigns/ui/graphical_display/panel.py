@@ -11,7 +11,7 @@ from modules.generic.entity_detail_factory import open_entity_tab
 from modules.generic.generic_model_wrapper import GenericModelWrapper
 from modules.scenarios.gm_screen.dashboard.styles.dashboard_theme import DASHBOARD_THEME
 from modules.helpers import theme_manager
-from modules.campaigns.services.poster_export import PosterTheme, render_campaign_poster
+from modules.campaigns.services.poster_export import build_poster_theme_from_tokens, render_campaign_poster
 from .components import (
     CampaignOverviewHero,
     ArcSelectorStrip,
@@ -278,16 +278,7 @@ class CampaignGraphPanel(ctk.CTkFrame):
             return
 
         tokens = theme_manager.get_tokens()
-        theme = PosterTheme(
-            background=tokens.get("panel_bg", "#0f172a"),
-            surface=tokens.get("panel_alt_bg", "#172033"),
-            elevated=tokens.get("accent_button_fg", "#1f2a40"),
-            border="#334155",
-            text_primary="#e2e8f0",
-            text_secondary="#94a3b8",
-            accent=tokens.get("button_fg", "#60a5fa"),
-            connector="#475569",
-        )
+        theme = build_poster_theme_from_tokens(tokens)
 
         try:
             rendered_path = render_campaign_poster(payload, Path(output_path), theme=theme)
